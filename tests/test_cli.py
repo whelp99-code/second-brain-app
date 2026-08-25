@@ -14,17 +14,17 @@ from multiprocessing import Event, Process
 from multiprocessing.synchronize import Event as MpEvent
 from pathlib import Path
 
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, raises
 
 from sb.cli import main
 from sb.config import Config
 from sb.contracts import BriefingInputs, PageSpec, SourceCite
-from sb.llm import LLMClient
+from sb.llm import LLMClient, LLMUnavailable
 from sb.pipeline import StageReport, collect_briefing_inputs, run_brief, run_compile, run_ingest
 from sb.store import Run, SourceItem
 from sb.store.cas import ContentAddressedStore
-from sb.store.ledger import Ledger
-from sb.vault import Vault, init_vault
+from sb.store.ledger import Ledger, load_ledger_tables
+from sb.vault import Vault, VaultLintError, init_vault
 
 TODAY = date(2026, 8, 26)
 RUNS_RE = re.compile(
@@ -372,3 +372,133 @@ def test_rollback_missing_id_returns_controlled_cli_error(tmp_path: Path) -> Non
     text = f"{out}{err}".lower()
     assert "traceback" not in text
     assert "missing-run" in text
+
+
+def _deriv_count(root: Path) -> int:
+    return len(load_ledger_tables(root / ".sb" / "ledger.db").derivations)
+
+
+def _seed_status(root: Path, status: str = "ok") -> None:
+    _ = (root / ".sb" / "runs.log").write_text(
+        f"2026-08-25T00:00:00+00:00 run seed {status} pages=0 conflicts=0 errors=0\n",
+        encoding="utf-8",
+    )
+
+
+def test_identical_brief_pages_leave_commit_and_log_unchanged(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+    page = _page(digest, page_id="daily/fixture")
+
+    def gen(inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec:
+        del inputs, llm, config
+        return page
+
+    first = run_brief(config, generator=gen)
+    assert first.git_commit is not None
+    before_log = (root / "log.md").read_bytes()
+    before_commits = _git_count(root)
+    second = run_brief(config, generator=gen)
+    assert second.git_commit is None
+    assert _git_count(root) == before_commits
+    assert (root / "log.md").read_bytes() == before_log
+    assert _git(root, "status", "--porcelain").stdout == ""
+    assert (root / "log.md").read_text(encoding="utf-8").count(first.run_id) == 1
+
+
+def test_equivalent_brief_skips_llm_and_derivation_when_facts_match(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    _seed_status(root)
+    fake = FakeLLM(["없음", "없음"])
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    first = run_brief(config, llm_mode="fake")
+    assert first.exit_code == 0
+    assert fake.calls == 1
+    before_deriv = _deriv_count(root)
+    before_log = (root / "log.md").read_bytes()
+    before_head = _git(root, "rev-parse", "HEAD").stdout
+    before_runs = (root / ".sb" / "runs.log").read_text(encoding="utf-8").count("\n")
+    second = run_brief(config, llm_mode="fake")
+    assert second.exit_code == 0
+    assert fake.calls == 1
+    assert _deriv_count(root) == before_deriv
+    assert (root / "log.md").read_bytes() == before_log
+    assert _git(root, "rev-parse", "HEAD").stdout == before_head
+    assert (root / ".sb" / "runs.log").read_text(encoding="utf-8").count("\n") == before_runs + 1
+
+
+def test_changed_briefing_facts_open_new_derivation_and_commit(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    _seed_status(root)
+    fake = FakeLLM(["없음", "없음"])
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    first = run_brief(config, llm_mode="fake")
+    assert fake.calls == 1
+    before_deriv = _deriv_count(root)
+    before_commits = _git_count(root)
+    _ = (root / "conflicts" / "open-x.md").write_text("conflict\n", encoding="utf-8")
+    second = run_brief(config, llm_mode="fake")
+    assert fake.calls == 2
+    assert _deriv_count(root) == before_deriv + 1
+    assert _git_count(root) == before_commits + 1
+    assert second.git_commit is not None
+    assert first.run_id != second.run_id
+
+
+def test_brief_generator_failure_marks_derivation_failed_without_commit(
+    tmp_path: Path,
+) -> None:
+    config, root = _ready(tmp_path)
+    _seed_status(root)
+    before_log = (root / "log.md").read_bytes()
+    before_commits = _git_count(root)
+
+    def boom(inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec:
+        del inputs, llm, config
+        raise LLMUnavailable(attempts=1, reason="down")
+
+    outcome = run_brief(config, generator=boom)
+    assert outcome.exit_code == 1
+    assert outcome.status == "failed"
+    assert outcome.git_commit is None
+    rows = load_ledger_tables(root / ".sb" / "ledger.db").derivations.values()
+    assert any(row.stage == "brief" and row.status == "failed" for row in rows)
+    assert (root / "log.md").read_bytes() == before_log
+    assert _git_count(root) == before_commits
+    assert _git(root, "status", "--porcelain").stdout == ""
+
+
+def test_lint_failure_with_run_log_line_leaves_log_and_index_clean(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+    before_log = (root / "log.md").read_bytes()
+    before_porc = _git(root, "status", "--porcelain").stdout
+    cite = SourceCite(sid=digest[:8], origin="me-wiki:notes/new.md", hash=digest)
+    bad = PageSpec("daily/bad", "Bad", "broken.[^zzzzzzzz]", [cite], "active")
+
+    def failing(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, vault, run_id
+        return _report(pages=(bad,), attempted=1)
+
+    with raises(VaultLintError):
+        _ = run_compile(config, compiler=failing)
+    assert (root / "log.md").read_bytes() == before_log
+    assert _git(root, "status", "--porcelain").stdout == before_porc

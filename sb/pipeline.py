@@ -7,9 +7,7 @@ import fcntl
 import hashlib
 import os
 import re
-import subprocess
-from collections.abc import Generator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -18,11 +16,19 @@ from uuid import uuid4
 
 from sb.config import Config
 from sb.contracts import Blob, BriefingInputs, PageSpec, Unit
-from sb.llm import LLMClient
-from sb.store import Run, SourceItem, UnitRow
+from sb.llm import LLMClient, LLMUnavailable
+from sb.store import (
+    DerivationOutput,
+    DerivStatus,
+    InvalidDerivationTransition,
+    Run,
+    SourceItem,
+    UnitRow,
+    deriv_key,
+)
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, parse_page_frontmatter
-from sb.vault import Vault, VaultLintError
+from sb.vault import Vault
 
 STALE_AFTER: Final = timedelta(days=30)
 UPCOMING_WINDOW: Final = timedelta(days=7)
@@ -100,8 +106,7 @@ def _dest(page_id: str) -> Path:
     return Path(f"{page_id}.md") if page_id.startswith(("conflicts/", "daily/", "wiki/")) else Path("wiki") / f"{page_id}.md"
 
 
-@contextmanager
-def _run_lock(root: Path) -> Generator[bool]:
+def _try_lock(root: Path) -> int | None:
     path = root / ".sb" / "run.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
@@ -109,20 +114,13 @@ def _run_lock(root: Path) -> Generator[bool]:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         os.close(fd)
-        yield False
-        return
-    try:
-        yield True
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+        return None
+    return fd
 
 
-def _git(root: Path, *args: str) -> None:
-    env = os.environ.copy()
-    env["GIT_CONFIG_GLOBAL"] = os.devnull
-    env["GIT_CONFIG_SYSTEM"] = os.devnull
-    _ = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False, env=env)
+def _unlock(fd: int) -> None:
+    fcntl.flock(fd, fcntl.LOCK_UN)
+    os.close(fd)
 
 
 def _as_date(stamp: str) -> date | None:
@@ -229,16 +227,18 @@ def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
     return loaded
 
 
+def _brief_facts(inputs: BriefingInputs) -> str:
+    payload = "\0".join((
+        *inputs.yesterday_items, "\x1e", *inputs.open_conflict_pages, "\x1e",
+        *inputs.stale_pages, "\x1e", *inputs.upcoming_items, "\x1e",
+        inputs.previous_run_status or "",
+    ))
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def _commit_pages(root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled) -> tuple[str | None, int, int]:
-    log_path, previous = root / "log.md", (root / "log.md").read_bytes() if (root / "log.md").is_file() else b""
-    vault.append_log(line)
-    _git(root, "add", "--", "log.md")
-    try:
-        result = vault.write_pages(report.pages, run_id, compiled)
-    except VaultLintError:
-        _git(root, "reset", "HEAD", "--", "log.md")
-        _ = log_path.write_bytes(previous)
-        raise
+    del root
+    result = vault.write_pages(report.pages, run_id, compiled, log_line=line)
     compiled.remember(report.pages)
     return result.commit, result.pages, result.conflicts
 
@@ -268,8 +268,13 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
 
 def _execute(config: Config, stage: StageFn) -> RunOutcome:
     root = Path(config.vault_root)
-    with _run_lock(root) as acquired:
-        return RunOutcome("", "ok", 0, 0, 0, 0, None, True) if not acquired else _run_locked(root, stage)
+    fd = _try_lock(root)
+    if fd is None:
+        return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    try:
+        return _run_locked(root, stage)
+    finally:
+        _unlock(fd)
 
 
 def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) -> StageFn:
@@ -339,13 +344,27 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
 def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str) -> StageFn:
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         inputs = collect_briefing_inputs(ledger, vault.root)
-        if generator is not None:
-            return StageReport((generator(inputs, None, config),), 0, 0, 1, False)
-        try:
-            from sb.briefing import generate_briefing
-        except ModuleNotFoundError:
+        key = deriv_key((_brief_facts(inputs),), "brief", config.llm.prompt_version, config.llm.model_id)
+        existing = ledger.get_derivation(key)
+        if existing is not None and existing.status == DerivStatus.DONE.value:
             return StageReport((), 0, 0, 0, False)
-        return StageReport((generate_briefing(inputs, _llm(config, llm_mode), config),), 0, 0, int(bool(run_id)), False)
+        ledger.ensure_derivation(key, "brief", run_id)
+        try:
+            ledger.mark_running(key, run_id)
+        except InvalidDerivationTransition:
+            return StageReport((), 0, 1, 1, False)
+        try:
+            if generator is not None:
+                page = generator(inputs, None, config)
+            else:
+                from sb.briefing import generate_briefing
+
+                page = generate_briefing(inputs, _llm(config, llm_mode), config)
+        except (LLMUnavailable, ModuleNotFoundError) as exc:
+            ledger.mark_failed(key, str(exc))
+            return StageReport((), 0, 1, 1, False)
+        ledger.mark_done(key, DerivationOutput(hashlib.sha256(page.body_md.encode()).hexdigest(), f"{page.page_id}.md"))
+        return StageReport((page,), 0, 0, 1, False)
 
     return stage
 
@@ -366,19 +385,22 @@ def run_brief(config: Config, *, generator: BriefGenerator | None = None, llm_mo
 
 def run_all(config: Config) -> RunOutcome:
     root = Path(config.vault_root)
-    with _run_lock(root) as acquired:
-        if not acquired:
-            return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    fd = _try_lock(root)
+    if fd is None:
+        return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    try:
         ingest = _run_locked(root, _ingest(config, None, None))
         compiled = _run_locked(root, _compile_stage(config, "cli"))
         brief = _run_locked(root, _brief_stage(config, None, "cli"))
-        chosen = brief
-        for outcome in (ingest, compiled, brief):
-            if outcome.exit_code != 0:
-                return outcome
-            if outcome.status == "capped":
-                chosen = outcome
-        return chosen
+    finally:
+        _unlock(fd)
+    chosen = brief
+    for outcome in (ingest, compiled, brief):
+        if outcome.exit_code != 0:
+            return outcome
+        if outcome.status == "capped":
+            chosen = outcome
+    return chosen
 
 
 def read_status(config: Config) -> str:
