@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import Final, override
+from typing import Final, Protocol, override
 
-from sb.config import Config
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.fs_safety import SafeSourceFilesystem
 from sb.contracts import SourceRef
@@ -18,6 +16,13 @@ ADAPTER_ID: Final = "markdown-vault"
 DEFAULT_SOURCE_ID: Final = "me-wiki"
 DEFAULT_ROOT: Final = Path("/Volumes/DevSpace/me-wiki")
 _MARKDOWN_ADAPTERS: Final = frozenset({"markdown-vault", "markdown_vault", "markdown"})
+
+
+class _ConnectorConfig(Protocol):
+    """Typed view over config source-root objects (todo-1 `list[dict]`)."""
+
+    @property
+    def source_roots(self) -> list[dict[str, str]]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +44,7 @@ class MarkdownVaultAdapter:
     def __init__(self, root: Path, source_id: str = DEFAULT_SOURCE_ID) -> None:
         self._root: Path = root
         self.source_id: str = source_id
-        self._next_cursor: str = "{}"
+        self._next_cursor: str = ""
         self._fs: SafeSourceFilesystem = SafeSourceFilesystem((root,))
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
@@ -64,49 +69,42 @@ class MarkdownVaultAdapter:
                 continue
             meta = {"relative_path": entry.relative_path, "cursor": token}
             items.append((SourceRef(self.source_id, entry.relative_path, token), body, meta))
-        self._next_cursor = json.dumps(current, sort_keys=True, separators=(",", ":"))
+        self._next_cursor = _dump_cursor(current)
         yield from items
 
     def next_cursor(self) -> str:
         return self._next_cursor
 
 
-def create(config: Config) -> SourceAdapter:
+def create(config: _ConnectorConfig) -> SourceAdapter:
     """Build the markdown-vault adapter from config, defaulting to me-wiki."""
     source_id, root = _configured_root(config)
     return MarkdownVaultAdapter(root=root, source_id=source_id)
 
 
-def _configured_root(config: Config) -> tuple[str, Path]:
+def _configured_root(config: _ConnectorConfig) -> tuple[str, Path]:
     for raw in config.source_roots:
-        source_id = DEFAULT_SOURCE_ID
-        adapter = ""
-        root_value: str | None = None
-        for key, value in raw.items():
-            if not isinstance(key, str) or not isinstance(value, str):
-                continue
-            if key == "id" and value:
-                source_id = value
-            if key in {"adapter", "type"}:
-                adapter = value
-            if key == "root" and value:
-                root_value = value
-        if root_value is None:
+        source_id = raw.get("id") or DEFAULT_SOURCE_ID
+        adapter = raw.get("adapter") or raw.get("type") or ""
+        root_value = raw.get("root")
+        if root_value is None or root_value == "":
             continue
         if adapter in _MARKDOWN_ADAPTERS or source_id == DEFAULT_SOURCE_ID:
             return source_id, Path(root_value)
     return DEFAULT_SOURCE_ID, DEFAULT_ROOT
 
 
+def _dump_cursor(current: dict[str, str]) -> str:
+    return "\n".join(f"{path}\t{token}" for path, token in sorted(current.items()))
+
+
 def _parse_cursor(cursor: str | None) -> dict[str, str]:
-    if cursor is None or cursor == "":
+    if cursor is None or cursor == "" or cursor == "{}":
         return {}
-    loaded = json.loads(cursor)
-    if not isinstance(loaded, dict):
-        raise MarkdownVaultError("cursor must be a JSON object")
     parsed: dict[str, str] = {}
-    for key, value in loaded.items():
-        if not isinstance(key, str) or not isinstance(value, str):
+    for line in cursor.split("\n"):
+        path, tab, token = line.partition("\t")
+        if tab == "" or not path:
             raise MarkdownVaultError("cursor entries must be string path/token pairs")
-        parsed[key] = value
+        parsed[path] = token
     return parsed

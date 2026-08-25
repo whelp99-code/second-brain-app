@@ -5,15 +5,23 @@ from __future__ import annotations
 import importlib
 import pkgutil
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType, ModuleType
-from typing import override
+from typing import Protocol, override, runtime_checkable
 
 from sb.config import Config
 from sb.connectors.base import ItemMeta, SourceAdapter
 
 _DISCOVERABLE_EXACT: frozenset[str] = frozenset({"unified_db", "markdown_vault"})
+
+
+@runtime_checkable
+class AdapterModule(Protocol):
+    """Discoverable connector module: unique id plus a typed factory."""
+
+    ADAPTER_ID: str
+    create: Callable[[Config], SourceAdapter]
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,14 +54,15 @@ def discover_adapters(config: Config, *, package: ModuleType | None = None) -> M
     for info in pkgutil.iter_modules(pkg.__path__):
         if not _is_discoverable(info.name):
             continue
-        module = importlib.import_module(f"{pkg.__name__}.{info.name}")
-        adapter_id = module.ADAPTER_ID
-        if not isinstance(adapter_id, str) or not adapter_id:
-            raise DuplicateAdapterId(repr(adapter_id))
+        loaded = importlib.import_module(f"{pkg.__name__}.{info.name}")
+        if not isinstance(loaded, AdapterModule):
+            raise DuplicateAdapterId(info.name)
+        adapter_id = loaded.ADAPTER_ID
+        if not adapter_id:
+            raise DuplicateAdapterId(adapter_id)
         if adapter_id in found:
             raise DuplicateAdapterId(adapter_id)
-        created: SourceAdapter = module.create(config)
-        found[adapter_id] = created
+        found[adapter_id] = loaded.create(config)
     return MappingProxyType(found)
 
 
