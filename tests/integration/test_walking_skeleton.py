@@ -8,7 +8,7 @@ import re
 import subprocess
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 
@@ -211,7 +211,9 @@ def test_walking_skeleton_end_to_end_with_idempotency_when_one_me_wiki_file(
         assert code == 0, err
         assert _git_count(vault) == 2
 
+        before = datetime.now().astimezone().date().isoformat()
         code, _out, err = _cli(["brief", "--llm", "fake"])
+        after = datetime.now().astimezone().date().isoformat()
         assert code == 0, err
         assert _git_count(vault) == 3
         assert _git(vault, "status", "--porcelain").stdout == ""
@@ -221,13 +223,11 @@ def test_walking_skeleton_end_to_end_with_idempotency_when_one_me_wiki_file(
         for page in wiki:
             _assert_k1(page)
 
-        today = datetime.now(UTC).date().isoformat()
-        daily = vault / "daily" / f"{today}.md"
-        assert daily.is_file()
-        daily_text = daily.read_text(encoding="utf-8")
-        assert f"# {today} 브리핑" in daily_text
+        dailies = tuple((vault / "daily").glob("*.md"))
+        assert len(dailies) == 1 and dailies[0].stem in {before, after}
+        daily_text = dailies[0].read_text(encoding="utf-8")
         heading_at = [daily_text.index(f"## {heading}") for heading in K4_H2]
-        assert heading_at == sorted(heading_at)
+        assert f"# {dailies[0].stem} 브리핑" in daily_text and heading_at == sorted(heading_at)
 
         tracked = _git(vault, "ls-files").stdout.splitlines()
         assert not any(name.startswith(("raw/", ".sb/")) for name in tracked)
