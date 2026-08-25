@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +34,74 @@ DEFAULT_CAPS: dict[str, int] = {
 # a placeholder until a real vault config (todo 17) records the probed value.
 DEFAULT_ARGV_TEMPLATE: list[str] = ["claude", "-p", "{prompt}"]
 
+type TomlValue = (
+    str | int | float | bool | date | datetime | time | list[TomlValue] | Mapping[str, TomlValue]
+)
+
+
+def _empty_raw() -> dict[str, TomlValue]:
+    return {}
+
+
+def _as_str(value: TomlValue | None) -> str | None:
+    match value:
+        case str() as text:
+            return text
+        case int() | float() | date() | time() | list() | Mapping() | None:
+            return None
+
+
+def _as_int(value: TomlValue | None) -> int | None:
+    match value:
+        case bool():
+            return None
+        case int() as count:
+            return count
+        case str() | float() | date() | time() | list() | Mapping() | None:
+            return None
+
+
+def _as_mapping(value: TomlValue | None) -> Mapping[str, TomlValue] | None:
+    match value:
+        case Mapping() as mapping:
+            return mapping
+        case str() | int() | float() | date() | time() | list() | None:
+            return None
+
+
+def _as_str_list(value: TomlValue | None) -> list[str] | None:
+    match value:
+        case list() as items:
+            texts: list[str] = []
+            for item in items:
+                text = _as_str(item)
+                if text is None:
+                    return None
+                texts.append(text)
+            return texts
+        case str() | int() | float() | date() | time() | Mapping() | None:
+            return None
+
+
+def _as_source_roots(value: TomlValue | None) -> list[dict[str, str]]:
+    match value:
+        case list() as items:
+            roots: list[dict[str, str]] = []
+            for item in items:
+                mapping = _as_mapping(item)
+                if mapping is None:
+                    return []
+                root: dict[str, str] = {}
+                for key, inner in mapping.items():
+                    text = _as_str(inner)
+                    if text is None:
+                        return []
+                    root[key] = text
+                roots.append(root)
+            return roots
+        case str() | int() | float() | date() | time() | Mapping() | None:
+            return []
+
 
 def _config_search_path() -> Path:
     env_path = os.environ.get("SB_CONFIG")
@@ -40,7 +110,7 @@ def _config_search_path() -> Path:
     return APP_ROOT / "config.toml"
 
 
-def _load_toml(path: Path) -> dict:
+def _load_toml(path: Path) -> Mapping[str, TomlValue]:
     if not path.is_file():
         return {}
     with path.open("rb") as fh:
@@ -63,35 +133,50 @@ class LlmConfig:
 class Config:
     """Typed, immutable view over config.toml + defaults."""
 
-    raw: dict = field(default_factory=dict, repr=False)
+    raw: Mapping[str, TomlValue] = field(default_factory=_empty_raw, repr=False)
 
     @property
     def vault_root(self) -> str:
-        return self.raw.get("vault_root", DEFAULT_VAULT_ROOT)
+        text = _as_str(self.raw.get("vault_root"))
+        return DEFAULT_VAULT_ROOT if text is None else text
 
     @property
     def caps(self) -> dict[str, int]:
         merged = dict(DEFAULT_CAPS)
-        merged.update(self.raw.get("caps", {}))
+        section = _as_mapping(self.raw.get("caps"))
+        if section is None:
+            return merged
+        for key, value in section.items():
+            parsed = _as_int(value)
+            if parsed is not None:
+                merged[key] = parsed
         return merged
 
     @property
     def llm(self) -> LlmConfig:
-        section = self.raw.get("llm", {})
+        section = _as_mapping(self.raw.get("llm"))
+        if section is None:
+            return LlmConfig()
+        argv_template = _as_str_list(section.get("argv_template"))
+        prompt_version = _as_str(section.get("prompt_version"))
+        model_id = _as_str(section.get("model_id"))
         return LlmConfig(
-            argv_template=list(section.get("argv_template", DEFAULT_ARGV_TEMPLATE)),
-            prompt_version=section.get("prompt_version", DEFAULT_PROMPT_VERSION),
-            model_id=section.get("model_id", DEFAULT_MODEL_ID),
+            argv_template=list(DEFAULT_ARGV_TEMPLATE if argv_template is None else argv_template),
+            prompt_version=DEFAULT_PROMPT_VERSION if prompt_version is None else prompt_version,
+            model_id=DEFAULT_MODEL_ID if model_id is None else model_id,
         )
 
     @property
     def unified_db(self) -> UnifiedDbConfig:
-        section = self.raw.get("unified_db", {})
-        return UnifiedDbConfig(dsn=section.get("dsn", DEFAULT_UNIFIED_DB_DSN))
+        section = _as_mapping(self.raw.get("unified_db"))
+        if section is None:
+            return UnifiedDbConfig()
+        dsn = _as_str(section.get("dsn"))
+        return UnifiedDbConfig(dsn=DEFAULT_UNIFIED_DB_DSN if dsn is None else dsn)
 
     @property
-    def source_roots(self) -> list[dict]:
-        return list(self.raw.get("sources", []))
+    def source_roots(self) -> list[dict[str, str]]:
+        return _as_source_roots(self.raw.get("sources"))
 
 
 def load_config(path: str | Path | None = None) -> Config:

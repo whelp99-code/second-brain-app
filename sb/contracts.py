@@ -74,7 +74,7 @@ class ConflictVerdict:
         if self.relation not in VALID_CONFLICT_RELATIONS:
             raise ValueError(
                 f"invalid relation {self.relation!r}; must be one of "
-                f"{sorted(VALID_CONFLICT_RELATIONS)}"
+                + f"{sorted(VALID_CONFLICT_RELATIONS)}"
             )
 
 

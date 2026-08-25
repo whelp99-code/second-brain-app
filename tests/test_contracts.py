@@ -21,13 +21,13 @@ def test_conflict_verdict_valid_relations_construct() -> None:
 
 def test_conflict_verdict_invalid_relation_raises_value_error() -> None:
     with pytest.raises(ValueError):
-        ConflictVerdict(relation="bogus", confidence=0.5, rationale="x")
+        _ = ConflictVerdict(relation="bogus", confidence=0.5, rationale="x")
 
 
 def test_conflict_verdict_is_frozen() -> None:
     verdict = ConflictVerdict(relation="supports", confidence=0.9, rationale="because")
     with pytest.raises(Exception):  # noqa: B017 - dataclasses.FrozenInstanceError
-        verdict.relation = "contradicts"  # type: ignore[misc]
+        verdict.__setattr__("relation", "contradicts")
 
 
 def test_source_ref_roundtrip() -> None:
