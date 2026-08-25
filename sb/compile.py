@@ -18,6 +18,7 @@ COMPILE_RUN_ID: Final = "compile"
 CAPPED_PAGE_ID: Final = "CAPPED"
 CAPPED_STATUS: Final = "CAPPED"
 SID_LEN: Final = 8
+ORIGIN_DIGEST_LEN: Final = 8
 _MD_SUFFIX: Final = ".md"
 
 
@@ -159,7 +160,8 @@ def _page_id(origin: str) -> str:
     slug = "".join(chars)
     while "--" in slug:
         slug = slug.replace("--", "-")
-    return slug.strip("-")
+    digest = hashlib.sha256(origin.encode("utf-8")).hexdigest()[:ORIGIN_DIGEST_LEN]
+    return f"{slug.strip('-')}-{digest}"
 
 
 def _title(origin: str) -> str:

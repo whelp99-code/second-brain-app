@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,6 @@ from sb.store.ledger import Ledger
 from sb.vault import VaultLintError, init_vault
 
 ORIGIN_PROFILE = "me-wiki:identity/profile.md"
-PAGE_PROFILE = "me-wiki-identity-profile"
 TITLE_PROFILE = "profile"
 HASH_A = "aa" * 32
 HASH_B = "bb" * 32
@@ -30,6 +30,9 @@ EXISTING_SENTINEL = f"EXISTING_BODY_V1.[^{SID_A}]"
 MERGED_BODY = f"MERGED.[^{SID_A}][^{SID_B}]"
 POISON_SID = "zzzz9999"
 POISON_BODY = f"Poison.[^{POISON_SID}]"
+ORIGIN_SLASH = "me-wiki:foo/bar.md"
+ORIGIN_DASH = "me-wiki-foo:bar.md"
+ORIGIN_DIGEST_LEN = 8
 
 
 class RecordingLLM:
@@ -81,6 +84,23 @@ def _unit(unit_id: str, digest: str, span: str, text: str, origin: str) -> Unit:
 
 def _profile_unit() -> Unit:
     return _unit("u-profile", HASH_A, "0-20", "이름은 박정민이다.", ORIGIN_PROFILE)
+
+
+def _origin_digest(origin: str) -> str:
+    return hashlib.sha256(origin.encode("utf-8")).hexdigest()[:ORIGIN_DIGEST_LEN]
+
+
+def _expected_page_id(origin: str) -> str:
+    digest = _origin_digest(origin)
+    trimmed = origin.removesuffix(".md")
+    chars = [char.lower() if char.isalnum() else "-" for char in trimmed]
+    slug = "".join(chars)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return f"{slug.strip('-')}-{digest}"
+
+
+PAGE_PROFILE = _expected_page_id(ORIGIN_PROFILE)
 
 
 def _seed_cas(root: Path, digest: str) -> None:
@@ -144,7 +164,7 @@ def test_compile_pages_returns_one_page_and_capped_when_cap_is_one_and_three_pen
     markers = [page for page in pages if page.status == CAPPED_STATUS]
     assert fake.calls == 1
     assert len(compiled) == 1
-    assert compiled[0].page_id == "me-wiki-a-one"
+    assert compiled[0].page_id == _expected_page_id(ORIGIN_ONE)
     assert compiled[0].status == "active"
     assert len(markers) == 1
     assert markers[0].page_id == CAPPED_PAGE_ID
@@ -203,3 +223,72 @@ def test_compile_pages_returns_pagespec_and_vault_rejects_when_body_has_unknown_
     with pytest.raises(VaultLintError) as raised:
         _ = vault.write_pages(pages, "run-poison", _HashLedger())
     assert any("unresolved" in reason and POISON_SID in reason for reason in raised.value.reasons)
+
+
+def test_compile_pages_returns_two_pages_when_slugified_origins_collide(
+    tmp_path: Path,
+) -> None:
+    units = [
+        _unit("u-slash", HASH_A, "0-1", "slash", ORIGIN_SLASH),
+        _unit("u-dash", HASH_B, "0-1", "dash", ORIGIN_DASH),
+    ]
+    fake = FakeLLM([f"slash.[^{SID_A}]", f"dash.[^{SID_B}]"])
+    with Ledger(tmp_path) as ledger:
+        pages = compile_pages(units, ledger, fake, _config())
+
+    assert len(pages) == 2
+    ids = {page.page_id for page in pages}
+    assert len(ids) == 2
+    by_origin = {page.sources[0].origin: page for page in pages}
+    assert by_origin[ORIGIN_SLASH].page_id == _expected_page_id(ORIGIN_SLASH)
+    assert by_origin[ORIGIN_DASH].page_id == _expected_page_id(ORIGIN_DASH)
+    assert _origin_digest(ORIGIN_SLASH) in by_origin[ORIGIN_SLASH].page_id
+    assert _origin_digest(ORIGIN_DASH) in by_origin[ORIGIN_DASH].page_id
+    assert fake.calls == 2
+
+
+def test_compile_pages_page_ids_are_stable_when_unit_order_changes(tmp_path: Path) -> None:
+    unit_slash = _unit("u-slash", HASH_A, "0-1", "slash", ORIGIN_SLASH)
+    unit_dash = _unit("u-dash", HASH_B, "0-1", "dash", ORIGIN_DASH)
+    with Ledger(tmp_path / "fwd") as ledger:
+        forward = compile_pages(
+            [unit_slash, unit_dash],
+            ledger,
+            FakeLLM([f"slash.[^{SID_A}]", f"dash.[^{SID_B}]"]),
+            _config(),
+        )
+    with Ledger(tmp_path / "rev") as ledger:
+        reverse = compile_pages(
+            [unit_dash, unit_slash],
+            ledger,
+            FakeLLM([f"slash.[^{SID_A}]", f"dash.[^{SID_B}]"]),
+            _config(),
+        )
+
+    assert {page.page_id for page in forward} == {page.page_id for page in reverse}
+    assert len(forward) == 2
+    assert len(reverse) == 2
+
+
+def test_compile_pages_page_id_matches_solo_when_batched_with_collider(
+    tmp_path: Path,
+) -> None:
+    unit_slash = _unit("u-slash", HASH_A, "0-1", "slash", ORIGIN_SLASH)
+    unit_dash = _unit("u-dash", HASH_B, "0-1", "dash", ORIGIN_DASH)
+    with Ledger(tmp_path / "solo") as ledger:
+        solo = compile_pages(
+            [unit_slash], ledger, FakeLLM([f"slash.[^{SID_A}]"]), _config()
+        )
+    with Ledger(tmp_path / "batch") as ledger:
+        batch = compile_pages(
+            [unit_slash, unit_dash],
+            ledger,
+            FakeLLM([f"slash.[^{SID_A}]", f"dash.[^{SID_B}]"]),
+            _config(),
+        )
+
+    assert len(solo) == 1
+    assert len(batch) == 2
+    batched_slash = next(page for page in batch if page.sources[0].origin == ORIGIN_SLASH)
+    assert solo[0].page_id == batched_slash.page_id
+    assert solo[0].page_id == _expected_page_id(ORIGIN_SLASH)
