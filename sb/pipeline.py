@@ -1,10 +1,13 @@
 """Thin run orchestration: lock, ledger, logs, briefing I/O, vault writes."""
+# noqa: SIZE_OK — single owned orchestrator; ownership forbids a split
 
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import os
 import re
+import subprocess
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -14,17 +17,18 @@ from typing import Final, Protocol
 from uuid import uuid4
 
 from sb.config import Config
-from sb.contracts import BriefingInputs, PageSpec
+from sb.contracts import Blob, BriefingInputs, PageSpec, Unit
 from sb.llm import LLMClient
-from sb.store import Run, SourceItem
+from sb.store import Run, SourceItem, UnitRow
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, parse_page_frontmatter
-from sb.vault import Vault
+from sb.vault import Vault, VaultLintError
 
 STALE_AFTER: Final = timedelta(days=30)
 UPCOMING_WINDOW: Final = timedelta(days=7)
 _UPDATED: Final = re.compile(r"^updated:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
 _ISO_DATE: Final = re.compile(r"\d{4}-\d{2}-\d{2}")
+_SID: Final = re.compile(r"\bsid=([0-9a-f]{8})\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,10 +60,44 @@ class BriefGenerator(Protocol):
     def __call__(self, inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec: ...
 
 
-class _NoHashes:
+class _CitedFake:
+    def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+        del system, json_mode, timeout
+        found: list[str] = _SID.findall(prompt)
+        return " ".join(f"Cited.[^{sid}]" for sid in dict.fromkeys(found)) or "empty."
+
+
+class _Compiled:
+    _root: Path
+    _cas: ContentAddressedStore
+    _dir: Path
+
+    def __init__(self, root: Path, cas: ContentAddressedStore) -> None:
+        self._root, self._cas, self._dir = root, cas, root / ".sb" / "compiled"
+
     def last_compiled_hash(self, page_id: str) -> str | None:
-        _ = page_id
-        return None
+        stored = self._dir / f"{page_id.replace('/', '_')}.sha"
+        dest = self._root / _dest(page_id)
+        if not stored.is_file():
+            return None
+        if dest.is_file():
+            facts = parse_page_frontmatter(dest.read_text(encoding="utf-8"))
+            if facts is not None and not all(self._cas.exists(digest) for _o, digest in facts.sources):
+                return None
+        return stored.read_text(encoding="utf-8").strip()
+
+    def remember(self, pages: Sequence[PageSpec]) -> None:
+        self._dir.mkdir(parents=True, exist_ok=True)
+        for page in pages:
+            dest = self._root / _dest(page.page_id)
+            if dest.is_file():
+                _ = (self._dir / f"{page.page_id.replace('/', '_')}.sha").write_text(
+                    hashlib.sha256(dest.read_bytes()).hexdigest(), encoding="utf-8"
+                )
+
+
+def _dest(page_id: str) -> Path:
+    return Path(f"{page_id}.md") if page_id.startswith(("conflicts/", "daily/", "wiki/")) else Path("wiki") / f"{page_id}.md"
 
 
 @contextmanager
@@ -80,6 +118,13 @@ def _run_lock(root: Path) -> Generator[bool]:
         os.close(fd)
 
 
+def _git(root: Path, *args: str) -> None:
+    env = os.environ.copy()
+    env["GIT_CONFIG_GLOBAL"] = os.devnull
+    env["GIT_CONFIG_SYSTEM"] = os.devnull
+    _ = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False, env=env)
+
+
 def _as_date(stamp: str) -> date | None:
     try:
         return datetime.fromisoformat(stamp).date()
@@ -91,44 +136,39 @@ def _source_changed(ledger: Ledger, sources: tuple[tuple[str, str], ...]) -> boo
     items = ledger.list_source_items()
     for origin, digest in sources:
         source_id, _sep, uri = origin.partition(":")
-        hashes = [row.content_hash for row in items if row.source_id == source_id and row.source_uri == uri]
-        if any(item_hash != digest for item_hash in hashes):
+        if any(row.content_hash != digest for row in items if row.source_id == source_id and row.source_uri == uri):
             return True
     return False
 
 
-def collect_briefing_inputs(
-    ledger: Ledger, vault_root: Path, *, today: date | None = None
-) -> BriefingInputs:
+def collect_briefing_inputs(ledger: Ledger, vault_root: Path, *, today: date | None = None) -> BriefingInputs:
     """Load K4 briefing inputs from the ledger and tracked vault files."""
-    day = datetime.now(UTC).date() if today is None else today
-    root = Path(vault_root)
-    yesterday = day - timedelta(days=1)
+    day, root = (datetime.now(UTC).date() if today is None else today), Path(vault_root)
+    yesterday, cas = day - timedelta(days=1), ContentAddressedStore(root)
     y_items = [
         f"{item.source_id}:{item.source_uri}"
         for item in ledger.list_source_items()
         if (run := ledger.get_run(item.first_seen_run)) is not None and _as_date(run.started_at) == yesterday
     ]
-    conflicts = root / "conflicts"
     open_pages = (
-        () if not conflicts.is_dir()
-        else tuple(sorted(path.relative_to(root).as_posix() for path in conflicts.glob("*.md")))
+        () if not (root / "conflicts").is_dir()
+        else tuple(sorted(path.relative_to(root).as_posix() for path in (root / "conflicts").glob("*.md")))
     )
-    wiki, cas, start, end = root / "wiki", ContentAddressedStore(root), day - UPCOMING_WINDOW, day + UPCOMING_WINDOW
     stale: list[str] = []
-    if wiki.is_dir():
+    upcoming: list[str] = []
+    dailies: list[tuple[date, Path]] = []
+    if (root / "wiki").is_dir():
         cutoff = day - STALE_AFTER
-        for path in wiki.rglob("*.md"):
+        for path in (root / "wiki").rglob("*.md"):
             if "_proposed" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8")
-            matched = _UPDATED.search(text)
-            facts = parse_page_frontmatter(text)
+            matched, facts = _UPDATED.search(text), parse_page_frontmatter(text)
             if matched is None or date.fromisoformat(matched.group(1)) > cutoff or facts is None:
                 continue
             if _source_changed(ledger, facts.sources):
                 stale.append(facts.page_id)
-    upcoming: list[str] = []
+    start, end = day - UPCOMING_WINDOW, day + UPCOMING_WINDOW
     for item in ledger.list_source_items():
         run = ledger.get_run(item.last_seen_run)
         seen = None if run is None else _as_date(run.started_at)
@@ -136,12 +176,8 @@ def collect_briefing_inputs(
             continue
         for raw in cas.get(item.content_hash).decode("utf-8", errors="replace").splitlines():
             matched = _ISO_DATE.search(raw)
-            if matched is None:
-                continue
-            when = date.fromisoformat(matched.group(0))
-            if day <= when <= end:
+            if matched is not None and day <= date.fromisoformat(matched.group(0)) <= end:
                 upcoming.append(raw.strip())
-    dailies: list[tuple[date, Path]] = []
     if (root / "daily").is_dir():
         for candidate in (root / "daily").glob("*.md"):
             try:
@@ -151,18 +187,65 @@ def collect_briefing_inputs(
             if stamp < day:
                 dailies.append((stamp, candidate))
     last = max(dailies)[1].read_text(encoding="utf-8") if dailies else None
-    return BriefingInputs(tuple(sorted(y_items)), open_pages, tuple(sorted(stale)), tuple(upcoming), last, read_status_line(root))
+    line = _last_run_line(root)
+    token = None if line is None or len(line.split()) < 4 else line.split()[3]
+    return BriefingInputs(tuple(sorted(y_items)), open_pages, tuple(sorted(stale)), tuple(upcoming), last, token)
 
 
-def read_status_line(root: Path) -> str | None:
+def _last_run_line(root: Path) -> str | None:
     path = root / ".sb" / "runs.log"
     lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()] if path.is_file() else []
-    parts = lines[-1].split() if lines else []
-    return None if len(parts) < 4 else parts[3]
+    return lines[-1] if lines else None
+
+
+def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
+    from sb.normalize import normalize
+    from sb.parsers import ParseError, UnsupportedSuffix, parser_for
+
+    try:
+        text = parser_for(Path(uri).suffix or ".md")(data)
+    except (ParseError, UnsupportedSuffix, UnicodeDecodeError):
+        return []
+    return normalize(Blob(digest, len(data)), text, origin)
+
+
+def _store_units(ledger: Ledger, units: Sequence[Unit]) -> None:
+    from sb.normalize import NORMALIZER_VERSION
+
+    for unit in units:
+        ledger.upsert_unit(UnitRow(
+            unit.unit_id, unit.content_hash, unit.span, hashlib.sha256(unit.text.encode()).hexdigest(), NORMALIZER_VERSION
+        ))
+
+
+def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
+    cas = ContentAddressedStore(root)
+    loaded: list[Unit] = []
+    for item in ledger.list_source_items():
+        if cas.exists(item.content_hash):
+            loaded.extend(_materialize(
+                cas.get(item.content_hash), item.content_hash, item.source_uri, f"{item.source_id}:{item.source_uri}"
+            ))
+    return loaded
+
+
+def _commit_pages(root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled) -> tuple[str | None, int, int]:
+    log_path, previous = root / "log.md", (root / "log.md").read_bytes() if (root / "log.md").is_file() else b""
+    vault.append_log(line)
+    _git(root, "add", "--", "log.md")
+    try:
+        result = vault.write_pages(report.pages, run_id, compiled)
+    except VaultLintError:
+        _git(root, "reset", "HEAD", "--", "log.md")
+        _ = log_path.write_bytes(previous)
+        raise
+    compiled.remember(report.pages)
+    return result.commit, result.pages, result.conflicts
 
 
 def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
     run_id, started, vault = uuid4().hex, datetime.now(UTC).isoformat(), Vault(root=root)
+    compiled = _Compiled(root, ContentAddressedStore(root))
     with Ledger(root) as ledger:
         _ = ledger.reset_stale_running(run_id)
         report = stage(ledger, vault, run_id)
@@ -172,9 +255,9 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
         commit, pages, conflicts = None, 0, report.conflicts
         rendered = f"{started} run {run_id} {status} pages={{0}} conflicts={{1}} errors={report.errors}"
         if report.pages:
-            vault.append_log(rendered.format(len(report.pages), conflicts))
-            result = vault.write_pages(report.pages, run_id, _NoHashes())
-            commit, pages, conflicts = result.commit, result.pages, result.conflicts
+            commit, pages, conflicts = _commit_pages(
+                root, vault, run_id, report, rendered.format(len(report.pages), conflicts), compiled
+            )
         ledger.record_run(Run(run_id, started, datetime.now(UTC).isoformat(), commit, status))
         log = root / ".sb" / "runs.log"
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -186,9 +269,7 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
 def _execute(config: Config, stage: StageFn) -> RunOutcome:
     root = Path(config.vault_root)
     with _run_lock(root) as acquired:
-        if not acquired:
-            return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
-        return _run_locked(root, stage)
+        return RunOutcome("", "ok", 0, 0, 0, 0, None, True) if not acquired else _run_locked(root, stage)
 
 
 def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) -> StageFn:
@@ -216,9 +297,14 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     continue
                 try:
                     digest = cas.put(data)
-                    ledger.upsert_source_item(
-                        SourceItem(ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id)
-                    )
+                    units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
+                    if not units and data:
+                        errors += 1
+                        continue
+                    ledger.upsert_source_item(SourceItem(
+                        ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
+                    ))
+                    _store_units(ledger, units)
                     written += 1
                 except OSError:
                     errors += 1
@@ -231,9 +317,9 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
 
 
 def _llm(config: Config, llm_mode: str) -> LLMClient:
-    from sb.llm import CliLLM, FakeLLM
+    from sb.llm import CliLLM
 
-    return FakeLLM([]) if llm_mode == "fake" else CliLLM(list(config.llm.argv_template))
+    return _CitedFake() if llm_mode == "fake" else CliLLM(list(config.llm.argv_template))
 
 
 def _compile_stage(config: Config, llm_mode: str) -> StageFn:
@@ -242,10 +328,10 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
             from sb.compile import compile_pages
         except ModuleNotFoundError:
             return StageReport((), 0, 0, 0, False)
-        pages = list(compile_pages([], ledger, _llm(config, llm_mode), config))
+        pages = list(compile_pages(_load_units(ledger, vault.root), ledger, _llm(config, llm_mode), config))
         capped = bool(pages) and pages[-1].status == "CAPPED"
         kept = pages[:-1] if capped else pages
-        return StageReport(tuple(kept), 0, 0, len(pages), capped) if vault and run_id else StageReport((), 0, 0, 0, False)
+        return StageReport(tuple(kept), 0, 0, max(len(pages), int(bool(run_id))), capped)
 
     return stage
 
@@ -296,4 +382,4 @@ def run_all(config: Config) -> RunOutcome:
 
 
 def read_status(config: Config) -> str:
-    return read_status_line(Path(config.vault_root)) or "no runs"
+    return _last_run_line(Path(config.vault_root)) or "no runs"

@@ -13,7 +13,7 @@ from pathlib import Path
 from sb.config import load_config
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
 from sb.store.ledger import rebuild_from_vault
-from sb.vault import Vault, init_vault
+from sb.vault import RunCommitNotFoundError, Vault, init_vault
 
 
 class Command(StrEnum):
@@ -110,8 +110,13 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     def rollback() -> int:
         run_id = _opt_str(ns, "run_id")
         if run_id is None:
+            print("rollback requires run_id", file=sys.stderr)
             return 2
-        Vault(root=Path(config.vault_root)).rollback(run_id)
+        try:
+            Vault(root=Path(config.vault_root)).rollback(run_id)
+        except RunCommitNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         return 0
 
     def doctor() -> int:

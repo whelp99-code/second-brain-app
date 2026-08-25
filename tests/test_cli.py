@@ -1,4 +1,5 @@
 """CLI and pipeline orchestration: lock, exit codes, logs, briefing I/O."""
+# noqa: SIZE_OK — single owned test module; file ownership forbids a split
 
 from __future__ import annotations
 
@@ -57,13 +58,15 @@ def _page(digest: str, page_id: str = "daily/2026-08-26") -> PageSpec:
     return PageSpec(page_id, "Brief", f"cited.[^{sid}]", [cite], "active")
 
 
-def _git_count(root: Path) -> int:
+def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["GIT_CONFIG_GLOBAL"] = os.devnull
     env["GIT_CONFIG_SYSTEM"] = os.devnull
-    done = subprocess.run(
-        ["git", "rev-list", "--count", "HEAD"], cwd=root, capture_output=True, text=True, check=False, env=env
-    )
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False, env=env)
+
+
+def _git_count(root: Path) -> int:
+    done = _git(root, "rev-list", "--count", "HEAD")
     assert done.returncode == 0, done.stderr
     return int(done.stdout.strip())
 
@@ -288,3 +291,84 @@ def test_resets_stale_running_when_new_run_starts(tmp_path: Path) -> None:
 
     _ = run_compile(config, compiler=check)
     assert seen == ["pending"]
+
+
+def test_changed_run_commit_contains_log_md_and_tree_is_clean(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+
+    def changed(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, vault, run_id
+        return _report(pages=(_page(digest),), attempted=1)
+
+    outcome = run_compile(config, compiler=changed)
+    shown = _git(root, "show", "HEAD:log.md")
+    assert shown.returncode == 0
+    assert outcome.run_id in shown.stdout
+    assert _git(root, "status", "--porcelain").stdout == ""
+
+
+def test_status_includes_run_id_counts_and_status_after_run(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+
+    def changed(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, vault, run_id
+        return _report(pages=(_page(digest),), attempted=1)
+
+    outcome = run_compile(config, compiler=changed)
+    code, out, _err = _cli_with_config(tmp_path, root, ["status"])
+    assert code == 0
+    assert outcome.run_id in out
+    assert "pages=" in out
+    assert "conflicts=" in out
+    assert "errors=" in out
+    assert any(token in out for token in ("ok", "capped", "failed"))
+
+
+def test_ingest_then_compile_writes_page_when_markdown_source_present(tmp_path: Path) -> None:
+    from sb.contracts import Blob
+    from sb.normalize import normalize
+    from sb.parsers import parser_for
+
+    src = tmp_path / "src"
+    _ = src.mkdir()
+    body = b"Alpha fact for compile.\n"
+    _ = (src / "note.md").write_bytes(body)
+    vault = tmp_path / "vault"
+    _ = init_vault(vault)
+    config = Config(
+        raw={
+            "vault_root": str(vault),
+            "sources": [{"id": "me-wiki", "adapter": "markdown-vault", "root": str(src)}],
+            "llm": {"prompt_version": "v1", "model_id": "fake"},
+        }
+    )
+    ingested = run_ingest(config, None)
+    assert ingested.exit_code == 0
+    with Ledger(vault) as ledger:
+        items = ledger.list_source_items()
+        assert items
+        item = items[0]
+        cas = ContentAddressedStore(vault)
+        assert cas.exists(item.content_hash)
+        assert ledger.get_cursor(item.source_id)
+        text = parser_for(".md")(cas.get(item.content_hash))
+        units = normalize(Blob(item.content_hash, len(body)), text, f"{item.source_id}:{item.source_uri}")
+        assert units
+        assert ledger.get_unit(units[0].unit_id) is not None
+    compiled = run_compile(config, llm_mode="fake")
+    assert compiled.exit_code == 0
+    wiki_pages = [path for path in (vault / "wiki").rglob("*.md") if "_proposed" not in path.parts]
+    assert wiki_pages
+    assert compiled.run_id in _git(vault, "show", "HEAD:log.md").stdout
+    assert _git(vault, "status", "--porcelain").stdout == ""
+
+
+def test_rollback_missing_id_returns_controlled_cli_error(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    code, out, err = _cli_with_config(tmp_path, root, ["rollback", "missing-run"])
+    assert code != 0
+    text = f"{out}{err}".lower()
+    assert "traceback" not in text
+    assert "missing-run" in text
