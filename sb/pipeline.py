@@ -47,6 +47,7 @@ class StageReport:
     attempted: int
     capped: bool
     deriv_key: str | None = None
+    written: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,7 @@ class RunOutcome:
     exit_code: int
     git_commit: str | None
     already_running: bool = False
+    written: int = 0
 
 
 class StageFn(Protocol):
@@ -290,10 +292,15 @@ def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
     return loaded
 
 
-def _brief_facts(inputs: BriefingInputs, day: date) -> str:
+def _source_content_ids(ledger: Ledger, root: Path) -> tuple[str, ...]:
+    cas = ContentAddressedStore(root)
+    return tuple(sorted({item.content_hash for item in ledger.list_source_items() if cas.exists(item.content_hash)}))
+
+
+def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]) -> str:
     payload = "\0".join((
         day.isoformat(),
-        *inputs.yesterday_items, "\x1e", *inputs.open_conflict_pages, "\x1e",
+        *content_ids, "\x1e", *inputs.open_conflict_pages, "\x1e",
         *inputs.stale_pages, "\x1e", *inputs.upcoming_items, "\x1e",
         inputs.last_brief or "",
     ))
@@ -336,7 +343,7 @@ def _reopen_failed(ledger: Ledger, key: str) -> None:
 
 
 def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
-    run_id, started, vault = uuid4().hex, datetime.now(UTC).isoformat(), Vault(root=root)
+    run_id, started, vault = uuid4().hex, datetime.now().astimezone().isoformat(), Vault(root=root)
     compiled = _Compiled(root, ContentAddressedStore(root))
     with Ledger(root) as ledger:
         _ = ledger.reset_stale_running(run_id)
@@ -365,7 +372,7 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("a", encoding="utf-8") as handle:
             _ = handle.write(rendered.format(pages, conflicts, errors) + "\n")
-        return RunOutcome(run_id, status, pages, conflicts, errors, exit_code, commit)
+        return RunOutcome(run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written)
 
 
 def _execute(config: Config, stage: StageFn) -> RunOutcome:
@@ -387,7 +394,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         adapters = _select_adapters(chosen, source_ids, config)
         cas, cap = ContentAddressedStore(vault.root), config.caps["max_new_units_per_run"] if limit is None else limit
         seen = {(item.source_id, item.source_uri, item.source_version) for item in ledger.list_source_items()}
-        errors = attempted = 0
+        errors = attempted = written = 0
         capped = False
         for adapter in adapters:
             try:
@@ -430,6 +437,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     _store_units(ledger, units)
                     seen.add(version_key)
                     progressed = True
+                    written += 1
                 except OSError:
                     errors += 1
                     ledger.upsert_source_item(SourceItem(
@@ -441,7 +449,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 break
             if progressed or not attempted:
                 ledger.set_cursor(adapter.source_id, adapter.next_cursor(), datetime.now(UTC).isoformat())
-        return StageReport((), 0, errors, attempted, capped)
+        return StageReport((), 0, errors, attempted, capped, None, written)
 
     return stage
 
@@ -493,7 +501,12 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         day = datetime.now().astimezone().date()
         inputs = collect_briefing_inputs(ledger, vault.root, today=day)
-        key = deriv_key((_brief_facts(inputs, day),), "brief", config.llm.prompt_version, config.llm.model_id)
+        key = deriv_key(
+            (_brief_facts(inputs, day, _source_content_ids(ledger, vault.root)),),
+            "brief",
+            config.llm.prompt_version,
+            config.llm.model_id,
+        )
         existing = ledger.get_derivation(key)
         if existing is not None and existing.status == DerivStatus.DONE.value:
             return StageReport((), 0, 0, 0, False)
@@ -541,7 +554,12 @@ def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
     try:
         ingest = _run_locked(root, _ingest(config, sources, None))
         compiled = _run_locked(root, _compile_stage(config, "cli"))
-        brief = _run_locked(root, _brief_stage(config, None, "cli"))
+        if ingest.written == 0 and compiled.pages == 0:
+            brief = compiled if compiled.exit_code == 0 else ingest
+            if ingest.status == "capped" and ingest.exit_code == 0:
+                brief = ingest
+        else:
+            brief = _run_locked(root, _brief_stage(config, None, "cli"))
     finally:
         _unlock(fd)
     chosen = brief

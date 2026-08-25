@@ -934,3 +934,141 @@ def test_quarantine_only_ingest_is_ok_or_capped(tmp_path: Path, monkeypatch: Mon
     assert _git_count(root) == commits
     assert _deriv_count(root) == derivs
     assert fake.calls == calls
+
+
+def test_brief_skipped_when_compile_pages_zero_and_no_new_units(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.contracts import SourceRef
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    fake = FakeLLM(["없음", "없음"])
+
+    class Seen:
+        source_id: str = "mix"
+
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+            del cursor
+            yield SourceRef("mix", "good.md", "v1"), b"ok note\n", {}
+            yield SourceRef("mix", "skip.dat", "v1"), b"", {"skip_reason": "denied-path"}
+
+        def next_cursor(self) -> str:
+            return "end"
+
+    def adapters(config: Config) -> dict[str, Seen]:
+        del config
+        return {"mix": Seen()}
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+        del units, ledger, llm, config
+        return []
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    _ = run_ingest(config, None)
+    daily_dir = root / "daily"
+    before_files = {path.name: path.read_bytes() for path in daily_dir.glob("*.md")}
+    before_deriv = _deriv_count(root)
+    before_calls = fake.calls
+    outcome = run_all(config)
+    assert outcome.exit_code == 0
+    assert outcome.status in {"ok", "capped"}
+    assert fake.calls == before_calls
+    assert _deriv_count(root) == before_deriv
+    after_files = {path.name: path.read_bytes() for path in daily_dir.glob("*.md")}
+    assert after_files == before_files
+    briefs = [row for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values() if row.stage == "brief"]
+    assert not any(row.status == "failed" for row in briefs)
+
+
+def test_rebucketed_existing_source_dates_do_not_change_brief_key(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.contracts import SourceRef
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    today = datetime.now().astimezone().date()
+    yesterday = today - timedelta(days=1)
+    utc_stamp = datetime(yesterday.year, yesterday.month, yesterday.day, 20, 35, 55, tzinfo=UTC).isoformat()
+    fake = FakeLLM(["없음", "없음"])
+    digest = _put(root, b"profile body\n")
+    with Ledger(root) as ledger:
+        ledger.record_run(Run("run-old", utc_stamp, utc_stamp, None, "ok"))
+        for index in range(17):
+            ledger.upsert_source_item(
+                SourceItem("me-wiki", f"identity/p{index}.md", "v1", digest, "run-old", "run-old")
+            )
+
+    class Extra:
+        source_id: str = "me-wiki"
+
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+            del cursor
+            for index in range(17):
+                yield SourceRef("me-wiki", f"identity/p{index}.zzz", "v2"), b"nope", {}
+
+        def next_cursor(self) -> str:
+            return "end"
+
+    def adapters(config: Config) -> dict[str, Extra]:
+        del config
+        return {"me-wiki": Extra()}
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+        del units, ledger, llm, config
+        return []
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    first = run_brief(config, llm_mode="fake")
+    assert first.exit_code == 0
+    real_collect = collect_briefing_inputs
+
+    def shifted(
+        ledger: Ledger, vault_root: Path, *, today: date | None = None
+    ) -> BriefingInputs:
+        base = real_collect(ledger, vault_root, today=today)
+        return BriefingInputs(
+            ("origin=me-wiki:rebucket.md hash=" + digest + f" [^{digest[:8]}] text=rebucket",)
+            + base.yesterday_items,
+            base.open_conflict_pages,
+            base.stale_pages,
+            base.upcoming_items,
+            base.last_brief,
+            base.previous_run_status,
+        )
+
+    monkeypatch.setattr("sb.pipeline.collect_briefing_inputs", shifted)
+    before_calls = fake.calls
+    before_failed = [
+        row
+        for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values()
+        if row.stage == "brief" and row.status == "failed"
+    ]
+    before_deriv = _deriv_count(root)
+    daily = root / "daily" / f"{today.isoformat()}.md"
+    before_daily = daily.read_bytes() if daily.is_file() else b""
+    outcome = run_all(config)
+    assert outcome.exit_code == 0
+    assert fake.calls == before_calls
+    assert _deriv_count(root) == before_deriv
+    failed = [
+        row
+        for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values()
+        if row.stage == "brief" and row.status == "failed"
+    ]
+    assert failed == before_failed
+    if daily.is_file():
+        assert daily.read_bytes() == before_daily
