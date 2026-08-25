@@ -205,3 +205,28 @@ def test_json_parser_emits_canonical_object_when_keys_are_unsorted() -> None:
     # Then: the machine-consumed canonical form is sorted and compact.
     assert json.loads(text) == {"a": 2, "z": 1}
     assert text == '{"a":2,"z":1}'
+
+
+_NON_STRING_KEY_REASON = "structured mapping key is not a string"
+
+
+def test_yaml_parser_raises_invalid_input_when_key_is_numeric() -> None:
+    # Given: a YAML mapping whose key is an integer scalar.
+    payload = b"1: hello\n"
+
+    # When: the structured parser loads the document.
+    # Then: the non-string key is rejected with the stable typed reason.
+    with pytest.raises(InvalidInput) as exc_info:
+        _ = parser_for(".yaml")(payload)
+    assert exc_info.value.reason == _NON_STRING_KEY_REASON
+
+
+def test_yaml_parser_raises_invalid_input_when_key_is_boolean() -> None:
+    # Given: a YAML mapping whose key is a boolean scalar.
+    payload = b"true: yes\n"
+
+    # When: the structured parser loads the document.
+    # Then: the non-string key is rejected with the stable typed reason.
+    with pytest.raises(InvalidInput) as exc_info:
+        _ = parser_for(".yaml")(payload)
+    assert exc_info.value.reason == _NON_STRING_KEY_REASON
