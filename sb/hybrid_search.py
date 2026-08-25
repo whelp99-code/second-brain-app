@@ -2,65 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import math
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
 import sb.embeddings as emb
-from sb.embeddings import (
-    DEFAULT_MODEL_ID,
-    VECTOR_DIM,
-    EmbeddingUnavailable,
-    Encoder,
-    ModelIdentity,
-)
+from sb.embeddings import EmbeddingUnavailable, Encoder
 from sb.search import SearchHit
 
 _LOGGER: Final = logging.getLogger(__name__)
 RRF_K: Final = 60
-_FAKE_IDENTITY: Final = ModelIdentity(DEFAULT_MODEL_ID, "fake-rev", VECTOR_DIM)
 # TODO(k3-v1): conflict candidates may later use cosine >= 0.75 — do not wire.
-
-
-@dataclass(frozen=True, slots=True)
-class FakeEncoder:
-    identity: ModelIdentity = _FAKE_IDENTITY
-
-    def encode(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
-        return tuple(fake_vector(text, self.identity.dim) for text in texts)
-
-
-def fake_vector(text: str, dim: int = VECTOR_DIM) -> tuple[float, ...]:
-    """Deterministic unit vector; shared tokens land near each other."""
-    acc = [0.0] * dim
-    buf: list[str] = []
-    current: list[str] = []
-    for char in text + " ":
-        if char.isalnum():
-            current.append(char.casefold())
-            continue
-        if current:
-            buf.append("".join(current))
-            current = []
-    for token in buf or [""]:
-        seed = hashlib.sha256(token.encode("utf-8")).digest()
-        index = 0
-        while index < dim:
-            seed = hashlib.sha256(seed).digest()
-            for offset in range(0, 32, 4):
-                acc[index] += (int.from_bytes(seed[offset : offset + 4], "big") / 4294967295.0) * 2.0 - 1.0
-                index += 1
-                if index == dim:
-                    break
-    norm = math.sqrt(sum(value * value for value in acc))
-    if norm == 0.0:
-        acc[-1] = 1.0
-        return tuple(acc)
-    return tuple(value / norm for value in acc)
 
 
 def rrf_merge(
@@ -100,7 +53,10 @@ def query_cosine(
     path = emb.vectors_path(vault_root)
     if not path.is_file():
         raise EmbeddingUnavailable("vectors missing")
+    stored = emb.read_identity(vault_root)
     enc = encoder if encoder is not None else emb.resolve_encoder()
+    if stored is None or stored.dim != enc.identity.dim:
+        raise EmbeddingUnavailable("embedding metadata missing or dim mismatch")
     literal = "[" + ",".join(format(value, ".9g") for value in enc.encode((query,))[0]) + "]"
     raw = emb.run_vec_sql(
         path,

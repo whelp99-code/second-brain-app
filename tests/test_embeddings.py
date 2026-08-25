@@ -1,12 +1,17 @@
+# noqa: SIZE_OK — single owned test file: behavior suite plus moved FakeEncoder
 """Embeddings + hybrid search: fake vectors, vec0, RRF, flag-off, fallbacks."""
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import sys
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import pytest
 from pytest import LogCaptureFixture, MonkeyPatch
@@ -25,13 +30,51 @@ from sb.embeddings import (
     rebuild,
     vectors_path,
 )
-from sb.hybrid_search import FakeEncoder, fake_vector, hybrid_search, query_cosine, rrf_merge
+from sb.hybrid_search import hybrid_search, query_cosine, rrf_merge
 from sb.search import SearchHit, SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 
+_FAKE_IDENTITY: Final = ModelIdentity(DEFAULT_MODEL_ID, "fake-rev", VECTOR_DIM)
+
 EN_TERM = "AlphaEngineer"
 KO_TERM = "박정민프로필"
+
+
+@dataclass(frozen=True, slots=True)
+class FakeEncoder:
+    identity: ModelIdentity = _FAKE_IDENTITY
+
+    def encode(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
+        return tuple(fake_vector(text, self.identity.dim) for text in texts)
+
+
+def fake_vector(text: str, dim: int = VECTOR_DIM) -> tuple[float, ...]:
+    acc = [0.0] * dim
+    buf: list[str] = []
+    current: list[str] = []
+    for char in text + " ":
+        if char.isalnum():
+            current.append(char.casefold())
+            continue
+        if current:
+            buf.append("".join(current))
+            current = []
+    for token in buf or [""]:
+        seed = hashlib.sha256(token.encode("utf-8")).digest()
+        index = 0
+        while index < dim:
+            seed = hashlib.sha256(seed).digest()
+            for offset in range(0, 32, 4):
+                acc[index] += (int.from_bytes(seed[offset : offset + 4], "big") / 4294967295.0) * 2.0 - 1.0
+                index += 1
+                if index == dim:
+                    break
+    norm = math.sqrt(sum(value * value for value in acc))
+    if norm == 0.0:
+        acc[-1] = 1.0
+        return tuple(acc)
+    return tuple(value / norm for value in acc)
 
 
 def _put(root: Path, data: bytes) -> str:
@@ -68,6 +111,17 @@ def _seed(tmp_path: Path) -> Path:
     )
     _ = vault.write_pages(pages, "run-embed", _HashLedger(root))
     return root
+
+
+def test_production_source_has_no_fake_encoder_or_vector() -> None:
+    """Given owned production modules, when reading source, then fake doubles are absent."""
+    root = Path(__file__).resolve().parents[1]
+    hybrid = (root / "sb" / "hybrid_search.py").read_text(encoding="utf-8")
+    embeddings = (root / "sb" / "embeddings.py").read_text(encoding="utf-8")
+
+    for name in ("FakeEncoder", "fake_vector", "_FAKE_IDENTITY"):
+        assert name not in hybrid
+        assert name not in embeddings
 
 
 def test_fake_vector_is_deterministic_unit_1024_when_text_repeats() -> None:
