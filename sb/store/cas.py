@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
@@ -36,9 +35,9 @@ class ContentAddressedStore:
             return digest
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_name(f".{digest}.tmp")
-        tmp.write_bytes(data)
-        _ = os.chmod(tmp, 0o444)
-        os.replace(tmp, dest)  # returns None
+        _ = tmp.write_bytes(data)
+        tmp.chmod(0o444)
+        _ = tmp.replace(dest)
         return digest
 
     def get(self, content_hash: str) -> bytes:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -31,8 +31,18 @@ _DERIV_GOLDEN: str = hashlib.sha256(b"u1\x00compile\x00v1\x00fake").hexdigest()
 
 
 def _table_columns(db_path: Path, table: str) -> list[str]:
-    with sqlite3.connect(db_path) as conn:
-        return [str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})")]
+    completed = subprocess.run(
+        ["sqlite3", str(db_path), f"PRAGMA table_info({table});"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    names: list[str] = []
+    for line in completed.stdout.splitlines():
+        fields = line.split("|")
+        if len(fields) >= 2:
+            names.append(fields[1])
+    return names
 
 
 def test_open_ledger_creates_wal_file_and_reports_wal_mode(tmp_path: Path) -> None:
@@ -90,12 +100,12 @@ def test_open_raises_ledger_corrupt_when_db_bytes_are_garbage(tmp_path: Path) ->
     db_path = tmp_path / ".sb" / "ledger.db"
     db_path.parent.mkdir(parents=True)
     with Ledger(tmp_path) as ledger:
-        ledger.journal_mode()
+        _ = ledger.journal_mode()
     for suffix in ("-wal", "-shm"):
         sidecar = Path(str(db_path) + suffix)
         if sidecar.exists():
             sidecar.unlink()
-    db_path.write_bytes(b"not-a-sqlite-database")
+    _ = db_path.write_bytes(b"not-a-sqlite-database")
 
     with pytest.raises(LedgerCorrupt):
         Ledger(tmp_path).open()
@@ -240,10 +250,10 @@ def test_rebuild_from_vault_restores_source_item_and_derivation(tmp_path: Path) 
     digest = hashlib.sha256(payload).hexdigest()
     raw_path = tmp_path / "raw" / digest[:2] / digest
     raw_path.parent.mkdir(parents=True)
-    raw_path.write_bytes(payload)
+    _ = raw_path.write_bytes(payload)
     page = tmp_path / "wiki" / "profile.md"
     page.parent.mkdir(parents=True)
-    page.write_text(
+    _ = page.write_text(
         "\n".join(
             [
                 "---",
@@ -281,3 +291,172 @@ def test_rebuild_from_vault_restores_source_item_and_derivation(tmp_path: Path) 
     assert derivation.status == "done"
     assert derivation.stage == "compile"
     assert derivation.output_path == "wiki/profile.md"
+
+
+def _write_cas(vault: Path, payload: bytes) -> str:
+    digest = hashlib.sha256(payload).hexdigest()
+    raw_path = vault / "raw" / digest[:2] / digest
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    _ = raw_path.write_bytes(payload)
+    return digest
+
+
+def _write_wiki(vault: Path, name: str, lines: list[str]) -> None:
+    page = vault / "wiki" / name
+    page.parent.mkdir(parents=True, exist_ok=True)
+    _ = page.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _derivation_count(vault: Path) -> int:
+    completed = subprocess.run(
+        ["sqlite3", str(vault / ".sb" / "ledger.db"), "SELECT COUNT(*) FROM derivation;"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return int(completed.stdout.strip() or "0")
+
+
+def test_rebuild_unreferenced_raw_blob_creates_no_source_item(tmp_path: Path) -> None:
+    """Given only an unreferenced CAS blob, when rebuild runs, then no source_item is invented."""
+    _ = _write_cas(tmp_path, b"orphan-raw-bytes")
+
+    rebuild_from_vault(tmp_path)
+
+    with Ledger(tmp_path) as ledger:
+        assert ledger.list_source_items() == ()
+
+
+def test_rebuild_source_item_uses_only_k1_facts_and_verified_cas_hash(tmp_path: Path) -> None:
+    """Given K1 sources plus an orphan blob, when rebuild runs, then only cited CAS facts are stored."""
+    cited = _write_cas(tmp_path, b"cited-bytes")
+    _ = _write_cas(tmp_path, b"orphan-bytes")
+    _write_wiki(
+        tmp_path,
+        "cited.md",
+        [
+            "---",
+            "id: cited-page",
+            "title: Cited",
+            "updated: 2026-08-25",
+            "compiled_by: sb/0.1.0|v1|fake",
+            "status: active",
+            "sources:",
+            "  - sid: cited001",
+            "    origin: me-wiki:notes/cited.md",
+            f"    hash: {cited}",
+            "---",
+            "Body.[^cited001]",
+        ],
+    )
+
+    rebuild_from_vault(tmp_path)
+
+    with Ledger(tmp_path) as ledger:
+        items = ledger.list_source_items()
+
+    assert len(items) == 1
+    assert items[0].source_id == "me-wiki"
+    assert items[0].source_uri == "notes/cited.md"
+    assert items[0].content_hash == cited
+    assert items[0].source_version == ""
+    assert items[0].source_id != "raw"
+
+
+def test_rebuild_missing_compiled_by_creates_no_derivation(tmp_path: Path) -> None:
+    """Given a cited page without compiled_by, when rebuild runs, then no derivation is invented."""
+    digest = _write_cas(tmp_path, b"no-stamp-bytes")
+    _write_wiki(
+        tmp_path,
+        "nostamp.md",
+        [
+            "---",
+            "id: no-stamp-page",
+            "title: No Stamp",
+            "updated: 2026-08-25",
+            "status: active",
+            "sources:",
+            "  - sid: deadbeef",
+            "    origin: me-wiki:nostamp.md",
+            f"    hash: {digest}",
+            "---",
+            "Body.[^deadbeef]",
+        ],
+    )
+
+    rebuild_from_vault(tmp_path)
+
+    invented = deriv_key(("no-stamp-page",), "compile", "v1", "unknown")
+    with Ledger(tmp_path) as ledger:
+        items = ledger.list_source_items()
+        invented_row = ledger.get_derivation(invented)
+    assert len(items) == 1
+    assert items[0].content_hash == digest
+    assert invented_row is None
+    assert _derivation_count(tmp_path) == 0
+
+
+def test_rebuild_invalid_compiled_by_creates_no_derivation(tmp_path: Path) -> None:
+    """Given an invalid compiled_by stamp, when rebuild runs, then no done derivation is created."""
+    digest = _write_cas(tmp_path, b"bad-stamp-bytes")
+    _write_wiki(
+        tmp_path,
+        "badstamp.md",
+        [
+            "---",
+            "id: bad-stamp-page",
+            "title: Bad Stamp",
+            "updated: 2026-08-25",
+            "compiled_by: not-a-valid-stamp",
+            "status: active",
+            "sources:",
+            "  - sid: deadbeef",
+            "    origin: me-wiki:badstamp.md",
+            f"    hash: {digest}",
+            "---",
+            "Body.[^deadbeef]",
+        ],
+    )
+
+    rebuild_from_vault(tmp_path)
+
+    with Ledger(tmp_path) as ledger:
+        fallback = ledger.get_derivation(deriv_key(("bad-stamp-page",), "compile", "v1", "unknown"))
+    assert fallback is None
+    assert _derivation_count(tmp_path) == 0
+
+
+def test_rebuild_valid_compiled_by_uses_exact_prompt_and_model(tmp_path: Path) -> None:
+    """Given a valid compiled_by stamp, when rebuild runs, then the derivation key uses those exact parts."""
+    digest = _write_cas(tmp_path, b"exact-stamp-bytes")
+    _write_wiki(
+        tmp_path,
+        "exact.md",
+        [
+            "---",
+            "id: exact-page",
+            "title: Exact",
+            "updated: 2026-08-25",
+            "compiled_by: sb/9.9.9|prompt-x|model-y",
+            "status: active",
+            "sources:",
+            "  - sid: deadbeef",
+            "    origin: me-wiki:exact.md",
+            f"    hash: {digest}",
+            "---",
+            "Body.[^deadbeef]",
+        ],
+    )
+
+    rebuild_from_vault(tmp_path)
+
+    exact = deriv_key(("exact-page",), "compile", "prompt-x", "model-y")
+    fallback = deriv_key(("exact-page",), "compile", "v1", "unknown")
+    with Ledger(tmp_path) as ledger:
+        row = ledger.get_derivation(exact)
+        invented = ledger.get_derivation(fallback)
+    assert row is not None
+    assert row.status == "done"
+    assert row.stage == "compile"
+    assert row.output_path == "wiki/exact.md"
+    assert invented is None

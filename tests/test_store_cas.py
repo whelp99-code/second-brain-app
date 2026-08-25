@@ -71,13 +71,13 @@ def test_get_raises_cas_blob_missing_when_absent(tmp_path: Path) -> None:
     cas = ContentAddressedStore(tmp_path)
 
     with pytest.raises(CasBlobMissing):
-        cas.get(_DIGEST)
+        _ = cas.get(_DIGEST)
 
 
 def test_exists_is_true_only_for_stored_hash(tmp_path: Path) -> None:
     """Given one stored blob, when exists is queried, then only that hash is present."""
     cas = ContentAddressedStore(tmp_path)
-    cas.put(_PAYLOAD)
+    _ = cas.put(_PAYLOAD)
 
     assert cas.exists(_DIGEST) is True
     assert cas.exists("0" * 64) is False
