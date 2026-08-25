@@ -13,6 +13,8 @@ from sb.llm import LLMClient
 EMPTY_PLACEHOLDER: Final = "없음"
 WARN_FAILED: Final = "[warn:previous_run_status=failed]"
 WARN_NONE: Final = "[warn:previous_run_status=none]"
+UNCITED_SID: Final = "uncited"
+UNCITED_MARK: Final = f"[^{UNCITED_SID}]"
 SID_RE: Final = re.compile(r"\[\^([^\]]+)\]")
 ORIGIN_RE: Final = re.compile(r"origin=(\S+)")
 HASH_RE: Final = re.compile(r"hash=([0-9a-fA-F]{64})")
@@ -53,7 +55,7 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     prompt = _fill_prompt(inputs)
     cap = config.caps["max_llm_calls_briefing"]
     if cap >= 1:
-        recs = _recommendation_body(llm.generate(prompt))
+        recs = _mark_uncited_bullets(_recommendation_body(llm.generate(prompt)))
     else:
         recs = EMPTY_PLACEHOLDER
     status = inputs.previous_run_status
@@ -76,7 +78,7 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
         page_id=f"daily/{day}",
         title=f"{day} 브리핑",
         body_md=body,
-        sources=_collect_sources(inputs, body),
+        sources=_input_sources(inputs),
         status="active",
     )
 
@@ -128,34 +130,45 @@ def _recommendation_body(raw: str) -> str:
     return text
 
 
-def _collect_sources(inputs: BriefingInputs, body: str) -> list[SourceCite]:
-    blobs: list[str] = [
+def _mark_uncited_bullets(recs: str) -> str:
+    lines: list[str] = []
+    for line in recs.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("-") and SID_RE.search(line) is None:
+            lines.append(f"{line.rstrip()} {UNCITED_MARK}")
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _input_sources(inputs: BriefingInputs) -> list[SourceCite]:
+    items: list[str] = [
         *inputs.yesterday_items,
         *inputs.open_conflict_pages,
         *inputs.stale_pages,
         *inputs.upcoming_items,
-        body,
     ]
     if inputs.last_brief is not None:
-        blobs.append(inputs.last_brief)
+        items.append(inputs.last_brief)
     by_sid: dict[str, SourceCite] = {}
-    for blob in blobs:
-        for cite in _cites_from_text(blob):
-            existing = by_sid.get(cite.sid)
-            if existing is None or (not existing.hash and cite.hash):
-                by_sid[cite.sid] = cite
+    for item in items:
+        cite = _cite_from_item(item)
+        if cite is None:
+            continue
+        if cite.sid not in by_sid:
+            by_sid[cite.sid] = cite
     return [by_sid[key] for key in sorted(by_sid)]
 
 
-def _cites_from_text(text: str) -> list[SourceCite]:
-    origin_match = ORIGIN_RE.search(text)
-    hash_match = HASH_RE.search(text)
-    origin = origin_match.group(1) if origin_match else "unknown"
-    digest = hash_match.group(1).lower() if hash_match else ""
-    sids = SID_RE.findall(text)
-    if not sids and digest:
-        sids = [digest[:8]]
-    cites: list[SourceCite] = []
-    for sid in sids:
-        cites.append(SourceCite(sid=sid, origin=origin, hash=digest or sid))
-    return cites
+def _cite_from_item(item: str) -> SourceCite | None:
+    origin_match = ORIGIN_RE.search(item)
+    hash_match = HASH_RE.search(item)
+    if origin_match is None or hash_match is None:
+        return None
+    origin = origin_match.group(1)
+    digest = hash_match.group(1).lower()
+    expected = digest[:8]
+    sids = [match.group(1) for match in SID_RE.finditer(item)]
+    if expected not in sids:
+        return None
+    return SourceCite(sid=expected, origin=origin, hash=digest)
