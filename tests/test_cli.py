@@ -7,6 +7,7 @@ import fcntl
 import os
 import re
 import subprocess
+from collections.abc import Iterator
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import date
 from io import StringIO
@@ -14,17 +15,25 @@ from multiprocessing import Event, Process
 from multiprocessing.synchronize import Event as MpEvent
 from pathlib import Path
 
-from pytest import MonkeyPatch, raises
+from pytest import MonkeyPatch
 
 from sb.cli import main
 from sb.config import Config
-from sb.contracts import BriefingInputs, PageSpec, SourceCite
+from sb.connectors.base import SourceAdapter
+from sb.contracts import BriefingInputs, PageSpec, SourceCite, Unit
 from sb.llm import LLMClient, LLMUnavailable
-from sb.pipeline import StageReport, collect_briefing_inputs, run_brief, run_compile, run_ingest
+from sb.pipeline import (
+    StageReport,
+    collect_briefing_inputs,
+    run_all,
+    run_brief,
+    run_compile,
+    run_ingest,
+)
 from sb.store import Run, SourceItem
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, load_ledger_tables
-from sb.vault import Vault, VaultLintError, init_vault
+from sb.vault import Vault, init_vault
 
 TODAY = date(2026, 8, 26)
 RUNS_RE = re.compile(
@@ -123,8 +132,12 @@ def _seed_briefing(root: Path) -> BriefingInputs:
         "2026-08-25T10:01:00+00:00 run run-yest failed pages=0 conflicts=0 errors=1\n", encoding="utf-8"
     )
     return BriefingInputs(
-        ("me-wiki:notes/new.md",), ("conflicts/open-alpha.md",), ("old-page",),
-        ("2026-08-30 ship date",), "yesterday brief body\n", "failed",
+        (f"origin=me-wiki:notes/new.md hash={new_hash} [^{new_hash[:8]}] text=new-source",),
+        ("conflicts/open-alpha.md",),
+        (f"origin=me-wiki:notes/old.md hash={new_hash} [^{new_hash[:8]}] text=old-page",),
+        (f"origin=me-wiki:notes/soon.md hash={upcoming_hash} [^{upcoming_hash[:8]}] text=2026-08-30 ship date",),
+        "yesterday brief body\n",
+        "failed",
     )
 
 
@@ -498,7 +511,159 @@ def test_lint_failure_with_run_log_line_leaves_log_and_index_clean(tmp_path: Pat
         del ledger, vault, run_id
         return _report(pages=(bad,), attempted=1)
 
-    with raises(VaultLintError):
-        _ = run_compile(config, compiler=failing)
+    outcome = run_compile(config, compiler=failing)
+    assert outcome.exit_code == 1
+    assert outcome.status == "failed"
     assert (root / "log.md").read_bytes() == before_log
     assert _git(root, "status", "--porcelain").stdout == before_porc
+
+
+CITE_ITEM_RE = re.compile(
+    r"origin=\S+ hash=[0-9a-fA-F]{64} \[\^[0-9a-fA-F]{8}\] text="
+)
+
+
+def test_collect_briefing_inputs_emits_parseable_citation_items(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    _ = _seed_briefing(root)
+    with Ledger(root) as ledger:
+        got = collect_briefing_inputs(ledger, root, today=TODAY)
+    assert got.yesterday_items
+    for item in got.yesterday_items:
+        assert CITE_ITEM_RE.search(item)
+        assert "origin=" in item and "hash=" in item and "text=" in item
+
+
+def test_fake_llm_brief_writes_linted_daily_page_when_inputs_are_cited(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    _ = _seed_briefing(root)
+    _seed_status(root)
+    outcome = run_brief(config, llm_mode="fake")
+    assert outcome.exit_code == 0
+    dailies = list((root / "daily").glob("*.md"))
+    assert any(
+        "[^" in path.read_text(encoding="utf-8") and "sid:" in path.read_text(encoding="utf-8")
+        for path in dailies
+    )
+
+
+def test_brief_lint_failure_does_not_mark_done_and_rerun_calls_generator(
+    tmp_path: Path,
+) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+    _seed_status(root)
+    calls = {"n": 0}
+    cite = SourceCite(sid=digest[:8], origin="me-wiki:notes/new.md", hash=digest)
+    bad = PageSpec("daily/x", "X", "bad.[^zzzzzzzz]", [cite], "active")
+
+    def gen(inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec:
+        del inputs, llm, config
+        calls["n"] += 1
+        return bad
+
+    first = run_brief(config, generator=gen)
+    assert first.exit_code == 1
+    rows = load_ledger_tables(root / ".sb" / "ledger.db").derivations.values()
+    assert not any(row.stage == "brief" and row.status == "done" for row in rows)
+    second = run_brief(config, generator=gen)
+    assert calls["n"] == 2
+    assert second.exit_code == 1
+
+
+def test_run_all_records_failed_run_without_traceback(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+    cite = SourceCite(sid=digest[:8], origin="me-wiki:notes/new.md", hash=digest)
+    bad = PageSpec("wiki/bad", "Bad", "nope.[^zzzzzzzz]", [cite], "active")
+
+    def boom(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+        del units, ledger, llm, config
+        return [bad]
+
+    def no_adapters(config: Config) -> dict[str, SourceAdapter]:
+        del config
+        return {}
+
+    monkeypatch.setattr("sb.compile.compile_pages", boom)
+    monkeypatch.setattr("sb.connectors.discover_adapters", no_adapters)
+    outcome = run_all(config)
+    assert outcome.exit_code == 1
+    assert outcome.status == "failed"
+    log = (root / ".sb" / "runs.log").read_text(encoding="utf-8")
+    assert "failed" in log
+    code, out, err = _cli_with_config(tmp_path, root, ["run"])
+    assert code != 0
+    assert "traceback" not in f"{out}{err}".lower()
+
+
+def test_ingest_cap_bounds_attempts_before_cas_put(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    from sb.contracts import SourceRef
+
+    config, root = _ready(tmp_path)
+    config = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 3}})
+
+    class Flood:
+        source_id: str = "flood"
+
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+            del cursor
+            for index in range(10):
+                yield SourceRef("flood", f"n{index}.zzz", "v"), b"not-a-parser-format", {}
+
+        def next_cursor(self) -> str:
+            return "end"
+
+    def flood_adapters(config: Config) -> dict[str, Flood]:
+        del config
+        return {"flood": Flood()}
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", flood_adapters)
+    outcome = run_ingest(config, None)
+    blobs = [path for path in (root / "raw").rglob("*") if path.is_file() and not path.name.startswith(".")]
+    assert len(blobs) <= 3
+    assert outcome.errors <= 3
+    assert outcome.status in {"capped", "failed", "ok"}
+    assert outcome.errors == 3 or outcome.status == "capped"
+
+
+def test_compile_routes_conflict_pages_through_vault(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.conflict import ConflictFinding
+    from sb.contracts import ConflictVerdict
+
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"cited-body")
+    sid = digest[:8]
+    compiled = PageSpec("wiki/src", "Src", f"fact.[^{sid}]", [SourceCite(sid, "me-wiki:a.md", digest)], "active")
+    conflict = PageSpec(
+        "conflicts/open-x", "Conflict", f"clash.[^{sid}]", [SourceCite(sid, "me-wiki:a.md", digest)], "conflicted"
+    )
+
+    def fake_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+        del units, ledger, llm, config
+        return [compiled]
+
+    def fake_check(
+        units: list[Unit], pages: list[PageSpec], ledger: Ledger, llm: LLMClient, config: Config
+    ) -> list[ConflictFinding]:
+        del units, pages, ledger, llm, config
+        verdict = ConflictVerdict("contradicts", 0.9, "clash")
+        return [ConflictFinding("a", "b", verdict, "conflict", conflict, None, (sid,), False)]
+
+    monkeypatch.setattr("sb.compile.compile_pages", fake_compile)
+    monkeypatch.setattr("sb.conflict.check", fake_check)
+    outcome = run_compile(config, llm_mode="fake")
+    assert outcome.exit_code == 0
+    assert (root / "conflicts" / "open-x.md").is_file()
+
+
+def test_doctor_exits_nonzero_when_citation_unresolved(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    _ = (root / "wiki" / "broken.md").write_text(
+        "---\nid: broken\nsources: []\n---\nHi.[^deadbeef]\n", encoding="utf-8"
+    )
+    code, _out, err = _cli_with_config(tmp_path, root, ["doctor"])
+    assert code != 0
+    assert "traceback" not in err.lower()

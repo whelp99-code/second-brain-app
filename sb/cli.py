@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -11,9 +12,9 @@ from enum import StrEnum
 from pathlib import Path
 
 from sb.config import load_config
-from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
+from sb.pipeline import audit_citations, read_status, run_all, run_brief, run_compile, run_ingest
 from sb.store.ledger import rebuild_from_vault
-from sb.vault import RunCommitNotFoundError, Vault, init_vault
+from sb.vault import RunCommitNotFoundError, Vault, VaultLintError, init_vault
 
 
 class Command(StrEnum):
@@ -63,6 +64,21 @@ def _opt_flag(ns: argparse.Namespace, name: str) -> bool:
     return vars(ns).get(name) is True
 
 
+def _configured_sources() -> tuple[str, ...] | None:
+    path = os.environ.get("SB_CONFIG")
+    if path is None:
+        return None
+    names: list[str] = []
+    config_path = Path(path)
+    if not config_path.is_file():
+        return None
+    for line in config_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("id =", "adapter =", "type =")):
+            names.append(stripped.split("=", 1)[1].strip().strip('"'))
+    return tuple(names) or None
+
+
 def _print_outcome(already_running: bool, exit_code: int) -> int:
     if already_running:
         print("already running")
@@ -87,7 +103,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
 
     def ingest() -> int:
         source = _opt_str(ns, "source")
-        selected = None if source is None else (source,)
+        selected = (source,) if source is not None else _configured_sources()
         outcome = run_ingest(config, selected, limit=_opt_int(ns, "limit"))
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
@@ -100,7 +116,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def run() -> int:
-        outcome = run_all(config)
+        outcome = run_all(config, _configured_sources())
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def status() -> int:
@@ -122,7 +138,10 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     def doctor() -> int:
         if _opt_flag(ns, "rebuild_ledger"):
             rebuild_from_vault(config.vault_root)
-        _ = read_status(config)
+        reasons = audit_citations(Path(config.vault_root))
+        if reasons:
+            print("\n".join(reasons), file=sys.stderr)
+            return 1
         return 0
 
     handlers: dict[Command, Callable[[], int]] = {
@@ -150,7 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     if not tokens:
         _ = parser.print_help()
         return 2
-    return _dispatch(Command(tokens[0]), ns)
+    try:
+        return _dispatch(Command(tokens[0]), ns)
+    except VaultLintError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
