@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from pathlib import Path
+from typing import ClassVar
 
 import anyio
 from mcp.client import Client
 from mcp.server.mcpserver import MCPServer
-from mcp_types import CallToolResult, TextContent
+from mcp_types import CallToolResult
+from pydantic import BaseModel, ConfigDict
 from pytest import raises
 
 from sb.contracts import PageSpec, SourceCite
@@ -20,6 +21,62 @@ from sb.vault import init_vault
 EN_TERM = "AlphaEngineer"
 KO_TERM = "박정민프로필"
 MAX_BYTES = 1024 * 1024
+
+
+class _HitOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    page_id: str
+    section: str
+    snippet: str
+    score: float
+
+
+class _SearchOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    results: list[_HitOut]
+
+
+class _ReadOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    frontmatter: dict[str, str]
+    body: str
+
+
+class _ChangeOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    page_id: str
+    change: str
+    date: str
+
+
+class _RecentOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    changes: list[_ChangeOut]
+
+
+class _ConflictOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    conflict_id: str
+    page_id: str
+    summary: str
+
+
+class _ConflictsOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    conflicts: list[_ConflictOut]
+
+
+class _RememberOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    inbox_path: str
+
+
+class _Envelope(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
+    structured_content: (
+        _SearchOut | _ReadOut | _RecentOut | _ConflictsOut | _RememberOut | None
+    ) = None
+    is_error: bool = False
 
 
 def _put(root: Path, data: bytes) -> str:
@@ -56,31 +113,50 @@ def _seed(tmp_path: Path) -> Path:
     return root
 
 
-def _json(result: CallToolResult) -> str | int | float | bool | None | list[str] | dict[str, str]:
-    if result.structured_content is not None:
-        return json.loads(json.dumps(result.structured_content))
-    texts: list[str] = []
-    for block in result.content:
-        if isinstance(block, TextContent):
-            texts.append(block.text)
-    if len(texts) != 1:
-        return texts
-    try:
-        return json.loads(texts[0])
-    except json.JSONDecodeError:
-        return texts[0]
+def _envelope(result: CallToolResult) -> _Envelope:
+    return _Envelope.model_validate_json(result.model_dump_json())
 
 
-def _rows(result: CallToolResult) -> list[str] | list[dict[str, str]]:
-    payload = _json(result)
-    if isinstance(payload, list):
-        return payload
-    if isinstance(payload, dict):
-        for key in ("results", "changes", "conflicts"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return value
-    return []
+def _structured(
+    result: CallToolResult,
+) -> _SearchOut | _ReadOut | _RecentOut | _ConflictsOut | _RememberOut | None:
+    return _envelope(result).structured_content
+
+
+def _search_rows(result: CallToolResult) -> list[_HitOut]:
+    payload = _structured(result)
+    match payload:
+        case _SearchOut(results=rows):
+            return rows
+        case _ReadOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | None:
+            return []
+
+
+def _change_rows(result: CallToolResult) -> list[_ChangeOut]:
+    payload = _structured(result)
+    match payload:
+        case _RecentOut(changes=rows):
+            return rows
+        case _SearchOut() | _ReadOut() | _ConflictsOut() | _RememberOut() | None:
+            return []
+
+
+def _conflict_rows(result: CallToolResult) -> list[_ConflictOut]:
+    payload = _structured(result)
+    match payload:
+        case _ConflictsOut(conflicts=rows):
+            return rows
+        case _SearchOut() | _ReadOut() | _RecentOut() | _RememberOut() | None:
+            return []
+
+
+def _remember(result: CallToolResult) -> _RememberOut | None:
+    payload = _structured(result)
+    match payload:
+        case _RememberOut() as remembered:
+            return remembered
+        case _SearchOut() | _ReadOut() | _RecentOut() | _ConflictsOut() | None:
+            return None
 
 
 def _call(server: MCPServer, name: str, arguments: Mapping[str, str | int | None]) -> CallToolResult:
@@ -114,26 +190,27 @@ def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> N
     names, results = anyio.run(_go)
     assert names == K5_TOOLS
     assert len(results) == 5
-    assert _rows(results[0])
-    read_payload = _json(results[1])
-    assert isinstance(read_payload, dict)
-    assert "frontmatter" in read_payload and "body" in read_payload
-    assert _rows(results[2])
-    conflicts_payload = _rows(results[3])
-    assert conflicts_payload
-    remember_payload = _json(results[4])
-    assert isinstance(remember_payload, dict)
-    inbox_path = remember_payload["inbox_path"]
-    assert isinstance(inbox_path, str) and inbox_path.startswith("inbox/")
-    assert (root / inbox_path).is_file()
+    assert _search_rows(results[0])
+    read_payload = _structured(results[1])
+    match read_payload:
+        case _ReadOut():
+            assert read_payload.frontmatter and read_payload.body
+        case _SearchOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | None:
+            raise AssertionError("expected read_page payload")
+    assert _change_rows(results[2])
+    assert _conflict_rows(results[3])
+    remembered = _remember(results[4])
+    assert remembered is not None
+    assert remembered.inbox_path.startswith("inbox/")
+    assert (root / remembered.inbox_path).is_file()
 
 
 def test_mcp_search_finds_korean_and_english_terms(tmp_path: Path) -> None:
     """Given committed bilingual pages, when searching via MCP, then both hit."""
     server = build_server(_seed(tmp_path))
 
-    en = _rows(_call(server, "sb_search", {"query": EN_TERM}))
-    ko = _rows(_call(server, "sb_search", {"query": KO_TERM}))
+    en = _search_rows(_call(server, "sb_search", {"query": EN_TERM}))
+    ko = _search_rows(_call(server, "sb_search", {"query": KO_TERM}))
     assert en and ko
 
 
@@ -144,8 +221,8 @@ def test_mcp_read_page_rejects_path_traversal(tmp_path: Path) -> None:
 
     result = _call(server, "sb_read_page", {"id": "../.sb/ledger.db"})
     assert result.is_error is True
-    leaked = json.dumps(_json(result), default=str)
-    assert "ledger" not in leaked.lower() or "not found" in leaked.lower() or "escape" in leaked.lower()
+    leaked = result.model_dump_json().lower()
+    assert "ledger" not in leaked or "not found" in leaked or "escape" in leaked
 
 
 def test_mcp_read_page_ignores_uncommitted_working_tree(tmp_path: Path) -> None:
@@ -162,16 +239,16 @@ def test_mcp_recent_changes_includes_committed_page(tmp_path: Path) -> None:
     """Given a committed page, when recent_changes runs, then that page is listed."""
     server = build_server(_seed(tmp_path))
 
-    blob = json.dumps(_rows(_call(server, "sb_recent_changes", {"days": 7})))
-    assert "alpha" in blob
+    assert any("alpha" in row.page_id for row in _change_rows(_call(server, "sb_recent_changes", {"days": 7})))
 
 
 def test_mcp_open_conflicts_lists_committed_conflict(tmp_path: Path) -> None:
     """Given a committed conflict file, when open_conflicts runs, then it is listed."""
     server = build_server(_seed(tmp_path))
 
-    blob = json.dumps(_rows(_call(server, "sb_open_conflicts", {})))
-    assert "conflict_id" in blob and "page_id" in blob and "summary" in blob
+    rows = _conflict_rows(_call(server, "sb_open_conflicts", {}))
+    assert rows
+    assert all(row.conflict_id and row.page_id and row.summary for row in rows)
 
 
 def test_mcp_remember_writes_collision_safe_inbox_file(tmp_path: Path) -> None:
@@ -179,10 +256,10 @@ def test_mcp_remember_writes_collision_safe_inbox_file(tmp_path: Path) -> None:
     root = _seed(tmp_path)
     server = build_server(root)
 
-    first = _json(_call(server, "sb_remember", {"content": "one", "title": "dup"}))
-    second = _json(_call(server, "sb_remember", {"content": "two", "title": "dup"}))
-    assert isinstance(first, dict) and isinstance(second, dict)
-    assert first["inbox_path"] != second["inbox_path"]
+    first = _remember(_call(server, "sb_remember", {"content": "one", "title": "dup"}))
+    second = _remember(_call(server, "sb_remember", {"content": "two", "title": "dup"}))
+    assert first is not None and second is not None
+    assert first.inbox_path != second.inbox_path
     listing = sorted(p.name for p in (root / "inbox").iterdir() if p.is_file())
     assert len(listing) == 2
     assert all(name.endswith(".md") for name in listing)
@@ -219,12 +296,11 @@ def test_mcp_remember_does_not_write_outside_inbox(tmp_path: Path) -> None:
     server = build_server(root)
     wiki_before = sorted(p.name for p in (root / "wiki").iterdir())
 
-    payload = _json(
+    remembered = _remember(
         _call(server, "sb_remember", {"content": "stay", "title": "../../wiki/hack"})
     )
-    assert isinstance(payload, dict)
-    inbox_path = payload["inbox_path"]
-    rel = Path(inbox_path)
+    assert remembered is not None
+    rel = Path(remembered.inbox_path)
     assert rel.parts[0] == "inbox"
     assert ".." not in rel.parts
     assert (root / rel).resolve().is_relative_to((root / "inbox").resolve())
