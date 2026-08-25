@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import subprocess
 from collections.abc import Sequence
-from typing import assert_never
 
 import pytest
 
@@ -18,8 +17,8 @@ class ScriptedRunner:
     """Mutable test double; `.calls` is the documented purpose."""
 
     def __init__(self, script: list[ScriptItem]) -> None:
-        self.calls = 0
-        self._script = script
+        self.calls: int = 0
+        self._script: list[ScriptItem] = script
 
     def __call__(
         self,
@@ -36,8 +35,6 @@ class ScriptedRunner:
                 return item
             case subprocess.TimeoutExpired():
                 raise item
-            case unreachable:
-                assert_never(unreachable)
 
 
 def _ok(stdout: str, argv: Sequence[str] = ("stub",)) -> subprocess.CompletedProcess[str]:
@@ -78,7 +75,7 @@ def test_generate_reserializes_first_object_when_json_mode_and_bare() -> None:
 def test_generate_raises_bad_json_when_json_mode_and_no_object() -> None:
     fake = FakeLLM(["not json at all"])
     with pytest.raises(LLMBadJson) as excinfo:
-        fake.generate("q", json_mode=True)
+        _ = fake.generate("q", json_mode=True)
     assert fake.calls == 1
     assert excinfo.value.raw == "not json at all"
 
@@ -86,7 +83,7 @@ def test_generate_raises_bad_json_when_json_mode_and_no_object() -> None:
 def test_clillm_raises_unavailable_after_exactly_two_attempts_when_argv_is_false() -> None:
     client = CliLLM(["false"])
     with pytest.raises(LLMUnavailable) as excinfo:
-        client.generate("x")
+        _ = client.generate("x")
     assert excinfo.value.attempts == 2
 
 
@@ -94,7 +91,7 @@ def test_clillm_counts_two_runner_calls_when_both_attempts_fail() -> None:
     runner = ScriptedRunner([_fail(), _fail()])
     client = CliLLM(["false"], runner=runner)
     with pytest.raises(LLMUnavailable) as excinfo:
-        client.generate("x")
+        _ = client.generate("x")
     assert runner.calls == 2
     assert excinfo.value.attempts == 2
 
@@ -115,7 +112,7 @@ def test_clillm_retries_timeout_then_raises_unavailable() -> None:
     )
     client = CliLLM(["sleep", "999"], runner=runner)
     with pytest.raises(LLMUnavailable) as excinfo:
-        client.generate("x", timeout=1)
+        _ = client.generate("x", timeout=1)
     assert runner.calls == 2
     assert excinfo.value.attempts == 2
 
