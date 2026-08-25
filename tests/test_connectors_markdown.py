@@ -8,8 +8,15 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
+
 from sb.connectors.base import ItemMeta
-from sb.connectors.markdown_vault import MarkdownVaultAdapter
+from sb.connectors.markdown_vault import (
+    MarkdownVaultAdapter,
+    MarkdownVaultError,
+    decode_source_cursor,
+    encode_source_cursor,
+)
 from sb.contracts import SourceRef
 
 _CURSOR_TOKEN: re.Pattern[str] = re.compile(r"^\d+:\d+:[0-9a-f]{64}$")
@@ -179,3 +186,72 @@ def test_scan_does_not_follow_symlinks_when_statting(tmp_path: Path) -> None:
     assert any(meta.get("skip_reason") == "symlink" for _r, _b, meta in items)
     assert not any("secret.md" in ref.source_uri for ref, _b, _m in items)
     assert os.path.islink(root / "leak")
+
+
+_TOKEN_A = "1:1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+_TOKEN_B = "2:2:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+
+def test_scan_delivers_tab_filename_and_unchanged_rescan_is_zero(tmp_path: Path) -> None:
+    # Given: a markdown file whose name contains a tab.
+    root = tmp_path / "vault"
+    relative = "a\tb.md"
+    path = _write_md(root, relative, "tab-body\n")
+    adapter = MarkdownVaultAdapter(root=root, source_id="fixture")
+
+    # When: the tree is scanned, then rescanned with the returned cursor.
+    items = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    resume = list(adapter.scan(cursor))
+
+    # Then: the SourceRef URI is the exact filename, keys round-trip, resume is empty.
+    assert _delivered(items) == [(relative, path.read_bytes())]
+    assert items[0][0].source_uri == relative
+    assert items[0][2].get("relative_path") == relative
+    assert relative in decode_source_cursor(cursor)
+    assert resume == []
+
+
+def test_scan_delivers_newline_filename_and_unchanged_rescan_is_zero(tmp_path: Path) -> None:
+    # Given: a markdown file whose name contains a newline.
+    root = tmp_path / "vault"
+    relative = "line\nbreak.md"
+    path = _write_md(root, relative, "nl-body\n")
+    adapter = MarkdownVaultAdapter(root=root, source_id="fixture")
+
+    # When: the tree is scanned, then rescanned with the returned cursor.
+    items = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    resume = list(adapter.scan(cursor))
+
+    # Then: the SourceRef URI is the exact filename, keys round-trip, resume is empty.
+    assert _delivered(items) == [(relative, path.read_bytes())]
+    assert items[0][0].source_uri == relative
+    assert items[0][2].get("relative_path") == relative
+    assert relative in decode_source_cursor(cursor)
+    assert resume == []
+
+
+def test_cursor_codec_roundtrips_tab_collision_keys() -> None:
+    # Given: keys the tab/newline codec would smash, plus colon/backslash/unicode.
+    original = {
+        "a": _TOKEN_A,
+        "a\tb.md": _TOKEN_B,
+        "line\nbreak.md": _TOKEN_A,
+        "col:on.md": _TOKEN_B,
+        "back\\slash.md": _TOKEN_A,
+        "위키.md": _TOKEN_B,
+    }
+
+    # When: the map is dumped and parsed.
+    roundtrip = decode_source_cursor(encode_source_cursor(original))
+
+    # Then: both keys and tokens survive losslessly.
+    assert roundtrip == original
+
+
+def test_parse_cursor_rejects_malformed_payload() -> None:
+    # Given: a cursor string that is not a valid encoded map.
+    # When / Then: parse fails closed with the typed cursor error.
+    with pytest.raises(MarkdownVaultError):
+        _ = decode_source_cursor("not-a-cursor")

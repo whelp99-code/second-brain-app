@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from hashlib import sha256
@@ -16,6 +17,7 @@ ADAPTER_ID: Final = "markdown-vault"
 DEFAULT_SOURCE_ID: Final = "me-wiki"
 DEFAULT_ROOT: Final = Path("/Volumes/DevSpace/me-wiki")
 _MARKDOWN_ADAPTERS: Final = frozenset({"markdown-vault", "markdown_vault", "markdown"})
+_CANONICAL_LEN: Final = re.compile(r"^(0|[1-9][0-9]*)$")
 
 
 class _ConnectorConfig(Protocol):
@@ -48,7 +50,7 @@ class MarkdownVaultAdapter:
         self._fs: SafeSourceFilesystem = SafeSourceFilesystem((root,))
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
-        previous = _parse_cursor(cursor)
+        previous = decode_source_cursor(cursor)
         result = self._fs.scan(self._root, reject_denied=False, reject_unsafe=False)
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         current: dict[str, str] = {}
@@ -69,7 +71,7 @@ class MarkdownVaultAdapter:
                 continue
             meta = {"relative_path": entry.relative_path, "cursor": token}
             items.append((SourceRef(self.source_id, entry.relative_path, token), body, meta))
-        self._next_cursor = _dump_cursor(current)
+        self._next_cursor = encode_source_cursor(current)
         yield from items
 
     def next_cursor(self) -> str:
@@ -94,17 +96,39 @@ def _configured_root(config: _ConnectorConfig) -> tuple[str, Path]:
     return DEFAULT_SOURCE_ID, DEFAULT_ROOT
 
 
-def _dump_cursor(current: dict[str, str]) -> str:
-    return "\n".join(f"{path}\t{token}" for path, token in sorted(current.items()))
+def encode_source_cursor(current: dict[str, str]) -> str:
+    """Encode path/token pairs with length prefixes (lossless for any filename)."""
+    chunks: list[str] = []
+    for path, token in sorted(current.items()):
+        chunks.append(f"{len(path)}:{path}{len(token)}:{token}")
+    return "".join(chunks)
 
 
-def _parse_cursor(cursor: str | None) -> dict[str, str]:
-    if cursor is None or cursor == "" or cursor == "{}":
+def _read_prefixed(cursor: str, index: int) -> tuple[str, int]:
+    colon = cursor.find(":", index)
+    if colon < 0:
+        raise MarkdownVaultError("malformed cursor")
+    length_text = cursor[index:colon]
+    if _CANONICAL_LEN.fullmatch(length_text) is None:
+        raise MarkdownVaultError("malformed cursor")
+    length = int(length_text)
+    start = colon + 1
+    end = start + length
+    if end > len(cursor):
+        raise MarkdownVaultError("malformed cursor")
+    return cursor[start:end], end
+
+
+def decode_source_cursor(cursor: str | None) -> dict[str, str]:
+    """Decode a length-prefixed cursor. None and empty string are an empty map."""
+    if cursor is None or cursor == "":
         return {}
     parsed: dict[str, str] = {}
-    for line in cursor.split("\n"):
-        path, tab, token = line.partition("\t")
-        if tab == "" or not path:
-            raise MarkdownVaultError("cursor entries must be string path/token pairs")
+    index = 0
+    while index < len(cursor):
+        path, index = _read_prefixed(cursor, index)
+        token, index = _read_prefixed(cursor, index)
+        if not path or not token or path in parsed:
+            raise MarkdownVaultError("malformed cursor")
         parsed[path] = token
     return parsed
