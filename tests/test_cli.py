@@ -9,7 +9,7 @@ import re
 import subprocess
 from collections.abc import Iterator
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 from multiprocessing import Event, Process
 from multiprocessing.synchronize import Event as MpEvent
@@ -671,9 +671,9 @@ def test_ingest_cap_bounds_attempts_before_cas_put(tmp_path: Path, monkeypatch: 
     outcome = run_ingest(config, None)
     blobs = [path for path in (root / "raw").rglob("*") if path.is_file() and not path.name.startswith(".")]
     assert len(blobs) <= 3
-    assert outcome.errors <= 3
-    assert outcome.status in {"capped", "failed", "ok"}
-    assert outcome.errors == 3 or outcome.status == "capped"
+    assert outcome.errors == 0
+    assert outcome.status == "capped"
+    assert outcome.exit_code == 0
 
 
 def test_compile_routes_conflict_pages_through_vault(
@@ -769,10 +769,10 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
     monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
     monkeypatch.setattr("sb.conflict.check", empty_check)
     probe = run_ingest(config, None)
-    assert probe.errors >= 1
+    assert probe.exit_code == 0
+    assert probe.status in {"ok", "capped"}
     first = run_all(config)
     assert first.exit_code == 0
-    first_errors = probe.errors
     commits = _git_count(root)
     derivs = _deriv_count(root)
     calls = fake.calls
@@ -785,8 +785,8 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
     assert fake.calls == calls
     mixed.versions["bad.zzz"] = "v2"
     third = run_ingest(config, None)
-    assert third.errors >= 1
-    assert first_errors >= 1
+    assert third.exit_code == 0
+    assert third.status in {"ok", "capped"}
     tight = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 2}})
 
     class Flood:
@@ -808,11 +808,10 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
     wave1 = run_ingest(tight, None)
     assert wave1.status == "capped"
     assert wave1.exit_code == 0
-    assert wave1.errors == 2
     wave2 = run_ingest(tight, None)
     assert wave2.status == "capped"
     assert wave2.exit_code == 0
-    assert wave2.errors == 2
+    assert wave2.errors == 0
 
 
 def test_brief_facts_stable_when_only_previous_run_status_changes(
@@ -841,3 +840,97 @@ def test_brief_facts_stable_when_only_previous_run_status_changes(
     assert _deriv_count(root) == before_deriv
     assert _git_count(root) == before_commits
     assert second.git_commit is None
+
+
+def test_ingest_started_at_uses_host_local_date(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    today = datetime.now().astimezone().date()
+    yesterday = today - timedelta(days=1)
+    utc_evening = datetime(yesterday.year, yesterday.month, yesterday.day, 21, 59, 29, tzinfo=UTC)
+    local_day = utc_evening.astimezone().date()
+    digest = _put(root, b"omo-session\n")
+    offset_stamp = utc_evening.isoformat()
+    z_stamp = utc_evening.strftime("%Y-%m-%dT%H:%M:%SZ")
+    with Ledger(root) as ledger:
+        ledger.record_run(Run("run-offset", offset_stamp, offset_stamp, None, "ok"))
+        ledger.record_run(Run("run-z", z_stamp, z_stamp, None, "ok"))
+        ledger.upsert_source_item(SourceItem("omo", "sess/offset", "v1", digest, "run-offset", "run-offset"))
+        ledger.upsert_source_item(SourceItem("omo", "sess/z", "v1", digest, "run-z", "run-z"))
+    with Ledger(root) as ledger:
+        got = collect_briefing_inputs(ledger, root, today=today)
+    if local_day == today:
+        assert all("sess/offset" not in item and "sess/z" not in item for item in got.yesterday_items)
+    if local_day == yesterday:
+        assert any("sess/offset" in item for item in got.yesterday_items)
+    fake = FakeLLM(["없음", "없음"])
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    first = run_brief(config, llm_mode="fake")
+    assert first.exit_code == 0
+    daily = root / "daily" / f"{today.isoformat()}.md"
+    before_hash = daily.read_bytes() if daily.is_file() else b""
+    before_deriv = _deriv_count(root)
+    before_calls = fake.calls
+    second = run_brief(config, llm_mode="fake")
+    assert second.exit_code == 0
+    assert fake.calls == before_calls
+    assert _deriv_count(root) == before_deriv
+    if daily.is_file():
+        assert daily.read_bytes() == before_hash
+
+
+def test_quarantine_only_ingest_is_ok_or_capped(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    from sb.contracts import SourceRef
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    config = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 10}, "llm": {"prompt_version": "v1", "model_id": "fake"}})
+    fake = FakeLLM(["없음", "없음"])
+
+    class QuarantineOnly:
+        source_id: str = "q"
+
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+            del cursor
+            yield SourceRef("q", "a.zzz", "v1"), b"nope", {}
+            yield SourceRef("q", "b.dat", "v1"), b"", {"skip_reason": "denied-path"}
+            yield SourceRef("q", "c.zzz", "v1"), b"still-nope", {}
+
+        def next_cursor(self) -> str:
+            return "end"
+
+    def adapters(config: Config) -> dict[str, QuarantineOnly]:
+        del config
+        return {"q": QuarantineOnly()}
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+        del units, ledger, llm, config
+        return []
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    first = run_all(config)
+    assert first.exit_code == 0
+    assert first.status in {"ok", "capped"}
+    commits = _git_count(root)
+    derivs = _deriv_count(root)
+    calls = fake.calls
+    second = run_all(config)
+    assert second.exit_code == 0
+    assert second.errors == 0
+    assert _git_count(root) == commits
+    assert _deriv_count(root) == derivs
+    assert fake.calls == calls

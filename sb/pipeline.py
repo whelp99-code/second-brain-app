@@ -130,9 +130,13 @@ def _unlock(fd: int) -> None:
 
 def _as_date(stamp: str) -> date | None:
     try:
-        return datetime.fromisoformat(stamp).date()
+        normalized = stamp[:-1] + "+00:00" if stamp.endswith("Z") else stamp
+        parsed = datetime.fromisoformat(normalized)
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone().date()
 
 
 def _source_changed(ledger: Ledger, sources: tuple[tuple[str, str], ...]) -> bool:
@@ -412,7 +416,6 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 digest = hashlib.sha256(data).hexdigest()
                 units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
                 if not units and data:
-                    errors += 1
                     ledger.upsert_source_item(SourceItem(
                         ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
                     ))
