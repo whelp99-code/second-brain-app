@@ -1,4 +1,4 @@
-"""Tests for sb.conflict.check two-stage contradiction detection."""
+"""Tests for sb.conflict.check list[ConflictFinding] contract."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from sb.config import Config
-from sb.conflict import SECTIONS, check
+from sb.conflict import SECTIONS, ConflictFinding, check, lexical_top
 from sb.contracts import PageSpec, SourceCite, Unit
 from sb.llm import FakeLLM
 from sb.store.ledger import Ledger
@@ -25,6 +25,7 @@ CONTRA_FLOOR: float = 0.8
 EMPTY_PAGES: list[PageSpec] = []
 ORIGIN_NEW: str = "me-wiki:notes/2026-08-25-lang.md"
 ORIGIN_OLD: str = "me-wiki:notes/2026-08-01-lang.md"
+ROUTES: frozenset[str] = frozenset({"conflict", "supersede", "note", "unrelated"})
 
 
 class RecordingLLM:
@@ -81,6 +82,10 @@ def _dated_page(page_id: str, origin: str, updated: str, text: str) -> PageSpec:
     )
 
 
+def _routes(findings: list[ConflictFinding]) -> list[str]:
+    return [item.route for item in findings]
+
+
 @pytest.fixture
 def ledger(tmp_path: Path) -> Iterator[Ledger]:
     with Ledger(tmp_path) as opened:
@@ -97,22 +102,34 @@ def unit() -> Unit:
     return _unit("u1", TEXT_STATIC)
 
 
-def test_lexical_top10_bounded_by_score_floor(ledger: Ledger, config: Config, unit: Unit) -> None:
-    """Given 15 candidates, when lexical search runs, then at most 10 above score floor return."""
+def test_lexical_top10_bounded_by_score_floor(unit: Unit) -> None:
+    """Given 15 candidates, when lexical rank runs, then at most 10 above score floor return."""
     candidates = [_unit(f"c{i}", TEXT_STATIC if i < 12 else TEXT_OTHER) for i in range(15)]
-    result = check([unit, *candidates], EMPTY_PAGES, ledger, FakeLLM([]), config)
-    assert len(result.lexical_matches) <= 10
+    hits = lexical_top([unit, *candidates], EMPTY_PAGES)
+    assert len(hits) <= 10
 
 
-def test_lexical_matches_ordered_by_score_descending(
-    ledger: Ledger, config: Config, unit: Unit
-) -> None:
-    """Given mixed-similarity candidates, when lexical search runs, then results are sorted descending."""
-    units = [unit, _unit("c1", TEXT_STATIC), _unit("c2", TEXT_PARTIAL)]
-    result = check(units, EMPTY_PAGES, ledger, FakeLLM([]), config)
-    scores = [match.score for match in result.lexical_matches]
+def test_lexical_matches_ordered_by_score_descending(unit: Unit) -> None:
+    """Given mixed-similarity candidates, when lexical rank runs, then scores are descending."""
+    hits = lexical_top([unit, _unit("c1", TEXT_STATIC), _unit("c2", TEXT_PARTIAL)], EMPTY_PAGES)
+    scores = [hit.score for hit in hits]
     assert scores == sorted(scores, reverse=True)
     assert scores
+
+
+def test_check_returns_list_of_findings(ledger: Ledger, config: Config, unit: Unit) -> None:
+    """Given a pair, when check runs, then the return value is list[ConflictFinding]."""
+    found = check(
+        [unit, _unit("c1", TEXT_DYNAMIC)],
+        EMPTY_PAGES,
+        ledger,
+        FakeLLM([_verdict("contradicts", CONTRA_FLOOR, "상반됨", ["c1"])]),
+        config,
+    )
+    assert type(found) is list
+    assert found
+    assert all(type(item) is ConflictFinding for item in found)
+    assert all(item.route in ROUTES for item in found)
 
 
 def test_contradiction_requires_confidence_at_floor(
@@ -120,17 +137,16 @@ def test_contradiction_requires_confidence_at_floor(
 ) -> None:
     """Given LLM returns confidence 0.8, when checked, then a conflicted page has required sections."""
     llm = FakeLLM([_verdict("contradicts", CONTRA_FLOOR, "타입 체계가 상반됨", ["c1"])])
-    result = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, llm, config)
-    assert result.route == "contradicts"
-    assert result.cites == ("c1",)
-    assert result.findings
-    finding = result.findings[0]
-    assert finding.headings == SECTIONS
-    assert finding.page.status == "conflicted"
+    found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, llm, config)
+    hit = next(item for item in found if item.route == "conflict")
+    assert hit.verdict.relation == "contradicts"
+    assert hit.verdict.confidence == CONTRA_FLOOR
+    assert hit.cites == ("c1",)
+    assert hit.page is not None
+    assert hit.page.status == "conflicted"
     for heading in SECTIONS:
-        assert f"## {heading}" in finding.page.body_md
-    assert "[^c1]" in finding.page.body_md
-    assert finding.cites == ("c1",)
+        assert f"## {heading}" in hit.page.body_md
+    assert "[^c1]" in hit.page.body_md
     assert llm.calls == 1
 
 
@@ -139,11 +155,12 @@ def test_supersedes_without_timestamp_flags_note_only(
 ) -> None:
     """Given supersedes at 0.9 without a source timestamp, when checked, then route is note+flag."""
     llm = FakeLLM([_verdict("supersedes", 0.9, "갱신된 정보", ["c1"])])
-    result = check([unit, _unit("c1", TEXT_STATIC)], EMPTY_PAGES, ledger, llm, config)
-    assert result.route == "note"
-    assert result.superseded_id is None
-    assert result.warning is True
-    assert result.findings == ()
+    found = check([unit, _unit("c1", TEXT_STATIC)], EMPTY_PAGES, ledger, llm, config)
+    assert "supersede" not in _routes(found)
+    assert any(
+        item.route == "note" and item.warning is True and item.superseded_id is None
+        for item in found
+    )
     assert llm.calls == 1
 
 
@@ -156,54 +173,54 @@ def test_supersedes_requires_newer_timestamp_and_floor(ledger: Ledger, config: C
         _dated_page("p-old", ORIGIN_OLD, "2026-08-01", TEXT_STATIC),
     ]
     llm = FakeLLM([_verdict("supersedes", 0.9, "갱신된 정보", ["c1"])])
-    result = check([newer, older], pages, ledger, llm, config)
-    assert result.route == "supersedes"
-    assert result.superseded_id == "c1"
-    assert result.warning is False
+    found = check([newer, older], pages, ledger, llm, config)
+    hit = next(item for item in found if item.route == "supersede")
+    assert hit.superseded_id == "c1"
+    assert hit.warning is not True
+    assert hit.verdict.relation == "supersedes"
 
 
 def test_confidence_below_floor_routes_to_note_only(
     ledger: Ledger, config: Config, unit: Unit
 ) -> None:
-    """Given LLM returns confidence 0.5, when checked, then route is note-only, not contradiction."""
-    result = check(
+    """Given LLM returns confidence 0.5, when checked, then route is note-only, not conflict."""
+    found = check(
         [unit, _unit("c1", TEXT_DYNAMIC)],
         EMPTY_PAGES,
         ledger,
         FakeLLM([_verdict("contradicts", 0.5, "약함", ["c1"])]),
         config,
     )
-    assert result.route == "note"
-    assert result.route != "contradicts"
-    assert result.findings == ()
+    assert "conflict" not in _routes(found)
+    assert any(item.route == "note" and item.page is None for item in found)
 
 
 def test_malformed_llm_json_fails_open_with_warning(
     ledger: Ledger, config: Config, unit: Unit
 ) -> None:
-    """Given LLM returns malformed JSON, when checked, then result fails open with a warning flag."""
-    result = check(
+    """Given LLM returns malformed JSON, when checked, then each pair fails open with a warning."""
+    found = check(
         [unit, _unit("c1", TEXT_DYNAMIC)],
         EMPTY_PAGES,
         ledger,
         FakeLLM(["{not valid json"]),
         config,
     )
-    assert result.route == "unrelated"
-    assert result.warning is True
+    assert found
+    assert all(item.route == "unrelated" and item.warning is True for item in found)
 
 
 def test_llm_call_failure_fails_open(ledger: Ledger, config: Config, unit: Unit) -> None:
     """Given the LLM raises on invocation, when checked, then result fails open without raising."""
-    result = check(
+    found = check(
         [unit, _unit("c1", TEXT_DYNAMIC)],
         EMPTY_PAGES,
         ledger,
         FakeLLM([]),
         config,
     )
-    assert result.route == "unrelated"
-    assert result.warning is True
+    assert found
+    assert all(item.route == "unrelated" and item.warning is True for item in found)
 
 
 def test_max_llm_calls_conflict_caps_invocations(
@@ -212,7 +229,8 @@ def test_max_llm_calls_conflict_caps_invocations(
     """Given more lexical matches than max_llm_calls_conflict, when checked, then LLM calls are capped."""
     units = [unit, *[_unit(f"c{i}", TEXT_STATIC) for i in range(5)]]
     llm = FakeLLM([_verdict("unrelated", 0.1, "", [])] * 5)
-    _ = check(units, EMPTY_PAGES, ledger, llm, config)
+    found = check(units, EMPTY_PAGES, ledger, llm, config)
+    assert type(found) is list
     assert llm.calls <= config.caps["max_llm_calls_conflict"]
 
 
@@ -226,10 +244,12 @@ def test_persistent_derivation_rerun_makes_zero_llm_calls(
     second_llm = FakeLLM([])
     second = check(units, EMPTY_PAGES, ledger, second_llm, config)
     assert second_llm.calls == 0
-    assert second.route == first.route
-    assert second.findings[0].page.status == "conflicted"
+    assert _routes(second) == _routes(first)
+    hit = next(item for item in second if item.route == "conflict")
+    assert hit.page is not None
+    assert hit.page.status == "conflicted"
     for heading in SECTIONS:
-        assert f"## {heading}" in second.findings[0].page.body_md
+        assert f"## {heading}" in hit.page.body_md
 
 
 def test_conflict_prompt_file_declares_pair_slots() -> None:
@@ -243,7 +263,7 @@ def test_check_fills_pair_slots_and_uses_json_mode_once_per_pair(
 ) -> None:
     recorder = RecordingLLM(_verdict("contradicts", CONTRA_FLOOR, "상반됨", ["c1"]))
     other = _unit("c1", TEXT_DYNAMIC)
-    result = check([unit, other], EMPTY_PAGES, ledger, recorder, config)
+    found = check([unit, other], EMPTY_PAGES, ledger, recorder, config)
     assert recorder.calls == 1
     assert recorder.json_modes == [True]
     prompt = recorder.prompts[0]
@@ -253,5 +273,5 @@ def test_check_fills_pair_slots_and_uses_json_mode_once_per_pair(
     assert TEXT_DYNAMIC in prompt
     for slot in PROMPT_SLOTS:
         assert slot not in prompt
-    assert result.route == "contradicts"
-    assert result.findings[0].page.status == "conflicted"
+    assert type(found) is list
+    assert any(item.route == "conflict" and item.page is not None for item in found)
