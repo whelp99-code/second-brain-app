@@ -1,4 +1,4 @@
-"""Checked-in unified-db table map. YAML is parsed once at this boundary."""
+"""Checked-in unified-db table map and row/project emit helpers."""
 
 from __future__ import annotations
 
@@ -7,31 +7,22 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Final, Protocol, override
-
-import yaml
 
 from sb.connectors.base import ItemMeta
 from sb.contracts import SourceRef
 
-_MAPPING: Final = Path(__file__).resolve().parent.parent / "mappings" / "unified_db.yaml"
 _IDENT: Final = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 type JVal = str | int | float | bool | None | list[JVal] | dict[str, JVal]
+type Scalar = str | int | bool | datetime | list[str] | None
+type Mark = tuple[datetime, str]
+type Item = tuple[SourceRef, bytes, ItemMeta]
 
 
 class _Loads(Protocol):
     def __call__(
         self, s: str, *, object_pairs_hook: Callable[[list[tuple[str, JVal]]], dict[str, JVal]]
     ) -> JVal: ...
-
-
-class _Dump(Protocol):
-    def __call__(self, obj: object) -> str: ...
-
-
-class _Yaml(Protocol):
-    def __call__(self, stream: str) -> object: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,31 +61,40 @@ class MappingSpec:
     tables: tuple[ScanTable, ...]
 
 
-def load_mapping(path: Path | None = None) -> MappingSpec:
-    """Parse the YAML map into typed scan specs."""
-    text = _dump()(_yaml()((path if path is not None else _MAPPING).read_text(encoding="utf-8")))
-    raw = _jdict(_loads()(text, object_pairs_hook=_pairs), "root")
-    projects = _jdict(raw.get("projects"), "projects")
-    sources = _jdict(raw.get("sources"), "sources")
-    return MappingSpec(
-        _int(raw.get("page_size"), "page_size"),
-        CatalogSpec(
-            _ident(projects.get("schema")),
-            _ident(projects.get("table")),
-            (
-                _ident(projects.get("project_id")),
-                _ident(projects.get("display_name")),
-                _ident(projects.get("aliases")),
-                _ident(projects.get("active")),
-            ),
+# Adjustment point B: recorded from unified-db init SQL (catalog/memory/evidence).
+# Event/evidence watermarks are occurred_at + primary key (lossless ties).
+DEFAULT_MAPPING: Final = MappingSpec(
+    1000,
+    CatalogSpec("catalog", "projects", ("project_id", "display_name", "aliases", "active")),
+    CatalogSpec("catalog", "sources", ("source_id", "enabled")),
+    (
+        ScanTable(
+            "memory.events",
+            "memory",
+            "events",
+            "event_id",
+            "occurred_at",
+            "project_id",
+            "source_id",
+            ("actor", "action", "status", "summary"),
         ),
-        CatalogSpec(
-            _ident(sources.get("schema")),
-            _ident(sources.get("table")),
-            (_ident(sources.get("source_id")), _ident(sources.get("enabled"))),
+        ScanTable(
+            "evidence.items",
+            "evidence",
+            "items",
+            "evidence_id",
+            "occurred_at",
+            "project_id",
+            "source_id",
+            ("uri", "sensitivity"),
         ),
-        tuple(_scan_table(item) for item in _jlist(raw.get("tables"), "tables")),
-    )
+    ),
+)
+
+
+def load_mapping() -> MappingSpec:
+    """Return the checked-in table map."""
+    return DEFAULT_MAPPING
 
 
 def catalog_sql(spec: CatalogSpec) -> str:
@@ -115,73 +115,6 @@ def quote(name: str) -> str:
     if _IDENT.fullmatch(name) is None:
         raise MappingError(name)
     return f'"{name}"'
-
-
-def _scan_table(raw: JVal) -> ScanTable:
-    item = _jdict(raw, "table")
-    schema = _ident(item.get("schema"))
-    table = _ident(item.get("table"))
-    return ScanTable(
-        f"{schema}.{table}",
-        schema,
-        table,
-        _ident(item.get("pk")),
-        _ident(item.get("occurred_at")),
-        _ident(item.get("project_id")),
-        _ident(item.get("source_id")),
-        tuple(_ident(col) for col in _jlist(item.get("text"), "text")),
-    )
-
-
-def _ident(value: object) -> str:
-    if not isinstance(value, str) or _IDENT.fullmatch(value) is None:
-        raise MappingError(str(value))
-    return value
-
-
-def _int(value: object, field: str) -> int:
-    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        raise MappingError(field)
-    return value
-
-
-def _jdict(value: JVal | None, field: str) -> dict[str, JVal]:
-    if not isinstance(value, dict):
-        raise MappingError(field)
-    return value
-
-
-def _jlist(value: JVal | None, field: str) -> list[JVal]:
-    if not isinstance(value, list):
-        raise MappingError(field)
-    return value
-
-
-def _pairs(pairs: list[tuple[str, JVal]]) -> dict[str, JVal]:
-    return dict(pairs)
-
-
-def _loads() -> _Loads:
-    fn: _Loads | None = getattr(json, "loads", None)
-    assert fn is not None
-    return fn
-
-
-def _dump() -> _Dump:
-    fn: _Dump | None = getattr(json, "dumps", None)
-    assert fn is not None
-    return fn
-
-
-def _yaml() -> _Yaml:
-    fn: _Yaml | None = getattr(yaml, "safe_load", None)
-    assert fn is not None
-    return fn
-
-
-type Scalar = str | int | bool | datetime | list[str] | None
-type Mark = tuple[datetime, str]
-type Item = tuple[SourceRef, bytes, ItemMeta]
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,3 +253,13 @@ def decode_cursor(cursor: str | None) -> dict[str, Mark]:
 def encode_cursor(marks: dict[str, Mark]) -> str:
     payload = {name: {"occurred_at": stamp.isoformat(), "id": pk} for name, (stamp, pk) in sorted(marks.items())}
     return json.dumps(payload, separators=(",", ":"), sort_keys=True)
+
+
+def _pairs(pairs: list[tuple[str, JVal]]) -> dict[str, JVal]:
+    return dict(pairs)
+
+
+def _loads() -> _Loads:
+    fn: _Loads | None = getattr(json, "loads", None)
+    assert fn is not None
+    return fn
