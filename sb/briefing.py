@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import date, datetime
 from typing import Final
 
 from sb.config import Config
@@ -16,15 +16,21 @@ WARN_NONE: Final = "[warn:previous_run_status=none]"
 UNCITED_SID: Final = "uncited"
 UNCITED_MARK: Final = f"[^{UNCITED_SID}]"
 SID_RE: Final = re.compile(r"\[\^([^\]]+)\]")
-ORIGIN_RE: Final = re.compile(r"origin=(\S+)")
-HASH_RE: Final = re.compile(r"hash=([0-9a-fA-F]{64})")
+CANONICAL_RE: Final = re.compile(
+    r"origin=(\S+)\s+hash=([0-9a-fA-F]{64})\s+\[\^([^\]]+)\]\s+text=(.+)$"
+)
+MIN_CITED_RECS: Final = 3
 
 PROMPT_TEMPLATE: Final = """다음 입력만 근거로 오늘의 추천 불릿만 한국어로 작성하라.
 규칙:
 - 추천은 3-5개
-- 모든 추천 불릿은 하나 이상의 [^sid] 각주를 포함한다
+- 각 추천 불릿은 아래 표의 각주를 하나 이상 그대로 포함한다
+- 표에 없는 각주를 만들지 마라
 - 입력에 없는 사실을 만들지 마라
 - 제목이나 다른 섹션 헤더는 출력하지 마라
+
+available-citations:
+{available_citations}
 
 어제 들어온 것:
 {yesterday_items}
@@ -46,16 +52,25 @@ PROMPT_TEMPLATE: Final = """다음 입력만 근거로 오늘의 추천 불릿�
 """
 
 
+def _local_today() -> date:
+    """Host local calendar date, not UTC."""
+    return datetime.now().astimezone().date()
+
+
 def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) -> PageSpec:
     """Map frozen briefing inputs to a cited Korean daily PageSpec.
 
     Pipeline and vault own I/O. This function only fills prompt slots, calls
     the LLM at most `max_llm_calls_briefing` times, and returns a PageSpec.
     """
-    prompt = _fill_prompt(inputs)
+    cites = _input_sources(inputs)
+    prompt = _fill_prompt(inputs, cites)
     cap = config.caps["max_llm_calls_briefing"]
     if cap >= 1:
-        recs = _mark_uncited_bullets(_recommendation_body(llm.generate(prompt)))
+        recs = _require_cited_recs(
+            _mark_uncited_bullets(_recommendation_body(llm.generate(prompt))),
+            frozenset(cite.sid for cite in cites),
+        )
     else:
         recs = EMPTY_PLACEHOLDER
     status = inputs.previous_run_status
@@ -63,7 +78,7 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
         recs = f"{WARN_NONE}\n{recs}"
     if status == "failed":
         recs = f"{WARN_FAILED}\n{recs}"
-    day = datetime.now(UTC).date().isoformat()
+    day = _local_today().isoformat()
     body = "\n\n".join(
         (
             f"# {day} 브리핑",
@@ -78,13 +93,14 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
         page_id=f"daily/{day}",
         title=f"{day} 브리핑",
         body_md=body,
-        sources=_input_sources(inputs),
+        sources=cites,
         status="active",
     )
 
 
-def _fill_prompt(inputs: BriefingInputs) -> str:
+def _fill_prompt(inputs: BriefingInputs, cites: list[SourceCite]) -> str:
     return PROMPT_TEMPLATE.format(
+        available_citations=_citation_table(cites),
         yesterday_items=_slot_text(inputs.yesterday_items),
         open_conflicts=_slot_text(inputs.open_conflict_pages),
         stale_pages=_slot_text(inputs.stale_pages),
@@ -92,6 +108,12 @@ def _fill_prompt(inputs: BriefingInputs) -> str:
         last_brief=_optional_text(inputs.last_brief),
         previous_run_status=_optional_text(inputs.previous_run_status),
     )
+
+
+def _citation_table(cites: list[SourceCite]) -> str:
+    if not cites:
+        return EMPTY_PLACEHOLDER
+    return "\n".join(f"[^{cite.sid}] origin={cite.origin} hash={cite.hash}" for cite in cites)
 
 
 def _slot_text(items: tuple[str, ...]) -> str:
@@ -141,6 +163,22 @@ def _mark_uncited_bullets(recs: str) -> str:
     return "\n".join(lines)
 
 
+def _require_cited_recs(recs: str, allowed: frozenset[str]) -> str:
+    if len(allowed) < MIN_CITED_RECS:
+        return recs
+    cited = 0
+    for line in recs.splitlines():
+        if line.lstrip().startswith("-") and any(match.group(1) in allowed for match in SID_RE.finditer(line)):
+            cited += 1
+    missing = MIN_CITED_RECS - cited
+    if missing <= 0:
+        return recs
+    pad = "\n".join(f"- {UNCITED_MARK}" for _ in range(missing))
+    if recs == EMPTY_PLACEHOLDER:
+        return pad
+    return f"{recs.rstrip()}\n{pad}"
+
+
 def _input_sources(inputs: BriefingInputs) -> list[SourceCite]:
     items: list[str] = [
         *inputs.yesterday_items,
@@ -153,22 +191,19 @@ def _input_sources(inputs: BriefingInputs) -> list[SourceCite]:
     by_sid: dict[str, SourceCite] = {}
     for item in items:
         cite = _cite_from_item(item)
-        if cite is None:
+        if cite is None or cite.sid in by_sid:
             continue
-        if cite.sid not in by_sid:
-            by_sid[cite.sid] = cite
+        by_sid[cite.sid] = cite
     return [by_sid[key] for key in sorted(by_sid)]
 
 
 def _cite_from_item(item: str) -> SourceCite | None:
-    origin_match = ORIGIN_RE.search(item)
-    hash_match = HASH_RE.search(item)
-    if origin_match is None or hash_match is None:
+    matched = CANONICAL_RE.search(item.strip())
+    if matched is None:
         return None
-    origin = origin_match.group(1)
-    digest = hash_match.group(1).lower()
-    expected = digest[:8]
-    sids = [match.group(1) for match in SID_RE.finditer(item)]
-    if expected not in sids:
+    origin = matched.group(1)
+    digest = matched.group(2).lower()
+    sid = matched.group(3).lower()
+    if not matched.group(4).strip() or sid != digest[:8]:
         return None
-    return SourceCite(sid=expected, origin=origin, hash=digest)
+    return SourceCite(sid=digest[:8], origin=origin, hash=digest)
