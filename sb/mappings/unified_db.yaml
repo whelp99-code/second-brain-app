@@ -1,0 +1,36 @@
+# Adjustment point B: recorded from unified-db init SQL (catalog/memory/evidence).
+# Event/evidence watermarks are occurred_at + primary key (lossless ties).
+page_size: 1000
+projects:
+  schema: catalog
+  table: projects
+  project_id: project_id
+  display_name: display_name
+  aliases: aliases
+  active: active
+sources:
+  schema: catalog
+  table: sources
+  source_id: source_id
+  enabled: enabled
+tables:
+  - schema: memory
+    table: events
+    pk: event_id
+    occurred_at: occurred_at
+    project_id: project_id
+    source_id: source_id
+    text:
+      - actor
+      - action
+      - status
+      - summary
+  - schema: evidence
+    table: items
+    pk: evidence_id
+    occurred_at: occurred_at
+    project_id: project_id
+    source_id: source_id
+    text:
+      - uri
+      - sensitivity

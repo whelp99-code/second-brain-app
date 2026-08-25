@@ -1,0 +1,322 @@
+"""Checked-in unified-db table map. YAML is parsed once at this boundary."""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Final, Protocol, override
+
+import yaml
+
+from sb.connectors.base import ItemMeta
+from sb.contracts import SourceRef
+
+_MAPPING: Final = Path(__file__).resolve().parent.parent / "mappings" / "unified_db.yaml"
+_IDENT: Final = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+type JVal = str | int | float | bool | None | list[JVal] | dict[str, JVal]
+
+
+class _Loads(Protocol):
+    def __call__(
+        self, s: str, *, object_pairs_hook: Callable[[list[tuple[str, JVal]]], dict[str, JVal]]
+    ) -> JVal: ...
+
+
+class _Dump(Protocol):
+    def __call__(self, obj: object) -> str: ...
+
+
+class _Yaml(Protocol):
+    def __call__(self, stream: str) -> object: ...
+
+
+@dataclass(frozen=True, slots=True)
+class MappingError(Exception):
+    reason: str
+
+    @override
+    def __str__(self) -> str:
+        return self.reason
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogSpec:
+    schema: str
+    table: str
+    columns: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScanTable:
+    name: str
+    schema: str
+    table: str
+    pk: str
+    occurred_at: str
+    project_id: str
+    source_id: str
+    text: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MappingSpec:
+    page_size: int
+    projects: CatalogSpec
+    sources: CatalogSpec
+    tables: tuple[ScanTable, ...]
+
+
+def load_mapping(path: Path | None = None) -> MappingSpec:
+    """Parse the YAML map into typed scan specs."""
+    text = _dump()(_yaml()((path if path is not None else _MAPPING).read_text(encoding="utf-8")))
+    raw = _jdict(_loads()(text, object_pairs_hook=_pairs), "root")
+    projects = _jdict(raw.get("projects"), "projects")
+    sources = _jdict(raw.get("sources"), "sources")
+    return MappingSpec(
+        _int(raw.get("page_size"), "page_size"),
+        CatalogSpec(
+            _ident(projects.get("schema")),
+            _ident(projects.get("table")),
+            (
+                _ident(projects.get("project_id")),
+                _ident(projects.get("display_name")),
+                _ident(projects.get("aliases")),
+                _ident(projects.get("active")),
+            ),
+        ),
+        CatalogSpec(
+            _ident(sources.get("schema")),
+            _ident(sources.get("table")),
+            (_ident(sources.get("source_id")), _ident(sources.get("enabled"))),
+        ),
+        tuple(_scan_table(item) for item in _jlist(raw.get("tables"), "tables")),
+    )
+
+
+def catalog_sql(spec: CatalogSpec) -> str:
+    return f"SELECT {', '.join(quote(col) for col in spec.columns)} FROM {quote(spec.schema)}.{quote(spec.table)}"
+
+
+def select_sql(table: ScanTable, watermarked: bool) -> str:
+    cols = (table.pk, table.occurred_at, table.project_id, table.source_id, *table.text)
+    relation = f"{quote(table.schema)}.{quote(table.table)}"
+    order = f"ORDER BY {quote(table.occurred_at)} ASC, {quote(table.pk)} ASC"
+    select = f"SELECT {', '.join(quote(col) for col in cols)} FROM {relation}"
+    if watermarked:
+        return f"{select} WHERE ({quote(table.occurred_at)}, {quote(table.pk)}) > (%s, %s) {order} LIMIT %s"
+    return f"{select} {order} LIMIT %s"
+
+
+def quote(name: str) -> str:
+    if _IDENT.fullmatch(name) is None:
+        raise MappingError(name)
+    return f'"{name}"'
+
+
+def _scan_table(raw: JVal) -> ScanTable:
+    item = _jdict(raw, "table")
+    schema = _ident(item.get("schema"))
+    table = _ident(item.get("table"))
+    return ScanTable(
+        f"{schema}.{table}",
+        schema,
+        table,
+        _ident(item.get("pk")),
+        _ident(item.get("occurred_at")),
+        _ident(item.get("project_id")),
+        _ident(item.get("source_id")),
+        tuple(_ident(col) for col in _jlist(item.get("text"), "text")),
+    )
+
+
+def _ident(value: object) -> str:
+    if not isinstance(value, str) or _IDENT.fullmatch(value) is None:
+        raise MappingError(str(value))
+    return value
+
+
+def _int(value: object, field: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise MappingError(field)
+    return value
+
+
+def _jdict(value: JVal | None, field: str) -> dict[str, JVal]:
+    if not isinstance(value, dict):
+        raise MappingError(field)
+    return value
+
+
+def _jlist(value: JVal | None, field: str) -> list[JVal]:
+    if not isinstance(value, list):
+        raise MappingError(field)
+    return value
+
+
+def _pairs(pairs: list[tuple[str, JVal]]) -> dict[str, JVal]:
+    return dict(pairs)
+
+
+def _loads() -> _Loads:
+    fn: _Loads | None = getattr(json, "loads", None)
+    assert fn is not None
+    return fn
+
+
+def _dump() -> _Dump:
+    fn: _Dump | None = getattr(json, "dumps", None)
+    assert fn is not None
+    return fn
+
+
+def _yaml() -> _Yaml:
+    fn: _Yaml | None = getattr(yaml, "safe_load", None)
+    assert fn is not None
+    return fn
+
+
+type Scalar = str | int | bool | datetime | list[str] | None
+type Mark = tuple[datetime, str]
+type Item = tuple[SourceRef, bytes, ItemMeta]
+
+
+@dataclass(frozen=True, slots=True)
+class AmbiguousProjectError(Exception):
+    name: str
+
+    @override
+    def __str__(self) -> str:
+        return f"ambiguous project: {self.name}"
+
+
+@dataclass(frozen=True, slots=True)
+class UnknownProjectError(Exception):
+    name: str
+
+    @override
+    def __str__(self) -> str:
+        return f"unknown project: {self.name}"
+
+
+@dataclass(slots=True)
+class EmitCtx:
+    """Per-scan project lookup and disabled-source skip set."""
+
+    adapter_id: str
+    lookup: dict[str, str]
+    disabled: frozenset[str]
+    seen_disabled: set[str]
+
+
+def build_lookup(rows: list[tuple[Scalar, ...]]) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for project_id, display_name, aliases, _active in rows:
+        if not isinstance(project_id, str):
+            raise UnknownProjectError(str(project_id))
+        names = [project_id]
+        if isinstance(display_name, str):
+            names.append(display_name)
+        names.extend(_alias_names(aliases))
+        for name in names:
+            key = name.strip().casefold()
+            if not key:
+                continue
+            existing = lookup.get(key)
+            if existing is not None and existing != project_id:
+                raise AmbiguousProjectError(name)
+            lookup[key] = project_id
+    return lookup
+
+
+def _alias_names(raw: Scalar) -> tuple[str, ...]:
+    if isinstance(raw, list):
+        return tuple(raw)
+    if not isinstance(raw, str) or not raw:
+        return ()
+    trim = " \t\"'[]{}"
+    return tuple(part.strip(trim) for part in raw.split(",") if part.strip(trim))
+
+
+def disabled_sources(rows: list[tuple[Scalar, ...]]) -> frozenset[str]:
+    return frozenset(source for source, enabled in rows if isinstance(source, str) and enabled is False)
+
+
+def emit_row(table: ScanTable, row: tuple[Scalar, ...], ctx: EmitCtx) -> tuple[Item | None, Mark]:
+    pk = cell_text(row[0])
+    stamp = row[1] if isinstance(row[1], datetime) else datetime.fromisoformat(cell_text(row[1]))
+    source = cell_text(row[3])
+    mark = (stamp, pk)
+    if source in ctx.disabled:
+        if source in ctx.seen_disabled:
+            return None, mark
+        ctx.seen_disabled.add(source)
+        skip: Item = (
+            SourceRef(ctx.adapter_id, f"unified-db:{source}:disabled", "disabled"),
+            b"",
+            {"relative_path": source, "skip_reason": "disabled"},
+        )
+        return skip, mark
+    project = resolve_project(row[2], ctx.lookup)
+    fields = [
+        (table.pk, pk),
+        (table.occurred_at, stamp.isoformat()),
+        (table.project_id, project),
+        (table.source_id, source),
+        *zip(table.text, (cell_text(value) for value in row[4:]), strict=False),
+    ]
+    token = f"{stamp.isoformat()}|{pk}"
+    meta: ItemMeta = {"relative_path": table.name, "cursor": token}
+    body = "\n".join(f"{key}: {value}" for key, value in fields).encode()
+    item: Item = (SourceRef(ctx.adapter_id, f"unified-db:{project}:{table.name}:{pk}", token), body, meta)
+    return item, mark
+
+
+def resolve_project(raw: Scalar, lookup: dict[str, str]) -> str:
+    if raw is None or raw == "":
+        return "global"
+    if not isinstance(raw, str):
+        raise UnknownProjectError(str(raw))
+    found = lookup.get(raw.strip().casefold())
+    if found is None:
+        raise UnknownProjectError(raw)
+    return found
+
+
+def cell_text(value: Scalar) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, list):
+        return ",".join(value)
+    return str(value)
+
+
+def decode_cursor(cursor: str | None) -> dict[str, Mark]:
+    if cursor is None or cursor == "":
+        return {}
+    try:
+        loaded = _loads()(cursor, object_pairs_hook=_pairs)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    out: dict[str, Mark] = {}
+    for key, value in loaded.items():
+        if not isinstance(value, dict):
+            continue
+        stamp, pk = value.get("occurred_at"), value.get("id")
+        if isinstance(stamp, str) and isinstance(pk, str) and stamp and pk:
+            out[key] = (datetime.fromisoformat(stamp), pk)
+    return out
+
+
+def encode_cursor(marks: dict[str, Mark]) -> str:
+    payload = {name: {"occurred_at": stamp.isoformat(), "id": pk} for name, (stamp, pk) in sorted(marks.items())}
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True)
