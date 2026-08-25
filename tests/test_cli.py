@@ -357,13 +357,13 @@ def test_ingest_then_compile_writes_page_when_markdown_source_present(tmp_path: 
             "llm": {"prompt_version": "v1", "model_id": "fake"},
         }
     )
-    ingested = run_ingest(config, None)
+    ingested = run_ingest(config, ("me-wiki", "markdown-vault"))
     assert ingested.exit_code == 0
     with Ledger(vault) as ledger:
         items = ledger.list_source_items()
         assert items
-        item = items[0]
         cas = ContentAddressedStore(vault)
+        item = next(row for row in items if cas.exists(row.content_hash))
         assert cas.exists(item.content_hash)
         assert ledger.get_cursor(item.source_id)
         text = parser_for(".md")(cas.get(item.content_hash))
@@ -716,3 +716,128 @@ def test_doctor_exits_nonzero_when_citation_unresolved(tmp_path: Path) -> None:
     code, _out, err = _cli_with_config(tmp_path, root, ["doctor"])
     assert code != 0
     assert "traceback" not in err.lower()
+
+
+def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.contracts import SourceRef
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    config = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 10}, "llm": {"prompt_version": "v1", "model_id": "fake"}})
+    fake = FakeLLM(["없음", "없음"])
+
+    class Mixed:
+        source_id: str = "mix"
+        versions: dict[str, str]
+
+        def __init__(self) -> None:
+            self.versions = {"good.md": "v1", "bad.zzz": "v1", "skip.dat": "v1"}
+
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+            del cursor
+            yield SourceRef("mix", "good.md", self.versions["good.md"]), b"ok note\n", {}
+            yield SourceRef("mix", "bad.zzz", self.versions["bad.zzz"]), b"nope", {}
+            yield SourceRef("mix", "skip.dat", self.versions["skip.dat"]), b"", {"skip_reason": "denied-path"}
+
+        def next_cursor(self) -> str:
+            return "end"
+
+    mixed = Mixed()
+
+    def adapters(config: Config) -> dict[str, Mixed]:
+        del config
+        return {"mix": mixed}
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+        del units, ledger, llm, config
+        return []
+
+    def empty_check(
+        units: list[Unit], pages: list[PageSpec], ledger: Ledger, llm: LLMClient, config: Config
+    ) -> list[PageSpec]:
+        del units, pages, ledger, llm, config
+        return []
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    monkeypatch.setattr("sb.conflict.check", empty_check)
+    probe = run_ingest(config, None)
+    assert probe.errors >= 1
+    first = run_all(config)
+    assert first.exit_code == 0
+    first_errors = probe.errors
+    commits = _git_count(root)
+    derivs = _deriv_count(root)
+    calls = fake.calls
+    second = run_all(config)
+    assert second.exit_code == 0
+    assert second.pages == 0
+    assert second.errors == 0
+    assert _git_count(root) == commits
+    assert _deriv_count(root) == derivs
+    assert fake.calls == calls
+    mixed.versions["bad.zzz"] = "v2"
+    third = run_ingest(config, None)
+    assert third.errors >= 1
+    assert first_errors >= 1
+    tight = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 2}})
+
+    class Flood:
+        source_id: str = "flood"
+
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+            del cursor
+            for index in range(5):
+                yield SourceRef("flood", f"n{index}.zzz", "v1"), b"nope", {}
+
+        def next_cursor(self) -> str:
+            return "end"
+
+    def flood_only(config: Config) -> dict[str, Flood]:
+        del config
+        return {"flood": Flood()}
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", flood_only)
+    wave1 = run_ingest(tight, None)
+    assert wave1.status == "capped"
+    assert wave1.exit_code == 0
+    assert wave1.errors == 2
+    wave2 = run_ingest(tight, None)
+    assert wave2.status == "capped"
+    assert wave2.exit_code == 0
+    assert wave2.errors == 2
+
+
+def test_brief_facts_stable_when_only_previous_run_status_changes(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    _seed_status(root, "ok")
+    fake = FakeLLM(["없음", "없음"])
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    monkeypatch.setattr("sb.pipeline._llm", provide)
+    first = run_brief(config, llm_mode="fake")
+    assert first.exit_code == 0
+    assert fake.calls == 1
+    before_deriv = _deriv_count(root)
+    before_commits = _git_count(root)
+    _seed_status(root, "failed")
+    second = run_brief(config, llm_mode="fake")
+    assert second.exit_code == 0
+    assert fake.calls == 1
+    assert _deriv_count(root) == before_deriv
+    assert _git_count(root) == before_commits
+    assert second.git_commit is None

@@ -162,7 +162,9 @@ def collect_briefing_inputs(ledger: Ledger, vault_root: Path, *, today: date | N
     y_items = [
         _cite_line(item.source_id, item.source_uri, item.content_hash, _blob_line(cas, item.content_hash, item.source_uri))
         for item in ledger.list_source_items()
-        if (run := ledger.get_run(item.first_seen_run)) is not None and _as_date(run.started_at) == yesterday
+        if cas.exists(item.content_hash)
+        and (run := ledger.get_run(item.first_seen_run)) is not None
+        and _as_date(run.started_at) == yesterday
     ]
     open_pages = _conflict_items(root, cas)
     stale: list[str] = []
@@ -284,11 +286,12 @@ def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
     return loaded
 
 
-def _brief_facts(inputs: BriefingInputs) -> str:
+def _brief_facts(inputs: BriefingInputs, day: date) -> str:
     payload = "\0".join((
+        day.isoformat(),
         *inputs.yesterday_items, "\x1e", *inputs.open_conflict_pages, "\x1e",
         *inputs.stale_pages, "\x1e", *inputs.upcoming_items, "\x1e",
-        inputs.previous_run_status or "",
+        inputs.last_brief or "",
     ))
     return hashlib.sha256(payload.encode()).hexdigest()
 
@@ -334,9 +337,12 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
     with Ledger(root) as ledger:
         _ = ledger.reset_stale_running(run_id)
         report = stage(ledger, vault, run_id)
-        status, exit_code = ("capped", 0) if report.capped else (
-            ("failed", 1) if report.attempted > 0 and report.errors * 2 > report.attempted else ("ok", 0)
-        )
+        if report.capped:
+            status, exit_code = "capped", 0
+        elif report.attempted > 0 and report.errors * 2 > report.attempted:
+            status, exit_code = "failed", 1
+        else:
+            status, exit_code = "ok", 0
         commit, pages, conflicts, errors = None, 0, report.conflicts, report.errors
         rendered = f"{started} run {run_id} {status} pages={{0}} conflicts={{1}} errors={{2}}"
         if report.pages:
@@ -376,7 +382,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         chosen = discover_adapters(config)
         adapters = _select_adapters(chosen, source_ids, config)
         cas, cap = ContentAddressedStore(vault.root), config.caps["max_new_units_per_run"] if limit is None else limit
-        seen = {(item.source_id, item.source_uri, item.content_hash) for item in ledger.list_source_items()}
+        seen = {(item.source_id, item.source_uri, item.source_version) for item in ledger.list_source_items()}
         errors = attempted = 0
         capped = False
         for adapter in adapters:
@@ -388,18 +394,30 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 continue
             progressed = False
             for ref, data, meta in items:
-                if meta.get("skip_reason"):
-                    continue
-                digest = hashlib.sha256(data).hexdigest()
-                if (ref.source_id, ref.source_uri, digest) in seen:
+                version_key = (ref.source_id, ref.source_uri, ref.source_version)
+                if version_key in seen:
                     continue
                 if attempted >= cap:
                     capped = True
                     break
                 attempted += 1
+                if meta.get("skip_reason"):
+                    skip_digest = hashlib.sha256(f"skip:{ref.source_version}".encode()).hexdigest()
+                    ledger.upsert_source_item(SourceItem(
+                        ref.source_id, ref.source_uri, ref.source_version, skip_digest, run_id, run_id
+                    ))
+                    seen.add(version_key)
+                    progressed = True
+                    continue
+                digest = hashlib.sha256(data).hexdigest()
                 units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
                 if not units and data:
                     errors += 1
+                    ledger.upsert_source_item(SourceItem(
+                        ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
+                    ))
+                    seen.add(version_key)
+                    progressed = True
                     continue
                 try:
                     _ = cas.put(data)
@@ -407,10 +425,15 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                         ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
                     ))
                     _store_units(ledger, units)
-                    seen.add((ref.source_id, ref.source_uri, digest))
+                    seen.add(version_key)
                     progressed = True
                 except OSError:
                     errors += 1
+                    ledger.upsert_source_item(SourceItem(
+                        ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
+                    ))
+                    seen.add(version_key)
+                    progressed = True
             if capped:
                 break
             if progressed or not attempted:
@@ -458,8 +481,6 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                     continue
                 if _page_ready(vault.root, page):
                     kept.append(page)
-                else:
-                    errors += 1
         return StageReport(tuple(kept), sum(1 for page in kept if page.page_id.startswith("conflicts/")), errors, max(len(kept), int(bool(run_id))), capped)
 
     return stage
@@ -467,8 +488,9 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
 
 def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str) -> StageFn:
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
-        inputs = collect_briefing_inputs(ledger, vault.root)
-        key = deriv_key((_brief_facts(inputs),), "brief", config.llm.prompt_version, config.llm.model_id)
+        day = datetime.now().astimezone().date()
+        inputs = collect_briefing_inputs(ledger, vault.root, today=day)
+        key = deriv_key((_brief_facts(inputs, day),), "brief", config.llm.prompt_version, config.llm.model_id)
         existing = ledger.get_derivation(key)
         if existing is not None and existing.status == DerivStatus.DONE.value:
             return StageReport((), 0, 0, 0, False)
