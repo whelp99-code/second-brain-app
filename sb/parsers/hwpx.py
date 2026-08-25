@@ -77,10 +77,17 @@ def _read_member(archive: ZipFile, info: ZipInfo) -> bytes:
     return data
 
 
+def _element_local_name(elem: Element) -> str | None:
+    tag = elem.tag
+    if type(tag) is not str:
+        return None
+    return _local_name(tag)
+
+
 def _paragraph_text(paragraph: Element) -> str:
     parts: list[str] = []
     for elem in paragraph.iter():
-        if isinstance(elem.tag, str) and _local_name(elem.tag) == "t" and elem.text:
+        if _element_local_name(elem) == "t" and elem.text:
             parts.append(elem.text)
     return "".join(parts)
 
@@ -88,7 +95,7 @@ def _paragraph_text(paragraph: Element) -> str:
 def _section_text(root: Element) -> str:
     paragraphs: list[str] = []
     for elem in root.iter():
-        if isinstance(elem.tag, str) and _local_name(elem.tag) == "p":
+        if _element_local_name(elem) == "p":
             text = _paragraph_text(elem)
             if text:
                 paragraphs.append(text)

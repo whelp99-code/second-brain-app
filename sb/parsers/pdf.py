@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Final
 
 from pypdf import PageObject, PdfReader
 from pypdf.errors import PyPdfError
+from pypdf.generic import DictionaryObject, PdfObject
 
 from sb.parsers import InvalidInput, LimitExceeded, OcrRequired
 
@@ -17,30 +17,31 @@ PDF_MEDIA_TYPE: Final = "application/pdf"
 PDF_MAX_BYTES: Final = 67_108_864
 
 
-def _resolved_mapping(value):
-    getter = getattr(value, "get_object", None)
-    resolved = getter() if callable(getter) else value
-    if isinstance(resolved, Mapping):
+def _as_dictionary(value: PdfObject | None) -> DictionaryObject | None:
+    if value is None:
+        return None
+    resolved = value.get_object()
+    if isinstance(resolved, DictionaryObject):
         return resolved
     return None
 
 
+def _dictionary_objects(catalog: DictionaryObject) -> list[PdfObject]:
+    values: list[PdfObject] = list(catalog.values())
+    return values
+
+
 def _page_has_image_xobject(page: PageObject) -> bool:
-    resources = page.get("/Resources")
-    if resources is None:
-        return False
-    resolved = _resolved_mapping(resources)
+    resources: PdfObject | None = page.get("/Resources")
+    resolved = _as_dictionary(resources)
     if resolved is None:
         return False
-    xobjects = resolved.get("/XObject")
-    if xobjects is None:
-        return False
-    catalog = _resolved_mapping(xobjects)
+    xobjects: PdfObject | None = resolved.get("/XObject")
+    catalog = _as_dictionary(xobjects)
     if catalog is None:
         return False
-    for key in catalog:
-        stream = catalog[key]
-        material = _resolved_mapping(stream) if stream is not None else None
+    for stream in _dictionary_objects(catalog):
+        material = _as_dictionary(stream)
         if material is not None and material.get("/Subtype") == "/Image":
             return True
     return False

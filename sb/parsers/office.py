@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import zipfile
 from dataclasses import dataclass
-from typing import Final, assert_never
+from typing import Final
 
 from docx import Document
 from docx.opc.exceptions import PackageNotFoundError
@@ -123,17 +123,12 @@ class DocxDocumentParser:
             raise InvalidInput("corrupt docx") from exc
         texts: list[str] = []
         for block in document.iter_inner_content():
-            match block:
-                case Paragraph() as paragraph:
-                    text = paragraph.text.strip()
-                    if text:
-                        texts.append(text)
-                case Table() as table:
-                    text = _table_text(table)
-                    if text:
-                        texts.append(text)
-                case unreachable:
-                    assert_never(unreachable)
+            if isinstance(block, Paragraph):
+                text = block.text.strip()
+            else:
+                text = _table_text(block)
+            if text:
+                texts.append(text)
         return "\n".join(texts)
 
 
