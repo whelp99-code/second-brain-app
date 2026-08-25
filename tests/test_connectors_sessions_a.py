@@ -242,6 +242,42 @@ def test_codex_event_user_takes_precedence_over_response_input_text(tmp_path: Pa
     assert "RESPONSE_INPUT_TEXT_FALLBACK" not in texts
 
 
+def test_codex_resume_keeps_session_lineage_when_later_turn_is_appended(
+    tmp_path: Path,
+) -> None:
+    # Given: a live Codex JSONL scanned once, with its byte-offset cursor captured.
+    root = tmp_path / "codex"
+    path = _write_jsonl(
+        root / "live.jsonl",
+        [
+            _codex_session_meta("sess-resume"),
+            _codex_event("task_started", turn_id="t1"),
+            _codex_event("user_message", message="TURN_ONE"),
+        ],
+    )
+    adapter = create_codex(_cfg(CODEX_ID, root, "codex"))
+    first = list(adapter.scan(None))
+    assert _texts(first) == ["TURN_ONE"]
+    cursor = adapter.next_cursor()
+
+    # When: a second task/user is appended after the same session_meta and scan resumes.
+    with path.open("a", encoding="utf-8") as handle:
+        for row in (
+            _codex_event("task_started", turn_id="t2"),
+            _codex_event("user_message", message="TURN_TWO"),
+        ):
+            _ = handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+    resumed = list(adapter.scan(cursor))
+
+    # Then: only the appended turn is delivered, lineage holds, unchanged re-resume is empty.
+    assert _texts(resumed) == ["TURN_TWO"]
+    assert "lineage" not in _skipped(resumed)
+    assert "TURN_ONE" not in _texts(resumed)
+    later = adapter.next_cursor()
+    assert list(adapter.scan(later)) == []
+    assert adapter.next_cursor() == later
+
+
 def test_codex_quarantines_missing_canonical_text_while_sibling_session_ingests(tmp_path: Path) -> None:
     # Given: one session missing canonical user text and one valid sibling.
     root = tmp_path / "codex"

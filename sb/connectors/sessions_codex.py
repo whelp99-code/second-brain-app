@@ -80,7 +80,11 @@ class CodexSessionsAdapter:
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         state = _State()
         with path.open("rb") as handle:
-            _ = handle.seek(start)
+            if start > 0:
+                for line in handle.read(start).splitlines():
+                    parsed = _obj(line.strip())
+                    if parsed is not None:
+                        _ = _interpret(state, parsed)
             while True:
                 raw = handle.readline()
                 if not raw:
