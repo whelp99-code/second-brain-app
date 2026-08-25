@@ -7,6 +7,7 @@ import fcntl
 import hashlib
 import os
 import re
+import sqlite3
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -29,7 +30,7 @@ from sb.store import (
 )
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, parse_page_frontmatter
-from sb.vault import Vault
+from sb.vault import GitCommandError, Vault, VaultLintError
 
 STALE_AFTER: Final = timedelta(days=30)
 UPCOMING_WINDOW: Final = timedelta(days=7)
@@ -305,9 +306,29 @@ def _finish_deriv(ledger: Ledger, key: str | None, digest: str, path: str) -> No
     ledger.mark_done(key, DerivationOutput(digest, path))
 
 
-def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
-    from sb.vault import VaultLintError
+def _fail_deriv(ledger: Ledger, key: str | None, error: str) -> None:
+    if key is None:
+        return
+    ledger.mark_failed(key, error)
 
+
+def _reopen_failed(ledger: Ledger, key: str) -> None:
+    """Return a failed brief key to pending so the same key can mark_running again."""
+    row = ledger.get_derivation(key)
+    if row is None or row.status != DerivStatus.FAILED.value:
+        return
+    path = ledger.db_path
+    ledger.close()
+    with sqlite3.connect(path) as conn:
+        _ = conn.execute(
+            "UPDATE derivation SET status=?, error=NULL, finished_at=NULL WHERE deriv_key=?",
+            (DerivStatus.PENDING.value, key),
+        )
+        conn.commit()
+    ledger.open()
+
+
+def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
     run_id, started, vault = uuid4().hex, datetime.now(UTC).isoformat(), Vault(root=root)
     compiled = _Compiled(root, ContentAddressedStore(root))
     with Ledger(root) as ledger:
@@ -324,10 +345,9 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
                     root, vault, run_id, report, rendered.format(len(report.pages), conflicts, errors), compiled
                 )
                 _finish_deriv(ledger, report.deriv_key, hashlib.sha256(report.pages[0].body_md.encode()).hexdigest(), f"{report.pages[0].page_id}.md")
-            except VaultLintError as exc:
+            except (VaultLintError, GitCommandError, OSError) as exc:
+                _fail_deriv(ledger, report.deriv_key, str(exc))
                 status, exit_code, errors = "failed", 1, max(errors, 1)
-                # Leave derivation running so the next run resets it and retries the LLM.
-                del exc
         if status == "failed":
             rendered = f"{started} run {run_id} {status} pages={{0}} conflicts={{1}} errors={{2}}"
         ledger.record_run(Run(run_id, started, datetime.now(UTC).isoformat(), commit, status))
@@ -452,6 +472,8 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
         existing = ledger.get_derivation(key)
         if existing is not None and existing.status == DerivStatus.DONE.value:
             return StageReport((), 0, 0, 0, False)
+        if existing is not None and existing.status == DerivStatus.FAILED.value:
+            _reopen_failed(ledger, key)
         ledger.ensure_derivation(key, "brief", run_id)
         try:
             ledger.mark_running(key, run_id)

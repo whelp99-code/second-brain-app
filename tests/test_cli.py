@@ -571,6 +571,55 @@ def test_brief_lint_failure_does_not_mark_done_and_rerun_calls_generator(
     assert second.exit_code == 1
 
 
+def test_brief_vault_failure_marks_original_key_failed_and_retries_same_key(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    config, root = _ready(tmp_path)
+    digest = _put(root, b"blob")
+    _seed_status(root)
+    before_log = (root / "log.md").read_bytes()
+    before_commits = _git_count(root)
+    calls = {"n": 0}
+    cite = SourceCite(sid=digest[:8], origin="me-wiki:notes/new.md", hash=digest)
+    bad = PageSpec("daily/x", "X", "bad.[^zzzzzzzz]", [cite], "active")
+    good = _page(digest, page_id="daily/ok")
+
+    def gen(inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec:
+        del inputs, llm, config
+        calls["n"] += 1
+        return bad if calls["n"] == 1 else good
+
+    first = run_brief(config, generator=gen)
+    assert first.exit_code == 1
+    assert first.status == "failed"
+    assert first.git_commit is None
+    briefs = [row for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values() if row.stage == "brief"]
+    assert len(briefs) == 1
+    key = briefs[0].deriv_key
+    assert briefs[0].status == "failed"
+    assert briefs[0].status != "running"
+    assert (root / "log.md").read_bytes() == before_log
+    assert _git_count(root) == before_commits
+    assert "failed" in (root / ".sb" / "runs.log").read_text(encoding="utf-8")
+
+    def boom_brief(inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec:
+        del inputs, llm, config
+        return bad
+
+    monkeypatch.setattr("sb.briefing.generate_briefing", boom_brief)
+    code, out, err = _cli_with_config(tmp_path, root, ["brief", "--llm", "fake"])
+    assert code != 0
+    assert "traceback" not in f"{out}{err}".lower()
+    _seed_status(root, "ok")
+    second = run_brief(config, generator=gen)
+    assert calls["n"] == 2
+    after = load_ledger_tables(root / ".sb" / "ledger.db").derivations[key]
+    assert after.deriv_key == key
+    assert after.status == "done"
+    assert second.exit_code == 0
+    assert second.git_commit is not None
+
+
 def test_run_all_records_failed_run_without_traceback(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     config, root = _ready(tmp_path)
     digest = _put(root, b"blob")
