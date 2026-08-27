@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import re
 import subprocess
@@ -14,6 +15,7 @@ from io import StringIO
 from multiprocessing import Event, Process
 from multiprocessing.synchronize import Event as MpEvent
 from pathlib import Path
+from typing import cast
 
 from pytest import MonkeyPatch
 
@@ -39,7 +41,19 @@ TODAY = date(2026, 8, 26)
 RUNS_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\S+ run \S+ (ok|capped|failed) pages=\d+ conflicts=\d+ errors=\d+$"
 )
-COMMANDS = ("init", "ingest", "compile", "brief", "run", "status", "rollback", "doctor", "mcp")
+COMMANDS = (
+    "init",
+    "ingest",
+    "compile",
+    "brief",
+    "run",
+    "status",
+    "rollback",
+    "doctor",
+    "mcp",
+    "search",
+    "remember",
+)
 
 
 def _hold_exclusive_lock(lock_path: str, held: MpEvent, release: MpEvent) -> None:
@@ -270,7 +284,7 @@ def test_run_brief_passes_same_inputs_instance_to_generator(
     assert seen[0] is sentinel
 
 
-def test_help_lists_nine_subcommands() -> None:
+def test_help_lists_eleven_subcommands() -> None:
     code, out, _err = _cli(["--help"])
     assert code == 0
     for name in COMMANDS:
@@ -1072,3 +1086,72 @@ def test_rebucketed_existing_source_dates_do_not_change_brief_key(
     assert failed == before_failed
     if daily.is_file():
         assert daily.read_bytes() == before_daily
+
+
+class _NoCompiledHash:
+    """Test ledger: every page is new, so the compiled-hash lookup stays empty."""
+
+    def last_compiled_hash(self, page_id: str) -> str | None:
+        del page_id
+        return None
+
+
+def _seed_page(root: Path, page_id: str, title: str, body: str) -> None:
+    digest = _put(root, b"cli-search-seed")
+    sid = digest[:8]
+    cite = SourceCite(sid=sid, origin="me-wiki:notes/x.md", hash=digest)
+    spec = PageSpec(page_id, title, f"# {title}\n{body}[^{sid}]\n", [cite], "active")
+    _ = Vault(root=root).write_pages((spec,), "run-cli-search", _NoCompiledHash())
+
+
+def test_remember_writes_inbox_note(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    argv = ["remember", "계약서 수요일 발송", "--title", "계약"]
+    code, out, _err = _cli_with_config(tmp_path, root, argv)
+    assert code == 0
+    rel = out.strip()
+    assert rel.startswith("inbox/")
+    assert rel.endswith("-계약.md")
+    assert (root / rel).read_text(encoding="utf-8") == "계약서 수요일 발송"
+
+
+def test_remember_rejects_blank_content_without_writing(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    code, _out, err = _cli_with_config(tmp_path, root, ["remember", "   "])
+    assert code == 2
+    assert "requires content" in err
+    assert list((root / "inbox").glob("*.md")) == []
+
+
+def test_search_reports_no_match_on_fresh_vault(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    code, out, _err = _cli_with_config(tmp_path, root, ["search", "AlphaEngineer"])
+    assert code == 0
+    assert out.strip() == "no match"
+
+
+def test_search_json_emits_empty_array_on_fresh_vault(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    code, out, _err = _cli_with_config(tmp_path, root, ["search", "AlphaEngineer", "--json"])
+    assert code == 0
+    assert json.loads(out) == []
+
+
+def test_search_prints_page_id_and_snippet_for_a_hit(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    _seed_page(root, "wiki/alpha", "Alpha", "AlphaEngineer builds tools.")
+    code, out, _err = _cli_with_config(tmp_path, root, ["search", "AlphaEngineer"])
+    assert code == 0
+    lines = out.splitlines()
+    assert lines[0] == "wiki/alpha — Alpha"
+    assert lines[1].startswith("  ")
+    assert lines[1].strip() != ""
+
+
+def test_search_json_carries_page_id_for_a_hit(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    _seed_page(root, "wiki/alpha", "Alpha", "AlphaEngineer builds tools.")
+    code, out, _err = _cli_with_config(tmp_path, root, ["search", "AlphaEngineer", "--json"])
+    assert code == 0
+    hits = cast(list[dict[str, object]], json.loads(out))
+    assert [hit["page_id"] for hit in hits] == ["wiki/alpha"]

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
-import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, override
 
@@ -14,8 +11,11 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from sb.config import load_config
+from sb.inbox import RememberRejected, write_inbox
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.vault import PathEscapeError
+
+__all__ = ("RememberRejected", "write_inbox")
 
 K5_TOOLS: Final = (
     "sb_open_conflicts",
@@ -24,18 +24,7 @@ K5_TOOLS: Final = (
     "sb_remember",
     "sb_search",
 )
-MAX_REMEMBER_BYTES: Final = 1024 * 1024
-_SLUG_RE: Final = re.compile(r"[^0-9A-Za-z가-힣]+")
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
-
-
-@dataclass(frozen=True, slots=True)
-class RememberRejected(Exception):
-    reason: str
-
-    @override
-    def __str__(self) -> str:
-        return self.reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,34 +67,6 @@ class ConflictRow:
             "page_id": self.page_id,
             "summary": self.summary,
         }
-
-
-def write_inbox(root: Path, content: str, title: str | None) -> Path:
-    """Write UTF-8 text <=1MB to a new `inbox/<ISO>-<slug>.md`. Never overwrites."""
-    try:
-        data = content.encode("utf-8")
-    except UnicodeEncodeError as exc:
-        raise RememberRejected("invalid utf-8") from exc
-    if len(data) > MAX_REMEMBER_BYTES:
-        raise RememberRejected("content exceeds 1MB")
-    vault = root.resolve()
-    inbox = (root / "inbox").resolve()
-    if not inbox.is_relative_to(vault):
-        raise RememberRejected("inbox escapes vault")
-    inbox.mkdir(parents=True, exist_ok=True)
-    slug = _slug(title)
-    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%S%f")
-    dest = inbox / f"{stamp}-{slug}.md"
-    suffix = 1
-    while dest.exists():
-        suffix += 1
-        dest = inbox / f"{stamp}-{slug}-{suffix}.md"
-    if not dest.resolve().is_relative_to(inbox):
-        raise RememberRejected("inbox escapes vault")
-    tmp = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
-    _ = tmp.write_bytes(data)
-    os.replace(tmp, dest)
-    return dest.relative_to(vault)
 
 
 def read_page(root: Path, page_id: str) -> PageRead:
@@ -174,11 +135,23 @@ def build_server(vault_root: Path | str | None = None) -> MCPServer:
 
     @server.tool(name="sb_search")
     def sb_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
+        """Search the compiled wiki, daily briefs, and conflict pages for `query`.
+
+        Use this to answer questions about what the user has recorded before.
+        Returns ranked sections with a snippet and the `page_id` to pass to
+        `sb_read_page`.
+        """
         hits = SearchIndex(vault_root=root).search(query, limit)
         return {"results": [hit.as_dict() for hit in hits]}
 
     @server.tool(name="sb_read_page")
     def sb_read_page(id: str) -> dict[str, dict[str, str] | str]:
+        """Read one committed page whole, with its citation frontmatter.
+
+        `id` is a `page_id` from `sb_search`, `sb_recent_changes`, or
+        `sb_open_conflicts` (`daily/2026-08-26`, `conflicts/<slug>`, or a bare
+        wiki id). Read the page before quoting it; snippets are truncated.
+        """
         try:
             page = read_page(root, id)
         except (PathEscapeError, PageNotFoundError) as exc:
@@ -187,14 +160,31 @@ def build_server(vault_root: Path | str | None = None) -> MCPServer:
 
     @server.tool(name="sb_recent_changes")
     def sb_recent_changes(days: int = 7) -> dict[str, list[dict[str, str]]]:
+        """List pages added, modified, or deleted in the last `days` days.
+
+        Use this for "what changed" or "what have I been working on" questions,
+        or to find the newest page before reading it.
+        """
         return {"changes": [row.as_dict() for row in recent_changes(root, days)]}
 
     @server.tool(name="sb_open_conflicts")
     def sb_open_conflicts() -> dict[str, list[dict[str, str]]]:
+        """List unresolved contradictions between recorded sources.
+
+        Each row names the conflicted `page_id`. Check this before stating a
+        fact from the wiki as settled.
+        """
         return {"conflicts": [row.as_dict() for row in open_conflicts(root)]}
 
     @server.tool(name="sb_remember")
     def sb_remember(content: str, title: str | None = None) -> dict[str, str]:
+        """Record `content` as a note for the second brain to absorb.
+
+        This is the only write. Use it whenever the user says to remember,
+        note, or record something, including personal details. The note lands
+        in the vault inbox and is picked up by the next ingest run; it does not
+        appear in search immediately.
+        """
         try:
             rel = write_inbox(root, content, title)
         except RememberRejected as exc:
@@ -244,12 +234,6 @@ def _frontmatter(block: str) -> dict[str, str]:
         if sep:
             out[key.strip()] = value.strip().strip("'\"")
     return out
-
-
-def _slug(title: str | None) -> str:
-    raw = "" if title is None else title.strip()
-    cleaned = _SLUG_RE.sub("-", raw).strip("-").lower()
-    return (cleaned or "note")[:40]
 
 
 def _conflict_page(stem: str) -> str:

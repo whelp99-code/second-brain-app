@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -12,7 +13,9 @@ from enum import StrEnum
 from pathlib import Path
 
 from sb.config import load_config
+from sb.inbox import RememberRejected, write_inbox
 from sb.pipeline import audit_citations, read_status, run_all, run_brief, run_compile, run_ingest
+from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import RunCommitNotFoundError, Vault, VaultLintError, init_vault
 
@@ -27,6 +30,8 @@ class Command(StrEnum):
     ROLLBACK = "rollback"
     DOCTOR = "doctor"
     MCP = "mcp"
+    SEARCH = "search"
+    REMEMBER = "remember"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -47,6 +52,13 @@ def _parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser(Command.DOCTOR.value)
     _ = doctor.add_argument("--rebuild-ledger", action="store_true")
     _ = sub.add_parser(Command.MCP.value)
+    search_cmd = sub.add_parser(Command.SEARCH.value)
+    _ = search_cmd.add_argument("query")
+    _ = search_cmd.add_argument("--limit", type=int)
+    _ = search_cmd.add_argument("--json", action="store_true")
+    remember = sub.add_parser(Command.REMEMBER.value)
+    _ = remember.add_argument("content")
+    _ = remember.add_argument("--title")
     return parser
 
 
@@ -144,6 +156,38 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             return 1
         return 0
 
+    def search() -> int:
+        query = _opt_str(ns, "query")
+        if query is None or not query.strip():
+            print("search requires a query", file=sys.stderr)
+            return 2
+        hits = SearchIndex(vault_root=Path(config.vault_root)).search(
+            query, _opt_int(ns, "limit") or 10
+        )
+        if _opt_flag(ns, "json"):
+            print(json.dumps([hit.as_dict() for hit in hits], ensure_ascii=False, indent=2))
+            return 0
+        if not hits:
+            print("no match")
+            return 0
+        for hit in hits:
+            print(f"{hit.page_id} — {hit.section}")
+            print(f"  {hit.snippet}")
+        return 0
+
+    def remember() -> int:
+        content = _opt_str(ns, "content")
+        if content is None or not content.strip():
+            print("remember requires content", file=sys.stderr)
+            return 2
+        try:
+            rel = write_inbox(Path(config.vault_root), content, _opt_str(ns, "title"))
+        except RememberRejected as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(rel.as_posix())
+        return 0
+
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
         Command.INGEST: ingest,
@@ -154,12 +198,14 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.ROLLBACK: rollback,
         Command.DOCTOR: doctor,
         Command.MCP: _mcp,
+        Command.SEARCH: search,
+        Command.REMEMBER: remember,
     }
     return handlers[command]()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Parse argv and dispatch one of the nine subcommands."""
+    """Parse argv and dispatch one of the eleven subcommands."""
     parser = _parser()
     tokens = sys.argv[1:] if argv is None else argv
     try:
