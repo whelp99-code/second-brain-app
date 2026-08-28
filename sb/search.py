@@ -1,4 +1,4 @@
-"""Rebuildable FTS5 BM25 search over committed wiki and daily pages."""
+"""Commit-aware FTS5 BM25 search over committed knowledge pages."""
 
 from __future__ import annotations
 
@@ -11,17 +11,14 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Protocol, TypedDict, runtime_checkable
+from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
 from sb.config import APP_ROOT
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
-_INDEX_PREFIXES: Final = ("wiki/", "daily/")
-_FTS_SELECT: Final = (
-    "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs) "
-    + "FROM docs WHERE docs MATCH {match} ORDER BY bm25(docs), page_id, section LIMIT {limit}"
-)
+_INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
+_INDEX_SCHEMA_VERSION: Final = "2"
 
 
 class SearchHitDict(TypedDict):
@@ -113,13 +110,30 @@ class SearchIndex:
     vault_root: Path
     hybrid: bool | None = None
 
-    def search(self, query: str, limit: int = 10) -> tuple[SearchHit, ...]:
-        """Rebuild the FTS5 index from HEAD, then BM25-search `query`."""
+    def search(
+        self,
+        query: str,
+        limit: int = 10,
+        *,
+        kinds: Sequence[str] | None = None,
+        status: str | None = None,
+        updated_from: str | None = None,
+        updated_to: str | None = None,
+    ) -> tuple[SearchHit, ...]:
+        """Refresh from Git HEAD only when needed, then BM25-search `query`."""
         root = self.vault_root
         db_path = _db_path(root)
         with _connect(db_path) as conn:
-            _rebuild(conn, root)
-        hits = _lexical(db_path, query, limit)
+            _refresh(conn, root)
+        hits = _lexical(
+            db_path,
+            query,
+            limit,
+            kinds=kinds,
+            status=status,
+            updated_from=updated_from,
+            updated_to=updated_to,
+        )
         if not _wants_hybrid(self.hybrid):
             return hits
         return _hybrid_or_lexical(hits, query, limit)
@@ -141,70 +155,187 @@ def _connect(path: Path) -> Generator[sqlite3.Connection, None, None]:
         conn.close()
 
 
-def _rebuild(conn: sqlite3.Connection, root: Path) -> None:
-    _ = conn.execute("DROP TABLE IF EXISTS docs")
-    _ = conn.execute(
-        "CREATE VIRTUAL TABLE docs USING fts5(page_id, section, text, tokenize='trigram')"
+def _head(root: Path) -> str | None:
+    raw = git_run(root, "rev-parse", "HEAD")
+    return None if raw is None else raw.strip() or None
+
+
+def _meta(conn: sqlite3.Connection, key: str) -> str | None:
+    row = cast(
+        tuple[object] | None,
+        conn.execute("SELECT value FROM search_meta WHERE key=?", (key,)).fetchone(),
     )
-    rows: list[tuple[str, str, str]] = []
-    for rel in committed_paths(root, _INDEX_PREFIXES):
-        text = committed_text(root, rel)
-        if text is None:
-            continue
-        page_id = rel.removesuffix(".md")
-        for section, body in _sections(text):
-            rows.append((page_id, section, body))
-    _ = conn.executemany("INSERT INTO docs(page_id, section, text) VALUES (?,?,?)", rows)
+    return None if row is None else str(row[0])
 
 
-def _lexical(db_path: Path, query: str, limit: int) -> tuple[SearchHit, ...]:
+def _set_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
+    _ = conn.execute(
+        "INSERT INTO search_meta(key,value) VALUES(?,?) "
+        + "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (key, value),
+    )
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> bool:
+    """Return True when an old or absent index required a clean rebuild."""
+    _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS search_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
+    reset = _meta(conn, "schema_version") != _INDEX_SCHEMA_VERSION
+    if reset:
+        _ = conn.execute("DROP TABLE IF EXISTS docs")
+        _ = conn.execute("DELETE FROM search_meta")
+    _ = conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5("
+        + "page_id UNINDEXED, section, text, kind UNINDEXED, updated UNINDEXED, "
+        + "status UNINDEXED, tokenize='trigram')"
+    )
+    _set_meta(conn, "schema_version", _INDEX_SCHEMA_VERSION)
+    return reset
+
+
+def _frontmatter_value(text: str, key: str) -> str:
+    if not text.startswith("---"):
+        return ""
+    rest = text[3:].lstrip("\n")
+    end = rest.find("\n---")
+    if end < 0:
+        return ""
+    for raw in rest[:end].splitlines():
+        field, sep, value = raw.partition(":")
+        if sep and field.strip() == key:
+            return value.strip().strip("\"'")
+    return ""
+
+
+def _replace_path(
+    conn: sqlite3.Connection,
+    root: Path,
+    rel: str,
+    committed: set[str],
+) -> None:
+    page_id = rel.removesuffix(".md")
+    _ = conn.execute("DELETE FROM docs WHERE page_id=?", (page_id,))
+    if rel not in committed:
+        return
+    text = committed_text(root, rel)
+    if text is None:
+        return
+    kind = rel.partition("/")[0]
+    updated = _frontmatter_value(text, "updated")
+    status = _frontmatter_value(text, "status")
+    rows = [
+        (page_id, section, body, kind, updated, status)
+        for section, body in _sections(text)
+    ]
+    _ = conn.executemany(
+        "INSERT INTO docs(page_id,section,text,kind,updated,status) VALUES(?,?,?,?,?,?)",
+        rows,
+    )
+
+
+def _full_rebuild(conn: sqlite3.Connection, root: Path) -> None:
+    _ = conn.execute("DELETE FROM docs")
+    committed = set(committed_paths(root, _INDEX_PREFIXES))
+    for rel in sorted(committed):
+        _replace_path(conn, root, rel, committed)
+
+
+def _changed_paths(root: Path, previous: str, current: str) -> tuple[str, ...] | None:
+    raw = _git_run_bytes(
+        root,
+        "diff",
+        "--name-only",
+        "-z",
+        previous,
+        current,
+        "--",
+        "wiki",
+        "daily",
+        "conflicts",
+    )
+    if raw is None:
+        return None
+    return tuple(
+        encoded.decode("utf-8", errors="surrogateescape")
+        for encoded in raw.split(b"\0")
+        if encoded.endswith(b".md")
+    )
+
+
+def _refresh(conn: sqlite3.Connection, root: Path) -> None:
+    reset = _ensure_schema(conn)
+    current = _head(root)
+    previous = _meta(conn, "git_head")
+    if current is None:
+        _ = conn.execute("DELETE FROM docs")
+        _ = conn.execute("DELETE FROM search_meta WHERE key='git_head'")
+        return
+    if not reset and current == previous:
+        return
+    changed = None if reset or previous is None else _changed_paths(root, previous, current)
+    if changed is None:
+        _full_rebuild(conn, root)
+    else:
+        committed = set(committed_paths(root, _INDEX_PREFIXES))
+        for rel in changed:
+            _replace_path(conn, root, rel, committed)
+    _set_meta(conn, "git_head", current)
+
+
+def _lexical(
+    db_path: Path,
+    query: str,
+    limit: int,
+    *,
+    kinds: Sequence[str] | None = None,
+    status: str | None = None,
+    updated_from: str | None = None,
+    updated_to: str | None = None,
+) -> tuple[SearchHit, ...]:
     stripped = query.strip()
     if stripped == "" or limit <= 0:
         return ()
     match = '"' + stripped.replace('"', '""') + '"'
-    sql = _FTS_SELECT.format(match=_sql_literal(match), limit=int(limit))
-    raw = _sqlite(db_path, sql)
-    if raw is None or raw == "":
-        return ()
-    hits: list[SearchHit] = []
-    for record in raw.split("\x1e"):
-        if record == "":
-            continue
-        page_id, section, snippet, score = _cells(record)
-        hits.append(SearchHit(page_id, section, snippet, -_float(score)))
-    return tuple(hits)
-
-
-def _sqlite(db_path: Path, sql: str) -> str | None:
-    done = subprocess.run(
-        ["sqlite3", "-separator", "\x1f", "-newline", "\x1e", str(db_path), sql],
-        capture_output=True,
-        text=True,
-        check=False,
+    where = ["docs MATCH ?"]
+    params: list[str | int] = [match]
+    selected_kinds = tuple(dict.fromkeys(kind for kind in (kinds or ()) if kind))
+    if selected_kinds:
+        where.append("kind IN (" + ",".join("?" for _ in selected_kinds) + ")")
+        params.extend(selected_kinds)
+    if status:
+        where.append("status=?")
+        params.append(status)
+    if updated_from:
+        where.append("updated>=?")
+        params.append(updated_from)
+    if updated_to:
+        where.append("updated<=?")
+        params.append(updated_to)
+    params.append(int(limit))
+    sql = (
+        "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs) "
+        + "FROM docs WHERE "
+        + " AND ".join(where)
+        + " ORDER BY bm25(docs), page_id, section LIMIT ?"
     )
-    if done.returncode != 0:
-        return None
-    return done.stdout
-
-
-def _sql_literal(value: str) -> str:
-    return "'" + value.replace("'", "''") + "'"
-
-
-def _cells(record: str) -> tuple[str, str, str, str]:
-    parts = record.split("\x1f")
-    page_id = parts[0] if len(parts) > 0 else ""
-    section = parts[1] if len(parts) > 1 else ""
-    snippet = parts[2] if len(parts) > 2 else ""
-    score = parts[3] if len(parts) > 3 else ""
-    return page_id, section, snippet, score
-
-
-def _float(text: str) -> float:
-    if text == "":
-        return 0.0
     try:
-        return float(text)
+        with _connect(db_path) as conn:
+            rows = cast(
+                list[tuple[object, object, object, object]],
+                conn.execute(sql, tuple(params)).fetchall(),
+            )
+    except sqlite3.DatabaseError:
+        return ()
+    return tuple(
+        SearchHit(str(page_id), str(section), str(snippet), -_score(score))
+        for page_id, section, snippet, score in rows
+    )
+
+
+def _score(value: object) -> float:
+    try:
+        return float(str(value))
     except ValueError:
         return 0.0
 

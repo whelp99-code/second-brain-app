@@ -12,6 +12,7 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from typing import cast
 
 from sb.config import load_config
 from sb.inbox import RememberRejected, write_inbox
@@ -75,6 +76,14 @@ def _parser() -> argparse.ArgumentParser:
     _ = search_cmd.add_argument("query")
     _ = search_cmd.add_argument("--limit", type=int)
     _ = search_cmd.add_argument("--json", action="store_true")
+    _ = search_cmd.add_argument(
+        "--kind",
+        action="append",
+        choices=("wiki", "daily", "conflicts"),
+    )
+    _ = search_cmd.add_argument("--status")
+    _ = search_cmd.add_argument("--updated-from")
+    _ = search_cmd.add_argument("--updated-to")
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
@@ -207,8 +216,23 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if query is None or not query.strip():
             print("search requires a query", file=sys.stderr)
             return 2
+        raw_kinds = vars(ns).get("kind")
+        kinds = (
+            tuple(
+                item
+                for item in cast(list[object], raw_kinds)
+                if isinstance(item, str)
+            )
+            if isinstance(raw_kinds, list)
+            else None
+        )
         hits = SearchIndex(vault_root=Path(config.vault_root)).search(
-            query, _opt_int(ns, "limit") or 10
+            query,
+            _opt_int(ns, "limit") or 10,
+            kinds=kinds,
+            status=_opt_str(ns, "status"),
+            updated_from=_opt_str(ns, "updated_from"),
+            updated_to=_opt_str(ns, "updated_to"),
         )
         if _opt_flag(ns, "json"):
             print(json.dumps([hit.as_dict() for hit in hits], ensure_ascii=False, indent=2))
