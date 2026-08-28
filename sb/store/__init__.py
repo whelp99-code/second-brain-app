@@ -10,8 +10,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final, override
 
-_NULL: Final = "\x1e"
+from pydantic import ConfigDict, TypeAdapter, ValidationError
+
 type SqlCell = str | None
+_SQL_ROWS: Final = TypeAdapter(
+    list[dict[str, SqlCell]], config=ConfigDict(coerce_numbers_to_str=True)
+)
 
 
 class DerivStatus(StrEnum):
@@ -278,7 +282,7 @@ def load_ledger_tables(path: Path) -> LedgerTables:
 
 def _cli(path: Path, sql: str) -> str:
     completed = subprocess.run(
-        ["sqlite3", "-separator", "|", "-nullvalue", _NULL, str(path), sql],
+        ["sqlite3", "-json", str(path), sql],
         capture_output=True, text=True, check=False,
     )
     if completed.returncode != 0:
@@ -287,10 +291,14 @@ def _cli(path: Path, sql: str) -> str:
 
 
 def _rows(path: Path, sql: str) -> list[list[SqlCell]]:
-    rows: list[list[SqlCell]] = []
-    for line in _cli(path, sql).splitlines():
-        rows.append([None if cell == _NULL else cell for cell in line.split("|")])
-    return rows
+    payload = _cli(path, sql).strip()
+    if payload == "":
+        return []
+    try:
+        records = _SQL_ROWS.validate_json(payload)
+    except ValidationError as exc:
+        raise LedgerCorrupt(path=str(path), detail="invalid sqlite JSON output") from exc
+    return [list(record.values()) for record in records]
 
 
 def _cell_text(cell: SqlCell) -> str:
