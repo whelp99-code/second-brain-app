@@ -9,6 +9,7 @@ from typing import Final
 from sb.config import Config
 from sb.contracts import BriefingInputs, PageSpec, SourceCite
 from sb.llm import LLMClient
+from sb.security import protect_briefing_inputs
 
 EMPTY_PLACEHOLDER: Final = "없음"
 WARN_FAILED: Final = "[warn:previous_run_status=failed]"
@@ -63,6 +64,7 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     Pipeline and vault own I/O. This function only fills prompt slots, calls
     the LLM at most `max_llm_calls_briefing` times, and returns a PageSpec.
     """
+    inputs = protect_briefing_inputs(inputs, config)
     cites = _input_sources(inputs)
     prompt = _fill_prompt(inputs, cites)
     cap = config.caps["max_llm_calls_briefing"]

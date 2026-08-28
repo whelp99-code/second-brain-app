@@ -15,6 +15,7 @@ from typing import Final
 from sb.config import Config
 from sb.contracts import ConflictVerdict, PageSpec, SourceCite, Unit
 from sb.llm import LLMBadJson, LLMClient, LLMUnavailable
+from sb.security import protect_units
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
 from sb.store.ledger import Ledger
 
@@ -65,6 +66,7 @@ def check(
     units: Sequence[Unit], pages: Sequence[PageSpec], ledger: Ledger, llm: LLMClient, config: Config,
     *, finalize: bool = True,
 ) -> list[ConflictFinding]:
+    units = protect_units(list(units), config)
     matches = lexical_top(units, pages)
     template = (files("sb") / "prompts" / "conflict.md").read_text(encoding="utf-8")
     version, model = config.llm.prompt_version, config.llm.model_id

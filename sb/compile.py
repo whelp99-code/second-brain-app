@@ -11,6 +11,7 @@ from typing import Final, Protocol
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite, Unit
 from sb.llm import LLMClient, LLMUnavailable
+from sb.security import protect_units
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
 
 COMPILE_STAGE: Final = "compile"
@@ -108,6 +109,7 @@ def compile_pending(
     existing_pages: Mapping[str, PageSpec] | None = None,
 ) -> tuple[list[PendingCompile], bool]:
     """Generate pages but leave successful derivations running until the caller commits them."""
+    units = protect_units(units, config)
     cap = config.caps["max_llm_calls_compile"]
     prompt_version = config.llm.prompt_version
     model_id = config.llm.model_id

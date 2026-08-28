@@ -95,7 +95,11 @@ def test_conflict_engine_attaches_prompt_model_and_derivation_lineage(tmp_path: 
         raw={
             "vault_root": str(root),
             "caps": {"max_llm_calls_conflict": 10},
-            "llm": {"prompt_version": "conflict-p7", "model_id": "conflict-m9"},
+            "llm": {
+                "prompt_version": "conflict-p7",
+                "model_id": "conflict-m9",
+                "external": False,
+            },
         }
     )
     verdict = (

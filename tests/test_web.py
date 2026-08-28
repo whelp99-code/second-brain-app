@@ -157,6 +157,18 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
         rows = changes_dict.get("changes")
         assert isinstance(rows, list) and rows
 
+        status, sources = _request(f"{base}/api/sources")
+        assert status == 200
+        assert isinstance(sources, dict)
+        assert cast(dict[str, object], sources).get("sources") == []
+
+        status, retention = _request(f"{base}/api/retention")
+        assert status == 200
+        assert isinstance(retention, dict)
+        retention_dict = cast(dict[str, object], retention)
+        assert isinstance(retention_dict.get("raw_blobs"), int)
+        assert isinstance(retention_dict.get("orphan_count"), int)
+
 
 def test_conflict_can_be_listed_and_explicitly_resolved(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)

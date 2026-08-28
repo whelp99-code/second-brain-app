@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import cast
 
 from sb.config import load_config
+from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
 from sb.inbox import RememberRejected, write_inbox
 from sb.ops import (
     OperationError,
@@ -51,6 +52,9 @@ class Command(StrEnum):
     MIGRATE = "migrate"
     RESOLVE = "resolve"
     WEB = "web"
+    SOURCES = "sources"
+    RETENTION = "retention"
+    GC = "gc"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -112,6 +116,14 @@ def _parser() -> argparse.ArgumentParser:
     web = sub.add_parser(Command.WEB.value)
     _ = web.add_argument("--host", default="127.0.0.1")
     _ = web.add_argument("--port", type=int, default=8765)
+    sources = sub.add_parser(Command.SOURCES.value)
+    _ = sources.add_argument("--json", action="store_true")
+    retention = sub.add_parser(Command.RETENTION.value)
+    _ = retention.add_argument("--json", action="store_true")
+    gc = sub.add_parser(Command.GC.value)
+    _ = gc.add_argument("--apply", action="store_true")
+    _ = gc.add_argument("--confirm", action="store_true")
+    _ = gc.add_argument("--json", action="store_true")
     return parser
 
 
@@ -360,6 +372,49 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             server.server_close()
         return 0
 
+    def sources() -> int:
+        rows = source_status(config)
+        if _opt_flag(ns, "json"):
+            print(json.dumps(list(rows), ensure_ascii=False, indent=2))
+            return 0
+        if not rows:
+            print("no configured sources")
+            return 0
+        for row in rows:
+            print(
+                f"{row['id']} adapter={row['adapter']} root={row['root']} "
+                + f"exists={row['root_exists']} llm_policy={row['llm_policy']} "
+                + f"sensitive={row['sensitive']}"
+            )
+        return 0
+
+    def retention() -> int:
+        report = retention_report(config.vault_root)
+        if _opt_flag(ns, "json"):
+            print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+        else:
+            print(
+                f"raw_blobs={report.raw_blobs} raw_bytes={report.raw_bytes} "
+                + f"protected={report.protected_blobs} "
+                + f"orphans={len(report.orphan_blobs)} invalid={len(report.invalid_blobs)}"
+            )
+        return 0
+
+    def gc() -> int:
+        report = collect_orphans(
+            config.vault_root,
+            apply=_opt_flag(ns, "apply"),
+            confirmed=_opt_flag(ns, "confirm"),
+        )
+        if _opt_flag(ns, "json"):
+            print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+        else:
+            print(
+                f"remaining_orphans={len(report.orphan_blobs)} "
+                + f"invalid={len(report.invalid_blobs)}"
+            )
+        return 0
+
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
         Command.INGEST: ingest,
@@ -378,6 +433,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.MIGRATE: migrate,
         Command.RESOLVE: resolve,
         Command.WEB: web,
+        Command.SOURCES: sources,
+        Command.RETENTION: retention,
+        Command.GC: gc,
     }
     return handlers[command]()
 
@@ -395,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except (OperationError, VaultLintError) as exc:
+    except (OperationError, VaultLintError, GovernanceError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 

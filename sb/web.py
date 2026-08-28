@@ -13,6 +13,7 @@ from typing import Final, cast, override
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from sb.config import Config, load_config
+from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.pipeline import read_status, run_all
@@ -78,6 +79,9 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <section>
 <h2>최근 변경</h2><p><button class="secondary" onclick="loadChanges()">7일 변경 조회</button></p><pre id="changeResult" class="muted"></pre>
 </section>
+<section>
+<h2>소스·보존</h2><p><button class="secondary" onclick="loadGovernance()">상태 조회</button></p><pre id="governanceResult" class="muted"></pre>
+</section>
 <script>
 const byId=(id)=>document.getElementById(id);
 function authHeaders(){const token=localStorage.getItem('sb_token')||'';return {'Content-Type':'application/json',...(token?{'Authorization':'Bearer '+token}:{})}}
@@ -92,7 +96,8 @@ async function readPage(){try{show('pageResult',await api('/api/pages/'+encodeUR
 async function loadConflicts(){try{const data=await api('/api/conflicts');show('conflictResult',data);if(data.conflicts&&data.conflicts.length)byId('conflictId').value=data.conflicts[0].conflict_id}catch(error){show('conflictResult',error.message)}}
 async function resolveConflict(){try{const id=byId('conflictId').value;const data=await api('/api/conflicts/'+encodeURIComponent(id)+'/resolve',{method:'POST',body:JSON.stringify({decision:byId('decision').value,note:byId('resolutionNote').value})});show('conflictResult',data);await loadConflicts()}catch(error){show('conflictResult',error.message)}}
 async function loadChanges(){try{show('changeResult',await api('/api/changes?days=7'))}catch(error){show('changeResult',error.message)}}
-byId('token').value=localStorage.getItem('sb_token')||'';loadStatus();loadConflicts();
+async function loadGovernance(){try{const sources=await api('/api/sources');const retention=await api('/api/retention');show('governanceResult',{...sources,retention})}catch(error){show('governanceResult',error.message)}}
+byId('token').value=localStorage.getItem('sb_token')||'';loadStatus();loadConflicts();loadGovernance();
 </script>
 </body>
 </html>
@@ -233,6 +238,15 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     HTTPStatus.OK,
                     {"conflicts": [row.as_dict() for row in open_conflicts(context.root)]},
                 )
+                return
+            if parsed.path == "/api/sources":
+                self._json(
+                    HTTPStatus.OK,
+                    {"sources": list(source_status(context.config))},
+                )
+                return
+            if parsed.path == "/api/retention":
+                self._json(HTTPStatus.OK, retention_report(context.root).as_dict())
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 

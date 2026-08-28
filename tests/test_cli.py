@@ -56,6 +56,11 @@ COMMANDS = (
     "backup",
     "restore",
     "migrate",
+    "resolve",
+    "web",
+    "sources",
+    "retention",
+    "gc",
 )
 
 
