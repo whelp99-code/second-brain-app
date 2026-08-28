@@ -14,6 +14,7 @@ from typing import Self
 import pytest
 
 from sb.config import DEFAULT_CAPS, DEFAULT_UNIFIED_DB_DSN, UnifiedDbConfig
+from sb.connectors import unified_db
 from sb.connectors.base import ItemMeta
 from sb.connectors.unified_db import (
     ADAPTER_ID,
@@ -348,7 +349,7 @@ def test_executed_sql_and_module_contain_no_write_or_ddl() -> None:
     # Then: neither executed SQL nor connector sources contain write/DDL verbs.
     for sql in db.sql:
         assert _FORBIDDEN_SQL.search(sql) is None
-    source = Path("/Volumes/DevSpace/second-brain-app/sb/connectors")
+    source = Path(unified_db.__file__).parent
     for path in (source / "unified_db.py", source / "unified_db_mapping.py"):
         assert _FORBIDDEN_SOURCE.search(path.read_text(encoding="utf-8")) is None
 
