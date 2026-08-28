@@ -159,7 +159,7 @@ def _package_version() -> str:
     try:
         return metadata.version("second-brain")
     except metadata.PackageNotFoundError:
-        return "0.1.0"
+        return "1.0.0"
 
 
 def _safe_detail(value: str | None, *, limit: int = 240) -> str:
@@ -202,7 +202,9 @@ def create_backup(vault_root: Path | str, output: Path | str) -> BackupResult:
             "git_head": _git_value(root, "rev-parse", "HEAD") or "",
             "files": entries,
         }
-        with NamedTemporaryFile(dir=archive.parent, prefix=f".{archive.name}.", delete=False) as raw:
+        with NamedTemporaryFile(
+            dir=archive.parent, prefix=f".{archive.name}.", delete=False
+        ) as raw:
             temporary = Path(raw.name)
         try:
             with tarfile.open(temporary, mode="w:gz", format=tarfile.PAX_FORMAT) as bundle:
@@ -398,14 +400,20 @@ def status_snapshot(config: Config) -> dict[str, object]:
         name: sum(1 for _ in (root / name).rglob("*.md")) if (root / name).is_dir() else 0
         for name in ("wiki", "daily", "conflicts")
     }
-    raw_files = [path for path in (root / "raw").rglob("*") if path.is_file()] if (root / "raw").is_dir() else []
+    raw_files = (
+        [path for path in (root / "raw").rglob("*") if path.is_file()]
+        if (root / "raw").is_dir()
+        else []
+    )
     return {
         "vault_root": str(root),
         "initialized": (root / ".git").is_dir(),
         "schema_version": ledger_schema_version(db),
         "schema_current": CURRENT_SCHEMA_VERSION,
         "git_head": _git_value(root, "rev-parse", "HEAD") if root.is_dir() else None,
-        "git_clean": _git_value(root, "status", "--porcelain") == "" if (root / ".git").is_dir() else False,
+        "git_clean": _git_value(root, "status", "--porcelain") == ""
+        if (root / ".git").is_dir()
+        else False,
         "last_run": last_run,
         "run_counts": runs,
         "derivation_counts": derivations,
@@ -429,29 +437,47 @@ def doctor(config: Config) -> tuple[DoctorCheck, ...]:
         return tuple(checks)
     mode = stat.S_IMODE(root.stat().st_mode)
     add("vault", "pass" if mode & 0o077 == 0 else "warn", f"path={root} mode={oct(mode)}")
-    add("git-repository", "pass" if (root / ".git").is_dir() else "fail", "initialized" if (root / ".git").is_dir() else "missing .git")
+    add(
+        "git-repository",
+        "pass" if (root / ".git").is_dir() else "fail",
+        "initialized" if (root / ".git").is_dir() else "missing .git",
+    )
     db = root / ".sb" / "ledger.db"
     if db.is_file():
         try:
             assert_ledger_integrity(db)
             version = ledger_schema_version(db)
-            add("ledger", "pass" if version == CURRENT_SCHEMA_VERSION else "warn", f"schema={version}/{CURRENT_SCHEMA_VERSION}")
+            add(
+                "ledger",
+                "pass" if version == CURRENT_SCHEMA_VERSION else "warn",
+                f"schema={version}/{CURRENT_SCHEMA_VERSION}",
+            )
         except Exception as exc:  # noqa: BLE001 - diagnostic boundary
             add("ledger", "fail", str(exc))
     else:
         add("ledger", "warn", "ledger not created yet")
     reasons = audit_citations(root)
-    add("citations", "pass" if not reasons else "fail", "ok" if not reasons else "; ".join(reasons[:5]))
+    add(
+        "citations",
+        "pass" if not reasons else "fail",
+        "ok" if not reasons else "; ".join(reasons[:5]),
+    )
     for source in config.source_roots:
         path = source.get("root")
         if not path:
             continue
         source_path = Path(path)
         status = "pass" if source_path.is_dir() and not source_path.is_symlink() else "fail"
-        add(f"source:{source.get('id', source.get('adapter', 'unknown'))}", status, str(source_path))
+        add(
+            f"source:{source.get('id', source.get('adapter', 'unknown'))}", status, str(source_path)
+        )
     command = config.llm.argv_template[0] if config.llm.argv_template else ""
     llm_status = "pass" if command and shutil.which(command) else "warn"
-    add("llm-cli", llm_status, command if llm_status == "pass" else f"not found: {command or '<empty>'}")
+    add(
+        "llm-cli",
+        llm_status,
+        command if llm_status == "pass" else f"not found: {command or '<empty>'}",
+    )
     scheduler = Path(__file__).resolve().parent.parent / "deploy" / "systemd"
     add("scheduler-assets", "pass" if scheduler.is_dir() else "warn", str(scheduler))
     return tuple(checks)

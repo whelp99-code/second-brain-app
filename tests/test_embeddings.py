@@ -57,7 +57,9 @@ def fake_vector(text: str, dim: int = VECTOR_DIM) -> tuple[float, ...]:
         while index < dim:
             seed = hashlib.sha256(seed).digest()
             for offset in range(0, 32, 4):
-                acc[index] += (int.from_bytes(seed[offset : offset + 4], "big") / 4294967295.0) * 2.0 - 1.0
+                acc[index] += (
+                    int.from_bytes(seed[offset : offset + 4], "big") / 4294967295.0
+                ) * 2.0 - 1.0
                 index += 1
                 if index == dim:
                     break

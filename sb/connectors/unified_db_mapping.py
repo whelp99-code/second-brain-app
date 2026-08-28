@@ -175,7 +175,9 @@ def _alias_names(raw: Scalar) -> tuple[str, ...]:
 
 
 def disabled_sources(rows: list[tuple[Scalar, ...]]) -> frozenset[str]:
-    return frozenset(source for source, enabled in rows if isinstance(source, str) and enabled is False)
+    return frozenset(
+        source for source, enabled in rows if isinstance(source, str) and enabled is False
+    )
 
 
 def emit_row(table: ScanTable, row: tuple[Scalar, ...], ctx: EmitCtx) -> tuple[Item | None, Mark]:
@@ -204,7 +206,11 @@ def emit_row(table: ScanTable, row: tuple[Scalar, ...], ctx: EmitCtx) -> tuple[I
     token = f"{stamp.isoformat()}|{pk}"
     meta: ItemMeta = {"relative_path": table.name, "cursor": token}
     body = "\n".join(f"{key}: {value}" for key, value in fields).encode()
-    item: Item = (SourceRef(ctx.adapter_id, f"unified-db:{project}:{table.name}:{pk}", token), body, meta)
+    item: Item = (
+        SourceRef(ctx.adapter_id, f"unified-db:{project}:{table.name}:{pk}", token),
+        body,
+        meta,
+    )
     return item, mark
 
 
@@ -251,7 +257,10 @@ def decode_cursor(cursor: str | None) -> dict[str, Mark]:
 
 
 def encode_cursor(marks: dict[str, Mark]) -> str:
-    payload = {name: {"occurred_at": stamp.isoformat(), "id": pk} for name, (stamp, pk) in sorted(marks.items())}
+    payload = {
+        name: {"occurred_at": stamp.isoformat(), "id": pk}
+        for name, (stamp, pk) in sorted(marks.items())
+    }
     return json.dumps(payload, separators=(",", ":"), sort_keys=True)
 
 

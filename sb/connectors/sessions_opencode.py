@@ -72,7 +72,9 @@ class OpenCodeSessionsAdapter:
         parsed = _obj(path.read_bytes())
         if parsed is None:
             return [_skip(self.source_id, rel, "invalid-format")]
-        names: set[str] = {entry.name for entry in path.parent.iterdir()} if path.parent.is_dir() else set()
+        names: set[str] = (
+            {entry.name for entry in path.parent.iterdir()} if path.parent.is_dir() else set()
+        )
         if names & _LIVE:
             return [_skip(self.source_id, rel, "live-store")]
         extracted = _from_json(parsed)
@@ -208,7 +210,9 @@ def _from_sqlite(database: Path) -> list[tuple[str, str]]:
     if database.is_symlink() or not database.is_file():
         return []
     try:
-        connection = sqlite3.connect(f"file:{database.resolve().as_posix()}?mode=ro&immutable=1", uri=True)
+        connection = sqlite3.connect(
+            f"file:{database.resolve().as_posix()}?mode=ro&immutable=1", uri=True
+        )
     except sqlite3.Error:
         return []
     try:

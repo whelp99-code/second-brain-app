@@ -21,7 +21,9 @@ DEFAULT_ROOTS: Final = (
     Path.home() / ".senpi" / "agent" / "sessions",
     Path.home() / ".pi" / "agent" / "sessions",
 )
-_DENIED: Final = frozenset({"cancelled", "compaction", "custom", "custom_message", "destroyed", "evicted"})
+_DENIED: Final = frozenset(
+    {"cancelled", "compaction", "custom", "custom_message", "destroyed", "evicted"}
+)
 
 
 class _ConnectorConfig(Protocol):
@@ -75,7 +77,9 @@ class OmoSessionsAdapter:
             items.extend(self._read_file(path, rel, start))
         return items
 
-    def _read_file(self, path: Path, rel: str, start: int) -> list[tuple[SourceRef, bytes, ItemMeta]]:
+    def _read_file(
+        self, path: Path, rel: str, start: int
+    ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         with path.open("rb") as handle:
             _ = handle.seek(start)

@@ -43,7 +43,9 @@ def _safe_member_name(name: str) -> bool:
         return False
     normalized = name.replace("\\", "/")
     path = PurePosixPath(normalized)
-    return not (path.is_absolute() or any(part == ".." for part in path.parts) or ":" in path.parts[0])
+    return not (
+        path.is_absolute() or any(part == ".." for part in path.parts) or ":" in path.parts[0]
+    )
 
 
 def _admit_members(infos: tuple[ZipInfo, ...]) -> None:
@@ -133,7 +135,11 @@ def _extract(archive: ZipFile) -> str:
     _admit_members(infos)
     sections = tuple(
         sorted(
-            ((int(match.group(1)), info) for info in infos if (match := SECTION_NAME.match(info.filename))),
+            (
+                (int(match.group(1)), info)
+                for info in infos
+                if (match := SECTION_NAME.match(info.filename))
+            ),
             key=lambda item: item[0],
         )
     )

@@ -123,7 +123,9 @@ def test_backup_restore_roundtrip_preserves_unicode_git_cas_and_search(tmp_path:
     assert restored.bytes == backup.bytes
     assert (restored.destination / ".git").is_dir()
     assert (restored.destination / "wiki" / "계약-일정.md").is_file()
-    assert ledger_schema_version(restored.destination / ".sb" / "ledger.db") == CURRENT_SCHEMA_VERSION
+    assert (
+        ledger_schema_version(restored.destination / ".sb" / "ledger.db") == CURRENT_SCHEMA_VERSION
+    )
     assert SearchIndex(restored.destination).search(_TERM)
     raw_files = [path for path in (restored.destination / "raw").rglob("*") if path.is_file()]
     assert len(raw_files) == 1
@@ -151,7 +153,14 @@ def test_restore_rejects_path_traversal_manifest(tmp_path: Path) -> None:
     archive = tmp_path / "malicious.tar.gz"
     manifest = {
         "format": BACKUP_FORMAT,
-        "files": [{"path": "../escape", "sha256": hashlib.sha256(b"x").hexdigest(), "size": 1, "mode": 0o600}],
+        "files": [
+            {
+                "path": "../escape",
+                "sha256": hashlib.sha256(b"x").hexdigest(),
+                "size": 1,
+                "mode": 0o600,
+            }
+        ],
     }
     payload = json.dumps(manifest).encode()
     with tarfile.open(archive, "w:gz") as bundle:
@@ -203,7 +212,9 @@ def test_migrate_status_backs_up_legacy_database_before_apply(tmp_path: Path) ->
     db = root / ".sb" / "ledger.db"
     db.parent.mkdir(parents=True)
     with sqlite3.connect(db) as conn:
-        _ = conn.execute("CREATE TABLE run(run_id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT, git_commit TEXT, status TEXT)")
+        _ = conn.execute(
+            "CREATE TABLE run(run_id TEXT PRIMARY KEY, started_at TEXT, finished_at TEXT, git_commit TEXT, status TEXT)"
+        )
         conn.commit()
 
     check = migrate_status(root, apply=False)

@@ -11,10 +11,12 @@ from mcp.client import Client
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult
 from pydantic import BaseModel, ConfigDict
-from pytest import raises
+from pytest import MonkeyPatch, raises
 
+from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
 from sb.mcp import K5_TOOLS, RememberRejected, build_server, write_inbox
+from sb.pipeline import RunOutcome
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 
@@ -71,10 +73,23 @@ class _RememberOut(BaseModel):
     inbox_path: str
 
 
+class _RunOut(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    run_id: str
+    status: str
+    pages: int
+    conflicts: int
+    errors: int
+    exit_code: int
+    git_commit: str | None
+    already_running: bool
+    written: int
+
+
 class _Envelope(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
     structured_content: (
-        _SearchOut | _ReadOut | _RecentOut | _ConflictsOut | _RememberOut | None
+        _SearchOut | _ReadOut | _RecentOut | _ConflictsOut | _RememberOut | _RunOut | None
     ) = None
     is_error: bool = False
 
@@ -119,7 +134,7 @@ def _envelope(result: CallToolResult) -> _Envelope:
 
 def _structured(
     result: CallToolResult,
-) -> _SearchOut | _ReadOut | _RecentOut | _ConflictsOut | _RememberOut | None:
+) -> _SearchOut | _ReadOut | _RecentOut | _ConflictsOut | _RememberOut | _RunOut | None:
     return _envelope(result).structured_content
 
 
@@ -128,7 +143,7 @@ def _search_rows(result: CallToolResult) -> list[_HitOut]:
     match payload:
         case _SearchOut(results=rows):
             return rows
-        case _ReadOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | None:
+        case _ReadOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | _RunOut() | None:
             return []
 
 
@@ -137,7 +152,7 @@ def _change_rows(result: CallToolResult) -> list[_ChangeOut]:
     match payload:
         case _RecentOut(changes=rows):
             return rows
-        case _SearchOut() | _ReadOut() | _ConflictsOut() | _RememberOut() | None:
+        case _SearchOut() | _ReadOut() | _ConflictsOut() | _RememberOut() | _RunOut() | None:
             return []
 
 
@@ -146,7 +161,7 @@ def _conflict_rows(result: CallToolResult) -> list[_ConflictOut]:
     match payload:
         case _ConflictsOut(conflicts=rows):
             return rows
-        case _SearchOut() | _ReadOut() | _RecentOut() | _RememberOut() | None:
+        case _SearchOut() | _ReadOut() | _RecentOut() | _RememberOut() | _RunOut() | None:
             return []
 
 
@@ -155,11 +170,22 @@ def _remember(result: CallToolResult) -> _RememberOut | None:
     match payload:
         case _RememberOut() as remembered:
             return remembered
-        case _SearchOut() | _ReadOut() | _RecentOut() | _ConflictsOut() | None:
+        case _SearchOut() | _ReadOut() | _RecentOut() | _ConflictsOut() | _RunOut() | None:
             return None
 
 
-def _call(server: MCPServer, name: str, arguments: Mapping[str, str | int | None]) -> CallToolResult:
+def _run(result: CallToolResult) -> _RunOut | None:
+    payload = _structured(result)
+    match payload:
+        case _RunOut() as outcome:
+            return outcome
+        case _SearchOut() | _ReadOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | None:
+            return None
+
+
+def _call(
+    server: MCPServer, name: str, arguments: Mapping[str, str | int | None]
+) -> CallToolResult:
     async def _go() -> CallToolResult:
         async with Client(server, mode="legacy", cache=None) as client:
             return await client.call_tool(name, dict(arguments))
@@ -168,7 +194,7 @@ def _call(server: MCPServer, name: str, arguments: Mapping[str, str | int | None
 
 
 def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> None:
-    """Given a vault, when the client handshakes, then 5 K5 tools round-trip."""
+    """Given a vault, when the client handshakes, then the complete tool set is listed."""
     root = _seed(tmp_path)
     server = build_server(root)
 
@@ -181,9 +207,7 @@ def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> N
                 await client.call_tool("sb_read_page", {"id": "wiki/alpha"}),
                 await client.call_tool("sb_recent_changes", {"days": 7}),
                 await client.call_tool("sb_open_conflicts", {}),
-                await client.call_tool(
-                    "sb_remember", {"content": "remember me", "title": "note"}
-                ),
+                await client.call_tool("sb_remember", {"content": "remember me", "title": "note"}),
             ]
             return names, results
 
@@ -195,7 +219,7 @@ def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> N
     match read_payload:
         case _ReadOut():
             assert read_payload.frontmatter and read_payload.body
-        case _SearchOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | None:
+        case _SearchOut() | _RecentOut() | _ConflictsOut() | _RememberOut() | _RunOut() | None:
             raise AssertionError("expected read_page payload")
     assert _change_rows(results[2])
     assert _conflict_rows(results[3])
@@ -203,6 +227,41 @@ def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> N
     assert remembered is not None
     assert remembered.inbox_path.startswith("inbox/")
     assert (root / remembered.inbox_path).is_file()
+
+
+def test_mcp_run_delegates_to_locked_pipeline_and_returns_full_outcome(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    root = _seed(tmp_path)
+    config = Config(
+        raw={
+            "vault_root": str(root),
+            "sources": [{"id": "inbox", "adapter": "inbox-documents"}],
+        }
+    )
+    called: list[tuple[str, object]] = []
+
+    def _fake_run(runtime: Config, sources: object) -> RunOutcome:
+        called.append((runtime.vault_root, sources))
+        return RunOutcome("mcp-run", "ok", 2, 1, 0, 0, "abc123", False, 3)
+
+    monkeypatch.setattr("sb.mcp.run_all", _fake_run)
+
+    result = _run(_call(build_server(root, config=config), "sb_run", {}))
+
+    assert result is not None
+    assert result.model_dump() == {
+        "run_id": "mcp-run",
+        "status": "ok",
+        "pages": 2,
+        "conflicts": 1,
+        "errors": 0,
+        "exit_code": 0,
+        "git_commit": "abc123",
+        "already_running": False,
+        "written": 3,
+    }
+    assert called == [(str(root.resolve()), ("inbox",))]
 
 
 def test_mcp_search_finds_korean_and_english_terms(tmp_path: Path) -> None:
@@ -239,7 +298,10 @@ def test_mcp_recent_changes_includes_committed_page(tmp_path: Path) -> None:
     """Given a committed page, when recent_changes runs, then that page is listed."""
     server = build_server(_seed(tmp_path))
 
-    assert any("alpha" in row.page_id for row in _change_rows(_call(server, "sb_recent_changes", {"days": 7})))
+    assert any(
+        "alpha" in row.page_id
+        for row in _change_rows(_call(server, "sb_recent_changes", {"days": 7}))
+    )
 
 
 def test_mcp_open_conflicts_lists_committed_conflict(tmp_path: Path) -> None:

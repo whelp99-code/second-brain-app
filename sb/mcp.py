@@ -1,17 +1,18 @@
-"""Read-only stdio MCP server: K5 tools plus collision-safe inbox remember."""
+"""Stdio MCP server for knowledge reads, capture, and explicit immediate runs."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, override
+from typing import Final, TypedDict, override
 
 import anyio
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from sb.config import load_config
+from sb.config import Config, load_config
 from sb.inbox import RememberRejected, write_inbox
+from sb.pipeline import RunOutcome, run_all
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.vault import PathEscapeError
 
@@ -22,6 +23,7 @@ K5_TOOLS: Final = (
     "sb_read_page",
     "sb_recent_changes",
     "sb_remember",
+    "sb_run",
     "sb_search",
 )
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
@@ -67,6 +69,42 @@ class ConflictRow:
             "page_id": self.page_id,
             "summary": self.summary,
         }
+
+
+class RunOutcomeDict(TypedDict):
+    run_id: str
+    status: str
+    pages: int
+    conflicts: int
+    errors: int
+    exit_code: int
+    git_commit: str | None
+    already_running: bool
+    written: int
+
+
+def _run_outcome(outcome: RunOutcome) -> RunOutcomeDict:
+    return {
+        "run_id": outcome.run_id,
+        "status": outcome.status,
+        "pages": outcome.pages,
+        "conflicts": outcome.conflicts,
+        "errors": outcome.errors,
+        "exit_code": outcome.exit_code,
+        "git_commit": outcome.git_commit,
+        "already_running": outcome.already_running,
+        "written": outcome.written,
+    }
+
+
+def _runtime_config(vault_root: Path | str | None, config: Config | None) -> tuple[Config, Path]:
+    chosen = load_config() if config is None else config
+    if vault_root is None:
+        return chosen, Path(chosen.vault_root)
+    root = Path(vault_root).expanduser().resolve(strict=False)
+    raw = dict(chosen.raw)
+    raw["vault_root"] = str(root)
+    return Config(raw=raw, base_dir=chosen.base_dir), root
 
 
 def read_page(root: Path, page_id: str) -> PageRead:
@@ -131,9 +169,11 @@ def open_conflicts(root: Path) -> tuple[ConflictRow, ...]:
     return tuple(rows)
 
 
-def build_server(vault_root: Path | str | None = None) -> MCPServer:
+def build_server(
+    vault_root: Path | str | None = None, *, config: Config | None = None
+) -> MCPServer:
     """Build the stdio MCP server bound to `vault_root` or config.vault_root."""
-    root = Path(load_config().vault_root if vault_root is None else vault_root)
+    runtime_config, root = _runtime_config(vault_root, config)
     server = MCPServer("second-brain")
 
     @server.tool(name="sb_search")
@@ -194,12 +234,22 @@ def build_server(vault_root: Path | str | None = None) -> MCPServer:
             raise ToolError(str(exc)) from exc
         return {"inbox_path": rel.as_posix()}
 
-    _ = (sb_search, sb_read_page, sb_recent_changes, sb_open_conflicts, sb_remember)
+    @server.tool(name="sb_run")
+    def sb_run() -> RunOutcomeDict:
+        """Immediately run ingest, compile, conflict checks, and the conditional briefing.
+
+        Call this after `sb_remember` when the new memory must become searchable now.
+        The normal pipeline lock is preserved; an overlapping request returns
+        `already_running=true` instead of starting a second writer.
+        """
+        return _run_outcome(run_all(runtime_config, runtime_config.configured_source_ids))
+
+    _ = (sb_search, sb_read_page, sb_recent_changes, sb_open_conflicts, sb_remember, sb_run)
     return server
 
 
 def main() -> None:
-    """Run the K5 MCP server on stdio."""
+    """Run the Second Brain MCP server on stdio."""
     anyio.run(build_server().run_stdio_async)
 
 

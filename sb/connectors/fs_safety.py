@@ -11,13 +11,29 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Final, override
 
-DIRECTORY_OPEN_FLAGS: Final = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+DIRECTORY_OPEN_FLAGS: Final = (
+    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+)
 _FILE_FLAGS: Final = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
 _CHUNK: Final = 65_536
 _DENIED_SUFFIXES: Final = frozenset(
-    {".cer", ".crt", ".der", ".key", ".keychain", ".keychain-db", ".p12", ".p7b", ".p7c", ".pem", ".pfx"}
+    {
+        ".cer",
+        ".crt",
+        ".der",
+        ".key",
+        ".keychain",
+        ".keychain-db",
+        ".p12",
+        ".p7b",
+        ".p7c",
+        ".pem",
+        ".pfx",
+    }
 )
-_DENIED_NAMES: Final = frozenset({".netrc", "cookies", "id_dsa", "id_ecdsa", "id_ed25519", "id_rsa", "known_hosts"})
+_DENIED_NAMES: Final = frozenset(
+    {".netrc", "cookies", "id_dsa", "id_ecdsa", "id_ed25519", "id_rsa", "known_hosts"}
+)
 _SENSITIVE_WORD: Final = re.compile(
     r"(?:^|[._\-/])(?:access[-_]?token|auth[-_]?token|cookie|credential|"
     + r"private[-_]?key|refresh[-_]?token|secret|session|token)s?(?:[._\-/]|$)"
@@ -45,7 +61,10 @@ class SourceFilesystemLimits:
     max_total_bytes: int = 268_435_456
 
     def __post_init__(self) -> None:
-        if min(self.max_entries, self.max_files, self.max_file_bytes, self.max_total_bytes) < 1 or self.max_depth < 0:
+        if (
+            min(self.max_entries, self.max_files, self.max_file_bytes, self.max_total_bytes) < 1
+            or self.max_depth < 0
+        ):
             raise SafeSourceFilesystemError("source filesystem limits must be positive")
 
 
@@ -184,7 +203,9 @@ class SafeSourceFilesystem:
             raise
         return root_fd, metadata
 
-    def scan(self, root: Path, *, reject_denied: bool = False, reject_unsafe: bool = True) -> SourceScan:
+    def scan(
+        self, root: Path, *, reject_denied: bool = False, reject_unsafe: bool = True
+    ) -> SourceScan:
         """No-follow metadata scan. `.git` is excluded at any depth."""
         root_fd, root_metadata = self._open_root(root)
         entries: list[SourceFileMetadata] = []
@@ -222,7 +243,9 @@ class SafeSourceFilesystem:
                     _assert_owner_mode(preview, relative, self._policy)
                     if stat.S_ISDIR(preview.st_mode):
                         if depth >= self._limits.max_depth:
-                            raise SafeSourceFilesystemError("source depth exceeds the resource budget")
+                            raise SafeSourceFilesystemError(
+                                "source depth exceeds the resource budget"
+                            )
                         child_fd = os.open(name, DIRECTORY_OPEN_FLAGS, dir_fd=directory_fd)
                         try:
                             _assert_same(preview, os.fstat(child_fd), relative)
@@ -237,12 +260,18 @@ class SafeSourceFilesystem:
                         refuse(relative, "hardlink", reject=reject_unsafe)
                         continue
                     if len(entries) >= self._limits.max_files:
-                        raise SafeSourceFilesystemError("source file count exceeds the resource budget")
+                        raise SafeSourceFilesystemError(
+                            "source file count exceeds the resource budget"
+                        )
                     if preview.st_size > self._limits.max_file_bytes:
-                        raise SafeSourceFilesystemError("source file bytes exceeds the resource budget")
+                        raise SafeSourceFilesystemError(
+                            "source file bytes exceeds the resource budget"
+                        )
                     total_bytes += preview.st_size
                     if total_bytes > self._limits.max_total_bytes:
-                        raise SafeSourceFilesystemError("source aggregate bytes exceed the resource budget")
+                        raise SafeSourceFilesystemError(
+                            "source aggregate bytes exceed the resource budget"
+                        )
                     file_fd = os.open(name, _FILE_FLAGS, dir_fd=directory_fd)
                     try:
                         _assert_same(preview, os.fstat(file_fd), relative)
@@ -255,14 +284,20 @@ class SafeSourceFilesystem:
         try:
             walk(root_fd, "", 0)
             _assert_same(root_metadata, os.fstat(root_fd), ".")
-            return SourceScan(tuple(sorted(entries, key=lambda item: item.relative_path)), tuple(skipped))
+            return SourceScan(
+                tuple(sorted(entries, key=lambda item: item.relative_path)), tuple(skipped)
+            )
         finally:
             os.close(root_fd)
 
     def read_path(self, root: Path, relative_path: str) -> tuple[bytes, os.stat_result]:
         """Open one canonical regular file with no-follow checks and read it."""
         pure = PurePosixPath(relative_path)
-        if pure.is_absolute() or pure.as_posix() != relative_path or any(part in {"", ".", ".."} for part in pure.parts):
+        if (
+            pure.is_absolute()
+            or pure.as_posix() != relative_path
+            or any(part in {"", ".", ".."} for part in pure.parts)
+        ):
             raise SafeSourceFilesystemError("source path escape detected")
         if is_denied_source_path(relative_path):
             raise SafeSourceFilesystemError(f"denied-path source path refused: {relative_path}")
@@ -292,7 +327,9 @@ class SafeSourceFilesystem:
                 raise SafeSourceFilesystemError("source file bytes exceeds the resource budget")
             file_fd = os.open(pure.name, _FILE_FLAGS, dir_fd=parent_fd)
             _assert_same(preview, os.fstat(file_fd), relative_path)
-            return _read_pinned(file_fd, relative_path, preview, self._limits.max_file_bytes), preview
+            return _read_pinned(
+                file_fd, relative_path, preview, self._limits.max_file_bytes
+            ), preview
         except OSError as exc:
             raise _translate_os_error(exc, relative_path) from exc
         finally:

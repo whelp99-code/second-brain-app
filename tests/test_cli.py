@@ -1,4 +1,5 @@
 """CLI and pipeline orchestration: lock, exit codes, logs, briefing I/O."""
+
 from __future__ import annotations
 
 import fcntl
@@ -94,7 +95,9 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["GIT_CONFIG_GLOBAL"] = os.devnull
     env["GIT_CONFIG_SYSTEM"] = os.devnull
-    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, check=False, env=env)
+    return subprocess.run(
+        ["git", *args], cwd=root, capture_output=True, text=True, check=False, env=env
+    )
 
 
 def _git_count(root: Path) -> int:
@@ -139,11 +142,21 @@ def _seed_briefing(root: Path) -> BriefingInputs:
     old_hash, new_hash = "ab" + ("0" * 62), _put(root, b"new-source")
     upcoming_hash = _put(root, b"2026-08-30 ship date\n")
     with Ledger(root) as ledger:
-        ledger.record_run(Run("run-yest", "2026-08-25T10:00:00+00:00", "2026-08-25T10:01:00+00:00", None, "ok"))
-        ledger.record_run(Run("run-today", "2026-08-26T08:00:00+00:00", "2026-08-26T08:01:00+00:00", None, "ok"))
-        ledger.upsert_source_item(SourceItem("me-wiki", "notes/new.md", "v1", new_hash, "run-yest", "run-yest"))
-        ledger.upsert_source_item(SourceItem("me-wiki", "notes/old.md", "v2", new_hash, "run-today", "run-today"))
-        ledger.upsert_source_item(SourceItem("me-wiki", "notes/soon.md", "v1", upcoming_hash, "run-today", "run-today"))
+        ledger.record_run(
+            Run("run-yest", "2026-08-25T10:00:00+00:00", "2026-08-25T10:01:00+00:00", None, "ok")
+        )
+        ledger.record_run(
+            Run("run-today", "2026-08-26T08:00:00+00:00", "2026-08-26T08:01:00+00:00", None, "ok")
+        )
+        ledger.upsert_source_item(
+            SourceItem("me-wiki", "notes/new.md", "v1", new_hash, "run-yest", "run-yest")
+        )
+        ledger.upsert_source_item(
+            SourceItem("me-wiki", "notes/old.md", "v2", new_hash, "run-today", "run-today")
+        )
+        ledger.upsert_source_item(
+            SourceItem("me-wiki", "notes/soon.md", "v1", upcoming_hash, "run-today", "run-today")
+        )
     _ = (root / "conflicts" / "open-alpha.md").write_text("open\n", encoding="utf-8")
     front = (
         "---\nid: old-page\nupdated: 2026-07-01\ncompiled_by: sb/0.1.0|v1|fake\n"
@@ -152,13 +165,16 @@ def _seed_briefing(root: Path) -> BriefingInputs:
     _ = (root / "wiki" / "old-page.md").write_text(front, encoding="utf-8")
     _ = (root / "daily" / "2026-08-25.md").write_text("yesterday brief body\n", encoding="utf-8")
     _ = (root / ".sb" / "runs.log").write_text(
-        "2026-08-25T10:01:00+00:00 run run-yest failed pages=0 conflicts=0 errors=1\n", encoding="utf-8"
+        "2026-08-25T10:01:00+00:00 run run-yest failed pages=0 conflicts=0 errors=1\n",
+        encoding="utf-8",
     )
     return BriefingInputs(
         (f"origin=me-wiki:notes/new.md hash={new_hash} [^{new_hash[:8]}] text=new-source",),
         ("conflicts/open-alpha.md",),
         (f"origin=me-wiki:notes/old.md hash={new_hash} [^{new_hash[:8]}] text=old-page",),
-        (f"origin=me-wiki:notes/soon.md hash={upcoming_hash} [^{upcoming_hash[:8]}] text=2026-08-30 ship date",),
+        (
+            f"origin=me-wiki:notes/soon.md hash={upcoming_hash} [^{upcoming_hash[:8]}] text=2026-08-30 ship date",
+        ),
         "yesterday brief body\n",
         "failed",
     )
@@ -179,7 +195,9 @@ def test_init_creates_layout_when_temp_vault(tmp_path: Path, monkeypatch: Monkey
 def test_run_exits_0_already_running_when_lock_held(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     held, release = Event(), Event()
-    worker = Process(target=_hold_exclusive_lock, args=(str(root / ".sb" / "run.lock"), held, release))
+    worker = Process(
+        target=_hold_exclusive_lock, args=(str(root / ".sb" / "run.lock"), held, release)
+    )
     worker.start()
     assert held.wait(timeout=5)
     try:
@@ -276,7 +294,9 @@ def test_run_brief_passes_same_inputs_instance_to_generator(
     digest = _put(root, b"blob")
     sentinel = BriefingInputs(("y",), ("c",), ("s",), ("u",), "lb", "ok")
 
-    def fake_collect(ledger: Ledger, vault_root: Path, *, today: date | None = None) -> BriefingInputs:
+    def fake_collect(
+        ledger: Ledger, vault_root: Path, *, today: date | None = None
+    ) -> BriefingInputs:
         del ledger, vault_root, today
         return sentinel
 
@@ -421,12 +441,8 @@ def test_backup_and_restore_commands_roundtrip_vault(tmp_path: Path) -> None:
 def test_migrate_check_and_apply_commands_report_schema(tmp_path: Path) -> None:
     _config, root = _ready(tmp_path)
 
-    check_code, check_out, _check_err = _cli_with_config(
-        tmp_path, root, ["migrate", "--check"]
-    )
-    apply_code, apply_out, _apply_err = _cli_with_config(
-        tmp_path, root, ["migrate", "--apply"]
-    )
+    check_code, check_out, _check_err = _cli_with_config(tmp_path, root, ["migrate", "--check"])
+    apply_code, apply_out, _apply_err = _cli_with_config(tmp_path, root, ["migrate", "--apply"])
 
     checked = cast(dict[str, object], json.loads(check_out))
     applied = cast(dict[str, object], json.loads(apply_out))
@@ -463,7 +479,9 @@ def test_ingest_then_compile_writes_page_when_markdown_source_present(tmp_path: 
         assert cas.exists(item.content_hash)
         assert ledger.get_cursor(item.source_id)
         text = parser_for(".md")(cas.get(item.content_hash))
-        units = normalize(Blob(item.content_hash, len(body)), text, f"{item.source_id}:{item.source_uri}")
+        units = normalize(
+            Blob(item.content_hash, len(body)), text, f"{item.source_id}:{item.source_uri}"
+        )
         assert units
         assert ledger.get_unit(units[0].unit_id) is not None
     compiled = run_compile(config, llm_mode="fake")
@@ -614,9 +632,7 @@ def test_lint_failure_with_run_log_line_leaves_log_and_index_clean(tmp_path: Pat
     assert _git(root, "status", "--porcelain").stdout == before_porc
 
 
-CITE_ITEM_RE = re.compile(
-    r"origin=\S+ hash=[0-9a-fA-F]{64} \[\^[0-9a-fA-F]{8}\] text="
-)
+CITE_ITEM_RE = re.compile(r"origin=\S+ hash=[0-9a-fA-F]{64} \[\^[0-9a-fA-F]{8}\] text=")
 
 
 def test_collect_briefing_inputs_emits_parseable_citation_items(tmp_path: Path) -> None:
@@ -689,7 +705,11 @@ def test_brief_vault_failure_marks_original_key_failed_and_retries_same_key(
     assert first.exit_code == 1
     assert first.status == "failed"
     assert first.git_commit is None
-    briefs = [row for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values() if row.stage == "brief"]
+    briefs = [
+        row
+        for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values()
+        if row.stage == "brief"
+    ]
     assert len(briefs) == 1
     key = briefs[0].deriv_key
     assert briefs[0].status == "failed"
@@ -716,14 +736,19 @@ def test_brief_vault_failure_marks_original_key_failed_and_retries_same_key(
     assert second.git_commit is not None
 
 
-def test_run_all_records_failed_run_without_traceback(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_run_all_records_failed_run_without_traceback(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     config, root = _ready(tmp_path)
     digest = _put(root, b"blob")
     cite = SourceCite(sid=digest[:8], origin="me-wiki:notes/new.md", hash=digest)
     bad = PageSpec("wiki/bad", "Bad", "nope.[^zzzzzzzz]", [cite], "active")
 
     def boom(
-        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        units: list[Unit],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
@@ -754,7 +779,9 @@ def test_run_all_records_failed_run_without_traceback(tmp_path: Path, monkeypatc
     assert "traceback" not in f"{out}{err}".lower()
 
 
-def test_ingest_cap_bounds_attempts_before_cas_put(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_ingest_cap_bounds_attempts_before_cas_put(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     from sb.contracts import SourceRef
 
     config, root = _ready(tmp_path)
@@ -777,7 +804,11 @@ def test_ingest_cap_bounds_attempts_before_cas_put(tmp_path: Path, monkeypatch: 
 
     monkeypatch.setattr("sb.connectors.discover_adapters", flood_adapters)
     outcome = run_ingest(config, None)
-    blobs = [path for path in (root / "raw").rglob("*") if path.is_file() and not path.name.startswith(".")]
+    blobs = [
+        path
+        for path in (root / "raw").rglob("*")
+        if path.is_file() and not path.name.startswith(".")
+    ]
     assert len(blobs) <= 3
     assert outcome.errors == 0
     assert outcome.status == "capped"
@@ -793,13 +824,22 @@ def test_compile_routes_conflict_pages_through_vault(
     config, root = _ready(tmp_path)
     digest = _put(root, b"cited-body")
     sid = digest[:8]
-    compiled = PageSpec("wiki/src", "Src", f"fact.[^{sid}]", [SourceCite(sid, "me-wiki:a.md", digest)], "active")
+    compiled = PageSpec(
+        "wiki/src", "Src", f"fact.[^{sid}]", [SourceCite(sid, "me-wiki:a.md", digest)], "active"
+    )
     conflict = PageSpec(
-        "conflicts/open-x", "Conflict", f"clash.[^{sid}]", [SourceCite(sid, "me-wiki:a.md", digest)], "conflicted"
+        "conflicts/open-x",
+        "Conflict",
+        f"clash.[^{sid}]",
+        [SourceCite(sid, "me-wiki:a.md", digest)],
+        "conflicted",
     )
 
     def fake_compile(
-        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        units: list[Unit],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
@@ -848,7 +888,13 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
     from sb.llm import FakeLLM
 
     config, root = _ready(tmp_path)
-    config = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 10}, "llm": {"prompt_version": "v1", "model_id": "fake"}})
+    config = Config(
+        raw={
+            "vault_root": str(root),
+            "caps": {"max_new_units_per_run": 10},
+            "llm": {"prompt_version": "v1", "model_id": "fake"},
+        }
+    )
     fake = FakeLLM(["없음", "없음"])
 
     class Mixed:
@@ -862,7 +908,11 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
             del cursor
             yield SourceRef("mix", "good.md", self.versions["good.md"]), b"ok note\n", {}
             yield SourceRef("mix", "bad.zzz", self.versions["bad.zzz"]), b"nope", {}
-            yield SourceRef("mix", "skip.dat", self.versions["skip.dat"]), b"", {"skip_reason": "denied-path"}
+            yield (
+                SourceRef("mix", "skip.dat", self.versions["skip.dat"]),
+                b"",
+                {"skip_reason": "denied-path"},
+            )
 
         def next_cursor(self) -> str:
             return "end"
@@ -878,7 +928,10 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
         return fake
 
     def empty_compile(
-        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        units: list[Unit],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
     ) -> tuple[list[object], bool]:
@@ -976,9 +1029,7 @@ def test_brief_facts_stable_when_only_previous_run_status_changes(
     assert second.git_commit is None
 
 
-def test_ingest_started_at_uses_host_local_date(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
+def test_ingest_started_at_uses_host_local_date(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     from sb.llm import FakeLLM
 
     config, root = _ready(tmp_path)
@@ -992,12 +1043,16 @@ def test_ingest_started_at_uses_host_local_date(
     with Ledger(root) as ledger:
         ledger.record_run(Run("run-offset", offset_stamp, offset_stamp, None, "ok"))
         ledger.record_run(Run("run-z", z_stamp, z_stamp, None, "ok"))
-        ledger.upsert_source_item(SourceItem("omo", "sess/offset", "v1", digest, "run-offset", "run-offset"))
+        ledger.upsert_source_item(
+            SourceItem("omo", "sess/offset", "v1", digest, "run-offset", "run-offset")
+        )
         ledger.upsert_source_item(SourceItem("omo", "sess/z", "v1", digest, "run-z", "run-z"))
     with Ledger(root) as ledger:
         got = collect_briefing_inputs(ledger, root, today=today)
     if local_day == today:
-        assert all("sess/offset" not in item and "sess/z" not in item for item in got.yesterday_items)
+        assert all(
+            "sess/offset" not in item and "sess/z" not in item for item in got.yesterday_items
+        )
     if local_day == yesterday:
         assert any("sess/offset" in item for item in got.yesterday_items)
     fake = FakeLLM(["없음", "없음"])
@@ -1026,7 +1081,13 @@ def test_quarantine_only_ingest_is_ok_or_capped(tmp_path: Path, monkeypatch: Mon
     from sb.llm import FakeLLM
 
     config, root = _ready(tmp_path)
-    config = Config(raw={"vault_root": str(root), "caps": {"max_new_units_per_run": 10}, "llm": {"prompt_version": "v1", "model_id": "fake"}})
+    config = Config(
+        raw={
+            "vault_root": str(root),
+            "caps": {"max_new_units_per_run": 10},
+            "llm": {"prompt_version": "v1", "model_id": "fake"},
+        }
+    )
     fake = FakeLLM(["없음", "없음"])
 
     class QuarantineOnly:
@@ -1050,7 +1111,10 @@ def test_quarantine_only_ingest_is_ok_or_capped(tmp_path: Path, monkeypatch: Mon
         return fake
 
     def empty_compile(
-        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        units: list[Unit],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
     ) -> tuple[list[object], bool]:
@@ -1104,7 +1168,10 @@ def test_brief_skipped_when_compile_pages_zero_and_no_new_units(
         return fake
 
     def empty_compile(
-        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        units: list[Unit],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
@@ -1127,7 +1194,11 @@ def test_brief_skipped_when_compile_pages_zero_and_no_new_units(
     assert _deriv_count(root) == before_deriv
     after_files = {path.name: path.read_bytes() for path in daily_dir.glob("*.md")}
     assert after_files == before_files
-    briefs = [row for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values() if row.stage == "brief"]
+    briefs = [
+        row
+        for row in load_ledger_tables(root / ".sb" / "ledger.db").derivations.values()
+        if row.stage == "brief"
+    ]
     assert not any(row.status == "failed" for row in briefs)
 
 
@@ -1140,7 +1211,9 @@ def test_rebucketed_existing_source_dates_do_not_change_brief_key(
     config, root = _ready(tmp_path)
     today = datetime.now().astimezone().date()
     yesterday = today - timedelta(days=1)
-    utc_stamp = datetime(yesterday.year, yesterday.month, yesterday.day, 20, 35, 55, tzinfo=UTC).isoformat()
+    utc_stamp = datetime(
+        yesterday.year, yesterday.month, yesterday.day, 20, 35, 55, tzinfo=UTC
+    ).isoformat()
     fake = FakeLLM(["없음", "없음"])
     digest = _put(root, b"profile body\n")
     with Ledger(root) as ledger:
@@ -1170,7 +1243,10 @@ def test_rebucketed_existing_source_dates_do_not_change_brief_key(
         return fake
 
     def empty_compile(
-        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        units: list[Unit],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
@@ -1185,9 +1261,7 @@ def test_rebucketed_existing_source_dates_do_not_change_brief_key(
     assert first.exit_code == 0
     real_collect = collect_briefing_inputs
 
-    def shifted(
-        ledger: Ledger, vault_root: Path, *, today: date | None = None
-    ) -> BriefingInputs:
+    def shifted(ledger: Ledger, vault_root: Path, *, today: date | None = None) -> BriefingInputs:
         base = real_collect(ledger, vault_root, today=today)
         return BriefingInputs(
             ("origin=me-wiki:rebucket.md hash=" + digest + f" [^{digest[:8]}] text=rebucket",)

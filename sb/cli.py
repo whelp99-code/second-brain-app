@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -148,21 +147,6 @@ def _opt_flag(ns: argparse.Namespace, name: str) -> bool:
     return vars(ns).get(name) is True
 
 
-def _configured_sources() -> tuple[str, ...] | None:
-    path = os.environ.get("SB_CONFIG")
-    if path is None:
-        return None
-    names: list[str] = []
-    config_path = Path(path)
-    if not config_path.is_file():
-        return None
-    for line in config_path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped.startswith(("id =", "adapter =", "type =")):
-            names.append(stripped.split("=", 1)[1].strip().strip('"'))
-    return tuple(names) or None
-
-
 def _print_outcome(already_running: bool, exit_code: int) -> int:
     if already_running:
         print("already running")
@@ -187,7 +171,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
 
     def ingest() -> int:
         source = _opt_str(ns, "source")
-        selected = (source,) if source is not None else _configured_sources()
+        selected = (source,) if source is not None else config.configured_source_ids
         outcome = run_ingest(config, selected, limit=_opt_int(ns, "limit"))
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
@@ -200,7 +184,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def run() -> int:
-        outcome = run_all(config, _configured_sources())
+        outcome = run_all(config, config.configured_source_ids)
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def status() -> int:
@@ -241,11 +225,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             return 2
         raw_kinds = vars(ns).get("kind")
         kinds = (
-            tuple(
-                item
-                for item in cast(list[object], raw_kinds)
-                if isinstance(item, str)
-            )
+            tuple(item for item in cast(list[object], raw_kinds) if isinstance(item, str))
             if isinstance(raw_kinds, list)
             else None
         )
@@ -295,9 +275,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if destination is None:
             stamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%z")
             destination_path = (
-                Path(config.vault_root).parent
-                / "backups"
-                / f"second-brain-{stamp}.tar.gz"
+                Path(config.vault_root).parent / "backups" / f"second-brain-{stamp}.tar.gz"
             )
         else:
             destination_path = Path(destination)

@@ -60,7 +60,9 @@ class MarkdownVaultAdapter:
             if previous.get(skipped.relative_path) == token:
                 continue
             meta: ItemMeta = {"relative_path": skipped.relative_path, "skip_reason": skipped.reason}
-            items.append((SourceRef(self.source_id, skipped.relative_path, skipped.reason), b"", meta))
+            items.append(
+                (SourceRef(self.source_id, skipped.relative_path, skipped.reason), b"", meta)
+            )
         for entry in result.files:
             if Path(entry.relative_path).suffix.casefold() != ".md":
                 continue

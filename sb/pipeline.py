@@ -69,11 +69,15 @@ class StageFn(Protocol):
 
 
 class BriefGenerator(Protocol):
-    def __call__(self, inputs: BriefingInputs, llm: LLMClient | None, config: Config) -> PageSpec: ...
+    def __call__(
+        self, inputs: BriefingInputs, llm: LLMClient | None, config: Config
+    ) -> PageSpec: ...
 
 
 class _CitedFake:
-    def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+    def generate(
+        self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120
+    ) -> str:
         del system, json_mode, timeout
         found: list[str] = _SID.findall(prompt)
         if not found:
@@ -96,7 +100,9 @@ class _Compiled:
             return None
         if dest.is_file():
             facts = parse_page_frontmatter(dest.read_text(encoding="utf-8"))
-            if facts is not None and not all(self._cas.exists(digest) for _o, digest in facts.sources):
+            if facts is not None and not all(
+                self._cas.exists(digest) for _o, digest in facts.sources
+            ):
                 return None
         return stored.read_text(encoding="utf-8").strip()
 
@@ -111,7 +117,11 @@ class _Compiled:
 
 
 def _dest(page_id: str) -> Path:
-    return Path(f"{page_id}.md") if page_id.startswith(("conflicts/", "daily/", "wiki/")) else Path("wiki") / f"{page_id}.md"
+    return (
+        Path(f"{page_id}.md")
+        if page_id.startswith(("conflicts/", "daily/", "wiki/"))
+        else Path("wiki") / f"{page_id}.md"
+    )
 
 
 def _try_lock(root: Path) -> int | None:
@@ -146,7 +156,11 @@ def _source_changed(ledger: Ledger, sources: tuple[tuple[str, str], ...]) -> boo
     items = ledger.list_source_items()
     for origin, digest in sources:
         source_id, _sep, uri = origin.partition(":")
-        if any(row.content_hash != digest for row in items if row.source_id == source_id and row.source_uri == uri):
+        if any(
+            row.content_hash != digest
+            for row in items
+            if row.source_id == source_id and row.source_uri == uri
+        ):
             return True
     return False
 
@@ -162,12 +176,19 @@ def _blob_line(cas: ContentAddressedStore, digest: str, fallback: str) -> str:
     return lines[0].strip() if lines and lines[0].strip() else fallback
 
 
-def collect_briefing_inputs(ledger: Ledger, vault_root: Path, *, today: date | None = None) -> BriefingInputs:
+def collect_briefing_inputs(
+    ledger: Ledger, vault_root: Path, *, today: date | None = None
+) -> BriefingInputs:
     """Load K4 briefing inputs from the ledger and tracked vault files."""
     day, root = (datetime.now().astimezone().date() if today is None else today), Path(vault_root)
     yesterday, cas = day - timedelta(days=1), ContentAddressedStore(root)
     y_items = [
-        _cite_line(item.source_id, item.source_uri, item.content_hash, _blob_line(cas, item.content_hash, item.source_uri))
+        _cite_line(
+            item.source_id,
+            item.source_uri,
+            item.content_hash,
+            _blob_line(cas, item.content_hash, item.source_uri),
+        )
         for item in ledger.list_source_items()
         if cas.exists(item.content_hash)
         and (run := ledger.get_run(item.first_seen_run)) is not None
@@ -197,7 +218,9 @@ def collect_briefing_inputs(ledger: Ledger, vault_root: Path, *, today: date | N
         for raw in cas.get(item.content_hash).decode("utf-8", errors="replace").splitlines():
             matched = _ISO_DATE.search(raw)
             if matched is not None and day <= date.fromisoformat(matched.group(0)) <= end:
-                upcoming.append(_cite_line(item.source_id, item.source_uri, item.content_hash, raw.strip()))
+                upcoming.append(
+                    _cite_line(item.source_id, item.source_uri, item.content_hash, raw.strip())
+                )
     if (root / "daily").is_dir():
         for candidate in (root / "daily").glob("*.md"):
             try:
@@ -209,7 +232,9 @@ def collect_briefing_inputs(ledger: Ledger, vault_root: Path, *, today: date | N
     last = max(dailies)[1].read_text(encoding="utf-8") if dailies else None
     line = _last_run_line(root)
     token = None if line is None or len(line.split()) < 4 else line.split()[3]
-    return BriefingInputs(tuple(sorted(y_items)), open_pages, tuple(sorted(stale)), tuple(upcoming), last, token)
+    return BriefingInputs(
+        tuple(sorted(y_items)), open_pages, tuple(sorted(stale)), tuple(upcoming), last, token
+    )
 
 
 def _stale_item(ledger: Ledger, page_id: str, sources: tuple[tuple[str, str], ...]) -> str:
@@ -244,7 +269,11 @@ def _conflict_items(root: Path, cas: ContentAddressedStore) -> tuple[str, ...]:
 
 def _last_run_line(root: Path) -> str | None:
     path = root / ".sb" / "runs.log"
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()] if path.is_file() else []
+    lines = (
+        [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if path.is_file()
+        else []
+    )
     return lines[-1] if lines else None
 
 
@@ -273,13 +302,19 @@ def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
     return normalize(Blob(digest, len(data)), text, origin)
 
 
-def _store_units(ledger: Ledger, units: Sequence[Unit]) -> None:
+def _unit_rows(units: Sequence[Unit]) -> list[UnitRow]:
     from sb.normalize import NORMALIZER_VERSION
 
-    for unit in units:
-        ledger.upsert_unit(UnitRow(
-            unit.unit_id, unit.content_hash, unit.span, hashlib.sha256(unit.text.encode()).hexdigest(), NORMALIZER_VERSION
-        ))
+    return [
+        UnitRow(
+            unit.unit_id,
+            unit.content_hash,
+            unit.span,
+            hashlib.sha256(unit.text.encode()).hexdigest(),
+            NORMALIZER_VERSION,
+        )
+        for unit in units
+    ]
 
 
 def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
@@ -287,28 +322,51 @@ def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
     loaded: list[Unit] = []
     for item in ledger.list_source_items():
         if cas.exists(item.content_hash):
-            loaded.extend(_materialize(
-                cas.get(item.content_hash), item.content_hash, item.source_uri, f"{item.source_id}:{item.source_uri}"
-            ))
+            loaded.extend(
+                _materialize(
+                    cas.get(item.content_hash),
+                    item.content_hash,
+                    item.source_uri,
+                    f"{item.source_id}:{item.source_uri}",
+                )
+            )
     return loaded
 
 
 def _source_content_ids(ledger: Ledger, root: Path) -> tuple[str, ...]:
     cas = ContentAddressedStore(root)
-    return tuple(sorted({item.content_hash for item in ledger.list_source_items() if cas.exists(item.content_hash)}))
+    return tuple(
+        sorted(
+            {
+                item.content_hash
+                for item in ledger.list_source_items()
+                if cas.exists(item.content_hash)
+            }
+        )
+    )
 
 
 def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]) -> str:
-    payload = "\0".join((
-        day.isoformat(),
-        *content_ids, "\x1e", *inputs.open_conflict_pages, "\x1e",
-        *inputs.stale_pages, "\x1e", *inputs.upcoming_items, "\x1e",
-        inputs.last_brief or "",
-    ))
+    payload = "\0".join(
+        (
+            day.isoformat(),
+            *content_ids,
+            "\x1e",
+            *inputs.open_conflict_pages,
+            "\x1e",
+            *inputs.stale_pages,
+            "\x1e",
+            *inputs.upcoming_items,
+            "\x1e",
+            inputs.last_brief or "",
+        )
+    )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _commit_pages(root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled) -> tuple[str | None, int, int]:
+def _commit_pages(
+    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled
+) -> tuple[str | None, int, int]:
     del root
     result = vault.write_pages(
         report.pages,
@@ -393,9 +451,19 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
         if report.pages:
             try:
                 commit, pages, conflicts = _commit_pages(
-                    root, vault, run_id, report, rendered.format(len(report.pages), conflicts, errors), compiled
+                    root,
+                    vault,
+                    run_id,
+                    report,
+                    rendered.format(len(report.pages), conflicts, errors),
+                    compiled,
                 )
-                _finish_deriv(ledger, report.deriv_key, hashlib.sha256(report.pages[0].body_md.encode()).hexdigest(), f"{report.pages[0].page_id}.md")
+                _finish_deriv(
+                    ledger,
+                    report.deriv_key,
+                    hashlib.sha256(report.pages[0].body_md.encode()).hexdigest(),
+                    f"{report.pages[0].page_id}.md",
+                )
                 _finish_pending(ledger, report.derivations)
             except (VaultLintError, GitCommandError, OSError) as exc:
                 _fail_deriv(ledger, report.deriv_key, str(exc))
@@ -418,7 +486,9 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
             )
         )
         _append_run_log(root, rendered.format(pages, conflicts, errors))
-        return RunOutcome(run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written)
+        return RunOutcome(
+            run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written
+        )
 
 
 def _execute(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
@@ -432,73 +502,140 @@ def _execute(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
         _unlock(fd)
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedIngest:
+    source_items: tuple[SourceItem, ...]
+    units: tuple[UnitRow, ...]
+    version_keys: tuple[tuple[str, str, str], ...]
+    errors: int
+    attempted: int
+    written: int
+    capped: bool
+    cursor: tuple[str, str] | None
+
+
+def _prepare_adapter_ingest(
+    adapter: SourceAdapter,
+    ledger: Ledger,
+    cas: ContentAddressedStore,
+    seen: set[tuple[str, str, str]],
+    run_id: str,
+    remaining: int,
+) -> _PreparedIngest:
+    items = adapter.scan(ledger.get_cursor(adapter.source_id))
+    source_items: list[SourceItem] = []
+    unit_rows: list[UnitRow] = []
+    version_keys: list[tuple[str, str, str]] = []
+    accepted: set[tuple[str, str, str]] = set()
+    errors = attempted = written = 0
+    capped = adapter_failed = False
+    for ref, data, meta in items:
+        version_key = (ref.source_id, ref.source_uri, ref.source_version)
+        if version_key in seen or version_key in accepted:
+            continue
+        if attempted >= remaining:
+            capped = True
+            break
+        attempted += 1
+        if meta.get("skip_reason"):
+            skip_digest = hashlib.sha256(f"skip:{ref.source_version}".encode()).hexdigest()
+            source_items.append(
+                SourceItem(
+                    ref.source_id,
+                    ref.source_uri,
+                    ref.source_version,
+                    skip_digest,
+                    run_id,
+                    run_id,
+                )
+            )
+            version_keys.append(version_key)
+            accepted.add(version_key)
+            continue
+        digest = hashlib.sha256(data).hexdigest()
+        units = _materialize(
+            data,
+            digest,
+            ref.source_uri,
+            f"{ref.source_id}:{ref.source_uri}",
+        )
+        try:
+            _ = cas.put(data)
+        except OSError:
+            errors += 1
+            adapter_failed = True
+            continue
+        source_items.append(
+            SourceItem(
+                ref.source_id,
+                ref.source_uri,
+                ref.source_version,
+                digest,
+                run_id,
+                run_id,
+            )
+        )
+        unit_rows.extend(_unit_rows(units))
+        version_keys.append(version_key)
+        accepted.add(version_key)
+        if units or not data:
+            written += 1
+    cursor: tuple[str, str] | None = None
+    if not capped and not adapter_failed and (version_keys or attempted == 0):
+        cursor = (adapter.next_cursor(), datetime.now(UTC).isoformat())
+    return _PreparedIngest(
+        tuple(source_items),
+        tuple(unit_rows),
+        tuple(version_keys),
+        errors,
+        attempted,
+        written,
+        capped,
+        cursor,
+    )
+
+
 def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) -> StageFn:
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         from sb.connectors import discover_adapters
 
         chosen = discover_adapters(config)
         adapters = _select_adapters(chosen, source_ids, config)
-        cas, cap = ContentAddressedStore(vault.root), config.caps["max_new_units_per_run"] if limit is None else limit
-        seen = {(item.source_id, item.source_uri, item.source_version) for item in ledger.list_source_items()}
+        cas = ContentAddressedStore(vault.root)
+        cap = config.caps["max_new_units_per_run"] if limit is None else limit
+        seen = {
+            (item.source_id, item.source_uri, item.source_version)
+            for item in ledger.list_source_items()
+        }
         errors = attempted = written = 0
         capped = False
         for adapter in adapters:
-            adapter_failed = False
-            adapter_attempted = 0
             try:
-                items = adapter.scan(ledger.get_cursor(adapter.source_id))
+                prepared = _prepare_adapter_ingest(
+                    adapter,
+                    ledger,
+                    cas,
+                    seen,
+                    run_id,
+                    max(cap - attempted, 0),
+                )
             except (OSError, RuntimeError):
                 errors += 1
                 attempted += 1
                 continue
-            progressed = False
-            for ref, data, meta in items:
-                version_key = (ref.source_id, ref.source_uri, ref.source_version)
-                if version_key in seen:
-                    continue
-                if attempted >= cap:
-                    capped = True
-                    break
-                attempted += 1
-                adapter_attempted += 1
-                if meta.get("skip_reason"):
-                    skip_digest = hashlib.sha256(f"skip:{ref.source_version}".encode()).hexdigest()
-                    ledger.upsert_source_item(SourceItem(
-                        ref.source_id, ref.source_uri, ref.source_version, skip_digest, run_id, run_id
-                    ))
-                    seen.add(version_key)
-                    progressed = True
-                    continue
-                digest = hashlib.sha256(data).hexdigest()
-                units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
-                if not units and data:
-                    try:
-                        _ = cas.put(data)
-                        ledger.upsert_source_item(SourceItem(
-                            ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
-                        ))
-                        seen.add(version_key)
-                        progressed = True
-                    except OSError:
-                        errors += 1
-                        adapter_failed = True
-                    continue
-                try:
-                    _ = cas.put(data)
-                    ledger.upsert_source_item(SourceItem(
-                        ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
-                    ))
-                    _store_units(ledger, units)
-                    seen.add(version_key)
-                    progressed = True
-                    written += 1
-                except OSError:
-                    errors += 1
-                    adapter_failed = True
+            with ledger.transaction():
+                _ = ledger.upsert_source_items(prepared.source_items)
+                _ = ledger.upsert_units(prepared.units)
+                if prepared.cursor is not None:
+                    position, updated_at = prepared.cursor
+                    ledger.set_cursor(adapter.source_id, position, updated_at)
+            seen.update(prepared.version_keys)
+            errors += prepared.errors
+            attempted += prepared.attempted
+            written += prepared.written
+            capped = prepared.capped
             if capped:
                 break
-            if not adapter_failed and (progressed or adapter_attempted == 0):
-                ledger.set_cursor(adapter.source_id, adapter.next_cursor(), datetime.now(UTC).isoformat())
         return StageReport((), 0, errors, attempted, capped, None, written)
 
     return stage
@@ -515,7 +652,10 @@ def _page_ready(root: Path, page: PageSpec) -> bool:
     for match in re.finditer(r"\[\^([^\]]+)\]", page.body_md):
         if match.group(1) not in known:
             return False
-    return all(len(cite.hash) == 64 and (root / "raw" / cite.hash[:2] / cite.hash).is_file() for cite in page.sources)
+    return all(
+        len(cite.hash) == 64 and (root / "raw" / cite.hash[:2] / cite.hash).is_file()
+        for cite in page.sources
+    )
 
 
 def _compile_stage(config: Config, llm_mode: str) -> StageFn:
@@ -631,12 +771,20 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
 
 
 def run_ingest(
-    config: Config, sources: Sequence[str] | None, *, stage: StageFn | None = None, limit: int | None = None
+    config: Config,
+    sources: Sequence[str] | None,
+    *,
+    stage: StageFn | None = None,
+    limit: int | None = None,
 ) -> RunOutcome:
-    return _execute(config, stage if stage is not None else _ingest(config, sources, limit), "ingest")
+    return _execute(
+        config, stage if stage is not None else _ingest(config, sources, limit), "ingest"
+    )
 
 
-def run_compile(config: Config, *, compiler: StageFn | None = None, llm_mode: str = "cli") -> RunOutcome:
+def run_compile(
+    config: Config, *, compiler: StageFn | None = None, llm_mode: str = "cli"
+) -> RunOutcome:
     return _execute(
         config,
         compiler if compiler is not None else _compile_stage(config, llm_mode),
@@ -644,7 +792,9 @@ def run_compile(config: Config, *, compiler: StageFn | None = None, llm_mode: st
     )
 
 
-def run_brief(config: Config, *, generator: BriefGenerator | None = None, llm_mode: str = "cli") -> RunOutcome:
+def run_brief(
+    config: Config, *, generator: BriefGenerator | None = None, llm_mode: str = "cli"
+) -> RunOutcome:
     return _execute(config, _brief_stage(config, generator, llm_mode), "brief")
 
 

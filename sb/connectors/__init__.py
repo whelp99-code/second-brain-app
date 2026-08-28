@@ -41,7 +41,9 @@ def _is_discoverable(name: str) -> bool:
     )
 
 
-def discover_adapters(config: Config, *, package: ModuleType | None = None) -> Mapping[str, SourceAdapter]:
+def discover_adapters(
+    config: Config, *, package: ModuleType | None = None
+) -> Mapping[str, SourceAdapter]:
     """Load discoverable connector modules and instantiate each once.
 
     A discoverable module is named `sessions_*`, `records_*`, `*_documents`,

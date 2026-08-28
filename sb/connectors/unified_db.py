@@ -132,7 +132,9 @@ class UnifiedDbAdapter:
         with self._settings.connect(self.dsn) as session:
             self.last_settings = _guard(session)
             emit.lookup = build_lookup(session.execute(catalog_sql(mapping.projects)).fetchall())
-            emit.disabled = disabled_sources(session.execute(catalog_sql(mapping.sources)).fetchall())
+            emit.disabled = disabled_sources(
+                session.execute(catalog_sql(mapping.sources)).fetchall()
+            )
             for table in mapping.tables:
                 _drain(session, table, state)
             _ = session.execute(_COMMIT)

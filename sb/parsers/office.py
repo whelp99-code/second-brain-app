@@ -148,7 +148,11 @@ class XlsxDocumentParser:
 
 def _formula_text(key: str, cache: dict[str, str]) -> str:
     cached = cache.get(key)
-    return FORMULA_UNAVAILABLE_TOKEN if cached is None or cached == "" else f"{FORMULA_CACHE_TOKEN}\t{cached}"
+    return (
+        FORMULA_UNAVAILABLE_TOKEN
+        if cached is None or cached == ""
+        else f"{FORMULA_CACHE_TOKEN}\t{cached}"
+    )
 
 
 def _cached_formulas(payload: bytes, keys: list[str]) -> dict[str, str]:
@@ -203,9 +207,7 @@ def _extract_xlsx(payload: bytes, limits: OfficeParseLimits) -> str:
     finally:
         workbook.close()
     cache = _cached_formulas(payload, formula_keys)
-    return "\n".join(
-        _formula_text(key, cache) if text is None else text for key, text in pending
-    )
+    return "\n".join(_formula_text(key, cache) if text is None else text for key, text in pending)
 
 
 __all__ = (

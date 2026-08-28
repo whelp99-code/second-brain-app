@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import shutil
 import sqlite3
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -77,9 +79,7 @@ def ledger_schema_version(path: Path) -> int:
                 return 1
             row = cast(
                 tuple[object, ...] | None,
-                conn.execute(
-                    "SELECT value FROM schema_meta WHERE key='schema_version'"
-                ).fetchone(),
+                conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone(),
             )
     except sqlite3.DatabaseError as exc:
         raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
@@ -124,12 +124,14 @@ class Ledger:
     _conn: sqlite3.Connection | None
     _tables: LedgerTables
     _journal_mode: str
+    _transaction_depth: int
 
     def __init__(self, vault_root: Path | str) -> None:
         self._vault_root = Path(vault_root)
         self._conn = None
         self._tables = LedgerTables()
         self._journal_mode = "delete"
+        self._transaction_depth = 0
 
     @property
     def db_path(self) -> Path:
@@ -161,6 +163,8 @@ class Ledger:
         try:
             conn = sqlite3.connect(path)
             _ = conn.execute("PRAGMA journal_mode=WAL")
+            _ = conn.execute("PRAGMA busy_timeout=5000")
+            _ = conn.execute("PRAGMA wal_autocheckpoint=1000")
         except sqlite3.DatabaseError as exc:
             raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
         self._conn = conn
@@ -170,6 +174,8 @@ class Ledger:
     def close(self) -> None:
         if self._conn is None:
             return
+        if self._transaction_depth != 0:
+            raise RuntimeError("cannot close ledger during an active transaction")
         self._conn.commit()
         self._conn.close()
         self._conn = None
@@ -184,8 +190,55 @@ class Ledger:
 
     def _exec(self, sql: str, params: SqlParams) -> int:
         cursor = self._db().execute(sql, params)
-        self._db().commit()
+        if self._transaction_depth == 0:
+            self._db().commit()
         return int(cursor.rowcount)
+
+    def _executemany(self, sql: str, params: Sequence[SqlParams]) -> int:
+        cursor = self._db().executemany(sql, params)
+        if self._transaction_depth == 0:
+            self._db().commit()
+        return int(cursor.rowcount)
+
+    @contextmanager
+    def transaction(self) -> Generator[None, None, None]:
+        """Group ledger mutations atomically, including the in-memory row snapshot."""
+        conn = self._db()
+        snapshot = _clone_tables(self._tables)
+        depth = self._transaction_depth
+        savepoint = f"sb_tx_{depth}"
+        self._transaction_depth += 1
+        try:
+            if depth == 0:
+                _ = conn.execute("BEGIN IMMEDIATE")
+            else:
+                _ = conn.execute(f"SAVEPOINT {savepoint}")
+            try:
+                yield
+            except BaseException:
+                if depth == 0:
+                    conn.rollback()
+                else:
+                    _ = conn.execute(f"ROLLBACK TO {savepoint}")
+                    _ = conn.execute(f"RELEASE {savepoint}")
+                self._tables = snapshot
+                raise
+            else:
+                try:
+                    if depth == 0:
+                        conn.commit()
+                    else:
+                        _ = conn.execute(f"RELEASE {savepoint}")
+                except BaseException:
+                    if depth == 0:
+                        conn.rollback()
+                    else:
+                        _ = conn.execute(f"ROLLBACK TO {savepoint}")
+                        _ = conn.execute(f"RELEASE {savepoint}")
+                    self._tables = snapshot
+                    raise
+        finally:
+            self._transaction_depth -= 1
 
     def journal_mode(self) -> str:
         return self._journal_mode
@@ -196,11 +249,40 @@ class Ledger:
             + " ON CONFLICT(source_id, source_uri, content_hash) DO UPDATE SET"
             + " last_seen_run=excluded.last_seen_run, source_version=excluded.source_version",
             (
-                item.source_id, item.source_uri, item.source_version,
-                item.content_hash, item.first_seen_run, item.last_seen_run,
+                item.source_id,
+                item.source_uri,
+                item.source_version,
+                item.content_hash,
+                item.first_seen_run,
+                item.last_seen_run,
             ),
         )
         self._tables.source_items[(item.source_id, item.source_uri, item.content_hash)] = item
+
+    def upsert_source_items(self, items: Sequence[SourceItem]) -> int:
+        """Upsert a source batch with one SQLite commit."""
+        if not items:
+            return 0
+        params: list[SqlParams] = [
+            (
+                item.source_id,
+                item.source_uri,
+                item.source_version,
+                item.content_hash,
+                item.first_seen_run,
+                item.last_seen_run,
+            )
+            for item in items
+        ]
+        _ = self._executemany(
+            "INSERT INTO source_item VALUES (?,?,?,?,?,?)"
+            + " ON CONFLICT(source_id, source_uri, content_hash) DO UPDATE SET"
+            + " last_seen_run=excluded.last_seen_run, source_version=excluded.source_version",
+            params,
+        )
+        for item in items:
+            self._tables.source_items[(item.source_id, item.source_uri, item.content_hash)] = item
+        return len(items)
 
     def list_source_items(self) -> tuple[SourceItem, ...]:
         items = list(self._tables.source_items.values())
@@ -225,6 +307,28 @@ class Ledger:
             (unit.unit_id, unit.content_hash, unit.span, unit.text_hash, unit.normalizer_version),
         )
         self._tables.units[unit.unit_id] = unit
+
+    def upsert_units(self, units: Sequence[UnitRow]) -> int:
+        """Upsert a normalized-unit batch with one SQLite commit."""
+        if not units:
+            return 0
+        params: list[SqlParams] = [
+            (
+                unit.unit_id,
+                unit.content_hash,
+                unit.span,
+                unit.text_hash,
+                unit.normalizer_version,
+            )
+            for unit in units
+        ]
+        _ = self._executemany(
+            "INSERT OR REPLACE INTO unit VALUES (?,?,?,?,?)",
+            params,
+        )
+        for unit in units:
+            self._tables.units[unit.unit_id] = unit
+        return len(units)
 
     def get_unit(self, unit_id: str) -> UnitRow | None:
         return self._tables.units.get(unit_id)
@@ -268,9 +372,7 @@ class Ledger:
         self._tables.derivations[key] = replace(
             row, status=DerivStatus.RUNNING.value, run_id=run_id, attempts=row.attempts + 1
         )
-        self._record_event(
-            self._tables.derivations[key], row.status, DerivStatus.RUNNING.value
-        )
+        self._record_event(self._tables.derivations[key], row.status, DerivStatus.RUNNING.value)
 
     def mark_done(self, key: str, output: DerivationOutput) -> None:
         row = self._need(key)
@@ -282,8 +384,12 @@ class Ledger:
             (DerivStatus.DONE.value, output.output_hash, output.output_path, finished, key),
         )
         self._tables.derivations[key] = replace(
-            row, status=DerivStatus.DONE.value, output_hash=output.output_hash,
-            output_path=output.output_path, error=None, finished_at=finished,
+            row,
+            status=DerivStatus.DONE.value,
+            output_hash=output.output_hash,
+            output_path=output.output_path,
+            error=None,
+            finished_at=finished,
         )
         self._record_event(self._tables.derivations[key], row.status, DerivStatus.DONE.value)
 
@@ -343,7 +449,9 @@ class Ledger:
             if row.status == DerivStatus.RUNNING.value and (row.run_id or "") != current_run_id:
                 self._tables.derivations[key] = replace(row, status=DerivStatus.PENDING.value)
                 self._record_event(
-                    self._tables.derivations[key], row.status, DerivStatus.PENDING.value,
+                    self._tables.derivations[key],
+                    row.status,
+                    DerivStatus.PENDING.value,
                     "stale running reset",
                 )
         return changed
@@ -409,6 +517,16 @@ class Ledger:
         if row is None:
             raise InvalidDerivationTransition(deriv_key=key, from_status="absent", to_status="")
         return row
+
+
+def _clone_tables(source: LedgerTables) -> LedgerTables:
+    cloned = LedgerTables()
+    cloned.source_items = dict(source.source_items)
+    cloned.cursors = dict(source.cursors)
+    cloned.units = dict(source.units)
+    cloned.derivations = dict(source.derivations)
+    cloned.runs = dict(source.runs)
+    return cloned
 
 
 def rebuild_from_vault(vault_root: Path | str) -> None:

@@ -68,19 +68,19 @@ def _config(
         raw=cast(
             dict[str, TomlValue],
             {
-            "vault_root": str(root),
-            "caps": {
-                "max_llm_calls_compile": 10,
-                "max_llm_calls_conflict": 10,
-                "max_llm_calls_briefing": 10,
-            },
-            "llm": {
-                "argv_template": ["claude", "-p", "{prompt}"],
-                "prompt_version": "v1",
-                "model_id": "remote-model" if external else "fake",
-                "external": external,
-            },
-            "sources": [source],
+                "vault_root": str(root),
+                "caps": {
+                    "max_llm_calls_compile": 10,
+                    "max_llm_calls_conflict": 10,
+                    "max_llm_calls_briefing": 10,
+                },
+                "llm": {
+                    "argv_template": ["claude", "-p", "{prompt}"],
+                    "prompt_version": "v1",
+                    "model_id": "remote-model" if external else "fake",
+                    "external": external,
+                },
+                "sources": [source],
             },
         )
     )

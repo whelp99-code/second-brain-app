@@ -30,11 +30,7 @@ def _write_md(root: Path, relative: str, body: str) -> Path:
 
 
 def _delivered(items: Sequence[tuple[SourceRef, bytes, ItemMeta]]) -> list[tuple[str, bytes]]:
-    return [
-        (ref.source_uri, body)
-        for ref, body, meta in items
-        if "skip_reason" not in meta
-    ]
+    return [(ref.source_uri, body) for ref, body, meta in items if "skip_reason" not in meta]
 
 
 def test_scan_yields_source_ref_bytes_meta_per_markdown_file(tmp_path: Path) -> None:

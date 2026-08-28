@@ -49,9 +49,7 @@ def test_metrics_ignore_malformed_partial_rows(tmp_path: Path) -> None:
     assert report.commands == {"status": 1}
 
 
-def test_metrics_rotation_keeps_a_bounded_tail(
-    tmp_path: Path, monkeypatch: MonkeyPatch
-) -> None:
+def test_metrics_rotation_keeps_a_bounded_tail(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr(metrics_module, "MAX_METRICS_BYTES", 200)
     monkeypatch.setattr(metrics_module, "KEEP_ROWS", 3)
 

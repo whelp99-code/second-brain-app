@@ -96,7 +96,12 @@ def _inputs(
     previous_run_status: str | None = "ok",
 ) -> BriefingInputs:
     return BriefingInputs(
-        yesterday_items, open_conflict_pages, stale_pages, upcoming_items, last_brief, previous_run_status
+        yesterday_items,
+        open_conflict_pages,
+        stale_pages,
+        upcoming_items,
+        last_brief,
+        previous_run_status,
     )
 
 
@@ -246,7 +251,8 @@ def test_incomplete_items_are_not_parsed_into_sources() -> None:
     items = (
         "me-wiki:notes/new.md",
         f"origin=me-wiki:a.md hash={HASH_A} [^{SID_A}]",
-        f"origin=me-wiki:b.md hash={HASH_B} text=no-footnote", f"[^{SID_C}] origin=me-wiki:c.md hash={HASH_C}",
+        f"origin=me-wiki:b.md hash={HASH_B} text=no-footnote",
+        f"[^{SID_C}] origin=me-wiki:c.md hash={HASH_C}",
     )
     spec = _spec("- x\n", _inputs(yesterday_items=items, last_brief=None))
     assert spec.sources == []
@@ -299,11 +305,24 @@ def test_briefing_prompt_file_declares_slots_without_placeholder_sid() -> None:
 
 def test_generate_briefing_substitutes_fields_and_lists_available_citations() -> None:
     recorder = RecordingLLM(CITED_RECS)
-    inputs = BriefingInputs((CITE,), ("CFLT_TOKEN",), ("STALE_TOKEN",), ("UPCOMING_TOKEN",), "LASTBRIEF_TOKEN", "STATUS_OK_TOKEN")
+    inputs = BriefingInputs(
+        (CITE,),
+        ("CFLT_TOKEN",),
+        ("STALE_TOKEN",),
+        ("UPCOMING_TOKEN",),
+        "LASTBRIEF_TOKEN",
+        "STATUS_OK_TOKEN",
+    )
     spec = generate_briefing(inputs, recorder, _config())
     assert recorder.calls == 1 and spec.body_md
     prompt = recorder.prompts[0]
-    for token in ("CFLT_TOKEN", "STALE_TOKEN", "UPCOMING_TOKEN", "LASTBRIEF_TOKEN", "STATUS_OK_TOKEN"):
+    for token in (
+        "CFLT_TOKEN",
+        "STALE_TOKEN",
+        "UPCOMING_TOKEN",
+        "LASTBRIEF_TOKEN",
+        "STATUS_OK_TOKEN",
+    ):
         assert token in prompt
     assert "available-citations:" in prompt
     assert f"[^{CAS_SID}]" in prompt

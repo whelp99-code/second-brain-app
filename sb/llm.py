@@ -13,7 +13,14 @@ ATTEMPT_LIMIT: Final = 2
 _WS: Final = frozenset(" \t\n\r")
 _NUMBER: Final = re.compile(r"-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?")
 _ESCAPES: Final = {
-    '"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t",
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
 }
 type JsonValue = str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
 
@@ -65,8 +72,13 @@ def _run_subprocess(
     timeout: int,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        list(argv), input=stdin_text, capture_output=True, text=True,
-        encoding="utf-8", timeout=timeout, check=False,
+        list(argv),
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=timeout,
+        check=False,
     )
 
 
@@ -212,7 +224,9 @@ def _render_invocation(
     has_prompt_slot = any("{prompt}" in part for part in template)
     has_system_slot = any("{system}" in part for part in template)
     payload = prompt if system is None or has_system_slot else f"{system}\n\n{prompt}"
-    argv = [part.replace("{prompt}", payload).replace("{system}", system or "") for part in template]
+    argv = [
+        part.replace("{prompt}", payload).replace("{system}", system or "") for part in template
+    ]
     return argv, None if has_prompt_slot else payload
 
 

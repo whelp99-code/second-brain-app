@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import threading
 import urllib.error
@@ -18,6 +20,7 @@ from pytest import MonkeyPatch
 
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
+from sb.pipeline import RunOutcome
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 from sb.web import MAX_BODY_BYTES, SecondBrainHTTPServer, build_server
@@ -54,6 +57,7 @@ def _ready(tmp_path: Path) -> tuple[Config, Path]:
         [
             _page(root, "wiki/계약-일정", "active", TERM),
             _page(root, "conflicts/web-case", "conflicted", "## status\nopen"),
+            _page(root, "daily/2026-08-28", "active", "오늘의 알림센터 브리핑"),
         ],
         "web-seed",
         _NoPreviousHash(),
@@ -113,6 +117,7 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
             html = response.read().decode("utf-8")
         assert "Second Brain" in html
         assert "기억 추가" in html
+        assert "파일 업로드" in html
 
         status, health = _request(f"{base}/health")
         assert status == 200 and health == {"status": "ok"}
@@ -120,6 +125,22 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
         status, current = _request(f"{base}/api/status")
         assert status == 200
         assert isinstance(current, dict) and "status" in current
+
+        status, capabilities = _request(f"{base}/api/capabilities")
+        assert status == 200
+        assert isinstance(capabilities, dict)
+        desktop = cast(dict[str, object], capabilities).get("desktop")
+        assert isinstance(desktop, dict)
+        assert cast(dict[str, object], desktop).get("file_upload") is True
+
+        status, briefing = _request(f"{base}/api/briefing/latest")
+        assert status == 200
+        assert isinstance(briefing, dict)
+        snapshot = cast(dict[str, object], briefing).get("briefing")
+        assert isinstance(snapshot, dict)
+        snapshot_dict = cast(dict[str, object], snapshot)
+        assert snapshot_dict.get("page_id") == "daily/2026-08-28"
+        assert "알림센터 브리핑" in str(snapshot_dict.get("body"))
 
         status, remembered = _request(
             f"{base}/api/remember",
@@ -177,6 +198,110 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
         assert isinstance(metrics_dict.get("commands"), dict)
 
 
+def test_desktop_upload_endpoint_is_authenticated_idempotent_and_inbox_compatible(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    config, root = _ready(tmp_path)
+    token = "desktop-upload-token"
+    monkeypatch.setenv("SB_WEB_TOKEN", token)
+    payload = b"# desktop upload\ncontract on Wednesday\n"
+    request_body = {
+        "filename": "계약서.md",
+        "relative_path": "Projects/계약서.md",
+        "device_id": "JaeMin-Mac",
+        "content_sha256": hashlib.sha256(payload).hexdigest(),
+        "content_base64": base64.b64encode(payload).decode("ascii"),
+    }
+
+    with _running(config) as base:
+        status, denied = _request(
+            f"{base}/api/uploads",
+            method="POST",
+            payload=request_body,
+        )
+        assert status == 401 and denied == {"error": "unauthorized"}
+
+        status, first = _request(
+            f"{base}/api/uploads",
+            method="POST",
+            payload=request_body,
+            token=token,
+        )
+        assert status == 201
+        assert isinstance(first, dict)
+        first_dict = cast(dict[str, object], first)
+        assert first_dict.get("state") == "queued"
+        inbox_path = first_dict.get("inbox_path")
+        assert isinstance(inbox_path, str)
+        assert (root / inbox_path).read_bytes() == payload
+
+        status, second = _request(
+            f"{base}/api/uploads",
+            method="POST",
+            payload=request_body,
+            token=token,
+        )
+        assert status == 200
+        assert isinstance(second, dict)
+        assert cast(dict[str, object], second).get("state") == "already-queued"
+
+
+def test_desktop_upload_endpoint_rejects_invalid_base64_and_path_escape(tmp_path: Path) -> None:
+    config, _root = _ready(tmp_path)
+    with _running(config) as base:
+        status, invalid = _request(
+            f"{base}/api/uploads",
+            method="POST",
+            payload={
+                "filename": "note.md",
+                "relative_path": "note.md",
+                "content_base64": "not base64!",
+            },
+        )
+        assert status == 400 and invalid == {"error": "content_base64 is invalid"}
+
+        status, escaped = _request(
+            f"{base}/api/uploads",
+            method="POST",
+            payload={
+                "filename": "note.md",
+                "relative_path": "../note.md",
+                "content_base64": base64.b64encode(b"safe").decode("ascii"),
+            },
+        )
+        assert status == 400
+        assert isinstance(escaped, dict)
+        assert "relative_path" in str(cast(dict[str, object], escaped).get("error"))
+
+
+def test_web_run_uses_only_explicitly_configured_sources(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    _base_config, root = _ready(tmp_path)
+    config = Config(
+        raw={
+            "vault_root": str(root),
+            "sources": [{"id": "inbox", "adapter": "inbox-documents"}],
+        }
+    )
+    seen: list[tuple[str, ...] | None] = []
+
+    def _fake_run(runtime: Config, sources: tuple[str, ...] | None) -> RunOutcome:
+        assert runtime.vault_root == str(root)
+        seen.append(sources)
+        return RunOutcome("web-run", "ok", 0, 0, 0, 0, None, False, 0)
+
+    monkeypatch.setattr("sb.web.run_all", _fake_run)
+
+    with _running(config) as base:
+        status, payload = _request(f"{base}/api/run", method="POST", payload={})
+
+    assert status == 200
+    assert isinstance(payload, dict)
+    assert cast(dict[str, object], payload).get("run_id") == "web-run"
+    assert seen == [("inbox",)]
+
+
 def test_conflict_can_be_listed_and_explicitly_resolved(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     with _running(config) as base:
@@ -188,8 +313,7 @@ def test_conflict_can_be_listed_and_explicitly_resolved(tmp_path: Path) -> None:
         assert isinstance(conflicts, list)
         conflict_rows = cast(list[object], conflicts)
         assert any(
-            isinstance(row, dict)
-            and cast(dict[str, object], row).get("conflict_id") == "web-case"
+            isinstance(row, dict) and cast(dict[str, object], row).get("conflict_id") == "web-case"
             for row in conflict_rows
         )
 

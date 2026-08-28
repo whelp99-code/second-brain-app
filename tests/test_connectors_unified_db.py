@@ -131,7 +131,9 @@ def _sources() -> list[tuple[Cell, ...]]:
     return [("memory_bank", True), ("legacy", False)]
 
 
-def _event(pk: str, stamp: datetime, project: str | None, source: str, summary: str) -> tuple[Cell, ...]:
+def _event(
+    pk: str, stamp: datetime, project: str | None, source: str, summary: str
+) -> tuple[Cell, ...]:
     return (pk, stamp, project, source, "agent", "note", "completed", summary)
 
 
@@ -162,7 +164,11 @@ def test_create_uses_default_dsn_when_config_omits_override() -> None:
 
 def test_scan_asserts_readonly_settings_before_source_selects() -> None:
     # Given: a read-only fake session with one event row.
-    db = FakeDb(projects=_catalog(), sources=_sources(), events=[_event("evt_1", T0, "orca-jarvis", "memory_bank", "hi")])
+    db = FakeDb(
+        projects=_catalog(),
+        sources=_sources(),
+        events=[_event("evt_1", T0, "orca-jarvis", "memory_bank", "hi")],
+    )
     adapter = _adapter(db)
 
     # When: scan opens a session and reads.
@@ -184,7 +190,11 @@ def test_scan_asserts_readonly_settings_before_source_selects() -> None:
 
 def test_scan_raises_unsafe_session_when_transaction_readonly_is_off() -> None:
     # Given: a session whose transaction_read_only is off.
-    db = FakeDb(txn_ro="off", projects=_catalog(), events=[_event("evt_1", T0, "orca-jarvis", "memory_bank", "x")])
+    db = FakeDb(
+        txn_ro="off",
+        projects=_catalog(),
+        events=[_event("evt_1", T0, "orca-jarvis", "memory_bank", "x")],
+    )
     adapter = _adapter(db)
 
     # When / Then: the guard fails before any source SELECT.
@@ -331,15 +341,17 @@ def test_occurred_at_id_cursor_is_lossless_across_timestamp_ties() -> None:
         "unified-db:orca-jarvis:memory.events:evt_a",
         "unified-db:orca-jarvis:memory.events:evt_b",
     ]
-    assert [ref.source_uri for ref, _b in second] == [
-        "unified-db:orca-jarvis:memory.events:evt_c"
-    ]
+    assert [ref.source_uri for ref, _b in second] == ["unified-db:orca-jarvis:memory.events:evt_c"]
     assert _delivered(list(adapter.scan(adapter.next_cursor()))) == []
 
 
 def test_executed_sql_and_module_contain_no_write_or_ddl() -> None:
     # Given: a successful mocked scan.
-    db = FakeDb(projects=_catalog(), sources=_sources(), events=[_event("evt_1", T0, "orca-jarvis", "memory_bank", "x")])
+    db = FakeDb(
+        projects=_catalog(),
+        sources=_sources(),
+        events=[_event("evt_1", T0, "orca-jarvis", "memory_bank", "x")],
+    )
     adapter = _adapter(db)
 
     # When: SQL is executed and the module text is scanned.

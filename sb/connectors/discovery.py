@@ -17,7 +17,19 @@ SOURCE_DISCOVERY_MANIFEST_V1: Final = "second-brain-source-discovery-manifest-v1
 SourceName = Literal["me-wiki", "unified-db", "legacy Mem0/RAG"]
 _REQUEST_FIELDS: Final = frozenset({"request_version", "source_name", "source_root"})
 _ALLOWED_SUFFIXES: Final = frozenset(
-    {".csv", ".db", ".json", ".jsonl", ".md", ".parquet", ".sqlite", ".sqlite3", ".toml", ".yaml", ".yml"}
+    {
+        ".csv",
+        ".db",
+        ".json",
+        ".jsonl",
+        ".md",
+        ".parquet",
+        ".sqlite",
+        ".sqlite3",
+        ".toml",
+        ".yaml",
+        ".yml",
+    }
 )
 _SOURCE_NAMES: Final[dict[str, SourceName]] = {
     "me-wiki": "me-wiki",
@@ -51,7 +63,9 @@ def _string(value: str, field: str) -> str:
 
 
 def _canonical(value: Mapping[str, str | list[dict[str, str]]]) -> bytes:
-    return json.dumps(dict(value), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        dict(value), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
 
 
 def path_digest(source_name: SourceName, entry: SourceDiscoveryEntryV1) -> str:
@@ -178,7 +192,11 @@ def discover_source(
             raise SourceDiscoveryError(f"unsupported source file suffix: {item.relative_path}")
         relative = item.relative_path
         pure = PurePosixPath(relative)
-        if pure.is_absolute() or relative != pure.as_posix() or any(part in {"", ".", ".."} for part in pure.parts):
+        if (
+            pure.is_absolute()
+            or relative != pure.as_posix()
+            or any(part in {"", ".", ".."} for part in pure.parts)
+        ):
             raise SourceDiscoveryError("relative_path must be a canonical relative POSIX path")
         entry = SourceDiscoveryEntryV1(
             relative,

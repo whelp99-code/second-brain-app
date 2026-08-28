@@ -249,6 +249,16 @@ class Config:
         return normalized
 
     @property
+    def configured_source_ids(self) -> tuple[str, ...] | None:
+        """Return the explicit source selection shared by CLI, web, and MCP runs."""
+        names: list[str] = []
+        for row in self.source_roots:
+            selected = row.get("id") or row.get("adapter") or row.get("type")
+            if selected and selected not in names:
+                names.append(selected)
+        return tuple(names) or None
+
+    @property
     def filesystem(self) -> FilesystemConfig:
         section = _as_mapping(self.raw.get("filesystem"))
         mode = None if section is None else _as_str(section.get("mode"))

@@ -22,7 +22,12 @@ from sb.store.ledger import Ledger, load_ledger_tables
 from sb.vault import Vault, VaultLintError
 
 ME_WIKI_FILE: Path = (
-    Path(__file__).resolve().parent.parent / "fixtures" / "wiki-spike" / "me-wiki" / "identity" / "profile.md"
+    Path(__file__).resolve().parent.parent
+    / "fixtures"
+    / "wiki-spike"
+    / "me-wiki"
+    / "identity"
+    / "profile.md"
 )
 SOURCE_REL: str = "identity/profile.md"
 K1_KEYS: tuple[str, ...] = ("id", "title", "updated", "compiled_by", "status")

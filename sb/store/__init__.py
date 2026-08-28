@@ -306,8 +306,7 @@ def load_ledger_tables(path: Path) -> LedgerTables:
                 )
                 tables.derivations[row.deriv_key] = row
             for cells in _query_rows(
-                conn,
-                "SELECT run_id,started_at,finished_at,git_commit,status FROM run"
+                conn, "SELECT run_id,started_at,finished_at,git_commit,status FROM run"
             ):
                 run = Run(
                     _cell_text(cells[0]),

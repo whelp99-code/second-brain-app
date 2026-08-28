@@ -165,9 +165,7 @@ def _page_hashes(root: Path) -> set[str]:
             facts = parse_page_frontmatter(text)
             if facts is None:
                 continue
-            protected.update(
-                digest for _origin, digest in facts.sources if _valid_digest(digest)
-            )
+            protected.update(digest for _origin, digest in facts.sources if _valid_digest(digest))
     return protected
 
 

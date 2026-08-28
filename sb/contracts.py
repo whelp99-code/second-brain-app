@@ -8,9 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-VALID_CONFLICT_RELATIONS = frozenset(
-    {"supports", "contradicts", "unrelated", "supersedes"}
-)
+VALID_CONFLICT_RELATIONS = frozenset({"supports", "contradicts", "unrelated", "supersedes"})
 
 
 @dataclass(frozen=True, slots=True)

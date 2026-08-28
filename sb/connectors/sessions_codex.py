@@ -76,7 +76,9 @@ class CodexSessionsAdapter:
     def next_cursor(self) -> str:
         return self._next_cursor
 
-    def _read_file(self, path: Path, rel: str, start: int) -> list[tuple[SourceRef, bytes, ItemMeta]]:
+    def _read_file(
+        self, path: Path, rel: str, start: int
+    ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         state = _State()
         with path.open("rb") as handle:

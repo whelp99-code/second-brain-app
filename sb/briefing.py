@@ -172,7 +172,9 @@ def _require_cited_recs(recs: str, allowed: frozenset[str]) -> str:
         return recs
     cited = 0
     for line in recs.splitlines():
-        if line.lstrip().startswith("-") and any(match.group(1) in allowed for match in SID_RE.finditer(line)):
+        if line.lstrip().startswith("-") and any(
+            match.group(1) in allowed for match in SID_RE.finditer(line)
+        ):
             cited += 1
     missing = MIN_CITED_RECS - cited
     if missing <= 0:

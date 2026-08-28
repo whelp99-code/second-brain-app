@@ -15,7 +15,7 @@ Ledger-centric batch library plus a thin CLI. Layers, top to bottom:
 | L4 | `sb/llm.py`, `sb/compile.py`, `sb/conflict.py`, `sb/briefing.py` | L0, L1, prompts |
 | L5 | `sb/vault.py` | L0. Sole writer of `wiki/`, `daily/`, `conflicts/`, `log.md`, and the only git committer. |
 | L6 | `sb/pipeline.py` | stages above. Lock, logs, briefing I/O, dispatch. |
-| L7 | `sb/cli.py`, `sb/mcp.py` | config, pipeline (CLI only), search, vault reads, inbox write |
+| L7 | `sb/cli.py`, `sb/mcp.py`, `sb/web.py` | config, explicit pipeline run surfaces, search, vault reads, inbox/upload writes |
 
 `sb/search.py`, `sb/embeddings.py`, and `sb/hybrid_search.py` sit beside L7. Search reads committed git blobs. Hybrid is off unless `[search] hybrid` is true.
 
@@ -27,10 +27,10 @@ From plan Scope. Do not add these.
 
 - Connectors must not import `sb.normalize`, `sb.llm`, or `sb.vault`.
 - `sb.compile` and `sb.briefing` must not touch the filesystem. They take frozen inputs and return `PageSpec`s.
-- Nothing imports `sb.pipeline` except `sb.cli`.
-- MCP shares no mutable pipeline state. The only write is `sb_remember` into `inbox/`.
+- Only `sb.cli`, `sb.web`, and the explicit MCP `sb_run` surface import `sb.pipeline`.
+- MCP shares no mutable pipeline state. Writes are `sb_remember` into `inbox/` and the explicit `sb_run`, which delegates to the normal single-writer pipeline lock.
 - No writes to unified-db. The connector asserts `default_transaction_read_only` and `transaction_read_only` are `on` before SELECTs. No INSERT/UPDATE/DELETE/DDL.
-- No daemon, file watcher, queue, or event bus. Inbox is scanned on the next ingest.
+- The server has no file watcher, queue, or event bus. The native macOS client may watch user-selected local folders and upload changed files through the bounded desktop API; the server still ingests only from `inbox/`.
 - No signing, consent, authority, or dual-approval machinery.
 - No vault git remote. `raw/` and `.sb/` stay gitignored. Vault root stays mode `0700`.
 - No human-approval gate on the default path. There is no `--review` flag.

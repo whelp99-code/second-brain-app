@@ -93,10 +93,12 @@ class Vault:
         try:
             version = metadata.version("second-brain")
         except metadata.PackageNotFoundError:
-            version = "0.1.0"
+            version = "1.0.0"
         prompt_version, model_id = compiled_by or ("v1", "unknown")
         counts, jobs = _plan_writes(
-            self.root, planned, ledger,
+            self.root,
+            planned,
+            ledger,
             (
                 f"sb/{version}|{prompt_version}|{model_id}",
                 datetime.now(UTC).date().isoformat(),
@@ -107,7 +109,9 @@ class Vault:
             return WriteResult(n_pages, n_conflicts, n_proposals, None)
         log_path = self.root / "log.md"
         log_prev = log_path.read_bytes() if log_path.is_file() else None
-        snapshots = tuple((dest, dest.read_bytes() if dest.is_file() else None) for dest, *_ in jobs)
+        snapshots = tuple(
+            (dest, dest.read_bytes() if dest.is_file() else None) for dest, *_ in jobs
+        )
         written: list[Path] = []
         try:
             for dest, text, kind, page_id in jobs:
@@ -307,9 +311,9 @@ def _plan_writes(
             compiled_by=f"{package_stamp}|{prompt_version}|{model_id}",
             updated=updated,
         )
-        if dest.is_file() and hashlib.sha256(dest.read_bytes()).hexdigest() != ledger.last_compiled_hash(
-            page.page_id
-        ):
+        if dest.is_file() and hashlib.sha256(
+            dest.read_bytes()
+        ).hexdigest() != ledger.last_compiled_hash(page.page_id):
             slug = page.page_id.replace("/", "-")
             proposed = _safe_rel(root, Path("wiki/_proposed") / f"{slug}.md")
             if not (proposed.is_file() and proposed.read_text(encoding="utf-8") == text):
@@ -328,7 +332,10 @@ def _plan_writes(
 
 
 def _restore(
-    root: Path, snapshots: Sequence[tuple[Path, bytes | None]], log_path: Path, log_prev: bytes | None
+    root: Path,
+    snapshots: Sequence[tuple[Path, bytes | None]],
+    log_path: Path,
+    log_prev: bytes | None,
 ) -> None:
     for path, previous in snapshots:
         if previous is None and path.is_file():
@@ -381,13 +388,21 @@ def _safe_rel(root: Path, rel: Path) -> Path:
 def _render(page: PageSpec, *, compiled_by: str, updated: str) -> str:
     sources: list[dict[str, str | list[str]]] = []
     for cite in page.sources:
-        entry: dict[str, str | list[str]] = {"sid": cite.sid, "origin": cite.origin, "hash": cite.hash}
+        entry: dict[str, str | list[str]] = {
+            "sid": cite.sid,
+            "origin": cite.origin,
+            "hash": cite.hash,
+        }
         if cite.spans:
             entry["spans"] = list(cite.spans)
         sources.append(entry)
     payload: dict[str, object] = {
-        "id": page.page_id, "title": page.title, "updated": updated,
-        "compiled_by": compiled_by, "status": page.status, "sources": sources,
+        "id": page.page_id,
+        "title": page.title,
+        "updated": updated,
+        "compiled_by": compiled_by,
+        "status": page.status,
+        "sources": sources,
     }
     if page.derivation_key is not None:
         payload["derivation_key"] = page.derivation_key
@@ -408,13 +423,26 @@ def _atomic_write(path: Path, text: str) -> None:
 
 def _git(root: Path, *args: str) -> str:
     env = os.environ.copy()
-    env.update({
-        "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
-        "GIT_AUTHOR_NAME": BOT_NAME, "GIT_AUTHOR_EMAIL": BOT_EMAIL,
-        "GIT_COMMITTER_NAME": BOT_NAME, "GIT_COMMITTER_EMAIL": BOT_EMAIL,
-    })
-    argv = ("git", "-c", f"user.name={BOT_NAME}", "-c", f"user.email={BOT_EMAIL}",
-            "-c", "commit.gpgsign=false", *args)
+    env.update(
+        {
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "GIT_AUTHOR_NAME": BOT_NAME,
+            "GIT_AUTHOR_EMAIL": BOT_EMAIL,
+            "GIT_COMMITTER_NAME": BOT_NAME,
+            "GIT_COMMITTER_EMAIL": BOT_EMAIL,
+        }
+    )
+    argv = (
+        "git",
+        "-c",
+        f"user.name={BOT_NAME}",
+        "-c",
+        f"user.email={BOT_EMAIL}",
+        "-c",
+        "commit.gpgsign=false",
+        *args,
+    )
     completed = subprocess.run(argv, cwd=root, capture_output=True, text=True, check=False, env=env)
     if completed.returncode != 0:
         raise GitCommandError(argv=args, stderr=completed.stderr)

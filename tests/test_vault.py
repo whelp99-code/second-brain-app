@@ -44,8 +44,11 @@ def _seed_cas(root: Path, digest: str = CAS_HASH, data: bytes = b"blob") -> None
 
 
 def _cited_page(
-    *, page_id: str = "identity-profile", body_md: str | None = None,
-    sid: str = CAS_SID, digest: str = CAS_HASH,
+    *,
+    page_id: str = "identity-profile",
+    body_md: str | None = None,
+    sid: str = CAS_SID,
+    digest: str = CAS_HASH,
 ) -> PageSpec:
     text = f"A cited fact.[^{sid}]" if body_md is None else body_md
     cite = SourceCite(sid=sid, origin="me-wiki:identity/profile.md", hash=digest, spans=["0-12"])
@@ -103,7 +106,9 @@ def test_write_pages_renders_k1_and_commits_when_lint_passes(tmp_path: Path) -> 
     assert _git(tmp_path, "log", "-1", "--format=%s").strip() == (
         "sb: run run-cited (1 pages, 0 conflicts, 0 proposals)"
     )
-    assert _git(tmp_path, "log", "-1", "--format=%an <%ae>").strip() == "second-brain-bot <sb@local>"
+    assert (
+        _git(tmp_path, "log", "-1", "--format=%an <%ae>").strip() == "second-brain-bot <sb@local>"
+    )
     assert list(tmp_path.rglob("*.tmp")) == []
 
 
@@ -167,7 +172,9 @@ def test_write_pages_routes_to_proposed_when_human_edited(tmp_path: Path) -> Non
     assert proposed_write.commit is not None
     assert dest.read_text(encoding="utf-8") == human_text
     proposed = tmp_path / "wiki" / "_proposed" / "identity-profile.md"
-    assert proposed.is_file() and proposed.read_text(encoding="utf-8") != dest.read_text(encoding="utf-8")
+    assert proposed.is_file() and proposed.read_text(encoding="utf-8") != dest.read_text(
+        encoding="utf-8"
+    )
     log = (tmp_path / "log.md").read_text(encoding="utf-8")
     assert "identity-profile" in log and "_proposed" in log
     assert _git(tmp_path, "log", "-1", "--format=%s").strip() == (
@@ -259,14 +266,19 @@ def test_write_pages_restores_log_when_lint_or_path_fails(tmp_path: Path) -> Non
     before = (tmp_path / "log.md").read_bytes()
     with pytest.raises(VaultLintError) as linted:
         unexpected = vault.write_pages(
-            [_cited_page(body_md=f"Poison.[^{DEAD_SID}]")], "run-lint", MemoryLedger(),
+            [_cited_page(body_md=f"Poison.[^{DEAD_SID}]")],
+            "run-lint",
+            MemoryLedger(),
             log_line="status run-lint",
         )
         assert unexpected.commit is None
     assert any("unresolved" in reason for reason in linted.value.reasons)
     with pytest.raises(PathEscapeError) as path_err:
         unexpected = vault.write_pages(
-            [_cited_page(page_id="../outside")], "run-path", MemoryLedger(), log_line="status run-path"
+            [_cited_page(page_id="../outside")],
+            "run-path",
+            MemoryLedger(),
+            log_line="status run-path",
         )
         assert unexpected.commit is None
     assert "outside" in str(path_err.value)
@@ -285,7 +297,15 @@ def test_write_pages_restores_page_log_index_when_commit_fails(
     def boom(root: Path, message: str, paths: list[Path] | None = None) -> str | None:
         del message
         if paths:
-            assert _git(root, "add", "--", *[str(p.resolve().relative_to(root.resolve())) for p in paths]) == ""
+            assert (
+                _git(
+                    root,
+                    "add",
+                    "--",
+                    *[str(p.resolve().relative_to(root.resolve())) for p in paths],
+                )
+                == ""
+            )
         raise GitCommandError(argv=("commit",), stderr="simulated")
 
     monkeypatch.setattr("sb.vault._commit_if_changed", boom)

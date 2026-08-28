@@ -108,7 +108,9 @@ def test_omo_scan_yields_source_ref_and_visible_text_when_current_fixture(tmp_pa
     assert b"VISIBLE_ASSISTANT_1" in blob
 
 
-def test_opencode_scan_yields_source_ref_and_visible_text_when_current_fixture(tmp_path: Path) -> None:
+def test_opencode_scan_yields_source_ref_and_visible_text_when_current_fixture(
+    tmp_path: Path,
+) -> None:
     # Given: a copied real-format OpenCode snapshot fixture.
     root = tmp_path / "opencode"
     root.mkdir()
@@ -276,7 +278,9 @@ def test_codex_resume_keeps_session_lineage_when_later_turn_is_appended(
     assert adapter.next_cursor() == later
 
 
-def test_codex_quarantines_missing_canonical_text_while_sibling_session_ingests(tmp_path: Path) -> None:
+def test_codex_quarantines_missing_canonical_text_while_sibling_session_ingests(
+    tmp_path: Path,
+) -> None:
     # Given: one session missing canonical user text and one valid sibling.
     root = tmp_path / "codex"
     _ = _write_jsonl(
@@ -356,7 +360,11 @@ def test_jsonl_byte_offset_resume_yields_zero_when_fixture_unchanged(tmp_path: P
     assert _delivered(list(omo.scan(None)))
     assert _delivered(list(claude.scan(None)))
     assert _delivered(list(codex.scan(None)))
-    omo_cursor, claude_cursor, codex_cursor = omo.next_cursor(), claude.next_cursor(), codex.next_cursor()
+    omo_cursor, claude_cursor, codex_cursor = (
+        omo.next_cursor(),
+        claude.next_cursor(),
+        codex.next_cursor(),
+    )
 
     # When: each adapter rescans with the exact byte-offset cursor.
     omo_resume = list(omo.scan(omo_cursor))

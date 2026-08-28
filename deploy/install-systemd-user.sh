@@ -32,7 +32,7 @@ if [[ ! -x "$SB_BIN" ]]; then
 fi
 
 run install -d -m 0700 "$UNIT_DEST" "$SB_CONFIG_DIR"
-for unit in second-brain.service second-brain.timer second-brain-backup.service second-brain-backup.timer; do
+for unit in second-brain.service second-brain.timer second-brain-backup.service second-brain-backup.timer second-brain-web.service; do
   run install -m 0644 "$UNIT_SOURCE/$unit" "$UNIT_DEST/$unit"
 done
 
@@ -44,6 +44,6 @@ fi
 
 if [[ $DRY_RUN -eq 0 ]]; then
   systemctl --user daemon-reload
-  systemctl --user enable --now second-brain.timer second-brain-backup.timer
+  systemctl --user enable --now second-brain-web.service second-brain.timer second-brain-backup.timer
   systemctl --user list-timers --all 'second-brain*'
 fi

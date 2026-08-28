@@ -280,9 +280,7 @@ def test_compile_pages_page_id_matches_solo_when_batched_with_collider(
     unit_slash = _unit("u-slash", HASH_A, "0-1", "slash", ORIGIN_SLASH)
     unit_dash = _unit("u-dash", HASH_B, "0-1", "dash", ORIGIN_DASH)
     with Ledger(tmp_path / "solo") as ledger:
-        solo = compile_pages(
-            [unit_slash], ledger, FakeLLM([f"slash.[^{SID_A}]"]), _config()
-        )
+        solo = compile_pages([unit_slash], ledger, FakeLLM([f"slash.[^{SID_A}]"]), _config())
     with Ledger(tmp_path / "batch") as ledger:
         batch = compile_pages(
             [unit_slash, unit_dash],

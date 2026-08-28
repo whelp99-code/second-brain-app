@@ -80,9 +80,7 @@ class _RemoteEncoder:
     def encode(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
         raw = _run_st(_ENCODE_SCRIPT, self.identity, json.dumps(list(texts)))
         return tuple(
-            tuple(float(part) for part in line.split(","))
-            for line in raw.splitlines()
-            if line
+            tuple(float(part) for part in line.split(",")) for line in raw.splitlines() if line
         )
 
 
@@ -91,8 +89,16 @@ def vectors_path(vault_root: Path) -> Path:
 
 
 def embedding_deriv_key(chunk: ChunkRef, identity: ModelIdentity) -> str:
-    payload = "\0".join((chunk.page_id, chunk.section, chunk.content_hash,
-                          identity.model_id, identity.revision, str(identity.dim)))
+    payload = "\0".join(
+        (
+            chunk.page_id,
+            chunk.section,
+            chunk.content_hash,
+            identity.model_id,
+            identity.revision,
+            str(identity.dim),
+        )
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -111,7 +117,9 @@ def run_vec_sql(path: Path, sql: str) -> str:
         raise EmbeddingUnavailable("sqlite-vec missing")
     done = subprocess.run(
         [cli, "-separator", "\x1f", "-newline", "\x1e", str(path), f".load {ext}", sql],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if done.returncode != 0:
         raise EmbeddingUnavailable(done.stderr.strip() or "vec sql failed")
@@ -130,7 +138,9 @@ def resolve_encoder() -> Encoder:
     identity = _env_identity()
     hub = os.environ.get("HF_HOME")
     base = Path(hub) / "hub" if hub else Path.home() / ".cache" / "huggingface" / "hub"
-    snap = base / ("models--" + identity.model_id.replace("/", "--")) / "snapshots" / identity.revision
+    snap = (
+        base / ("models--" + identity.model_id.replace("/", "--")) / "snapshots" / identity.revision
+    )
     if not snap.is_dir():
         raise EmbeddingUnavailable("embedding model unavailable")
     return _RemoteEncoder(identity)
@@ -215,10 +225,15 @@ def _collect(vault_root: Path) -> tuple[tuple[str, str, str, str], ...]:
 
 
 def _sqlite(path: Path, sql: str) -> str | None:
-    done = subprocess.run(
-        ["sqlite3", "-separator", "\x1f", "-newline", "\x1e", str(path), sql],
-        capture_output=True, text=True, check=False,
-    )
+    try:
+        done = subprocess.run(
+            ["sqlite3", "-separator", "\x1f", "-newline", "\x1e", str(path), sql],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
     return None if done.returncode != 0 else done.stdout
 
 
@@ -270,14 +285,23 @@ def _vec_cli() -> str | None:
         return _CLI_MEMO[0]
     ext, found = _vec0_path(), None
     env = os.environ.get("SB_SQLITE")
-    for cand in (env, "/opt/homebrew/opt/sqlite/bin/sqlite3",
-                 "/usr/local/opt/sqlite/bin/sqlite3", "sqlite3"):
+    for cand in (
+        env,
+        "/opt/homebrew/opt/sqlite/bin/sqlite3",
+        "/usr/local/opt/sqlite/bin/sqlite3",
+        "sqlite3",
+    ):
         if cand is None or ext is None:
             continue
-        done = subprocess.run(
-            [cand, ":memory:", f".load {ext}", "select vec_version();"],
-            capture_output=True, text=True, check=False,
-        )
+        try:
+            done = subprocess.run(
+                [cand, ":memory:", f".load {ext}", "select vec_version();"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            continue
         if done.returncode == 0 and done.stdout.strip() != "":
             found = cand
             break
@@ -288,7 +312,10 @@ def _vec_cli() -> str | None:
 def _run_st(script: str, identity: ModelIdentity, stdin_text: str) -> str:
     done = subprocess.run(
         [sys.executable, "-c", script, identity.model_id, identity.revision],
-        input=stdin_text, capture_output=True, text=True, check=False,
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if done.returncode != 0:
         raise EmbeddingUnavailable(done.stderr.strip() or "sentence-transformers failed")
