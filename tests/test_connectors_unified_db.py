@@ -348,7 +348,7 @@ def test_executed_sql_and_module_contain_no_write_or_ddl() -> None:
     # Then: neither executed SQL nor connector sources contain write/DDL verbs.
     for sql in db.sql:
         assert _FORBIDDEN_SQL.search(sql) is None
-    source = Path("/Volumes/DevSpace/second-brain-app/sb/connectors")
+    source = Path(__file__).resolve().parent.parent / "sb" / "connectors"
     for path in (source / "unified_db.py", source / "unified_db_mapping.py"):
         assert _FORBIDDEN_SOURCE.search(path.read_text(encoding="utf-8")) is None
 

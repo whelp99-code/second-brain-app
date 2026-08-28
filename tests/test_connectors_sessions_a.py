@@ -19,9 +19,7 @@ from sb.connectors.sessions_opencode import ADAPTER_ID as OPENCODE_ID
 from sb.connectors.sessions_opencode import create as create_opencode
 from sb.contracts import SourceRef
 
-SPIKE = Path(
-    "/Volumes/DevSpace/orca/Wiki-spike/wiki-spike-sb44/tests/fixtures/second-brain"
-)
+SPIKE = Path(__file__).resolve().parent / "fixtures" / "wiki-spike"
 
 
 @dataclass(frozen=True, slots=True)

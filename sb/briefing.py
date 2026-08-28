@@ -95,6 +95,8 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
         body_md=body,
         sources=cites,
         status="active",
+        prompt_version=config.llm.prompt_version,
+        model_id=config.llm.model_id,
     )
 
 

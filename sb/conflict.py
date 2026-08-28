@@ -8,7 +8,7 @@ import re
 import unicodedata
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import files
 from typing import Final
 
@@ -28,7 +28,16 @@ _STR: Final = re.compile(r'"((?:\\.|[^"\\])*)"')
 _NUM: Final = re.compile(r"-?\d+(?:\.\d+)?")
 _STAMP: Final = re.compile(r"(?:updated:\s*)?(\d{4}-\d{2}-\d{2})")
 _SEP: Final = "\x1f"
-type _Pack = tuple[ConflictVerdict, tuple[str, ...], LexicalMatch, Mapping[str, str], Mapping[str, str | None]]
+_SID_LEN: Final = 8
+type _Evidence = Mapping[str, tuple[SourceCite, ...]]
+type _Pack = tuple[
+    ConflictVerdict,
+    tuple[str, ...],
+    LexicalMatch,
+    Mapping[str, str],
+    Mapping[str, str | None],
+    _Evidence,
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,16 +57,20 @@ class ConflictFinding:
     superseded_id: str | None
     cites: tuple[str, ...]
     warning: bool | None
+    deriv_key: str | None = None
+    deriv_output: DerivationOutput | None = None
 
 
 def check(
     units: Sequence[Unit], pages: Sequence[PageSpec], ledger: Ledger, llm: LLMClient, config: Config,
+    *, finalize: bool = True,
 ) -> list[ConflictFinding]:
     matches = lexical_top(units, pages)
     template = (files("sb") / "prompts" / "conflict.md").read_text(encoding="utf-8")
     version, model = config.llm.prompt_version, config.llm.model_id
     texts: dict[str, str] = {unit.unit_id: unit.text for unit in units}
     texts.update({page.page_id: page.body_md for page in pages})
+    evidence = _evidence(units, pages)
     stamps = {unit.unit_id: _stamp(unit, pages) for unit in units}
     for page in pages:
         found = _STAMP.search(page.body_md)
@@ -70,13 +83,83 @@ def check(
         key = deriv_key((pair.left_id, pair.unit_id), "conflict", version, model)
         row = ledger.get_derivation(key)
         if row is not None and row.status == DerivStatus.DONE.value:
-            findings.append(_restore(row, pair))
-        elif used >= cap or (row is not None and row.status != DerivStatus.PENDING.value):
+            findings.append(_with_lineage(_restore(row, pair, evidence), version, model, key))
+        elif used >= cap:
             continue
         else:
-            findings.append(_judge((pair, texts, stamps, ledger, llm, template, key)))
+            if row is not None and row.status == DerivStatus.FAILED.value:
+                _ = ledger.requeue_failed(key)
+            elif row is not None and row.status != DerivStatus.PENDING.value:
+                continue
+            findings.append(
+                _with_lineage(
+                    _judge((pair, texts, stamps, evidence, ledger, llm, template, key), finalize),
+                    version,
+                    model,
+                    key,
+                )
+            )
             used += 1
     return findings
+
+
+def _with_lineage(
+    finding: ConflictFinding,
+    prompt_version: str,
+    model_id: str,
+    key: str,
+) -> ConflictFinding:
+    if finding.page is None:
+        return finding
+    return replace(
+        finding,
+        page=replace(
+            finding.page,
+            prompt_version=prompt_version,
+            model_id=model_id,
+            derivation_key=key,
+        ),
+    )
+
+
+def _clone_cite(cite: SourceCite) -> SourceCite:
+    return SourceCite(cite.sid, cite.origin, cite.hash, list(cite.spans))
+
+
+def _evidence(units: Sequence[Unit], pages: Sequence[PageSpec]) -> dict[str, tuple[SourceCite, ...]]:
+    found: dict[str, tuple[SourceCite, ...]] = {
+        unit.unit_id: (
+            SourceCite(
+                sid=unit.content_hash[:_SID_LEN],
+                origin=unit.origin,
+                hash=unit.content_hash,
+                spans=[unit.span],
+            ),
+        )
+        for unit in units
+    }
+    for page in pages:
+        found[page.page_id] = tuple(_clone_cite(cite) for cite in page.sources)
+    return found
+
+
+def _pair_sources(pair: LexicalMatch, evidence: _Evidence) -> list[SourceCite]:
+    unique: dict[tuple[str, str, str], SourceCite] = {}
+    for item_id in (pair.left_id, pair.unit_id):
+        for cite in evidence.get(item_id, ()):
+            key = (cite.sid, cite.origin, cite.hash)
+            current = unique.get(key)
+            if current is None:
+                unique[key] = _clone_cite(cite)
+                continue
+            for span in cite.spans:
+                if span not in current.spans:
+                    current.spans.append(span)
+    return list(unique.values())
+
+
+def _citation_marks(cites: Sequence[SourceCite]) -> str:
+    return "".join(f"[^{cite.sid}]" for cite in cites)
 
 
 def _tokens(text: str) -> tuple[str, ...]:
@@ -162,8 +245,20 @@ def _hit(pair: LexicalMatch, verdict: ConflictVerdict, route: str, page: PageSpe
     return ConflictFinding(pair.left_id, pair.unit_id, verdict, route, page, superseded_id, cites, warning)
 
 
-def _judge(job: tuple[LexicalMatch, Mapping[str, str], Mapping[str, str | None], Ledger, LLMClient, str, str]) -> ConflictFinding:
-    pair, texts, stamps, ledger, llm, template, key = job
+def _judge(
+    job: tuple[
+        LexicalMatch,
+        Mapping[str, str],
+        Mapping[str, str | None],
+        _Evidence,
+        Ledger,
+        LLMClient,
+        str,
+        str,
+    ],
+    finalize: bool,
+) -> ConflictFinding:
+    pair, texts, stamps, evidence, ledger, llm, template, key = job
     prompt = (
         template.replace("{left_id}", pair.left_id).replace("{left_text}", texts.get(pair.left_id, ""))
         .replace("{right_id}", pair.unit_id).replace("{right_text}", texts.get(pair.unit_id, ""))
@@ -172,16 +267,29 @@ def _judge(job: tuple[LexicalMatch, Mapping[str, str], Mapping[str, str | None],
     ledger.mark_running(key, "conflict")
     try:
         raw = llm.generate(prompt, json_mode=True)
-    except (LLMUnavailable, LLMBadJson):
-        out = _open(pair)
+    except (LLMUnavailable, LLMBadJson) as exc:
+        ledger.mark_failed(key, str(exc))
+        return _open(pair)
     else:
-        out = _parse(raw, pair, texts, stamps)
+        out = _parse(raw, pair, texts, stamps, evidence)
+    if out.warning is True and out.route == "unrelated" and out.verdict.confidence == 0.0:
+        ledger.mark_failed(key, "invalid conflict verdict")
+        return out
     payload = _dump(out)
-    ledger.mark_done(key, DerivationOutput(hashlib.sha256(payload.encode()).hexdigest(), payload))
-    return out
+    output = DerivationOutput(hashlib.sha256(payload.encode()).hexdigest(), payload)
+    if finalize:
+        ledger.mark_done(key, output)
+        return out
+    return replace(out, deriv_key=key, deriv_output=output)
 
 
-def _parse(raw: str, pair: LexicalMatch, texts: Mapping[str, str], stamps: Mapping[str, str | None]) -> ConflictFinding:
+def _parse(
+    raw: str,
+    pair: LexicalMatch,
+    texts: Mapping[str, str],
+    stamps: Mapping[str, str | None],
+    evidence: _Evidence,
+) -> ConflictFinding:
     relation, rationale, score = _fstr(raw, "relation"), _fstr(raw, "rationale"), _fnum(raw, "confidence")
     cites = _fstrs(raw, "cites")
     if relation is None or rationale is None or score is None or cites is None:
@@ -195,29 +303,33 @@ def _parse(raw: str, pair: LexicalMatch, texts: Mapping[str, str], stamps: Mappi
     if soft is not None:
         return _hit(pair, verdict, soft, None, None, filled, False)
     handler = _HANDLERS.get(relation)
-    return _open(pair) if handler is None else handler((verdict, filled, pair, texts, stamps))
+    return _open(pair) if handler is None else handler((verdict, filled, pair, texts, stamps, evidence))
 
 
 def _contra(pack: _Pack) -> ConflictFinding:
-    verdict, cites, pair, texts, _stamps = pack
+    verdict, cites, pair, texts, _stamps, evidence = pack
     if verdict.confidence < CONTRADICTION_FLOOR:
         return _hit(pair, verdict, "note", None, None, cites, False)
-    mark = f"[^{cites[0]}]" if cites else ""
+    sources = _pair_sources(pair, evidence)
+    if not sources:
+        return _hit(pair, verdict, "note", None, None, cites, True)
+    left_mark = _citation_marks(evidence.get(pair.left_id, ()))
+    right_mark = _citation_marks(evidence.get(pair.unit_id, ()))
+    verdict_mark = _citation_marks(sources)
     body = "\n\n".join((
-        f"## 주장A\n{texts.get(pair.left_id, '')}{mark}",
-        f"## 주장B\n{texts.get(pair.unit_id, '')}{mark}",
-        f"## 판정\n{verdict.rationale}{mark}", "## status\nopen",
+        f"## 주장A\n{texts.get(pair.left_id, '')}{left_mark}",
+        f"## 주장B\n{texts.get(pair.unit_id, '')}{right_mark}",
+        f"## 판정\n{verdict.rationale}{verdict_mark}", "## status\nopen",
     ))
-    sid = (cites[0] if cites else pair.left_id)[:8]
     page = PageSpec(
         page_id=f"conflicts/{pair.left_id}-{pair.unit_id}", title="conflict", body_md=body,
-        sources=[SourceCite(sid=sid, origin=pair.left_id, hash=sid, spans=[])], status="conflicted",
+        sources=sources, status="conflicted",
     )
     return _hit(pair, verdict, "conflict", page, None, cites, False)
 
 
 def _super(pack: _Pack) -> ConflictFinding:
-    verdict, cites, pair, _texts, stamps = pack
+    verdict, cites, pair, _texts, stamps, _evidence_map = pack
     left, right = stamps.get(pair.left_id), stamps.get(pair.unit_id)
     if verdict.confidence < SUPERSEDE_FLOOR or left is None or right is None or left == right:
         return _hit(pair, verdict, "note", None, None, cites, True)
@@ -237,7 +349,7 @@ def _dump(hit: ConflictFinding) -> str:
     ))
 
 
-def _restore(row: Derivation, pair: LexicalMatch) -> ConflictFinding:
+def _restore(row: Derivation, pair: LexicalMatch, evidence: _Evidence) -> ConflictFinding:
     raw = row.output_path
     if raw is None:
         return _open(pair)
@@ -252,7 +364,15 @@ def _restore(row: Derivation, pair: LexicalMatch) -> ConflictFinding:
         return _open(pair)
     page: PageSpec | None = None
     if route == "conflict" and body:
-        page = PageSpec(page_id=f"conflicts/{left_id}-{right_id}", title="conflict", body_md=body.replace("\\n", "\n"), sources=[], status="conflicted")
+        sources = _pair_sources(pair, evidence)
+        if sources:
+            page = PageSpec(
+                page_id=f"conflicts/{left_id}-{right_id}",
+                title="conflict",
+                body_md=body.replace("\\n", "\n"),
+                sources=sources,
+                status="conflicted",
+            )
     warning: bool | None = None if flag == "" else flag == "1"
     return ConflictFinding(left_id, right_id, verdict, route, page, target or None, cites, warning)
 

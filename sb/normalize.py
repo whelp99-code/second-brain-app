@@ -11,7 +11,7 @@ from llama_index.core.node_parser import SentenceSplitter
 
 from sb.contracts import Blob, Unit
 
-NORMALIZER_VERSION: Final = "v1"
+NORMALIZER_VERSION: Final = "v2"
 CHUNK_SIZE: Final = 700
 CHUNK_OVERLAP: Final = 100
 
@@ -29,6 +29,11 @@ _ASSIGN_LABELS: Final[dict[str, str]] = {
     "token": "token",
     "secret": "secret",
 }
+_TOKEN: Final = re.compile(r"\w+|[^\w\s]", flags=re.UNICODE)
+_SENTENCE: Final = re.compile(
+    r".+?(?:[.!?。？！]+(?:\s+|$)|\n{2,}|$)",
+    flags=re.DOTALL,
+)
 
 
 class _TextSplitter(Protocol):
@@ -60,7 +65,25 @@ def _redact(text: str) -> str:
 
 
 def _splitter() -> _TextSplitter:
-    return SentenceSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+    return SentenceSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        tokenizer=_tokenize,
+        chunking_tokenizer_fn=_sentence_chunks,
+    )
+
+
+def _tokenize(text: str) -> list[str]:
+    """Portable Unicode token counter with no model or downloaded data dependency."""
+    return _TOKEN.findall(text)
+
+
+def _sentence_chunks(text: str) -> list[str]:
+    """Preserve deterministic sentence/paragraph pieces without NLTK resources."""
+    if not text:
+        return []
+    chunks = [match.group(0) for match in _SENTENCE.finditer(text)]
+    return chunks if "".join(chunks) == text else [text]
 
 
 def _split(text: str) -> list[str]:

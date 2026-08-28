@@ -9,11 +9,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
-from typing import Final, Protocol, override
+from typing import Final, Protocol, cast, override
 
 import yaml
 
-from sb.contracts import PageSpec
+from sb.contracts import PageSpec, SourceCite
+from sb.store import parse_compiled_by
 
 BOT_NAME: Final = "second-brain-bot"
 BOT_EMAIL: Final = "sb@local"
@@ -83,6 +84,7 @@ class Vault:
         ledger: CompiledHashLedger,
         *,
         log_line: str | None = None,
+        compiled_by: tuple[str, str] | None = None,
     ) -> WriteResult:
         reasons = tuple(reason for page in pages for reason in _lint(self.root, page))
         if reasons:
@@ -92,9 +94,13 @@ class Vault:
             version = metadata.version("second-brain")
         except metadata.PackageNotFoundError:
             version = "0.1.0"
+        prompt_version, model_id = compiled_by or ("v1", "unknown")
         counts, jobs = _plan_writes(
             self.root, planned, ledger,
-            (f"sb/{version}|v1|unknown", datetime.now(UTC).date().isoformat()),
+            (
+                f"sb/{version}|{prompt_version}|{model_id}",
+                datetime.now(UTC).date().isoformat(),
+            ),
         )
         n_pages, n_conflicts, n_proposals = counts
         if not jobs:
@@ -136,6 +142,128 @@ class Vault:
             raise RunCommitNotFoundError(run_id=run_id)
         _ = _git(self.root, "revert", "--no-edit", sha)
 
+    def resolve_conflict(
+        self,
+        conflict_id: str,
+        decision: str,
+        note: str,
+        run_id: str,
+    ) -> str | None:
+        """Record one explicit human conflict decision and commit it."""
+        if decision not in {"keep-left", "keep-right", "note"}:
+            raise ValueError("decision must be keep-left, keep-right, or note")
+        clean_id = conflict_id.removeprefix("conflicts/").removesuffix(".md")
+        path = _safe_rel(self.root, Path("conflicts") / f"{clean_id}.md")
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        split = _split_rendered(path.read_text(encoding="utf-8"))
+        if split is None:
+            raise VaultLintError((f"{clean_id}: invalid conflict page",))
+        block, body = split
+        loaded = cast(object, yaml.safe_load(block))
+        if not isinstance(loaded, dict):
+            raise VaultLintError((f"{clean_id}: invalid conflict frontmatter",))
+        payload = cast(dict[str, object], loaded)
+        resolved_at = datetime.now(UTC).isoformat()
+        payload["status"] = "resolved"
+        payload["resolution"] = {
+            "decision": decision,
+            "note": note.strip(),
+            "resolved_at": resolved_at,
+        }
+        body = re.sub(
+            r"(?m)(^## status\s*\n)open\s*$",
+            r"\1resolved",
+            body,
+            count=1,
+        )
+        body = re.sub(r"(?ms)\n*## resolution\n.*\Z", "", body).rstrip()
+        resolution = (
+            "## resolution\n"
+            f"- decision: {decision}\n"
+            f"- resolved_at: {resolved_at}\n"
+            f"- note: {note.strip() or 'none'}"
+        )
+        dumped = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
+        _atomic_write(path, f"---\n{dumped}---\n\n{body}\n\n{resolution}\n")
+        return _commit_if_changed(
+            self.root,
+            f"sb: resolve {run_id} {clean_id} ({decision})",
+            [path],
+        )
+
+
+def read_page_spec(root: Path | str, page_id: str) -> PageSpec | None:
+    """Read one current rendered page as a PageSpec for persistent merge input."""
+    root_path = Path(root)
+    path = _safe_rel(root_path, _rel_for(page_id))
+    if not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8")
+    split = _split_rendered(text)
+    if split is None:
+        return None
+    block, body = split
+    loaded = cast(object, yaml.safe_load(block))
+    if not isinstance(loaded, dict):
+        return None
+    fields = cast(dict[str, object], loaded)
+    stored_id = fields.get("id")
+    title = fields.get("title")
+    status = fields.get("status")
+    raw_sources = fields.get("sources")
+    if stored_id != page_id or not isinstance(title, str) or not isinstance(status, str):
+        return None
+    if not isinstance(raw_sources, list):
+        return None
+    sources: list[SourceCite] = []
+    for raw in cast(list[object], raw_sources):
+        if not isinstance(raw, dict):
+            return None
+        item = cast(dict[str, object], raw)
+        sid, origin, digest = item.get("sid"), item.get("origin"), item.get("hash")
+        if not isinstance(sid, str) or not isinstance(origin, str) or not isinstance(digest, str):
+            return None
+        raw_spans = item.get("spans", [])
+        if not isinstance(raw_spans, list):
+            return None
+        raw_span_items = cast(list[object], raw_spans)
+        spans = [span for span in raw_span_items if isinstance(span, str)]
+        if len(spans) != len(raw_span_items):
+            return None
+        sources.append(SourceCite(sid, origin, digest, spans))
+    compiled_by = fields.get("compiled_by")
+    lineage = parse_compiled_by(compiled_by) if isinstance(compiled_by, str) else None
+    derivation_key = fields.get("derivation_key")
+    return PageSpec(
+        page_id,
+        title,
+        _strip_definitions(body, sources),
+        sources,
+        status,
+        None if lineage is None else lineage[0],
+        None if lineage is None else lineage[1],
+        derivation_key if isinstance(derivation_key, str) else None,
+    )
+
+
+def _split_rendered(text: str) -> tuple[str, str] | None:
+    if not text.startswith("---"):
+        return None
+    rest = text[3:].lstrip("\n")
+    end = rest.find("\n---")
+    if end < 0:
+        return None
+    return rest[:end], rest[end + 4 :].lstrip("\n")
+
+
+def _strip_definitions(body: str, sources: Sequence[SourceCite]) -> str:
+    definitions = {f"[^{cite.sid}]: {cite.origin}" for cite in sources}
+    lines = body.rstrip().splitlines()
+    while lines and (not lines[-1].strip() or lines[-1] in definitions):
+        _ = lines.pop()
+    return "\n".join(lines).rstrip()
+
 
 def init_vault(root: str | Path) -> Vault:
     root_path = Path(root)
@@ -164,11 +292,21 @@ def _plan_writes(
     compiled: tuple[str, str],
 ) -> tuple[tuple[int, int, int], list[tuple[Path, str, str, str]]]:
     stamp, updated = compiled
+    stamp_parts = stamp.split("|", 2)
+    package_stamp = stamp_parts[0]
+    fallback_prompt = stamp_parts[1] if len(stamp_parts) >= 2 else "v1"
+    fallback_model = stamp_parts[2] if len(stamp_parts) >= 3 else "unknown"
     n_pages = n_conflicts = n_proposals = 0
     jobs: list[tuple[Path, str, str, str]] = []
     conflicts_root = root / "conflicts"
     for dest, page in planned:
-        text = _render(page, compiled_by=stamp, updated=updated)
+        prompt_version = page.prompt_version or fallback_prompt
+        model_id = page.model_id or fallback_model
+        text = _render(
+            page,
+            compiled_by=f"{package_stamp}|{prompt_version}|{model_id}",
+            updated=updated,
+        )
         if dest.is_file() and hashlib.sha256(dest.read_bytes()).hexdigest() != ledger.last_compiled_hash(
             page.page_id
         ):
@@ -247,10 +385,12 @@ def _render(page: PageSpec, *, compiled_by: str, updated: str) -> str:
         if cite.spans:
             entry["spans"] = list(cite.spans)
         sources.append(entry)
-    payload = {
+    payload: dict[str, object] = {
         "id": page.page_id, "title": page.title, "updated": updated,
         "compiled_by": compiled_by, "status": page.status, "sources": sources,
     }
+    if page.derivation_key is not None:
+        payload["derivation_key"] = page.derivation_key
     dumped = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     definitions = "\n".join(f"[^{cite.sid}]: {cite.origin}" for cite in page.sources)
     body = page.body_md.rstrip()

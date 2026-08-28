@@ -1,0 +1,5 @@
+{"export_version":"project-jarvis-records-v1","type":"export_meta"}
+{"id":"project-fixture","type":"project_meta"}
+{"id":"status","schema":"operational_json_v1","text":"VISIBLE_STATUS_1","type":"record"}
+{"id":"decision","schema":"operational_markdown_v1","text":"VISIBLE_DECISION_1","type":"record"}
+{"id":"tower","schema":"jarvis_control_tower_export_v1","text":"VISIBLE_TOWER_1","type":"record"}

@@ -1,0 +1,56 @@
+# Second Brain 1.0 local-first example configuration.
+# Copy to ~/.config/second-brain/config.toml and adjust only approved paths.
+
+# Relative paths are resolved from this config file's directory.
+vault_root = "../../.local/share/second-brain/vault"
+
+[caps]
+max_llm_calls_compile = 200
+max_llm_calls_conflict = 200
+max_llm_calls_briefing = 10
+max_new_units_per_run = 500
+max_db_rows_per_run = 5000
+max_derivation_attempts = 3
+
+[llm]
+argv_template = ["claude", "-p", "{prompt}"]
+prompt_version = "v1"
+model_id = "claude-cli"
+
+[filesystem]
+# strict: reject group-writable sources
+# trusted-root: allow owner-owned paths writable by the user's trusted groups
+# audit-only: report unsafe paths without ingesting them
+mode = "trusted-root"
+
+[retry]
+max_attempts = 3
+base_delay_seconds = 1
+max_delay_seconds = 60
+
+[search]
+hybrid = false
+
+[web]
+host = "127.0.0.1"
+port = 8765
+# token = "set-with-SB_WEB_TOKEN-or-a-secret-file"
+
+[security]
+# Remains false until an operator explicitly approves external model transmission.
+allow_external_llm = false
+redact_pii = false
+
+[unified_db]
+dsn = "postgresql://localhost:5433/unified"
+
+# Add only explicitly approved roots. Examples:
+# [[sources]]
+# id = "notes"
+# adapter = "markdown-vault"
+# root = "../../Documents/notes"
+# allow_external_llm = false
+#
+# [[sources]]
+# id = "inbox"
+# adapter = "inbox-documents"

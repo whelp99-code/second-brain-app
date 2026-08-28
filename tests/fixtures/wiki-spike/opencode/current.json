@@ -1,0 +1,1 @@
+{"parts":[{"data":{"text":"VISIBLE_USER_2","type":"text"},"id":"oc-user"},{"data":{"text":"VISIBLE_ASSISTANT_2","type":"text"},"id":"oc-assistant"},{"data":{"state":{"output":"VISIBLE_TOOL_2","status":"completed"},"tool":"shell","type":"tool"},"id":"oc-tool"}]}

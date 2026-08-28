@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import sqlite3
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
-from typing import Final, Self
+from typing import Final, Self, cast
 
 from . import (
     Derivation,
@@ -18,6 +19,7 @@ from . import (
     LedgerCorrupt,
     LedgerTables,
     Run,
+    RunStage,
     SourceItem,
     UnitRow,
     assert_ledger_integrity,
@@ -28,6 +30,7 @@ from . import (
 )
 
 _HEX: Final = frozenset("0123456789abcdef")
+CURRENT_SCHEMA_VERSION: Final = 2
 _SCHEMA: Final = (
     "CREATE TABLE IF NOT EXISTS source_item ("
     "source_id TEXT NOT NULL, source_uri TEXT NOT NULL, source_version TEXT NOT NULL, "
@@ -44,8 +47,74 @@ _SCHEMA: Final = (
     "CREATE TABLE IF NOT EXISTS run ("
     "run_id TEXT PRIMARY KEY, started_at TEXT NOT NULL, finished_at TEXT, "
     "git_commit TEXT, status TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS schema_meta ("
+    "key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS derivation_event ("
+    "event_id INTEGER PRIMARY KEY AUTOINCREMENT, deriv_key TEXT NOT NULL, stage TEXT NOT NULL, "
+    "from_status TEXT NOT NULL, to_status TEXT NOT NULL, attempts INTEGER NOT NULL, "
+    "error TEXT, run_id TEXT, created_at TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS run_stage ("
+    "run_id TEXT NOT NULL, stage TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, "
+    "status TEXT NOT NULL, attempted INTEGER NOT NULL, written INTEGER NOT NULL, "
+    "errors INTEGER NOT NULL, detail TEXT, PRIMARY KEY(run_id, stage));"
 )
 type SqlParams = tuple[str | int | None, ...]
+
+
+def ledger_schema_version(path: Path) -> int:
+    """Return 0 for no DB, 1 for the legacy schema, or the stored schema version."""
+    if not path.is_file() or path.stat().st_size == 0:
+        return 0
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            table = cast(
+                tuple[object, ...] | None,
+                conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_meta'"
+                ).fetchone(),
+            )
+            if table is None:
+                return 1
+            row = cast(
+                tuple[object, ...] | None,
+                conn.execute(
+                    "SELECT value FROM schema_meta WHERE key='schema_version'"
+                ).fetchone(),
+            )
+    except sqlite3.DatabaseError as exc:
+        raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
+    if row is None:
+        return 1
+    try:
+        return int(str(row[0]))
+    except ValueError as exc:
+        raise LedgerCorrupt(path=str(path), detail="invalid schema_version") from exc
+
+
+def migrate_ledger(path: Path, *, backup: bool = True) -> Path | None:
+    """Apply additive, idempotent migrations and optionally preserve the pre-migration DB."""
+    version = ledger_schema_version(path)
+    if version > CURRENT_SCHEMA_VERSION:
+        raise LedgerCorrupt(path=str(path), detail=f"unsupported schema version {version}")
+    backup_path: Path | None = None
+    if version not in {0, CURRENT_SCHEMA_VERSION} and backup:
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        folder = path.parent / "migrations"
+        folder.mkdir(parents=True, exist_ok=True)
+        backup_path = folder / f"ledger-v{version}-{stamp}.db"
+        _ = shutil.copy2(path, backup_path)
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            _ = conn.executescript(_SCHEMA)
+            _ = conn.execute(
+                "INSERT INTO schema_meta(key,value) VALUES('schema_version',?) "
+                + "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+            conn.commit()
+    except sqlite3.DatabaseError as exc:
+        raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
+    return backup_path
 
 
 class Ledger:
@@ -87,16 +156,16 @@ class Ledger:
         existed = path.is_file() and path.stat().st_size > 0
         if existed:
             assert_ledger_integrity(path)
+        _ = migrate_ledger(path, backup=existed)
+        tables = load_ledger_tables(path)
         try:
             conn = sqlite3.connect(path)
             _ = conn.execute("PRAGMA journal_mode=WAL")
         except sqlite3.DatabaseError as exc:
             raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
-        _ = conn.executescript(_SCHEMA)
-        conn.commit()
         self._conn = conn
         self._journal_mode = "wal"
-        self._tables = load_ledger_tables(path) if existed else LedgerTables()
+        self._tables = tables
 
     def close(self) -> None:
         if self._conn is None:
@@ -161,19 +230,33 @@ class Ledger:
         return self._tables.units.get(unit_id)
 
     def ensure_derivation(self, key: str, stage: str, run_id: str) -> None:
+        is_new = key not in self._tables.derivations
         _ = self._exec(
             "INSERT OR IGNORE INTO derivation"
             + " (deriv_key, stage, output_hash, output_path, status, attempts, error, run_id, finished_at)"
             + " VALUES (?, ?, NULL, NULL, ?, 0, NULL, ?, NULL)",
             (key, stage, DerivStatus.PENDING.value, run_id),
         )
-        if key not in self._tables.derivations:
-            self._tables.derivations[key] = Derivation(
+        if is_new:
+            row = Derivation(
                 key, stage, None, None, DerivStatus.PENDING.value, 0, None, run_id, None
             )
+            self._tables.derivations[key] = row
+            self._record_event(row, "absent", DerivStatus.PENDING.value)
 
     def get_derivation(self, key: str) -> Derivation | None:
         return self._tables.derivations.get(key)
+
+    def list_derivations(
+        self, *, status: str | None = None, stage: str | None = None
+    ) -> tuple[Derivation, ...]:
+        rows = [
+            row
+            for row in self._tables.derivations.values()
+            if (status is None or row.status == status) and (stage is None or row.stage == stage)
+        ]
+        rows.sort(key=lambda row: (row.stage, row.finished_at or "", row.deriv_key))
+        return tuple(rows)
 
     def mark_running(self, key: str, run_id: str) -> None:
         row = self._need(key)
@@ -184,6 +267,9 @@ class Ledger:
         )
         self._tables.derivations[key] = replace(
             row, status=DerivStatus.RUNNING.value, run_id=run_id, attempts=row.attempts + 1
+        )
+        self._record_event(
+            self._tables.derivations[key], row.status, DerivStatus.RUNNING.value
         )
 
     def mark_done(self, key: str, output: DerivationOutput) -> None:
@@ -199,6 +285,7 @@ class Ledger:
             row, status=DerivStatus.DONE.value, output_hash=output.output_hash,
             output_path=output.output_path, error=None, finished_at=finished,
         )
+        self._record_event(self._tables.derivations[key], row.status, DerivStatus.DONE.value)
 
     def mark_failed(self, key: str, error: str) -> None:
         row = self._need(key)
@@ -211,6 +298,40 @@ class Ledger:
         self._tables.derivations[key] = replace(
             row, status=DerivStatus.FAILED.value, error=error, finished_at=finished
         )
+        self._record_event(
+            self._tables.derivations[key], row.status, DerivStatus.FAILED.value, error
+        )
+
+    def requeue_failed(self, key: str, *, reset_attempts: bool = False) -> bool:
+        """Move a failed derivation back to pending for an explicit retry."""
+        row = self._need(key)
+        if row.status != DerivStatus.FAILED.value:
+            return False
+        attempts = 0 if reset_attempts else row.attempts
+        _ = self._exec(
+            "UPDATE derivation SET status=?, attempts=?, error=NULL, finished_at=NULL "
+            + "WHERE deriv_key=?",
+            (DerivStatus.PENDING.value, attempts, key),
+        )
+        self._tables.derivations[key] = replace(
+            row,
+            status=DerivStatus.PENDING.value,
+            attempts=attempts,
+            error=None,
+            finished_at=None,
+        )
+        self._record_event(self._tables.derivations[key], row.status, DerivStatus.PENDING.value)
+        return True
+
+    def retry_failed(
+        self, *, stage: str | None = None, limit: int | None = None, reset_attempts: bool = True
+    ) -> int:
+        rows = list(self.list_derivations(status=DerivStatus.FAILED.value, stage=stage))
+        if limit is not None:
+            rows = rows[: max(limit, 0)]
+        return sum(
+            self.requeue_failed(row.deriv_key, reset_attempts=reset_attempts) for row in rows
+        )
 
     def reset_stale_running(self, current_run_id: str) -> int:
         """Reset running rows whose run_id is not the current run back to pending."""
@@ -221,6 +342,10 @@ class Ledger:
         for key, row in list(self._tables.derivations.items()):
             if row.status == DerivStatus.RUNNING.value and (row.run_id or "") != current_run_id:
                 self._tables.derivations[key] = replace(row, status=DerivStatus.PENDING.value)
+                self._record_event(
+                    self._tables.derivations[key], row.status, DerivStatus.PENDING.value,
+                    "stale running reset",
+                )
         return changed
 
     def record_run(self, run: Run) -> None:
@@ -234,6 +359,50 @@ class Ledger:
 
     def get_run(self, run_id: str) -> Run | None:
         return self._tables.runs.get(run_id)
+
+    def list_runs(self) -> tuple[Run, ...]:
+        rows = list(self._tables.runs.values())
+        rows.sort(key=lambda row: (row.started_at, row.run_id))
+        return tuple(rows)
+
+    def record_stage(self, row: RunStage) -> None:
+        _ = self._exec(
+            "INSERT INTO run_stage VALUES (?,?,?,?,?,?,?,?,?) "
+            + "ON CONFLICT(run_id,stage) DO UPDATE SET "
+            + "started_at=excluded.started_at,finished_at=excluded.finished_at,"
+            + "status=excluded.status,attempted=excluded.attempted,written=excluded.written,"
+            + "errors=excluded.errors,detail=excluded.detail",
+            (
+                row.run_id,
+                row.stage,
+                row.started_at,
+                row.finished_at,
+                row.status,
+                row.attempted,
+                row.written,
+                row.errors,
+                row.detail,
+            ),
+        )
+
+    def _record_event(
+        self, row: Derivation, from_status: str, to_status: str, error: str | None = None
+    ) -> None:
+        _ = self._exec(
+            "INSERT INTO derivation_event "
+            + "(deriv_key,stage,from_status,to_status,attempts,error,run_id,created_at) "
+            + "VALUES (?,?,?,?,?,?,?,?)",
+            (
+                row.deriv_key,
+                row.stage,
+                from_status,
+                to_status,
+                row.attempts,
+                error,
+                row.run_id,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
 
     def _need(self, key: str) -> Derivation:
         row = self._tables.derivations.get(key)
@@ -267,7 +436,9 @@ def _rebuild_pages(ledger: Ledger, vault: Path, folder: Path, stage: str) -> Non
             ledger.upsert_source_item(SourceItem(source_id, source_uri, "", content_hash, "", ""))
         if facts.prompt_version is None or facts.model_id is None:
             continue
-        key = deriv_key((facts.page_id,), stage, facts.prompt_version, facts.model_id)
+        key = facts.derivation_key or deriv_key(
+            (facts.page_id,), stage, facts.prompt_version, facts.model_id
+        )
         ledger.ensure_derivation(key, stage, "")
         ledger.mark_running(key, "")
         digest = hashlib.sha256(path.read_bytes()).hexdigest()

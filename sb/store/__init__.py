@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-import subprocess
-from collections.abc import Sequence
+import sqlite3
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Final, override
+from typing import Final, cast, override
 
-_NULL: Final = "\x1e"
-type SqlCell = str | None
+type SqlCell = str | int | None
+type SqlRow = tuple[SqlCell, ...]
 
 
 class DerivStatus(StrEnum):
@@ -29,7 +29,7 @@ _ALLOWED: Final[dict[DerivStatus, frozenset[DerivStatus]]] = {
 }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class LedgerCorrupt(Exception):
     path: str
     detail: str
@@ -39,7 +39,7 @@ class LedgerCorrupt(Exception):
         return f"ledger corrupt at {self.path}: {self.detail}"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class InvalidDerivationTransition(Exception):
     deriv_key: str
     from_status: str
@@ -101,11 +101,25 @@ class Run:
 
 
 @dataclass(frozen=True, slots=True)
+class RunStage:
+    run_id: str
+    stage: str
+    started_at: str
+    finished_at: str | None
+    status: str
+    attempted: int
+    written: int
+    errors: int
+    detail: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PageFacts:
     page_id: str
     prompt_version: str | None
     model_id: str | None
     sources: tuple[tuple[str, str], ...]
+    derivation_key: str | None = None
 
 
 def deriv_key(unit_ids: Sequence[str], stage: str, prompt_version: str, model_id: str) -> str:
@@ -158,6 +172,7 @@ def parse_page_frontmatter(text: str) -> PageFacts | None:
         return None
     page_id: str | None = None
     compiled: str | None = None
+    stored_derivation_key: str | None = None
     sources: list[tuple[str, str]] = []
     current: dict[str, str] = {}
     in_sources = False
@@ -177,6 +192,8 @@ def parse_page_frontmatter(text: str) -> PageFacts | None:
                 page_id = parsed
             elif field == "compiled_by":
                 compiled = parsed
+            elif field == "derivation_key":
+                stored_derivation_key = parsed
             elif field == "sources":
                 in_sources = True
             continue
@@ -200,7 +217,7 @@ def parse_page_frontmatter(text: str) -> PageFacts | None:
     stamp = parse_compiled_by(compiled) if compiled is not None else None
     prompt = stamp[0] if stamp is not None else None
     model = stamp[1] if stamp is not None else None
-    return PageFacts(page_id, prompt, model, tuple(sources))
+    return PageFacts(page_id, prompt, model, tuple(sources), stored_derivation_key)
 
 
 def _flush_source(current: dict[str, str], sources: list[tuple[str, str]]) -> None:
@@ -228,13 +245,14 @@ class LedgerTables:
 
 
 def assert_ledger_integrity(path: Path) -> None:
-    completed = subprocess.run(
-        ["sqlite3", str(path), "PRAGMA integrity_check;"],
-        capture_output=True, text=True, check=False,
-    )
-    if completed.stdout.strip() != "ok":
-        detail = completed.stderr.strip() or completed.stdout.strip() or "integrity_check failed"
-        raise LedgerCorrupt(path=str(path), detail=detail)
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            row = cast(SqlRow | None, conn.execute("PRAGMA integrity_check").fetchone())
+    except sqlite3.DatabaseError as exc:
+        raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
+    detail = "" if row is None else str(row[0])
+    if detail != "ok":
+        raise LedgerCorrupt(path=str(path), detail=detail or "integrity_check failed")
 
 
 def load_ledger_tables(path: Path) -> LedgerTables:
@@ -243,58 +261,78 @@ def load_ledger_tables(path: Path) -> LedgerTables:
         "SELECT source_id,source_uri,source_version,content_hash,"
         + "first_seen_run,last_seen_run FROM source_item"
     )
-    for cells in _rows(path, src_sql):
-        if len(cells) == 6:
-            item = SourceItem(_cell_text(cells[0]), _cell_text(cells[1]), _cell_text(cells[2]),
-                              _cell_text(cells[3]), _cell_text(cells[4]), _cell_text(cells[5]))
-            tables.source_items[(item.source_id, item.source_uri, item.content_hash)] = item
-    for cells in _rows(path, "SELECT source_id,position,updated_at FROM cursor"):
-        if len(cells) == 3:
-            tables.cursors[_cell_text(cells[0])] = (_cell_text(cells[1]), _cell_text(cells[2]))
     unit_sql = "SELECT unit_id,content_hash,span,text_hash,normalizer_version FROM unit"
-    for cells in _rows(path, unit_sql):
-        if len(cells) == 5:
-            unit = UnitRow(_cell_text(cells[0]), _cell_text(cells[1]), _cell_text(cells[2]),
-                           _cell_text(cells[3]), _cell_text(cells[4]))
-            tables.units[unit.unit_id] = unit
     deriv_sql = (
         "SELECT deriv_key,stage,output_hash,output_path,status,attempts,"
         + "error,run_id,finished_at FROM derivation"
     )
-    for cells in _rows(path, deriv_sql):
-        if len(cells) == 9:
-            row = Derivation(
-                _cell_text(cells[0]), _cell_text(cells[1]), cells[2], cells[3],
-                _cell_text(cells[4]), _cell_int(cells[5]), cells[6], cells[7], cells[8],
-            )
-            tables.derivations[row.deriv_key] = row
-    for cells in _rows(path, "SELECT run_id,started_at,finished_at,git_commit,status FROM run"):
-        if len(cells) == 5:
-            run = Run(_cell_text(cells[0]), _cell_text(cells[1]), cells[2], cells[3],
-                      _cell_text(cells[4]))
-            tables.runs[run.run_id] = run
+    try:
+        with sqlite3.connect(str(path)) as conn:
+            for cells in _query_rows(conn, src_sql):
+                item = SourceItem(
+                    _cell_text(cells[0]),
+                    _cell_text(cells[1]),
+                    _cell_text(cells[2]),
+                    _cell_text(cells[3]),
+                    _cell_text(cells[4]),
+                    _cell_text(cells[5]),
+                )
+                tables.source_items[(item.source_id, item.source_uri, item.content_hash)] = item
+            for cells in _query_rows(conn, "SELECT source_id,position,updated_at FROM cursor"):
+                tables.cursors[_cell_text(cells[0])] = (
+                    _cell_text(cells[1]),
+                    _cell_text(cells[2]),
+                )
+            for cells in _query_rows(conn, unit_sql):
+                unit = UnitRow(
+                    _cell_text(cells[0]),
+                    _cell_text(cells[1]),
+                    _cell_text(cells[2]),
+                    _cell_text(cells[3]),
+                    _cell_text(cells[4]),
+                )
+                tables.units[unit.unit_id] = unit
+            for cells in _query_rows(conn, deriv_sql):
+                row = Derivation(
+                    _cell_text(cells[0]),
+                    _cell_text(cells[1]),
+                    _cell_optional_text(cells[2]),
+                    _cell_optional_text(cells[3]),
+                    _cell_text(cells[4]),
+                    _cell_int(cells[5]),
+                    _cell_optional_text(cells[6]),
+                    _cell_optional_text(cells[7]),
+                    _cell_optional_text(cells[8]),
+                )
+                tables.derivations[row.deriv_key] = row
+            for cells in _query_rows(
+                conn,
+                "SELECT run_id,started_at,finished_at,git_commit,status FROM run"
+            ):
+                run = Run(
+                    _cell_text(cells[0]),
+                    _cell_text(cells[1]),
+                    _cell_optional_text(cells[2]),
+                    _cell_optional_text(cells[3]),
+                    _cell_text(cells[4]),
+                )
+                tables.runs[run.run_id] = run
+    except sqlite3.DatabaseError as exc:
+        raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
     return tables
 
 
-def _cli(path: Path, sql: str) -> str:
-    completed = subprocess.run(
-        ["sqlite3", "-separator", "|", "-nullvalue", _NULL, str(path), sql],
-        capture_output=True, text=True, check=False,
-    )
-    if completed.returncode != 0:
-        raise LedgerCorrupt(path=str(path), detail=completed.stderr.strip() or "sqlite3 failed")
-    return completed.stdout
-
-
-def _rows(path: Path, sql: str) -> list[list[SqlCell]]:
-    rows: list[list[SqlCell]] = []
-    for line in _cli(path, sql).splitlines():
-        rows.append([None if cell == _NULL else cell for cell in line.split("|")])
-    return rows
+def _query_rows(conn: sqlite3.Connection, sql: str) -> Iterator[SqlRow]:
+    rows = cast(list[SqlRow], conn.execute(sql).fetchall())
+    yield from rows
 
 
 def _cell_text(cell: SqlCell) -> str:
-    return "" if cell is None else cell
+    return "" if cell is None else str(cell)
+
+
+def _cell_optional_text(cell: SqlCell) -> str | None:
+    return None if cell is None else str(cell)
 
 
 def _cell_int(cell: SqlCell) -> int:

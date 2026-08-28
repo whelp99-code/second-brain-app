@@ -1,0 +1,25 @@
+[Unit]
+Description=Create a checksummed Second Brain backup
+Documentation=file:%h/.local/share/doc/second-brain/OPERATIONS.md
+
+[Service]
+Type=oneshot
+Environment=SB_CONFIG=%h/.config/second-brain/config.toml
+EnvironmentFile=-%h/.config/second-brain/environment
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env sb backup
+TimeoutStartSec=30min
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths=-%h/.local/share/second-brain -%h/.config/second-brain
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -17,6 +17,7 @@ from sb.vault import init_vault
 EN_TERM = "AlphaEngineer"
 KO_TERM = "박정민프로필"
 DAILY_TERM = "브리핑큐"
+KO_PATH_TERM = "한글파일명검색"
 
 
 def _put(root: Path, data: bytes) -> str:
@@ -36,6 +37,7 @@ def _seed(tmp_path: Path) -> Path:
     pages = (
         _page(digest, "wiki/alpha", "Alpha", f"# Intro\n{EN_TERM} builds tools.\n"),
         _page(digest, "wiki/profile", "Profile", f"# 소개\n{KO_TERM} 는 엔지니어다.\n"),
+        _page(digest, "wiki/계약-일정", "계약 일정", f"# 계약\n{KO_PATH_TERM} 가능.\n"),
         _page(digest, "daily/2026-08-26", "Brief", f"# 오늘\n{DAILY_TERM} 항목.\n"),
     )
     _ = vault.write_pages(pages, "run-search", _HashLedger(root))
@@ -71,6 +73,15 @@ def test_search_returns_korean_wiki_page_when_query_matches(tmp_path: Path) -> N
     hits = index.search(KO_TERM)
 
     assert any(hit.page_id.endswith("profile") for hit in hits)
+
+
+def test_search_returns_wiki_page_when_committed_path_contains_korean(tmp_path: Path) -> None:
+    """Given a committed Korean filename, when searching its body, then the page is indexed."""
+    index = SearchIndex(vault_root=_seed(tmp_path))
+
+    hits = index.search(KO_PATH_TERM)
+
+    assert any(hit.page_id == "wiki/계약-일정" for hit in hits)
 
 
 def test_search_returns_daily_page_when_brief_term_matches(tmp_path: Path) -> None:

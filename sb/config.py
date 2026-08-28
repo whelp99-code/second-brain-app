@@ -1,6 +1,6 @@
 """Typed config loader for second-brain.
 
-Loads `config.toml` (search order: $SB_CONFIG, then the app root) and exposes
+Loads `config.toml` (search order: $SB_CONFIG, user config, then the app root) and exposes
 typed accessors with defaults per the plan todo-1 body. No third-party deps
 beyond stdlib `tomllib` (py3.11+).
 """
@@ -16,10 +16,10 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 
-DEFAULT_VAULT_ROOT = "/Volumes/DevSpace/second-brain"
 DEFAULT_PROMPT_VERSION = "v1"
 DEFAULT_MODEL_ID = "unknown"
 DEFAULT_UNIFIED_DB_DSN = "postgresql://localhost:5433/unified"
+FILESYSTEM_MODES = frozenset({"strict", "trusted-root", "audit-only"})
 
 DEFAULT_CAPS: dict[str, int] = {
     "max_llm_calls_compile": 200,
@@ -27,6 +27,7 @@ DEFAULT_CAPS: dict[str, int] = {
     "max_llm_calls_briefing": 10,
     "max_new_units_per_run": 500,
     "max_db_rows_per_run": 5000,
+    "max_derivation_attempts": 3,
 }
 
 # Adjustment point A: exact non-interactive LLM CLI invocation is probed and
@@ -59,6 +60,10 @@ def _as_int(value: TomlValue | None) -> int | None:
             return count
         case str() | float() | date() | time() | list() | Mapping() | None:
             return None
+
+
+def _as_bool(value: TomlValue | None) -> bool | None:
+    return value if isinstance(value, bool) else None
 
 
 def _as_mapping(value: TomlValue | None) -> Mapping[str, TomlValue] | None:
@@ -103,11 +108,36 @@ def _as_source_roots(value: TomlValue | None) -> list[dict[str, str]]:
             return []
 
 
+def _xdg_config_home() -> Path:
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    return Path(configured).expanduser() if configured else Path.home() / ".config"
+
+
+def _xdg_data_home() -> Path:
+    configured = os.environ.get("XDG_DATA_HOME")
+    return Path(configured).expanduser() if configured else Path.home() / ".local" / "share"
+
+
+def user_config_path() -> Path:
+    return _xdg_config_home() / "second-brain" / "config.toml"
+
+
+def default_vault_root() -> Path:
+    return _xdg_data_home() / "second-brain" / "vault"
+
+
+DEFAULT_VAULT_ROOT = str(default_vault_root())
+
+
 def _config_search_path() -> Path:
     env_path = os.environ.get("SB_CONFIG")
     if env_path:
-        return Path(env_path)
-    return APP_ROOT / "config.toml"
+        return Path(os.path.expandvars(env_path)).expanduser()
+    user_path = user_config_path()
+    if user_path.is_file():
+        return user_path
+    app_path = APP_ROOT / "config.toml"
+    return app_path if app_path.is_file() else user_path
 
 
 def _load_toml(path: Path) -> Mapping[str, TomlValue]:
@@ -130,15 +160,47 @@ class LlmConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class FilesystemConfig:
+    mode: str = "trusted-root"
+
+
+@dataclass(frozen=True, slots=True)
+class RetryConfig:
+    max_attempts: int = 3
+    base_delay_seconds: int = 1
+    max_delay_seconds: int = 60
+
+
+@dataclass(frozen=True, slots=True)
+class WebConfig:
+    host: str = "127.0.0.1"
+    port: int = 8765
+    token: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SecurityConfig:
+    allow_external_llm: bool = False
+    redact_pii: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     """Typed, immutable view over config.toml + defaults."""
 
     raw: Mapping[str, TomlValue] = field(default_factory=_empty_raw, repr=False)
+    base_dir: Path = field(default_factory=Path.cwd, repr=False)
+
+    def _path(self, value: str | None, default: Path) -> str:
+        raw = str(default) if value is None else value
+        expanded = Path(os.path.expandvars(raw)).expanduser()
+        resolved = expanded if expanded.is_absolute() else self.base_dir / expanded
+        return str(resolved.resolve(strict=False))
 
     @property
     def vault_root(self) -> str:
         text = _as_str(self.raw.get("vault_root"))
-        return DEFAULT_VAULT_ROOT if text is None else text
+        return self._path(text, default_vault_root())
 
     @property
     def caps(self) -> dict[str, int]:
@@ -176,7 +238,55 @@ class Config:
 
     @property
     def source_roots(self) -> list[dict[str, str]]:
-        return _as_source_roots(self.raw.get("sources"))
+        roots = _as_source_roots(self.raw.get("sources"))
+        normalized: list[dict[str, str]] = []
+        for item in roots:
+            copied = dict(item)
+            root = copied.get("root")
+            if root:
+                copied["root"] = self._path(root, self.base_dir)
+            normalized.append(copied)
+        return normalized
+
+    @property
+    def filesystem(self) -> FilesystemConfig:
+        section = _as_mapping(self.raw.get("filesystem"))
+        mode = None if section is None else _as_str(section.get("mode"))
+        selected = mode if mode in FILESYSTEM_MODES else "trusted-root"
+        return FilesystemConfig(selected)
+
+    @property
+    def retry(self) -> RetryConfig:
+        section = _as_mapping(self.raw.get("retry"))
+        if section is None:
+            return RetryConfig(max_attempts=self.caps["max_derivation_attempts"])
+        attempts = _as_int(section.get("max_attempts"))
+        base = _as_int(section.get("base_delay_seconds"))
+        maximum = _as_int(section.get("max_delay_seconds"))
+        return RetryConfig(
+            max_attempts=max(1, attempts or self.caps["max_derivation_attempts"]),
+            base_delay_seconds=max(0, base if base is not None else 1),
+            max_delay_seconds=max(0, maximum if maximum is not None else 60),
+        )
+
+    @property
+    def web(self) -> WebConfig:
+        section = _as_mapping(self.raw.get("web"))
+        if section is None:
+            return WebConfig()
+        host = _as_str(section.get("host")) or "127.0.0.1"
+        port = _as_int(section.get("port")) or 8765
+        token = _as_str(section.get("token"))
+        return WebConfig(host, port, token)
+
+    @property
+    def security(self) -> SecurityConfig:
+        section = _as_mapping(self.raw.get("security"))
+        if section is None:
+            return SecurityConfig()
+        external = _as_bool(section.get("allow_external_llm"))
+        pii = _as_bool(section.get("redact_pii"))
+        return SecurityConfig(bool(external), bool(pii))
 
 
 def load_config(path: str | Path | None = None) -> Config:
@@ -184,5 +294,6 @@ def load_config(path: str | Path | None = None) -> Config:
 
     Missing file => empty raw dict, all accessors fall back to defaults.
     """
-    resolved = Path(path) if path is not None else _config_search_path()
-    return Config(raw=_load_toml(resolved))
+    resolved = Path(path).expanduser() if path is not None else _config_search_path()
+    resolved = resolved.resolve(strict=False)
+    return Config(raw=_load_toml(resolved), base_dir=resolved.parent)

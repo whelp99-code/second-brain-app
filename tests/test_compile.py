@@ -11,6 +11,7 @@ from sb.compile import CAPPED_PAGE_ID, CAPPED_STATUS, compile_pages
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite, Unit
 from sb.llm import FakeLLM
+from sb.store import deriv_key
 from sb.store.ledger import Ledger
 from sb.vault import VaultLintError, init_vault
 
@@ -129,6 +130,9 @@ def test_compile_pages_returns_exact_pagespec_when_units_fixture(tmp_path: Path)
             )
         ],
         status="active",
+        prompt_version="v1",
+        model_id="fake",
+        derivation_key=deriv_key((unit.unit_id,), "compile", "v1", "fake"),
     )
     assert pages == [expected]
     assert fake.calls == 1

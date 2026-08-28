@@ -1,0 +1,12 @@
+[Unit]
+Description=Create a daily Second Brain backup
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=15min
+AccuracySec=1min
+Unit=second-brain-backup.service
+
+[Install]
+WantedBy=timers.target

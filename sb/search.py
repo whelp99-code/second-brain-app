@@ -67,6 +67,23 @@ def git_run(root: Path, *args: str) -> str | None:
     return done.stdout
 
 
+def _git_run_bytes(root: Path, *args: str) -> bytes | None:
+    """Run git and preserve NUL-delimited path bytes without quote-path escaping."""
+    env = os.environ.copy()
+    env["GIT_CONFIG_GLOBAL"] = os.devnull
+    env["GIT_CONFIG_SYSTEM"] = os.devnull
+    done = subprocess.run(
+        ["git", "-c", "core.quotepath=false", *args],
+        cwd=root,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    if done.returncode != 0:
+        return None
+    return done.stdout
+
+
 def committed_text(root: Path, rel: str) -> str | None:
     """Return HEAD blob text for a vault-relative path, or None if missing."""
     if rel.startswith("/") or ".." in Path(rel).parts:
@@ -76,11 +93,14 @@ def committed_text(root: Path, rel: str) -> str | None:
 
 def committed_paths(root: Path, prefixes: tuple[str, ...]) -> tuple[str, ...]:
     """Committed `*.md` paths under `prefixes`, excluding wiki/_proposed/."""
-    raw = git_run(root, "ls-tree", "-r", "--name-only", "HEAD")
+    raw = _git_run_bytes(root, "ls-tree", "-rz", "--name-only", "HEAD")
     if raw is None:
         return ()
     found: list[str] = []
-    for line in raw.splitlines():
+    for encoded in raw.split(b"\0"):
+        if not encoded:
+            continue
+        line = encoded.decode("utf-8", errors="surrogateescape")
         if not line.endswith(".md") or line.startswith("wiki/_proposed/"):
             continue
         if line.startswith(prefixes):

@@ -27,7 +27,7 @@ _REASONING_NAME: Final = re.compile(
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class SafeSourceFilesystemError(Exception):
     reason: str
 
@@ -47,6 +47,18 @@ class SourceFilesystemLimits:
     def __post_init__(self) -> None:
         if min(self.max_entries, self.max_files, self.max_file_bytes, self.max_total_bytes) < 1 or self.max_depth < 0:
             raise SafeSourceFilesystemError("source filesystem limits must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class SourceFilesystemPolicy:
+    """Ownership policy for source roots and files.
+
+    Ubuntu commonly creates user-owned paths as 0775 under a user-private
+    primary group. That is accepted by default while world-writable paths and
+    writes by an unrelated group remain fail-closed.
+    """
+
+    allow_trusted_group_write: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,10 +108,20 @@ def _assert_same(before: os.stat_result, after: os.stat_result, relative_path: s
         raise SafeSourceFilesystemError(f"source mutation observed: {relative_path}")
 
 
-def _assert_owner_mode(metadata: os.stat_result, relative_path: str) -> None:
+def _assert_owner_mode(
+    metadata: os.stat_result,
+    relative_path: str,
+    policy: SourceFilesystemPolicy,
+) -> None:
     if metadata.st_uid != os.getuid():
         raise SafeSourceFilesystemError(f"source owner refused: {relative_path}")
-    if stat.S_IMODE(metadata.st_mode) & 0o022:
+    mode = stat.S_IMODE(metadata.st_mode)
+    if mode & 0o002:
+        raise SafeSourceFilesystemError(f"source mode refused: {relative_path}")
+    trusted_groups = {os.getgid(), *os.getgroups()}
+    if mode & 0o020 and (
+        not policy.allow_trusted_group_write or metadata.st_gid not in trusted_groups
+    ):
         raise SafeSourceFilesystemError(f"source mode refused: {relative_path}")
 
 
@@ -131,12 +153,18 @@ def _read_pinned(fd: int, relative_path: str, metadata: os.stat_result, max_byte
 class SafeSourceFilesystem:
     """Read-only descriptor client constrained to an explicit root allowlist."""
 
-    def __init__(self, approved_roots: Iterable[Path], limits: SourceFilesystemLimits | None = None) -> None:
+    def __init__(
+        self,
+        approved_roots: Iterable[Path],
+        limits: SourceFilesystemLimits | None = None,
+        policy: SourceFilesystemPolicy | None = None,
+    ) -> None:
         roots = tuple(approved_roots)
         if not roots:
             raise SafeSourceFilesystemError("at least one approved source root is required")
         self._approved: frozenset[str] = frozenset(os.path.abspath(root) for root in roots)
         self._limits: SourceFilesystemLimits = limits or SourceFilesystemLimits()
+        self._policy: SourceFilesystemPolicy = policy or SourceFilesystemPolicy()
 
     def _open_root(self, root: Path) -> tuple[int, os.stat_result]:
         if root.is_symlink():
@@ -150,7 +178,7 @@ class SafeSourceFilesystem:
             raise _translate_os_error(exc, ".") from exc
         metadata = os.fstat(root_fd)
         try:
-            _assert_owner_mode(metadata, ".")
+            _assert_owner_mode(metadata, ".", self._policy)
         except SafeSourceFilesystemError:
             os.close(root_fd)
             raise
@@ -191,7 +219,7 @@ class SafeSourceFilesystem:
                     if stat.S_ISLNK(preview.st_mode):
                         refuse(relative, "symlink", reject=reject_unsafe)
                         continue
-                    _assert_owner_mode(preview, relative)
+                    _assert_owner_mode(preview, relative, self._policy)
                     if stat.S_ISDIR(preview.st_mode):
                         if depth >= self._limits.max_depth:
                             raise SafeSourceFilesystemError("source depth exceeds the resource budget")
@@ -247,7 +275,7 @@ class SafeSourceFilesystem:
                 if stat.S_ISLNK(preview.st_mode) or not stat.S_ISDIR(preview.st_mode):
                     kind = "symlink" if stat.S_ISLNK(preview.st_mode) else "special"
                     raise SafeSourceFilesystemError(f"{kind} source path refused: {relative_path}")
-                _assert_owner_mode(preview, relative_path)
+                _assert_owner_mode(preview, relative_path, self._policy)
                 child_fd = os.open(part, DIRECTORY_OPEN_FLAGS, dir_fd=parent_fd)
                 _assert_same(preview, os.fstat(child_fd), relative_path)
                 if parent_fd != root_fd:
@@ -257,7 +285,7 @@ class SafeSourceFilesystem:
             if stat.S_ISLNK(preview.st_mode) or not stat.S_ISREG(preview.st_mode):
                 kind = "symlink" if stat.S_ISLNK(preview.st_mode) else "special"
                 raise SafeSourceFilesystemError(f"{kind} source file refused: {relative_path}")
-            _assert_owner_mode(preview, relative_path)
+            _assert_owner_mode(preview, relative_path, self._policy)
             if preview.st_nlink != 1:
                 raise SafeSourceFilesystemError(f"hardlink source file refused: {relative_path}")
             if preview.st_size > self._limits.max_file_bytes:

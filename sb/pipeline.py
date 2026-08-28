@@ -1,5 +1,4 @@
 """Thin run orchestration: lock, ledger, logs, briefing I/O, vault writes."""
-# noqa: SIZE_OK — single owned orchestrator; ownership forbids a split
 
 from __future__ import annotations
 
@@ -7,9 +6,8 @@ import fcntl
 import hashlib
 import os
 import re
-import sqlite3
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Protocol
@@ -24,13 +22,14 @@ from sb.store import (
     DerivStatus,
     InvalidDerivationTransition,
     Run,
+    RunStage,
     SourceItem,
     UnitRow,
     deriv_key,
 )
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, parse_page_frontmatter
-from sb.vault import GitCommandError, Vault, VaultLintError
+from sb.vault import GitCommandError, Vault, VaultLintError, read_page_spec
 
 STALE_AFTER: Final = timedelta(days=30)
 UPCOMING_WINDOW: Final = timedelta(days=7)
@@ -48,6 +47,8 @@ class StageReport:
     capped: bool
     deriv_key: str | None = None
     written: int = 0
+    derivations: tuple[tuple[str, DerivationOutput], ...] = ()
+    compiled_by: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,7 +310,13 @@ def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]
 
 def _commit_pages(root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled) -> tuple[str | None, int, int]:
     del root
-    result = vault.write_pages(report.pages, run_id, compiled, log_line=line)
+    result = vault.write_pages(
+        report.pages,
+        run_id,
+        compiled,
+        log_line=line,
+        compiled_by=report.compiled_by,
+    )
     compiled.remember(report.pages)
     return result.commit, result.pages, result.conflicts
 
@@ -326,32 +333,59 @@ def _fail_deriv(ledger: Ledger, key: str | None, error: str) -> None:
     ledger.mark_failed(key, error)
 
 
+def _finish_pending(ledger: Ledger, pending: Sequence[tuple[str, DerivationOutput]]) -> None:
+    for key, output in pending:
+        ledger.mark_done(key, output)
+
+
+def _fail_pending(
+    ledger: Ledger, pending: Sequence[tuple[str, DerivationOutput]], error: str
+) -> None:
+    for key, _output in pending:
+        row = ledger.get_derivation(key)
+        if row is not None and row.status == DerivStatus.RUNNING.value:
+            ledger.mark_failed(key, error)
+
+
 def _reopen_failed(ledger: Ledger, key: str) -> None:
     """Return a failed brief key to pending so the same key can mark_running again."""
     row = ledger.get_derivation(key)
     if row is None or row.status != DerivStatus.FAILED.value:
         return
-    path = ledger.db_path
-    ledger.close()
-    with sqlite3.connect(path) as conn:
-        _ = conn.execute(
-            "UPDATE derivation SET status=?, error=NULL, finished_at=NULL WHERE deriv_key=?",
-            (DerivStatus.PENDING.value, key),
-        )
-        conn.commit()
-    ledger.open()
+    _ = ledger.requeue_failed(key)
 
 
-def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
+def _append_run_log(root: Path, line: str) -> None:
+    log = root / ".sb" / "runs.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a", encoding="utf-8") as handle:
+        _ = handle.write(line.rstrip() + "\n")
+
+
+def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
     run_id, started, vault = uuid4().hex, datetime.now().astimezone().isoformat(), Vault(root=root)
     compiled = _Compiled(root, ContentAddressedStore(root))
     with Ledger(root) as ledger:
         _ = ledger.reset_stale_running(run_id)
-        report = stage(ledger, vault, run_id)
+        ledger.record_stage(RunStage(run_id, stage_name, started, None, "running", 0, 0, 0))
+        try:
+            report = stage(ledger, vault, run_id)
+        except Exception as exc:  # noqa: BLE001 - stage boundary must persist unexpected failures
+            finished = datetime.now(UTC).isoformat()
+            detail = f"{type(exc).__name__}: {exc}"
+            ledger.record_stage(
+                RunStage(run_id, stage_name, started, finished, "failed", 0, 0, 1, detail)
+            )
+            ledger.record_run(Run(run_id, started, finished, None, "failed"))
+            line = f"{started} run {run_id} failed pages=0 conflicts=0 errors=1"
+            _append_run_log(root, line)
+            return RunOutcome(run_id, "failed", 0, 0, 1, 1, None)
         if report.capped:
             status, exit_code = "capped", 0
         elif report.attempted > 0 and report.errors * 2 > report.attempted:
             status, exit_code = "failed", 1
+        elif report.errors > 0:
+            status, exit_code = "partial", 0
         else:
             status, exit_code = "ok", 0
         commit, pages, conflicts, errors = None, 0, report.conflicts, report.errors
@@ -362,26 +396,38 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
                     root, vault, run_id, report, rendered.format(len(report.pages), conflicts, errors), compiled
                 )
                 _finish_deriv(ledger, report.deriv_key, hashlib.sha256(report.pages[0].body_md.encode()).hexdigest(), f"{report.pages[0].page_id}.md")
+                _finish_pending(ledger, report.derivations)
             except (VaultLintError, GitCommandError, OSError) as exc:
                 _fail_deriv(ledger, report.deriv_key, str(exc))
+                _fail_pending(ledger, report.derivations, str(exc))
                 status, exit_code, errors = "failed", 1, max(errors, 1)
         if status == "failed":
             rendered = f"{started} run {run_id} {status} pages={{0}} conflicts={{1}} errors={{2}}"
-        ledger.record_run(Run(run_id, started, datetime.now(UTC).isoformat(), commit, status))
-        log = root / ".sb" / "runs.log"
-        log.parent.mkdir(parents=True, exist_ok=True)
-        with log.open("a", encoding="utf-8") as handle:
-            _ = handle.write(rendered.format(pages, conflicts, errors) + "\n")
+        finished = datetime.now(UTC).isoformat()
+        ledger.record_run(Run(run_id, started, finished, commit, status))
+        ledger.record_stage(
+            RunStage(
+                run_id,
+                stage_name,
+                started,
+                finished,
+                status,
+                report.attempted,
+                report.written or pages,
+                errors,
+            )
+        )
+        _append_run_log(root, rendered.format(pages, conflicts, errors))
         return RunOutcome(run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written)
 
 
-def _execute(config: Config, stage: StageFn) -> RunOutcome:
+def _execute(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
     root = Path(config.vault_root)
     fd = _try_lock(root)
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
     try:
-        return _run_locked(root, stage)
+        return _run_locked(root, stage, stage_name)
     finally:
         _unlock(fd)
 
@@ -397,6 +443,8 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         errors = attempted = written = 0
         capped = False
         for adapter in adapters:
+            adapter_failed = False
+            adapter_attempted = 0
             try:
                 items = adapter.scan(ledger.get_cursor(adapter.source_id))
             except (OSError, RuntimeError):
@@ -412,6 +460,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     capped = True
                     break
                 attempted += 1
+                adapter_attempted += 1
                 if meta.get("skip_reason"):
                     skip_digest = hashlib.sha256(f"skip:{ref.source_version}".encode()).hexdigest()
                     ledger.upsert_source_item(SourceItem(
@@ -423,11 +472,16 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 digest = hashlib.sha256(data).hexdigest()
                 units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
                 if not units and data:
-                    ledger.upsert_source_item(SourceItem(
-                        ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
-                    ))
-                    seen.add(version_key)
-                    progressed = True
+                    try:
+                        _ = cas.put(data)
+                        ledger.upsert_source_item(SourceItem(
+                            ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
+                        ))
+                        seen.add(version_key)
+                        progressed = True
+                    except OSError:
+                        errors += 1
+                        adapter_failed = True
                     continue
                 try:
                     _ = cas.put(data)
@@ -440,14 +494,10 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     written += 1
                 except OSError:
                     errors += 1
-                    ledger.upsert_source_item(SourceItem(
-                        ref.source_id, ref.source_uri, ref.source_version, digest, run_id, run_id
-                    ))
-                    seen.add(version_key)
-                    progressed = True
+                    adapter_failed = True
             if capped:
                 break
-            if progressed or not attempted:
+            if not adapter_failed and (progressed or adapter_attempted == 0):
                 ledger.set_cursor(adapter.source_id, adapter.next_cursor(), datetime.now(UTC).isoformat())
         return StageReport((), 0, errors, attempted, capped, None, written)
 
@@ -471,14 +521,25 @@ def _page_ready(root: Path, page: PageSpec) -> bool:
 def _compile_stage(config: Config, llm_mode: str) -> StageFn:
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         try:
-            from sb.compile import compile_pages
+            from sb.compile import compile_pending, page_id_for_origin
         except ModuleNotFoundError:
             return StageReport((), 0, 0, 0, False)
         units = _load_units(ledger, vault.root)
         llm = _llm(config, llm_mode)
-        pages = list(compile_pages(units, ledger, llm, config))
-        capped = bool(pages) and pages[-1].status == "CAPPED"
-        kept = list(pages[:-1] if capped else pages)
+        existing: dict[str, PageSpec] = {}
+        for page_id in sorted({page_id_for_origin(unit.origin) for unit in units}):
+            page = read_page_spec(vault.root, page_id)
+            if page is not None:
+                existing[page_id] = page
+        pending, capped = compile_pending(
+            units,
+            ledger,
+            llm,
+            config,
+            existing_pages=existing,
+        )
+        kept = [item.page for item in pending]
+        derivations = [(item.key, item.output) for item in pending]
         errors = 0
         checker = None
         try:
@@ -486,13 +547,36 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
         except ModuleNotFoundError:
             checker = None
         if checker is not None:
-            for finding in checker(units, kept, ledger, llm, config):
+            for finding in checker(units, kept, ledger, llm, config, finalize=False):
                 page = finding.page
+                deriv = (
+                    (finding.deriv_key, finding.deriv_output)
+                    if finding.deriv_key is not None and finding.deriv_output is not None
+                    else None
+                )
                 if page is None:
+                    if deriv is not None:
+                        ledger.mark_done(deriv[0], deriv[1])
                     continue
                 if _page_ready(vault.root, page):
                     kept.append(page)
-        return StageReport(tuple(kept), sum(1 for page in kept if page.page_id.startswith("conflicts/")), errors, max(len(kept), int(bool(run_id))), capped)
+                    if deriv is not None:
+                        derivations.append(deriv)
+                    continue
+                errors += 1
+                if deriv is not None:
+                    row = ledger.get_derivation(deriv[0])
+                    if row is not None and row.status == DerivStatus.RUNNING.value:
+                        ledger.mark_failed(deriv[0], "conflict page failed citation readiness")
+        return StageReport(
+            tuple(kept),
+            sum(1 for page in kept if page.page_id.startswith("conflicts/")),
+            errors,
+            max(len(kept), int(bool(run_id))),
+            capped,
+            derivations=tuple(derivations),
+            compiled_by=(config.llm.prompt_version, config.llm.model_id),
+        )
 
     return stage
 
@@ -527,7 +611,21 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
         except (LLMUnavailable, ModuleNotFoundError) as exc:
             ledger.mark_failed(key, str(exc))
             return StageReport((), 0, 1, 1, False)
-        return StageReport((page,), 0, 0, 1, False, key)
+        page = replace(
+            page,
+            prompt_version=config.llm.prompt_version,
+            model_id=config.llm.model_id,
+            derivation_key=key,
+        )
+        return StageReport(
+            (page,),
+            0,
+            0,
+            1,
+            False,
+            key,
+            compiled_by=(config.llm.prompt_version, config.llm.model_id),
+        )
 
     return stage
 
@@ -535,15 +633,19 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
 def run_ingest(
     config: Config, sources: Sequence[str] | None, *, stage: StageFn | None = None, limit: int | None = None
 ) -> RunOutcome:
-    return _execute(config, stage if stage is not None else _ingest(config, sources, limit))
+    return _execute(config, stage if stage is not None else _ingest(config, sources, limit), "ingest")
 
 
 def run_compile(config: Config, *, compiler: StageFn | None = None, llm_mode: str = "cli") -> RunOutcome:
-    return _execute(config, compiler if compiler is not None else _compile_stage(config, llm_mode))
+    return _execute(
+        config,
+        compiler if compiler is not None else _compile_stage(config, llm_mode),
+        "compile",
+    )
 
 
 def run_brief(config: Config, *, generator: BriefGenerator | None = None, llm_mode: str = "cli") -> RunOutcome:
-    return _execute(config, _brief_stage(config, generator, llm_mode))
+    return _execute(config, _brief_stage(config, generator, llm_mode), "brief")
 
 
 def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
@@ -552,14 +654,14 @@ def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
     try:
-        ingest = _run_locked(root, _ingest(config, sources, None))
-        compiled = _run_locked(root, _compile_stage(config, "cli"))
+        ingest = _run_locked(root, _ingest(config, sources, None), "ingest")
+        compiled = _run_locked(root, _compile_stage(config, "cli"), "compile")
         if ingest.written == 0 and compiled.pages == 0:
             brief = compiled if compiled.exit_code == 0 else ingest
             if ingest.status == "capped" and ingest.exit_code == 0:
                 brief = ingest
         else:
-            brief = _run_locked(root, _brief_stage(config, None, "cli"))
+            brief = _run_locked(root, _brief_stage(config, None, "cli"), "brief")
     finally:
         _unlock(fd)
     chosen = brief

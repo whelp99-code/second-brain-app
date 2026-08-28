@@ -1,0 +1,5 @@
+{"export_version":"orca-exported-records-v1","type":"export_meta"}
+{"id":"wt-fixture","type":"worktree_meta"}
+{"id":"orca-comment","text":"VISIBLE_COMMENT_1","type":"worktree_comment"}
+{"id":"orca-terminal","text":"VISIBLE_TERMINAL_1","type":"terminal_summary"}
+{"id":"orca-artifact","text":"VISIBLE_ARTIFACT_1","type":"artifact"}

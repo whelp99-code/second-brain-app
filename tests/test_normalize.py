@@ -25,18 +25,16 @@ _EMAIL: str = "owner@example.com"
 _PHONE: str = "+1-555-0100"
 _PHONE_KR: str = "010-1234-5678"
 _FIXTURE_SPANS: tuple[str, ...] = (
-    "0-3205",
-    "2766-5985",
-    "5539-8781",
-    "8350-11664",
-    "11161-11664",
+    "0-3716",
+    "3206-7008",
+    "6505-10338",
+    "9820-11736",
 )
 _FIXTURE_HEADS: tuple[str, ...] = (
     "## Notes 1\n\nPersonal vault note 1 record",
-    "Personal vault note 5 records the daily ",
-    "Personal vault note 10 records the daily",
-    "Personal vault note 15 records the daily",
-    "Personal vault note 20 records the daily",
+    "Personal vault note 6 records the daily ",
+    "Personal vault note 12 records the daily",
+    "Personal vault note 17 records the daily",
 )
 
 
@@ -87,7 +85,7 @@ def test_unit_ids_change_when_normalizer_version_bumps(
 
     text = "Version bump must rewrite unit identity."
     before = _ids(text)
-    monkeypatch.setattr(normalize_mod, "NORMALIZER_VERSION", "v2")
+    monkeypatch.setattr(normalize_mod, "NORMALIZER_VERSION", "v3")
     after = _ids(text)
     assert before != after
     first = normalize(_blob(text), text, _ORIGIN)

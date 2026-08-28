@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
 from typing import Final, Protocol
@@ -35,6 +35,17 @@ class CompileLedger(Protocol):
 
     def mark_failed(self, key: str, error: str) -> None: ...
 
+    def requeue_failed(self, key: str) -> bool: ...
+
+
+@dataclass(frozen=True, slots=True)
+class PendingCompile:
+    """A generated page whose derivation is finalized only after durable vault write."""
+
+    page: PageSpec
+    key: str
+    output: DerivationOutput
+
 
 class _BodyCache:
     """Last compiled bodies keyed by ledger id. Ledger has no body column."""
@@ -62,18 +73,55 @@ def compile_pages(
     ledger: CompileLedger,
     llm: LLMClient,
     config: Config,
+    *,
+    existing_bodies: Mapping[str, str] | None = None,
+    existing_pages: Mapping[str, PageSpec] | None = None,
 ) -> list[PageSpec]:
     """Compile one cited wiki page per source document.
 
     Skips a page when its deriv_key is done. Stops at max_llm_calls_compile
     and appends a CAPPED marker PageSpec so the pipeline can report partial.
     """
+    pending, capped = compile_pending(
+        units,
+        ledger,
+        llm,
+        config,
+        existing_bodies=existing_bodies,
+        existing_pages=existing_pages,
+    )
+    for item in pending:
+        ledger.mark_done(item.key, item.output)
+    pages = [item.page for item in pending]
+    if capped:
+        pages.append(_capped_marker())
+    return pages
+
+
+def compile_pending(
+    units: list[Unit],
+    ledger: CompileLedger,
+    llm: LLMClient,
+    config: Config,
+    *,
+    existing_bodies: Mapping[str, str] | None = None,
+    existing_pages: Mapping[str, PageSpec] | None = None,
+) -> tuple[list[PendingCompile], bool]:
+    """Generate pages but leave successful derivations running until the caller commits them."""
     cap = config.caps["max_llm_calls_compile"]
     prompt_version = config.llm.prompt_version
     model_id = config.llm.model_id
     template = _prompt_template()
-    ctx = _CompileCtx(ledger, llm, template)
-    pages: list[PageSpec] = []
+    ctx = _CompileCtx(
+        ledger,
+        llm,
+        template,
+        existing_bodies or {},
+        existing_pages or {},
+        prompt_version,
+        model_id,
+    )
+    pending: list[PendingCompile] = []
     used = 0
     remaining = False
     for page_id, grouped in _group_by_page(units):
@@ -83,16 +131,14 @@ def compile_pages(
             prompt_version,
             model_id,
         )
-        if not _needs_compile(ledger, key):
+        if not _prepare_compile(ledger, key):
             continue
         if used >= cap:
             remaining = True
             break
-        pages.append(_compile_one(_PageJob(page_id, key, grouped), ctx))
+        pending.append(_compile_one(_PageJob(page_id, key, grouped), ctx))
         used += 1
-    if remaining:
-        pages.append(_capped_marker())
-    return pages
+    return pending, remaining
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,11 +153,20 @@ class _CompileCtx:
     ledger: CompileLedger
     llm: LLMClient
     template: str
+    existing_bodies: Mapping[str, str]
+    existing_pages: Mapping[str, PageSpec]
+    prompt_version: str
+    model_id: str
 
 
-def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PageSpec:
+def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
     title = _title(job.units[0].origin)
-    existing = _BODIES.get(ctx.ledger, job.page_id)
+    previous = ctx.existing_pages.get(job.page_id)
+    existing = (
+        previous.body_md
+        if previous is not None
+        else ctx.existing_bodies.get(job.page_id, _BODIES.get(ctx.ledger, job.page_id))
+    )
     prompt = (
         ctx.template.replace("{units_with_sids}", _unit_block(job.units))
         .replace("{existing_page_body_or_empty}", existing)
@@ -125,19 +180,26 @@ def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PageSpec:
         ctx.ledger.mark_failed(job.key, str(exc))
         raise
     _BODIES.put(ctx.ledger, job.page_id, body)
-    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    ctx.ledger.mark_done(job.key, DerivationOutput(digest, f"wiki/{job.page_id}.md"))
-    return PageSpec(
+    sources = _sources(job.units)
+    page = PageSpec(
         page_id=job.page_id,
         title=title,
         body_md=body,
-        sources=_sources(job.units),
+        sources=_merge_sources(() if previous is None else previous.sources, sources),
         status="active",
+        prompt_version=ctx.prompt_version,
+        model_id=ctx.model_id,
+        derivation_key=job.key,
     )
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return PendingCompile(page, job.key, DerivationOutput(digest, f"wiki/{job.page_id}.md"))
 
 
-def _needs_compile(ledger: CompileLedger, key: str) -> bool:
+def _prepare_compile(ledger: CompileLedger, key: str) -> bool:
     row = ledger.get_derivation(key)
+    if row is not None and row.status == DerivStatus.FAILED.value:
+        _ = ledger.requeue_failed(key)
+        return True
     return row is None or row.status == DerivStatus.PENDING.value
 
 
@@ -153,6 +215,11 @@ def _group_by_page(units: Sequence[Unit]) -> list[tuple[str, tuple[Unit, ...]]]:
 
 
 def _page_id(origin: str) -> str:
+    return page_id_for_origin(origin)
+
+
+def page_id_for_origin(origin: str) -> str:
+    """Return the stable wiki page id used for one source origin."""
     trimmed = origin.removesuffix(_MD_SUFFIX)
     chars: list[str] = []
     for char in trimmed:
@@ -185,6 +252,24 @@ def _sources(units: Sequence[Unit]) -> list[SourceCite]:
         SourceCite(sid=sid, origin=meta[sid][0], hash=meta[sid][1], spans=list(spans[sid]))
         for sid in order
     ]
+
+
+def _merge_sources(
+    existing: Sequence[SourceCite], current: Sequence[SourceCite]
+) -> list[SourceCite]:
+    merged: dict[tuple[str, str, str], SourceCite] = {}
+    order: list[tuple[str, str, str]] = []
+    for cite in (*existing, *current):
+        key = (cite.sid, cite.origin, cite.hash)
+        stored = merged.get(key)
+        if stored is None:
+            order.append(key)
+            merged[key] = SourceCite(cite.sid, cite.origin, cite.hash, list(cite.spans))
+            continue
+        for span in cite.spans:
+            if span not in stored.spans:
+                stored.spans.append(span)
+    return [merged[key] for key in order]
 
 
 def _unit_block(units: Sequence[Unit]) -> str:

@@ -1,0 +1,4 @@
+{"export_version":"claude-project-jsonl-v1","type":"export_meta"}
+{"session_id":"claude-fixture","type":"session_meta"}
+{"id":"claude-user","role":"user","text":"VISIBLE_USER_1","type":"message"}
+{"id":"claude-assistant","role":"assistant","text":"VISIBLE_ASSISTANT_1","type":"message"}

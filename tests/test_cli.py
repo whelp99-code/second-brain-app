@@ -1,6 +1,4 @@
 """CLI and pipeline orchestration: lock, exit codes, logs, briefing I/O."""
-# noqa: SIZE_OK — single owned test module; file ownership forbids a split
-
 from __future__ import annotations
 
 import fcntl
@@ -8,7 +6,7 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from io import StringIO
@@ -20,6 +18,7 @@ from typing import cast
 from pytest import MonkeyPatch
 
 from sb.cli import main
+from sb.compile import PendingCompile
 from sb.config import Config
 from sb.connectors.base import SourceAdapter
 from sb.contracts import BriefingInputs, PageSpec, SourceCite, Unit
@@ -32,14 +31,14 @@ from sb.pipeline import (
     run_compile,
     run_ingest,
 )
-from sb.store import Run, SourceItem
+from sb.store import DerivationOutput, Run, SourceItem
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, load_ledger_tables
 from sb.vault import Vault, init_vault
 
 TODAY = date(2026, 8, 26)
 RUNS_RE = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\S+ run \S+ (ok|capped|failed) pages=\d+ conflicts=\d+ errors=\d+$"
+    r"^\d{4}-\d{2}-\d{2}T\S+ run \S+ (ok|partial|capped|failed) pages=\d+ conflicts=\d+ errors=\d+$"
 )
 COMMANDS = (
     "init",
@@ -53,6 +52,10 @@ COMMANDS = (
     "mcp",
     "search",
     "remember",
+    "retry",
+    "backup",
+    "restore",
+    "migrate",
 )
 
 
@@ -284,7 +287,7 @@ def test_run_brief_passes_same_inputs_instance_to_generator(
     assert seen[0] is sentinel
 
 
-def test_help_lists_eleven_subcommands() -> None:
+def test_help_lists_all_subcommands() -> None:
     code, out, _err = _cli(["--help"])
     assert code == 0
     for name in COMMANDS:
@@ -351,6 +354,79 @@ def test_status_includes_run_id_counts_and_status_after_run(tmp_path: Path) -> N
     assert "conflicts=" in out
     assert "errors=" in out
     assert any(token in out for token in ("ok", "capped", "failed"))
+
+
+def test_status_json_returns_machine_readable_snapshot(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    with Ledger(root):
+        pass
+
+    code, out, _err = _cli_with_config(tmp_path, root, ["status", "--json"])
+
+    payload = cast(dict[str, object], json.loads(out))
+    assert code == 0
+    assert payload["vault_root"] == str(root)
+    schema_version = payload["schema_version"]
+    assert isinstance(schema_version, int) and schema_version >= 1
+    assert "derivation_counts" in payload
+
+
+def test_retry_command_requeues_failed_derivation(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    with Ledger(root) as ledger:
+        ledger.ensure_derivation("retry-cli", "compile", "run-cli")
+        ledger.mark_running("retry-cli", "run-cli")
+        ledger.mark_failed("retry-cli", "temporary")
+
+    code, out, _err = _cli_with_config(
+        tmp_path, root, ["retry", "--stage", "compile", "--limit", "1"]
+    )
+
+    with Ledger(root) as ledger:
+        row = ledger.get_derivation("retry-cli")
+    assert code == 0
+    assert "requeued=1" in out
+    assert row is not None and row.status == "pending" and row.attempts == 0
+
+
+def test_backup_and_restore_commands_roundtrip_vault(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    with Ledger(root):
+        pass
+    archive = tmp_path / "backup.tar.gz"
+
+    backup_code, backup_out, _backup_err = _cli_with_config(
+        tmp_path, root, ["backup", str(archive)]
+    )
+    destination = tmp_path / "restored"
+    restore_code, restore_out, _restore_err = _cli_with_config(
+        tmp_path, root, ["restore", str(archive), "--to", str(destination)]
+    )
+
+    backup_payload = cast(dict[str, object], json.loads(backup_out))
+    restore_payload = cast(dict[str, object], json.loads(restore_out))
+    assert backup_code == restore_code == 0
+    assert backup_payload["archive"] == str(archive.resolve())
+    assert restore_payload["destination"] == str(destination.resolve())
+    assert (destination / ".git").is_dir()
+    assert (destination / ".sb" / "ledger.db").is_file()
+
+
+def test_migrate_check_and_apply_commands_report_schema(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+
+    check_code, check_out, _check_err = _cli_with_config(
+        tmp_path, root, ["migrate", "--check"]
+    )
+    apply_code, apply_out, _apply_err = _cli_with_config(
+        tmp_path, root, ["migrate", "--apply"]
+    )
+
+    checked = cast(dict[str, object], json.loads(check_out))
+    applied = cast(dict[str, object], json.loads(apply_out))
+    assert check_code == apply_code == 0
+    assert checked["before"] == 0
+    assert applied["after"] == applied["current"]
 
 
 def test_ingest_then_compile_writes_page_when_markdown_source_present(tmp_path: Path) -> None:
@@ -640,15 +716,27 @@ def test_run_all_records_failed_run_without_traceback(tmp_path: Path, monkeypatc
     cite = SourceCite(sid=digest[:8], origin="me-wiki:notes/new.md", hash=digest)
     bad = PageSpec("wiki/bad", "Bad", "nope.[^zzzzzzzz]", [cite], "active")
 
-    def boom(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
-        del units, ledger, llm, config
-        return [bad]
+    def boom(
+        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        *,
+        existing_pages: Mapping[str, PageSpec] | None = None,
+    ) -> tuple[list[PendingCompile], bool]:
+        del existing_pages
+        del units, llm, config
+        key = "compile-bad"
+        existing = ledger.get_derivation(key)
+        if existing is not None and existing.status == "failed":
+            _ = ledger.requeue_failed(key)
+        ledger.ensure_derivation(key, "compile", "test")
+        ledger.mark_running(key, "test")
+        output = DerivationOutput("0" * 64, "wiki/bad.md")
+        return [PendingCompile(bad, key, output)], False
 
     def no_adapters(config: Config) -> dict[str, SourceAdapter]:
         del config
         return {}
 
-    monkeypatch.setattr("sb.compile.compile_pages", boom)
+    monkeypatch.setattr("sb.compile.compile_pending", boom)
     monkeypatch.setattr("sb.connectors.discover_adapters", no_adapters)
     outcome = run_all(config)
     assert outcome.exit_code == 1
@@ -704,18 +792,33 @@ def test_compile_routes_conflict_pages_through_vault(
         "conflicts/open-x", "Conflict", f"clash.[^{sid}]", [SourceCite(sid, "me-wiki:a.md", digest)], "conflicted"
     )
 
-    def fake_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
-        del units, ledger, llm, config
-        return [compiled]
+    def fake_compile(
+        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        *,
+        existing_pages: Mapping[str, PageSpec] | None = None,
+    ) -> tuple[list[PendingCompile], bool]:
+        del existing_pages
+        del units, llm, config
+        key = "compile-conflict-route"
+        ledger.ensure_derivation(key, "compile", "test")
+        ledger.mark_running(key, "test")
+        output = DerivationOutput("1" * 64, "wiki/src.md")
+        return [PendingCompile(compiled, key, output)], False
 
     def fake_check(
-        units: list[Unit], pages: list[PageSpec], ledger: Ledger, llm: LLMClient, config: Config
+        units: list[Unit],
+        pages: list[PageSpec],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
+        *,
+        finalize: bool = True,
     ) -> list[ConflictFinding]:
-        del units, pages, ledger, llm, config
+        del units, pages, ledger, llm, config, finalize
         verdict = ConflictVerdict("contradicts", 0.9, "clash")
         return [ConflictFinding("a", "b", verdict, "conflict", conflict, None, (sid,), False)]
 
-    monkeypatch.setattr("sb.compile.compile_pages", fake_compile)
+    monkeypatch.setattr("sb.compile.compile_pending", fake_compile)
     monkeypatch.setattr("sb.conflict.check", fake_check)
     outcome = run_compile(config, llm_mode="fake")
     assert outcome.exit_code == 0
@@ -768,19 +871,30 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
         del config, llm_mode
         return fake
 
-    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+    def empty_compile(
+        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        *,
+        existing_pages: Mapping[str, PageSpec] | None = None,
+    ) -> tuple[list[object], bool]:
+        del existing_pages
         del units, ledger, llm, config
-        return []
+        return [], False
 
     def empty_check(
-        units: list[Unit], pages: list[PageSpec], ledger: Ledger, llm: LLMClient, config: Config
+        units: list[Unit],
+        pages: list[PageSpec],
+        ledger: Ledger,
+        llm: LLMClient,
+        config: Config,
+        *,
+        finalize: bool = True,
     ) -> list[PageSpec]:
-        del units, pages, ledger, llm, config
+        del units, pages, ledger, llm, config, finalize
         return []
 
     monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
     monkeypatch.setattr("sb.pipeline._llm", provide)
-    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    monkeypatch.setattr("sb.compile.compile_pending", empty_compile)
     monkeypatch.setattr("sb.conflict.check", empty_check)
     probe = run_ingest(config, None)
     assert probe.exit_code == 0
@@ -929,13 +1043,18 @@ def test_quarantine_only_ingest_is_ok_or_capped(tmp_path: Path, monkeypatch: Mon
         del config, llm_mode
         return fake
 
-    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+    def empty_compile(
+        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        *,
+        existing_pages: Mapping[str, PageSpec] | None = None,
+    ) -> tuple[list[object], bool]:
+        del existing_pages
         del units, ledger, llm, config
-        return []
+        return [], False
 
     monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
     monkeypatch.setattr("sb.pipeline._llm", provide)
-    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    monkeypatch.setattr("sb.compile.compile_pending", empty_compile)
     first = run_all(config)
     assert first.exit_code == 0
     assert first.status in {"ok", "capped"}
@@ -978,13 +1097,18 @@ def test_brief_skipped_when_compile_pages_zero_and_no_new_units(
         del config, llm_mode
         return fake
 
-    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+    def empty_compile(
+        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        *,
+        existing_pages: Mapping[str, PageSpec] | None = None,
+    ) -> tuple[list[PendingCompile], bool]:
+        del existing_pages
         del units, ledger, llm, config
-        return []
+        return [], False
 
     monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
     monkeypatch.setattr("sb.pipeline._llm", provide)
-    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    monkeypatch.setattr("sb.compile.compile_pending", empty_compile)
     _ = run_ingest(config, None)
     daily_dir = root / "daily"
     before_files = {path.name: path.read_bytes() for path in daily_dir.glob("*.md")}
@@ -1039,13 +1163,18 @@ def test_rebucketed_existing_source_dates_do_not_change_brief_key(
         del config, llm_mode
         return fake
 
-    def empty_compile(units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config) -> list[PageSpec]:
+    def empty_compile(
+        units: list[Unit], ledger: Ledger, llm: LLMClient, config: Config,
+        *,
+        existing_pages: Mapping[str, PageSpec] | None = None,
+    ) -> tuple[list[PendingCompile], bool]:
+        del existing_pages
         del units, ledger, llm, config
-        return []
+        return [], False
 
     monkeypatch.setattr("sb.connectors.discover_adapters", adapters)
     monkeypatch.setattr("sb.pipeline._llm", provide)
-    monkeypatch.setattr("sb.compile.compile_pages", empty_compile)
+    monkeypatch.setattr("sb.compile.compile_pending", empty_compile)
     first = run_brief(config, llm_mode="fake")
     assert first.exit_code == 0
     real_collect = collect_briefing_inputs

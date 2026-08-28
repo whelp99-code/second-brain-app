@@ -1,0 +1,4 @@
+{"payload":{"id":"codex-fixture","session_id":"codex-fixture"},"type":"session_meta"}
+{"payload":{"turn_id":"turn-1","type":"task_started"},"type":"event_msg"}
+{"payload":{"message":"VISIBLE_USER_1","type":"user_message"},"type":"event_msg"}
+{"payload":{"content":[{"text":"VISIBLE_ASSISTANT_1","type":"output_text"}],"id":"codex-assistant","phase":"final","role":"assistant","type":"message"},"type":"response_item"}

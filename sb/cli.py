@@ -9,12 +9,24 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 
 from sb.config import load_config
 from sb.inbox import RememberRejected, write_inbox
-from sb.pipeline import audit_citations, read_status, run_all, run_brief, run_compile, run_ingest
+from sb.ops import (
+    OperationError,
+    create_backup,
+    migrate_status,
+    restore_backup,
+    retry_failed,
+    status_snapshot,
+)
+from sb.ops import (
+    doctor as run_doctor,
+)
+from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
 from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import RunCommitNotFoundError, Vault, VaultLintError, init_vault
@@ -32,6 +44,11 @@ class Command(StrEnum):
     MCP = "mcp"
     SEARCH = "search"
     REMEMBER = "remember"
+    RETRY = "retry"
+    BACKUP = "backup"
+    RESTORE = "restore"
+    MIGRATE = "migrate"
+    RESOLVE = "resolve"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -46,11 +63,13 @@ def _parser() -> argparse.ArgumentParser:
     brief = sub.add_parser(Command.BRIEF.value)
     _ = brief.add_argument("--llm")
     _ = sub.add_parser(Command.RUN.value)
-    _ = sub.add_parser(Command.STATUS.value)
+    status = sub.add_parser(Command.STATUS.value)
+    _ = status.add_argument("--json", action="store_true")
     rollback = sub.add_parser(Command.ROLLBACK.value)
     _ = rollback.add_argument("run_id")
     doctor = sub.add_parser(Command.DOCTOR.value)
     _ = doctor.add_argument("--rebuild-ledger", action="store_true")
+    _ = doctor.add_argument("--json", action="store_true")
     _ = sub.add_parser(Command.MCP.value)
     search_cmd = sub.add_parser(Command.SEARCH.value)
     _ = search_cmd.add_argument("query")
@@ -59,6 +78,27 @@ def _parser() -> argparse.ArgumentParser:
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
+    retry = sub.add_parser(Command.RETRY.value)
+    _ = retry.add_argument("--stage", choices=("compile", "conflict", "brief"))
+    _ = retry.add_argument("--limit", type=int)
+    backup = sub.add_parser(Command.BACKUP.value)
+    _ = backup.add_argument("destination", nargs="?")
+    restore = sub.add_parser(Command.RESTORE.value)
+    _ = restore.add_argument("archive")
+    _ = restore.add_argument("--to")
+    _ = restore.add_argument("--force", action="store_true")
+    migrate = sub.add_parser(Command.MIGRATE.value)
+    group = migrate.add_mutually_exclusive_group()
+    _ = group.add_argument("--check", action="store_true")
+    _ = group.add_argument("--apply", action="store_true")
+    resolve = sub.add_parser(Command.RESOLVE.value)
+    _ = resolve.add_argument("conflict_id")
+    _ = resolve.add_argument(
+        "--decision",
+        required=True,
+        choices=("keep-left", "keep-right", "note"),
+    )
+    _ = resolve.add_argument("--note", default="")
     return parser
 
 
@@ -132,6 +172,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def status() -> int:
+        if _opt_flag(ns, "json"):
+            print(json.dumps(status_snapshot(config), ensure_ascii=False, indent=2))
+            return 0
         print(read_status(config))
         return 0
 
@@ -150,11 +193,14 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     def doctor() -> int:
         if _opt_flag(ns, "rebuild_ledger"):
             rebuild_from_vault(config.vault_root)
-        reasons = audit_citations(Path(config.vault_root))
-        if reasons:
-            print("\n".join(reasons), file=sys.stderr)
-            return 1
-        return 0
+        checks = run_doctor(config)
+        if _opt_flag(ns, "json"):
+            print(json.dumps([check.as_dict() for check in checks], ensure_ascii=False, indent=2))
+        else:
+            for check in checks:
+                line = f"{check.status.upper():4} {check.name}: {check.detail}"
+                print(line, file=sys.stderr if check.status == "fail" else sys.stdout)
+        return 1 if any(check.status == "fail" for check in checks) else 0
 
     def search() -> int:
         query = _opt_str(ns, "query")
@@ -188,6 +234,85 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         print(rel.as_posix())
         return 0
 
+    def retry() -> int:
+        changed = retry_failed(
+            config.vault_root,
+            stage=_opt_str(ns, "stage"),
+            limit=_opt_int(ns, "limit"),
+        )
+        print(f"requeued={changed}")
+        return 0
+
+    def backup() -> int:
+        destination = _opt_str(ns, "destination")
+        if destination is None:
+            stamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%z")
+            destination_path = (
+                Path(config.vault_root).parent
+                / "backups"
+                / f"second-brain-{stamp}.tar.gz"
+            )
+        else:
+            destination_path = Path(destination)
+        result = create_backup(config.vault_root, destination_path)
+        print(
+            json.dumps(
+                {
+                    "archive": str(result.archive),
+                    "checksum": result.checksum,
+                    "files": result.files,
+                    "bytes": result.bytes,
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
+
+    def restore() -> int:
+        archive = _opt_str(ns, "archive")
+        if archive is None:
+            print("restore requires archive", file=sys.stderr)
+            return 2
+        destination = _opt_str(ns, "to") or config.vault_root
+        result = restore_backup(archive, destination, force=_opt_flag(ns, "force"))
+        print(
+            json.dumps(
+                {
+                    "destination": str(result.destination),
+                    "files": result.files,
+                    "bytes": result.bytes,
+                    "previous": None if result.previous is None else str(result.previous),
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
+
+    def migrate() -> int:
+        result = migrate_status(config.vault_root, apply=_opt_flag(ns, "apply"))
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    def resolve() -> int:
+        conflict_id = _opt_str(ns, "conflict_id")
+        decision = _opt_str(ns, "decision")
+        note = _opt_str(ns, "note") or ""
+        if conflict_id is None or decision is None:
+            print("resolve requires conflict_id and decision", file=sys.stderr)
+            return 2
+        try:
+            commit = Vault(root=Path(config.vault_root)).resolve_conflict(
+                conflict_id,
+                decision,
+                note,
+                f"manual-{conflict_id}",
+            )
+        except (FileNotFoundError, ValueError, VaultLintError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(commit or "unchanged")
+        return 0
+
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
         Command.INGEST: ingest,
@@ -200,12 +325,17 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.MCP: _mcp,
         Command.SEARCH: search,
         Command.REMEMBER: remember,
+        Command.RETRY: retry,
+        Command.BACKUP: backup,
+        Command.RESTORE: restore,
+        Command.MIGRATE: migrate,
+        Command.RESOLVE: resolve,
     }
     return handlers[command]()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Parse argv and dispatch one of the eleven subcommands."""
+    """Parse argv and dispatch a second-brain command."""
     parser = _parser()
     tokens = sys.argv[1:] if argv is None else argv
     try:
@@ -217,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except VaultLintError as exc:
+    except (OperationError, VaultLintError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 

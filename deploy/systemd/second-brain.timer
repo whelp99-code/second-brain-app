@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Second Brain every hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=5min
+AccuracySec=1min
+Unit=second-brain.service
+
+[Install]
+WantedBy=timers.target

@@ -146,7 +146,10 @@ def test_contradiction_requires_confidence_at_floor(
     assert hit.page.status == "conflicted"
     for heading in SECTIONS:
         assert f"## {heading}" in hit.page.body_md
-    assert "[^c1]" in hit.page.body_md
+    assert f"[^{HASH_A[:8]}]" in hit.page.body_md
+    assert hit.page.sources
+    assert all(len(cite.hash) == 64 for cite in hit.page.sources)
+    assert all(cite.hash == HASH_A for cite in hit.page.sources)
     assert llm.calls == 1
 
 
