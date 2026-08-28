@@ -169,6 +169,13 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
         assert isinstance(retention_dict.get("raw_blobs"), int)
         assert isinstance(retention_dict.get("orphan_count"), int)
 
+        status, metrics = _request(f"{base}/api/metrics")
+        assert status == 200
+        assert isinstance(metrics, dict)
+        metrics_dict = cast(dict[str, object], metrics)
+        assert isinstance(metrics_dict.get("total"), int)
+        assert isinstance(metrics_dict.get("commands"), dict)
+
 
 def test_conflict_can_be_listed_and_explicitly_resolved(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)

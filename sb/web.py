@@ -16,6 +16,7 @@ from sb.config import Config, load_config
 from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
+from sb.metrics import summary as metrics_summary
 from sb.pipeline import read_status, run_all
 from sb.search import SearchIndex
 from sb.vault import GitCommandError, PathEscapeError, Vault, VaultLintError
@@ -96,7 +97,7 @@ async function readPage(){try{show('pageResult',await api('/api/pages/'+encodeUR
 async function loadConflicts(){try{const data=await api('/api/conflicts');show('conflictResult',data);if(data.conflicts&&data.conflicts.length)byId('conflictId').value=data.conflicts[0].conflict_id}catch(error){show('conflictResult',error.message)}}
 async function resolveConflict(){try{const id=byId('conflictId').value;const data=await api('/api/conflicts/'+encodeURIComponent(id)+'/resolve',{method:'POST',body:JSON.stringify({decision:byId('decision').value,note:byId('resolutionNote').value})});show('conflictResult',data);await loadConflicts()}catch(error){show('conflictResult',error.message)}}
 async function loadChanges(){try{show('changeResult',await api('/api/changes?days=7'))}catch(error){show('changeResult',error.message)}}
-async function loadGovernance(){try{const sources=await api('/api/sources');const retention=await api('/api/retention');show('governanceResult',{...sources,retention})}catch(error){show('governanceResult',error.message)}}
+async function loadGovernance(){try{const sources=await api('/api/sources');const retention=await api('/api/retention');const metrics=await api('/api/metrics');show('governanceResult',{...sources,retention,metrics})}catch(error){show('governanceResult',error.message)}}
 byId('token').value=localStorage.getItem('sb_token')||'';loadStatus();loadConflicts();loadGovernance();
 </script>
 </body>
@@ -247,6 +248,11 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path == "/api/retention":
                 self._json(HTTPStatus.OK, retention_report(context.root).as_dict())
+                return
+            if parsed.path == "/api/metrics":
+                values = parse_qs(parsed.query, keep_blank_values=True)
+                limit = _query_int(values, "limit", 1000, 10_000)
+                self._json(HTTPStatus.OK, metrics_summary(context.root, limit).as_dict())
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 

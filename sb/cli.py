@@ -12,11 +12,14 @@ from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from time import monotonic
 from typing import cast
 
 from sb.config import load_config
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
 from sb.inbox import RememberRejected, write_inbox
+from sb.metrics import record_command
+from sb.metrics import summary as metrics_summary
 from sb.ops import (
     OperationError,
     create_backup,
@@ -55,6 +58,7 @@ class Command(StrEnum):
     SOURCES = "sources"
     RETENTION = "retention"
     GC = "gc"
+    METRICS = "metrics"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -124,6 +128,9 @@ def _parser() -> argparse.ArgumentParser:
     _ = gc.add_argument("--apply", action="store_true")
     _ = gc.add_argument("--confirm", action="store_true")
     _ = gc.add_argument("--json", action="store_true")
+    metrics = sub.add_parser(Command.METRICS.value)
+    _ = metrics.add_argument("--limit", type=int, default=1000)
+    _ = metrics.add_argument("--json", action="store_true")
     return parser
 
 
@@ -415,6 +422,18 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             )
         return 0
 
+    def metrics() -> int:
+        report = metrics_summary(config.vault_root, _opt_int(ns, "limit") or 1000)
+        if _opt_flag(ns, "json"):
+            print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+        else:
+            print(
+                f"total={report.total} failures={report.failures} "
+                + f"average_ms={report.average_ms} p95_ms={report.p95_ms} "
+                + f"commands={report.commands}"
+            )
+        return 0
+
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
         Command.INGEST: ingest,
@@ -436,8 +455,20 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.SOURCES: sources,
         Command.RETENTION: retention,
         Command.GC: gc,
+        Command.METRICS: metrics,
     }
-    return handlers[command]()
+    started = monotonic()
+    exit_code = 1
+    try:
+        exit_code = handlers[command]()
+        return exit_code
+    finally:
+        root = Path(config.vault_root)
+        if root.is_dir():
+            try:
+                record_command(root, command.value, exit_code, (monotonic() - started) * 1000)
+            except OSError:
+                pass
 
 
 def main(argv: list[str] | None = None) -> int:
