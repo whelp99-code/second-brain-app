@@ -3,10 +3,10 @@ import Foundation
 import Security
 
 struct AppSettings: Codable, Equatable {
-    var serverURL = "http://127.0.0.1:8765"
+    var serverURL = "http://127.0.0.1:18765"
     var sshHostAlias = "second-brain-web"
     var automaticSSHTunnel = true
-    var localPort = 8765
+    var localPort = 18765
     var remotePort = 8765
     var autoRunAfterUpload = true
     var automaticFolderSync = true

@@ -52,7 +52,7 @@ private struct MenuBarContent: View {
                     Text("Second Brain").font(.headline)
                     Text(model.serverStatus)
                         .font(.caption)
-                        .foregroundStyle(model.isConnected ? .secondary : .red)
+                        .foregroundStyle(model.isConnected ? Color.secondary : Color.red)
                 }
                 Spacer()
             }

@@ -3,6 +3,7 @@ import Darwin
 import Dispatch
 import Foundation
 import ServiceManagement
+import SecondBrainCore
 import UserNotifications
 
 @MainActor

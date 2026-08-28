@@ -4,18 +4,18 @@
 검증 호스트: Ubuntu  
 브랜치: `release/second-brain-1.0.0`  
 현재 Python 패키지 버전: `1.0.0`  
-상태: Ubuntu 릴리스 검증 완료, macOS 실기 설치 검증 대기
+상태: Ubuntu 릴리스 검증 및 macOS 네이티브 빌드·서명·설치·실행 검증 완료
 
 ## 1. 필수 기능 구현 현황
 
 | 필수 기능 | 구현 위치 | Ubuntu 자동 검증 | 실제 macOS 인증 |
 | --- | --- | --- | --- |
-| 맥 파일 드래그 앤 드롭 업로드 | SwiftUI 앱, 웹 drop zone, `POST /api/uploads` | 통과 | 필요 |
-| 폴더 자동 동기화 | 보안 범위 북마크, DispatchSource, 주기 스캔, manifest | 소스·계약 통과 | 필요 |
-| 메뉴바 아이콘 | SwiftUI `MenuBarExtra` | 소스·계약 통과 | 필요 |
-| 알림센터 브리핑 | `/api/briefing/latest`, `UNUserNotificationCenter` | API·소스 계약 통과 | 필요 |
-| 네이티브 macOS 앱 | Swift Package, AppKit·SwiftUI, `.app` 빌드 스크립트 | 소스·bundle 계약 통과 | 필요 |
-| MCP 즉시 `sb run` | MCP `sb_run` → 기존 `run_all` lock | 단위·통합 통과 | MCP 클라이언트 실기 권장 |
+| 맥 파일 드래그 앤 드롭 업로드 | SwiftUI 앱, 웹 drop zone, `POST /api/uploads` | 통과 | 앱 빌드 통과, 서버 연결 후 실파일 전송 검증 필요 |
+| 폴더 자동 동기화 | 보안 범위 북마크, DispatchSource, 주기 스캔, manifest | 소스·계약 통과 | Swift 6 단위 테스트 통과 |
+| 메뉴바 아이콘 | SwiftUI `MenuBarExtra` | 소스·계약 통과 | 설치 앱 프로세스 실행 확인 |
+| 알림센터 브리핑 | `/api/briefing/latest`, `UNUserNotificationCenter` | API·소스 계약 통과 | 컴파일 통과, 사용자 권한 승인 후 실알림 검증 필요 |
+| 네이티브 macOS 앱 | Swift Package, AppKit·SwiftUI, `.app` 빌드 스크립트 | 소스·bundle 계약 통과 | Swift 6.3 테스트·release 빌드·서명·설치·실행 통과 |
+| MCP 즉시 `sb run` | MCP `sb_run` → 기존 `run_all` lock | 단위·통합 통과 | 서버 계약 통과, 실제 AI 클라이언트 호출 권장 |
 
 ## 2. 구현된 서버 계약
 
@@ -82,6 +82,7 @@ clients/macos/SecondBrainMac/
 - API token: macOS Keychain
 - SSH: `/usr/bin/ssh`를 인자 배열로 실행, shell 미사용
 - 서버 노출: Ubuntu `127.0.0.1:8765`
+- 맥 로컬 포워딩: `127.0.0.1:18765` → Ubuntu `127.0.0.1:8765`
 - 연결: 맥 SSH local forwarding
 - 폴더 접근: 사용자가 직접 선택한 bookmark
 - 동기화: Mac → Ubuntu 단방향
@@ -148,6 +149,21 @@ sb/pipeline.py
 sb/prompts/compile.md
 sb/prompts/conflict.md
 ```
+
+### 실제 macOS 네이티브 검증
+
+```text
+Apple Swift 6.3.3 / Xcode 26.6
+swift test: 6 passed, 0 failed
+release build: PASS
+ad-hoc codesign verification: PASS
+Info.plist lint: PASS
+install: ~/Applications/Second Brain.app
+process launch: PASS
+screen capture: macOS Screen Recording 권한 미허용으로 증거 이미지 미생성
+```
+
+실기 과정에서 Swift Core import 누락, SwiftUI 색상 타입 불일치, 기존 AgentCat의 로컬 `8765` 점유를 발견해 수정했다. macOS 앱은 로컬 `18765`를 사용하고 Ubuntu 웹 서비스는 원격 `8765`를 유지한다.
 
 ## 5. 설치형 데스크톱 API E2E
 

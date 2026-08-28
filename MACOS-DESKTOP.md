@@ -13,7 +13,7 @@ macOS Second Brain.app
 ├── Notification Center 브리핑
 └── SSH loopback 터널
           ↓
-Ubuntu 127.0.0.1:8765
+macOS 127.0.0.1:18765 → Ubuntu 127.0.0.1:8765
 ├── /api/uploads
 ├── /api/run
 ├── /api/briefing/latest
@@ -139,7 +139,7 @@ cd clients/macos/SecondBrainMac
 
 1. 메뉴바의 뇌 아이콘을 클릭한다.
 2. **설정**을 연다.
-3. 서버 URL을 `http://127.0.0.1:8765`로 둔다.
+3. 서버 URL을 `http://127.0.0.1:18765`로 둔다.
 4. SSH Host 별칭을 `second-brain-web`로 둔다.
 5. API 토큰을 사용한다면 입력한다.
 6. **SSH 터널 자동 연결**을 켠다.

@@ -149,3 +149,14 @@ def test_ubuntu_installer_enables_loopback_web_service_for_mac_client() -> None:
     assert "second-brain-web.service" in installer
     assert "enable --now second-brain-web.service" in installer
     assert os.stat(installer_path).st_mode & 0o111
+
+
+def test_mac_client_imports_core_models_and_uses_dedicated_local_tunnel_port() -> None:
+    settings = _text(APP / "AppSettings.swift")
+    services = _text(APP / "SystemServices.swift")
+    ui = _text(APP / "SecondBrainMacApp.swift")
+    assert 'import SecondBrainCore' in services
+    assert 'serverURL = "http://127.0.0.1:18765"' in settings
+    assert 'localPort = 18765' in settings
+    assert 'remotePort = 8765' in settings
+    assert 'Color.secondary' in ui and 'Color.red' in ui
