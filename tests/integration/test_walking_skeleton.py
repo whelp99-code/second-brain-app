@@ -21,7 +21,9 @@ from sb.llm import FakeLLM
 from sb.store.ledger import Ledger, load_ledger_tables
 from sb.vault import Vault, VaultLintError
 
-ME_WIKI_FILE: Path = Path("/Volumes/DevSpace/me-wiki/identity/profile.md")
+ME_WIKI_FILE: Path = (
+    Path(__file__).parent.parent / "fixtures" / "second-brain" / "me-wiki" / "identity" / "profile.md"
+)
 SOURCE_REL: str = "identity/profile.md"
 K1_KEYS: tuple[str, ...] = ("id", "title", "updated", "compiled_by", "status")
 K1_STATUS: frozenset[str] = frozenset({"active", "superseded", "conflicted"})

@@ -1,0 +1,3 @@
+{"type":"session","version":3,"id":"fixture-omo"}
+{"type":"message","id":"user-1","parentId":null,"message":{"role":"user","content":[{"type":"text","text":"VISIBLE_USER_1"}]}}
+{"type":"message","id":"assistant-1","parentId":"user-1","message":{"role":"assistant","content":[{"type":"text","text":"VISIBLE_ASSISTANT_1"}]}}

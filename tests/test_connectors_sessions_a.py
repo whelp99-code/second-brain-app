@@ -19,9 +19,7 @@ from sb.connectors.sessions_opencode import ADAPTER_ID as OPENCODE_ID
 from sb.connectors.sessions_opencode import create as create_opencode
 from sb.contracts import SourceRef
 
-SPIKE = Path(
-    "/Volumes/DevSpace/orca/Wiki-spike/wiki-spike-sb44/tests/fixtures/second-brain"
-)
+FIXTURES = Path(__file__).parent / "fixtures" / "second-brain"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +34,7 @@ def _cfg(adapter_id: str, root: Path, source_id: str) -> _Cfg:
 def _copy_spike(tmp: Path, family: str, name: str) -> Path:
     dest = tmp / family / name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    _ = dest.write_bytes((SPIKE / family / name).read_bytes())
+    _ = dest.write_bytes((FIXTURES / family / name).read_bytes())
     return dest
 
 
@@ -114,7 +112,9 @@ def test_opencode_scan_yields_source_ref_and_visible_text_when_current_fixture(t
     # Given: a copied real-format OpenCode snapshot fixture.
     root = tmp_path / "opencode"
     root.mkdir()
-    _ = (root / "snapshot.json").write_bytes((SPIKE / "opencode" / "current.json").read_bytes())
+    _ = (root / "snapshot.json").write_bytes(
+        (FIXTURES / "opencode" / "current.json").read_bytes()
+    )
     adapter = create_opencode(_cfg(OPENCODE_ID, root, "opencode"))
 
     # When: the adapter scans the snapshot.
@@ -378,7 +378,9 @@ def test_opencode_byte_offset_resume_yields_zero_when_snapshot_unchanged(tmp_pat
     # Given: a scanned OpenCode snapshot whose cursor was captured.
     root = tmp_path / "opencode"
     root.mkdir()
-    _ = (root / "snapshot.json").write_bytes((SPIKE / "opencode" / "current.json").read_bytes())
+    _ = (root / "snapshot.json").write_bytes(
+        (FIXTURES / "opencode" / "current.json").read_bytes()
+    )
     adapter = create_opencode(_cfg(OPENCODE_ID, root, "opencode"))
     first = list(adapter.scan(None))
     assert _delivered(first)

@@ -1,0 +1,1 @@
+{"parts":[{"id":"user-2","data":{"type":"text","text":"VISIBLE_USER_2"}},{"id":"assistant-2","data":{"type":"text","text":"VISIBLE_ASSISTANT_2"}},{"id":"tool-2","data":{"type":"tool","tool":"fictional_tool","state":{"status":"completed","output":"VISIBLE_TOOL_2"}}}]}

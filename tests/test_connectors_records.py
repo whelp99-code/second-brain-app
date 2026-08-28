@@ -17,7 +17,7 @@ from sb.connectors.sessions_gjc import ADAPTER_ID as GJC_ID
 from sb.connectors.sessions_gjc import create as create_gjc
 from sb.contracts import SourceRef
 
-SPIKE = Path("/Volumes/DevSpace/orca/Wiki-spike/wiki-spike-sb44/tests/fixtures/second-brain")
+FIXTURES = Path(__file__).parent / "fixtures" / "second-brain"
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +32,7 @@ def _cfg(adapter_id: str, root: Path, source_id: str) -> _Cfg:
 def _copy_spike(tmp: Path, family: str, name: str) -> Path:
     dest = tmp / family / name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    _ = dest.write_bytes((SPIKE / family / name).read_bytes())
+    _ = dest.write_bytes((FIXTURES / family / name).read_bytes())
     return dest
 
 
