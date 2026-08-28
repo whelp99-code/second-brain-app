@@ -121,6 +121,9 @@ def open_conflicts(root: Path) -> tuple[ConflictRow, ...]:
         text = committed_text(root, rel)
         if text is None:
             continue
+        block, _body = _split_md(text)
+        if _frontmatter(block).get("status") == "resolved":
+            continue
         stem = Path(rel).stem
         rows.append(
             ConflictRow(conflict_id=stem, page_id=_conflict_page(stem), summary=_summary(text))

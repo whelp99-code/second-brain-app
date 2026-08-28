@@ -50,6 +50,7 @@ class Command(StrEnum):
     RESTORE = "restore"
     MIGRATE = "migrate"
     RESOLVE = "resolve"
+    WEB = "web"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -108,6 +109,9 @@ def _parser() -> argparse.ArgumentParser:
         choices=("keep-left", "keep-right", "note"),
     )
     _ = resolve.add_argument("--note", default="")
+    web = sub.add_parser(Command.WEB.value)
+    _ = web.add_argument("--host", default="127.0.0.1")
+    _ = web.add_argument("--port", type=int, default=8765)
     return parser
 
 
@@ -337,6 +341,25 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         print(commit or "unchanged")
         return 0
 
+    def web() -> int:
+        from sb.web import build_server
+
+        host = _opt_str(ns, "host") or "127.0.0.1"
+        port = _opt_int(ns, "port") or 8765
+        try:
+            server = build_server(config, host, port)
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"http://{host}:{server.server_address[1]}")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            return 0
+        finally:
+            server.server_close()
+        return 0
+
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
         Command.INGEST: ingest,
@@ -354,6 +377,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.RESTORE: restore,
         Command.MIGRATE: migrate,
         Command.RESOLVE: resolve,
+        Command.WEB: web,
     }
     return handlers[command]()
 
