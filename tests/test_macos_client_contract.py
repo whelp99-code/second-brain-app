@@ -146,6 +146,12 @@ def test_ubuntu_installer_enables_loopback_web_service_for_mac_client() -> None:
     assert "sb web --host 127.0.0.1 --port 8765" in service
     assert "Restart=on-failure" in service
     assert "EnvironmentFile=-%h/.config/second-brain/environment" in service
+    for incompatible in (
+        "ProtectControlGroups=true",
+        "ProtectKernelModules=true",
+        "ProtectKernelTunables=true",
+    ):
+        assert incompatible not in service
     assert "second-brain-web.service" in installer
     assert "enable --now second-brain-web.service" in installer
     assert os.stat(installer_path).st_mode & 0o111

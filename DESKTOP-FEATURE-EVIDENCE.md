@@ -124,13 +124,17 @@ systemd-analyze verify: PASS
 isolated installer --dry-run: PASS
 ```
 
-활성화 대상:
+활성화 대상 및 실운영 결과:
 
 ```text
-second-brain-web.service
-second-brain.timer
-second-brain-backup.timer
+second-brain 1.0.0 user tool install: PASS
+second-brain-web.service: active (running), restart 0
+127.0.0.1:8765 /health: {"status":"ok"}
+second-brain.timer: enabled
+second-brain-backup.timer: enabled
 ```
+
+user systemd가 capability drop을 허용하지 않는 환경에서 실패하던 `ProtectControlGroups`, `ProtectKernelModules`, `ProtectKernelTunables`는 제거했다. `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, 쓰기 경로 제한은 유지한다.
 
 ### 패키지 빌드
 
