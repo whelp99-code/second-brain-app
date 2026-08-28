@@ -127,6 +127,28 @@ def _assert_same(before: os.stat_result, after: os.stat_result, relative_path: s
         raise SafeSourceFilesystemError(f"source mutation observed: {relative_path}")
 
 
+def _assert_same_directory(
+    before: os.stat_result, after: os.stat_result, relative_path: str
+) -> None:
+    """Pin directory identity without treating ordinary child churn as tampering.
+
+    Directory size/mtime/ctime legitimately change when the desktop uploader
+    queues a file while an ingest scan is enumerating the same inbox.  Keep the
+    no-follow identity, owner, mode, and link-count checks, but reserve strict
+    content timestamps for regular files that are actually read.
+    """
+    same = (
+        before.st_dev == after.st_dev
+        and before.st_ino == after.st_ino
+        and before.st_mode == after.st_mode
+        and before.st_nlink == after.st_nlink
+        and before.st_uid == after.st_uid
+        and before.st_gid == after.st_gid
+    )
+    if not same:
+        raise SafeSourceFilesystemError(f"source mutation observed: {relative_path}")
+
+
 def _assert_owner_mode(
     metadata: os.stat_result,
     relative_path: str,
@@ -248,7 +270,7 @@ class SafeSourceFilesystem:
                             )
                         child_fd = os.open(name, DIRECTORY_OPEN_FLAGS, dir_fd=directory_fd)
                         try:
-                            _assert_same(preview, os.fstat(child_fd), relative)
+                            _assert_same_directory(preview, os.fstat(child_fd), relative)
                             walk(child_fd, relative, depth + 1)
                         finally:
                             os.close(child_fd)
@@ -283,7 +305,7 @@ class SafeSourceFilesystem:
 
         try:
             walk(root_fd, "", 0)
-            _assert_same(root_metadata, os.fstat(root_fd), ".")
+            _assert_same_directory(root_metadata, os.fstat(root_fd), ".")
             return SourceScan(
                 tuple(sorted(entries, key=lambda item: item.relative_path)), tuple(skipped)
             )
@@ -312,7 +334,7 @@ class SafeSourceFilesystem:
                     raise SafeSourceFilesystemError(f"{kind} source path refused: {relative_path}")
                 _assert_owner_mode(preview, relative_path, self._policy)
                 child_fd = os.open(part, DIRECTORY_OPEN_FLAGS, dir_fd=parent_fd)
-                _assert_same(preview, os.fstat(child_fd), relative_path)
+                _assert_same_directory(preview, os.fstat(child_fd), relative_path)
                 if parent_fd != root_fd:
                     os.close(parent_fd)
                 parent_fd = child_fd
