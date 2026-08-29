@@ -5,11 +5,13 @@ from __future__ import annotations
 import importlib
 import logging
 import os
+import shutil
 import sqlite3
 import subprocess
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
@@ -19,7 +21,24 @@ _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
 _INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
 _INDEX_SCHEMA_VERSION: Final = "2"
-_REQUIRED_DOCS_COLUMNS: Final = ("page_id", "section", "text", "kind", "updated", "status")
+_REQUIRED_DOCS_COLUMNS: Final = (
+    "page_id",
+    "section",
+    "text",
+    "kind",
+    "updated",
+    "status",
+    "knowledge_status",
+    "approval_status",
+    "canonical",
+    "source_ref",
+)
+_ACTIVE_SCOPE: Final = "active"
+_CANDIDATE_SCOPE: Final = "candidate"
+_UNKNOWN: Final = "UNKNOWN"
+_ACTIVE: Final = "ACTIVE"
+_APPROVED: Final = "APPROVED"
+_CANDIDATE: Final = "CANDIDATE"
 
 
 class SearchHitDict(TypedDict):
@@ -29,6 +48,11 @@ class SearchHitDict(TypedDict):
     score: float
     kind: str
     index_status: str
+    knowledge_status: str
+    approval_status: str
+    canonical: str
+    source_ref: str
+    updated_at: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +63,11 @@ class SearchHit:
     score: float
     kind: str = ""
     index_status: str = ""
+    knowledge_status: str = ""
+    approval_status: str = ""
+    canonical: str = ""
+    source_ref: str = ""
+    updated_at: str = ""
 
     def as_dict(self) -> SearchHitDict:
         return {
@@ -48,6 +77,11 @@ class SearchHit:
             "score": self.score,
             "kind": self.kind,
             "index_status": self.index_status,
+            "knowledge_status": self.knowledge_status,
+            "approval_status": self.approval_status,
+            "canonical": self.canonical,
+            "source_ref": self.source_ref,
+            "updated_at": self.updated_at,
         }
 
 
@@ -126,12 +160,12 @@ class SearchIndex:
         status: str | None = None,
         updated_from: str | None = None,
         updated_to: str | None = None,
+        scope: str | None = None,
     ) -> tuple[SearchHit, ...]:
         """Refresh from Git HEAD only when needed, then BM25-search `query`."""
         root = self.vault_root
         db_path = _db_path(root)
-        with _connect(db_path) as conn:
-            _refresh(conn, root)
+        _refresh(db_path, root)
         hits = _lexical(
             db_path,
             query,
@@ -140,6 +174,7 @@ class SearchIndex:
             status=status,
             updated_from=updated_from,
             updated_to=updated_to,
+            scope=scope,
         )
         if not _wants_hybrid(self.hybrid):
             return hits
@@ -187,24 +222,58 @@ def _docs_columns(conn: sqlite3.Connection) -> tuple[str, ...]:
     return tuple(str(row[1]) for row in conn.execute("PRAGMA table_info(docs)"))
 
 
-def _ensure_schema(conn: sqlite3.Connection) -> bool:
-    """Return True when an old or absent index required a clean rebuild."""
+def _ensure_meta(conn: sqlite3.Connection) -> None:
     _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS search_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
     )
-    version_mismatch = _meta(conn, "schema_version") != _INDEX_SCHEMA_VERSION
-    schema_wrong = _docs_columns(conn) != _REQUIRED_DOCS_COLUMNS
-    reset = version_mismatch or schema_wrong
-    if reset:
-        _ = conn.execute("DROP TABLE IF EXISTS docs")
-        _ = conn.execute("DELETE FROM search_meta")
+
+
+def _schema_is_current(conn: sqlite3.Connection) -> bool:
+    """True only when PRAGMA columns and schema_version both match. Never version alone."""
+    _ensure_meta(conn)
+    if _meta(conn, "schema_version") != _INDEX_SCHEMA_VERSION:
+        return False
+    return _docs_columns(conn) == _REQUIRED_DOCS_COLUMNS
+
+
+def _create_schema(conn: sqlite3.Connection) -> None:
+    _ensure_meta(conn)
     _ = conn.execute(
         "CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5("
         + "page_id UNINDEXED, section, text, kind UNINDEXED, updated UNINDEXED, "
-        + "status UNINDEXED, tokenize='trigram')"
+        + "status UNINDEXED, knowledge_status UNINDEXED, approval_status UNINDEXED, "
+        + "canonical UNINDEXED, source_ref UNINDEXED, tokenize='trigram')"
     )
     _set_meta(conn, "schema_version", _INDEX_SCHEMA_VERSION)
-    return reset
+
+
+def _backup_index(db_path: Path) -> None:
+    if not db_path.is_file():
+        return
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    dest = db_path.with_name(f"{db_path.name}.{stamp}.bak")
+    suffix = 0
+    while dest.exists():
+        suffix += 1
+        dest = db_path.with_name(f"{db_path.name}.{stamp}.{suffix}.bak")
+    shutil.copy2(db_path, dest)
+
+
+def _rebuild_atomic(db_path: Path, root: Path, current: str | None) -> None:
+    tmp = db_path.with_name(db_path.name + ".tmp")
+    if tmp.exists():
+        tmp.unlink()
+    try:
+        with _connect(tmp) as conn:
+            _create_schema(conn)
+            if current is not None:
+                _full_rebuild(conn, root)
+                _set_meta(conn, "git_head", current)
+        tmp.replace(db_path)
+    except Exception:
+        if tmp.exists():
+            tmp.unlink()
+        raise
 
 
 def _frontmatter_value(text: str, key: str) -> str:
@@ -219,6 +288,12 @@ def _frontmatter_value(text: str, key: str) -> str:
         if sep and field.strip() == key:
             return value.strip().strip("\"'")
     return ""
+
+
+def _structured_status(text: str, key: str) -> str:
+    """Read a structured YAML scalar. Empty or absent → UNKNOWN. Never parse body."""
+    value = _frontmatter_value(text, key).strip().upper()
+    return value if value else _UNKNOWN
 
 
 def _replace_path(
@@ -237,9 +312,29 @@ def _replace_path(
     kind = rel.partition("/")[0]
     updated = _frontmatter_value(text, "updated")
     status = _frontmatter_value(text, "status")
-    rows = [(page_id, section, body, kind, updated, status) for section, body in _sections(text)]
+    knowledge_status = _structured_status(text, "knowledge_status")
+    approval_status = _structured_status(text, "approval_status")
+    canonical = _frontmatter_value(text, "canonical")
+    source_ref = _frontmatter_value(text, "source_ref")
+    rows = [
+        (
+            page_id,
+            section,
+            body,
+            kind,
+            updated,
+            status,
+            knowledge_status,
+            approval_status,
+            canonical,
+            source_ref,
+        )
+        for section, body in _sections(text)
+    ]
     _ = conn.executemany(
-        "INSERT INTO docs(page_id,section,text,kind,updated,status) VALUES(?,?,?,?,?,?)",
+        "INSERT INTO docs(page_id,section,text,kind,updated,status,"
+        + "knowledge_status,approval_status,canonical,source_ref) "
+        + "VALUES(?,?,?,?,?,?,?,?,?,?)",
         rows,
     )
 
@@ -273,24 +368,49 @@ def _changed_paths(root: Path, previous: str, current: str) -> tuple[str, ...] |
     )
 
 
-def _refresh(conn: sqlite3.Connection, root: Path) -> None:
-    reset = _ensure_schema(conn)
+def _refresh(db_path: Path, root: Path) -> None:
     current = _head(root)
-    previous = _meta(conn, "git_head")
-    if current is None:
-        _ = conn.execute("DELETE FROM docs")
-        _ = conn.execute("DELETE FROM search_meta WHERE key='git_head'")
+    existing = db_path.is_file() and db_path.stat().st_size > 0
+    if existing:
+        with _connect(db_path) as conn:
+            current_schema = _schema_is_current(conn)
+            previous = _meta(conn, "git_head")
+        if not current_schema:
+            _backup_index(db_path)
+            _rebuild_atomic(db_path, root, current)
+            return
+        if current is None:
+            with _connect(db_path) as conn:
+                _ = conn.execute("DELETE FROM docs")
+                _ = conn.execute("DELETE FROM search_meta WHERE key='git_head'")
+            return
+        if current == previous:
+            return
+        changed = None if previous is None else _changed_paths(root, previous, current)
+        with _connect(db_path) as conn:
+            if changed is None:
+                _full_rebuild(conn, root)
+            else:
+                committed = set(committed_paths(root, _INDEX_PREFIXES))
+                for rel in changed:
+                    _replace_path(conn, root, rel, committed)
+            _set_meta(conn, "git_head", current)
         return
-    if not reset and current == previous:
-        return
-    changed = None if reset or previous is None else _changed_paths(root, previous, current)
-    if changed is None:
+    with _connect(db_path) as conn:
+        _create_schema(conn)
+        if current is None:
+            return
         _full_rebuild(conn, root)
-    else:
-        committed = set(committed_paths(root, _INDEX_PREFIXES))
-        for rel in changed:
-            _replace_path(conn, root, rel, committed)
-    _set_meta(conn, "git_head", current)
+        _set_meta(conn, "git_head", current)
+
+
+def _normalize_scope(scope: str | None) -> str:
+    if scope is None:
+        return _ACTIVE_SCOPE
+    value = scope.strip().lower()
+    if value == _CANDIDATE_SCOPE:
+        return _CANDIDATE_SCOPE
+    return _ACTIVE_SCOPE
 
 
 def _lexical(
@@ -302,6 +422,7 @@ def _lexical(
     status: str | None = None,
     updated_from: str | None = None,
     updated_to: str | None = None,
+    scope: str | None = None,
 ) -> tuple[SearchHit, ...]:
     stripped = query.strip()
     if stripped == "" or limit <= 0:
@@ -322,17 +443,26 @@ def _lexical(
     if updated_to:
         where.append("updated<=?")
         params.append(updated_to)
+    chosen = _normalize_scope(scope)
+    if chosen == _CANDIDATE_SCOPE:
+        where.append("knowledge_status=?")
+        params.append(_CANDIDATE)
+    else:
+        where.append("knowledge_status=?")
+        where.append("approval_status=?")
+        params.extend((_ACTIVE, _APPROVED))
     params.append(int(limit))
     sql = (
         "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs), "
-        + "kind, status FROM docs WHERE "
+        + "kind, status, knowledge_status, approval_status, canonical, source_ref, "
+        + "updated FROM docs WHERE "
         + " AND ".join(where)
         + " ORDER BY bm25(docs), page_id, section LIMIT ?"
     )
     try:
         with _connect(db_path) as conn:
             rows = cast(
-                list[tuple[object, object, object, object, object, object]],
+                list[tuple[object, ...]],
                 conn.execute(sql, tuple(params)).fetchall(),
             )
     except sqlite3.DatabaseError:
@@ -345,8 +475,25 @@ def _lexical(
             -_score(score),
             str(kind),
             str(index_status),
+            str(knowledge_status),
+            str(approval_status),
+            str(canonical),
+            str(source_ref),
+            str(updated_at),
         )
-        for page_id, section, snippet, score, kind, index_status in rows
+        for (
+            page_id,
+            section,
+            snippet,
+            score,
+            kind,
+            index_status,
+            knowledge_status,
+            approval_status,
+            canonical,
+            source_ref,
+            updated_at,
+        ) in rows
     )
 
 

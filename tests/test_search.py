@@ -14,6 +14,7 @@ from sb.contracts import PageSpec, SourceCite
 from sb.search import SearchHit, SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
+from tests.knowledge import commit_page, stamp_knowledge
 
 EN_TERM = "AlphaEngineer"
 KO_TERM = "박정민프로필"
@@ -42,6 +43,7 @@ def _seed(tmp_path: Path) -> Path:
         _page(digest, "daily/2026-08-26", "Brief", f"# 오늘\n{DAILY_TERM} 항목.\n"),
     )
     _ = vault.write_pages(pages, "run-search", _HashLedger(root))
+    stamp_knowledge(root)
     return root
 
 
@@ -110,10 +112,12 @@ def test_search_hit_fields_are_page_id_section_snippet_score(tmp_path: Path) -> 
             "score",
             "kind",
             "index_status",
+            "knowledge_status",
+            "approval_status",
+            "canonical",
+            "source_ref",
+            "updated_at",
         }
-        assert "knowledge_status" not in payload
-        assert "approval_status" not in payload
-        assert "canonical" not in payload
         assert "source_path" not in payload
         assert isinstance(hit.page_id, str)
         assert isinstance(hit.section, str)
@@ -121,6 +125,9 @@ def test_search_hit_fields_are_page_id_section_snippet_score(tmp_path: Path) -> 
         assert isinstance(hit.score, float)
         assert hit.kind == "wiki"
         assert hit.index_status == "active"
+        assert hit.knowledge_status == "ACTIVE"
+        assert hit.approval_status == "APPROVED"
+        assert hit.source_ref == ""
 
 
 def test_search_ignores_uncommitted_wiki_when_index_rebuilds(tmp_path: Path) -> None:
@@ -225,7 +232,18 @@ def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path
         version = conn.execute(
             "SELECT value FROM search_meta WHERE key='schema_version'"
         ).fetchone()
-    assert cols == ["page_id", "section", "text", "kind", "updated", "status"]
+    assert cols == [
+        "page_id",
+        "section",
+        "text",
+        "kind",
+        "updated",
+        "status",
+        "knowledge_status",
+        "approval_status",
+        "canonical",
+        "source_ref",
+    ]
     assert version is not None and str(version[0]) == "2"
 
 
@@ -243,6 +261,7 @@ def test_search_matches_yaml_title_and_empty_bodied_h1(tmp_path: Path) -> None:
         ),
     )
     _ = vault.write_pages(pages, "run-title-h1", _HashLedger(root))
+    stamp_knowledge(root)
     index = SearchIndex(vault_root=root)
 
     hits = index.search("Hello World")
@@ -254,6 +273,7 @@ def _one_page(tmp_path: Path, page_id: str, title: str, body: str, digest: bytes
     vault = init_vault(root)
     pages = (_page(_put(root, digest), page_id, title, body),)
     _ = vault.write_pages(pages, "run-title-index", _HashLedger(root))
+    stamp_knowledge(root)
     return root
 
 
@@ -324,3 +344,109 @@ def test_search_empty_h1_does_not_insert_blank_text_row(tmp_path: Path) -> None:
         ).fetchall()
     assert rows
     assert all(str(text).strip() != "" for _section, text in rows)
+
+
+_HIT_KEYS = {
+    "page_id",
+    "section",
+    "snippet",
+    "score",
+    "kind",
+    "index_status",
+    "knowledge_status",
+    "approval_status",
+    "canonical",
+    "source_ref",
+    "updated_at",
+}
+
+
+def test_default_search_excludes_unknown_and_candidate(tmp_path: Path) -> None:
+    """Given UNKNOWN and CANDIDATE YAML, when default-searching, then neither page is hit."""
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    commit_page(
+        root,
+        "wiki/unknown.md",
+        "---\ntitle: UnknownPage\n---\n\n# UnknownPage\nExcludeUnknownToken lives here.\n",
+    )
+    commit_page(
+        root,
+        "wiki/candidate.md",
+        "---\ntitle: CandidatePage\nknowledge_status: CANDIDATE\napproval_status: UNKNOWN\n---\n"
+        "\n# CandidatePage\nExcludeCandidateToken lives here.\n",
+    )
+    index = SearchIndex(vault_root=root)
+    assert index.search("ExcludeUnknownToken") == ()
+    assert index.search("ExcludeCandidateToken") == ()
+
+
+def test_default_search_returns_active_approved_page(tmp_path: Path) -> None:
+    """Given ACTIVE+APPROVED YAML, when default-searching, then that page_id is hit."""
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    commit_page(
+        root,
+        "wiki/approved.md",
+        "---\ntitle: ApprovedPage\nknowledge_status: ACTIVE\napproval_status: APPROVED\n"
+        "canonical: wiki/approved\nsource_ref: inbox:approved.md\nupdated: '2026-08-29'\n---\n"
+        "\n# ApprovedPage\nApprovedKnowledgeToken is confirmed.\n",
+    )
+    index = SearchIndex(vault_root=root)
+    hits = index.search("ApprovedKnowledgeToken")
+    assert hits
+    hit = hits[0]
+    assert hit.page_id == "wiki/approved"
+    assert hit.knowledge_status == "ACTIVE"
+    assert hit.approval_status == "APPROVED"
+    assert hit.canonical == "wiki/approved"
+    assert hit.source_ref == "inbox:approved.md"
+    assert hit.updated_at == "2026-08-29"
+    assert set(hit.as_dict()) == _HIT_KEYS
+
+
+def test_scope_candidate_returns_candidate_page_id(tmp_path: Path) -> None:
+    """Given a CANDIDATE page, when scope=candidate, then that page_id is returned."""
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    commit_page(
+        root,
+        "wiki/dec-candidate.md",
+        "---\ntitle: DecCandidate\nknowledge_status: CANDIDATE\napproval_status: UNKNOWN\n---\n"
+        "\n# DecCandidate\nCandidateOnlyToken and 운영 Registry는.\n",
+    )
+    commit_page(
+        root,
+        "wiki/approved.md",
+        "---\ntitle: ApprovedPage\nknowledge_status: ACTIVE\napproval_status: APPROVED\n---\n"
+        "\n# ApprovedPage\nApprovedKnowledgeToken stays out of candidate scope.\n",
+    )
+    index = SearchIndex(vault_root=root)
+    hits = index.search("CandidateOnlyToken", scope="candidate")
+    assert [hit.page_id for hit in hits] == ["wiki/dec-candidate"]
+    assert hits[0].knowledge_status == "CANDIDATE"
+    assert index.search("ApprovedKnowledgeToken", scope="candidate") == ()
+    assert index.search("CandidateOnlyToken") == ()
+
+
+def test_missing_knowledge_fields_index_as_unknown(tmp_path: Path) -> None:
+    """Given YAML without knowledge fields, when indexed, then knowledge_status is UNKNOWN."""
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    commit_page(
+        root,
+        "wiki/bare.md",
+        "---\ntitle: BarePage\nstatus: active\n---\n\n# BarePage\nMissingFieldsToken is here.\n",
+    )
+    index = SearchIndex(vault_root=root)
+    assert index.search("MissingFieldsToken") == ()
+    assert index.search("MissingFieldsToken", scope="candidate") == ()
+    db = root / ".sb" / "search.db"
+    with sqlite3.connect(str(db)) as conn:
+        rows = conn.execute(
+            "SELECT knowledge_status, approval_status FROM docs WHERE page_id=?",
+            ("wiki/bare",),
+        ).fetchall()
+    assert rows
+    assert all(str(knowledge) == "UNKNOWN" for knowledge, _approval in rows)
+    assert all(str(approval) == "UNKNOWN" for _knowledge, approval in rows)

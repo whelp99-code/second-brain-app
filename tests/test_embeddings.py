@@ -33,6 +33,7 @@ from sb.hybrid_search import hybrid_search, query_cosine, rrf_merge
 from sb.search import SearchHit, SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
+from tests.knowledge import stamp_knowledge
 
 _FAKE_IDENTITY: Final = ModelIdentity(DEFAULT_MODEL_ID, "fake-rev", VECTOR_DIM)
 _FAKE_NAMES: Final = ("FakeEncoder", "fake_vector", "_FAKE_IDENTITY")
@@ -91,6 +92,7 @@ def _seed(tmp_path: Path) -> Path:
         _page(digest, "wiki/zeta", "# Other\nUnrelatedZucchiniToken sits here.\n"),
     )
     _ = vault.write_pages(pages, "run-embed", _HashLedger())
+    stamp_knowledge(root)
     return root
 
 

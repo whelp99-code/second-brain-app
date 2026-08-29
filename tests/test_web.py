@@ -24,6 +24,7 @@ from sb.pipeline import RunOutcome
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 from sb.web import MAX_BODY_BYTES, SecondBrainHTTPServer, build_server
+from tests.knowledge import stamp_knowledge
 
 TERM = "웹콘솔계약검색"
 
@@ -63,6 +64,7 @@ def _ready(tmp_path: Path) -> tuple[Config, Path]:
         _NoPreviousHash(),
     )
     assert result.commit is not None
+    stamp_knowledge(root)
     config = Config(
         raw={
             "vault_root": str(root),

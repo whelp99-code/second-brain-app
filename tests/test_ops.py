@@ -28,6 +28,7 @@ from sb.store import DerivStatus
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger, ledger_schema_version
 from sb.vault import init_vault
+from tests.knowledge import stamp_knowledge
 
 _TERM = "백업복원검증키워드"
 
@@ -58,6 +59,7 @@ def _seed_vault(tmp_path: Path) -> tuple[Path, Config]:
         compiled_by=("prompt-ops", "fake-model"),
     )
     assert result.commit is not None
+    stamp_knowledge(root)
     with Ledger(root):
         pass
     config = Config(

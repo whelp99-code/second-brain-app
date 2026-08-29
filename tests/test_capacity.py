@@ -10,6 +10,7 @@ from sb.ops import create_backup, restore_backup
 from sb.search import SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
+from tests.knowledge import stamp_knowledge
 
 PAGE_COUNT = 1000
 TERM = "용량검증공통키워드"
@@ -38,6 +39,7 @@ def test_one_thousand_committed_pages_search_backup_and_restore(tmp_path: Path) 
     ]
 
     written = vault.write_pages(pages, "capacity-1000", _NoPreviousHash())
+    stamp_knowledge(root)
 
     assert written.commit is not None
     assert written.pages == PAGE_COUNT

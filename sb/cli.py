@@ -92,6 +92,11 @@ def _parser() -> argparse.ArgumentParser:
     _ = search_cmd.add_argument("--status")
     _ = search_cmd.add_argument("--updated-from")
     _ = search_cmd.add_argument("--updated-to")
+    _ = search_cmd.add_argument(
+        "--scope",
+        choices=("active", "candidate"),
+        default="active",
+    )
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
@@ -236,6 +241,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             status=_opt_str(ns, "status"),
             updated_from=_opt_str(ns, "updated_from"),
             updated_to=_opt_str(ns, "updated_to"),
+            scope=_opt_str(ns, "scope") or "active",
         )
         if _opt_flag(ns, "json"):
             print(json.dumps([hit.as_dict() for hit in hits], ensure_ascii=False, indent=2))

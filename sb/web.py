@@ -295,6 +295,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     status=_query_optional(values, "status"),
                     updated_from=_query_optional(values, "updated_from"),
                     updated_to=_query_optional(values, "updated_to"),
+                    scope=_query_optional(values, "scope"),
                 )
                 self._json(HTTPStatus.OK, {"results": [hit.as_dict() for hit in hits]})
                 return

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, TypedDict, override
+from typing import Final, Literal, TypedDict, override
 
 import anyio
 from mcp.server.mcpserver import MCPServer
@@ -177,14 +177,21 @@ def build_server(
     server = MCPServer("second-brain")
 
     @server.tool(name="sb_search")
-    def sb_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
+    def sb_search(
+        query: str,
+        limit: int = 10,
+        scope: Literal["active", "candidate"] = "active",
+    ) -> dict[str, list[SearchHitDict]]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
-        Use this to answer questions about what the user has recorded before.
+        Default `scope` is `active`: only pages with structured
+        `knowledge_status=ACTIVE` and `approval_status=APPROVED`. Pass
+        `scope="candidate"` to list CANDIDATE knowledge. Missing structured
+        fields index as UNKNOWN and are excluded from both listings.
         Returns ranked sections with a snippet and the `page_id` to pass to
         `sb_read_page`.
         """
-        hits = SearchIndex(vault_root=root).search(query, limit)
+        hits = SearchIndex(vault_root=root).search(query, limit, scope=scope)
         return {"results": [hit.as_dict() for hit in hits]}
 
     @server.tool(name="sb_read_page")

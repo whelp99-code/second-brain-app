@@ -19,6 +19,7 @@ from sb.mcp import K5_TOOLS, RememberRejected, build_server, write_inbox
 from sb.pipeline import RunOutcome
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
+from tests.knowledge import stamp_knowledge
 
 EN_TERM = "AlphaEngineer"
 KO_TERM = "박정민프로필"
@@ -33,6 +34,11 @@ class _HitOut(BaseModel):
     score: float
     kind: str
     index_status: str
+    knowledge_status: str
+    approval_status: str
+    canonical: str
+    source_ref: str
+    updated_at: str
 
 
 class _SearchOut(BaseModel):
@@ -127,6 +133,7 @@ def _seed(tmp_path: Path) -> Path:
         ),
     )
     _ = vault.write_pages(pages, "run-mcp", _HashLedger())
+    stamp_knowledge(root)
     return root
 
 
@@ -369,3 +376,19 @@ def test_mcp_remember_does_not_write_outside_inbox(tmp_path: Path) -> None:
     assert ".." not in rel.parts
     assert (root / rel).resolve().is_relative_to((root / "inbox").resolve())
     assert sorted(p.name for p in (root / "wiki").iterdir()) == wiki_before
+
+
+def test_mcp_sb_search_schema_includes_scope(tmp_path: Path) -> None:
+    """Given the MCP server, when listing tools, then sb_search advertises scope."""
+    root = _seed(tmp_path)
+    server = build_server(root)
+
+    async def _go() -> object:
+        async with Client(server, mode="legacy", cache=None) as client:
+            listed = await client.list_tools()
+            return next(tool for tool in listed.tools if tool.name == "sb_search")
+
+    tool = anyio.run(_go)
+    dumped = tool.model_dump() if hasattr(tool, "model_dump") else tool.__dict__
+    blob = str(dumped).lower()
+    assert "scope" in blob

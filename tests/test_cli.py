@@ -36,6 +36,7 @@ from sb.store import DerivationOutput, Run, SourceItem
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, load_ledger_tables
 from sb.vault import Vault, init_vault
+from tests.knowledge import stamp_knowledge
 
 TODAY = date(2026, 8, 26)
 RUNS_RE = re.compile(
@@ -1311,6 +1312,7 @@ def _seed_page(root: Path, page_id: str, title: str, body: str) -> None:
     cite = SourceCite(sid=sid, origin="me-wiki:notes/x.md", hash=digest)
     spec = PageSpec(page_id, title, f"# {title}\n{body}[^{sid}]\n", [cite], "active")
     _ = Vault(root=root).write_pages((spec,), "run-cli-search", _NoCompiledHash())
+    stamp_knowledge(root)
 
 
 def test_remember_writes_inbox_note(tmp_path: Path) -> None:

@@ -15,6 +15,7 @@ from sb.contracts import PageSpec, SourceCite
 from sb.search import SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import Vault, init_vault
+from tests.knowledge import stamp_knowledge
 
 TERM = "공통검색키워드"
 NEW_TERM = "증분추가키워드"
@@ -75,6 +76,7 @@ def _seed(tmp_path: Path) -> Path:
     ]
     result = vault.write_pages(pages, "seed-search", _NoPreviousHash())
     assert result.commit is not None
+    stamp_knowledge(root)
     return root
 
 
@@ -112,6 +114,7 @@ def test_same_head_reuses_index_and_new_commit_updates_without_full_rebuild(
         _NoPreviousHash(),
     )
     assert result.commit is not None
+    stamp_knowledge(root)
     hits = index.search(NEW_TERM)
     assert any(hit.page_id == "wiki/새-지식" for hit in hits)
     assert _meta(root, "git_head") != first_head
