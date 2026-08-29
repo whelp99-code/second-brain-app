@@ -19,6 +19,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
 _INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
 _INDEX_SCHEMA_VERSION: Final = "2"
+_REQUIRED_DOCS_COLUMNS: Final = ("page_id", "section", "text", "kind", "updated", "status")
 
 
 class SearchHitDict(TypedDict):
@@ -26,6 +27,8 @@ class SearchHitDict(TypedDict):
     section: str
     snippet: str
     score: float
+    kind: str
+    index_status: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +37,8 @@ class SearchHit:
     section: str
     snippet: str
     score: float
+    kind: str = ""
+    index_status: str = ""
 
     def as_dict(self) -> SearchHitDict:
         return {
@@ -41,6 +46,8 @@ class SearchHit:
             "section": self.section,
             "snippet": self.snippet,
             "score": self.score,
+            "kind": self.kind,
+            "index_status": self.index_status,
         }
 
 
@@ -176,12 +183,18 @@ def _set_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
     )
 
 
+def _docs_columns(conn: sqlite3.Connection) -> tuple[str, ...]:
+    return tuple(str(row[1]) for row in conn.execute("PRAGMA table_info(docs)"))
+
+
 def _ensure_schema(conn: sqlite3.Connection) -> bool:
     """Return True when an old or absent index required a clean rebuild."""
     _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS search_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
     )
-    reset = _meta(conn, "schema_version") != _INDEX_SCHEMA_VERSION
+    version_mismatch = _meta(conn, "schema_version") != _INDEX_SCHEMA_VERSION
+    schema_wrong = _docs_columns(conn) != _REQUIRED_DOCS_COLUMNS
+    reset = version_mismatch or schema_wrong
     if reset:
         _ = conn.execute("DROP TABLE IF EXISTS docs")
         _ = conn.execute("DELETE FROM search_meta")
@@ -311,22 +324,29 @@ def _lexical(
         params.append(updated_to)
     params.append(int(limit))
     sql = (
-        "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs) "
-        + "FROM docs WHERE "
+        "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs), "
+        + "kind, status FROM docs WHERE "
         + " AND ".join(where)
         + " ORDER BY bm25(docs), page_id, section LIMIT ?"
     )
     try:
         with _connect(db_path) as conn:
             rows = cast(
-                list[tuple[object, object, object, object]],
+                list[tuple[object, object, object, object, object, object]],
                 conn.execute(sql, tuple(params)).fetchall(),
             )
     except sqlite3.DatabaseError:
         return ()
     return tuple(
-        SearchHit(str(page_id), str(section), str(snippet), -_score(score))
-        for page_id, section, snippet, score in rows
+        SearchHit(
+            str(page_id),
+            str(section),
+            str(snippet),
+            -_score(score),
+            str(kind),
+            str(index_status),
+        )
+        for page_id, section, snippet, score, kind, index_status in rows
     )
 
 
@@ -386,6 +406,8 @@ def _sections(text: str) -> tuple[tuple[str, str], ...]:
             chunk = "\n".join(buf).strip()
             if chunk:
                 parts.append((name, chunk))
+            elif name:
+                parts.append((name, name))
             name = line.lstrip("#").strip()
             buf = []
             continue
@@ -393,6 +415,11 @@ def _sections(text: str) -> tuple[tuple[str, str], ...]:
     chunk = "\n".join(buf).strip()
     if chunk:
         parts.append((name, chunk))
+    elif name:
+        parts.append((name, name))
+    title = _frontmatter_value(text, "title")
+    if title and all(title != section and title != body_text for section, body_text in parts):
+        parts.insert(0, ("title", title))
     return tuple(parts)
 
 

@@ -31,6 +31,8 @@ class _HitOut(BaseModel):
     section: str
     snippet: str
     score: float
+    kind: str
+    index_status: str
 
 
 class _SearchOut(BaseModel):

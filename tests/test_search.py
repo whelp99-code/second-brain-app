@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 import sys
 import types
 from pathlib import Path
@@ -94,18 +95,32 @@ def test_search_returns_daily_page_when_brief_term_matches(tmp_path: Path) -> No
 
 
 def test_search_hit_fields_are_page_id_section_snippet_score(tmp_path: Path) -> None:
-    """Given a matching query, when searching, then each hit has the K5 fields."""
+    """Given a matching query, when searching, then each hit has K5 plus index metadata."""
     index = SearchIndex(vault_root=_seed(tmp_path))
 
     hits = index.search(EN_TERM)
 
     assert hits
     for hit in hits:
-        assert set(hit.as_dict()) == {"page_id", "section", "snippet", "score"}
+        payload = hit.as_dict()
+        assert set(payload) == {
+            "page_id",
+            "section",
+            "snippet",
+            "score",
+            "kind",
+            "index_status",
+        }
+        assert "knowledge_status" not in payload
+        assert "approval_status" not in payload
+        assert "canonical" not in payload
+        assert "source_path" not in payload
         assert isinstance(hit.page_id, str)
         assert isinstance(hit.section, str)
         assert isinstance(hit.snippet, str)
         assert isinstance(hit.score, float)
+        assert hit.kind == "wiki"
+        assert hit.index_status == "active"
 
 
 def test_search_ignores_uncommitted_wiki_when_index_rebuilds(tmp_path: Path) -> None:
@@ -179,3 +194,133 @@ def test_search_empty_query_returns_no_hits(tmp_path: Path) -> None:
     index = SearchIndex(vault_root=_seed(tmp_path))
 
     assert index.search("   ") == ()
+
+
+def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path: Path) -> None:
+    """Given schema_version 2 and old 3-col FTS, when searching, then docs rebuilds and hits return."""
+    root = _seed(tmp_path)
+    index = SearchIndex(vault_root=root)
+    expected = index.search(EN_TERM)
+    assert expected
+
+    db = root / ".sb" / "search.db"
+    with sqlite3.connect(str(db)) as conn:
+        conn.execute("DROP TABLE IF EXISTS docs")
+        conn.execute(
+            "CREATE VIRTUAL TABLE docs USING fts5(page_id, section, text, tokenize='trigram')"
+        )
+        conn.execute(
+            "INSERT INTO search_meta(key,value) VALUES('schema_version','2') "
+            + "ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+        )
+        conn.commit()
+        cols_before = [row[1] for row in conn.execute("PRAGMA table_info(docs)")]
+    assert cols_before == ["page_id", "section", "text"]
+
+    hits = index.search(EN_TERM)
+
+    assert [hit.page_id for hit in hits] == [hit.page_id for hit in expected]
+    with sqlite3.connect(str(db)) as conn:
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(docs)")]
+        version = conn.execute(
+            "SELECT value FROM search_meta WHERE key='schema_version'"
+        ).fetchone()
+    assert cols == ["page_id", "section", "text", "kind", "updated", "status"]
+    assert version is not None and str(version[0]) == "2"
+
+
+def test_search_matches_yaml_title_and_empty_bodied_h1(tmp_path: Path) -> None:
+    """Given YAML title and empty H1, when querying that phrase, then the page is hit."""
+    root = tmp_path / "vault"
+    vault = init_vault(root)
+    digest = _put(root, b"title-h1-seed")
+    pages = (
+        _page(
+            digest,
+            "wiki/titled",
+            "Hello World",
+            "# Hello World\n\n## Body\nunrelated placeholder text.\n",
+        ),
+    )
+    _ = vault.write_pages(pages, "run-title-h1", _HashLedger(root))
+    index = SearchIndex(vault_root=root)
+
+    hits = index.search("Hello World")
+
+    assert any(hit.page_id == "wiki/titled" for hit in hits)
+
+def _one_page(tmp_path: Path, page_id: str, title: str, body: str, digest: bytes) -> Path:
+    root = tmp_path / "vault"
+    vault = init_vault(root)
+    pages = (_page(_put(root, digest), page_id, title, body),)
+    _ = vault.write_pages(pages, "run-title-index", _HashLedger(root))
+    return root
+
+
+def test_search_matches_yaml_title_without_h1(tmp_path: Path) -> None:
+    """Given YAML title only (no H1), when querying that title, then the page is hit."""
+    root = _one_page(
+        tmp_path,
+        "wiki/yaml-only",
+        "YamlOnlyTitleToken",
+        "unrelated placeholder body without the title phrase.\n",
+        b"yaml-title-only",
+    )
+    index = SearchIndex(vault_root=root)
+
+    hits = index.search("YamlOnlyTitleToken")
+
+    assert any(hit.page_id == "wiki/yaml-only" for hit in hits)
+
+
+def test_search_yaml_title_equal_h1_does_not_duplicate_hits(tmp_path: Path) -> None:
+    """Given YAML title equal to H1, when querying that phrase, then one row/hit returns."""
+    root = _one_page(
+        tmp_path,
+        "wiki/same-title",
+        "Hello World",
+        "# Hello World\n\nunique body token stays here.\n",
+        b"title-eq-h1",
+    )
+    index = SearchIndex(vault_root=root)
+
+    hits = index.search("Hello World")
+    page_hits = [hit for hit in hits if hit.page_id == "wiki/same-title"]
+
+    assert len(page_hits) == 1
+    db = root / ".sb" / "search.db"
+    with sqlite3.connect(str(db)) as conn:
+        match = '"Hello World"'
+        count = conn.execute(
+            "SELECT count(*) FROM docs WHERE page_id=? AND docs MATCH ?",
+            ("wiki/same-title", match),
+        ).fetchone()
+        rows = conn.execute(
+            "SELECT section, text FROM docs WHERE page_id=?",
+            ("wiki/same-title",),
+        ).fetchall()
+    assert count is not None and int(count[0]) == 1
+    title_rows = [row for row in rows if str(row[0]) == "title"]
+    assert title_rows == []
+
+
+def test_search_empty_h1_does_not_insert_blank_text_row(tmp_path: Path) -> None:
+    """Given an empty-bodied H1 and no other prose, when indexing, then text is never blank."""
+    root = _one_page(
+        tmp_path,
+        "wiki/empty-h1",
+        "EmptyH1YamlTitle",
+        "# EmptyOnlyHeading\n",
+        b"empty-h1-only",
+    )
+    index = SearchIndex(vault_root=root)
+    _ = index.search("EmptyH1YamlTitle")
+
+    db = root / ".sb" / "search.db"
+    with sqlite3.connect(str(db)) as conn:
+        rows = conn.execute(
+            "SELECT section, text FROM docs WHERE page_id=?",
+            ("wiki/empty-h1",),
+        ).fetchall()
+    assert rows
+    assert all(str(text).strip() != "" for _section, text in rows)
