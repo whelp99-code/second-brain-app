@@ -1,4 +1,5 @@
 """Derivation-gated cited page compiler. No vault I/O, no normalize import."""
+# pyright: reportUnusedCallResult=none
 
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from importlib.resources import files
 from typing import Final, Protocol
 
 from sb.config import Config
-from sb.contracts import PageSpec, SourceCite, Unit
+from sb.contracts import PageSpec, SourceCite, TerminalWorkSummaryV1, Unit
 from sb.llm import LLMClient, LLMUnavailable
 from sb.security import protect_units
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
@@ -295,3 +296,28 @@ def _capped_marker() -> PageSpec:
         sources=[],
         status=CAPPED_STATUS,
     )
+
+def compile_terminal_work_summary(summary: TerminalWorkSummaryV1) -> PageSpec:
+    """Compile a verified terminal summary without filesystem or LLM access."""
+    if summary.schema != "terminal-work-summary-v1":
+        raise ValueError(f"unsupported summary schema: {summary.schema}")
+    body = summary.render_markdown()
+    cites: list[SourceCite] = []
+    for ref in summary.source_refs:
+        if ref.startswith("sha256:") and len(ref) == 71:
+            digest = ref[7:]
+            try:
+                int(digest, 16)
+            except ValueError:
+                continue
+            cites.append(SourceCite(digest[:8], f"jarvis:evidence/{digest}", digest))
+    return PageSpec(
+        page_id=f"terminal-work/{summary.memory_candidate_id}",
+        title=f"Terminal work {summary.project_id}",
+        body_md=body,
+        sources=cites,
+        status="active",
+    )
+
+
+compile_terminal_summary = compile_terminal_work_summary

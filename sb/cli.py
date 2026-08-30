@@ -27,13 +27,12 @@ from sb.ops import (
     retry_failed,
     status_snapshot,
 )
-from sb.ops import (
-    doctor as run_doctor,
-)
+from sb.ops import doctor as run_doctor
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
 from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import RunCommitNotFoundError, Vault, VaultLintError, init_vault
+from sb.write_requests import RequestInbox, WriteRequestError
 
 
 class Command(StrEnum):
@@ -58,6 +57,7 @@ class Command(StrEnum):
     RETENTION = "retention"
     GC = "gc"
     METRICS = "metrics"
+    RECONCILE = "reconcile"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -99,6 +99,9 @@ def _parser() -> argparse.ArgumentParser:
     _ = retry.add_argument("--stage", choices=("compile", "conflict", "brief"))
     _ = retry.add_argument("--limit", type=int)
     backup = sub.add_parser(Command.BACKUP.value)
+    reconcile = sub.add_parser(Command.RECONCILE.value)
+    _ = reconcile.add_argument("--limit", type=int)
+    _ = reconcile.add_argument("--json", action="store_true")
     _ = backup.add_argument("destination", nargs="?")
     restore = sub.add_parser(Command.RESTORE.value)
     _ = restore.add_argument("archive")
@@ -270,6 +273,21 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         print(f"requeued={changed}")
         return 0
 
+    def reconcile() -> int:
+        inbox = RequestInbox(root)
+        rows = inbox.list(status="accepted", limit=_opt_int(ns, "limit") or 100)
+        results: list[dict[str, object]] = []
+        for row in rows:
+            try:
+                results.append(inbox.process(row.request_id).as_dict())
+            except WriteRequestError as exc:
+                results.append({"request_id": row.request_id, "status": "error", "code": exc.code})
+        if _opt_flag(ns, "json"):
+            print(json.dumps(results, ensure_ascii=False, indent=2))
+        else:
+            print(f"processed={len(results)}")
+        return 0 if not any(item.get("status") == "error" for item in results) else 1
+
     def backup() -> int:
         destination = _opt_str(ns, "destination")
         if destination is None:
@@ -418,6 +436,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.COMPILE: compile_cmd,
         Command.BRIEF: brief,
         Command.RUN: run,
+        Command.RECONCILE: reconcile,
         Command.STATUS: status,
         Command.ROLLBACK: rollback,
         Command.DOCTOR: doctor,

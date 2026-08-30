@@ -30,6 +30,7 @@ from sb.uploads import (
     supported_suffixes,
 )
 from sb.vault import GitCommandError, PathEscapeError, Vault, VaultLintError
+from sb.write_requests import provider_status
 
 MAX_BODY_BYTES: Final = 1024 * 1024
 DEFAULT_HOST: Final = "127.0.0.1"
@@ -278,7 +279,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                             "latest_briefing": True,
                             "supported_suffixes": list(supported_suffixes()),
                             "max_upload_bytes": MAX_UPLOAD_BYTES,
-                        }
+                        },
+                        "provider": provider_status(context.root),
                     },
                 )
                 return

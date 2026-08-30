@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, TypedDict, override
@@ -13,10 +15,33 @@ from mcp.server.mcpserver.exceptions import ToolError
 from sb.config import Config, load_config
 from sb.inbox import RememberRejected, write_inbox
 from sb.pipeline import RunOutcome, run_all
-from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
+from sb.search import SearchIndex, committed_text, git_run
 from sb.vault import PathEscapeError
+from sb.write_requests import (
+    MCP_CONTRACT,
+    MCP_PROVIDER_TOOL_NAMES,
+    MCP_TOOL_NAMES,
+    ErrorResponse,
+    HealthResponse,
+    NoDataResponse,
+    RequestInbox,
+    WriteRequestError,
+    WriteRequestV1,
+)
 
-__all__ = ("RememberRejected", "write_inbox")
+__all__ = (
+    "K5_TOOLS",
+    "MCP_CONTRACT",
+    "MCP_PROVIDER_TOOL_NAMES",
+    "MCP_TOOL_NAMES",
+    "PageNotFoundError",
+    "RememberRejected",
+    "build_server",
+    "open_conflicts",
+    "read_page",
+    "recent_changes",
+    "write_inbox",
+)
 
 K5_TOOLS: Final = (
     "sb_open_conflicts",
@@ -170,14 +195,21 @@ def open_conflicts(root: Path) -> tuple[ConflictRow, ...]:
 
 
 def build_server(
-    vault_root: Path | str | None = None, *, config: Config | None = None
+    vault_root: Path | str | None = None,
+    *,
+    config: Config | None = None,
+    provider: bool = False,
 ) -> MCPServer:
-    """Build the stdio MCP server bound to `vault_root` or config.vault_root."""
+    """Build the stdio MCP server bound to ``vault_root`` or config.vault_root.
+
+    The default profile is the frozen six-tool compatibility contract. The
+    opt-in provider profile adds approval-bound write reconciliation tools.
+    """
     runtime_config, root = _runtime_config(vault_root, config)
     server = MCPServer("second-brain")
 
     @server.tool(name="sb_search")
-    def sb_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
+    def sb_search(query: str, limit: int = 10) -> dict[str, object]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
         Use this to answer questions about what the user has recorded before.
@@ -185,6 +217,8 @@ def build_server(
         `sb_read_page`.
         """
         hits = SearchIndex(vault_root=root).search(query, limit)
+        if provider and not hits:
+            return dict(NoDataResponse("no_matching_pages").as_dict())
         return {"results": [hit.as_dict() for hit in hits]}
 
     @server.tool(name="sb_read_page")
@@ -244,13 +278,106 @@ def build_server(
         """
         return _run_outcome(run_all(runtime_config, runtime_config.configured_source_ids))
 
+    if provider:
+        _register_provider_tools(server, root)
     _ = (sb_search, sb_read_page, sb_recent_changes, sb_open_conflicts, sb_remember, sb_run)
     return server
+def _register_provider_tools(server: MCPServer, root: Path) -> None:
+    inbox = RequestInbox(root)
+
+    @server.tool(name="sb_provider_health")
+    def sb_provider_health() -> dict[str, object]:
+        """Return the provider contract and capability health."""
+        return HealthResponse(
+            "ok",
+            "second-brain-provider-v1",
+            "1",
+            (
+                "approved_write_requests",
+                "idempotency",
+                "reconciliation",
+                "tombstones",
+                "bounded_export",
+            ),
+        ).as_dict()
+
+    @server.tool(name="sb_write_request")
+    def sb_write_request(request: dict[str, object]) -> dict[str, object]:
+        """Accept and apply one JARVIS-approved, versioned write request."""
+        try:
+            parsed = WriteRequestV1.from_mapping(request)
+            receipt = inbox.submit(parsed)
+            if receipt.status == "accepted":
+                receipt = inbox.process(receipt.request_id)
+            return receipt.as_dict()
+        except (WriteRequestError, ValueError) as exc:
+            if isinstance(exc, WriteRequestError):
+                error = ErrorResponse(exc.code, str(exc), exc.code in {"busy", "temporary"})
+            else:
+                error = ErrorResponse("invalid_request", str(exc))
+            raise ToolError(json.dumps(error.as_dict(), ensure_ascii=False)) from exc
+
+    @server.tool(name="sb_request_status")
+    def sb_request_status(request_id: str) -> dict[str, object]:
+        """Read durable request state and bounded history without replaying."""
+        record = inbox.get(request_id)
+        if record is None:
+            return dict(NoDataResponse("request_not_found").as_dict())
+        return {
+            "kind": "request",
+            **record.as_dict(),
+            "history": list(inbox.history(request_id)),
+        }
+
+    @server.tool(name="sb_reconcile_write")
+    def sb_reconcile_write(request_id: str, observed_digest: str | None = None) -> dict[str, object]:
+        """Reconcile an accepted/applied request after a lost response."""
+        try:
+            return inbox.reconcile(request_id, observed_digest=observed_digest).as_dict()
+        except WriteRequestError as exc:
+            raise ToolError(json.dumps(ErrorResponse(exc.code, str(exc)).as_dict())) from exc
+
+    @server.tool(name="sb_restore_request")
+    def sb_restore_request(request_id: str) -> dict[str, object]:
+        """Restore a forgotten memory only from its retained CAS summary."""
+        try:
+            return inbox.restore(request_id).as_dict()
+        except WriteRequestError as exc:
+            raise ToolError(json.dumps(ErrorResponse(exc.code, str(exc)).as_dict())) from exc
+
+    @server.tool(name="sb_observe_artifact")
+    def sb_observe_artifact(request_id: str, digest: str, page_id: str | None = None) -> dict[str, object]:
+        """Settle a request only after its bounded artifact digest is observed."""
+        try:
+            return inbox.observe_artifact(request_id, digest=digest, page_id=page_id).as_dict()
+        except WriteRequestError as exc:
+            raise ToolError(json.dumps(ErrorResponse(exc.code, str(exc)).as_dict())) from exc
+
+    @server.tool(name="sb_export_history")
+    def sb_export_history(include_forgotten: bool = False, limit: int = 100) -> dict[str, object]:
+        """Export bounded request provenance; never exports raw terminal output."""
+        try:
+            return inbox.export(include_forgotten=include_forgotten, limit=limit)
+        except WriteRequestError as exc:
+            raise ToolError(json.dumps(ErrorResponse(exc.code, str(exc)).as_dict())) from exc
+
+    _ = (
+        sb_provider_health,
+        sb_write_request,
+        sb_request_status,
+        sb_reconcile_write,
+        sb_restore_request,
+        sb_observe_artifact,
+        sb_export_history,
+    )
+
+
 
 
 def main() -> None:
     """Run the Second Brain MCP server on stdio."""
-    anyio.run(build_server().run_stdio_async)
+    provider = os.environ.get("SB_MCP_PROFILE", "compat") == "provider"
+    anyio.run(build_server(provider=provider).run_stdio_async)
 
 
 def _git_rel(page_id: str) -> str:

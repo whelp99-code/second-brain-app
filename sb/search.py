@@ -224,6 +224,8 @@ def _replace_path(
     kind = rel.partition("/")[0]
     updated = _frontmatter_value(text, "updated")
     status = _frontmatter_value(text, "status")
+    if status in {"forgotten", "tombstone"}:
+        return
     rows = [(page_id, section, body, kind, updated, status) for section, body in _sections(text)]
     _ = conn.executemany(
         "INSERT INTO docs(page_id,section,text,kind,updated,status) VALUES(?,?,?,?,?,?)",

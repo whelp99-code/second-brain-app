@@ -25,6 +25,7 @@ from sb.config import Config
 from sb.pipeline import audit_citations
 from sb.store import DerivStatus, assert_ledger_integrity, load_ledger_tables
 from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger, ledger_schema_version, migrate_ledger
+from sb.write_requests import provider_status
 
 BACKUP_FORMAT: Final = "second-brain-backup-v1"
 _MAX_BACKUP_FILES: Final = 100_000
@@ -420,6 +421,7 @@ def status_snapshot(config: Config) -> dict[str, object]:
         "failed_derivations": failed,
         "pages": page_counts,
         "raw": {"files": len(raw_files), "bytes": sum(path.stat().st_size for path in raw_files)},
+        "provider": provider_status(root),
     }
 
 
@@ -479,6 +481,18 @@ def doctor(config: Config) -> tuple[DoctorCheck, ...]:
         command if llm_status == "pass" else f"not found: {command or '<empty>'}",
     )
     scheduler = Path(__file__).resolve().parent.parent / "deploy" / "systemd"
+    provider = provider_status(root)
+    provider_state = provider.get("status")
+    if provider_state == "error":
+        add("provider", "fail", "request inbox unreadable")
+    elif provider.get("available"):
+        add(
+            "provider",
+            "pass",
+            f"contract={provider['contract']} pending={provider['pending']} reconciling={provider['reconciling']}",
+        )
+    else:
+        add("provider", "warn", "request inbox not initialized")
     add("scheduler-assets", "pass" if scheduler.is_dir() else "warn", str(scheduler))
     return tuple(checks)
 

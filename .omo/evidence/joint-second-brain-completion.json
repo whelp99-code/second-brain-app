@@ -1,0 +1,44 @@
+{
+  "schema": "joint-second-brain-completion-v1",
+  "provider_scope": "Second Brain provider side only",
+  "implemented": [
+    "Frozen six-tool MCP compatibility contract with opt-in provider profile and typed health/no-data/error forms",
+    "TerminalWorkSummaryV1 and versioned idempotent write requests for remember/correct/forget/export plus restoration",
+    "SQLite collision-safe request inbox with immutable status history and reconciliation",
+    "Approved write-request MCP tools, bounded artifact observation, bounded provenance export, and CLI reconciliation",
+    "Correction supersession markers, tombstone forgetting, CAS-backed restoration, and forgotten-page search exclusion",
+    "Filesystem-free terminal summary compilation with citations and redaction before durable storage",
+    "Provider capability fields in status/doctor/web capabilities",
+    "systemd reconciliation service and timer",
+    "Existing six-tool compatibility, capture, search, web, and macOS API behavior preserved"
+  ],
+  "files": [
+    "sb/contracts.py",
+    "sb/compile.py",
+    "sb/write_requests.py",
+    "sb/mcp.py",
+    "sb/search.py",
+    "sb/ops.py",
+    "sb/web.py",
+    "sb/cli.py",
+    "deploy/systemd/second-brain-reconcile.service",
+    "deploy/systemd/second-brain-reconcile.timer",
+    "tests/test_write_requests.py",
+    "tests/test_mcp_provider.py"
+  ],
+  "verification": {
+    "focused_provider": "8 passed",
+    "mcp_compatibility_and_provider": "19 passed",
+    "full_pytest": "372 passed, 3 skipped",
+    "ruff": "passed",
+    "basedpyright": "0 errors, 0 warnings, 0 notes",
+    "package_build": "uv build passed; second_brain-1.0.0 wheel and sdist",
+    "desktop_api_regression": "passed; upload, run, Korean search, briefing, duplicate upload, doctor",
+    "runtime_packaging": "service and timer non-empty"
+  },
+  "remaining_blockers": [
+    "Production activation is intentionally separate from this source commit; shipped systemd units remain disabled until an owner-controlled deployment.",
+    "Mac hardware and Tailscale sleep-wake verification remains an environment-level acceptance activity, not a provider-code blocker."
+  ],
+  "production_activation": false
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Second Brain approved write-request reconciliation timer
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+Persistent=true
+Unit=second-brain-reconcile.service
+
+[Install]
+WantedBy=timers.target
