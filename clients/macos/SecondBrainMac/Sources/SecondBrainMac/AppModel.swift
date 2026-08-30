@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var lastSync: Date?
     @Published private(set) var lastRun: RunOutcome?
+    @Published private(set) var lastRunStatus: String?
     @Published private(set) var latestBriefing: BriefingSnapshot?
     @Published private(set) var searchResults: [SearchHit] = []
     @Published private(set) var activity = "준비됨"
@@ -73,6 +74,7 @@ final class AppModel: ObservableObject {
         do {
             let response = try await client().status()
             serverStatus = response.status
+            lastRunStatus = response.lastRunStatus
             isConnected = true
             lastError = nil
         } catch {
@@ -172,6 +174,7 @@ final class AppModel: ObservableObject {
         do {
             let outcome = try await client().runNow()
             lastRun = outcome
+            lastRunStatus = outcome.status
             activity = outcome.alreadyRunning
                 ? "이미 다른 처리가 실행 중입니다."
                 : "처리 완료: \(outcome.status), 페이지 \(outcome.pages)"

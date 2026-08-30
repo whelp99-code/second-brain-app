@@ -28,6 +28,17 @@ final class APIContractTests: XCTestCase {
         XCTAssertFalse(outcome.alreadyRunning)
     }
 
+    func testStatusEnvelopeDecodesAuthoritativeServerRunStatus() throws {
+        let data = Data(
+            #"{"status":"Second Brain is ready","last_run_status":"ok"}"#.utf8
+        )
+
+        let status = try JSONDecoder().decode(StatusEnvelope.self, from: data)
+
+        XCTAssertEqual(status.status, "Second Brain is ready")
+        XCTAssertEqual(status.lastRunStatus, "ok")
+    }
+
     func testMarkdownSummaryProducesNotificationSizedPlainText() {
         let markdown = """
         # 2026-08-28 브리핑

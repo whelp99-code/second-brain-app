@@ -172,7 +172,7 @@ private struct DashboardView: View {
             )
             StatusCard(
                 title: "최근 실행",
-                value: model.lastRun?.status ?? "아직 없음",
+                value: model.lastRunStatus ?? model.lastRun?.status ?? "아직 없음",
                 symbol: "gearshape.2"
             )
         }

@@ -151,6 +151,12 @@ public struct LatestBriefingEnvelope: Codable, Equatable, Sendable {
 
 public struct StatusEnvelope: Codable, Equatable, Sendable {
     public let status: String
+    public let lastRunStatus: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case lastRunStatus = "last_run_status"
+    }
 }
 
 public struct SearchHit: Codable, Equatable, Identifiable, Sendable {

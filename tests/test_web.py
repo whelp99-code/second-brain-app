@@ -21,7 +21,9 @@ from pytest import MonkeyPatch
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
 from sb.pipeline import RunOutcome
+from sb.store import Run
 from sb.store.cas import ContentAddressedStore
+from sb.store.ledger import Ledger
 from sb.vault import init_vault
 from sb.web import MAX_BODY_BYTES, SecondBrainHTTPServer, build_server
 from tests.knowledge import stamp_knowledge
@@ -65,6 +67,16 @@ def _ready(tmp_path: Path) -> tuple[Config, Path]:
     )
     assert result.commit is not None
     stamp_knowledge(root)
+    with Ledger(root) as ledger:
+        ledger.record_run(
+            Run(
+                "web-status-run",
+                "2026-08-28T10:00:00+00:00",
+                "2026-08-28T10:01:00+00:00",
+                None,
+                "ok",
+            )
+        )
     config = Config(
         raw={
             "vault_root": str(root),
@@ -127,6 +139,7 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
         status, current = _request(f"{base}/api/status")
         assert status == 200
         assert isinstance(current, dict) and "status" in current
+        assert cast(dict[str, object], current).get("last_run_status") == "ok"
 
         status, capabilities = _request(f"{base}/api/capabilities")
         assert status == 200
