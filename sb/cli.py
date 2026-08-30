@@ -96,7 +96,7 @@ def _parser() -> argparse.ArgumentParser:
     _ = search_cmd.add_argument("--updated-to")
     _ = search_cmd.add_argument(
         "--scope",
-        choices=("active", "candidate"),
+        choices=("active", "candidate", "reference"),
         default="active",
     )
     remember = sub.add_parser(Command.REMEMBER.value)

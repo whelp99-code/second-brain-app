@@ -180,14 +180,17 @@ def build_server(
     def sb_search(
         query: str,
         limit: int = 10,
-        scope: Literal["active", "candidate"] = "active",
+        scope: Literal["active", "candidate", "reference"] = "active",
     ) -> dict[str, list[SearchHitDict]]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
         Default `scope` is `active`: only pages with Registry
         `knowledge_status=ACTIVE` and `approval_status=APPROVED`. Pass
-        `scope="candidate"` to list CANDIDATE knowledge. Missing Registry
-        `page_id` is UNKNOWN and excluded from both listings.
+        `scope="candidate"` to list CANDIDATE knowledge. Pass
+        `scope="reference"` for indexed pages including UNKNOWN
+        Registry-missing rows (labeled REFERENCE/UNVERIFIED). Missing
+        Registry `page_id` is UNKNOWN and excluded from active and
+        candidate listings.
         Returns ranked sections with a snippet and the `page_id` to pass to
         `sb_read_page`.
         """

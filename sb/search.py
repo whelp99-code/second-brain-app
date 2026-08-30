@@ -41,6 +41,8 @@ _REQUIRED_DOCS_COLUMNS: Final = (
 )
 _ACTIVE_SCOPE: Final = "active"
 _CANDIDATE_SCOPE: Final = "candidate"
+_REFERENCE_SCOPE: Final = "reference"
+_ALL_SCOPE: Final = "all"
 
 
 class SearchHitDict(TypedDict):
@@ -55,6 +57,8 @@ class SearchHitDict(TypedDict):
     canonical: str
     source_ref: str
     updated_at: str
+    role: str
+    verification: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +76,7 @@ class SearchHit:
     updated_at: str = ""
 
     def as_dict(self) -> SearchHitDict:
+        role, verification = _labels(self.knowledge_status, self.approval_status)
         return {
             "page_id": self.page_id,
             "section": self.section,
@@ -84,7 +89,17 @@ class SearchHit:
             "canonical": self.canonical,
             "source_ref": self.source_ref,
             "updated_at": self.updated_at,
+            "role": role,
+            "verification": verification,
         }
+
+    @property
+    def role(self) -> str:
+        return _labels(self.knowledge_status, self.approval_status)[0]
+
+    @property
+    def verification(self) -> str:
+        return _labels(self.knowledge_status, self.approval_status)[1]
 
 
 @runtime_checkable
@@ -453,12 +468,20 @@ def _refresh(db_path: Path, root: Path, registry: KnowledgeRegistry) -> None:
         _set_meta(conn, "registry_fp", fingerprint)
 
 
+def _labels(knowledge_status: str, approval_status: str) -> tuple[str, str]:
+    if knowledge_status == ACTIVE and approval_status == APPROVED:
+        return "CANONICAL", "VERIFIED"
+    return "REFERENCE", "UNVERIFIED"
+
+
 def _normalize_scope(scope: str | None) -> str:
     if scope is None:
         return _ACTIVE_SCOPE
     value = scope.strip().lower()
     if value == _CANDIDATE_SCOPE:
         return _CANDIDATE_SCOPE
+    if value in {_REFERENCE_SCOPE, _ALL_SCOPE}:
+        return _REFERENCE_SCOPE
     return _ACTIVE_SCOPE
 
 
@@ -496,7 +519,7 @@ def _lexical(
     if chosen == _CANDIDATE_SCOPE:
         where.append("knowledge_status=?")
         params.append(CANDIDATE)
-    else:
+    elif chosen != _REFERENCE_SCOPE:
         where.append("knowledge_status=?")
         where.append("approval_status=?")
         params.extend((ACTIVE, APPROVED))

@@ -39,6 +39,8 @@ class _HitOut(BaseModel):
     canonical: str
     source_ref: str
     updated_at: str
+    role: str
+    verification: str
 
 
 class _SearchOut(BaseModel):
@@ -392,3 +394,4 @@ def test_mcp_sb_search_schema_includes_scope(tmp_path: Path) -> None:
     dumped = tool.model_dump() if hasattr(tool, "model_dump") else tool.__dict__
     blob = str(dumped).lower()
     assert "scope" in blob
+    assert "reference" in blob

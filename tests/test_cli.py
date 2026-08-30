@@ -36,7 +36,7 @@ from sb.store import DerivationOutput, Run, SourceItem
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, load_ledger_tables
 from sb.vault import Vault, init_vault
-from tests.knowledge import stamp_knowledge
+from tests.knowledge import commit_page, stamp_knowledge
 
 TODAY = date(2026, 8, 26)
 RUNS_RE = re.compile(
@@ -1366,6 +1366,29 @@ def test_search_json_carries_page_id_for_a_hit(tmp_path: Path) -> None:
     assert code == 0
     hits = cast(list[dict[str, object]], json.loads(out))
     assert [hit["page_id"] for hit in hits] == ["wiki/alpha"]
+
+
+def test_search_scope_reference_json_labels_unverified(tmp_path: Path) -> None:
+    """Given no registry rows, when --scope reference --json, then hits are REFERENCE/UNVERIFIED."""
+    _config, root = _ready(tmp_path)
+    commit_page(
+        root,
+        "wiki/bare.md",
+        "---\ntitle: BarePage\n---\n\n# BarePage\nReferenceScopeToken lives here.\n",
+    )
+    code, out, _err = _cli_with_config(tmp_path, root, ["search", "ReferenceScopeToken", "--json"])
+    assert code == 0
+    assert json.loads(out) == []
+    code, out, _err = _cli_with_config(
+        tmp_path, root, ["search", "ReferenceScopeToken", "--scope", "reference", "--json"]
+    )
+    assert code == 0
+    hits = cast(list[dict[str, object]], json.loads(out))
+    assert hits
+    assert hits[0]["page_id"] == "wiki/bare"
+    assert hits[0]["knowledge_status"] == "UNKNOWN"
+    assert hits[0]["role"] == "REFERENCE"
+    assert hits[0]["verification"] == "UNVERIFIED"
 
 
 def test_compile_dry_run_and_state_report_do_not_write_vault(tmp_path: Path) -> None:

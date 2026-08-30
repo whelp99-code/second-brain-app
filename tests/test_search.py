@@ -117,6 +117,8 @@ def test_search_hit_fields_are_page_id_section_snippet_score(tmp_path: Path) -> 
             "canonical",
             "source_ref",
             "updated_at",
+            "role",
+            "verification",
         }
         assert "source_path" not in payload
         assert isinstance(hit.page_id, str)
@@ -127,6 +129,8 @@ def test_search_hit_fields_are_page_id_section_snippet_score(tmp_path: Path) -> 
         assert hit.index_status == "active"
         assert hit.knowledge_status == "ACTIVE"
         assert hit.approval_status == "APPROVED"
+        assert hit.role == "CANONICAL"
+        assert hit.verification == "VERIFIED"
         assert hit.source_ref == ""
 
 
@@ -359,6 +363,8 @@ _HIT_KEYS = {
     "canonical",
     "source_ref",
     "updated_at",
+    "role",
+    "verification",
 }
 
 
@@ -410,6 +416,8 @@ def test_default_search_returns_active_approved_page(tmp_path: Path) -> None:
     assert hit.canonical == "wiki/approved"
     assert hit.source_ref == "inbox:approved.md"
     assert hit.updated_at == "2026-08-29"
+    assert hit.role == "CANONICAL"
+    assert hit.verification == "VERIFIED"
     assert set(hit.as_dict()) == _HIT_KEYS
 
 
@@ -462,3 +470,30 @@ def test_missing_knowledge_fields_index_as_unknown(tmp_path: Path) -> None:
     assert rows
     assert all(str(knowledge) == "UNKNOWN" for knowledge, _approval in rows)
     assert all(str(approval) == "UNKNOWN" for _knowledge, approval in rows)
+
+
+def test_scope_reference_returns_unknown_pages_labeled_unverified(tmp_path: Path) -> None:
+    """Given no registry rows, when scope=reference, then indexed hits are REFERENCE/UNVERIFIED."""
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    commit_page(
+        root,
+        "wiki/bare.md",
+        "---\ntitle: BarePage\n---\n\n# BarePage\nReferenceScopeToken is here.\n",
+    )
+    index = SearchIndex(vault_root=root)
+    assert index.search("ReferenceScopeToken") == ()
+    hits = index.search("ReferenceScopeToken", scope="reference")
+    assert hits
+    hit = hits[0]
+    payload = hit.as_dict()
+    assert hit.page_id == "wiki/bare"
+    assert hit.knowledge_status == "UNKNOWN"
+    assert payload["knowledge_status"] == "UNKNOWN"
+    assert payload["role"] == "REFERENCE"
+    assert payload["verification"] == "UNVERIFIED"
+    assert hit.role == "REFERENCE"
+    assert hit.verification == "UNVERIFIED"
+    aliased = index.search("ReferenceScopeToken", scope="all")
+    assert [row.page_id for row in aliased] == [hit.page_id]
+    assert aliased[0].as_dict()["verification"] == "UNVERIFIED"
