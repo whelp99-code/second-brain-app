@@ -1,4 +1,4 @@
-"""Temp-vault helper: stamp structured knowledge/approval YAML, then commit."""
+"""Temp-vault helper: register knowledge/approval in the durable registry."""
 
 from __future__ import annotations
 
@@ -6,7 +6,40 @@ import os
 import subprocess
 from pathlib import Path
 
-_INDEX_FOLDERS: tuple[str, ...] = ("wiki", "daily", "conflicts")
+from sb.knowledge_registry import KnowledgeRegistry, KnowledgeState
+from sb.search import committed_paths
+
+_INDEX_PREFIXES: tuple[str, ...] = ("wiki/", "daily/", "conflicts/")
+
+
+def registry_file(root: Path) -> Path:
+    """Per-vault registry used by tests. Outside markdown, next to search.db."""
+    return root / ".sb" / "knowledge-registry.sqlite"
+
+
+def register_page(
+    root: Path,
+    page_id: str,
+    *,
+    knowledge_status: str = "ACTIVE",
+    approval_status: str = "APPROVED",
+    canonical: str = "",
+    decided_by: str = "test",
+    reason: str = "test register",
+    source_hash: str = "",
+) -> KnowledgeState:
+    """Write one registry row. Does not edit vault markdown."""
+    folder = root / ".sb"
+    folder.mkdir(parents=True, exist_ok=True)
+    return KnowledgeRegistry(registry_file(root)).put(
+        page_id,
+        knowledge_status=knowledge_status,
+        approval_status=approval_status,
+        canonical=canonical,
+        decided_by=decided_by,
+        reason=reason,
+        source_hash=source_hash,
+    )
 
 
 def stamp_knowledge(
@@ -15,38 +48,15 @@ def stamp_knowledge(
     knowledge_status: str = "ACTIVE",
     approval_status: str = "APPROVED",
 ) -> None:
-    """Insert structured frontmatter keys into committed pages that lack them.
-
-    Does not parse body prose. Skips wiki/_proposed. Commits only when files change.
-    """
-    changed: list[Path] = []
-    for folder in _INDEX_FOLDERS:
-        base = root / folder
-        if not base.is_dir():
-            continue
-        for path in base.rglob("*.md"):
-            if "_proposed" in path.parts:
-                continue
-            text = path.read_text(encoding="utf-8")
-            if not text.startswith("---"):
-                continue
-            rest = text[3:].lstrip("\n")
-            end = rest.find("\n---")
-            if end < 0:
-                continue
-            block = rest[:end]
-            keys = {line.partition(":")[0].strip() for line in block.splitlines()}
-            if "knowledge_status" in keys:
-                continue
-            stamped = (
-                block.rstrip()
-                + f"\nknowledge_status: {knowledge_status}\napproval_status: {approval_status}\n"
-            )
-            path.write_text("---\n" + stamped + rest[end:], encoding="utf-8")
-            changed.append(path)
-    if not changed:
-        return
-    _git_commit(root, "test: stamp knowledge_status")
+    """Register committed index pages. Does not parse body or write YAML."""
+    for rel in committed_paths(root, _INDEX_PREFIXES):
+        page_id = rel.removesuffix(".md")
+        register_page(
+            root,
+            page_id,
+            knowledge_status=knowledge_status,
+            approval_status=approval_status,
+        )
 
 
 def commit_page(root: Path, rel: str, text: str, message: str = "test: add knowledge page") -> None:

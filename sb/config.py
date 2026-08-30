@@ -126,6 +126,10 @@ def default_vault_root() -> Path:
     return _xdg_data_home() / "second-brain" / "vault"
 
 
+def default_knowledge_registry_path() -> Path:
+    return _xdg_data_home() / "second-brain" / "knowledge-registry.sqlite"
+
+
 DEFAULT_VAULT_ROOT = str(default_vault_root())
 
 
@@ -201,6 +205,11 @@ class Config:
     def vault_root(self) -> str:
         text = _as_str(self.raw.get("vault_root"))
         return self._path(text, default_vault_root())
+
+    @property
+    def knowledge_registry(self) -> str:
+        text = _as_str(self.raw.get("knowledge_registry"))
+        return self._path(text, default_knowledge_registry_path())
 
     @property
     def caps(self) -> dict[str, int]:

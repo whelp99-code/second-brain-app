@@ -15,7 +15,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
-from sb.config import APP_ROOT
+from sb.config import APP_ROOT, default_knowledge_registry_path
+from sb.knowledge_registry import (
+    ACTIVE,
+    APPROVED,
+    CANDIDATE,
+    KnowledgeRegistry,
+)
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
@@ -35,10 +41,6 @@ _REQUIRED_DOCS_COLUMNS: Final = (
 )
 _ACTIVE_SCOPE: Final = "active"
 _CANDIDATE_SCOPE: Final = "candidate"
-_UNKNOWN: Final = "UNKNOWN"
-_ACTIVE: Final = "ACTIVE"
-_APPROVED: Final = "APPROVED"
-_CANDIDATE: Final = "CANDIDATE"
 
 
 class SearchHitDict(TypedDict):
@@ -146,10 +148,31 @@ def committed_paths(root: Path, prefixes: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(found)
 
 
+def resolve_registry_path(vault_root: Path, explicit: Path | None = None) -> Path:
+    """Resolve the durable registry path. Never uses vault markdown as authority."""
+    if explicit is not None:
+        return Path(explicit)
+    env = os.environ.get("SB_KNOWLEDGE_REGISTRY")
+    if env:
+        return Path(os.path.expandvars(env)).expanduser()
+    env_cfg = os.environ.get("SB_CONFIG")
+    if env_cfg:
+        from sb.config import load_config
+
+        cfg = load_config()
+        if "knowledge_registry" in cfg.raw:
+            return Path(cfg.knowledge_registry)
+    local = vault_root / ".sb" / "knowledge-registry.sqlite"
+    if local.is_file():
+        return local
+    return default_knowledge_registry_path()
+
+
 @dataclass(frozen=True, slots=True)
 class SearchIndex:
     vault_root: Path
     hybrid: bool | None = None
+    registry_path: Path | None = None
 
     def search(
         self,
@@ -165,7 +188,8 @@ class SearchIndex:
         """Refresh from Git HEAD only when needed, then BM25-search `query`."""
         root = self.vault_root
         db_path = _db_path(root)
-        _refresh(db_path, root)
+        registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
+        _refresh(db_path, root, registry)
         hits = _lexical(
             db_path,
             query,
@@ -179,6 +203,12 @@ class SearchIndex:
         if not _wants_hybrid(self.hybrid):
             return hits
         return _hybrid_or_lexical(hits, query, limit)
+
+    def project(self) -> None:
+        """Re-read the registry and project status columns onto search.db. No vault write."""
+        root = self.vault_root
+        registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
+        _refresh(_db_path(root), root, registry)
 
 
 def _db_path(root: Path) -> Path:
@@ -259,7 +289,9 @@ def _backup_index(db_path: Path) -> None:
     shutil.copy2(db_path, dest)
 
 
-def _rebuild_atomic(db_path: Path, root: Path, current: str | None) -> None:
+def _rebuild_atomic(
+    db_path: Path, root: Path, current: str | None, registry: KnowledgeRegistry
+) -> None:
     tmp = db_path.with_name(db_path.name + ".tmp")
     if tmp.exists():
         tmp.unlink()
@@ -267,8 +299,9 @@ def _rebuild_atomic(db_path: Path, root: Path, current: str | None) -> None:
         with _connect(tmp) as conn:
             _create_schema(conn)
             if current is not None:
-                _full_rebuild(conn, root)
+                _full_rebuild(conn, root, registry)
                 _set_meta(conn, "git_head", current)
+            _set_meta(conn, "registry_fp", registry.fingerprint())
         tmp.replace(db_path)
     except Exception:
         if tmp.exists():
@@ -290,17 +323,12 @@ def _frontmatter_value(text: str, key: str) -> str:
     return ""
 
 
-def _structured_status(text: str, key: str) -> str:
-    """Read a structured YAML scalar. Empty or absent → UNKNOWN. Never parse body."""
-    value = _frontmatter_value(text, key).strip().upper()
-    return value if value else _UNKNOWN
-
-
 def _replace_path(
     conn: sqlite3.Connection,
     root: Path,
     rel: str,
     committed: set[str],
+    registry: KnowledgeRegistry,
 ) -> None:
     page_id = rel.removesuffix(".md")
     _ = conn.execute("DELETE FROM docs WHERE page_id=?", (page_id,))
@@ -312,9 +340,7 @@ def _replace_path(
     kind = rel.partition("/")[0]
     updated = _frontmatter_value(text, "updated")
     status = _frontmatter_value(text, "status")
-    knowledge_status = _structured_status(text, "knowledge_status")
-    approval_status = _structured_status(text, "approval_status")
-    canonical = _frontmatter_value(text, "canonical")
+    state = registry.get(page_id)
     source_ref = _frontmatter_value(text, "source_ref")
     rows = [
         (
@@ -324,9 +350,9 @@ def _replace_path(
             kind,
             updated,
             status,
-            knowledge_status,
-            approval_status,
-            canonical,
+            state.knowledge_status,
+            state.approval_status,
+            state.canonical,
             source_ref,
         )
         for section, body in _sections(text)
@@ -339,11 +365,21 @@ def _replace_path(
     )
 
 
-def _full_rebuild(conn: sqlite3.Connection, root: Path) -> None:
+def _full_rebuild(conn: sqlite3.Connection, root: Path, registry: KnowledgeRegistry) -> None:
     _ = conn.execute("DELETE FROM docs")
     committed = set(committed_paths(root, _INDEX_PREFIXES))
     for rel in sorted(committed):
-        _replace_path(conn, root, rel, committed)
+        _replace_path(conn, root, rel, committed, registry)
+
+
+def _project_registry(conn: sqlite3.Connection, registry: KnowledgeRegistry) -> None:
+    page_ids = [str(row[0]) for row in conn.execute("SELECT DISTINCT page_id FROM docs")]
+    for page_id in page_ids:
+        state = registry.get(page_id)
+        _ = conn.execute(
+            "UPDATE docs SET knowledge_status=?, approval_status=?, canonical=? WHERE page_id=?",
+            (state.knowledge_status, state.approval_status, state.canonical, page_id),
+        )
 
 
 def _changed_paths(root: Path, previous: str, current: str) -> tuple[str, ...] | None:
@@ -368,40 +404,53 @@ def _changed_paths(root: Path, previous: str, current: str) -> tuple[str, ...] |
     )
 
 
-def _refresh(db_path: Path, root: Path) -> None:
+def _refresh(db_path: Path, root: Path, registry: KnowledgeRegistry) -> None:
     current = _head(root)
+    fingerprint = registry.fingerprint()
     existing = db_path.is_file() and db_path.stat().st_size > 0
     if existing:
         with _connect(db_path) as conn:
             current_schema = _schema_is_current(conn)
             previous = _meta(conn, "git_head")
+            previous_fp = _meta(conn, "registry_fp")
         if not current_schema:
             _backup_index(db_path)
-            _rebuild_atomic(db_path, root, current)
+            _rebuild_atomic(db_path, root, current, registry)
             return
         if current is None:
             with _connect(db_path) as conn:
                 _ = conn.execute("DELETE FROM docs")
                 _ = conn.execute("DELETE FROM search_meta WHERE key='git_head'")
+                _set_meta(conn, "registry_fp", fingerprint)
             return
         if current == previous:
+            if fingerprint == previous_fp:
+                return
+            with _connect(db_path) as conn:
+                _project_registry(conn, registry)
+                _set_meta(conn, "registry_fp", fingerprint)
             return
         changed = None if previous is None else _changed_paths(root, previous, current)
         with _connect(db_path) as conn:
             if changed is None:
-                _full_rebuild(conn, root)
+                _full_rebuild(conn, root, registry)
             else:
                 committed = set(committed_paths(root, _INDEX_PREFIXES))
                 for rel in changed:
-                    _replace_path(conn, root, rel, committed)
+                    _replace_path(conn, root, rel, committed, registry)
+                if fingerprint != previous_fp:
+                    _project_registry(conn, registry)
             _set_meta(conn, "git_head", current)
+            _set_meta(conn, "registry_fp", fingerprint)
         return
     with _connect(db_path) as conn:
         _create_schema(conn)
         if current is None:
+            _set_meta(conn, "registry_fp", fingerprint)
             return
-        _full_rebuild(conn, root)
+        _full_rebuild(conn, root, registry)
         _set_meta(conn, "git_head", current)
+        _set_meta(conn, "registry_fp", fingerprint)
 
 
 def _normalize_scope(scope: str | None) -> str:
@@ -446,11 +495,11 @@ def _lexical(
     chosen = _normalize_scope(scope)
     if chosen == _CANDIDATE_SCOPE:
         where.append("knowledge_status=?")
-        params.append(_CANDIDATE)
+        params.append(CANDIDATE)
     else:
         where.append("knowledge_status=?")
         where.append("approval_status=?")
-        params.extend((_ACTIVE, _APPROVED))
+        params.extend((ACTIVE, APPROVED))
     params.append(int(limit))
     sql = (
         "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs), "

@@ -1366,3 +1366,30 @@ def test_search_json_carries_page_id_for_a_hit(tmp_path: Path) -> None:
     assert code == 0
     hits = cast(list[dict[str, object]], json.loads(out))
     assert [hit["page_id"] for hit in hits] == ["wiki/alpha"]
+
+
+def test_compile_dry_run_and_state_report_do_not_write_vault(tmp_path: Path) -> None:
+    """Given compile --dry-run/--state-report, when invoked, then the vault is untouched."""
+    _config, root = _ready(tmp_path)
+    wiki = root / "wiki" / "flag.md"
+    _ = wiki.write_text("# flag\n", encoding="utf-8")
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    code, out, _err = _cli_with_config(tmp_path, root, ["compile", "--dry-run"])
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["vault_written"] is False
+    assert payload["status_created"] is False
+    assert payload["dry_run"] is True
+    code, out, _err = _cli_with_config(tmp_path, root, ["compile", "--state-report"])
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["vault_written"] is False
+    assert payload["status_created"] is False
+    assert payload["projected"] is True
+    after = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    for path, data in before.items():
+        if path.name == "search.db" or path.name.endswith(".bak"):
+            continue
+        if "knowledge-registry" in path.name:
+            continue
+        assert after.get(path) == data

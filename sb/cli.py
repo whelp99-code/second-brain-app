@@ -69,6 +69,8 @@ def _parser() -> argparse.ArgumentParser:
     _ = ingest.add_argument("--limit", type=int)
     compile_cmd = sub.add_parser(Command.COMPILE.value)
     _ = compile_cmd.add_argument("--llm")
+    _ = compile_cmd.add_argument("--dry-run", action="store_true")
+    _ = compile_cmd.add_argument("--state-report", action="store_true")
     brief = sub.add_parser(Command.BRIEF.value)
     _ = brief.add_argument("--llm")
     _ = sub.add_parser(Command.RUN.value)
@@ -181,6 +183,14 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def compile_cmd() -> int:
+        dry = _opt_flag(ns, "dry_run")
+        report = _opt_flag(ns, "state_report")
+        if dry or report:
+            from sb.compile import compile_state_report
+
+            payload = compile_state_report(config, dry_run=dry, project=report)
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
         outcome = run_compile(config, llm_mode=_opt_str(ns, "llm") or "cli")
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
@@ -234,7 +244,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             if isinstance(raw_kinds, list)
             else None
         )
-        hits = SearchIndex(vault_root=Path(config.vault_root)).search(
+        explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+        hits = SearchIndex(vault_root=Path(config.vault_root), registry_path=explicit).search(
             query,
             _opt_int(ns, "limit") or 10,
             kinds=kinds,

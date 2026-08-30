@@ -14,7 +14,7 @@ from sb.contracts import PageSpec, SourceCite
 from sb.search import SearchHit, SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
-from tests.knowledge import commit_page, stamp_knowledge
+from tests.knowledge import commit_page, register_page, stamp_knowledge
 
 EN_TERM = "AlphaEngineer"
 KO_TERM = "박정민프로필"
@@ -268,6 +268,7 @@ def test_search_matches_yaml_title_and_empty_bodied_h1(tmp_path: Path) -> None:
 
     assert any(hit.page_id == "wiki/titled" for hit in hits)
 
+
 def _one_page(tmp_path: Path, page_id: str, title: str, body: str, digest: bytes) -> Path:
     root = tmp_path / "vault"
     vault = init_vault(root)
@@ -373,9 +374,9 @@ def test_default_search_excludes_unknown_and_candidate(tmp_path: Path) -> None:
     commit_page(
         root,
         "wiki/candidate.md",
-        "---\ntitle: CandidatePage\nknowledge_status: CANDIDATE\napproval_status: UNKNOWN\n---\n"
-        "\n# CandidatePage\nExcludeCandidateToken lives here.\n",
+        "---\ntitle: CandidatePage\n---\n\n# CandidatePage\nExcludeCandidateToken lives here.\n",
     )
+    register_page(root, "wiki/candidate", knowledge_status="CANDIDATE", approval_status="PENDING")
     index = SearchIndex(vault_root=root)
     assert index.search("ExcludeUnknownToken") == ()
     assert index.search("ExcludeCandidateToken") == ()
@@ -388,9 +389,16 @@ def test_default_search_returns_active_approved_page(tmp_path: Path) -> None:
     commit_page(
         root,
         "wiki/approved.md",
-        "---\ntitle: ApprovedPage\nknowledge_status: ACTIVE\napproval_status: APPROVED\n"
-        "canonical: wiki/approved\nsource_ref: inbox:approved.md\nupdated: '2026-08-29'\n---\n"
+        "---\ntitle: ApprovedPage\n"
+        "source_ref: inbox:approved.md\nupdated: '2026-08-29'\n---\n"
         "\n# ApprovedPage\nApprovedKnowledgeToken is confirmed.\n",
+    )
+    register_page(
+        root,
+        "wiki/approved",
+        knowledge_status="ACTIVE",
+        approval_status="APPROVED",
+        canonical="wiki/approved",
     )
     index = SearchIndex(vault_root=root)
     hits = index.search("ApprovedKnowledgeToken")
@@ -412,15 +420,19 @@ def test_scope_candidate_returns_candidate_page_id(tmp_path: Path) -> None:
     commit_page(
         root,
         "wiki/dec-candidate.md",
-        "---\ntitle: DecCandidate\nknowledge_status: CANDIDATE\napproval_status: UNKNOWN\n---\n"
+        "---\ntitle: DecCandidate\n---\n"
         "\n# DecCandidate\nCandidateOnlyToken and 운영 Registry는.\n",
     )
     commit_page(
         root,
         "wiki/approved.md",
-        "---\ntitle: ApprovedPage\nknowledge_status: ACTIVE\napproval_status: APPROVED\n---\n"
+        "---\ntitle: ApprovedPage\n---\n"
         "\n# ApprovedPage\nApprovedKnowledgeToken stays out of candidate scope.\n",
     )
+    register_page(
+        root, "wiki/dec-candidate", knowledge_status="CANDIDATE", approval_status="PENDING"
+    )
+    register_page(root, "wiki/approved", knowledge_status="ACTIVE", approval_status="APPROVED")
     index = SearchIndex(vault_root=root)
     hits = index.search("CandidateOnlyToken", scope="candidate")
     assert [hit.page_id for hit in hits] == ["wiki/dec-candidate"]
@@ -430,7 +442,7 @@ def test_scope_candidate_returns_candidate_page_id(tmp_path: Path) -> None:
 
 
 def test_missing_knowledge_fields_index_as_unknown(tmp_path: Path) -> None:
-    """Given YAML without knowledge fields, when indexed, then knowledge_status is UNKNOWN."""
+    """Given no registry row, when indexed, then knowledge_status is UNKNOWN."""
     root = tmp_path / "vault"
     _ = init_vault(root)
     commit_page(

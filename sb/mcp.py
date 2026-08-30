@@ -184,14 +184,21 @@ def build_server(
     ) -> dict[str, list[SearchHitDict]]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
-        Default `scope` is `active`: only pages with structured
+        Default `scope` is `active`: only pages with Registry
         `knowledge_status=ACTIVE` and `approval_status=APPROVED`. Pass
-        `scope="candidate"` to list CANDIDATE knowledge. Missing structured
-        fields index as UNKNOWN and are excluded from both listings.
+        `scope="candidate"` to list CANDIDATE knowledge. Missing Registry
+        `page_id` is UNKNOWN and excluded from both listings.
         Returns ranked sections with a snippet and the `page_id` to pass to
         `sb_read_page`.
         """
-        hits = SearchIndex(vault_root=root).search(query, limit, scope=scope)
+        explicit = (
+            Path(runtime_config.knowledge_registry)
+            if "knowledge_registry" in runtime_config.raw
+            else None
+        )
+        hits = SearchIndex(vault_root=root, registry_path=explicit).search(
+            query, limit, scope=scope
+        )
         return {"results": [hit.as_dict() for hit in hits]}
 
     @server.tool(name="sb_read_page")
