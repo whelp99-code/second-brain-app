@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from sb.contracts import MemoryWriteResultV1
 from sb.write_requests import WriteRequestRejected, accept_write_request
 
 type JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
@@ -60,6 +63,13 @@ def _seed_prior(root: Path) -> dict[str, str]:
     }
 
 
+def _rederive(request: dict[str, JsonValue]) -> None:
+    base = {key: value for key, value in request.items() if key not in {"request_id", "request_digest"}}
+    request_digest = _digest("request", base)
+    request["request_id"] = "memreq:pos:v1:" + request_digest[7:]
+    request["request_digest"] = request_digest
+
+
 def _request(operation: str = "remember", prior: dict[str, str] | None = None) -> dict[str, JsonValue]:
     purpose = {"remember": "personal_memory", "correct": "personal_memory", "forget": "data_erasure", "export": "data_portability"}[operation]
     retention = {"remember": 3650, "correct": 3650, "forget": 30, "export": 1}[operation]
@@ -107,9 +117,7 @@ def _request(operation: str = "remember", prior: dict[str, str] | None = None) -
         "receipt_digest": _digest("receipt", receipt),
         "payload": payload_value,
     }
-    request_digest = _digest("request", request)
-    request["request_id"] = "memreq:pos:v1:" + request_digest[7:]
-    request["request_digest"] = request_digest
+    _rederive(request)
     return request
 
 
@@ -199,6 +207,99 @@ def test_unsafe_queue_and_symlink_fail_closed(tmp_path: Path) -> None:
     with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_INBOX_UNSAFE"):
         _ = accept_write_request(tmp_path, _request(), NOW)
     assert list(outside.iterdir()) == []
+
+
+def test_receipt_time_is_bound_to_created_at_and_maps_operation_errors(tmp_path: Path) -> None:
+    # Given
+    _queue(tmp_path)
+    request = _request()
+    receipt = request["receipt"]
+    assert isinstance(receipt, dict)
+    receipt["issued_at"] = "2026-08-31T11:59:59.999Z"
+    request["receipt_digest"] = _digest("receipt", receipt)
+    _rederive(request)
+    # When / Then
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_RECEIPT_INVALID"):
+        _ = accept_write_request(tmp_path, request, NOW)
+    receipt["issued_at"] = "2026-08-31T12:00:00.000Z"
+    receipt["operation"] = "invalid"
+    request["receipt_digest"] = _digest("receipt", receipt)
+    _rederive(request)
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_RECEIPT_INVALID"):
+        _ = accept_write_request(tmp_path, request, NOW)
+
+
+@pytest.mark.parametrize("source_id", [
+    "wiki/_proposed/x", "daily/_proposed/x", "conflicts/_proposed/x", "Wiki/example",
+    "wiki//example", "wiki/./example", "wiki/../example", "wiki/example\\x", "wiki/e\u0301",
+    "wiki/example\x01",
+])
+def test_prior_rejects_every_noncanonical_page_id(tmp_path: Path, source_id: str) -> None:
+    # Given
+    _queue(tmp_path)
+    prior = {"source_id": source_id, "source_version": "git:" + "5" * 40, "source_digest": "sha256:" + "6" * 64}
+    request = _request("correct", prior)
+    # When / Then
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_PATH_INVALID"):
+        _ = accept_write_request(tmp_path, request, NOW)
+
+
+def test_replay_rejects_hardlink_and_non_exact_modes(tmp_path: Path) -> None:
+    # Given
+    _queue(tmp_path)
+    result = accept_write_request(tmp_path, _request(), NOW)
+    final = tmp_path / result.inbox_path
+    alias = final.with_suffix(".alias")
+    _ = os.link(final, alias)
+    # When / Then
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_REPLAY_CONFLICT"):
+        _ = accept_write_request(tmp_path, _request(), NOW)
+    alias.unlink()
+    final.chmod(0o640)
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_REPLAY_CONFLICT"):
+        _ = accept_write_request(tmp_path, _request(), NOW)
+
+
+def test_32_concurrent_exact_writers_publish_once(tmp_path: Path) -> None:
+    # Given
+    _queue(tmp_path)
+    request = _request()
+    def accept_once(index: int) -> MemoryWriteResultV1:
+        del index
+        return accept_write_request(tmp_path, request, NOW)
+
+    # When
+    with ThreadPoolExecutor(max_workers=32) as pool:
+        results = list(pool.map(accept_once, range(32)))
+    # Then
+    assert sum(not result.replayed for result in results) == 1
+    assert sum(result.replayed for result in results) == 31
+    assert len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 1
+
+
+def test_crash_after_link_leaves_replayable_final_without_partial_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given
+    _queue(tmp_path)
+    real_fsync = os.fsync
+    calls = 0
+
+    def fail_first_directory_fsync(fd: int) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected directory fsync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_first_directory_fsync)
+    # When / Then
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_IO_FAILED"):
+        _ = accept_write_request(tmp_path, _request(), NOW)
+    monkeypatch.setattr(os, "fsync", real_fsync)
+    replay = accept_write_request(tmp_path, _request(), NOW)
+    assert replay.replayed is True
+    assert not list((tmp_path / "inbox/.requests/pending").glob(".*.tmp"))
 
 
 def test_pending_file_is_canonical_private_and_mode_0600(tmp_path: Path) -> None:

@@ -19,6 +19,8 @@ from sb.contracts import (
     RequestId,
     WriteOperation,
 )
+from sb.page_ids import git_rel
+from sb.vault import PathEscapeError
 
 type JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 MAX_REQUEST_BYTES: Final = 16_384
@@ -118,11 +120,21 @@ def _decision(value: JsonValue) -> Literal["auto_staged", "owner_confirmed"]:
     reject("WRITE_REQUEST_RECEIPT_INVALID")
 
 
-def _receipt(raw: JsonValue, request: dict[str, JsonValue], now: datetime) -> JarvisReceiptV1:
-    value = _record(raw, RECEIPT_KEYS)
-    operation = _operation(value["operation"])
-    issued, expires = _instant(value["issued_at"]), _instant(value["expires_at"])
-    if value["schema_version"] != 1 or value["principal_id"] != "principal:owner" or not issued < expires or not issued <= now < expires:
+def _receipt(
+    raw: JsonValue,
+    request: dict[str, JsonValue],
+    created: datetime,
+    now: datetime,
+) -> JarvisReceiptV1:
+    try:
+        value = _record(raw, RECEIPT_KEYS)
+        operation = _operation(value["operation"])
+        issued, expires = _instant(value["issued_at"]), _instant(value["expires_at"])
+    except WriteRequestRejected as exc:
+        raise WriteRequestRejected("WRITE_REQUEST_RECEIPT_INVALID") from exc
+    if value["schema_version"] != 1 or value["principal_id"] != "principal:owner":
+        reject("WRITE_REQUEST_RECEIPT_INVALID")
+    if not created <= issued < expires or not issued <= now < expires:
         reject("WRITE_REQUEST_RECEIPT_INVALID")
     for key in ("candidate_id", "candidate_digest", "classification_digest", "operation"):
         if value[key] != request[key]:
@@ -137,11 +149,15 @@ def _prior(raw: JsonValue) -> ExpectedPriorV1 | None:
     if raw is None:
         return None
     value = _record(raw, frozenset({"source_id", "source_version", "source_digest"}))
-    source_id = _text(value["source_id"], 512)
-    parts = source_id.split("/")
-    invalid = len(parts) < 2 or parts[0] not in {"wiki", "daily", "conflicts"}
-    invalid = invalid or any(not part or part in {".", ".."} for part in parts)
-    if invalid or "\\" in source_id or source_id.startswith("wiki/_proposed/"):
+    raw_source_id = value["source_id"]
+    if not isinstance(raw_source_id, str):
+        reject("WRITE_REQUEST_PATH_INVALID")
+    try:
+        relative = git_rel(raw_source_id)
+    except PathEscapeError as exc:
+        raise WriteRequestRejected("WRITE_REQUEST_PATH_INVALID") from exc
+    source_id = relative.removesuffix(".md")
+    if not source_id.startswith(("wiki/", "daily/", "conflicts/")):
         reject("WRITE_REQUEST_PATH_INVALID")
     version, source_digest = _text(value["source_version"], 44), _text(value["source_digest"], 71)
     if re.fullmatch(r"git:[0-9a-f]{40}", version) is None or DIGEST.fullmatch(source_digest) is None:
@@ -190,7 +206,7 @@ def parse_request(raw: JsonValue, now: datetime) -> MemoryWriteRequestV1:
     sensitivity = _text(value["sensitivity"], 10)
     if sensitivity not in SENSITIVITIES:
         reject("WRITE_REQUEST_INVALID")
-    receipt = _receipt(value["receipt"], value, now)
+    receipt = _receipt(value["receipt"], value, created, now)
     if value["receipt_digest"] != digest("receipt", value["receipt"]):
         reject("WRITE_REQUEST_RECEIPT_INVALID")
     expected_idempotency = digest("idempotency", {"candidate_id": candidate, "candidate_digest": candidate_digest, "classification_digest": classification, "operation": operation.value})

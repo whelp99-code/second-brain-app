@@ -6,7 +6,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, Protocol
 
 from sb.mcp import K5_TOOLS
 from sb.mcp_write_models import MemoryWriteRequestModel, MemoryWriteResultModel
@@ -61,11 +61,35 @@ def _write_fixture_request() -> JsonObject:
     return request
 
 
+class _Loads(Protocol):
+    def __call__(self, value: str) -> JsonValue: ...
+
+
+def _loads() -> _Loads:
+    loader: _Loads | None = getattr(json, "loads", None)
+    if loader is None:
+        raise RuntimeError(MISMATCH)
+    return loader
+
+
+def _json_object(value: JsonValue) -> JsonObject:
+    if isinstance(value, dict):
+        return value
+    raise RuntimeError(MISMATCH)
+
+
 def _write_arguments() -> JsonObject:
-    schema = MemoryWriteRequestModel.model_json_schema()
-    definitions = schema.pop("$defs")
-    return {"$defs": definitions, "properties": {"request": {"$ref": "#/$defs/MemoryWriteRequestModel"}},
-            "required": ["request"], "title": "sb_write_requestArguments", "type": "object"}
+    encoded = json.dumps(MemoryWriteRequestModel.model_json_schema())
+    schema = _json_object(_loads()(encoded))
+    definitions = _json_object(schema.pop("$defs"))
+    definitions["MemoryWriteRequestModel"] = schema
+    return {
+        "$defs": definitions,
+        "properties": {"request": {"$ref": "#/$defs/MemoryWriteRequestModel"}},
+        "required": ["request"],
+        "title": "sb_write_requestArguments",
+        "type": "object",
+    }
 
 
 def _write_errors() -> list[JsonValue]:

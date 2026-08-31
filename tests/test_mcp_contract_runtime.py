@@ -41,11 +41,9 @@ class _HashLedger:
 
 
 def _mapping(value: JsonValue) -> JsonObject:
-    match value:  # noqa: MATCH_OK - JsonValue union is exhaustively listed below.
-        case dict() as result:
-            return result
-        case None | bool() | int() | float() | str() | list():
-            raise AssertionError("expected JSON object")
+    if isinstance(value, dict):
+        return value
+    raise AssertionError("expected JSON object")
 
 
 def _entry(tool: str) -> JsonObject:
@@ -54,14 +52,11 @@ def _entry(tool: str) -> JsonObject:
 
 def _error(code: str) -> JsonObject:
     errors = build_contract()["errors"]
-    match errors:  # noqa: MATCH_OK - JsonValue union is exhaustively listed below.
-        case list() as rows:
-            for row in rows:
-                candidate = _mapping(row)
-                if candidate["code"] == code:
-                    return candidate
-        case None | bool() | int() | float() | str() | dict():
-            _ = errors
+    if isinstance(errors, list):
+        for row in errors:
+            candidate = _mapping(row)
+            if candidate["code"] == code:
+                return candidate
     raise AssertionError(f"missing error {code}")
 
 

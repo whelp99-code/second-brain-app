@@ -15,6 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from sb.config import load_config
 from sb.inbox import RememberRejected, write_inbox
 from sb.mcp_write_models import MemoryWriteRequestModel, MemoryWriteResultModel
+from sb.page_ids import git_rel
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.vault import PathEscapeError
 from sb.write_request_values import WriteRequestRejected
@@ -77,7 +78,7 @@ class ConflictRow:
 
 def read_page(root: Path, page_id: str) -> PageRead:
     """Read a committed wiki/daily/conflicts page. Rejects path escape."""
-    rel = _git_rel(page_id)
+    rel = git_rel(page_id)
     text = committed_text(root, rel)
     if text is None:
         raise PageNotFoundError(page_id=page_id)
@@ -214,21 +215,6 @@ def build_server(vault_root: Path | str | None = None) -> MCPServer:
 def main() -> None:
     """Run the K5 MCP server on stdio."""
     anyio.run(build_server().run_stdio_async)
-
-
-def _git_rel(page_id: str) -> str:
-    if not page_id or page_id.startswith("/") or "\x00" in page_id:
-        raise PathEscapeError(page_id=page_id)
-    parts = page_id.split("/")
-    if ".." in parts or any(part in {"", "."} for part in parts):
-        raise PathEscapeError(page_id=page_id)
-    if page_id.startswith(("wiki/", "daily/", "conflicts/")):
-        rel = f"{page_id}.md"
-    else:
-        rel = f"wiki/{page_id}.md"
-    if rel.startswith("wiki/_proposed/"):
-        raise PathEscapeError(page_id=page_id)
-    return rel
 
 
 def _split_md(text: str) -> tuple[str, str]:
