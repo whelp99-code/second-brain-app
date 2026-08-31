@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import importlib.util
 import json
 import os
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import asdict
 from enum import StrEnum
 from pathlib import Path
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from sb.config import load_config
 from sb.inbox import RememberRejected, write_inbox
 from sb.pipeline import audit_citations, read_status, run_all, run_brief, run_compile, run_ingest
+from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
-from sb.vault import RunCommitNotFoundError, Vault, VaultLintError, init_vault
+from sb.vault import VaultLintError, init_vault
 
 
 class Command(StrEnum):
@@ -32,6 +37,7 @@ class Command(StrEnum):
     MCP = "mcp"
     SEARCH = "search"
     REMEMBER = "remember"
+    APPLY_REQUESTS = "apply-requests"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -59,6 +65,8 @@ def _parser() -> argparse.ArgumentParser:
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
+    apply_requests = sub.add_parser(Command.APPLY_REQUESTS.value)
+    _ = apply_requests.add_argument("--once", action="store_true")
     return parser
 
 
@@ -136,16 +144,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     def rollback() -> int:
-        run_id = _opt_str(ns, "run_id")
-        if run_id is None:
-            print("rollback requires run_id", file=sys.stderr)
-            return 2
-        try:
-            Vault(root=Path(config.vault_root)).rollback(run_id)
-        except RunCommitNotFoundError as exc:
-            print(str(exc), file=sys.stderr)
-            return 1
-        return 0
+        print("ROLLBACK_REQUIRES_GENERATION_AUTHORITY", file=sys.stderr)
+        return 1
 
     def doctor() -> int:
         if _opt_flag(ns, "rebuild_ledger"):
@@ -188,6 +188,63 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         print(rel.as_posix())
         return 0
 
+    def apply_requests() -> int:
+        if not _opt_flag(ns, "once"):
+            print("apply-requests requires --once", file=sys.stderr)
+            return 2
+        configured_jarvis_keys = config.jarvis_public_keys
+        if (
+            not configured_jarvis_keys
+            or config.provider_signing_key_id is None
+            or config.provider_private_key is None
+        ):
+            print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
+            return 1
+        try:
+            jarvis_keys = {
+                key_id: Ed25519PublicKey.from_public_bytes(
+                    base64.urlsafe_b64decode(encoded + "==")
+                )
+                for key_id, encoded in configured_jarvis_keys.items()
+                if key_id not in config.revoked_jarvis_signing_key_ids
+            }
+            external_keys = {
+                key_id: Ed25519PublicKey.from_public_bytes(
+                    base64.urlsafe_b64decode(encoded + "==")
+                )
+                for key_id, encoded in config.external_erasure_public_keys.items()
+            }
+            provider_key = Ed25519PrivateKey.from_private_bytes(
+                base64.urlsafe_b64decode(config.provider_private_key + "==")
+            )
+        except ValueError:
+            print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
+            return 1
+        if not jarvis_keys:
+            print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
+            return 1
+        executor = RequestExecutor(
+            ExecutorConfig(
+                request_root=Path(config.request_root),
+                state_root=Path(config.state_root),
+                share_root=Path(config.share_root),
+                export_root=Path(config.export_root),
+                backup_root=Path(config.backup_root),
+                provider_instance_id=config.provider_instance_id,
+                provider_release_sha=config.provider_release_sha,
+                provider_signing_key_id=config.provider_signing_key_id,
+                provider_signing_key=provider_key,
+                jarvis_public_keys=jarvis_keys,
+                external_public_keys=external_keys,
+            )
+        )
+        try:
+            result = executor.apply_once()
+        finally:
+            executor.close()
+        print(json.dumps(asdict(result), sort_keys=True, separators=(",", ":")))
+        return 0 if result.state in {"idle", "proved", "reconciling"} else 1
+
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
         Command.INGEST: ingest,
@@ -200,6 +257,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.MCP: _mcp,
         Command.SEARCH: search,
         Command.REMEMBER: remember,
+        Command.APPLY_REQUESTS: apply_requests,
     }
     return handlers[command]()
 

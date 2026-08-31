@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar
 
@@ -15,6 +16,7 @@ from pytest import raises
 
 from sb.contracts import PageSpec, SourceCite
 from sb.mcp import K5_TOOLS, RememberRejected, build_server, write_inbox
+from sb.request_store import RequestIdentity, RequestStore
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 
@@ -203,6 +205,60 @@ def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> N
     assert remembered is not None
     assert remembered.inbox_path.startswith("inbox/")
     assert (root / remembered.inbox_path).is_file()
+
+
+def test_post_forget_reads_status_and_resolve_require_latest_fence(tmp_path: Path) -> None:
+    root = _seed(tmp_path)
+    requests = tmp_path / "requests"
+    store = RequestStore(requests)
+    try:
+        identity = RequestIdentity(
+            schema_version=2,
+            request_id="memeff:req:v2:" + "1" * 64,
+            request_digest="sha256:" + "2" * 64,
+            idempotency_key="memeff:idem:v2:" + "3" * 64,
+            envelope_digest="sha256:" + "4" * 64,
+            lane_id="memdel:req:v1:" + "5" * 64,
+            operation="forget",
+            payload_digest=None,
+            target_manifest_digest=None,
+            scope_digest=None,
+            delegation_id="memdeleg:v1:" + "6" * 64,
+            delegation_digest=None,
+            delegation_nonce=None,
+            tombstone_sequence=1,
+            tombstone_set_root="sha256:" + "7" * 64,
+        )
+        observed = datetime.now(UTC)
+        _ = store.accept(identity, {"accepted": True}, observed)
+        _ = store.apply_tombstones(({
+            "sequence": 1, "tombstone_id": "memtomb:v1:" + "7" * 64, "operation": "forget",
+            "lane_id": identity.lane_id, "target_manifest_digest": "sha256:" + "8" * 64,
+            "scope_digest": "sha256:" + "9" * 64, "authority_receipt_digest": "sha256:" + "a" * 64,
+            "payload_digest": "sha256:" + "b" * 64, "keyed_subject_digest": "hmac-sha256:" + "c" * 64,
+            "effective_at": observed.isoformat(),
+            "previous_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3",
+            "set_root": identity.tombstone_set_root,
+        },), identity.request_id, observed)
+    finally:
+        store.close()
+    server = build_server(root, requests)
+    calls: tuple[tuple[str, dict[str, str | int | None]], ...] = (
+        ("sb_search", {"query": EN_TERM}),
+        ("sb_read_page", {"id": "wiki/alpha"}),
+        ("sb_recent_changes", {"days": 7}),
+        ("sb_open_conflicts", {}),
+        ("sb_generation_status", {}),
+        ("sb_request_status", {"request_id": identity.request_id}),
+        ("sb_resolve_memory_target", {
+            "page_id": "wiki/alpha", "exact_record": EN_TERM,
+            "source_identity_full": "8" * 64,
+        }),
+    )
+    for name, arguments in calls:
+        result = _call(server, name, arguments)
+        assert result.is_error is True
+        assert "TOMBSTONE_FENCE_REQUIRED" in result.model_dump_json()
 
 
 def test_mcp_search_finds_korean_and_english_terms(tmp_path: Path) -> None:

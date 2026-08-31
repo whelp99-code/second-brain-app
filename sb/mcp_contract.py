@@ -8,13 +8,16 @@ import sys
 from pathlib import Path
 from typing import Final, Protocol
 
+from pydantic import TypeAdapter
+
+from sb.effect_write_values import frozen_effect_vectors
 from sb.mcp import K5_TOOLS
-from sb.mcp_write_models import MemoryWriteRequestModel, MemoryWriteResultModel
+from sb.mcp_write_models import MemoryWriteRequest
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
-SCHEMA_VERSION: Final = 2
-IMPLEMENTATION_COMMIT: Final = "fe44e9753dcc120a6a9bb310074fee55e21c289e"
+SCHEMA_VERSION: Final = 3
+IMPLEMENTATION_COMMIT: Final = "30cebe1670c0b65dc9832066a09c2c64f8371b20"
 MISMATCH: Final = "SECOND_BRAIN_CONTRACT_MISMATCH"
 
 
@@ -31,7 +34,7 @@ def _digest(domain: bytes, value: JsonObject) -> str:
     return "sha256:" + hashlib.sha256(domain + canonical_bytes(value).rstrip(b"\n")).hexdigest()
 
 
-def _write_fixture_request() -> JsonObject:
+def write_fixture_request() -> JsonObject:
     candidate = "memcand:pos:v1:" + "1" * 64
     candidate_digest = "sha256:" + "2" * 64
     classification_digest = "sha256:" + "3" * 64
@@ -79,13 +82,15 @@ def _json_object(value: JsonValue) -> JsonObject:
 
 
 def _write_arguments() -> JsonObject:
-    encoded = json.dumps(MemoryWriteRequestModel.model_json_schema())
+    encoded = json.dumps(TypeAdapter(MemoryWriteRequest).json_schema())
     schema = _json_object(_loads()(encoded))
-    definitions = _json_object(schema.pop("$defs"))
-    definitions["MemoryWriteRequestModel"] = schema
     return {
-        "$defs": definitions,
-        "properties": {"request": {"$ref": "#/$defs/MemoryWriteRequestModel"}},
+        "$defs": schema.get("$defs", {}),
+        "additionalProperties": False,
+        "properties": {"request": {
+            "discriminator": {"propertyName": "schema_version"},
+            "oneOf": schema.get("oneOf", []),
+        }},
         "required": ["request"],
         "title": "sb_write_requestArguments",
         "type": "object",
@@ -100,21 +105,65 @@ def _write_errors() -> list[JsonValue]:
         "WRITE_REQUEST_PRIOR_FORBIDDEN", "WRITE_REQUEST_PRIOR_NOT_FOUND",
         "WRITE_REQUEST_PRIOR_MISMATCH", "WRITE_REQUEST_PATH_INVALID",
         "WRITE_REQUEST_REPLAY_CONFLICT", "WRITE_REQUEST_INBOX_UNSAFE", "WRITE_REQUEST_IO_FAILED",
+        "EFFECT_REQUEST_INVALID", "EFFECT_REQUEST_OVERSIZE", "EFFECT_OPERATION_CONFUSION",
+        "EFFECT_IDENTITY_INVALID", "EFFECT_SPEC_DIGEST_INVALID", "EFFECT_IDEMPOTENCY_INVALID",
+        "EFFECT_ENVELOPE_DIGEST_INVALID", "EFFECT_TARGET_INVALID", "EFFECT_TARGET_AMBIGUOUS",
+        "EFFECT_SCOPE_INVALID", "EFFECT_PRIOR_STALE", "EFFECT_PAYLOAD_INVALID",
+        "EFFECT_DELEGATION_INVALID", "EFFECT_DELEGATION_USED", "EFFECT_TOMBSTONE_STALE",
+        "EFFECT_TOMBSTONE_DELTA_INVALID", "TOMBSTONE_DELTA_TOO_LARGE",
+        "EXTERNAL_RECEIPT_INVALID", "MANAGED_ERASURE_SCOPE_INVALID", "EXPORT_SCOPE_AMBIGUOUS",
+        "REAPPROVAL_REQUIRED", "TOMBSTONE_FENCE_REQUIRED", "TOMBSTONE_SET_STALE",
     )
-    return [
-        {"class": "ToolError", "code": code,
-         "raw_error": json.dumps({"schema_version": 1, "kind": "error", "code": code,
-                                  "retryable": False}, sort_keys=True, separators=(",", ":"))}
-        for code in codes
+    legacy_codes = codes[:14]
+    v2_codes = codes[14:]
+    legacy: list[JsonValue] = [
+        {
+            "class": "ToolError",
+            "code": code,
+            "raw_error": json.dumps(
+                {"schema_version": 1, "kind": "error", "code": code, "retryable": False},
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        }
+        for code in legacy_codes
     ]
+    effect: list[JsonValue] = [
+        {
+            "class": "ToolError",
+            "code": code,
+            "raw_error": json.dumps(
+                {
+                    "schema_version": 2,
+                    "kind": "error",
+                    "code": code,
+                    "retryable": False,
+                    "request_id": None,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        }
+        for code in v2_codes
+    ]
+    return [*legacy, *effect]
 
 
 def build_contract() -> JsonObject:
-    """Build the deterministic contract for the reviewed pre-fixture implementation."""
+    """Build the deterministic schema-3/tool-9 compatibility contract."""
+    frozen = frozen_effect_vectors()
+    correction = _json_object(frozen["correction"])
+    vector_request = _json_object(_loads()(json.dumps(correction["request"])))
+    vector_targets = vector_request.get("targets")
+    if not isinstance(vector_targets, list) or not vector_targets:
+        raise TypeError(MISMATCH)
+    vector_target = _json_object(vector_targets[0])
+    envelope_bytes = correction["envelope_bytes"]
     tools: JsonObject = {
         "sb_search": {
             "arguments": _arguments(
-                {"limit": {"default": 10, "type": "integer"}, "query": {"type": "string"}},
+                {"limit": {"default": 10, "type": "integer"}, "query": {"type": "string"},
+                 "read_fence": {"default": None, "type": ["object", "null"]}},
                 ["query"],
             ),
             "dynamic_fields": {"results[].score": {"normalization": "<finite-number>", "pattern": "^-?[0-9]+(?:[.][0-9]+)?(?:e-?[0-9]+)?$"}},
@@ -126,7 +175,8 @@ def build_contract() -> JsonObject:
             "no_data": {"raw_response": {"results": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
         },
         "sb_read_page": {
-            "arguments": _arguments({"id": {"type": "string"}}, ["id"]),
+            "arguments": _arguments({"id": {"type": "string"},
+                                     "read_fence": {"default": None, "type": ["object", "null"]}}, ["id"]),
             "dynamic_fields": {"frontmatter.updated": {"normalization": "<YYYY-MM-DD>", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}},
             "happy": {
                 "arguments": {"id": "wiki/example-alpha"},
@@ -139,7 +189,8 @@ def build_contract() -> JsonObject:
             "no_data": None,
         },
         "sb_recent_changes": {
-            "arguments": _arguments({"days": {"default": 7, "type": "integer"}}, []),
+            "arguments": _arguments({"days": {"default": 7, "type": "integer"},
+                                     "read_fence": {"default": None, "type": ["object", "null"]}}, []),
             "dynamic_fields": {"changes[].date": {"normalization": "<YYYY-MM-DD>", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}},
             "happy": {
                 "arguments": {"days": 7},
@@ -149,7 +200,7 @@ def build_contract() -> JsonObject:
             "no_data": {"raw_response": {"changes": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
         },
         "sb_open_conflicts": {
-            "arguments": _arguments({}, []),
+            "arguments": _arguments({"read_fence": {"default": None, "type": ["object", "null"]}}, []),
             "happy": {
                 "arguments": {},
                 "normalized": {"kind": "data", "value": {"conflict_count": 1}},
@@ -168,10 +219,77 @@ def build_contract() -> JsonObject:
             "no_data": None,
             "repeated_call": {"behavior": "non_idempotent_collision_safe_no_overwrite", "paths_are_distinct": True, "same_input_creates_distinct_files": True},
         },
+        "sb_generation_status": {
+            "arguments": _arguments(
+                {"read_fence": {"default": None, "type": ["object", "null"]}}, []
+            ),
+            "happy": {
+                "arguments": {},
+                "normalized": {"kind": "data", "value": {"feature": "memory_effect_write_v2"}},
+                "raw_response": {
+                    "schema_version": 1,
+                    "provider_instance_id": "provider:fixture",
+                    "provider_release_sha": "<release-sha>",
+                    "generation_id": "<generation-id>",
+                    "generation_manifest_digest": "<sha256>",
+                    "vault_head": "<git-sha>",
+                    "vault_tree": "<git-sha>",
+                    "tombstone_sequence": 0,
+                    "tombstone_set_root": "<sha256>",
+                    "pointer_health": "healthy",
+                    "journal_health": "healthy",
+                    "features": ["memory_effect_write_v2"],
+                },
+            },
+            "no_data": None,
+        },
+        "sb_request_status": {
+            "arguments": _arguments(
+                {
+                    "request_id": {"type": "string"},
+                    "read_fence": {"default": None, "type": ["object", "null"]},
+                },
+                ["request_id"],
+            ),
+            "happy": {
+                "arguments": {"request_id": "memeff:req:v2:" + "1" * 64},
+                "normalized": {"kind": "data", "value": {"state": "not_found"}},
+                "raw_response": {
+                    "schema_version": 1,
+                    "request_id": "<request-id>",
+                    "state": "not_found",
+                },
+            },
+            "no_data": None,
+        },
+        "sb_resolve_memory_target": {
+            "arguments": _arguments(
+                {
+                    "page_id": {"type": "string"},
+                    "exact_record": {"type": "string"},
+                    "source_identity_full": {"type": "string"},
+                    "sensitivity": {"default": "personal", "type": "string"},
+                    "source_owner_class": {"default": "provider_owned", "type": "string"},
+                    "source_owner_id": {"default": "provider", "type": "string"},
+                    "read_fence": {"default": None, "type": ["object", "null"]},
+                },
+                ["page_id", "exact_record", "source_identity_full"],
+            ),
+            "happy": {
+                "arguments": {
+                    "page_id": "wiki/example-alpha",
+                    "exact_record": "ExampleAlpha 예시기록.",
+                    "source_identity_full": "6" * 64,
+                },
+                "normalized": {"kind": "data", "value": {"target": "full"}},
+                "raw_response": vector_target,
+            },
+            "no_data": None,
+        },
         "sb_write_request": {
             "arguments": _write_arguments(),
             "happy": {
-                "arguments": {"request": _write_fixture_request()},
+                "arguments": {"request": write_fixture_request()},
                 "normalized": {"kind": "data", "value": {"state": "pending"}},
                 "raw_response": {
                     "schema_version": 1, "kind": "accepted", "state": "pending",
@@ -183,7 +301,7 @@ def build_contract() -> JsonObject:
                 },
             },
             "no_data": None,
-            "output_schema": MemoryWriteResultModel.model_json_schema(),
+            "output_schema": {"additionalProperties": True, "type": "object"},
             "repeated_call": {"behavior": "idempotent_exact_replay", "same_identity": True,
                               "second_result_replayed": True, "changed_body_conflicts": True},
         },
@@ -203,6 +321,22 @@ def build_contract() -> JsonObject:
         "normalization": {"boundary": "fixture_export_only", "raw_response_and_error_preserved": True, "typed_outcomes": ["data", "no_data", "error"]},
         "schema_version": SCHEMA_VERSION,
         "tools": tools,
+        "vectors": {
+            "correction": {
+                "request": vector_request,
+                "request_digest": str(correction["request_digest"]),
+                "idempotency_key": str(correction["idempotency_key"]),
+                "delegation_digest": str(correction["delegation_digest"]),
+                "envelope_digest": str(correction["envelope_digest"]),
+                "request_file_digest": str(correction["request_file_digest"]),
+                "envelope_bytes": envelope_bytes,
+            },
+            "export": frozen["export"],
+            "forget": frozen["forget"],
+            "delegation_revocation": frozen["delegation_revocation"],
+            "features": ["memory_effect_write_v2", "sealed_generations", "tombstone_high_water"],
+            "tool_count": 9,
+        },
     }
 
 

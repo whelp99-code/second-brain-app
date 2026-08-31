@@ -396,9 +396,9 @@ def test_rollback_missing_id_returns_controlled_cli_error(tmp_path: Path) -> Non
     _config, root = _ready(tmp_path)
     code, out, err = _cli_with_config(tmp_path, root, ["rollback", "missing-run"])
     assert code != 0
-    text = f"{out}{err}".lower()
-    assert "traceback" not in text
-    assert "missing-run" in text
+    text = f"{out}{err}"
+    assert "traceback" not in text.lower()
+    assert text.strip() == "ROLLBACK_REQUIRES_GENERATION_AUTHORITY"
 
 
 def _deriv_count(root: Path) -> int:

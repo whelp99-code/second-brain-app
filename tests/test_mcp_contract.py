@@ -17,10 +17,13 @@ from sb.mcp_contract import JsonObject
 FIXTURE: Final = Path("contracts/second-brain-mcp-v1.json")
 SIDECAR: Final = Path("contracts/second-brain-mcp-v1.json.sha256")
 TOOLS: Final = {
+    "sb_generation_status",
     "sb_open_conflicts",
     "sb_read_page",
     "sb_recent_changes",
     "sb_remember",
+    "sb_request_status",
+    "sb_resolve_memory_target",
     "sb_search",
     "sb_write_request",
 }
@@ -87,7 +90,7 @@ def _contract() -> _Contract:
 def test_contract_has_exact_tools_and_version() -> None:
     """Given the fixture, when parsed, then its version and tool set are exact."""
     contract = _contract()
-    assert contract.schema_version == 2
+    assert contract.schema_version == 3
     assert set(contract.tools) == TOOLS
 
 
@@ -123,6 +126,14 @@ def test_contract_freezes_stable_error_codes_and_classes() -> None:
         "WRITE_REQUEST_PRIOR_FORBIDDEN", "WRITE_REQUEST_PRIOR_NOT_FOUND",
         "WRITE_REQUEST_PRIOR_MISMATCH", "WRITE_REQUEST_PATH_INVALID",
         "WRITE_REQUEST_REPLAY_CONFLICT", "WRITE_REQUEST_INBOX_UNSAFE", "WRITE_REQUEST_IO_FAILED",
+        "EFFECT_REQUEST_INVALID", "EFFECT_REQUEST_OVERSIZE", "EFFECT_OPERATION_CONFUSION",
+        "EFFECT_IDENTITY_INVALID", "EFFECT_SPEC_DIGEST_INVALID", "EFFECT_IDEMPOTENCY_INVALID",
+        "EFFECT_ENVELOPE_DIGEST_INVALID", "EFFECT_TARGET_INVALID", "EFFECT_TARGET_AMBIGUOUS",
+        "EFFECT_SCOPE_INVALID", "EFFECT_PRIOR_STALE", "EFFECT_PAYLOAD_INVALID",
+        "EFFECT_DELEGATION_INVALID", "EFFECT_DELEGATION_USED", "EFFECT_TOMBSTONE_STALE",
+        "EFFECT_TOMBSTONE_DELTA_INVALID", "TOMBSTONE_DELTA_TOO_LARGE",
+        "EXTERNAL_RECEIPT_INVALID", "MANAGED_ERASURE_SCOPE_INVALID", "EXPORT_SCOPE_AMBIGUOUS",
+        "REAPPROVAL_REQUIRED", "TOMBSTONE_FENCE_REQUIRED", "TOMBSTONE_SET_STALE",
     }
     assert all(error.class_ for error in errors)
 

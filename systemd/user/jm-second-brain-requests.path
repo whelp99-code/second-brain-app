@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the stable Second Brain request queue
+
+[Path]
+PathChanged=%h/.local/state/second-brain/requests/pending
+Unit=jm-second-brain-requests.service
+
+[Install]
+WantedBy=default.target

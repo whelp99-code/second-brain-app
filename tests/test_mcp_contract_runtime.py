@@ -152,7 +152,22 @@ def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, 
         "sb_recent_changes": _call(server, "sb_recent_changes", {"days": 7}),
         "sb_open_conflicts": _call(server, "sb_open_conflicts", {}),
         "sb_remember": _call(server, "sb_remember", {"content": "예시기록", "title": "ExampleAlpha"}),
-        "sb_write_request": _call(server, "sb_write_request", _mapping(_mapping(_entry("sb_write_request")["happy"])["arguments"])),
+        "sb_generation_status": _call(server, "sb_generation_status", {}),
+        "sb_request_status": _call(
+            server,
+            "sb_request_status",
+            _mapping(_mapping(_entry("sb_request_status")["happy"])["arguments"]),
+        ),
+        "sb_resolve_memory_target": _call(
+            server,
+            "sb_resolve_memory_target",
+            _mapping(_mapping(_entry("sb_resolve_memory_target")["happy"])["arguments"]),
+        ),
+        "sb_write_request": _call(
+            server,
+            "sb_write_request",
+            _mapping(_mapping(_entry("sb_write_request")["happy"])["arguments"]),
+        ),
     }
     assert tuple(sorted(happy)) == K5_TOOLS
     for tool, envelope in happy.items():

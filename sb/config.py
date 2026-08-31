@@ -20,6 +20,13 @@ DEFAULT_VAULT_ROOT = "/Volumes/DevSpace/second-brain"
 DEFAULT_PROMPT_VERSION = "v1"
 DEFAULT_MODEL_ID = "unknown"
 DEFAULT_UNIFIED_DB_DSN = "postgresql://localhost:5433/unified"
+DEFAULT_REQUEST_ROOT = "/home/jm/.local/state/second-brain/requests"
+DEFAULT_EXPORT_ROOT = "/home/jm/.local/state/second-brain/exports"
+DEFAULT_ACTIVE_VAULT = "/home/jm/.local/share/second-brain/vault"
+DEFAULT_GENERATION_ROOT = "/home/jm/.local/share/second-brain/vault-generations"
+DEFAULT_STATE_ROOT = "/home/jm/.local/state/second-brain"
+DEFAULT_BACKUP_ROOT = "/home/jm/.local/state/second-brain/backups"
+DEFAULT_PROVIDER_INSTANCE_ID = "provider:second-brain:linux"
 
 DEFAULT_CAPS: dict[str, int] = {
     "max_llm_calls_compile": 200,
@@ -83,6 +90,19 @@ def _as_str_list(value: TomlValue | None) -> list[str] | None:
             return None
 
 
+def _as_str_mapping(value: TomlValue | None) -> dict[str, str]:
+    mapping = _as_mapping(value)
+    if mapping is None:
+        return {}
+    result: dict[str, str] = {}
+    for key, item in mapping.items():
+        parsed = _as_str(item)
+        if parsed is None:
+            return {}
+        result[key] = parsed
+    return result
+
+
 def _as_source_roots(value: TomlValue | None) -> list[dict[str, str]]:
     match value:
         case list() as items:
@@ -139,6 +159,85 @@ class Config:
     def vault_root(self) -> str:
         text = _as_str(self.raw.get("vault_root"))
         return DEFAULT_VAULT_ROOT if text is None else text
+
+    @property
+    def request_root(self) -> str:
+        text = _as_str(self.raw.get("request_root"))
+        return DEFAULT_REQUEST_ROOT if text is None else text
+
+    @property
+    def export_root(self) -> str:
+        text = _as_str(self.raw.get("export_root"))
+        return DEFAULT_EXPORT_ROOT if text is None else text
+
+    @property
+    def state_root(self) -> str:
+        text = _as_str(self.raw.get("state_root"))
+        return DEFAULT_STATE_ROOT if text is None else text
+
+    @property
+    def share_root(self) -> str:
+        text = _as_str(self.raw.get("share_root"))
+        if text is not None:
+            return text
+        return str(Path(DEFAULT_ACTIVE_VAULT).parent)
+
+    @property
+    def generation_root(self) -> str:
+        text = _as_str(self.raw.get("generation_root"))
+        return DEFAULT_GENERATION_ROOT if text is None else text
+
+    @property
+    def backup_root(self) -> str:
+        text = _as_str(self.raw.get("backup_root"))
+        return DEFAULT_BACKUP_ROOT if text is None else text
+
+    @property
+    def provider_instance_id(self) -> str:
+        text = _as_str(self.raw.get("provider_instance_id"))
+        return DEFAULT_PROVIDER_INSTANCE_ID if text is None else text
+
+    @property
+    def provider_release_sha(self) -> str:
+        text = _as_str(self.raw.get("provider_release_sha"))
+        return "development" if text is None else text
+
+    @property
+    def jarvis_signing_key_id(self) -> str | None:
+        return _as_str(self.raw.get("jarvis_signing_key_id"))
+
+    @property
+    def jarvis_public_key(self) -> str | None:
+        return _as_str(self.raw.get("jarvis_public_key"))
+
+    @property
+    def jarvis_public_keys(self) -> dict[str, str]:
+        keys = _as_str_mapping(self.raw.get("jarvis_public_keys"))
+        key_id = self.jarvis_signing_key_id
+        key = self.jarvis_public_key
+        if key_id is not None and key is not None:
+            _ = keys.setdefault(key_id, key)
+        return keys
+
+    @property
+    def revoked_jarvis_signing_key_ids(self) -> frozenset[str]:
+        return frozenset(_as_str_list(self.raw.get("revoked_jarvis_signing_key_ids")) or [])
+
+    @property
+    def revoked_delegation_ids(self) -> frozenset[str]:
+        return frozenset(_as_str_list(self.raw.get("revoked_delegation_ids")) or [])
+
+    @property
+    def external_erasure_public_keys(self) -> dict[str, str]:
+        return _as_str_mapping(self.raw.get("external_erasure_public_keys"))
+
+    @property
+    def provider_signing_key_id(self) -> str | None:
+        return _as_str(self.raw.get("provider_signing_key_id"))
+
+    @property
+    def provider_private_key(self) -> str | None:
+        return _as_str(self.raw.get("provider_private_key"))
 
     @property
     def caps(self) -> dict[str, int]:

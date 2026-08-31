@@ -7,10 +7,13 @@ import re
 import secrets
 import stat
 import subprocess
+from collections.abc import Set as AbstractSet
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from sb.contracts import (
     Digest,
@@ -19,7 +22,11 @@ from sb.contracts import (
     MemoryWriteRequestV1,
     MemoryWriteResultV1,
 )
+from sb.effect_values import is_json_object
+from sb.effect_write_models import MemoryEffectWriteAcceptedV2
+from sb.effect_write_requests import accept_effect_request
 from sb.page_ids import git_rel
+from sb.stable_requests import StableRequestError, accept_stable_v1_request
 from sb.write_request_values import (
     MAX_ENVELOPE_BYTES,
     JsonValue,
@@ -34,7 +41,11 @@ from sb.write_request_values import (
 FINAL_NAME: Final = re.compile(r"memreq:pos:v1:[0-9a-f]{64}\.json\Z")
 TEMP_NAME: Final = re.compile(r"\.memreq:pos:v1:[0-9a-f]{64}\.[0-9]+\.[0-9a-f]{32}\.tmp\Z")
 
-__all__: Final = ("WriteRequestRejected", "accept_write_request")
+__all__: Final = (
+    "WriteRequestRejected",
+    "accept_memory_write_request",
+    "accept_write_request",
+)
 
 
 def _check_prior(root: Path, prior: ExpectedPriorV1 | None) -> None:
@@ -270,3 +281,40 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
         except FileNotFoundError:
             temporary = ""
         os.close(directory)
+
+
+def accept_memory_write_request(
+    vault_root: Path,
+    request_root: Path,
+    value: object,
+    now: datetime,
+    *,
+    public_keys: dict[str, Ed25519PublicKey] | None = None,
+    provider_instance_id: str | None = None,
+    revoked_delegations: AbstractSet[str] | None = None,
+    external_public_keys: dict[str, Ed25519PublicKey] | None = None,
+) -> MemoryWriteResultV1 | MemoryEffectWriteAcceptedV2:
+    """Dispatch the exact V1/V2 discriminated union without mutating V1 bytes."""
+    if not is_json_object(value):
+        reject("WRITE_REQUEST_INVALID")
+    schema_version = value.get("schema_version")
+    if schema_version == 1:
+        try:
+            return accept_stable_v1_request(request_root, value, now)
+        except StableRequestError as exc:
+            raise WriteRequestRejected(str(exc)) from exc
+    if schema_version == 2:
+        del vault_root
+        try:
+            return accept_effect_request(
+                request_root,
+                value,
+                now,
+                public_keys=public_keys,
+                provider_instance_id=provider_instance_id,
+                revoked_delegations=revoked_delegations,
+                external_public_keys=external_public_keys,
+            )
+        except ValueError as exc:
+            raise WriteRequestRejected(str(exc)) from exc
+    reject("WRITE_REQUEST_INVALID")

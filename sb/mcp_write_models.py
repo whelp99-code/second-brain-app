@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Literal
+from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from sb.effect_write_models import MemoryEffectWriteAcceptedV2, MemoryEffectWriteRequestV2
 
 
 class _ClosedModel(BaseModel):
@@ -86,3 +88,13 @@ class MemoryWriteRequestModel(_ClosedModel):
     receipt: JarvisReceiptModel
     receipt_digest: str
     payload: WritePayloadModel
+
+
+type MemoryWriteRequest = Annotated[
+    MemoryWriteRequestModel | MemoryEffectWriteRequestV2,
+    Field(discriminator="schema_version"),
+]
+type MemoryWriteResult = Annotated[
+    MemoryWriteResultModel | MemoryEffectWriteAcceptedV2,
+    Field(discriminator="schema_version"),
+]

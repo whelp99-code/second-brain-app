@@ -10,7 +10,14 @@ from pathlib import Path
 import pytest
 
 from sb.contracts import PageSpec, SourceCite
-from sb.vault import GitCommandError, PathEscapeError, Vault, VaultLintError, init_vault
+from sb.vault import (
+    GenerationAuthorityRequiredError,
+    GitCommandError,
+    PathEscapeError,
+    Vault,
+    VaultLintError,
+    init_vault,
+)
 
 CAS_HASH = "ab" + ("cd" * 31)
 CAS_SID = CAS_HASH[:8]
@@ -187,15 +194,18 @@ def test_write_pages_skips_commit_when_content_unchanged(tmp_path: Path) -> None
     assert _git(tmp_path, "status", "--porcelain") == ""
 
 
-def test_rollback_reverts_run_commit_when_run_id_exists(tmp_path: Path) -> None:
+def test_rollback_requires_generation_authority_and_changes_zero_bytes(tmp_path: Path) -> None:
     vault = _ready(tmp_path)
     written = vault.write_pages([_cited_page()], "run-rb", MemoryLedger())
     dest = tmp_path / "wiki" / "identity-profile.md"
+    before = _git(tmp_path, "rev-parse", "HEAD")
     assert written.commit is not None and dest.is_file()
-    vault.rollback("run-rb")
-    assert not dest.exists()
-    subject = _git(tmp_path, "log", "-1", "--format=%s").strip()
-    assert "revert" in subject.lower() or "run-rb" in subject
+    with pytest.raises(
+        GenerationAuthorityRequiredError,
+        match="ROLLBACK_REQUIRES_GENERATION_AUTHORITY",
+    ):
+        vault.rollback("run-rb")
+    assert dest.is_file() and _git(tmp_path, "rev-parse", "HEAD") == before
 
 
 def test_init_vault_does_not_commit_when_already_initialized(tmp_path: Path) -> None:

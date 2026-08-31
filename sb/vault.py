@@ -46,6 +46,13 @@ class RunCommitNotFoundError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class GenerationAuthorityRequiredError(Exception):
+    @override
+    def __str__(self) -> str:
+        return "ROLLBACK_REQUIRES_GENERATION_AUTHORITY"
+
+
+@dataclass(frozen=True, slots=True)
 class GitCommandError(Exception):
     argv: tuple[str, ...]
     stderr: str
@@ -129,12 +136,8 @@ class Vault:
         _atomic_write(path, f"{existing}{line.rstrip()}\n")
 
     def rollback(self, run_id: str) -> None:
-        sha = _git(
-            self.root, "log", "-F", "--grep", f"sb: run {run_id} ", "--format=%H", "-1"
-        ).strip()
-        if not sha:
-            raise RunCommitNotFoundError(run_id=run_id)
-        _ = _git(self.root, "revert", "--no-edit", sha)
+        del run_id
+        raise GenerationAuthorityRequiredError()
 
 
 def init_vault(root: str | Path) -> Vault:
