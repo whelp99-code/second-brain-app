@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -9,9 +10,21 @@ from sb.effect_write_requests import accept_effect_request
 from sb.mcp_contract import write_fixture_request
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.stable_requests import accept_stable_v1_request
+from sb.task30_barriers import BarrierEvent, Task30BarrierId
 from tests.task30_effect_factory import effect_request
 
 NOW = datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC)
+
+
+@final
+class CrashBarrierSink:
+    def __init__(self, barrier_id: Task30BarrierId, code: str) -> None:
+        self.barrier_id = barrier_id
+        self.code = code
+
+    def reach(self, event: BarrierEvent) -> None:
+        if event.barrier_id is self.barrier_id:
+            raise RuntimeError(self.code)
 
 
 def test_pre_effect_barrier_failure_is_terminal_and_content_file_is_purged(tmp_path: Path) -> None:
@@ -23,11 +36,10 @@ def test_pre_effect_barrier_failure_is_terminal_and_content_file_is_purged(tmp_p
     )
     accepted = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
 
-    def crash(phase: str) -> None:
-        if phase == "journal_claim":
-            raise RuntimeError("INJECTED_CRASH")
-
-    executor = RequestExecutor(config, barrier=crash)
+    executor = RequestExecutor(
+        config,
+        barrier_sink=CrashBarrierSink(Task30BarrierId.JOURNAL_CLAIM, "INJECTED_CRASH"),
+    )
     result = executor.apply_once(now=NOW)
     assert result.state == "failed" and result.code == "INJECTED_CRASH"
     assert not tuple(config.request_root.joinpath("processing").iterdir())
@@ -57,11 +69,13 @@ def test_crash_after_pointer_rename_resumes_disposal_and_one_proof(tmp_path: Pat
     )
     seed.close()
 
-    def crash(phase: str) -> None:
-        if phase == "pointer_rename":
-            raise RuntimeError("INJECTED_POINTER_CRASH")
-
-    crashed = RequestExecutor(config, barrier=crash)
+    crashed = RequestExecutor(
+        config,
+        barrier_sink=CrashBarrierSink(
+            Task30BarrierId.POINTER_RENAME,
+            "INJECTED_POINTER_CRASH",
+        ),
+    )
     first = crashed.apply_once(now=effect_time, lease_ms=1)
     assert first.state == "reconciling" and first.phase == "switch_intent"
     successor = crashed.generations.active().generation_id
@@ -89,11 +103,13 @@ def test_crash_after_proof_commit_finalizes_queue_without_second_effect(tmp_path
     )
     accepted = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
 
-    def crash(phase: str) -> None:
-        if phase == "proof_write_fsync":
-            raise RuntimeError("INJECTED_PROOF_CRASH")
-
-    crashed = RequestExecutor(config, barrier=crash)
+    crashed = RequestExecutor(
+        config,
+        barrier_sink=CrashBarrierSink(
+            Task30BarrierId.PROOF_WRITE_FSYNC,
+            "INJECTED_PROOF_CRASH",
+        ),
+    )
     first = crashed.apply_once(now=NOW)
     assert first.state == "reconciling" and first.phase == "proved"
     generation_id = crashed.generations.active().generation_id

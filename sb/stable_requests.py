@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import fcntl
-import hashlib
 import os
 import secrets
 import stat
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import final
 
 from sb.contracts import (
     Digest,
@@ -21,7 +19,13 @@ from sb.contracts import (
 )
 from sb.effect_values import canonical_bytes, format_instant, is_json_object, strict_loads
 from sb.request_store import ReplayConflict, RequestIdentity, RequestStore
-from sb.write_request_values import JsonValue, digest, parse_envelope_bytes, parse_request
+from sb.task30_barriers import (
+    BarrierContext,
+    BoundBarrierEmitter,
+    NoopBarrierSink,
+    Task30BarrierSink,
+)
+from sb.write_request_values import JsonValue, digest, parse_request
 
 
 class StableRequestError(ValueError):
@@ -81,7 +85,7 @@ def _result(
     )
 
 
-def _safe_file(metadata: os.stat_result, links: int = 1) -> bool:
+def safe_request_file(metadata: os.stat_result, links: int = 1) -> bool:
     return (
         stat.S_ISREG(metadata.st_mode)
         and metadata.st_uid == os.getuid()
@@ -90,7 +94,16 @@ def _safe_file(metadata: os.stat_result, links: int = 1) -> bool:
     )
 
 
-def _publish(directory: Path, name: str, payload: bytes) -> None:
+@dataclass(frozen=True, slots=True)
+class _PendingPublication:
+    name: str
+    payload: bytes
+    emitter: BoundBarrierEmitter
+
+
+def _publish(directory: Path, publication: _PendingPublication) -> None:
+    name = publication.name
+    payload = publication.payload
     directory_fd = os.open(
         directory,
         os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
@@ -99,22 +112,42 @@ def _publish(directory: Path, name: str, payload: bytes) -> None:
     file_fd: int | None = None
     try:
         fcntl.flock(directory_fd, fcntl.LOCK_EX)
+        owned_temps = tuple(directory.glob(f".{name}.*.tmp"))
+        if len(owned_temps) > 1:
+            raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
         if (directory / name).exists():
+            for candidate in owned_temps:
+                if not safe_request_file(candidate.stat(follow_symlinks=False)) or candidate.read_bytes() != payload:
+                    raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+                candidate.unlink()
+                os.fsync(directory_fd)
             return
-        file_fd = os.open(
-            temporary,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
-            0o600,
-            dir_fd=directory_fd,
-        )
-        written = 0
-        while written < len(payload):
-            count = os.write(file_fd, payload[written:])
-            if count <= 0:
-                raise StableRequestError("WRITE_REQUEST_IO_FAILED")
-            written += count
-        os.fsync(file_fd)
-        if not _safe_file(os.fstat(file_fd)):
+        if owned_temps:
+            candidate = owned_temps[0]
+            if not safe_request_file(candidate.stat(follow_symlinks=False)) or candidate.read_bytes() != payload:
+                raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+            temporary = candidate.name
+            file_fd = os.open(
+                temporary,
+                os.O_WRONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=directory_fd,
+            )
+        else:
+            file_fd = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0o600,
+                dir_fd=directory_fd,
+            )
+            written = 0
+            while written < len(payload):
+                count = os.write(file_fd, payload[written:])
+                if count <= 0:
+                    raise StableRequestError("WRITE_REQUEST_IO_FAILED")
+                written += count
+            os.fsync(file_fd)
+            publication.emitter.emit("request_temp_write")
+        if not safe_request_file(os.fstat(file_fd)):
             raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
         os.link(
             temporary,
@@ -123,11 +156,12 @@ def _publish(directory: Path, name: str, payload: bytes) -> None:
             dst_dir_fd=directory_fd,
             follow_symlinks=False,
         )
-        if not _safe_file(os.fstat(file_fd), 2):
+        if not safe_request_file(os.fstat(file_fd), 2):
             raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
         os.fsync(directory_fd)
         os.unlink(temporary, dir_fd=directory_fd)
         os.fsync(directory_fd)
+        publication.emitter.emit("pending_publish_fsync")
     except FileExistsError:
         return
     finally:
@@ -145,6 +179,7 @@ def accept_stable_v1_request(
     request_root: Path,
     value: JsonValue,
     now: datetime,
+    barrier_sink: Task30BarrierSink | None = None,
 ) -> MemoryWriteResultV1:
     request = parse_request(value, now)
     if request.operation is not WriteOperation.REMEMBER:
@@ -168,9 +203,19 @@ def accept_stable_v1_request(
             return _result(request, accepted_value, digest_value, True)
         payload = canonical_bytes(envelope) + b"\n"
         final = store.pending / f"{request.request_id}.v1.json"
-        _publish(store.pending, final.name, payload)
+        _publish(
+            store.pending,
+            _PendingPublication(
+                final.name,
+                payload,
+                BoundBarrierEmitter(
+                    barrier_sink or NoopBarrierSink(),
+                    BarrierContext(str(request.request_id)),
+                ),
+            ),
+        )
         metadata = final.stat(follow_symlinks=False)
-        if not _safe_file(metadata) or final.read_bytes() != payload:
+        if not safe_request_file(metadata) or final.read_bytes() != payload:
             raise StableRequestError("WRITE_REQUEST_REPLAY_CONFLICT")
         status, replayed = store.accept(identity, asdict(result), now)
         if replayed:
@@ -187,68 +232,3 @@ def accept_stable_v1_request(
         raise StableRequestError("WRITE_REQUEST_REPLAY_CONFLICT") from exc
     finally:
         store.close()
-
-
-@final
-class LegacyRequestImporterV1:
-    """Import each owned legacy V1 final at most once into the stable journal."""
-
-    def __init__(self, request_root: Path, legacy_roots: tuple[Path, ...]) -> None:
-        self.request_root = request_root
-        self.legacy_roots = legacy_roots
-
-    def import_once(self, now: datetime) -> tuple[int, int]:
-        imported = 0
-        reapproval = 0
-        store = RequestStore(self.request_root)
-        try:
-            for root in self.legacy_roots:
-                pending = root / "inbox" / ".requests" / "pending"
-                if not pending.exists():
-                    continue
-                metadata = pending.stat(follow_symlinks=False)
-                if not stat.S_ISDIR(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o700:
-                    raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
-                for path in sorted(pending.iterdir(), key=lambda item: item.name):
-                    if path.is_symlink():
-                        raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
-                    file_metadata = path.stat(follow_symlinks=False)
-                    if not _safe_file(file_metadata):
-                        raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
-                    raw = path.read_bytes()
-                    locator = hashlib.sha256(str(path).encode("utf-8")).hexdigest()
-                    import_digest = "sha256:" + hashlib.sha256(raw).hexdigest()
-                    envelope = parse_envelope_bytes(raw)
-                    operation = envelope.request.operation
-                    if operation is WriteOperation.REMEMBER:
-                        accepted = accept_stable_v1_request(
-                            self.request_root,
-                            request_value(envelope.request),
-                            now,
-                        )
-                        fresh = store.record_import(
-                            import_digest,
-                            locator,
-                            str(accepted.request_id),
-                            "published",
-                            now,
-                        )
-                        imported += int(fresh)
-                    else:
-                        fresh = store.record_import(
-                            import_digest,
-                            locator,
-                            str(envelope.request.request_id),
-                            "reapproval_required",
-                            now,
-                        )
-                        reapproval += int(fresh)
-                    path.unlink()
-                    directory_fd = os.open(pending, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
-                    try:
-                        os.fsync(directory_fd)
-                    finally:
-                        os.close(directory_fd)
-            return imported, reapproval
-        finally:
-            store.close()

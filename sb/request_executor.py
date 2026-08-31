@@ -33,10 +33,25 @@ from sb.erasure import (
     purge_matching_managed_copies,
     scan_managed_surfaces,
 )
-from sb.exports import ExportPublisher
+from sb.exports import ExportPublication, ExportPublisher
+from sb.generation_runtime import (
+    GenerationAuthority,
+    GenerationExpectation,
+    GenerationMutation,
+    GenerationMutationHooks,
+    GenerationMutationService,
+    GenerationOperation,
+)
 from sb.generations import Generation, GenerationError, GenerationStore
+from sb.legacy_requests import LegacyRequestImporterV1
+from sb.provider_lifecycle import ProviderLifecycle
 from sb.request_store import PHASES, Phase, RequestLease, RequestStatus, RequestStore
-from sb.stable_requests import LegacyRequestImporterV1
+from sb.task30_barriers import (
+    BarrierContext,
+    BoundBarrierEmitter,
+    NoopBarrierSink,
+    Task30BarrierSink,
+)
 from sb.write_request_values import parse_envelope_bytes
 
 
@@ -91,20 +106,20 @@ class FrozenGenerationIdentity:
     tree: str
 
 
-def _no_barrier(_phase: str) -> None:
-    return
-
-
 @final
 class RequestExecutor:
     def __init__(
         self,
         config: ExecutorConfig,
         *,
-        barrier: Callable[[str], None] | None = None,
+        barrier_sink: Task30BarrierSink | None = None,
     ) -> None:
         self.config = config
-        self.barrier: Callable[[str], None] = barrier or _no_barrier
+        self.barrier_sink = barrier_sink or NoopBarrierSink()
+        self.barrier: Callable[[str], None] = BoundBarrierEmitter(
+            self.barrier_sink,
+            BarrierContext(),
+        ).emit
         self.store = RequestStore(config.request_root)
         self.generations = GenerationStore(
             config.state_root,
@@ -115,7 +130,17 @@ class RequestExecutor:
         )
         self.reingress = ReingressGate(config.state_root / "reingress.db")
         self.erasure = ErasureEngine(self.reingress)
-        self.exports = ExportPublisher(config.export_root, config.provider_release_sha)
+        self.exports = ExportPublisher(
+            config.export_root,
+            config.provider_release_sha,
+            self.store.exports,
+        )
+        self.lifecycle = ProviderLifecycle(self.exports)
+        self.mutations = GenerationMutationService(
+            self.generations,
+            self.store,
+            self.lifecycle,
+        )
         if config.legacy_request_roots:
             _ = LegacyRequestImporterV1(
                 config.request_root,
@@ -128,6 +153,12 @@ class RequestExecutor:
         self.reingress.close()
         self.generations.close()
         self.store.close()
+
+    def _bind_barrier(self, lease: RequestLease) -> None:
+        self.barrier = BoundBarrierEmitter(
+            self.barrier_sink,
+            BarrierContext(lease.request_id, lease.fence, lease.phase),
+        ).emit
 
     @staticmethod
     def _fsync(directory: Path) -> None:
@@ -179,13 +210,6 @@ class RequestExecutor:
                 raise
             return None
 
-    @staticmethod
-    def _allowed(relative: Path) -> bool:
-        if not relative.parts:
-            return False
-        forbidden = {"inbox", "exports", "backups", ".staging", ".retired"}
-        return not any(part in forbidden for part in relative.parts)
-
     def _advance(
         self,
         lease: RequestLease,
@@ -198,7 +222,7 @@ class RequestExecutor:
         for index in range(current_index + 1, target_index + 1):
             phase = PHASES[index]
             lease = self.store.transition(lease, phase, now, generation_id=generation_id)
-            self.barrier(f"journal_{phase}")
+            self._bind_barrier(lease)
         return lease
 
     def _remember(
@@ -215,7 +239,15 @@ class RequestExecutor:
         source_identity = hashlib.sha256(str(request.candidate_id).encode()).hexdigest()
         content_identity = hashlib.sha256(content.encode()).hexdigest()
         self.reingress.check(source_identity=source_identity, content_identity=content_identity)
-        parent = self._active_or_none(self.generations)
+        status = self.store.get(lease.request_id)
+        if status is None:
+            raise RequestExecutionError("REQUEST_NOT_FOUND")
+        resume_id = status.result_generation_id
+        parent = (
+            self.generations.generation(status.base_generation_id)
+            if resume_id is not None and status.base_generation_id is not None
+            else (None if resume_id is not None else self._active_or_none(self.generations))
+        )
         lease = self._advance(
             lease,
             "staging",
@@ -246,26 +278,42 @@ class RequestExecutor:
             _ = page.write_text(text, encoding="utf-8")
             page.chmod(0o600)
 
-        generation = self.generations.build(
-            request_id=str(request.request_id),
-            parent=parent,
-            tombstone_sequence=0 if parent is None else parent.manifest.tombstone_sequence,
-            tombstone_set_root=(
-                "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
-                if parent is None
-                else parent.manifest.tombstone_set_root
-            ),
-            created_at=parse_instant(request.created_at),
-            allowed=self._allowed,
-            mutate=materialize,
-            barrier=self.barrier,
+        def sealed(generation: Generation) -> None:
+            nonlocal lease
+            lease = self._advance(lease, "sealed", now, generation.generation_id)
+
+        def switching(generation: Generation) -> None:
+            nonlocal lease
+            lease = self._advance(lease, "switch_intent", now, generation.generation_id)
+
+        def activated(generation: Generation) -> None:
+            nonlocal lease
+            lease = self._advance(lease, "activated", now, generation.generation_id)
+            lease = self._advance(lease, "disposing", now, generation.generation_id)
+            lease = self._advance(lease, "proved", now, generation.generation_id)
+
+        expected = (
+            None
+            if parent is None
+            else GenerationExpectation(parent.generation_id, parent.head, parent.tree)
         )
-        lease = self._advance(lease, "sealed", now, generation.generation_id)
-        lease = self._advance(lease, "switch_intent", now, generation.generation_id)
-        self.generations.activate(generation, parent, now, barrier=self.barrier)
-        lease = self._advance(lease, "activated", now, generation.generation_id)
-        lease = self._advance(lease, "disposing", now, generation.generation_id)
-        lease = self._advance(lease, "proved", now, generation.generation_id)
+        mutation = self.mutations.mutate(
+            GenerationMutation(
+                mutation_id=str(request.request_id),
+                operation=GenerationOperation.REMEMBER,
+                now=parse_instant(request.created_at),
+                authority=GenerationAuthority(
+                    expected,
+                    self.store.tombstone_high_water(),
+                    resume_generation_id=resume_id,
+                ),
+                apply=lambda root: materialize(root),
+                recover=lambda _generation: None,
+                hooks=GenerationMutationHooks(sealed, switching, activated),
+                barrier=self.barrier,
+            )
+        )
+        generation = mutation.generation
         artifact: dict[str, JsonValue] = {
             "schema_version": 1,
             "request_id": str(request.request_id),
@@ -352,38 +400,61 @@ class RequestExecutor:
                 if current_generation.generation_id != active.generation_id:
                     raise RequestExecutionError("EFFECT_PRIOR_STALE")
                 manifest = self.exports.publish(
-                    request,
-                    current_generation,
-                    now,
-                    current_high_water=self.store.tombstone_high_water,
-                    fence=lease.fence,
+                    ExportPublication(
+                        request=request,
+                        generation=current_generation,
+                        now=now,
+                        current_high_water=self.store.tombstone_high_water,
+                        fence=lease.fence,
+                        barrier=self.barrier,
+                    )
                 )
-            self.barrier("export_published")
             lease = self._advance(lease, "proved", now, active.generation_id)
             return lease, base, active, None, manifest.manifest_digest
 
         prior_needles = self._prior_needles(parent, request)
-        if result is None:
-            if parent is None:
-                raise RequestExecutionError("EFFECT_PRIOR_STALE")
+        if parent is None and result is None:
+            raise RequestExecutionError("EFFECT_PRIOR_STALE")
 
-            def mutate(root: Path) -> None:
-                _ = self.erasure.apply(root, request, now)
+        def mutate(root: Path) -> None:
+            _ = self.erasure.apply(root, request, now)
 
-            result = self.generations.build(
-                request_id=request.request_id,
-                parent=parent,
-                tombstone_sequence=request.tombstone_high_water.sequence,
-                tombstone_set_root=request.tombstone_high_water.set_root,
-                created_at=parse_instant(request.created_at),
-                allowed=self._allowed,
-                mutate=mutate,
+        def sealed(generation: Generation) -> None:
+            nonlocal lease
+            lease = self._advance(lease, "sealed", now, generation.generation_id)
+
+        def switching(generation: Generation) -> None:
+            nonlocal lease
+            lease = self._advance(lease, "switch_intent", now, generation.generation_id)
+
+        def activated(generation: Generation) -> None:
+            nonlocal lease
+            lease = self._advance(lease, "activated", now, generation.generation_id)
+
+        mutation = self.mutations.mutate(
+            GenerationMutation(
+                mutation_id=request.request_id,
+                operation=GenerationOperation.EFFECT,
+                now=parse_instant(request.created_at),
+                authority=GenerationAuthority(
+                    GenerationExpectation(
+                        request.expected_prior.generation_id,
+                        request.expected_prior.vault_head,
+                        request.expected_prior.vault_tree,
+                    ),
+                    (
+                        request.tombstone_high_water.sequence,
+                        request.tombstone_high_water.set_root,
+                    ),
+                    resume_generation_id=None if result is None else result.generation_id,
+                ),
+                apply=lambda root: mutate(root),
+                recover=lambda _generation: None,
+                hooks=GenerationMutationHooks(sealed, switching, activated),
                 barrier=self.barrier,
             )
-        lease = self._advance(lease, "sealed", now, result.generation_id)
-        lease = self._advance(lease, "switch_intent", now, result.generation_id)
-        self.generations.activate(result, parent, now, barrier=self.barrier)
-        lease = self._advance(lease, "activated", now, result.generation_id)
+        )
+        result = mutation.generation
 
         intersecting_identities = {
             identity
@@ -395,9 +466,11 @@ class RequestExecutor:
                 target.citation_identity_full,
             )
         }
-        _ = self.exports.invalidate(intersecting_identities)
         _ = purge_matching_managed_copies((self.config.backup_root,), prior_needles)
-        self.barrier("backup_export_disposed")
+        self.barrier("backup_disposal")
+        _ = self.exports.invalidate(intersecting_identities, now)
+        self.barrier("export_disposal")
+        self.barrier("disposal_parent_fsync")
         lease = self._advance(lease, "disposing", now, result.generation_id)
         inventory = scan_managed_surfaces(
             (
@@ -615,10 +688,12 @@ class RequestExecutor:
         lease_ms: int = 60_000,
     ) -> ApplyResult:
         observed = datetime.now(UTC) if now is None else now.astimezone(UTC)
+        _ = self.mutations.maintain(observed)
         _ = self._finalize_proved()
         lease = self.store.claim(worker, observed, lease_ms)
         if lease is None:
             return ApplyResult(None, "idle", None, "NO_PENDING_REQUEST", 0)
+        self._bind_barrier(lease)
         path: Path | None = None
         activated = lease.phase in {"activated", "disposing", "proved"}
         try:
@@ -666,7 +741,7 @@ class RequestExecutor:
             path.unlink(missing_ok=True)
             self._fsync(path.parent)
             self._write_receipt(final_status, "PROVIDER_PROVED")
-            self.barrier("receipt_fsync")
+            self.barrier("receipt_final_transition")
             return ApplyResult(lease.request_id, "proved", "proved", "PROVIDER_PROVED", lease.fence)
         except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
             code = str(exc) if str(exc) else type(exc).__name__

@@ -12,7 +12,7 @@ import sqlite3
 import stat
 import subprocess
 from collections.abc import Callable, Generator, Iterable, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -123,17 +123,14 @@ def _directory_fsync(path: Path) -> None:
 
 
 def _private_directory(path: Path) -> None:
-    if path.exists() or path.is_symlink():
-        metadata = path.stat(follow_symlinks=False)
-        if (
-            not stat.S_ISDIR(metadata.st_mode)
-            or metadata.st_uid != os.getuid()
-            or metadata.st_nlink < 2
-        ):
-            raise GenerationError("GENERATION_ROOT_UNSAFE")
-        path.chmod(0o700)
-        return
-    path.mkdir(parents=True, exist_ok=False, mode=0o700)
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    metadata = path.stat(follow_symlinks=False)
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or metadata.st_nlink < 2
+    ):
+        raise GenerationError("GENERATION_ROOT_UNSAFE")
     path.chmod(0o700)
 
 
@@ -318,7 +315,27 @@ def _build_derived_stores(
     )
 
     ledger_path = derived / "ledger.db"
-    ledger = _connect_fresh(ledger_path)
+    if ledger_path.exists():
+        source = sqlite3.connect(ledger_path, isolation_level=None)
+        _ = source.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+        rebuilt_path = ledger_path.with_name("ledger.rebuilt.db")
+        rebuilt = _connect_fresh(rebuilt_path)
+        try:
+            source.backup(rebuilt)
+        finally:
+            source.close()
+        _ = rebuilt.execute("PRAGMA journal_mode=DELETE").fetchall()
+        _close_fresh(rebuilt, rebuilt_path)
+        ledger_path.unlink()
+        for suffix in ("-wal", "-shm", "-journal"):
+            Path(f"{ledger_path}{suffix}").unlink(missing_ok=True)
+        os.replace(rebuilt_path, ledger_path)
+        ledger = sqlite3.connect(ledger_path, isolation_level=None)
+        _ = ledger.execute("PRAGMA synchronous=FULL")
+        _ = ledger.execute("PRAGMA secure_delete=ON")
+        _ = ledger.executescript("DROP TABLE IF EXISTS generation_meta; DROP TABLE IF EXISTS records;")
+    else:
+        ledger = _connect_fresh(ledger_path)
     try:
         _ = ledger.executescript(
             """
@@ -717,12 +734,12 @@ class GenerationStore:
     ) -> Generation:
         emit: Callable[[str], None] = barrier or _no_barrier
         request_key = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
-        staging = self.staging / f"{request_key}.{os.getpid()}"
+        staging = self.staging / request_key
         if staging.exists():
             _make_writable(staging)
             shutil.rmtree(staging)
         staging.mkdir(mode=0o700)
-        emit("successor_created")
+        emit("successor_creation")
         try:
             if parent is not None:
                 self._copy_allowed(parent.root, staging, allowed)
@@ -747,13 +764,13 @@ class GenerationStore:
                 "--allow-empty",
                 "-qm",
                 "sealed generation",
-                timestamp=format_instant(created_at),
+                timestamp="2000-01-01T00:00:00+00:00",
             )
             head = self._git(staging, "rev-parse", "HEAD")
             tree = self._git(staging, "rev-parse", "HEAD^{tree}")
             if self._git(staging, "rev-list", "--parents", "-n", "1", "HEAD").count(" ") != 0:
                 raise GenerationError("GENERATION_HISTORY_INVALID")
-            emit("git_sealed")
+            emit("git_seal")
             content_rows, byte_count = _content_rows(staging)
             pages = _page_rows(staging)
             logical = _logical_derived_digests(
@@ -805,10 +822,10 @@ class GenerationStore:
                 created_at=format_instant(created_at),
             )
             _build_derived_stores(staging, manifest, pages)
-            emit("ledger_built")
-            emit("lexical_built")
-            emit("vector_built")
-            emit("briefing_built")
+            emit("ledger_build")
+            emit("lexical_build")
+            emit("vector_build")
+            emit("brief_build")
             manifest_path = staging / "generation.json"
             _write_private(manifest_path, canonical_bytes(asdict(manifest)) + b"\n")
             self._fsync_tree(staging)
@@ -901,9 +918,11 @@ class GenerationStore:
         now: datetime,
         *,
         barrier: Callable[[str], None] | None = None,
+        lock_held: bool = False,
     ) -> None:
         emit: Callable[[str], None] = barrier or _no_barrier
-        with self.exclusive():
+        manager = nullcontext() if lock_held else self.exclusive()
+        with manager:
             phase = self._phase(generation.generation_id)
             current = self.active() if self.active_link.is_symlink() else None
             if current is not None and current.generation_id == generation.generation_id:
@@ -917,7 +936,7 @@ class GenerationStore:
                         raise GenerationError("GENERATION_SPLIT_BRAIN")
                     self.journal.commit()
                     phase = "activated"
-                    emit("activation_verified")
+                    emit("activation_verify")
                 if phase not in {"activated", "disposing", "proved"}:
                     raise GenerationError("GENERATION_SPLIT_BRAIN")
                 if phase != "proved":
@@ -944,7 +963,7 @@ class GenerationStore:
                 if changed != 1:
                     raise GenerationError("GENERATION_SPLIT_BRAIN")
                 self.journal.commit()
-                emit("activation_verified")
+                emit("activation_verify")
                 self._complete_disposal(generation, current, now, emit)
                 return
             if phase != "sealed":
@@ -981,7 +1000,7 @@ class GenerationStore:
             if changed != 1:
                 raise GenerationError("GENERATION_SPLIT_BRAIN")
             self.journal.commit()
-            emit("activation_verified")
+            emit("activation_verify")
             self._complete_disposal(generation, current, now, emit)
 
     def _complete_disposal(
@@ -1036,7 +1055,7 @@ class GenerationStore:
             _make_writable(retired)
             shutil.rmtree(retired)
             _directory_fsync(self.retired)
-        emit("predecessor_disposed")
+        emit("predecessor_disposal")
         disposal_digest = digest(
             "generation",
             {"generation_id": predecessor.generation_id, "disposed": True},
@@ -1049,7 +1068,6 @@ class GenerationStore:
         if changed != 1:
             raise GenerationError("GENERATION_SPLIT_BRAIN")
         self.journal.commit()
-        emit("disposal_parent_fsync")
 
     def activation_digests(self, generation_id: str) -> tuple[str, str, str]:
         row = cast(

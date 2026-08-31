@@ -9,6 +9,7 @@ from sb.mcp_contract import write_fixture_request
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.request_store import RequestStore
 from sb.stable_requests import accept_stable_v1_request
+from sb.task30_barriers import RecordingBarrierSink
 
 NOW = datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC)
 
@@ -32,33 +33,27 @@ def _config(tmp_path: Path) -> ExecutorConfig:
 def test_apply_once_consumes_v1_remember_into_one_sealed_generation(tmp_path: Path) -> None:
     config = _config(tmp_path)
     accepted = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
-    barriers: list[str] = []
-    executor = RequestExecutor(config, barrier=barriers.append)
+    barriers = RecordingBarrierSink()
+    executor = RequestExecutor(config, barrier_sink=barriers)
     result = executor.apply_once(now=NOW)
     assert result.state == "proved" and result.request_id == accepted.request_id
-    assert barriers == [
+    assert [event.barrier_id.value for event in barriers.events] == [
         "claim_rename_fsync",
         "journal_claim",
-        "journal_staging",
-        "successor_created",
+        "successor_creation",
         "sanitized_copy",
-        "git_sealed",
-        "ledger_built",
-        "lexical_built",
-        "vector_built",
-        "briefing_built",
+        "git_seal",
+        "ledger_build",
+        "lexical_build",
+        "vector_build",
+        "brief_build",
         "sealed_manifest",
-        "journal_sealed",
-        "journal_switch_intent",
         "switch_intent_fsync",
         "pointer_rename",
         "pointer_parent_fsync",
-        "activation_verified",
-        "journal_activated",
-        "journal_disposing",
-        "journal_proved",
+        "activation_verify",
         "proof_write_fsync",
-        "receipt_fsync",
+        "receipt_final_transition",
     ]
     active = executor.generations.active()
     assert active.root.joinpath("wiki").is_dir()

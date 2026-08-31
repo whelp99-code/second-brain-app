@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import itertools
 import json
 import os
+import sys
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
@@ -21,7 +23,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
 
-from sb.config import load_config
+from sb.config import Config, load_config
 from sb.contracts import MemoryWriteResultV1
 from sb.delegations import DelegationRejected, verify_read_fence
 from sb.effect_values import JsonObject, JsonValue, digest, is_json_object, strict_loads
@@ -31,13 +33,17 @@ from sb.effect_write_models import (
     MemoryEffectWriteRequestV2,
 )
 from sb.erasure import ErasureError, ReingressGate
+from sb.exports import ExportPublisher
+from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import RememberRejected, write_inbox
 from sb.mcp_write_models import MemoryWriteRequest, MemoryWriteRequestModel
 from sb.page_ids import git_rel
+from sb.provider_lifecycle import ProviderLifecycle
 from sb.request_store import RequestStore
 from sb.search import SearchIndex, committed_text, git_run
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
+from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
 from sb.write_request_values import WriteRequestRejected
 from sb.write_requests import accept_memory_write_request
@@ -68,6 +74,16 @@ LEGACY_TOOLS: Final = (
     "sb_write_request",
 )
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
+_CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
+_TASK30_PROFILE: Final = "task30-schema3"
+
+
+class ContractProfileError(RuntimeError):
+    code: str
+
+    def __init__(self) -> None:
+        self.code = "SECOND_BRAIN_CONTRACT_PROFILE_INVALID"
+        super().__init__(self.code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +192,7 @@ def build_server(
     request_root: Path | str | None = None,
     *,
     task30: bool | None = None,
+    barrier_sink: Task30BarrierSink | None = None,
 ) -> MCPServer:
     """Build a stdio server in legacy V1 or proof-bound Task 30 mode.
 
@@ -188,9 +205,22 @@ def build_server(
     requests = Path(
         config.request_root
         if request_root is None and vault_root is None
-        else (root / ".sb" / "requests" if request_root is None else request_root)
+        else (root.parent / ".requests" if request_root is None else request_root)
     )
-    runtime_state_root = Path(config.state_root) if vault_root is None else root / ".sb" / "task30-state"
+    runtime_state_root = Path(config.state_root) if vault_root is None else root.parent / ".task30-state"
+    runtime_export_root = Path(config.export_root) if vault_root is None else root.parent / ".exports"
+    runtime_config = Config(
+        raw={
+            **dict(config.raw),
+            "vault_root": str(root),
+            "request_root": str(requests),
+            "state_root": str(runtime_state_root),
+            "share_root": str(Path(config.share_root) if vault_root is None else root.parent),
+            "export_root": str(runtime_export_root),
+            "provider_instance_id": config.provider_instance_id,
+            "provider_release_sha": config.provider_release_sha,
+        }
+    )
     server = MCPServer("second-brain")
     public_keys: dict[str, Ed25519PublicKey] | None = None
     configured_keys = config.jarvis_public_keys
@@ -215,9 +245,18 @@ def build_server(
         except ValueError:
             external_public_keys = None
 
-    task30_enabled = (
-        (vault_root is not None or public_keys is not None) if task30 is None else task30
-    )
+    if task30 is not None:
+        task30_enabled = task30
+    elif vault_root is not None:
+        task30_enabled = True
+    else:
+        profile = os.environ.get(_CONTRACT_PROFILE_ENV)
+        if profile is None:
+            task30_enabled = False
+        elif profile == _TASK30_PROFILE:
+            task30_enabled = True
+        else:
+            raise ContractProfileError
     generation_store: GenerationStore | None = None
     if task30_enabled and vault_root is None and root.is_symlink():
         generation_store = GenerationStore(
@@ -255,8 +294,28 @@ def build_server(
             tree,
         )
 
+    def maintain(now: datetime) -> None:
+        if vault_root is None:
+            mutations = GenerationMutationService.from_config(runtime_config)
+            try:
+                _ = mutations.maintain(now)
+            finally:
+                mutations.close()
+            return
+        store = RequestStore(requests)
+        try:
+            publisher = ExportPublisher(
+                runtime_export_root,
+                config.provider_release_sha,
+                store.exports,
+            )
+            _ = ProviderLifecycle(publisher).maintain(now)
+        finally:
+            store.close()
+
     @contextmanager
     def pin_generation() -> Generator[tuple[Path, GenerationIdentityV1], None, None]:
+        maintain(datetime.now(UTC))
         if generation_store is None:
             yield root, legacy_generation_identity(root)
             return
@@ -323,7 +382,7 @@ def build_server(
         generation: GenerationIdentityV1,
         current: tuple[int, str],
     ) -> ToolResult:
-        if not (root / "generation.json").is_file() and generation_store is None:
+        if generation_store is None:
             return dict(payload)
         sequence, set_root = current
         return cast(ToolResult, {
@@ -391,6 +450,9 @@ def build_server(
 
     def sb_remember(content: str, title: str | None = None) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
+        maintain(datetime.now(UTC))
+        if not task30_enabled and high_water()[0] != 0:
+            raise ToolError("TOMBSTONE_FENCE_REQUIRED")
         if task30_enabled:
             reingress = ReingressGate(runtime_state_root / "reingress.db")
             try:
@@ -399,10 +461,13 @@ def build_server(
                 raise ToolError(str(exc)) from exc
             finally:
                 reingress.close()
+        mutations = GenerationMutationService.from_config(runtime_config)
         try:
-            rel = write_inbox(root, content, title)
+            rel = mutations.remember(content, title, datetime.now(UTC))
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
+        finally:
+            mutations.close()
         return {"inbox_path": rel.as_posix()}
 
     def sb_generation_status(
@@ -515,6 +580,8 @@ def build_server(
             return cast(ToolResult, target.as_dict())
 
     def accept_request(raw: JsonObject, is_effect: bool) -> ToolResult:
+        maintain(datetime.now(UTC))
+
         def accept() -> MemoryEffectWriteAcceptedV2 | MemoryWriteResultV1:
             return accept_memory_write_request(
                 root,
@@ -525,6 +592,7 @@ def build_server(
                 provider_instance_id=config.provider_instance_id,
                 revoked_delegations=config.revoked_delegation_ids,
                 external_public_keys=external_public_keys,
+                barrier_sink=barrier_sink,
             )
 
         try:
@@ -571,6 +639,8 @@ def build_server(
         request: MemoryWriteRequestModel,
     ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
         """Accept unchanged Task 29 V1 bytes into the stable queue."""
+        if high_water()[0] != 0:
+            raise ToolError("TOMBSTONE_FENCE_REQUIRED")
         raw = cast(JsonObject, request.model_dump(mode="json"))
         return accept_request(raw, False)
 
@@ -613,7 +683,19 @@ def build_server(
 
 def main() -> None:
     """Run the MCP server on stdio."""
-    anyio.run(build_server().run_stdio_async)
+    parser = argparse.ArgumentParser(prog="python -m sb.mcp")
+    _ = parser.add_argument("--test-control-socket")
+    arguments = parser.parse_args(sys.argv[1:])
+    control_value = vars(arguments).get("test_control_socket")
+    control = control_value if isinstance(control_value, str) else None
+    sink = None if control is None else UnixBarrierSink(Path(control))
+    if sink is not None:
+        sink.await_trigger("mcp")
+    try:
+        anyio.run(build_server(barrier_sink=sink).run_stdio_async)
+    finally:
+        if sink is not None:
+            sink.close()
 
 
 def _split_md(text: str) -> tuple[str, str]:

@@ -13,7 +13,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal, cast, final
 
-from sb.effect_values import JsonValue, canonical_bytes, format_instant
+from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant
+from sb.export_journal import ExportJournal
+from sb.tombstone_snapshot import (
+    TombstoneSnapshot,
+    register_target_identities,
+    root_at,
+    verified_snapshot,
+)
 
 RequestState = Literal[
     "pending",
@@ -74,6 +81,8 @@ class RequestStatus:
     phase: Phase | None
     fence: int
     owner: str | None
+    owner_process_id: int | None
+    owner_process_start: int | None
     lease_expires_at: str | None
     base_generation_id: str | None
     result_generation_id: str | None
@@ -90,6 +99,8 @@ class RequestLease:
     request_id: str
     fence: int
     owner: str
+    owner_process_id: int
+    owner_process_start: int
     phase: Phase
 
 
@@ -118,6 +129,8 @@ CREATE TABLE IF NOT EXISTS requests(
   )),
   fence INTEGER NOT NULL DEFAULT 0 CHECK(fence>=0),
   owner TEXT,
+  owner_process_id INTEGER,
+  owner_process_start INTEGER,
   lease_expires_at TEXT,
   base_generation_id TEXT,
   result_generation_id TEXT,
@@ -127,8 +140,12 @@ CREATE TABLE IF NOT EXISTS requests(
   proof_json TEXT,
   accepted_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  CHECK((owner IS NULL AND lease_expires_at IS NULL) OR
-        (owner IS NOT NULL AND lease_expires_at IS NOT NULL AND fence>0))
+  CHECK(
+    (owner IS NULL AND owner_process_id IS NULL AND owner_process_start IS NULL
+     AND lease_expires_at IS NULL) OR
+    (owner IS NOT NULL AND owner_process_id IS NOT NULL AND owner_process_start IS NOT NULL
+     AND lease_expires_at IS NOT NULL AND fence>0)
+  )
 );
 CREATE INDEX IF NOT EXISTS request_claim
   ON requests(state,lease_expires_at,accepted_at,request_id);
@@ -175,6 +192,25 @@ CREATE TABLE IF NOT EXISTS tombstone_replica(
   request_id TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tombstone_target_identities(
+  sequence INTEGER NOT NULL REFERENCES tombstone_replica(sequence),
+  target_digest TEXT NOT NULL,
+  source_identity_digest TEXT NOT NULL,
+  content_identity_digest TEXT NOT NULL,
+  citation_identity_digest TEXT NOT NULL,
+  subject_identity_digest TEXT NOT NULL,
+  page_id_digest TEXT NOT NULL,
+  page_content_digest TEXT NOT NULL,
+  citation_span_start INTEGER NOT NULL,
+  citation_span_end INTEGER NOT NULL,
+  PRIMARY KEY(sequence,target_digest)
+);
+CREATE TRIGGER IF NOT EXISTS tombstone_target_no_update
+BEFORE UPDATE ON tombstone_target_identities
+BEGIN SELECT RAISE(ABORT,'immutable tombstone target'); END;
+CREATE TRIGGER IF NOT EXISTS tombstone_target_no_delete
+BEFORE DELETE ON tombstone_target_identities
+BEGIN SELECT RAISE(ABORT,'immutable tombstone target'); END;
 CREATE TABLE IF NOT EXISTS legacy_imports(
   import_digest TEXT PRIMARY KEY,
   legacy_locator_digest TEXT NOT NULL UNIQUE,
@@ -219,11 +255,41 @@ def _optional_text(row: sqlite3.Row, key: str) -> str | None:
     return value
 
 
+def _optional_integer(row: sqlite3.Row, key: str) -> int | None:
+    value = _cell(row, key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise RequestStoreError("REQUEST_JOURNAL_CORRUPT")
+    return value
+
+
 def _integer(row: sqlite3.Row, key: str) -> int:
     value = _cell(row, key)
     if not isinstance(value, int) or isinstance(value, bool):
         raise RequestStoreError("REQUEST_JOURNAL_CORRUPT")
     return value
+
+
+def _process_start(process_id: int) -> int | None:
+    try:
+        raw = Path(f"/proc/{process_id}/stat").read_text(encoding="ascii")
+        close = raw.rfind(")")
+        fields = raw[close + 2 :].split()
+        return int(fields[19]) if close > 0 and len(fields) > 19 else None
+    except (OSError, ValueError):
+        return None
+
+
+def _current_process_start() -> int:
+    observed = _process_start(os.getpid())
+    if observed is None:
+        raise RequestStoreError("REQUEST_OWNER_IDENTITY_INVALID")
+    return observed
+
+
+def _owner_alive(process_id: int, process_start: int) -> bool:
+    return _process_start(process_id) == process_start
 
 
 @final
@@ -252,6 +318,7 @@ class RequestStore:
         _ = self.db.execute("PRAGMA synchronous=FULL")
         _ = self.db.execute("PRAGMA foreign_keys=ON")
         _ = self.db.executescript(_SCHEMA)
+        self.exports = ExportJournal(self.db)
         self.db.commit()
         self.path.chmod(0o600)
 
@@ -310,6 +377,8 @@ class RequestStore:
             phase=phase,
             fence=_integer(row, "fence"),
             owner=_optional_text(row, "owner"),
+            owner_process_id=_optional_integer(row, "owner_process_id"),
+            owner_process_start=_optional_integer(row, "owner_process_start"),
             lease_expires_at=_optional_text(row, "lease_expires_at"),
             base_generation_id=_optional_text(row, "base_generation_id"),
             result_generation_id=_optional_text(row, "result_generation_id"),
@@ -408,7 +477,28 @@ class RequestStore:
                 (*values, request_id, stamp),
             )
             next_root = entry.get("set_root")
-            if not isinstance(next_root, str):
+            tombstone_id = entry.get("tombstone_id")
+            core = {
+                name: entry.get(name)
+                for name in (
+                    "sequence",
+                    "operation",
+                    "lane_id",
+                    "target_manifest_digest",
+                    "scope_digest",
+                    "authority_receipt_digest",
+                    "payload_digest",
+                    "keyed_subject_digest",
+                    "effective_at",
+                    "previous_root",
+                )
+            }
+            observed = digest("tombstone_chain", core)
+            if (
+                not isinstance(next_root, str)
+                or next_root != observed
+                or tombstone_id != "memtomb:v1:" + observed[7:]
+            ):
                 raise RequestStoreError("EFFECT_TOMBSTONE_DELTA_INVALID")
             sequence = next_sequence
             set_root = next_root
@@ -422,6 +512,7 @@ class RequestStore:
         *,
         initial_state: RequestState = "pending",
         tombstones: Sequence[Mapping[str, JsonValue]] | None = None,
+        tombstone_targets: Sequence[Mapping[str, JsonValue]] | None = None,
     ) -> tuple[RequestStatus, bool]:
         stamp = format_instant(now)
         result_json = canonical_bytes(result).decode("utf-8")
@@ -458,14 +549,21 @@ class RequestStore:
                     or set_root != identity.tombstone_set_root
                 ):
                     raise RequestStoreError("TOMBSTONE_SET_STALE")
+                if tombstone_targets is not None:
+                    register_target_identities(
+                        self.db,
+                        sequence,
+                        tuple(dict(target) for target in tombstone_targets),
+                    )
             _ = self.db.execute(
                 """INSERT INTO requests(
                   request_id,schema_version,request_digest,envelope_digest,idempotency_key,lane_id,
                   operation,payload_digest,target_manifest_digest,scope_digest,delegation_id,
                   delegation_digest,delegation_nonce,tombstone_sequence,tombstone_set_root,state,
-                  phase,fence,owner,lease_expires_at,base_generation_id,result_generation_id,
-                  status_digest,proof_digest,result_json,proof_json,accepted_at,updated_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,0,NULL,NULL,NULL,NULL,NULL,NULL,?,NULL,?,?)""",
+                  phase,fence,owner,owner_process_id,owner_process_start,lease_expires_at,
+                  base_generation_id,result_generation_id,status_digest,proof_digest,result_json,
+                  proof_json,accepted_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,?,NULL,?,?)""",
                 (
                     identity.request_id,
                     identity.schema_version,
@@ -514,33 +612,60 @@ class RequestStore:
             raise RequestStoreError("REQUEST_CLAIM_INVALID")
         stamp = format_instant(now)
         expires = format_instant(now + timedelta(milliseconds=lease_ms))
+        owner_process_id = os.getpid()
+        owner_process_start = _current_process_start()
         self._begin()
         try:
-            row = cast(
-                sqlite3.Row | None,
+            candidates = cast(
+                list[sqlite3.Row],
                 self.db.execute(
-                    """SELECT * FROM requests
-                       WHERE state='pending' OR (state='processing' AND lease_expires_at<=?)
-                       ORDER BY accepted_at,request_id LIMIT 1""",
-                    (stamp,),
-                ).fetchone(),
+                    """SELECT * FROM requests WHERE state IN('pending','processing')
+                       ORDER BY accepted_at,request_id"""
+                ).fetchall(),
             )
+            row: sqlite3.Row | None = None
+            dead_owner = False
+            for candidate in candidates:
+                state = _text(candidate, "state")
+                if state == "pending":
+                    row = candidate
+                    break
+                process_id = _optional_integer(candidate, "owner_process_id")
+                process_start = _optional_integer(candidate, "owner_process_start")
+                lease_expires = _optional_text(candidate, "lease_expires_at")
+                if process_id is None or process_start is None or lease_expires is None:
+                    raise RequestStoreError("REQUEST_JOURNAL_CORRUPT")
+                dead_owner = not _owner_alive(process_id, process_start)
+                if dead_owner or lease_expires <= stamp:
+                    row = candidate
+                    break
             if row is None:
                 self._commit()
                 return None
             identity = self._identity(row)
             prior_fence = _integer(row, "fence")
-            fence = prior_fence + 1
             prior_state = _text(row, "state")
+            fence = prior_fence if prior_state == "processing" and dead_owner else prior_fence + 1
             prior_phase = _optional_text(row, "phase")
             phase: Phase = (
                 prior_phase if prior_state == "processing" and prior_phase in PHASES else "claimed"
             )
             changed = self.db.execute(
                 """UPDATE requests SET state='processing',phase=?,fence=?,owner=?,
-                   lease_expires_at=?,updated_at=? WHERE request_id=? AND fence=? AND
-                   (state='pending' OR (state='processing' AND lease_expires_at<=?))""",
-                (phase, fence, worker, expires, stamp, identity.request_id, prior_fence, stamp),
+                   owner_process_id=?,owner_process_start=?,lease_expires_at=?,updated_at=?
+                   WHERE request_id=? AND fence=? AND state=?""",
+                (
+                    phase,
+                    fence,
+                    worker,
+                    owner_process_id,
+                    owner_process_start,
+                    expires,
+                    stamp,
+                    identity.request_id,
+                    prior_fence,
+                    prior_state,
+                ),
             ).rowcount
             if changed != 1:
                 self._rollback()
@@ -579,7 +704,14 @@ class RequestStore:
                 (identity.request_id, fence, phase, None, event_digest, stamp),
             )
             self._commit()
-            return RequestLease(identity.request_id, fence, worker, phase)
+            return RequestLease(
+                identity.request_id,
+                fence,
+                worker,
+                owner_process_id,
+                owner_process_start,
+                phase,
+            )
         except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
@@ -624,6 +756,8 @@ class RequestStore:
                 current.state != "processing"
                 or current.owner != lease.owner
                 or current.fence != lease.fence
+                or current.owner_process_id != lease.owner_process_id
+                or current.owner_process_start != lease.owner_process_start
                 or current.lease_expires_at is None
                 or current.lease_expires_at <= stamp
                 or current.phase is None
@@ -633,7 +767,14 @@ class RequestStore:
             requested_index = PHASES.index(phase)
             if requested_index == current_index:
                 self._commit()
-                return RequestLease(lease.request_id, lease.fence, lease.owner, phase)
+                return RequestLease(
+                    lease.request_id,
+                    lease.fence,
+                    lease.owner,
+                    lease.owner_process_id,
+                    lease.owner_process_start,
+                    phase,
+                )
             if requested_index != current_index + 1:
                 raise RequestStoreError("REQUEST_PHASE_INVALID")
             base_generation = generation_id if phase == "staging" else current.base_generation_id
@@ -641,7 +782,8 @@ class RequestStore:
             changed = self.db.execute(
                 """UPDATE requests SET phase=?,base_generation_id=COALESCE(base_generation_id,?),
                    result_generation_id=COALESCE(?,result_generation_id),updated_at=?
-                   WHERE request_id=? AND state='processing' AND owner=? AND fence=?""",
+                   WHERE request_id=? AND state='processing' AND owner=? AND fence=?
+                   AND owner_process_id=? AND owner_process_start=?""",
                 (
                     phase,
                     base_generation,
@@ -650,6 +792,8 @@ class RequestStore:
                     lease.request_id,
                     lease.owner,
                     lease.fence,
+                    lease.owner_process_id,
+                    lease.owner_process_start,
                 ),
             ).rowcount
             if changed != 1:
@@ -662,7 +806,14 @@ class RequestStore:
                 (lease.request_id, lease.fence, phase, generation_id, event_digest, stamp),
             )
             self._commit()
-            return RequestLease(lease.request_id, lease.fence, lease.owner, phase)
+            return RequestLease(
+                lease.request_id,
+                lease.fence,
+                lease.owner,
+                lease.owner_process_id,
+                lease.owner_process_start,
+                phase,
+            )
         except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
@@ -681,9 +832,10 @@ class RequestStore:
         try:
             changed = self.db.execute(
                 """UPDATE requests SET state='proved',phase='proved',owner=NULL,
-                   lease_expires_at=NULL,proof_digest=?,status_digest=?,proof_json=?,updated_at=?
+                   owner_process_id=NULL,owner_process_start=NULL,lease_expires_at=NULL,
+                   proof_digest=?,status_digest=?,proof_json=?,updated_at=?
                    WHERE request_id=? AND state='processing' AND phase='proved'
-                   AND owner=? AND fence=?""",
+                   AND owner=? AND fence=? AND owner_process_id=? AND owner_process_start=?""",
                 (
                     proof_digest,
                     status_digest,
@@ -692,6 +844,8 @@ class RequestStore:
                     lease.request_id,
                     lease.owner,
                     lease.fence,
+                    lease.owner_process_id,
+                    lease.owner_process_start,
                 ),
             ).rowcount
             if changed != 1:
@@ -716,7 +870,8 @@ class RequestStore:
         self._begin()
         try:
             changed = self.db.execute(
-                """UPDATE requests SET state=?,owner=NULL,lease_expires_at=NULL,status_digest=?,updated_at=?
+                """UPDATE requests SET state=?,owner=NULL,owner_process_id=NULL,
+                   owner_process_start=NULL,lease_expires_at=NULL,status_digest=?,updated_at=?
                    WHERE request_id=? AND state IN ('pending','processing')""",
                 (state, status_digest, stamp, request_id),
             ).rowcount
@@ -744,6 +899,12 @@ class RequestStore:
         except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
+
+    def verified_tombstone_snapshot(self) -> TombstoneSnapshot:
+        return verified_snapshot(self.db)
+
+    def tombstone_root_at(self, sequence: int) -> tuple[int, str]:
+        return root_at(self.db, sequence)
 
     def tombstone_high_water(self) -> tuple[int, str]:
         row = cast(

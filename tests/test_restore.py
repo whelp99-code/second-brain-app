@@ -1,32 +1,52 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 
-from sb.generations import GenerationStore
-from sb.restore import GenerationRestoreSanitizer
+import pytest
+
+from sb.restore import RestoreError
+from tests.task30_restore_factory import OLD, restore_fixture
 
 
-def test_restore_rebuilds_distinct_sanitized_generation(tmp_path: Path) -> None:
-    old = b"pre-tombstone-value"
-    source = tmp_path / "backup"
-    (source / "wiki").mkdir(parents=True)
-    _ = (source / "wiki/old.md").write_bytes(old)
-    _ = (source / "wiki/unrelated.md").write_text("keep", encoding="utf-8")
-    store = GenerationStore(
-        tmp_path / "state", tmp_path / "share",
-        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+def test_restore_accepts_exact_chain_prefix_and_never_activates(tmp_path: Path) -> None:
+    # Given: an old exact-prefix archive and a signed fence at the current chain root.
+    fixture = restore_fixture(tmp_path)
+
+    # When: the provider sanitizes the archive through the global mutation service.
+    generation, proof = fixture.sanitizer.sanitize(
+        fixture.request,
+        fixture.executor.mutations,
     )
-    generation, proof = GenerationRestoreSanitizer(tmp_path / "restore").sanitize(
-        archive=source,
-        store=store,
-        source_high_water=(0, "sha256:" + "0" * 64),
-        current_high_water=(1, "sha256:" + "1" * 64),
-        forbidden_needles=(old,),
-        now=datetime(2026, 8, 31, tzinfo=UTC),
-        request_id="restore:1",
+
+    # Then: blocked bytes are absent, unrelated bytes survive, and active never changes.
+    managed = b"".join(path.read_bytes() for path in generation.root.rglob("*") if path.is_file())
+    assert OLD.encode() not in managed
+    assert fixture.unrelated in managed
+    assert proof.blocked_matches == 0 and proof.scan_errors == 0
+    assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
+    fixture.executor.close()
+
+
+def test_restore_rejects_arbitrary_lower_root(tmp_path: Path) -> None:
+    # Given: a valid archive whose claimed genesis root is changed to an arbitrary lower root.
+    fixture = restore_fixture(tmp_path)
+    forged_manifest = fixture.request.archive_manifest.model_copy(
+        update={"source_tombstone_set_root": "sha256:" + "f" * 64}
     )
-    assert proof.sentinel_matches == 0 and proof.scan_errors == 0
-    assert not (generation.root / "wiki/old.md").exists()
-    assert (generation.root / "wiki/unrelated.md").read_text() == "keep"
-    store.close()
+    forged = fixture.request.model_copy(update={"archive_manifest": forged_manifest})
+
+    # When / Then: exact-prefix validation rejects it before creating a restore generation.
+    before = {
+        path.name
+        for path in fixture.executor.generations.generations.iterdir()
+        if path.is_dir() and not path.name.startswith(".")
+    }
+    with pytest.raises(RestoreError, match="TOMBSTONE_SET_STALE"):
+        _ = fixture.sanitizer.sanitize(forged, fixture.executor.mutations)
+    after = {
+        path.name
+        for path in fixture.executor.generations.generations.iterdir()
+        if path.is_dir() and not path.name.startswith(".")
+    }
+    assert after == before
+    fixture.executor.close()

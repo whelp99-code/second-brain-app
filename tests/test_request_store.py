@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from sb.effect_values import JsonValue
+from sb.effect_values import JsonValue, digest
 from sb.request_store import ReplayConflict, RequestIdentity, RequestStore
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
@@ -63,9 +63,10 @@ def test_lease_reclaim_increments_once_and_phases_are_contiguous(tmp_path: Path)
 def test_request_and_tombstone_acceptance_roll_back_in_one_transaction(tmp_path: Path) -> None:
     store = RequestStore(tmp_path)
     genesis = "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
-    entry: dict[str, JsonValue] = {
-        "sequence": 1, "tombstone_id": "memtomb:v1:" + "1" * 64,
-        "operation": "forget", "lane_id": "lane:" + "2" * 64,
+    core: dict[str, JsonValue] = {
+        "sequence": 1,
+        "operation": "forget",
+        "lane_id": "lane:" + "2" * 64,
         "target_manifest_digest": "sha256:" + "3" * 64,
         "scope_digest": "sha256:" + "4" * 64,
         "authority_receipt_digest": "sha256:" + "5" * 64,
@@ -73,17 +74,22 @@ def test_request_and_tombstone_acceptance_roll_back_in_one_transaction(tmp_path:
         "keyed_subject_digest": "hmac-sha256:" + "7" * 64,
         "effective_at": "2026-08-31T00:00:00.000Z",
         "previous_root": genesis,
-        "set_root": "sha256:" + "1" * 64,
+    }
+    set_root = digest("tombstone_chain", core)
+    entry: dict[str, JsonValue] = {
+        **core,
+        "tombstone_id": "memtomb:v1:" + set_root[7:],
+        "set_root": set_root,
     }
     mismatched = replace(_identity(), tombstone_sequence=1, tombstone_set_root="sha256:" + "f" * 64)
     with pytest.raises(ValueError, match="TOMBSTONE_SET_STALE"):
         _ = store.accept(mismatched, {"state": "pending"}, NOW, tombstones=(entry,))
     assert store.get(mismatched.request_id) is None
     assert store.tombstone_high_water() == (0, genesis)
-    accepted = replace(mismatched, tombstone_set_root="sha256:" + "1" * 64)
+    accepted = replace(mismatched, tombstone_set_root=set_root)
     status, replayed = store.accept(accepted, {"state": "pending"}, NOW, tombstones=(entry,))
     assert status.identity == accepted and replayed is False
-    assert store.tombstone_high_water() == (1, "sha256:" + "1" * 64)
+    assert store.tombstone_high_water() == (1, set_root)
     store.close()
 
 

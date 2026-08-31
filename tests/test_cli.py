@@ -1,5 +1,6 @@
-"""CLI and pipeline orchestration: lock, exit codes, logs, briefing I/O."""
-# noqa: SIZE_OK — single owned test module; file ownership forbids a split
+"""CLI and pipeline orchestration: lock, exit codes, logs, briefing I/O.
+# noqa: SIZE_OK -- legacy CLI behavior matrix remains one test ownership surface
+"""
 
 from __future__ import annotations
 
@@ -406,7 +407,11 @@ def _deriv_count(root: Path) -> int:
 
 
 def _seed_status(root: Path, status: str = "ok") -> None:
-    _ = (root / ".sb" / "runs.log").write_text(
+    runs = root / ".sb" / "runs.log"
+    if root.is_symlink():
+        runs.parent.chmod(0o700)
+        runs.chmod(0o600)
+    _ = runs.write_text(
         f"2026-08-25T00:00:00+00:00 run seed {status} pages=0 conflicts=0 errors=0\n",
         encoding="utf-8",
     )
@@ -480,12 +485,14 @@ def test_changed_briefing_facts_open_new_derivation_and_commit(
     first = run_brief(config, llm_mode="fake")
     assert fake.calls == 1
     before_deriv = _deriv_count(root)
-    before_commits = _git_count(root)
+    before_head = _git(root, "rev-parse", "HEAD").stdout
+    (root / "conflicts").chmod(0o700)
     _ = (root / "conflicts" / "open-x.md").write_text("conflict\n", encoding="utf-8")
     second = run_brief(config, llm_mode="fake")
     assert fake.calls == 2
     assert _deriv_count(root) == before_deriv + 1
-    assert _git_count(root) == before_commits + 1
+    assert _git_count(root) == 1
+    assert _git(root, "rev-parse", "HEAD").stdout != before_head
     assert second.git_commit is not None
     assert first.run_id != second.run_id
 

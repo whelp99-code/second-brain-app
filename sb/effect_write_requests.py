@@ -10,6 +10,7 @@ import secrets
 import stat
 from collections.abc import Mapping
 from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +33,12 @@ from sb.effect_write_values import (
     request_file_digest,
 )
 from sb.request_store import ReplayConflict, RequestIdentity, RequestStore, RequestStoreError
+from sb.task30_barriers import (
+    BarrierContext,
+    BoundBarrierEmitter,
+    NoopBarrierSink,
+    Task30BarrierSink,
+)
 
 
 class EffectWriteIoError(ValueError):
@@ -105,7 +112,16 @@ def _read_file(directory: int, name: str) -> bytes:
             os.close(descriptor)
 
 
-def _publish(directory: int, final: str, payload: bytes) -> None:
+@dataclass(frozen=True, slots=True)
+class _PendingPublication:
+    final: str
+    payload: bytes
+    emitter: BoundBarrierEmitter
+
+
+def _publish(directory: int, publication: _PendingPublication) -> None:
+    final = publication.final
+    payload = publication.payload
     temporary = f".{final}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
     descriptor: int | None = None
     linked = False
@@ -123,6 +139,7 @@ def _publish(directory: int, final: str, payload: bytes) -> None:
                 raise EffectWriteIoError("WRITE_REQUEST_IO_FAILED")
             written += count
         os.fsync(descriptor)
+        publication.emitter.emit("request_temp_write")
         before = os.fstat(descriptor)
         if not _safe_file(before):
             raise EffectWriteIoError("WRITE_REQUEST_INBOX_UNSAFE")
@@ -143,6 +160,7 @@ def _publish(directory: int, final: str, payload: bytes) -> None:
         os.fsync(directory)
         os.unlink(temporary, dir_fd=directory)
         os.fsync(directory)
+        publication.emitter.emit("pending_publish_fsync")
     except FileExistsError:
         raise
     except OSError as exc:
@@ -218,6 +236,7 @@ def accept_effect_request(
     provider_instance_id: str | None = None,
     revoked_delegations: AbstractSet[str] | None = None,
     external_public_keys: Mapping[str, Ed25519PublicKey] | None = None,
+    barrier_sink: Task30BarrierSink | None = None,
 ) -> MemoryEffectWriteAcceptedV2:
     """Verify, atomically publish, and globally journal one V2 request."""
     stamp = format_instant(accepted_at)
@@ -272,7 +291,17 @@ def accept_effect_request(
         if not valid_high_water:
             raise EffectRequestRejected("EFFECT_TOMBSTONE_STALE", request.request_id)
         try:
-            _publish(directory, final, payload)
+            _publish(
+                directory,
+                _PendingPublication(
+                    final,
+                    payload,
+                    BoundBarrierEmitter(
+                        barrier_sink or NoopBarrierSink(),
+                        BarrierContext(request.request_id),
+                    ),
+                ),
+            )
         except FileExistsError:
             existing = _read_file(directory, final)
             loaded = strict_loads(existing, MAX_EFFECT_FILE_BYTES)
@@ -285,7 +314,11 @@ def accept_effect_request(
         file_digest = request_file_digest(request, stamp)
         accepted = _result(request, stamp, file_digest, False)
         status, replayed = store.accept(
-            identity, model_object(accepted), parse_instant(stamp), tombstones=delta
+            identity,
+            model_object(accepted),
+            parse_instant(stamp),
+            tombstones=delta,
+            tombstone_targets=[model_object(target) for target in request.targets] if delta else None,
         )
         if replayed:
             loaded = strict_loads(status.result_json, MAX_EFFECT_FILE_BYTES)

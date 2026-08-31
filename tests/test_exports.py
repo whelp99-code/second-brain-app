@@ -6,10 +6,13 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from sb.effect_write_models import MemoryEffectWriteRequestV2
 from sb.effect_write_values import frozen_correction_vector
-from sb.exports import ExportPublisher
+from sb.exports import ExportError, ExportPublication, ExportPublisher
 from sb.generations import Generation, GenerationStore
+from sb.request_store import RequestStore
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 RECORD = "approved export record"
@@ -95,25 +98,55 @@ def _request(generation: Generation) -> MemoryEffectWriteRequestV2:
 def test_record_level_export_is_fixed_root_private_and_invalidatable(tmp_path: Path) -> None:
     store, generation = _generation(tmp_path)
     request = _request(generation)
-    publisher = ExportPublisher(tmp_path / "exports", "a" * 40)
+    requests = RequestStore(tmp_path / "requests")
+    publisher = ExportPublisher(tmp_path / "exports", "a" * 40, requests.exports)
     manifest = publisher.publish(
-        request, generation, NOW,
-        current_high_water=lambda: (0, ROOT), fence=1,
+        ExportPublication(request, generation, NOW, lambda: (0, ROOT), 1)
     )
     root = tmp_path / "exports" / request.request_id
     assert (root / "memory.json").stat().st_mode & 0o777 == 0o600
     assert RECORD in (root / "memory.json").read_text(encoding="utf-8")
     assert manifest.record_count == 1 and manifest.data_bytes <= 4096
-    assert publisher.invalidate({request.targets[0].target_id})
+    assert publisher.invalidate({request.targets[0].target_id}, NOW)
     assert not root.exists()
     store.close()
+    requests.close()
 
 
 def test_export_expiry_removes_all_managed_residue(tmp_path: Path) -> None:
     store, generation = _generation(tmp_path)
     request = _request(generation)
-    publisher = ExportPublisher(tmp_path / "exports", "a" * 40)
-    _ = publisher.publish(request, generation, NOW, current_high_water=lambda: (0, ROOT), fence=1)
+    requests = RequestStore(tmp_path / "requests")
+    publisher = ExportPublisher(tmp_path / "exports", "a" * 40, requests.exports)
+    _ = publisher.publish(ExportPublication(request, generation, NOW, lambda: (0, ROOT), 1))
     assert publisher.expire(NOW + timedelta(days=1))
     assert tuple((tmp_path / "exports").iterdir()) == ()
+    lifecycle = requests.exports.get(request.request_id)
+    assert lifecycle is not None and lifecycle.state == "expired"
     store.close()
+    requests.close()
+
+
+def test_export_is_available_until_but_not_at_exact_one_day_cutoff(tmp_path: Path) -> None:
+    # Given: one durably published export with the fixed one-day retention interval.
+    store, generation = _generation(tmp_path)
+    request = _request(generation)
+    requests = RequestStore(tmp_path / "requests")
+    publisher = ExportPublisher(tmp_path / "exports", "a" * 40, requests.exports)
+    manifest = publisher.publish(
+        ExportPublication(request, generation, NOW, lambda: (0, ROOT), 1)
+    )
+
+    # When / Then: one millisecond before expiry is available.
+    before = NOW + timedelta(milliseconds=86_399_999)
+    assert publisher.read_manifest(request.request_id, before) == manifest
+
+    # When / Then: the exact 86,400,000ms boundary is unavailable and disposed.
+    cutoff = NOW + timedelta(milliseconds=86_400_000)
+    with pytest.raises(ExportError, match="EXPORT_EXPIRED"):
+        _ = publisher.read_manifest(request.request_id, cutoff)
+    assert not (tmp_path / "exports" / request.request_id).exists()
+    lifecycle = requests.exports.get(request.request_id)
+    assert lifecycle is not None and lifecycle.state == "expired"
+    store.close()
+    requests.close()

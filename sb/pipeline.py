@@ -1,5 +1,6 @@
-"""Thin run orchestration: lock, ledger, logs, briefing I/O, vault writes."""
-# noqa: SIZE_OK — single owned orchestrator; ownership forbids a split
+"""Thin run orchestration: lock, ledger, logs, briefing I/O, vault writes.
+# noqa: SIZE_OK -- legacy stage assembly; public writers now enter generation_runtime
+"""
 
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ import os
 import re
 import sqlite3
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Protocol
@@ -19,6 +20,12 @@ from sb.config import Config
 from sb.connectors.base import SourceAdapter
 from sb.contracts import Blob, BriefingInputs, PageSpec, Unit
 from sb.erasure import ErasureError, ReingressGate
+from sb.generation_runtime import (
+    GenerationAuthority,
+    GenerationMutation,
+    GenerationMutationService,
+    GenerationOperation,
+)
 from sb.llm import LLMClient, LLMUnavailable
 from sb.store import (
     DerivationOutput,
@@ -376,14 +383,27 @@ def _run_locked(root: Path, stage: StageFn) -> RunOutcome:
         return RunOutcome(run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written)
 
 
-def _execute(config: Config, stage: StageFn) -> RunOutcome:
+def _execute(config: Config, stage: StageFn, operation: GenerationOperation) -> RunOutcome:
     root = Path(config.vault_root)
-    fd = _try_lock(root)
+    lock_root = Path(config.state_root) if root.is_symlink() else root
+    fd = _try_lock(lock_root)
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    service = GenerationMutationService.from_config(config)
     try:
-        return _run_locked(root, stage)
+        result = service.mutate(
+            GenerationMutation(
+                mutation_id=f"pipeline:{operation.value}:{uuid4().hex}",
+                operation=operation,
+                now=datetime.now(UTC),
+                authority=GenerationAuthority(None, None),
+                apply=lambda staging: _run_locked(staging, stage),
+            )
+        )
+        git_commit = result.generation.head if result.value.git_commit is not None else None
+        return replace(result.value, git_commit=git_commit)
     finally:
+        service.close()
         _unlock(fd)
 
 
@@ -406,6 +426,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 attempted += 1
                 continue
             progressed = False
+            blocked = False
             for ref, data, meta in items:
                 version_key = (ref.source_id, ref.source_uri, ref.source_version)
                 if version_key in seen:
@@ -438,18 +459,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     )
                     reingress.check_content(data)
                 except ErasureError:
-                    ledger.upsert_source_item(
-                        SourceItem(
-                            ref.source_id,
-                            ref.source_uri,
-                            ref.source_version,
-                            digest,
-                            run_id,
-                            run_id,
-                        )
-                    )
-                    seen.add(version_key)
-                    progressed = True
+                    blocked = True
                     continue
                 units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
                 if not units and data:
@@ -477,7 +487,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     progressed = True
             if capped:
                 break
-            if progressed or not attempted:
+            if not blocked and (progressed or not attempted):
                 ledger.set_cursor(adapter.source_id, adapter.next_cursor(), datetime.now(UTC).isoformat())
         reingress.close()
         return StageReport((), 0, errors, attempted, capped, None, written)
@@ -566,23 +576,31 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
 def run_ingest(
     config: Config, sources: Sequence[str] | None, *, stage: StageFn | None = None, limit: int | None = None
 ) -> RunOutcome:
-    return _execute(config, stage if stage is not None else _ingest(config, sources, limit))
+    return _execute(
+        config,
+        stage if stage is not None else _ingest(config, sources, limit),
+        GenerationOperation.INGEST,
+    )
 
 
 def run_compile(config: Config, *, compiler: StageFn | None = None, llm_mode: str = "cli") -> RunOutcome:
-    return _execute(config, compiler if compiler is not None else _compile_stage(config, llm_mode))
+    return _execute(
+        config,
+        compiler if compiler is not None else _compile_stage(config, llm_mode),
+        GenerationOperation.COMPILE,
+    )
 
 
 def run_brief(config: Config, *, generator: BriefGenerator | None = None, llm_mode: str = "cli") -> RunOutcome:
-    return _execute(config, _brief_stage(config, generator, llm_mode))
+    return _execute(
+        config,
+        _brief_stage(config, generator, llm_mode),
+        GenerationOperation.BRIEF,
+    )
 
 
 def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
-    root = Path(config.vault_root)
-    fd = _try_lock(root)
-    if fd is None:
-        return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
-    try:
+    def stages(root: Path) -> RunOutcome:
         ingest = _run_locked(root, _ingest(config, sources, None))
         compiled = _run_locked(root, _compile_stage(config, "cli"))
         if ingest.written == 0 and compiled.pages == 0:
@@ -591,15 +609,35 @@ def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
                 brief = ingest
         else:
             brief = _run_locked(root, _brief_stage(config, None, "cli"))
+        chosen = brief
+        for outcome in (ingest, compiled, brief):
+            if outcome.exit_code != 0:
+                return outcome
+            if outcome.status == "capped":
+                chosen = outcome
+        return chosen
+
+    root = Path(config.vault_root)
+    lock_root = Path(config.state_root) if root.is_symlink() else root
+    fd = _try_lock(lock_root)
+    if fd is None:
+        return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    service = GenerationMutationService.from_config(config)
+    try:
+        result = service.mutate(
+            GenerationMutation(
+                mutation_id=f"pipeline:run:{uuid4().hex}",
+                operation=GenerationOperation.RUN,
+                now=datetime.now(UTC),
+                authority=GenerationAuthority(None, None),
+                apply=stages,
+            )
+        )
+        git_commit = result.generation.head if result.value.git_commit is not None else None
+        return replace(result.value, git_commit=git_commit)
     finally:
+        service.close()
         _unlock(fd)
-    chosen = brief
-    for outcome in (ingest, compiled, brief):
-        if outcome.exit_code != 0:
-            return outcome
-        if outcome.status == "capped":
-            chosen = outcome
-    return chosen
 
 
 def read_status(config: Config) -> str:

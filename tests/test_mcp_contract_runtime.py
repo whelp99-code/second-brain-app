@@ -110,6 +110,9 @@ def runtime() -> Iterator[tuple[Path, MCPServer, MCPServer]]:
     try:
         yield root, build_server(root), build_server(empty_root)
     finally:
+        for path in base.rglob("*"):
+            if not path.is_symlink():
+                path.chmod(0o700 if path.is_dir() else 0o600)
         shutil.rmtree(base, ignore_errors=True)
 
 

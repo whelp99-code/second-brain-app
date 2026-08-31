@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import stat
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -88,8 +89,11 @@ class Ledger:
         if existed:
             assert_ledger_integrity(path)
         try:
-            conn = sqlite3.connect(path)
-            _ = conn.execute("PRAGMA journal_mode=WAL")
+            if existed and not path.stat().st_mode & stat.S_IWUSR:
+                conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            else:
+                conn = sqlite3.connect(path)
+                _ = conn.execute("PRAGMA journal_mode=WAL")
         except sqlite3.DatabaseError as exc:
             raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
         _ = conn.executescript(_SCHEMA)

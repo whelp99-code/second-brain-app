@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule Second Brain lifecycle maintenance
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=jm-second-brain-maintenance.service
+
+[Install]
+WantedBy=timers.target

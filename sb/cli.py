@@ -3,23 +3,26 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import importlib.util
 import json
 import os
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import asdict
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
-
+from sb.cli_requests import apply_requests_once
 from sb.config import load_config
-from sb.inbox import RememberRejected, write_inbox
+from sb.generation_runtime import (
+    GenerationAuthority,
+    GenerationMutation,
+    GenerationMutationService,
+    GenerationOperation,
+)
+from sb.inbox import RememberRejected
 from sb.pipeline import audit_citations, read_status, run_all, run_brief, run_compile, run_ingest
-from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import VaultLintError, init_vault
@@ -38,6 +41,7 @@ class Command(StrEnum):
     SEARCH = "search"
     REMEMBER = "remember"
     APPLY_REQUESTS = "apply-requests"
+    MAINTAIN = "maintain"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -67,6 +71,9 @@ def _parser() -> argparse.ArgumentParser:
     _ = remember.add_argument("--title")
     apply_requests = sub.add_parser(Command.APPLY_REQUESTS.value)
     _ = apply_requests.add_argument("--once", action="store_true")
+    _ = apply_requests.add_argument("--test-control-socket")
+    maintain = sub.add_parser(Command.MAINTAIN.value)
+    _ = maintain.add_argument("--once", action="store_true")
     return parser
 
 
@@ -149,7 +156,19 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
 
     def doctor() -> int:
         if _opt_flag(ns, "rebuild_ledger"):
-            rebuild_from_vault(config.vault_root)
+            mutations = GenerationMutationService.from_config(config)
+            try:
+                _ = mutations.mutate(
+                    GenerationMutation(
+                        mutation_id="doctor:rebuild-ledger",
+                        operation=GenerationOperation.COMPILE,
+                        now=datetime.now(UTC),
+                        authority=GenerationAuthority(None, None),
+                        apply=lambda root: rebuild_from_vault(root),
+                    )
+                )
+            finally:
+                mutations.close()
         reasons = audit_citations(Path(config.vault_root))
         if reasons:
             print("\n".join(reasons), file=sys.stderr)
@@ -180,71 +199,40 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if content is None or not content.strip():
             print("remember requires content", file=sys.stderr)
             return 2
+        mutations = GenerationMutationService.from_config(config)
         try:
-            rel = write_inbox(Path(config.vault_root), content, _opt_str(ns, "title"))
+            rel = mutations.remember(content, _opt_str(ns, "title"), datetime.now(UTC))
         except RememberRejected as exc:
             print(str(exc), file=sys.stderr)
             return 1
+        finally:
+            mutations.close()
         print(rel.as_posix())
+        return 0
+
+    def maintain() -> int:
+        if not _opt_flag(ns, "once"):
+            print("maintain requires --once", file=sys.stderr)
+            return 2
+        mutations = GenerationMutationService.from_config(config)
+        try:
+            result = mutations.maintain(datetime.now(UTC))
+        finally:
+            mutations.close()
+        print(
+            json.dumps(
+                {"disposed_exports": len(result.disposed_export_digests)},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
         return 0
 
     def apply_requests() -> int:
         if not _opt_flag(ns, "once"):
             print("apply-requests requires --once", file=sys.stderr)
             return 2
-        configured_jarvis_keys = config.jarvis_public_keys
-        if (
-            not configured_jarvis_keys
-            or config.provider_signing_key_id is None
-            or config.provider_private_key is None
-        ):
-            print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
-            return 1
-        try:
-            jarvis_keys = {
-                key_id: Ed25519PublicKey.from_public_bytes(
-                    base64.urlsafe_b64decode(encoded + "==")
-                )
-                for key_id, encoded in configured_jarvis_keys.items()
-                if key_id not in config.revoked_jarvis_signing_key_ids
-            }
-            external_keys = {
-                key_id: Ed25519PublicKey.from_public_bytes(
-                    base64.urlsafe_b64decode(encoded + "==")
-                )
-                for key_id, encoded in config.external_erasure_public_keys.items()
-            }
-            provider_key = Ed25519PrivateKey.from_private_bytes(
-                base64.urlsafe_b64decode(config.provider_private_key + "==")
-            )
-        except ValueError:
-            print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
-            return 1
-        if not jarvis_keys:
-            print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
-            return 1
-        executor = RequestExecutor(
-            ExecutorConfig(
-                request_root=Path(config.request_root),
-                state_root=Path(config.state_root),
-                share_root=Path(config.share_root),
-                export_root=Path(config.export_root),
-                backup_root=Path(config.backup_root),
-                provider_instance_id=config.provider_instance_id,
-                provider_release_sha=config.provider_release_sha,
-                provider_signing_key_id=config.provider_signing_key_id,
-                provider_signing_key=provider_key,
-                jarvis_public_keys=jarvis_keys,
-                external_public_keys=external_keys,
-                legacy_request_roots=tuple(Path(root) for root in config.legacy_request_roots),
-            )
-        )
-        try:
-            result = executor.apply_once()
-        finally:
-            executor.close()
-        print(json.dumps(asdict(result), sort_keys=True, separators=(",", ":")))
-        return 0 if result.state in {"idle", "proved", "reconciling"} else 1
+        return apply_requests_once(config, _opt_str(ns, "test_control_socket"))
 
     handlers: dict[Command, Callable[[], int]] = {
         Command.INIT: init,
@@ -259,12 +247,13 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.SEARCH: search,
         Command.REMEMBER: remember,
         Command.APPLY_REQUESTS: apply_requests,
+        Command.MAINTAIN: maintain,
     }
     return handlers[command]()
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Parse argv and dispatch one of the eleven subcommands."""
+    """Parse argv and dispatch one provider subcommand."""
     parser = _parser()
     tokens = sys.argv[1:] if argv is None else argv
     try:
