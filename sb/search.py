@@ -11,9 +11,10 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Protocol, TypedDict, runtime_checkable
+from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
 from sb.config import APP_ROOT
+from sb.effect_values import strict_loads
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
@@ -50,7 +51,12 @@ class SearchHit:
 @runtime_checkable
 class HybridModule(Protocol):
     def hybrid_search(
-        self, lexical_results: tuple[SearchHit, ...], query: str, limit: int
+        self,
+        lexical_results: tuple[SearchHit, ...],
+        query: str,
+        limit: int,
+        *,
+        vault_root: Path | None = None,
     ) -> Sequence[SearchHit]: ...
 
 
@@ -94,15 +100,18 @@ class SearchIndex:
     hybrid: bool | None = None
 
     def search(self, query: str, limit: int = 10) -> tuple[SearchHit, ...]:
-        """Rebuild the FTS5 index from HEAD, then BM25-search `query`."""
+        """Read a sealed index, or rebuild only for a legacy mutable vault."""
         root = self.vault_root
         db_path = _db_path(root)
-        with _connect(db_path) as conn:
-            _rebuild(conn, root)
+        if (root / "generation.json").is_file():
+            _validate_sealed_index(db_path, root)
+        else:
+            with _connect(db_path) as conn:
+                _rebuild(conn, root)
         hits = _lexical(db_path, query, limit)
         if not _wants_hybrid(self.hybrid):
             return hits
-        return _hybrid_or_lexical(hits, query, limit)
+        return _hybrid_or_lexical(hits, query, limit, root)
 
 
 def _db_path(root: Path) -> Path:
@@ -135,6 +144,33 @@ def _rebuild(conn: sqlite3.Connection, root: Path) -> None:
         for section, body in _sections(text):
             rows.append((page_id, section, body))
     _ = conn.executemany("INSERT INTO docs(page_id, section, text) VALUES (?,?,?)", rows)
+
+
+def _validate_sealed_index(db_path: Path, root: Path) -> None:
+    try:
+        loaded = strict_loads((root / "generation.json").read_bytes(), 65_536)
+        manifest = loaded if isinstance(loaded, dict) else {}
+        connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        row = cast(
+            tuple[object, ...] | None,
+            connection.execute(
+                "SELECT generation_id,head,tree,tombstone_sequence,tombstone_set_root,"
+                + "manifest_digest FROM generation_meta LIMIT 1"
+            ).fetchone(),
+        )
+        connection.close()
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        raise RuntimeError("GENERATION_INDEX_INVALID") from exc
+    expected = (
+        manifest.get("generation_id"),
+        manifest.get("head"),
+        manifest.get("tree"),
+        manifest.get("tombstone_sequence"),
+        manifest.get("tombstone_set_root"),
+        manifest.get("lexical_manifest_digest"),
+    )
+    if row != expected:
+        raise RuntimeError("GENERATION_INDEX_INVALID")
 
 
 def _lexical(db_path: Path, query: str, limit: int) -> tuple[SearchHit, ...]:
@@ -215,7 +251,7 @@ def _hybrid_from_config() -> bool:
 
 
 def _hybrid_or_lexical(
-    hits: tuple[SearchHit, ...], query: str, limit: int
+    hits: tuple[SearchHit, ...], query: str, limit: int, root: Path
 ) -> tuple[SearchHit, ...]:
     try:
         module = importlib.import_module("sb.hybrid_search")
@@ -223,7 +259,7 @@ def _hybrid_or_lexical(
         _LOGGER.warning("hybrid search unavailable; using lexical results")
         return hits
     if isinstance(module, HybridModule):
-        return tuple(module.hybrid_search(hits, query, limit))
+        return tuple(module.hybrid_search(hits, query, limit, vault_root=root))
     _LOGGER.warning("hybrid search unavailable; using lexical results")
     return hits
 

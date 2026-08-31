@@ -10,7 +10,14 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from pydantic import Field, ValidationError, model_validator
 
-from sb.effect_values import JsonObject, canonical_bytes, digest, parse_instant
+from sb.effect_values import (
+    JsonInput,
+    JsonObject,
+    JsonValue,
+    canonical_bytes,
+    digest,
+    parse_instant,
+)
 from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
 
@@ -107,7 +114,7 @@ class MemoryDispositionProofV1(ClosedModel):
             if self.proof_type == "correction":
                 valid = valid and self.artifact_manifest_digest is not None
         if not valid:
-            raise ValueError("PROOF_OPERATION_CONFUSION")
+            raise DispositionRejected("PROOF_OPERATION_CONFUSION")
         return self
 
 
@@ -152,10 +159,10 @@ def create_surface_manifest(
 
 
 def sign_disposition_proof(
-    body: Mapping[str, object],
+    body: Mapping[str, JsonInput],
     private_key: Ed25519PrivateKey,
 ) -> MemoryDispositionProofV1:
-    unsigned: dict[str, object] = dict(body)
+    unsigned: dict[str, JsonInput] = dict(body)
     _ = unsigned.pop("proof_id", None)
     _ = unsigned.pop("proof_digest", None)
     _ = unsigned.pop("signature", None)
@@ -173,7 +180,7 @@ def sign_disposition_proof(
 
 
 def verify_disposition_proof(
-    value: object,
+    value: JsonValue,
     keys: Mapping[str, Ed25519PublicKey],
     *,
     provider_instance_id: str,

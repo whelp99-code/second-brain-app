@@ -274,10 +274,15 @@ def _vec_cli() -> str | None:
                  "/usr/local/opt/sqlite/bin/sqlite3", "sqlite3"):
         if cand is None or ext is None:
             continue
-        done = subprocess.run(
-            [cand, ":memory:", f".load {ext}", "select vec_version();"],
-            capture_output=True, text=True, check=False,
-        )
+        if os.path.dirname(cand) and not os.access(cand, os.X_OK):
+            continue
+        try:
+            done = subprocess.run(
+                [cand, ":memory:", f".load {ext}", "select vec_version();"],
+                capture_output=True, text=True, check=False,
+            )
+        except OSError:
+            continue
         if done.returncode == 0 and done.stdout.strip() != "":
             found = cand
             break

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -64,6 +65,47 @@ def test_reader_lease_blocks_predecessor_disposal(tmp_path: Path) -> None:
     assert store.active().generation_id == second.generation_id
     store.close()
     requests.close()
+
+
+def test_open_predecessor_descriptor_blocks_disposal(tmp_path: Path) -> None:
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share",
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    first = _build(store, text="first")
+    store.activate(first, None, NOW)
+    second = _build(store, first, "second")
+    descriptor = os.open(first.root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
+            store.activate(second, first, NOW)
+        assert first.root.is_dir()
+    finally:
+        os.close(descriptor)
+        store.close()
+
+
+def test_generation_rebuilds_every_named_derived_store(tmp_path: Path) -> None:
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share",
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    generation = _build(store)
+    expected = {
+        ".sb/ledger.db",
+        ".sb/search.db",
+        ".sb/vectors.db",
+        ".sb/briefing-manifest.json",
+        ".sb/derived-manifest.json",
+    }
+    observed = {
+        path.relative_to(generation.root).as_posix()
+        for path in generation.root.rglob("*")
+        if path.is_file()
+    }
+    assert expected <= observed
+    assert all((generation.root / relative).stat().st_size > 0 for relative in expected)
+    store.close()
 
 
 def test_unexpected_pointer_is_split_brain(tmp_path: Path) -> None:

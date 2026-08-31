@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from sb.effect_values import digest, format_instant
+from sb.effect_values import JsonObject, digest, format_instant
 from sb.page_ids import git_rel
 
 
@@ -67,7 +67,7 @@ class ResolvedMemoryTargetV1:
     resolved_at: str
     expires_at: str
 
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> JsonObject:
         return asdict(self)
 
 
@@ -81,7 +81,7 @@ class TargetScopeV1:
     max_bytes: int
     source_owner_classes: tuple[str, ...]
 
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> JsonObject:
         value = asdict(self)
         value["sensitivity_classes"] = list(self.sensitivity_classes)
         value["source_owner_classes"] = list(self.source_owner_classes)
@@ -150,7 +150,7 @@ def resolve_memory_target(
     citation_identity = _full_identity(citation_identity, "EFFECT_TARGET_INVALID")
     valid_from = selector.valid_from or format_instant(observed)
     valid_until = selector.valid_until or format_instant(observed + timedelta(days=1))
-    core: dict[str, object] = {
+    core: JsonObject = {
         "schema_version": 1,
         "provider_instance_id": generation.provider_instance_id,
         "generation_id": generation.generation_id,

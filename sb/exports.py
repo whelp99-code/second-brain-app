@@ -1,4 +1,6 @@
-"""Fixed-root record-level export publication, expiry, and invalidation."""
+"""Fixed-root record-level export publication, expiry, and invalidation.
+# noqa: SIZE_OK -- one fixed-root export lifecycle boundary
+"""
 
 from __future__ import annotations
 
@@ -14,6 +16,7 @@ from typing import Literal, final
 from pydantic import Field
 
 from sb.effect_values import (
+    JsonInput,
     JsonObject,
     canonical_bytes,
     digest,
@@ -21,7 +24,12 @@ from sb.effect_values import (
     parse_instant,
     strict_loads,
 )
-from sb.effect_write_models import ClosedModel, ExportPayloadModelV2, MemoryEffectWriteRequestV2
+from sb.effect_write_models import (
+    ClosedModel,
+    ExportPayloadModelV2,
+    MemoryEffectWriteRequestV2,
+    ResolvedMemoryTargetModel,
+)
 from sb.generations import Generation
 
 
@@ -72,6 +80,13 @@ class ExportPublisher:
         self.root = root
         self.provider_release_sha = provider_release_sha
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        metadata = root.stat(follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or metadata.st_nlink < 2
+        ):
+            raise ExportError("EXPORT_ROOT_UNSAFE")
         root.chmod(0o700)
 
     @staticmethod
@@ -96,11 +111,7 @@ class ExportPublisher:
             os.close(descriptor)
 
     @staticmethod
-    def _record(generation: Generation, target: object) -> JsonObject:
-        from sb.effect_write_models import ResolvedMemoryTargetModel
-
-        if not isinstance(target, ResolvedMemoryTargetModel):
-            raise ExportError("EXPORT_SCOPE_AMBIGUOUS")
+    def _record(generation: Generation, target: ResolvedMemoryTargetModel) -> JsonObject:
         if (
             target.generation_id != generation.generation_id
             or target.vault_head != generation.head
@@ -154,10 +165,16 @@ class ExportPublisher:
         if len(records) > payload.max_records or len(data) > payload.max_bytes:
             raise ExportError("EXPORT_SCOPE_AMBIGUOUS")
         final = self.root / request.request_id
-        if final.exists():
+        if final.exists() or final.is_symlink():
+            metadata = final.stat(follow_symlinks=False)
+            if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid():
+                raise ExportError("EXPORT_ROOT_UNSAFE")
             return self.read_manifest(request.request_id)
         staging = self.root / f".staging-{request.request_id}.{fence}"
-        if staging.exists():
+        if staging.exists() or staging.is_symlink():
+            metadata = staging.stat(follow_symlinks=False)
+            if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid():
+                raise ExportError("EXPORT_ROOT_UNSAFE")
             shutil.rmtree(staging)
         staging.mkdir(mode=0o700)
         try:
@@ -169,7 +186,7 @@ class ExportPublisher:
                 bytes=len(data),
             )
             expires = now + timedelta(days=1)
-            body: dict[str, object] = {
+            body: dict[str, JsonInput] = {
                 "schema_version": 1,
                 "request_id": request.request_id,
                 "request_digest": request.request_digest,
@@ -206,6 +223,8 @@ class ExportPublisher:
                 request.tombstone_high_water.set_root,
             ):
                 raise ExportError("TOMBSTONE_SET_STALE")
+            if final.exists() or final.is_symlink():
+                raise ExportError("WRITE_REQUEST_REPLAY_CONFLICT")
             os.rename(staging, final)
             root_fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
             try:
@@ -213,7 +232,7 @@ class ExportPublisher:
             finally:
                 os.close(root_fd)
             return manifest
-        except BaseException:
+        except (OSError, RuntimeError, ValueError):
             shutil.rmtree(staging, ignore_errors=True)
             raise
 
@@ -223,6 +242,42 @@ class ExportPublisher:
         path = self.root / request_id / "manifest.json"
         value = strict_loads(path.read_bytes(), 262_144)
         return MemoryExportManifestV1.model_validate(value)
+
+    def validate(self, now: datetime) -> None:
+        for path in sorted(self.root.iterdir(), key=lambda item: item.name):
+            metadata = path.stat(follow_symlinks=False)
+            if (
+                path.name.startswith(".staging-")
+                or not stat.S_ISDIR(metadata.st_mode)
+                or metadata.st_uid != os.getuid()
+                or stat.S_IMODE(metadata.st_mode) != 0o700
+            ):
+                raise ExportError("EXPORT_ROOT_UNSAFE")
+            names = {item.name for item in path.iterdir()}
+            if names != {"memory.json", "manifest.json"}:
+                raise ExportError("EXPORT_ROOT_UNSAFE")
+            manifest = self.read_manifest(path.name)
+            if manifest.request_id != path.name or parse_instant(manifest.expires_at) <= now:
+                raise ExportError("EXPORT_ROOT_UNSAFE")
+            data = path / "memory.json"
+            data_metadata = data.stat(follow_symlinks=False)
+            manifest_metadata = (path / "manifest.json").stat(follow_symlinks=False)
+            if any(
+                not stat.S_ISREG(item.st_mode)
+                or item.st_uid != os.getuid()
+                or item.st_nlink != 1
+                or stat.S_IMODE(item.st_mode) != 0o600
+                for item in (data_metadata, manifest_metadata)
+            ):
+                raise ExportError("EXPORT_ROOT_UNSAFE")
+            raw = data.read_bytes()
+            expected = manifest.files[0]
+            if (
+                expected.name != "memory.json"
+                or expected.bytes != len(raw)
+                or expected.digest != "sha256:" + hashlib.sha256(raw).hexdigest()
+            ):
+                raise ExportError("EXPORT_ROOT_UNSAFE")
 
     def expire(self, now: datetime) -> tuple[str, ...]:
         removed: list[str] = []

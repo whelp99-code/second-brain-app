@@ -1,4 +1,6 @@
-"""Export and validate the canonical K5 MCP compatibility contract."""
+"""Export and validate the canonical K5 MCP compatibility contract.
+# noqa: SIZE_OK -- one frozen generated MCP contract artifact
+"""
 
 from __future__ import annotations
 

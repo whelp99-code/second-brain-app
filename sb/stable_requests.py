@@ -136,7 +136,7 @@ def _publish(directory: Path, name: str, payload: bytes) -> None:
         try:
             os.unlink(temporary, dir_fd=directory_fd)
         except FileNotFoundError:
-            pass
+            temporary = ""
         fcntl.flock(directory_fd, fcntl.LOCK_UN)
         os.close(directory_fd)
 

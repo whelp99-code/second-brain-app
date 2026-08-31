@@ -2,20 +2,26 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar
 
 import anyio
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from mcp.client import Client
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult
 from pydantic import BaseModel, ConfigDict
-from pytest import raises
+from pytest import MonkeyPatch, raises
 
+import sb.mcp as mcp_module
 from sb.contracts import PageSpec, SourceCite
-from sb.mcp import K5_TOOLS, RememberRejected, build_server, write_inbox
+from sb.generations import GenerationStore
+from sb.mcp import K5_TOOLS, LEGACY_TOOLS, RememberRejected, build_server, write_inbox
+from sb.mcp_contract import write_fixture_request
 from sb.request_store import RequestIdentity, RequestStore
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
@@ -167,6 +173,98 @@ def _call(server: MCPServer, name: str, arguments: Mapping[str, str | int | None
             return await client.call_tool(name, dict(arguments))
 
     return anyio.run(_go)
+
+
+def test_legacy_mode_preserves_task29_tool_and_v1_write_schemas(tmp_path: Path) -> None:
+    root = _seed(tmp_path)
+    server = build_server(root, task30=False)
+
+    async def _go() -> tuple[tuple[str, ...], str, CallToolResult]:
+        async with Client(server, mode="legacy", cache=None) as client:
+            listed = await client.list_tools()
+            names = tuple(sorted(tool.name for tool in listed.tools))
+            write_tool = next(tool for tool in listed.tools if tool.name == "sb_write_request")
+            result = await client.call_tool(
+                "sb_write_request", {"request": write_fixture_request()}
+            )
+            return names, json.dumps(write_tool.input_schema, sort_keys=True), result
+
+    names, schema, result = anyio.run(_go)
+    assert names == LEGACY_TOOLS
+    assert "MemoryEffectWriteRequestV2" not in schema
+    assert result.is_error is False
+    assert result.content
+
+
+def test_task30_reads_hold_a_registered_generation_pin(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+    state = tmp_path / "state"
+    share = tmp_path / "share"
+    requests = tmp_path / "requests"
+    store = GenerationStore(
+        state,
+        share,
+        provider_instance_id="provider:pinned",
+        provider_release_sha="a" * 40,
+    )
+
+    def materialize(root: Path) -> None:
+        page = root / "wiki" / "alpha.md"
+        page.parent.mkdir(parents=True)
+        _ = page.write_text("# Intro\npinned record", encoding="utf-8")
+
+    generation = store.build(
+        request_id="pin-fixture",
+        parent=None,
+        tombstone_sequence=0,
+        tombstone_set_root="sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3",
+        created_at=datetime(2026, 8, 31, tzinfo=UTC),
+        allowed=lambda _path: True,
+        mutate=materialize,
+    )
+    store.activate(generation, None, datetime(2026, 8, 31, tzinfo=UTC))
+    store.close()
+    public_key = base64.urlsafe_b64encode(key.public_key().public_bytes_raw()).rstrip(b"=").decode()
+    config = tmp_path / "config.toml"
+    _ = config.write_text(
+        "\n".join(
+            (
+                f'vault_root = "{share / "vault"}"',
+                f'request_root = "{requests}"',
+                f'state_root = "{state}"',
+                f'share_root = "{share}"',
+                'provider_instance_id = "provider:pinned"',
+                f'provider_release_sha = "{"a" * 40}"',
+                'jarvis_signing_key_id = "jarvis:fixture"',
+                f'jarvis_public_key = "{public_key}"',
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("SB_CONFIG", str(config))
+    observed_leases: list[int] = []
+    original = mcp_module.read_page
+
+    def observed(root: Path, page_id: str) -> mcp_module.PageRead:
+        journal = RequestStore(requests)
+        try:
+            observed_leases.append(len(journal.readers(generation.generation_id)))
+        finally:
+            journal.close()
+        return original(root, page_id)
+
+    monkeypatch.setattr(mcp_module, "read_page", observed)
+    result = _call(build_server(), "sb_read_page", {"id": "wiki/alpha"})
+    assert result.is_error is False
+    assert observed_leases == [1]
+    journal = RequestStore(requests)
+    try:
+        assert journal.readers(generation.generation_id) == ()
+    finally:
+        journal.close()
 
 
 def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> None:

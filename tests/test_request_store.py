@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonValue
 from sb.request_store import ReplayConflict, RequestIdentity, RequestStore
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
@@ -62,7 +63,7 @@ def test_lease_reclaim_increments_once_and_phases_are_contiguous(tmp_path: Path)
 def test_request_and_tombstone_acceptance_roll_back_in_one_transaction(tmp_path: Path) -> None:
     store = RequestStore(tmp_path)
     genesis = "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
-    entry: dict[str, object] = {
+    entry: dict[str, JsonValue] = {
         "sequence": 1, "tombstone_id": "memtomb:v1:" + "1" * 64,
         "operation": "forget", "lane_id": "lane:" + "2" * 64,
         "target_manifest_digest": "sha256:" + "3" * 64,
@@ -88,7 +89,7 @@ def test_request_and_tombstone_acceptance_roll_back_in_one_transaction(tmp_path:
 
 def test_tombstone_replica_requires_contiguous_high_water(tmp_path: Path) -> None:
     store = RequestStore(tmp_path)
-    entry: dict[str, object] = {
+    entry: dict[str, JsonValue] = {
         "sequence": 1, "tombstone_id": "memtomb:v1:" + "1" * 64,
         "operation": "forget", "lane_id": "lane:" + "2" * 64,
         "target_manifest_digest": "sha256:" + "3" * 64,

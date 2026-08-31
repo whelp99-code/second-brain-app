@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import assert_never
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 
@@ -56,6 +57,8 @@ def _as_str(value: TomlValue | None) -> str | None:
             return text
         case int() | float() | date() | time() | list() | Mapping() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_int(value: TomlValue | None) -> int | None:
@@ -66,6 +69,8 @@ def _as_int(value: TomlValue | None) -> int | None:
             return count
         case str() | float() | date() | time() | list() | Mapping() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_mapping(value: TomlValue | None) -> Mapping[str, TomlValue] | None:
@@ -74,6 +79,8 @@ def _as_mapping(value: TomlValue | None) -> Mapping[str, TomlValue] | None:
             return mapping
         case str() | int() | float() | date() | time() | list() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_str_list(value: TomlValue | None) -> list[str] | None:
@@ -88,6 +95,8 @@ def _as_str_list(value: TomlValue | None) -> list[str] | None:
             return texts
         case str() | int() | float() | date() | time() | Mapping() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_str_mapping(value: TomlValue | None) -> dict[str, str]:
@@ -121,6 +130,8 @@ def _as_source_roots(value: TomlValue | None) -> list[dict[str, str]]:
             return roots
         case str() | int() | float() | date() | time() | Mapping() | None:
             return []
+        case _:
+            assert_never(value)
 
 
 def _config_search_path() -> Path:
@@ -276,6 +287,10 @@ class Config:
     @property
     def source_roots(self) -> list[dict[str, str]]:
         return _as_source_roots(self.raw.get("sources"))
+
+    @property
+    def legacy_request_roots(self) -> tuple[str, ...]:
+        return tuple(_as_str_list(self.raw.get("legacy_request_roots")) or ())
 
 
 def load_config(path: str | Path | None = None) -> Config:

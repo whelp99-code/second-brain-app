@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from pydantic import ValidationError
 
-from sb.effect_values import JsonObject, canonical_bytes, digest, parse_instant
+from sb.effect_values import JsonObject, JsonValue, canonical_bytes, digest, parse_instant
 from sb.effect_write_models import ClosedModel, MemoryEffectDelegationModel
 from sb.effect_write_values import model_object
 
@@ -97,7 +97,7 @@ def _verify_signature(
 
 
 def verify_delegation(
-    value: object,
+    value: JsonValue,
     keys: Mapping[str, Ed25519PublicKey | bytes],
     provider: str,
     now: datetime,
@@ -180,7 +180,7 @@ def create_read_fence(
 
 
 def verify_read_fence(
-    value: object,
+    value: JsonValue,
     keys: Mapping[str, Ed25519PublicKey | bytes],
     provider: str,
     now: datetime,
@@ -227,7 +227,7 @@ def verify_read_fence(
 
 
 def verify_external_receipt(
-    value: object,
+    value: JsonValue,
     keys: Mapping[str, Ed25519PublicKey | bytes],
     owner_id_digest: str,
     scope_digest: str,

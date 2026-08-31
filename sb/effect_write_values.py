@@ -1,4 +1,6 @@
-"""Construction and verification for the closed Task 30 V2 effect envelope."""
+"""Construction and verification for the closed Task 30 V2 effect envelope.
+# noqa: SIZE_OK -- one frozen cryptographic contract and validator
+"""
 
 from __future__ import annotations
 
@@ -6,7 +8,7 @@ import base64
 import re
 from collections.abc import Mapping
 from datetime import timedelta
-from typing import Final, Never, TypedDict, cast, final, override
+from typing import Final, Never, TypedDict, assert_never, cast, final, override
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
@@ -16,6 +18,7 @@ from sb.effect_values import JsonObject, JsonValue, canonical_bytes, digest, par
 from sb.effect_write_models import (
     CorrectionPayloadModelV2,
     DeletePayloadModelV2,
+    ExportPayloadModelV2,
     MemoryEffectWriteRequestV2,
     ResolvedMemoryTargetModel,
 )
@@ -73,7 +76,7 @@ def model_object(model: BaseModel) -> JsonObject:
     return cast(JsonObject, model.model_dump(mode="json"))
 
 
-def _model[Model: BaseModel](cls: type[Model], raw: object, code: str) -> Model:
+def _model[Model: BaseModel](cls: type[Model], raw: JsonValue, code: str) -> Model:
     try:
         return cls.model_validate(raw)
     except ValidationError as exc:
@@ -202,67 +205,70 @@ def _verify_payload(
 ) -> str:
     payload = request.payload
     payload_value = model_object(payload)
-    if isinstance(payload, CorrectionPayloadModelV2):
-        encoded = payload.content.encode("utf-8")
-        valid = payload.content == payload.content.strip() and 1 <= len(encoded) <= 4_096
-        expected = digest("effect_content", {"content": payload.content})
-        if not valid or payload.content_bytes != len(encoded) or payload.content_digest != expected:
-            reject("EFFECT_PAYLOAD_INVALID")
-    elif isinstance(payload, DeletePayloadModelV2):
-        if len(payload.external_receipts) > 16:
-            reject("EFFECT_PAYLOAD_INVALID")
-        external_owners = {
-            target.source_owner_id_digest
-            for target in request.targets
-            if target.source_owner_class == "external_read_only"
-        }
-        if payload.erasure_claim == "managed_erasure" and external_owners:
-            reject("MANAGED_ERASURE_SCOPE_INVALID")
-        receipt_owners: set[str] = set()
-        for receipt in payload.external_receipts:
-            receipt_value = model_object(receipt)
-            digest_body = {
-                name: item
-                for name, item in receipt_value.items()
-                if name not in {"receipt_id", "receipt_digest", "signature"}
+    match payload:
+        case CorrectionPayloadModelV2():
+            encoded = payload.content.encode("utf-8")
+            valid = payload.content == payload.content.strip() and 1 <= len(encoded) <= 4_096
+            expected = digest("effect_content", {"content": payload.content})
+            if not valid or payload.content_bytes != len(encoded) or payload.content_digest != expected:
+                reject("EFFECT_PAYLOAD_INVALID")
+        case DeletePayloadModelV2():
+            if len(payload.external_receipts) > 16:
+                reject("EFFECT_PAYLOAD_INVALID")
+            external_owners = {
+                target.source_owner_id_digest
+                for target in request.targets
+                if target.source_owner_class == "external_read_only"
             }
-            observed = digest("external_receipt", digest_body)
-            valid = receipt.receipt_digest == observed
-            valid = valid and receipt.receipt_id == "exterase:v1:" + observed[7:]
-            valid = valid and receipt.scope_digest == request.scope_digest
-            valid = valid and receipt.owner_id_digest in external_owners
-            if not valid or len(canonical_bytes(receipt_value)) > 2_048:
+            if payload.erasure_claim == "managed_erasure" and external_owners:
+                reject("MANAGED_ERASURE_SCOPE_INVALID")
+            receipt_owners: set[str] = set()
+            for receipt in payload.external_receipts:
+                receipt_value = model_object(receipt)
+                digest_body = {
+                    name: item
+                    for name, item in receipt_value.items()
+                    if name not in {"receipt_id", "receipt_digest", "signature"}
+                }
+                observed = digest("external_receipt", digest_body)
+                valid = receipt.receipt_digest == observed
+                valid = valid and receipt.receipt_id == "exterase:v1:" + observed[7:]
+                valid = valid and receipt.scope_digest == request.scope_digest
+                valid = valid and receipt.owner_id_digest in external_owners
+                if not valid or len(canonical_bytes(receipt_value)) > 2_048:
+                    reject("EXTERNAL_RECEIPT_INVALID")
+                if external_public_keys is None:
+                    reject("EXTERNAL_RECEIPT_INVALID")
+                key = external_public_keys.get(receipt.signing_key_id)
+                if key is None:
+                    reject("EXTERNAL_RECEIPT_INVALID")
+                unsigned = {
+                    name: item for name, item in receipt_value.items() if name != "signature"
+                }
+                try:
+                    key.verify(
+                        _decode_signature(receipt.signature, "EXTERNAL_RECEIPT_INVALID"),
+                        b"external-owner/memory-erasure-receipt/v1\0" + canonical_bytes(unsigned),
+                    )
+                except InvalidSignature as exc:
+                    raise EffectRequestRejected("EXTERNAL_RECEIPT_INVALID") from exc
+                receipt_owners.add(receipt.owner_id_digest)
+            if external_owners and receipt_owners != external_owners:
                 reject("EXTERNAL_RECEIPT_INVALID")
-            if external_public_keys is None:
-                reject("EXTERNAL_RECEIPT_INVALID")
-            key = external_public_keys.get(receipt.signing_key_id)
-            if key is None:
-                reject("EXTERNAL_RECEIPT_INVALID")
-            unsigned = {
-                name: item for name, item in receipt_value.items() if name != "signature"
-            }
-            try:
-                key.verify(
-                    _decode_signature(receipt.signature, "EXTERNAL_RECEIPT_INVALID"),
-                    b"external-owner/memory-erasure-receipt/v1\0" + canonical_bytes(unsigned),
-                )
-            except InvalidSignature as exc:
-                raise EffectRequestRejected("EXTERNAL_RECEIPT_INVALID") from exc
-            receipt_owners.add(receipt.owner_id_digest)
-        if external_owners and receipt_owners != external_owners:
-            reject("EXTERNAL_RECEIPT_INVALID")
-    else:
-        scope = request.scope
-        if payload.target_record_ids != [target.target_id for target in request.targets]:
-            reject("EXPORT_SCOPE_AMBIGUOUS")
-        if (
-            payload.sensitivity_classes != scope.sensitivity_classes
-            or payload.valid_from != scope.valid_from
-            or payload.valid_until != scope.valid_until
-            or payload.max_records != scope.max_records
-            or payload.max_bytes != scope.max_bytes
-        ):
-            reject("EXPORT_SCOPE_AMBIGUOUS")
+        case ExportPayloadModelV2():
+            scope = request.scope
+            if payload.target_record_ids != [target.target_id for target in request.targets]:
+                reject("EXPORT_SCOPE_AMBIGUOUS")
+            if (
+                payload.sensitivity_classes != scope.sensitivity_classes
+                or payload.valid_from != scope.valid_from
+                or payload.valid_until != scope.valid_until
+                or payload.max_records != scope.max_records
+                or payload.max_bytes != scope.max_bytes
+            ):
+                reject("EXPORT_SCOPE_AMBIGUOUS")
+        case _:
+            assert_never(payload)
     return digest("effect_payload", payload_value)
 
 
@@ -360,7 +366,7 @@ def _verify_delegation(
 
 
 def parse_effect_request(
-    raw: object,
+    raw: JsonValue,
     *,
     now: str,
     public_keys: Mapping[str, Ed25519PublicKey] | None = None,
@@ -667,14 +673,14 @@ fixed_vector = frozen_correction_vector
 def _frozen_effect_variant(operation: str) -> JsonObject:
     """Construct deterministic export/forget vectors from the frozen target identity."""
     if operation not in {"forget", "export"}:
-        raise ValueError("EFFECT_OPERATION_CONFUSION")
+        raise EffectRequestRejected("EFFECT_OPERATION_CONFUSION")
     correction = frozen_correction_vector()
     correction_request = correction["request"]
     raw_targets = correction_request.get("targets")
     raw_prior = correction_request.get("expected_prior")
     raw_high = correction_request.get("tombstone_high_water")
     if not isinstance(raw_targets, list) or not isinstance(raw_prior, dict) or not isinstance(raw_high, dict):
-        raise TypeError("EFFECT_TARGET_INVALID")
+        raise EffectRequestRejected("EFFECT_TARGET_INVALID")
     targets = cast(list[JsonValue], raw_targets)
     target = cast(JsonObject, targets[0])
     target_manifest_digest = str(correction_request["target_manifest_digest"])
@@ -714,7 +720,7 @@ def _frozen_effect_variant(operation: str) -> JsonObject:
     raw_sequence = raw_high.get("sequence")
     raw_root = raw_high.get("set_root")
     if not isinstance(raw_sequence, int) or not isinstance(raw_root, str):
-        raise TypeError("EFFECT_TOMBSTONE_DELTA_INVALID")
+        raise EffectRequestRejected("EFFECT_TOMBSTONE_DELTA_INVALID")
     previous_sequence = raw_sequence
     previous_root = raw_root
     delta: list[JsonValue] = []
@@ -827,7 +833,7 @@ def frozen_effect_vectors() -> JsonObject:
     forget = _frozen_effect_variant("forget")
     forget_delegation = forget["delegation_id"]
     if not isinstance(forget_delegation, str):
-        raise TypeError("EFFECT_DELEGATION_INVALID")
+        raise EffectRequestRejected("EFFECT_DELEGATION_INVALID")
     revocation_body: JsonObject = {
         "schema_version": 1,
         "delegation_id": forget_delegation,

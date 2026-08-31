@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Final, Never, Protocol, TypeGuard
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
+type JsonInput = None | bool | int | float | str | Sequence[JsonInput] | Mapping[str, JsonInput]
 
 DOMAINS: Final = {
     "target": b"second-brain/memory-target/v1\0",
@@ -34,6 +35,10 @@ DOMAINS: Final = {
 }
 
 
+class CanonicalValueError(ValueError):
+    pass
+
+
 class _Loads(Protocol):
     def __call__(
         self,
@@ -44,11 +49,11 @@ class _Loads(Protocol):
     ) -> JsonValue: ...
 
 
-def is_json_object(value: object) -> TypeGuard[JsonObject]:
+def is_json_object(value: JsonInput) -> TypeGuard[JsonObject]:
     return isinstance(value, dict)
 
 
-def canonical_bytes(value: object) -> bytes:
+def canonical_bytes(value: JsonInput) -> bytes:
     """Return closed canonical UTF-8 JSON bytes and reject non-NFC text."""
     try:
         text = json.dumps(
@@ -60,62 +65,62 @@ def canonical_bytes(value: object) -> bytes:
         )
         encoded = text.encode("utf-8")
     except (TypeError, ValueError, UnicodeEncodeError) as exc:
-        raise ValueError("NON_CANONICAL_JSON") from exc
+        raise CanonicalValueError("NON_CANONICAL_JSON") from exc
     if unicodedata.normalize("NFC", text) != text:
-        raise ValueError("NON_CANONICAL_NFC")
+        raise CanonicalValueError("NON_CANONICAL_NFC")
     if any(ord(character) < 32 for character in text if character not in "\t\n\r"):
-        raise ValueError("NON_CANONICAL_CONTROL")
+        raise CanonicalValueError("NON_CANONICAL_CONTROL")
     return encoded
 
 
-def digest(kind: str, value: object) -> str:
+def digest(kind: str, value: JsonInput) -> str:
     try:
         domain = DOMAINS[kind]
     except KeyError as exc:
-        raise ValueError("UNKNOWN_DIGEST_DOMAIN") from exc
+        raise CanonicalValueError("UNKNOWN_DIGEST_DOMAIN") from exc
     return "sha256:" + hashlib.sha256(domain + canonical_bytes(value)).hexdigest()
 
 
 def parse_instant(value: str) -> datetime:
     if len(value) != 24 or not value.endswith("Z"):
-        raise ValueError("INSTANT_INVALID")
+        raise CanonicalValueError("INSTANT_INVALID")
     try:
         parsed = datetime.fromisoformat(value)
     except ValueError as exc:
-        raise ValueError("INSTANT_INVALID") from exc
+        raise CanonicalValueError("INSTANT_INVALID") from exc
     if parsed.tzinfo != UTC or format_instant(parsed) != value:
-        raise ValueError("INSTANT_INVALID")
+        raise CanonicalValueError("INSTANT_INVALID")
     return parsed
 
 
 def format_instant(value: datetime) -> str:
     if value.tzinfo is None:
-        raise ValueError("INSTANT_INVALID")
+        raise CanonicalValueError("INSTANT_INVALID")
     return value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _pairs(pairs: list[tuple[str, JsonValue]]) -> JsonObject:
     result = dict(pairs)
     if len(result) != len(pairs):
-        raise ValueError("DUPLICATE_JSON_KEY")
+        raise CanonicalValueError("DUPLICATE_JSON_KEY")
     return result
 
 
 def _constant(_value: str) -> Never:
-    raise ValueError("NON_FINITE_JSON_NUMBER")
+    raise CanonicalValueError("NON_FINITE_JSON_NUMBER")
 
 
 def strict_loads(raw: bytes | str, maximum: int) -> JsonValue:
     encoded = raw.encode("utf-8") if isinstance(raw, str) else raw
     if len(encoded) > maximum:
-        raise ValueError("JSON_OVERSIZE")
+        raise CanonicalValueError("JSON_OVERSIZE")
     loader: _Loads | None = getattr(json, "loads", None)
     if loader is None:
-        raise ValueError("JSON_INVALID")
+        raise CanonicalValueError("JSON_INVALID")
     try:
         value = loader(encoded, object_pairs_hook=_pairs, parse_constant=_constant)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("JSON_INVALID") from exc
+        raise CanonicalValueError("JSON_INVALID") from exc
     if canonical_bytes(value) != encoded.rstrip(b"\n"):
-        raise ValueError("JSON_NON_CANONICAL")
+        raise CanonicalValueError("JSON_NON_CANONICAL")
     return value

@@ -10,6 +10,10 @@ DigestText = str
 InstantText = str
 
 
+class EffectModelError(ValueError):
+    pass
+
+
 class ClosedModel(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
@@ -186,7 +190,7 @@ class MemoryEffectWriteRequestV2(ClosedModel):
         valid = self.lane == "export" and self.operation == "export"
         valid = valid and isinstance(self.payload, ExportPayloadModelV2)
         if not valid:
-            raise ValueError("EFFECT_OPERATION_CONFUSION")
+            raise EffectModelError("EFFECT_OPERATION_CONFUSION")
         return self
 
 

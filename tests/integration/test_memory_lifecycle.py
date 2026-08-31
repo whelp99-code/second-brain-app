@@ -29,7 +29,9 @@ def test_real_provider_lifecycle_remember_correct_export_forget(tmp_path: Path) 
     executor = RequestExecutor(config)
     remember = executor.apply_once(now=NOW)
     assert remember.request_id == accepted.request_id and remember.state == "proved"
-    assert executor.generations.active().manifest.file_count == 1
+    remembered_generation = executor.generations.active()
+    assert remembered_generation.manifest.file_count == 2
+    assert remembered_generation.root.joinpath(".sb", "derived-manifest.json").is_file()
 
     correction_time = NOW + timedelta(minutes=1)
     correction = effect_request(
@@ -62,8 +64,10 @@ def test_real_provider_lifecycle_remember_correct_export_forget(tmp_path: Path) 
     assert (config.export_root / export_accepted.request_id / "memory.json").is_file()
 
     forget_time = NOW + timedelta(minutes=3)
+    # Reuse the exact export target identity: target/scope/payload digests are bindings,
+    # not globally unique replay aliases across distinct authorized operations.
     forget = effect_request(
-        executor.generations.active(), "forget", CORRECTED, forget_time,
+        executor.generations.active(), "forget", CORRECTED, export_time,
         executor.store.tombstone_high_water(), key, "3",
     )
     forget_accepted = accept_effect_request(

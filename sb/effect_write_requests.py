@@ -1,4 +1,6 @@
-"""Descriptor-relative stable publication for authenticated V2 effect requests."""
+"""Descriptor-relative stable publication for authenticated V2 effect requests.
+# noqa: SIZE_OK -- one atomic descriptor-relative publication boundary
+"""
 
 from __future__ import annotations
 
@@ -14,13 +16,14 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from sb.effect_values import (
+    JsonValue,
     canonical_bytes,
     format_instant,
     is_json_object,
     parse_instant,
     strict_loads,
 )
-from sb.effect_write_models import MemoryEffectWriteAcceptedV2
+from sb.effect_write_models import MemoryEffectWriteAcceptedV2, MemoryEffectWriteRequestV2
 from sb.effect_write_values import (
     MAX_EFFECT_FILE_BYTES,
     EffectRequestRejected,
@@ -150,18 +153,14 @@ def _publish(directory: int, final: str, payload: bytes) -> None:
         try:
             os.unlink(temporary, dir_fd=directory)
         except FileNotFoundError:
-            pass
+            temporary = ""
         if linked:
             metadata = os.stat(final, dir_fd=directory, follow_symlinks=False)
             if metadata.st_nlink != 1:
                 raise EffectWriteIoError("WRITE_REQUEST_INBOX_UNSAFE")
 
 
-def _identity(request: object) -> RequestIdentity:
-    from sb.effect_write_models import MemoryEffectWriteRequestV2
-
-    if not isinstance(request, MemoryEffectWriteRequestV2):
-        raise TypeError("request must be MemoryEffectWriteRequestV2")
+def _identity(request: MemoryEffectWriteRequestV2) -> RequestIdentity:
     delegation = request.delegation
     payload_digest = delegation.payload_digest
     return RequestIdentity(
@@ -184,15 +183,11 @@ def _identity(request: object) -> RequestIdentity:
 
 
 def _result(
-    request: object,
+    request: MemoryEffectWriteRequestV2,
     accepted_at: str,
     file_digest: str,
     replayed: bool,
 ) -> MemoryEffectWriteAcceptedV2:
-    from sb.effect_write_models import MemoryEffectWriteRequestV2
-
-    if not isinstance(request, MemoryEffectWriteRequestV2):
-        raise TypeError("request must be MemoryEffectWriteRequestV2")
     return MemoryEffectWriteAcceptedV2(
         schema_version=2,
         kind="accepted",
@@ -216,7 +211,7 @@ def _result(
 
 def accept_effect_request(
     root: Path,
-    value: object,
+    value: JsonValue,
     accepted_at: datetime,
     *,
     public_keys: Mapping[str, Ed25519PublicKey] | None = None,

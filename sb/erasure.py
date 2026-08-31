@@ -1,4 +1,6 @@
-"""Permanent tombstone reingress gates and managed-copy generation sanitation."""
+"""Permanent tombstone reingress gates and managed-copy generation sanitation.
+# noqa: SIZE_OK -- one closed managed-surface erasure boundary
+"""
 
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast, final
 
-from sb.effect_values import canonical_bytes, digest, format_instant
+from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant
 from sb.effect_write_models import CorrectionPayloadModelV2, MemoryEffectWriteRequestV2
 
 
@@ -162,6 +164,29 @@ class ReingressGate:
         if exception is None:
             raise ErasureError("TOMBSTONE_REINGRESS_BLOCKED")
 
+    def check_content(self, content: bytes) -> None:
+        candidates = {hashlib.sha256(content).hexdigest()}
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            text = ""
+        candidates.update(
+            hashlib.sha256(part.encode("utf-8")).hexdigest()
+            for part in {text, *text.splitlines(), *text.split("\n\n")}
+            if part
+        )
+        placeholders = ",".join("?" for _candidate in candidates)
+        row = cast(
+            tuple[int] | None,
+            self.db.execute(
+                "SELECT 1 FROM blocked_identities WHERE identity_kind='content' "
+                + f"AND identity_digest IN ({placeholders}) LIMIT 1",
+                tuple(sorted(candidates)),
+            ).fetchone(),
+        )
+        if row is not None:
+            raise ErasureError("TOMBSTONE_REINGRESS_BLOCKED")
+
     def allow_new_version(
         self,
         source_identity: str,
@@ -279,19 +304,75 @@ class ErasureEngine:
         return tuple(sorted(removed))
 
 
+def _process_fd_count(root: Path) -> int:
+    resolved = root.resolve()
+    count = 0
+    for process in Path("/proc").glob("[0-9]*"):
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            descriptors = tuple((process / "fd").iterdir())
+        except OSError:
+            continue
+        for descriptor in descriptors:
+            try:
+                target = Path(os.readlink(descriptor).removesuffix(" (deleted)"))
+                if target.is_absolute() and target.resolve().is_relative_to(resolved):
+                    count += 1
+            except OSError:
+                continue
+    return count
+
+
+def _sqlite_rows(path: Path) -> tuple[int, tuple[str, ...]]:
+    errors: list[str] = []
+    rows = 0
+    try:
+        connection = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
+        check = cast(
+            tuple[str] | None,
+            connection.execute("PRAGMA quick_check").fetchone(),
+        )
+        if check != ("ok",):
+            errors.append("SQLITE_INTEGRITY_FAILED")
+        tables = cast(
+            list[tuple[str]],
+            connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall(),
+        )
+        for (table,) in tables:
+            if not table.replace("_", "").isalnum():
+                errors.append("SQLITE_TABLE_INVALID")
+                continue
+            value = cast(
+                tuple[int] | None,
+                connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone(),
+            )
+            if value is not None:
+                rows += value[0]
+        connection.close()
+    except sqlite3.Error:
+        errors.append("SQLITE_SCAN_FAILED")
+    return rows, tuple(errors)
+
+
 def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry:
     file_count = 0
     matches = 0
     errors: list[str] = []
-    rows: list[dict[str, object]] = []
+    rows: list[dict[str, JsonValue]] = []
+    row_count = 0
     object_count = 0
     fd_count = 0
     try:
+        if not root.is_dir() or root.is_symlink():
+            raise OSError("managed root missing or unsafe")
         for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
             metadata = path.stat(follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
                 continue
-            if not stat.S_ISREG(metadata.st_mode):
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
                 errors.append("NON_REGULAR_SURFACE")
                 continue
             try:
@@ -302,6 +383,10 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
             count = sum(raw.count(needle) for needle in needles)
             matches += count
             file_count += 1
+            if path.suffix == ".db":
+                found_rows, sqlite_errors = _sqlite_rows(path)
+                row_count += found_rows
+                errors.extend(sqlite_errors)
             rows.append(
                 {
                     "surface_id": hashlib.sha256(
@@ -336,15 +421,7 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
                         continue
                     object_count += 1
                     matches += sum(item.stdout.count(needle) for needle in needles)
-        proc = Path("/proc") / str(os.getpid()) / "fd"
-        if proc.is_dir():
-            for descriptor in proc.iterdir():
-                try:
-                    target = descriptor.resolve()
-                except OSError:
-                    continue
-                if target.is_relative_to(root.resolve()):
-                    fd_count += 1
+        fd_count = _process_fd_count(root)
     except OSError:
         errors.append("SURFACE_ENUMERATION_FAILED")
     scan_digest = digest(
@@ -357,7 +434,7 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
         manifest_digest=digest("surface", {"root": hashlib.sha256(str(root).encode()).hexdigest()}),
         readable=not errors,
         file_count=file_count,
-        row_count=0,
+        row_count=row_count,
         object_count=object_count,
         fd_count=fd_count,
         scan_digest=scan_digest,

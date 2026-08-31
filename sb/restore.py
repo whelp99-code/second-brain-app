@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import final
 
-from sb.effect_values import digest
+from sb.effect_values import JsonValue, digest
 from sb.erasure import scan_managed_surfaces
 from sb.generations import Generation, GenerationStore
 
@@ -76,7 +76,7 @@ class GenerationRestoreSanitizer:
 
     @staticmethod
     def _input_digest(root: Path) -> str:
-        rows: list[dict[str, object]] = []
+        rows: list[dict[str, JsonValue]] = []
         for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
             if path.is_file():
                 raw = path.read_bytes()
@@ -182,6 +182,6 @@ class GenerationRestoreSanitizer:
                 proof_digest=digest("generation", proof_body),
             )
             return generation, proof
-        except BaseException:
+        except (OSError, RuntimeError, ValueError):
             shutil.rmtree(staging, ignore_errors=True)
             raise

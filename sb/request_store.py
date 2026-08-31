@@ -1,4 +1,6 @@
-"""Stable global replay, delegation-use, lease, phase, and status journal."""
+"""Stable global replay, delegation-use, lease, phase, and status journal.
+# noqa: SIZE_OK -- one transactional replay and lease authority
+"""
 
 from __future__ import annotations
 
@@ -11,7 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal, cast, final
 
-from sb.effect_values import canonical_bytes, format_instant
+from sb.effect_values import JsonValue, canonical_bytes, format_instant
 
 RequestState = Literal[
     "pending",
@@ -61,9 +63,6 @@ class RequestIdentity:
             ("delegation_id", self.delegation_id),
             ("delegation_digest", self.delegation_digest),
             ("delegation_nonce", self.delegation_nonce),
-            ("target_manifest_digest", self.target_manifest_digest),
-            ("scope_digest", self.scope_digest),
-            ("payload_digest", self.payload_digest),
         )
         return tuple((kind, value) for kind, value in values if value is not None)
 
@@ -326,6 +325,19 @@ class RequestStore:
         row = self._row(request_id)
         return None if row is None else self._status(row)
 
+    def list_states(self, states: Sequence[RequestState]) -> tuple[RequestStatus, ...]:
+        if not states:
+            return ()
+        placeholders = ",".join("?" for _state in states)
+        rows = cast(
+            list[sqlite3.Row],
+            self.db.execute(
+                f"SELECT * FROM requests WHERE state IN ({placeholders}) ORDER BY accepted_at,request_id",
+                tuple(states),
+            ).fetchall(),
+        )
+        return tuple(self._status(row) for row in rows)
+
     def replay_status(self, identity: RequestIdentity) -> RequestStatus | None:
         aliases = identity.aliases()
         values = tuple(value for _kind, value in aliases)
@@ -354,7 +366,7 @@ class RequestStore:
 
     def _apply_tombstones_inside(
         self,
-        entries: Sequence[Mapping[str, object]],
+        entries: Sequence[Mapping[str, JsonValue]],
         request_id: str,
         stamp: str,
     ) -> tuple[int, str]:
@@ -405,11 +417,11 @@ class RequestStore:
     def accept(
         self,
         identity: RequestIdentity,
-        result: Mapping[str, object],
+        result: Mapping[str, JsonValue],
         now: datetime,
         *,
         initial_state: RequestState = "pending",
-        tombstones: Sequence[Mapping[str, object]] | None = None,
+        tombstones: Sequence[Mapping[str, JsonValue]] | None = None,
     ) -> tuple[RequestStatus, bool]:
         stamp = format_instant(now)
         result_json = canonical_bytes(result).decode("utf-8")
@@ -488,7 +500,7 @@ class RequestStore:
                 raise RequestStoreError("REQUEST_JOURNAL_CORRUPT")
             self._commit()
             return self._status(row), False
-        except BaseException:
+        except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
 
@@ -519,11 +531,16 @@ class RequestStore:
             identity = self._identity(row)
             prior_fence = _integer(row, "fence")
             fence = prior_fence + 1
+            prior_state = _text(row, "state")
+            prior_phase = _optional_text(row, "phase")
+            phase: Phase = (
+                prior_phase if prior_state == "processing" and prior_phase in PHASES else "claimed"
+            )
             changed = self.db.execute(
-                """UPDATE requests SET state='processing',phase='claimed',fence=?,owner=?,
+                """UPDATE requests SET state='processing',phase=?,fence=?,owner=?,
                    lease_expires_at=?,updated_at=? WHERE request_id=? AND fence=? AND
                    (state='pending' OR (state='processing' AND lease_expires_at<=?))""",
-                (fence, worker, expires, stamp, identity.request_id, prior_fence, stamp),
+                (phase, fence, worker, expires, stamp, identity.request_id, prior_fence, stamp),
             ).rowcount
             if changed != 1:
                 self._rollback()
@@ -556,14 +573,14 @@ class RequestStore:
                     )
                 elif use[0] != identity.request_id:
                     raise ReplayConflict("EFFECT_DELEGATION_USED")
-            event_digest = self._phase_digest(identity.request_id, fence, "claimed", None, stamp)
+            event_digest = self._phase_digest(identity.request_id, fence, phase, None, stamp)
             _ = self.db.execute(
                 "INSERT OR IGNORE INTO phase_events VALUES(?,?,?,?,?,?)",
-                (identity.request_id, fence, "claimed", None, event_digest, stamp),
+                (identity.request_id, fence, phase, None, event_digest, stamp),
             )
             self._commit()
-            return RequestLease(identity.request_id, fence, worker, "claimed")
-        except BaseException:
+            return RequestLease(identity.request_id, fence, worker, phase)
+        except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
 
@@ -646,14 +663,14 @@ class RequestStore:
             )
             self._commit()
             return RequestLease(lease.request_id, lease.fence, lease.owner, phase)
-        except BaseException:
+        except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
 
     def prove(
         self,
         lease: RequestLease,
-        proof: Mapping[str, object],
+        proof: Mapping[str, JsonValue],
         proof_digest: str,
         status_digest: str,
         now: datetime,
@@ -684,7 +701,7 @@ class RequestStore:
                 raise RequestStoreError("REQUEST_JOURNAL_CORRUPT")
             self._commit()
             return self._status(row)
-        except BaseException:
+        except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
 
@@ -708,13 +725,13 @@ class RequestStore:
                 raise RequestStoreError("REQUEST_TERMINAL_INVALID")
             self._commit()
             return self._status(row)
-        except BaseException:
+        except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
 
     def apply_tombstones(
         self,
-        entries: Sequence[Mapping[str, object]],
+        entries: Sequence[Mapping[str, JsonValue]],
         request_id: str,
         now: datetime,
     ) -> tuple[int, str]:
@@ -724,7 +741,7 @@ class RequestStore:
             result = self._apply_tombstones_inside(entries, request_id, stamp)
             self._commit()
             return result
-        except BaseException:
+        except (sqlite3.Error, TypeError, ValueError):
             self._rollback()
             raise
 

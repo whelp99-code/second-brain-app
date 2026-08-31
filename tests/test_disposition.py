@@ -12,9 +12,10 @@ from sb.disposition import (
     sign_disposition_proof,
     verify_disposition_proof,
 )
+from sb.effect_values import JsonInput
 
 
-def _export_body() -> dict[str, object]:
+def _export_body() -> dict[str, JsonInput]:
     return {
         "schema_version": 1,
         "proof_type": "export",

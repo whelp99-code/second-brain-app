@@ -236,6 +236,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
                 provider_signing_key=provider_key,
                 jarvis_public_keys=jarvis_keys,
                 external_public_keys=external_keys,
+                legacy_request_roots=tuple(Path(root) for root in config.legacy_request_roots),
             )
         )
         try:

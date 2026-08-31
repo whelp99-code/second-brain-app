@@ -37,8 +37,28 @@ def test_apply_once_consumes_v1_remember_into_one_sealed_generation(tmp_path: Pa
     result = executor.apply_once(now=NOW)
     assert result.state == "proved" and result.request_id == accepted.request_id
     assert barriers == [
-        "claim_rename_fsync", "journal_claim", "staging", "sealed",
-        "switch_intent", "activated", "receipt_fsync",
+        "claim_rename_fsync",
+        "journal_claim",
+        "journal_staging",
+        "successor_created",
+        "sanitized_copy",
+        "git_sealed",
+        "ledger_built",
+        "lexical_built",
+        "vector_built",
+        "briefing_built",
+        "sealed_manifest",
+        "journal_sealed",
+        "journal_switch_intent",
+        "switch_intent_fsync",
+        "pointer_rename",
+        "pointer_parent_fsync",
+        "activation_verified",
+        "journal_activated",
+        "journal_disposing",
+        "journal_proved",
+        "proof_write_fsync",
+        "receipt_fsync",
     ]
     active = executor.generations.active()
     assert active.root.joinpath("wiki").is_dir()

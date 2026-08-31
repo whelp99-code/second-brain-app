@@ -45,7 +45,7 @@ def effect_request(
         subject_digest_key=b"subject-key",
         now=now,
     )
-    target = cast(JsonObject, resolved_target.as_dict())
+    target = resolved_target.as_dict()
     targets: list[JsonValue] = [target]
     target_manifest_digest = digest("target_manifest", {"targets": targets})
     scope: JsonObject = {

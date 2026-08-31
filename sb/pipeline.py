@@ -18,6 +18,7 @@ from uuid import uuid4
 from sb.config import Config
 from sb.connectors.base import SourceAdapter
 from sb.contracts import Blob, BriefingInputs, PageSpec, Unit
+from sb.erasure import ErasureError, ReingressGate
 from sb.llm import LLMClient, LLMUnavailable
 from sb.store import (
     DerivationOutput,
@@ -393,6 +394,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         chosen = discover_adapters(config)
         adapters = _select_adapters(chosen, source_ids, config)
         cas, cap = ContentAddressedStore(vault.root), config.caps["max_new_units_per_run"] if limit is None else limit
+        reingress = ReingressGate(Path(config.state_root) / "reingress.db")
         seen = {(item.source_id, item.source_uri, item.source_version) for item in ledger.list_source_items()}
         errors = attempted = written = 0
         capped = False
@@ -421,6 +423,34 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     progressed = True
                     continue
                 digest = hashlib.sha256(data).hexdigest()
+                source_identity = (
+                    ref.source_id
+                    if len(ref.source_id) == 64
+                    and all(character in "0123456789abcdef" for character in ref.source_id)
+                    else hashlib.sha256(
+                        f"{ref.source_id}\0{ref.source_uri}".encode()
+                    ).hexdigest()
+                )
+                try:
+                    reingress.check(
+                        source_identity=source_identity,
+                        content_identity=digest,
+                    )
+                    reingress.check_content(data)
+                except ErasureError:
+                    ledger.upsert_source_item(
+                        SourceItem(
+                            ref.source_id,
+                            ref.source_uri,
+                            ref.source_version,
+                            digest,
+                            run_id,
+                            run_id,
+                        )
+                    )
+                    seen.add(version_key)
+                    progressed = True
+                    continue
                 units = _materialize(data, digest, ref.source_uri, f"{ref.source_id}:{ref.source_uri}")
                 if not units and data:
                     ledger.upsert_source_item(SourceItem(
@@ -449,6 +479,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 break
             if progressed or not attempted:
                 ledger.set_cursor(adapter.source_id, adapter.next_cursor(), datetime.now(UTC).isoformat())
+        reingress.close()
         return StageReport((), 0, errors, attempted, capped, None, written)
 
     return stage

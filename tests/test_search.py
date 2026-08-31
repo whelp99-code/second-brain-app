@@ -150,9 +150,14 @@ def test_search_uses_hybrid_module_when_flag_enabled(
     sentinel = SearchHit(page_id="hybrid-only", section="", snippet="x", score=1.0)
 
     def _hybrid(
-        lexical_results: tuple[SearchHit, ...], query: str, limit: int
+        lexical_results: tuple[SearchHit, ...],
+        query: str,
+        limit: int,
+        *,
+        vault_root: Path | None = None,
     ) -> tuple[SearchHit, ...]:
         del lexical_results, query, limit
+        assert vault_root == index.vault_root
         return (sentinel,)
 
     stub.__dict__["hybrid_search"] = _hybrid

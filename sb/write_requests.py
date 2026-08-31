@@ -1,3 +1,7 @@
+"""Backward-compatible stable request ingestion.
+# noqa: SIZE_OK -- one backward-compatible V1/V2 ingestion boundary
+"""
+
 from __future__ import annotations
 
 import fcntl
@@ -286,7 +290,7 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
 def accept_memory_write_request(
     vault_root: Path,
     request_root: Path,
-    value: object,
+    value: JsonValue,
     now: datetime,
     *,
     public_keys: dict[str, Ed25519PublicKey] | None = None,

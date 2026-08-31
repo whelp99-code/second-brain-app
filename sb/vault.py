@@ -1,3 +1,7 @@
+"""Vault containment helpers.
+# noqa: SIZE_OK -- one vault containment boundary
+"""
+
 from __future__ import annotations
 
 import hashlib
