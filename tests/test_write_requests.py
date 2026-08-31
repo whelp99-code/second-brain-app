@@ -5,13 +5,12 @@ import json
 import os
 import subprocess
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from sb.contracts import MemoryWriteResultV1
 from sb.write_requests import WriteRequestRejected, accept_write_request
 
 type JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
@@ -56,11 +55,9 @@ def _seed_prior(root: Path) -> dict[str, str]:
     _ = _git(root, "config", "user.name", "Test")
     _ = _git(root, "add", "wiki/example.md")
     _ = _git(root, "commit", "-qm", "seed")
-    return {
-        "source_id": "wiki/example",
-        "source_version": "git:" + _git(root, "rev-parse", "HEAD:wiki/example.md"),
-        "source_digest": "sha256:" + hashlib.sha256(page.read_bytes()).hexdigest(),
-    }
+    return {"source_id": "wiki/example",
+            "source_version": "git:" + _git(root, "rev-parse", "HEAD:wiki/example.md"),
+            "source_digest": "sha256:" + hashlib.sha256(page.read_bytes()).hexdigest()}
 
 
 def _rederive(request: dict[str, JsonValue]) -> None:
@@ -81,44 +78,34 @@ def _request(operation: str = "remember", prior: dict[str, str] | None = None) -
     }[operation]
     payload_value: JsonValue = {key: value for key, value in payload.items()}
     receipt: dict[str, JsonValue] = {
-        "schema_version": 1,
-        "receipt_id": "receipt:memory:" + "4" * 64,
-        "candidate_id": CANDIDATE,
-        "candidate_digest": CANDIDATE_DIGEST,
-        "classification_digest": CLASSIFICATION_DIGEST,
-        "operation": operation,
-        "decision": "owner_confirmed",
-        "principal_id": "principal:owner",
-        "issued_at": "2026-08-31T12:00:00.000Z",
-        "expires_at": "2026-09-01T00:00:00.000Z",
-    }
+        "schema_version": 1, "receipt_id": "receipt:memory:" + "4" * 64,
+        "candidate_id": CANDIDATE, "candidate_digest": CANDIDATE_DIGEST,
+        "classification_digest": CLASSIFICATION_DIGEST, "operation": operation,
+        "decision": "owner_confirmed", "principal_id": "principal:owner",
+        "issued_at": "2026-08-31T12:00:00.000Z", "expires_at": "2026-09-01T00:00:00.000Z"}
     idempotency = _digest("idempotency", {
-        "candidate_id": CANDIDATE,
-        "candidate_digest": CANDIDATE_DIGEST,
-        "classification_digest": CLASSIFICATION_DIGEST,
-        "operation": operation,
-    })
+        "candidate_id": CANDIDATE, "candidate_digest": CANDIDATE_DIGEST,
+        "classification_digest": CLASSIFICATION_DIGEST, "operation": operation})
     prior_value: JsonValue = None if prior is None else {key: value for key, value in prior.items()}
     request: dict[str, JsonValue] = {
-        "schema_version": 1,
-        "candidate_id": CANDIDATE,
-        "candidate_digest": CANDIDATE_DIGEST,
+        "schema_version": 1, "candidate_id": CANDIDATE, "candidate_digest": CANDIDATE_DIGEST,
         "classification_digest": CLASSIFICATION_DIGEST,
-        "idempotency_key": "memidem:pos:v1:" + idempotency[7:],
-        "operation": operation,
-        "subject": "wiki/example",
-        "purpose": purpose,
-        "sensitivity": "personal",
-        "retention_days": retention,
-        "created_at": "2026-08-31T12:00:00.000Z",
-        "expires_at": "2026-09-01T00:00:00.000Z",
-        "expected_prior": prior_value,
-        "receipt": receipt,
-        "receipt_digest": _digest("receipt", receipt),
-        "payload": payload_value,
-    }
+        "idempotency_key": "memidem:pos:v1:" + idempotency[7:], "operation": operation,
+        "subject": "wiki/example", "purpose": purpose, "sensitivity": "personal",
+        "retention_days": retention, "created_at": "2026-08-31T12:00:00.000Z",
+        "expires_at": "2026-09-01T00:00:00.000Z", "expected_prior": prior_value,
+        "receipt": receipt, "receipt_digest": _digest("receipt", receipt), "payload": payload_value}
     _rederive(request)
     return request
+
+
+def _accept_process(item: tuple[str, dict[str, JsonValue]]) -> tuple[bool, bool, str]:
+    root, request = item
+    try:
+        result = accept_write_request(Path(root), request, NOW)
+        return True, result.replayed, ""
+    except WriteRequestRejected as exc:
+        return False, False, exc.code
 
 
 def test_accepts_each_operation_once_and_exact_replay(tmp_path: Path) -> None:
@@ -132,22 +119,23 @@ def test_accepts_each_operation_once_and_exact_replay(tmp_path: Path) -> None:
     # Then
     assert [item.operation for item in first] == ["remember", "correct", "forget", "export"]
     assert all(item.state == "pending" and item.replayed is False for item in first)
-    assert replay.request_id == first[0].request_id
-    assert replay.accepted_at == first[0].accepted_at
-    assert replay.replayed is True
-    assert len(list((tmp_path / "inbox" / ".requests" / "pending").glob("*.json"))) == 4
+    assert replay.request_id == first[0].request_id and replay.accepted_at == first[0].accepted_at
+    assert replay.replayed is True and len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 4
 
 
-def test_changed_body_same_identity_conflicts(tmp_path: Path) -> None:
+def test_same_valid_key_changed_body_and_new_valid_request_id_conflicts(tmp_path: Path) -> None:
     # Given
     _queue(tmp_path)
     request = _request()
     _ = accept_write_request(tmp_path, request, NOW)
     changed = dict(request)
-    changed["payload"] = {"content": "changed"}
+    changed["payload"] = {"content": "changed canonical body"}
+    _rederive(changed)
+    assert changed["idempotency_key"] == request["idempotency_key"] and changed["request_id"] != request["request_id"]
     # When / Then
     with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_REPLAY_CONFLICT"):
         _ = accept_write_request(tmp_path, changed, NOW)
+    assert len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 1
 
 
 def _forge_receipt(value: dict[str, JsonValue]) -> None:
@@ -244,7 +232,7 @@ def test_prior_rejects_every_noncanonical_page_id(tmp_path: Path, source_id: str
         _ = accept_write_request(tmp_path, request, NOW)
 
 
-def test_replay_rejects_hardlink_and_non_exact_modes(tmp_path: Path) -> None:
+def test_replay_rejects_hardlink_and_non_exact_modes_as_unsafe(tmp_path: Path) -> None:
     # Given
     _queue(tmp_path)
     result = accept_write_request(tmp_path, _request(), NOW)
@@ -252,11 +240,53 @@ def test_replay_rejects_hardlink_and_non_exact_modes(tmp_path: Path) -> None:
     alias = final.with_suffix(".alias")
     _ = os.link(final, alias)
     # When / Then
-    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_REPLAY_CONFLICT"):
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_INBOX_UNSAFE"):
         _ = accept_write_request(tmp_path, _request(), NOW)
     alias.unlink()
     final.chmod(0o640)
-    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_REPLAY_CONFLICT"):
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_INBOX_UNSAFE"):
+        _ = accept_write_request(tmp_path, _request(), NOW)
+
+
+def test_32_changed_contenders_under_one_key_publish_once(tmp_path: Path) -> None:
+    # Given
+    _queue(tmp_path)
+    original = _request()
+    changed = dict(original)
+    changed["payload"] = {"content": "contending canonical body"}
+    _rederive(changed)
+    requests = [original if index % 2 == 0 else changed for index in range(32)]
+
+    # When
+    with ProcessPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(_accept_process, [(str(tmp_path), request) for request in requests]))
+    # Then
+    assert sum(accepted and not replayed for accepted, replayed, _code in results) == 1
+    assert sum(code == "WRITE_REQUEST_REPLAY_CONFLICT" for _accepted, _replayed, code in results) == 16
+    assert len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 1
+
+
+def test_visible_unknown_malformed_and_over_cap_entries_fail_unsafe(tmp_path: Path) -> None:
+    # Given
+    _queue(tmp_path)
+    pending = tmp_path / "inbox/.requests/pending"
+    _ = (pending / "unknown.json").write_text("{}", encoding="utf-8")
+    (pending / "unknown.json").chmod(0o600)
+    # When / Then
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_INBOX_UNSAFE"):
+        _ = accept_write_request(tmp_path, _request(), NOW)
+    (pending / "unknown.json").unlink()
+    malformed = pending / f"memreq:pos:v1:{'a' * 64}.json"
+    _ = malformed.write_text("{}", encoding="utf-8")
+    malformed.chmod(0o600)
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_INBOX_UNSAFE"):
+        _ = accept_write_request(tmp_path, _request(), NOW)
+    malformed.unlink()
+    for index in range(1_025):
+        path = pending / f"memreq:pos:v1:{index:064x}.json"
+        _ = path.write_text("{}", encoding="utf-8")
+        path.chmod(0o600)
+    with pytest.raises(WriteRequestRejected, match="WRITE_REQUEST_INBOX_UNSAFE"):
         _ = accept_write_request(tmp_path, _request(), NOW)
 
 
@@ -264,16 +294,12 @@ def test_32_concurrent_exact_writers_publish_once(tmp_path: Path) -> None:
     # Given
     _queue(tmp_path)
     request = _request()
-    def accept_once(index: int) -> MemoryWriteResultV1:
-        del index
-        return accept_write_request(tmp_path, request, NOW)
-
     # When
-    with ThreadPoolExecutor(max_workers=32) as pool:
-        results = list(pool.map(accept_once, range(32)))
+    with ProcessPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(_accept_process, [(str(tmp_path), request)] * 32))
     # Then
-    assert sum(not result.replayed for result in results) == 1
-    assert sum(result.replayed for result in results) == 31
+    assert sum(accepted and not replayed for accepted, replayed, _code in results) == 1
+    assert sum(accepted and replayed for accepted, replayed, _code in results) == 31
     assert len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 1
 
 
@@ -309,8 +335,6 @@ def test_pending_file_is_canonical_private_and_mode_0600(tmp_path: Path) -> None
     result = accept_write_request(tmp_path, _request(), NOW)
     path = tmp_path / result.inbox_path
     # Then
-    assert path.stat().st_mode & 0o777 == 0o600
-    assert path.stat().st_nlink == 1
-    assert path.read_bytes().endswith(b"\n")
-    assert json.loads(path.read_bytes())["state"] == "pending"
+    assert path.stat().st_mode & 0o777 == 0o600 and path.stat().st_nlink == 1
+    assert path.read_bytes().endswith(b"\n") and json.loads(path.read_bytes())["state"] == "pending"
     assert not list(path.parent.glob(".*.tmp"))

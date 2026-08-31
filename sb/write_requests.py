@@ -1,7 +1,6 @@
-"""Descriptor-safe pending memory-write request publication."""
-
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import os
 import re
@@ -27,9 +26,13 @@ from sb.write_request_values import (
     WriteRequestRejected,
     canonical_bytes,
     digest,
+    parse_envelope_bytes,
     parse_request,
     reject,
 )
+
+FINAL_NAME: Final = re.compile(r"memreq:pos:v1:[0-9a-f]{64}\.json\Z")
+TEMP_NAME: Final = re.compile(r"\.memreq:pos:v1:[0-9a-f]{64}\.[0-9]+\.[0-9a-f]{32}\.tmp\Z")
 
 __all__: Final = ("WriteRequestRejected", "accept_write_request")
 
@@ -124,14 +127,15 @@ def _result(
     )
 
 
-def _read_replay(directory: int, final: str, request: MemoryWriteRequestV1) -> MemoryWriteResultV1:
-    preview = os.stat(final, dir_fd=directory, follow_symlinks=False)
-    fd = os.open(
-        final,
-        os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
-        dir_fd=directory,
-    )
+def _visible_envelope(directory: int, name: str) -> MemoryWriteInboxEnvelopeV1:
+    fd: int | None = None
     try:
+        preview = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        fd = os.open(
+            name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+            dir_fd=directory,
+        )
         before = os.fstat(fd)
         chunks: list[bytes] = []
         size = 0
@@ -141,22 +145,67 @@ def _read_replay(directory: int, final: str, request: MemoryWriteRequestV1) -> M
                 break
             chunks.append(block)
             size += len(block)
-        existing = b"".join(chunks)
         after = os.fstat(fd)
+        observed = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        safe = _safe_file(preview) and _same(preview, before) and _same(before, after)
+        safe = safe and _safe_file(observed) and _same(after, observed)
+        if not safe or size > MAX_ENVELOPE_BYTES:
+            reject("WRITE_REQUEST_INBOX_UNSAFE")
+        envelope = parse_envelope_bytes(b"".join(chunks))
+        if name != f"{envelope.request.request_id}.json":
+            reject("WRITE_REQUEST_INBOX_UNSAFE")
+        return envelope
+    except (OSError, WriteRequestRejected) as exc:
+        raise WriteRequestRejected("WRITE_REQUEST_INBOX_UNSAFE") from exc
     finally:
-        os.close(fd)
-    match = re.match(rb'^\{"accepted_at":"([^"]+)"', existing)
-    accepted = match.group(1).decode() if match is not None else ""
-    envelope = MemoryWriteInboxEnvelopeV1(1, "pending", accepted, request)
-    expected = canonical_bytes(asdict(envelope)) + b"\n"
-    safe = _safe_file(preview) and _same(preview, before) and _same(before, after)
-    if not safe or len(existing) > MAX_ENVELOPE_BYTES or existing != expected:
+        if fd is not None:
+            os.close(fd)
+
+
+def _scan_pending(directory: int, request: MemoryWriteRequestV1) -> MemoryWriteResultV1 | None:
+    before = os.fstat(directory)
+    try:
+        names = os.listdir(directory)
+    except OSError as exc:
+        raise WriteRequestRejected("WRITE_REQUEST_INBOX_UNSAFE") from exc
+    if len(names) > 1_024:
+        reject("WRITE_REQUEST_INBOX_UNSAFE")
+    replay: MemoryWriteInboxEnvelopeV1 | None = None
+    conflict = False
+    for name in names:
+        if name.startswith("."):
+            if TEMP_NAME.fullmatch(name) is None:
+                reject("WRITE_REQUEST_INBOX_UNSAFE")
+            continue
+        if FINAL_NAME.fullmatch(name) is None:
+            reject("WRITE_REQUEST_INBOX_UNSAFE")
+        envelope = _visible_envelope(directory, name)
+        existing = envelope.request
+        if existing == request:
+            replay = envelope
+            continue
+        same_key = existing.idempotency_key == request.idempotency_key
+        digest_alias = (
+            existing.candidate_id == request.candidate_id
+            and existing.operation == request.operation
+            and existing.request_digest == request.request_digest
+        )
+        conflict = conflict or same_key or digest_alias
+    if not _same(before, os.fstat(directory)):
+        reject("WRITE_REQUEST_INBOX_UNSAFE")
+    if conflict:
         reject("WRITE_REQUEST_REPLAY_CONFLICT")
-    return _result(request, accepted, digest("file", asdict(envelope)), True)
+    if replay is None:
+        return None
+    return _result(
+        replay.request,
+        replay.accepted_at,
+        digest("file", asdict(replay)),
+        True,
+    )
 
 
 def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryWriteResultV1:
-    """Validate and atomically publish one pending request without overwrite."""
     request = parse_request(value, now)
     _check_prior(root, request.expected_prior)
     accepted = now.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -170,6 +219,10 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
     temporary = f".{request.request_id}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
     fd: int | None = None
     try:
+        fcntl.flock(directory, fcntl.LOCK_EX)
+        replay = _scan_pending(directory, request)
+        if replay is not None:
+            return replay
         try:
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
             fd = os.open(temporary, flags, 0o600, dir_fd=directory)
@@ -197,7 +250,10 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
             if not _safe_file(after_link, links=2) or not _safe_file(final_metadata, links=2):
                 reject("WRITE_REQUEST_INBOX_UNSAFE")
         except FileExistsError:
-            return _read_replay(directory, final, request)
+            replay = _scan_pending(directory, request)
+            if replay is None:
+                reject("WRITE_REQUEST_INBOX_UNSAFE")
+            return replay
         os.fsync(directory)
         os.unlink(temporary, dir_fd=directory)
         os.fsync(directory)

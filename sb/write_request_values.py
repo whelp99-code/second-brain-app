@@ -1,20 +1,20 @@
-"""Closed parsing and identity checks for memory-write requests."""
-
 from __future__ import annotations
 
 import hashlib
 import json
 import re
 import unicodedata
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Final, Literal, Never, TypeGuard, override
+from typing import Final, Literal, Never, Protocol, TypeGuard, override
 
 from sb.contracts import (
     CandidateId,
     Digest,
     ExpectedPriorV1,
     JarvisReceiptV1,
+    MemoryWriteInboxEnvelopeV1,
     MemoryWriteRequestV1,
     RequestId,
     WriteOperation,
@@ -40,6 +40,17 @@ INSTANT: Final = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\Z")
 SENSITIVITIES: Final = ("public", "personal", "sensitive", "restricted")
 ROOT_KEYS: Final = frozenset({"schema_version", "candidate_id", "candidate_digest", "classification_digest", "idempotency_key", "request_id", "request_digest", "operation", "subject", "purpose", "sensitivity", "retention_days", "created_at", "expires_at", "expected_prior", "receipt", "receipt_digest", "payload"})
 RECEIPT_KEYS: Final = frozenset({"schema_version", "receipt_id", "candidate_id", "candidate_digest", "classification_digest", "operation", "decision", "principal_id", "issued_at", "expires_at"})
+ENVELOPE_KEYS: Final = frozenset({"schema_version", "state", "accepted_at", "request"})
+
+
+class _Loads(Protocol):
+    def __call__(
+        self,
+        value: bytes,
+        *,
+        object_pairs_hook: Callable[[list[tuple[str, JsonValue]]], dict[str, JsonValue]],
+        parse_constant: Callable[[str], Never],
+    ) -> JsonValue: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +113,52 @@ def canonical_bytes(value: JsonValue) -> bytes:
 
 def digest(domain: str, value: JsonValue) -> Digest:
     return Digest("sha256:" + hashlib.sha256(DOMAINS[domain] + canonical_bytes(value)).hexdigest())
+
+
+def _loads() -> _Loads:
+    loader: _Loads | None = getattr(json, "loads", None)
+    if loader is None:
+        reject("WRITE_REQUEST_INVALID")
+    return loader
+
+
+def _unique_pairs(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        reject("WRITE_REQUEST_INVALID")
+    return result
+
+
+def _invalid_constant(_value: str) -> Never:
+    reject("WRITE_REQUEST_INVALID")
+
+
+def parse_envelope_bytes(raw: bytes) -> MemoryWriteInboxEnvelopeV1:
+    if len(raw) > MAX_ENVELOPE_BYTES:
+        reject("WRITE_REQUEST_INVALID")
+    try:
+        loaded = _loads()(raw, object_pairs_hook=_unique_pairs, parse_constant=_invalid_constant)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise WriteRequestRejected("WRITE_REQUEST_INVALID") from exc
+    value = _record(loaded, ENVELOPE_KEYS)
+    if value["schema_version"] != 1 or value["state"] != "pending":
+        reject("WRITE_REQUEST_INVALID")
+    accepted = _instant(value["accepted_at"])
+    stored_request = value["request"]
+    if not isinstance(stored_request, dict) or "schema_version" in stored_request:
+        reject("WRITE_REQUEST_INVALID")
+    stored_receipt = stored_request.get("receipt")
+    if not isinstance(stored_receipt, dict) or "schema_version" in stored_receipt:
+        reject("WRITE_REQUEST_INVALID")
+    request_value: dict[str, JsonValue] = {
+        "schema_version": 1, **stored_request, "receipt": {"schema_version": 1, **stored_receipt}
+    }
+    request = parse_request(request_value, accepted)
+    accepted_text = accepted.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    envelope = MemoryWriteInboxEnvelopeV1(1, "pending", accepted_text, request)
+    if canonical_bytes(asdict(envelope)) + b"\n" != raw:
+        reject("WRITE_REQUEST_INVALID")
+    return envelope
 
 
 def _operation(value: JsonValue) -> WriteOperation:
