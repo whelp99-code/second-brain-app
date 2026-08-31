@@ -41,7 +41,7 @@ class _HashLedger:
 
 
 def _mapping(value: JsonValue) -> JsonObject:
-    match value:
+    match value:  # noqa: MATCH_OK - JsonValue union is exhaustively listed below.
         case dict() as result:
             return result
         case None | bool() | int() | float() | str() | list():
@@ -54,14 +54,14 @@ def _entry(tool: str) -> JsonObject:
 
 def _error(code: str) -> JsonObject:
     errors = build_contract()["errors"]
-    match errors:
+    match errors:  # noqa: MATCH_OK - JsonValue union is exhaustively listed below.
         case list() as rows:
             for row in rows:
                 candidate = _mapping(row)
                 if candidate["code"] == code:
                     return candidate
         case None | bool() | int() | float() | str() | dict():
-            pass
+            _ = errors
     raise AssertionError(f"missing error {code}")
 
 
@@ -106,6 +106,10 @@ def runtime() -> Iterator[tuple[Path, MCPServer, MCPServer]]:
         PageSpec("conflicts/2026-08-26-example-alpha", "ExampleAlpha", f"# Conflict\n예시기록[^{marker}]", [cite], "active"),
     )
     _ = vault.write_pages(pages, "task-6-remediation", _HashLedger())
+    pending = root / "inbox" / ".requests" / "pending"
+    pending.mkdir(parents=True)
+    for directory in (root, root / "inbox", root / "inbox" / ".requests", pending):
+        directory.chmod(0o700)
     empty_root = base / "empty"
     _ = init_vault(empty_root)
     try:
@@ -153,6 +157,7 @@ def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, 
         "sb_recent_changes": _call(server, "sb_recent_changes", {"days": 7}),
         "sb_open_conflicts": _call(server, "sb_open_conflicts", {}),
         "sb_remember": _call(server, "sb_remember", {"content": "예시기록", "title": "ExampleAlpha"}),
+        "sb_write_request": _call(server, "sb_write_request", _mapping(_mapping(_entry("sb_write_request")["happy"])["arguments"])),
     }
     assert tuple(sorted(happy)) == K5_TOOLS
     for tool, envelope in happy.items():

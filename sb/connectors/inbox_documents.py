@@ -28,7 +28,7 @@ ADAPTER_ID: Final = "inbox-documents"
 DEFAULT_SOURCE_ID: Final = "inbox"
 _ADAPTERS: Final = frozenset({ADAPTER_ID, "inbox", "inbox_documents", "documents"})
 MAX_INBOX_BYTES: Final = 10 * 1024 * 1024
-_SKIP_DIRS: Final = frozenset({".done", ".git"})
+_SKIP_DIRS: Final = frozenset({".done", ".git", ".requests"})
 
 
 @dataclass(frozen=True, slots=True)

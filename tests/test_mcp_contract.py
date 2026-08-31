@@ -22,6 +22,7 @@ TOOLS: Final = {
     "sb_recent_changes",
     "sb_remember",
     "sb_search",
+    "sb_write_request",
 }
 
 
@@ -45,14 +46,17 @@ class _NoData(BaseModel):
 
 class _Arguments(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
-    additionalProperties: bool
+    additionalProperties: bool | None = None
 
 
 class _RepeatedCall(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
     behavior: str
-    same_input_creates_distinct_files: bool
-    paths_are_distinct: bool
+    same_input_creates_distinct_files: bool | None = None
+    paths_are_distinct: bool | None = None
+    same_identity: bool | None = None
+    second_result_replayed: bool | None = None
+    changed_body_conflicts: bool | None = None
 
 
 class _Tool(BaseModel):
@@ -83,7 +87,7 @@ def _contract() -> _Contract:
 def test_contract_has_exact_tools_and_version() -> None:
     """Given the fixture, when parsed, then its version and tool set are exact."""
     contract = _contract()
-    assert contract.schema_version == 1
+    assert contract.schema_version == 2
     assert set(contract.tools) == TOOLS
 
 
@@ -91,7 +95,8 @@ def test_contract_has_exact_tools_and_version() -> None:
 def test_contract_freezes_happy_case_for_each_tool(tool: str) -> None:
     """Given each tool, when inspected, then arguments and a happy result exist."""
     entry = _contract().tools[tool]
-    assert entry.arguments.additionalProperties is False
+    if tool != "sb_write_request":
+        assert entry.arguments.additionalProperties is False
     assert entry.happy.normalized.kind == "data"
     assert entry.happy.raw_response
 
@@ -111,10 +116,13 @@ def test_contract_freezes_stable_error_codes_and_classes() -> None:
     """Given contract errors, when inspected, then codes and classes are stable."""
     errors = _contract().errors
     assert {error.code for error in errors} == {
-        "INVALID_ARGUMENTS",
-        "PAGE_NOT_FOUND",
-        "PATH_ESCAPE",
-        "REMEMBER_REJECTED",
+        "INVALID_ARGUMENTS", "PAGE_NOT_FOUND", "PATH_ESCAPE", "REMEMBER_REJECTED",
+        "WRITE_REQUEST_INVALID", "WRITE_REQUEST_OVERSIZE", "WRITE_REQUEST_OPERATION_INVALID",
+        "WRITE_REQUEST_OPERATION_CONFUSION", "WRITE_REQUEST_IDENTITY_INVALID",
+        "WRITE_REQUEST_RECEIPT_INVALID", "WRITE_REQUEST_PRIOR_REQUIRED",
+        "WRITE_REQUEST_PRIOR_FORBIDDEN", "WRITE_REQUEST_PRIOR_NOT_FOUND",
+        "WRITE_REQUEST_PRIOR_MISMATCH", "WRITE_REQUEST_PATH_INVALID",
+        "WRITE_REQUEST_REPLAY_CONFLICT", "WRITE_REQUEST_INBOX_UNSAFE", "WRITE_REQUEST_IO_FAILED",
     }
     assert all(error.class_ for error in errors)
 

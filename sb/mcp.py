@@ -1,8 +1,10 @@
-"""Read-only stdio MCP server: K5 tools plus collision-safe inbox remember."""
+"""Bounded stdio MCP server: K5 tools plus isolated pending-request writes."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, override
 
@@ -12,8 +14,11 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from sb.config import load_config
 from sb.inbox import RememberRejected, write_inbox
+from sb.mcp_write_models import MemoryWriteRequestModel, MemoryWriteResultModel
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.vault import PathEscapeError
+from sb.write_request_values import WriteRequestRejected
+from sb.write_requests import accept_write_request
 
 __all__ = ("RememberRejected", "write_inbox")
 
@@ -23,6 +28,7 @@ K5_TOOLS: Final = (
     "sb_recent_changes",
     "sb_remember",
     "sb_search",
+    "sb_write_request",
 )
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 
@@ -191,7 +197,17 @@ def build_server(vault_root: Path | str | None = None) -> MCPServer:
             raise ToolError(str(exc)) from exc
         return {"inbox_path": rel.as_posix()}
 
-    _ = (sb_search, sb_read_page, sb_recent_changes, sb_open_conflicts, sb_remember)
+    @server.tool(name="sb_write_request")
+    def sb_write_request(request: MemoryWriteRequestModel) -> MemoryWriteResultModel:
+        """Accept one closed JARVIS memory request into the pending inbox queue."""
+        try:
+            result = accept_write_request(root, request.model_dump(mode="json"), datetime.now(UTC))
+        except WriteRequestRejected as exc:
+            error = {"schema_version": 1, "kind": "error", "code": exc.code, "retryable": False}
+            raise ToolError(json.dumps(error, sort_keys=True, separators=(",", ":"))) from exc
+        return MemoryWriteResultModel.model_validate(asdict(result))
+
+    _ = (sb_search, sb_read_page, sb_recent_changes, sb_open_conflicts, sb_remember, sb_write_request)
     return server
 
 

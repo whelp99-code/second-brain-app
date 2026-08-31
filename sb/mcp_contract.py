@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import Final
 
 from sb.mcp import K5_TOOLS
+from sb.mcp_write_models import MemoryWriteRequestModel, MemoryWriteResultModel
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
-SCHEMA_VERSION: Final = 1
-IMPLEMENTATION_COMMIT: Final = "011abade5b29de66af4722dfd9c21398064eeb1e"
+SCHEMA_VERSION: Final = 2
+IMPLEMENTATION_COMMIT: Final = "fe44e9753dcc120a6a9bb310074fee55e21c289e"
 MISMATCH: Final = "SECOND_BRAIN_CONTRACT_MISMATCH"
 
 
@@ -24,6 +25,64 @@ def _arguments(properties: JsonObject, required: list[JsonValue]) -> JsonObject:
         "required": required,
         "type": "object",
     }
+
+
+def _digest(domain: bytes, value: JsonObject) -> str:
+    return "sha256:" + hashlib.sha256(domain + canonical_bytes(value).rstrip(b"\n")).hexdigest()
+
+
+def _write_fixture_request() -> JsonObject:
+    candidate = "memcand:pos:v1:" + "1" * 64
+    candidate_digest = "sha256:" + "2" * 64
+    classification_digest = "sha256:" + "3" * 64
+    receipt: JsonObject = {
+        "schema_version": 1, "receipt_id": "receipt:memory:" + "4" * 64,
+        "candidate_id": candidate, "candidate_digest": candidate_digest,
+        "classification_digest": classification_digest, "operation": "remember",
+        "decision": "owner_confirmed", "principal_id": "principal:owner",
+        "issued_at": "2026-08-31T00:00:00.000Z", "expires_at": "2026-09-01T00:00:00.000Z",
+    }
+    identity: JsonObject = {"candidate_id": candidate, "candidate_digest": candidate_digest,
+                            "classification_digest": classification_digest, "operation": "remember"}
+    idempotency = _digest(b"orca-jarvis/memory-write-idempotency/v1\0", identity)
+    request: JsonObject = {
+        "schema_version": 1, "candidate_id": candidate, "candidate_digest": candidate_digest,
+        "classification_digest": classification_digest,
+        "idempotency_key": "memidem:pos:v1:" + idempotency[7:], "operation": "remember",
+        "subject": "wiki/example-alpha", "purpose": "personal_memory", "sensitivity": "personal",
+        "retention_days": 3650, "created_at": "2026-08-31T00:00:00.000Z",
+        "expires_at": "2026-09-01T00:00:00.000Z", "expected_prior": None,
+        "receipt": receipt, "receipt_digest": _digest(b"orca-jarvis/memory-write-receipt/v1\0", receipt),
+        "payload": {"content": "ExampleAlpha 예시기록"},
+    }
+    request_digest = _digest(b"orca-jarvis/memory-write-request/v1\0", request)
+    request["request_id"] = "memreq:pos:v1:" + request_digest[7:]
+    request["request_digest"] = request_digest
+    return request
+
+
+def _write_arguments() -> JsonObject:
+    schema = MemoryWriteRequestModel.model_json_schema()
+    definitions = schema.pop("$defs")
+    return {"$defs": definitions, "properties": {"request": {"$ref": "#/$defs/MemoryWriteRequestModel"}},
+            "required": ["request"], "title": "sb_write_requestArguments", "type": "object"}
+
+
+def _write_errors() -> list[JsonValue]:
+    codes = (
+        "WRITE_REQUEST_INVALID", "WRITE_REQUEST_OVERSIZE", "WRITE_REQUEST_OPERATION_INVALID",
+        "WRITE_REQUEST_OPERATION_CONFUSION", "WRITE_REQUEST_IDENTITY_INVALID",
+        "WRITE_REQUEST_RECEIPT_INVALID", "WRITE_REQUEST_PRIOR_REQUIRED",
+        "WRITE_REQUEST_PRIOR_FORBIDDEN", "WRITE_REQUEST_PRIOR_NOT_FOUND",
+        "WRITE_REQUEST_PRIOR_MISMATCH", "WRITE_REQUEST_PATH_INVALID",
+        "WRITE_REQUEST_REPLAY_CONFLICT", "WRITE_REQUEST_INBOX_UNSAFE", "WRITE_REQUEST_IO_FAILED",
+    )
+    return [
+        {"class": "ToolError", "code": code,
+         "raw_error": json.dumps({"schema_version": 1, "kind": "error", "code": code,
+                                  "retryable": False}, sort_keys=True, separators=(",", ":"))}
+        for code in codes
+    ]
 
 
 def build_contract() -> JsonObject:
@@ -85,17 +144,37 @@ def build_contract() -> JsonObject:
             "no_data": None,
             "repeated_call": {"behavior": "non_idempotent_collision_safe_no_overwrite", "paths_are_distinct": True, "same_input_creates_distinct_files": True},
         },
+        "sb_write_request": {
+            "arguments": _write_arguments(),
+            "happy": {
+                "arguments": {"request": _write_fixture_request()},
+                "normalized": {"kind": "data", "value": {"state": "pending"}},
+                "raw_response": {
+                    "schema_version": 1, "kind": "accepted", "state": "pending",
+                    "candidate_id": "memcand:pos:v1:" + "1" * 64,
+                    "request_id": "<request-id>", "request_digest": "<sha256>",
+                    "idempotency_key": "<idempotency-key>", "operation": "remember",
+                    "accepted_at": "<instant>", "inbox_path": "<inbox-path>",
+                    "request_file_digest": "<sha256>", "replayed": False,
+                },
+            },
+            "no_data": None,
+            "output_schema": MemoryWriteResultModel.model_json_schema(),
+            "repeated_call": {"behavior": "idempotent_exact_replay", "same_identity": True,
+                              "second_result_replayed": True, "changed_body_conflicts": True},
+        },
     }
     if tuple(sorted(tools)) != K5_TOOLS:
         raise RuntimeError(MISMATCH)
     return {
-        "application": {"implementation_commit": IMPLEMENTATION_COMMIT, "implementation_commit_role": "reviewed_pre_fixture_runtime"},
+        "application": {"implementation_commit": IMPLEMENTATION_COMMIT, "implementation_commit_role": "task28_entry_baseline"},
         "canonicalization": {"encoding": "utf-8", "json": "sorted_keys_compact_separators_trailing_newline", "sha256_sidecar": "64_lowercase_hex_newline"},
         "errors": [
             {"class": "pydantic.ValidationError", "code": "INVALID_ARGUMENTS", "raw_error_pattern": "^Error executing tool sb_search: 1 validation error for sb_searchArguments\\nlimit\\n  Input should be a valid integer, unable to parse string as an integer \\[type=int_parsing, input_value='bad', input_type=str\\]\\n    For further information visit https://errors[.]pydantic[.]dev/2[.][0-9]+/v/int_parsing$"},
             {"class": "ToolError", "code": "PAGE_NOT_FOUND", "raw_error": "Error executing tool sb_read_page: page not found: wiki/missing"},
             {"class": "ToolError", "code": "PATH_ESCAPE", "raw_error": "Error executing tool sb_read_page: page_id escapes vault: ../example"},
             {"class": "ToolError", "code": "REMEMBER_REJECTED", "raw_error": "Error executing tool sb_remember: content exceeds 1MB"},
+            *_write_errors(),
         ],
         "normalization": {"boundary": "fixture_export_only", "raw_response_and_error_preserved": True, "typed_outcomes": ["data", "no_data", "error"]},
         "schema_version": SCHEMA_VERSION,

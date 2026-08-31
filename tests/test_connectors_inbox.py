@@ -208,6 +208,23 @@ def test_inbox_does_not_write_outside_inbox_when_nested_file_succeeds(tmp_path: 
     assert set(tmp_path.iterdir()) == {inbox}
 
 
+def test_inbox_ignores_memory_request_queue(tmp_path: Path) -> None:
+    # Given: a pending write request beneath the reserved queue directory.
+    inbox = tmp_path / "inbox"
+    pending = inbox / ".requests" / "pending"
+    pending.mkdir(parents=True)
+    _ = (pending / "memreq.json").write_text('{"state":"pending"}\n', encoding="utf-8")
+    adapter = create(_cfg(inbox))
+
+    # When: generic inbox intake scans the inbox.
+    items = list(adapter.scan(None))
+
+    # Then: request files are neither parsed nor moved by the connector.
+    assert items == []
+    assert (pending / "memreq.json").is_file()
+    assert not (inbox / ".done").exists()
+
+
 def test_registry_auto_discovers_inbox_documents_adapter() -> None:
     # Given: the real sb.connectors package after inbox_documents exists.
     from sb.config import load_config

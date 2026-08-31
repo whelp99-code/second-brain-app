@@ -7,6 +7,91 @@ Stdlib only. No I/O, no third-party imports. See draft
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Literal, NewType
+
+
+class WriteOperation(StrEnum):
+    REMEMBER = "remember"
+    CORRECT = "correct"
+    FORGET = "forget"
+    EXPORT = "export"
+CandidateId = NewType("CandidateId", str)
+RequestId = NewType("RequestId", str)
+Digest = NewType("Digest", str)
+
+
+@dataclass(frozen=True, slots=True)
+class ExpectedPriorV1:
+    source_id: str
+    source_version: str
+    source_digest: Digest
+
+
+@dataclass(frozen=True, slots=True)
+class JarvisReceiptV1:
+    receipt_id: str
+    candidate_id: CandidateId
+    candidate_digest: Digest
+    classification_digest: Digest
+    operation: WriteOperation
+    decision: Literal["auto_staged", "owner_confirmed"]
+    principal_id: Literal["principal:owner"]
+    issued_at: str
+    expires_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryWriteRequestV1:
+    candidate_id: CandidateId
+    candidate_digest: Digest
+    classification_digest: Digest
+    idempotency_key: str
+    request_id: RequestId
+    request_digest: Digest
+    operation: WriteOperation
+    subject: str
+    purpose: str
+    sensitivity: str
+    retention_days: int
+    created_at: str
+    expires_at: str
+    expected_prior: ExpectedPriorV1 | None
+    receipt: JarvisReceiptV1
+    receipt_digest: Digest
+    payload: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryWriteResultV1:
+    schema_version: Literal[1]
+    kind: Literal["accepted"]
+    state: Literal["pending"]
+    candidate_id: CandidateId
+    request_id: RequestId
+    request_digest: Digest
+    idempotency_key: str
+    operation: WriteOperation
+    accepted_at: str
+    inbox_path: str
+    request_file_digest: Digest
+    replayed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryWriteErrorV1:
+    schema_version: Literal[1]
+    kind: Literal["error"]
+    code: str
+    retryable: Literal[False]
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryWriteInboxEnvelopeV1:
+    schema_version: Literal[1]
+    state: Literal["pending"]
+    accepted_at: str
+    request: MemoryWriteRequestV1
 
 VALID_CONFLICT_RELATIONS = frozenset(
     {"supports", "contradicts", "unrelated", "supersedes"}
