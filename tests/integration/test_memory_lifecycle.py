@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from pytest import MonkeyPatch
 
 from sb.delegations import create_read_fence
-from sb.effect_values import JsonObject, format_instant, is_json_object, strict_loads
+from sb.effect_values import JsonObject, digest, format_instant, is_json_object, strict_loads
 from sb.effect_write_requests import accept_effect_request
 from sb.effect_write_values import model_object
 from sb.mcp import build_server
@@ -118,6 +118,15 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     export_proof = strict_loads(export_status.proof_json, 262_144)
     assert is_json_object(export_proof)
     assert export_proof["export_manifest_digest"] == export_observations.export.manifest_digest
+    retained_manifest = export_observations.export.manifest
+    retained_body = model_object(retained_manifest)
+    del retained_body["manifest_id"], retained_body["manifest_digest"]
+    assert digest("export", retained_body) == export_proof["export_manifest_digest"]
+    assert len(retained_manifest.files) == export_observations.export.file_count
+    assert sum(entry.bytes for entry in retained_manifest.files) == export_observations.export.byte_count
+    assert retained_manifest.record_count == export_observations.export.record_count
+    export_wire = export_observations.model_dump_json()
+    assert str(tmp_path) not in export_wire and CORRECTED not in export_wire
 
     forget_time = NOW + timedelta(minutes=3)
     # Reuse the exact export target identity: target/scope/payload digests are bindings,
@@ -173,18 +182,27 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         signing_key_id="jarvis:fixture", private_key=key,
     )
 
-    async def request_status() -> str:
+    async def request_status(request_id: str) -> str:
         async with Client(build_server(), mode="legacy", cache=None) as client:
             result = await client.call_tool("sb_request_status", {
-                "request_id": forget_accepted.request_id,
+                "request_id": request_id,
                 "read_fence": model_object(fence),
             })
         return result.model_dump_json()
 
-    status_envelope = _StatusEnvelope.model_validate_json(anyio.run(request_status))
+    status_envelope = _StatusEnvelope.model_validate_json(
+        anyio.run(request_status, forget_accepted.request_id)
+    )
     wire_observations = ProviderLifecycleObservationsV1.model_validate(
         status_envelope.structured_content.get("observations")
     )
     stored_observations = executor.store.observations(forget_accepted.request_id)
     assert stored_observations == wire_observations
+    export_envelope = _StatusEnvelope.model_validate_json(
+        anyio.run(request_status, export_accepted.request_id)
+    )
+    wire_export = ProviderLifecycleObservationsV1.model_validate(
+        export_envelope.structured_content.get("observations")
+    ).export
+    assert wire_export is not None and wire_export.manifest == retained_manifest
     executor.close()

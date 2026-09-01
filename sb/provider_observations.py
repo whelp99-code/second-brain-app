@@ -110,6 +110,7 @@ def _export(input_: ProviderObservationInput) -> ProviderExportObservationV1:
         raise ProviderObservationError("PROVIDER_EXPORT_OBSERVATION_INVALID")
     return ProviderExportObservationV1(
         manifest_digest=manifest.manifest_digest,
+        manifest=manifest,
         file_count=len(records),
         byte_count=byte_count,
         record_count=manifest.record_count,

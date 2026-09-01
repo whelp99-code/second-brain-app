@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import Field
 
 from sb.effect_write_models import ClosedModel
+from sb.export_models import MemoryExportManifestV1
 from sb.provider_surface_catalog import ProviderSurfaceOwner
 
 
@@ -100,6 +101,7 @@ class ProviderAbsenceObservationV1(ClosedModel):
 
 class ProviderExportObservationV1(ClosedModel):
     manifest_digest: str
+    manifest: MemoryExportManifestV1
     file_count: int = Field(ge=1)
     byte_count: int = Field(ge=1)
     record_count: int = Field(ge=1)
