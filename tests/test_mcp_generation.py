@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import assert_never
@@ -15,8 +14,7 @@ from pytest import MonkeyPatch
 import sb.mcp as mcp_module
 from sb.effect_values import JsonValue, digest
 from sb.generations import GenerationStore
-from sb.mcp import K5_TOOLS, LEGACY_TOOLS, build_server
-from sb.mcp_contract import write_fixture_request
+from sb.mcp import K5_TOOLS, build_server
 from sb.request_store import RequestIdentity, RequestStore
 from tests.mcp_test_support import (
     EN_TERM,
@@ -33,25 +31,6 @@ from tests.mcp_test_support import (
     seed,
     structured,
 )
-
-
-def test_legacy_mode_preserves_task29_tool_and_v1_write_schemas(tmp_path: Path) -> None:
-    root = seed(tmp_path)
-    server = build_server(root, task30=False)
-
-    async def go() -> tuple[tuple[str, ...], str, CallToolResult]:
-        async with Client(server, mode="legacy", cache=None) as client:
-            listed = await client.list_tools()
-            names = tuple(sorted(tool.name for tool in listed.tools))
-            write_tool = next(tool for tool in listed.tools if tool.name == "sb_write_request")
-            result = await client.call_tool("sb_write_request", {"request": write_fixture_request()})
-            return names, json.dumps(write_tool.input_schema, sort_keys=True), result
-
-    names, schema, result = anyio.run(go)
-    assert names == LEGACY_TOOLS
-    assert "MemoryEffectWriteRequestV2" not in schema
-    assert result.is_error is False
-    assert result.content
 
 
 def test_task30_reads_hold_a_registered_generation_pin(

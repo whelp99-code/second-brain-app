@@ -14,12 +14,15 @@ from mcp.client import Client
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult
 from pydantic import BaseModel, ConfigDict
+from pytest import MonkeyPatch
 
+import sb.mcp as mcp_module
 from sb.contracts import PageSpec, SourceCite
 from sb.mcp import K5_TOOLS, build_server
 from sb.mcp_contract import JsonObject, JsonValue, build_contract
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
+from tests.task30_clock import FrozenTask30DateTime
 
 
 class _Text(BaseModel):
@@ -88,7 +91,7 @@ def _assert_shape(actual: JsonValue, expected: JsonValue) -> None:
 
 
 @pytest.fixture
-def runtime() -> Iterator[tuple[Path, MCPServer, MCPServer]]:
+def runtime(monkeypatch: MonkeyPatch) -> Iterator[tuple[Path, MCPServer, MCPServer]]:
     base = Path(".test-vault/task-6-remediation-runtime")
     shutil.rmtree(base, ignore_errors=True)
     root = base / "vault"
@@ -107,6 +110,7 @@ def runtime() -> Iterator[tuple[Path, MCPServer, MCPServer]]:
         directory.chmod(0o700)
     empty_root = base / "empty"
     _ = init_vault(empty_root)
+    monkeypatch.setattr(mcp_module, "datetime", FrozenTask30DateTime)
     try:
         yield root, build_server(root), build_server(empty_root)
     finally:

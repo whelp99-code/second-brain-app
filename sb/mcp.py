@@ -37,11 +37,15 @@ from sb.exports import ExportPublisher
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import RememberRejected, write_inbox
-from sb.mcp_write_models import MemoryWriteRequest, MemoryWriteRequestModel
+from sb.mcp_write_models import (
+    MemoryWriteRequest,
+    MemoryWriteRequestModel,
+    MemoryWriteResultModel,
+)
 from sb.page_ids import git_rel
 from sb.provider_lifecycle import ProviderLifecycle
 from sb.request_store import RequestStore
-from sb.search import SearchIndex, committed_text, git_run
+from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
@@ -635,32 +639,72 @@ def build_server(
         raw = cast(JsonObject, request.model_dump(mode="json"))
         return accept_request(raw, isinstance(request, MemoryEffectWriteRequestV2))
 
-    def sb_write_request_legacy(
-        request: MemoryWriteRequestModel,
-    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-        """Accept unchanged Task 29 V1 bytes into the stable queue."""
+    def require_legacy_genesis() -> None:
         if high_water()[0] != 0:
             raise ToolError("TOMBSTONE_FENCE_REQUIRED")
+
+    def legacy_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
+        """Search the compiled wiki, daily briefs, and conflict pages for `query`.
+
+        Use this to answer questions about what the user has recorded before.
+        Returns ranked sections with a snippet and the `page_id` to pass to
+        `sb_read_page`.
+        """
+        with pin_generation() as (current_root, _generation):
+            require_legacy_genesis()
+            hits = SearchIndex(vault_root=current_root).search(query, limit)
+            return {"results": [hit.as_dict() for hit in hits]}
+
+    def legacy_read_page(id: str) -> dict[str, dict[str, str] | str]:
+        """Read one committed page whole, with its citation frontmatter.
+
+        `id` is a `page_id` from `sb_search`, `sb_recent_changes`, or
+        `sb_open_conflicts` (`daily/2026-08-26`, `conflicts/<slug>`, or a bare
+        wiki id). Read the page before quoting it; snippets are truncated.
+        """
+        with pin_generation() as (current_root, _generation):
+            require_legacy_genesis()
+            try:
+                page = read_page(current_root, id)
+            except (PathEscapeError, PageNotFoundError) as exc:
+                raise ToolError(str(exc)) from exc
+            return page.as_dict()
+
+    def legacy_recent_changes(days: int = 7) -> dict[str, list[dict[str, str]]]:
+        """List pages added, modified, or deleted in the last `days` days.
+
+        Use this for "what changed" or "what have I been working on" questions,
+        or to find the newest page before reading it.
+        """
+        with pin_generation() as (current_root, _generation):
+            require_legacy_genesis()
+            return {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
+
+    def legacy_open_conflicts() -> dict[str, list[dict[str, str]]]:
+        """List unresolved contradictions between recorded sources.
+
+        Each row names the conflicted `page_id`. Check this before stating a
+        fact from the wiki as settled.
+        """
+        with pin_generation() as (current_root, _generation):
+            require_legacy_genesis()
+            return {"conflicts": [row.as_dict() for row in open_conflicts(current_root)]}
+
+    def legacy_remember(content: str, title: str | None = None) -> dict[str, str]:
+        """Record `content` as a note for the second brain to absorb.
+
+        This is the only write. Use it whenever the user says to remember,
+        note, or record something, including personal details. The note lands
+        in the vault inbox and is picked up by the next ingest run; it does not
+        appear in search immediately.
+        """
+        return sb_remember(content, title)
+
+    def legacy_write_request(request: MemoryWriteRequestModel) -> MemoryWriteResultModel:
+        """Accept one closed JARVIS memory request into the pending inbox queue."""
+        require_legacy_genesis()
         raw = cast(JsonObject, request.model_dump(mode="json"))
-        return accept_request(raw, False)
-
-    def legacy_search(
-        query: str, limit: int = 10
-    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-        return sb_search(query, limit)
-
-    def legacy_read_page(
-        id: str,
-    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-        return sb_read_page(id)
-
-    def legacy_recent_changes(
-        days: int = 7,
-    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-        return sb_recent_changes(days)
-
-    def legacy_open_conflicts() -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-        return sb_open_conflicts()
+        return MemoryWriteResultModel.model_validate(accept_request(raw, False))
 
     _ = server.tool(name="sb_search")(sb_search if task30_enabled else legacy_search)
     _ = server.tool(name="sb_read_page")(sb_read_page if task30_enabled else legacy_read_page)
@@ -670,9 +714,9 @@ def build_server(
     _ = server.tool(name="sb_open_conflicts")(
         sb_open_conflicts if task30_enabled else legacy_open_conflicts
     )
-    _ = server.tool(name="sb_remember")(sb_remember)
+    _ = server.tool(name="sb_remember")(sb_remember if task30_enabled else legacy_remember)
     _ = server.tool(name="sb_write_request")(
-        sb_write_request if task30_enabled else sb_write_request_legacy
+        sb_write_request if task30_enabled else legacy_write_request
     )
     if task30_enabled:
         _ = server.tool(name="sb_generation_status")(sb_generation_status)
