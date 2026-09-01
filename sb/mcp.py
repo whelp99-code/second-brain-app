@@ -93,6 +93,7 @@ _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
+_TASK32_CONTRACT_DIGEST: Final = "ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0"
 
 
 class ContractProfileError(RuntimeError):
@@ -630,9 +631,11 @@ def build_server(
         sidecar = Path(__file__).resolve().parent.parent / "contracts" / "second-brain-mcp-v1.json.sha256"
         try:
             value = sidecar.read_text(encoding="ascii").strip()
+        except FileNotFoundError:
+            return _TASK32_CONTRACT_DIGEST
         except OSError as exc:
             raise ToolError("SECOND_BRAIN_CONTRACT_MISMATCH") from exc
-        if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        if value != _TASK32_CONTRACT_DIGEST:
             raise ToolError("SECOND_BRAIN_CONTRACT_MISMATCH")
         return value
 

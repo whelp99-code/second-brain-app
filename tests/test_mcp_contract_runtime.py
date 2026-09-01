@@ -136,6 +136,19 @@ def test_read_page_fixture_matches_complete_runtime_frontmatter(runtime: tuple[P
     assert actual_frontmatter == expected_frontmatter
 
 
+def test_schema4_status_uses_pinned_digest_without_repository_sidecar(
+    runtime: tuple[Path, MCPServer, MCPServer], monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    """An installed wheel exposes the locked contract digest without root data files."""
+    _, server, _ = runtime
+    monkeypatch.setattr(mcp_module, "__file__", str(tmp_path / "site" / "sb" / "mcp.py"))
+    actual = _call(server, "sb_generation_status", {}).structured_content
+    assert actual is not None
+    assert actual["contract_digest"] == (
+        "ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0"
+    )
+
+
 def test_path_escape_fixture_matches_exact_runtime_error(runtime: tuple[Path, MCPServer, MCPServer]) -> None:
     """Given traversal, when rejected, then fixture freezes the exact raw boundary error."""
     _, server, _ = runtime
