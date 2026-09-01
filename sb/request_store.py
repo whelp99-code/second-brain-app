@@ -13,8 +13,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal, cast, final
 
-from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant
+from pydantic import ValidationError
+
+from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant, strict_loads
+from sb.effect_write_values import model_object
 from sb.export_journal import ExportJournal
+from sb.provider_observation_models import ProviderLifecycleObservationsV1
+from sb.sqlite_values import OPTIONAL_TEXT_ROW
 from sb.tombstone_snapshot import (
     TombstoneSnapshot,
     register_target_identities,
@@ -102,6 +107,15 @@ class RequestLease:
     owner_process_id: int
     owner_process_start: int
     phase: Phase
+
+
+@dataclass(frozen=True, slots=True)
+class RequestProofSettlement:
+    proof: Mapping[str, JsonValue]
+    proof_digest: str
+    status_digest: str
+    observations: ProviderLifecycleObservationsV1 | None
+    now: datetime
 
 
 _SCHEMA: Final = """
@@ -224,6 +238,16 @@ CREATE TABLE IF NOT EXISTS reader_leases(
   process_id INTEGER NOT NULL,
   opened_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS request_observations(
+  request_id TEXT PRIMARY KEY REFERENCES requests(request_id),
+  observation_digest TEXT NOT NULL UNIQUE,
+  observations_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS request_observations_no_update
+BEFORE UPDATE ON request_observations BEGIN SELECT RAISE(ABORT,'immutable request observation'); END;
+CREATE TRIGGER IF NOT EXISTS request_observations_no_delete
+BEFORE DELETE ON request_observations BEGIN SELECT RAISE(ABORT,'immutable request observation'); END;
 CREATE TRIGGER IF NOT EXISTS tombstone_replica_no_update
 BEFORE UPDATE ON tombstone_replica BEGIN SELECT RAISE(ABORT,'immutable tombstone replica'); END;
 CREATE TRIGGER IF NOT EXISTS tombstone_replica_no_delete
@@ -393,6 +417,18 @@ class RequestStore:
     def get(self, request_id: str) -> RequestStatus | None:
         row = self._row(request_id)
         return None if row is None else self._status(row)
+
+    def observations(self, request_id: str) -> ProviderLifecycleObservationsV1 | None:
+        row = OPTIONAL_TEXT_ROW.validate_python(self.db.execute(
+            "SELECT observations_json FROM request_observations WHERE request_id=?",
+            (request_id,),
+        ).fetchone())
+        if row is None:
+            return None
+        try:
+            return ProviderLifecycleObservationsV1.model_validate(strict_loads(row[0], 262_144))
+        except (ValidationError, ValueError) as exc:
+            raise RequestStoreError("REQUEST_OBSERVATION_CORRUPT") from exc
 
     def list_states(self, states: Sequence[RequestState]) -> tuple[RequestStatus, ...]:
         if not states:
@@ -821,15 +857,25 @@ class RequestStore:
     def prove(
         self,
         lease: RequestLease,
-        proof: Mapping[str, JsonValue],
-        proof_digest: str,
-        status_digest: str,
-        now: datetime,
+        settlement: RequestProofSettlement,
     ) -> RequestStatus:
-        stamp = format_instant(now)
-        proof_json = canonical_bytes(proof).decode("utf-8")
+        stamp = format_instant(settlement.now)
+        proof_json = canonical_bytes(settlement.proof).decode("utf-8")
         self._begin()
         try:
+            if settlement.observations is not None:
+                observations_json = canonical_bytes(
+                    model_object(settlement.observations)
+                ).decode("utf-8")
+                _ = self.db.execute(
+                    "INSERT INTO request_observations VALUES(?,?,?,?)",
+                    (
+                        lease.request_id,
+                        settlement.observations.observation_digest,
+                        observations_json,
+                        stamp,
+                    ),
+                )
             changed = self.db.execute(
                 """UPDATE requests SET state='proved',phase='proved',owner=NULL,
                    owner_process_id=NULL,owner_process_start=NULL,lease_expires_at=NULL,
@@ -837,8 +883,8 @@ class RequestStore:
                    WHERE request_id=? AND state='processing' AND phase='proved'
                    AND owner=? AND fence=? AND owner_process_id=? AND owner_process_start=?""",
                 (
-                    proof_digest,
-                    status_digest,
+                    settlement.proof_digest,
+                    settlement.status_digest,
                     proof_json,
                     stamp,
                     lease.request_id,

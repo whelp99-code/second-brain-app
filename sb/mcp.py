@@ -32,6 +32,7 @@ from sb.effect_write_models import (
     MemoryEffectWriteErrorV2,
     MemoryEffectWriteRequestV2,
 )
+from sb.effect_write_values import model_object
 from sb.erasure import ErasureError, ReingressGate
 from sb.exports import ExportPublisher
 from sb.generation_runtime import GenerationMutationService
@@ -513,6 +514,7 @@ def build_server(
             store = RequestStore(requests)
             try:
                 status = store.get(request_id)
+                observations = store.observations(request_id)
             finally:
                 store.close()
             if status is None:
@@ -538,6 +540,8 @@ def build_server(
             }
             if status.state == "proved" and status.proof_json is not None:
                 result["proof"] = json.loads(status.proof_json)
+                if observations is not None:
+                    result["observations"] = model_object(observations)
             return bind_read(result, generation, current)
 
     def sb_resolve_memory_target(

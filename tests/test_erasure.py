@@ -9,7 +9,13 @@ import pytest
 
 from sb.effect_write_models import MemoryEffectWriteRequestV2
 from sb.effect_write_values import frozen_correction_vector
-from sb.erasure import ErasureEngine, ErasureError, ReingressGate, scan_managed_surfaces
+from sb.erasure import (
+    ErasureEngine,
+    ErasureError,
+    IngressIdentity,
+    ReingressGate,
+    scan_managed_surfaces,
+)
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 
@@ -47,10 +53,10 @@ def test_correction_removes_old_bytes_and_blocks_reingress(tmp_path: Path) -> No
     assert inventory.matches == 0 and inventory.scan_errors == 0
     target = request.targets[0]
     with pytest.raises(ErasureError, match="TOMBSTONE_REINGRESS_BLOCKED"):
-        gate.check(
-            source_identity=target.source_identity_full,
-            content_identity="future-version",
-        )
+        gate.check(IngressIdentity(
+            source=target.source_identity_full,
+            content="future-version",
+        ))
     gate.close()
 
 

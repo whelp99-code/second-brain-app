@@ -74,11 +74,9 @@ def test_frozen_export_forget_and_revocation_vectors_match_cross_repository_valu
 def test_external_read_only_forget_requires_signed_owner_receipt() -> None:
     vectors = frozen_effect_vectors()
     raw_forget = vectors.get("forget")
-    if not isinstance(raw_forget, dict):
-        raise TypeError("forget vector missing")
+    assert isinstance(raw_forget, dict)
     raw_request = raw_forget.get("request")
-    if not isinstance(raw_request, dict):
-        raise TypeError("forget request missing")
+    assert isinstance(raw_request, dict)
     request = deepcopy(raw_request)
     targets = request["targets"]
     assert isinstance(targets, list) and isinstance(targets[0], dict)

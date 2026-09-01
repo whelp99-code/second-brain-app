@@ -9,7 +9,7 @@ import sqlite3
 import stat
 from pathlib import Path
 
-from sb.erasure import ReingressGate
+from sb.erasure import IngressIdentity, ReingressGate
 from sb.generation_runtime_models import GenerationMutationError
 
 
@@ -51,10 +51,10 @@ def copy_pending_inbox(source: Path, destination: Path, state_root: Path) -> Non
         payloads = tuple((path, path.read_bytes()) for path in pending)
         for path, payload in payloads:
             relative = path.relative_to(inbox).as_posix()
-            gate.check(
-                source_identity=hashlib.sha256(f"inbox\0{relative}".encode()).hexdigest(),
-                content_identity=hashlib.sha256(payload).hexdigest(),
-            )
+            gate.check(IngressIdentity(
+                source=hashlib.sha256(f"inbox\0{relative}".encode()).hexdigest(),
+                content=hashlib.sha256(payload).hexdigest(),
+            ))
             gate.check_content(payload)
     finally:
         gate.close()

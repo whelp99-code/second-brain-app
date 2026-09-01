@@ -15,7 +15,7 @@ from typing import Literal, Protocol, final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-from sb.disposition import MemorySurfaceEntryV1, create_surface_manifest, sign_disposition_proof
+from sb.disposition import sign_disposition_proof
 from sb.effect_values import (
     JsonValue,
     canonical_bytes,
@@ -25,14 +25,16 @@ from sb.effect_values import (
     parse_instant,
     strict_loads,
 )
-from sb.effect_write_models import CorrectionPayloadModelV2, MemoryEffectWriteRequestV2
+from sb.effect_write_models import MemoryEffectWriteRequestV2
 from sb.effect_write_values import model_object, parse_effect_request
 from sb.erasure import (
     ErasureEngine,
+    IngressIdentity,
     ReingressGate,
     purge_matching_managed_copies,
     scan_managed_surfaces,
 )
+from sb.export_models import MemoryExportManifestV1
 from sb.exports import ExportPublication, ExportPublisher
 from sb.generation_runtime import (
     GenerationAuthority,
@@ -45,7 +47,16 @@ from sb.generation_runtime import (
 from sb.generations import Generation, GenerationError, GenerationStore
 from sb.legacy_requests import LegacyRequestImporterV1
 from sb.provider_lifecycle import ProviderLifecycle
-from sb.request_store import PHASES, Phase, RequestLease, RequestStatus, RequestStore
+from sb.provider_observations import ProviderObservationInput, create_provider_observations
+from sb.provider_surface_scanner import ProviderSurfaceLayout
+from sb.request_store import (
+    PHASES,
+    Phase,
+    RequestLease,
+    RequestProofSettlement,
+    RequestStatus,
+    RequestStore,
+)
 from sb.task30_barriers import (
     BarrierContext,
     BoundBarrierEmitter,
@@ -104,6 +115,17 @@ class FrozenGenerationIdentity:
     generation_id: str
     head: str
     tree: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderProofContext:
+    request: MemoryEffectWriteRequestV2
+    parent: GenerationIdentity
+    result: Generation
+    prior_needles: tuple[bytes, ...]
+    export_manifest: MemoryExportManifestV1 | None
+    claimed_at: str
+    now: datetime
 
 
 @final
@@ -238,7 +260,10 @@ class RequestExecutor:
         content = request.payload["content"]
         source_identity = hashlib.sha256(str(request.candidate_id).encode()).hexdigest()
         content_identity = hashlib.sha256(content.encode()).hexdigest()
-        self.reingress.check(source_identity=source_identity, content_identity=content_identity)
+        self.reingress.check(IngressIdentity(
+            source=source_identity,
+            content=content_identity,
+        ))
         status = self.store.get(lease.request_id)
         if status is None:
             raise RequestExecutionError("REQUEST_NOT_FOUND")
@@ -362,7 +387,13 @@ class RequestExecutor:
         lease: RequestLease,
         request: MemoryEffectWriteRequestV2,
         now: datetime,
-    ) -> tuple[RequestLease, GenerationIdentity, Generation, Mapping[str, JsonValue] | None, str | None]:
+    ) -> tuple[
+        RequestLease,
+        GenerationIdentity,
+        Generation,
+        tuple[bytes, ...],
+        MemoryExportManifestV1 | None,
+    ]:
         status = self.store.get(lease.request_id)
         if status is None:
             raise RequestExecutionError("REQUEST_NOT_FOUND")
@@ -410,7 +441,7 @@ class RequestExecutor:
                     )
                 )
             lease = self._advance(lease, "proved", now, active.generation_id)
-            return lease, base, active, None, manifest.manifest_digest
+            return lease, base, active, (), manifest
 
         prior_needles = self._prior_needles(parent, request)
         if parent is None and result is None:
@@ -487,19 +518,7 @@ class RequestExecutor:
         if inventory.scan_errors or inventory.matches:
             raise RequestExecutionError("MANAGED_COPY_REMAINS")
         lease = self._advance(lease, "proved", now, result.generation_id)
-        artifact: Mapping[str, JsonValue] | None = None
-        if request.operation == "correct":
-            payload = request.payload
-            if not isinstance(payload, CorrectionPayloadModelV2):
-                raise RequestExecutionError("EFFECT_OPERATION_CONFUSION")
-            artifact = {
-                "schema_version": 1,
-                "request_id": request.request_id,
-                "target_id": request.targets[0].target_id,
-                "content_digest": payload.content_digest,
-                "generation_id": result.generation_id,
-            }
-        return lease, base, result, artifact, None
+        return lease, base, result, prior_needles, None
 
     def _validate_managed_lifecycle(self, result: Generation, now: datetime) -> None:
         self.exports.validate(now)
@@ -522,64 +541,35 @@ class RequestExecutor:
             if not is_json_object(manifest) or manifest.get("schema_version") != 1:
                 raise RequestExecutionError("UNMANIFESTED_BACKUP")
 
-    def _proof(
-        self,
-        request: MemoryEffectWriteRequestV2,
-        parent: GenerationIdentity,
-        result: Generation,
-        artifact: Mapping[str, JsonValue] | None,
-        export_manifest_digest: str | None,
-        claimed_at: str,
-        now: datetime,
-    ) -> Mapping[str, JsonValue]:
-        self._validate_managed_lifecycle(result, now)
-        inventory = scan_managed_surfaces(
-            (
-                result.root,
-                self.config.request_root / "receipts",
-                self.config.state_root,
-                self.config.export_root,
-                self.config.backup_root,
-                self.generations.staging,
-                self.generations.retired,
+    def _proof(self, context: ProviderProofContext) -> RequestProofSettlement:
+        request = context.request
+        result = context.result
+        self._validate_managed_lifecycle(result, context.now)
+        observations = create_provider_observations(ProviderObservationInput(
+            request=request,
+            generation=result,
+            layout=ProviderSurfaceLayout(
+                generation_root=result.root,
+                request_root=self.config.request_root,
+                state_root=self.config.state_root,
+                share_root=self.config.share_root,
+                export_root=self.config.export_root,
+                backup_root=self.config.backup_root,
+                staging_root=self.generations.staging,
+                retired_root=self.generations.retired,
             ),
-            (),
-        )
-        if inventory.scan_errors:
-            raise RequestExecutionError("SURFACE_SCAN_FAILED")
-        surfaces = [
-            MemorySurfaceEntryV1(
-                owner="second_brain",
-                surface_id=entry.surface_id,
-                manifest_digest=entry.manifest_digest,
-                readable=entry.readable,
-                file_count=entry.file_count,
-                row_count=entry.row_count,
-                object_count=entry.object_count,
-                fd_count=entry.fd_count,
-                scan_digest=entry.scan_digest,
-                match_count=entry.matches,
-                errors=list(entry.errors),
-                content_digests=[],
-            )
-            for entry in inventory.entries
-        ]
-        surface = create_surface_manifest(
-            provider_instance_id=self.config.provider_instance_id,
-            generation_id=result.generation_id,
-            vault_head=result.head,
-            vault_tree=result.tree,
-            tombstone_sequence=request.tombstone_high_water.sequence,
-            tombstone_set_root=request.tombstone_high_water.set_root,
-            surfaces=surfaces,
-            created_at=format_instant(now),
-        )
+            reingress=self.reingress,
+            prior_needles=context.prior_needles,
+            export_manifest=context.export_manifest,
+            created_at=format_instant(context.now),
+        ))
         destructive = request.operation != "export"
         activation, drain, disposal = (
             self.generations.activation_digests(result.generation_id)
             if destructive
             else (None, None, None)
         )
+        inventory_digest = observations.surface_manifest.provider_inventory.manifest_digest
         previous_root = (
             request.tombstone_chain_delta[-1].previous_root
             if request.tombstone_chain_delta
@@ -602,9 +592,9 @@ class RequestExecutor:
             "payload_digest": request.delegation.payload_digest,
             "target_manifest_digest": request.target_manifest_digest,
             "scope_digest": request.scope_digest,
-            "base_generation_id": parent.generation_id,
-            "base_head": parent.head,
-            "base_tree": parent.tree,
+            "base_generation_id": context.parent.generation_id,
+            "base_head": context.parent.head,
+            "base_tree": context.parent.tree,
             "result_generation_id": result.generation_id,
             "result_head": result.head,
             "result_tree": result.tree,
@@ -614,20 +604,32 @@ class RequestExecutor:
             "activation_journal_digest": activation,
             "reader_drain_digest": drain,
             "predecessor_disposal_digest": disposal,
-            "backup_disposal_digest": digest("surface", {"backups": inventory.manifest_digest})
+            "backup_disposal_digest": digest("surface", {"backups": inventory_digest})
             if destructive
             else None,
-            "export_disposal_digest": digest("surface", {"exports": inventory.manifest_digest})
+            "export_disposal_digest": digest("surface", {"exports": inventory_digest})
             if destructive
             else None,
-            "surface_manifest_digest": surface.manifest_digest,
-            "artifact_manifest_digest": None if artifact is None else digest("surface", artifact),
-            "export_manifest_digest": export_manifest_digest,
-            "claimed_at": claimed_at,
-            "applied_at": format_instant(now),
-            "completed_at": format_instant(now),
+            "surface_manifest_digest": observations.surface_manifest.manifest_digest,
+            "artifact_manifest_digest": (
+                None if observations.artifact is None else observations.artifact.manifest_digest
+            ),
+            "export_manifest_digest": (
+                None if observations.export is None else observations.export.manifest_digest
+            ),
+            "claimed_at": context.claimed_at,
+            "applied_at": format_instant(context.now),
+            "completed_at": format_instant(context.now),
         }
-        return model_object(sign_disposition_proof(body, self.config.provider_signing_key))
+        proof = model_object(sign_disposition_proof(body, self.config.provider_signing_key))
+        proof_digest = str(proof["proof_digest"])
+        return RequestProofSettlement(
+            proof=proof,
+            proof_digest=proof_digest,
+            status_digest=digest("surface", {"state": "proved", "proof": proof_digest}),
+            observations=observations,
+            now=context.now,
+        )
 
     def _write_receipt(self, status: RequestStatus, code: str) -> None:
         receipt = {
@@ -706,37 +708,32 @@ class RequestExecutor:
             if status.identity.schema_version == 1:
                 lease, generation, artifact = self._remember(lease, path, observed)
                 proof_digest = digest("surface", artifact)
-                final_status = self.store.prove(
-                    lease,
-                    artifact,
-                    proof_digest,
-                    digest("surface", {"state": "proved", "proof": proof_digest}),
-                    observed,
-                )
+                final_status = self.store.prove(lease, RequestProofSettlement(
+                    proof=artifact,
+                    proof_digest=proof_digest,
+                    status_digest=digest(
+                        "surface", {"state": "proved", "proof": proof_digest}
+                    ),
+                    observations=None,
+                    now=observed,
+                ))
                 activated = True
             else:
                 request = self._parse_v2(path, observed)
-                lease, parent, generation, artifact, export_digest = self._effect(
+                lease, parent, generation, prior_needles, export_manifest = self._effect(
                     lease, request, observed
                 )
                 activated = lease.phase in {"activated", "disposing", "proved"}
-                proof = self._proof(
-                    request,
-                    parent,
-                    generation,
-                    artifact,
-                    export_digest,
-                    claimed_at,
-                    observed,
-                )
-                proof_digest = str(proof["proof_digest"])
-                final_status = self.store.prove(
-                    lease,
-                    proof,
-                    proof_digest,
-                    digest("surface", {"state": "proved", "proof": proof_digest}),
-                    observed,
-                )
+                settlement = self._proof(ProviderProofContext(
+                    request=request,
+                    parent=parent,
+                    result=generation,
+                    prior_needles=prior_needles,
+                    export_manifest=export_manifest,
+                    claimed_at=claimed_at,
+                    now=observed,
+                ))
+                final_status = self.store.prove(lease, settlement)
             self.barrier("proof_write_fsync")
             path.unlink(missing_ok=True)
             self._fsync(path.parent)

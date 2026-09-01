@@ -6,17 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from sb.generations import GenerationError, GenerationStore
+from sb.generations import Generation, GenerationError, GenerationStore
 from sb.request_store import RequestStore
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 ROOT = "sha256:" + "0" * 64
 
 
-def _build(store: GenerationStore, parent: object = None, text: str = "unrelated"):
-    from sb.generations import Generation
-
-    typed_parent = parent if isinstance(parent, Generation) else None
+def _build(
+    store: GenerationStore,
+    parent: Generation | None = None,
+    text: str = "unrelated",
+) -> Generation:
 
     def materialize(root: Path) -> None:
         (root / "wiki").mkdir(parents=True, exist_ok=True)
@@ -24,7 +25,7 @@ def _build(store: GenerationStore, parent: object = None, text: str = "unrelated
 
     return store.build(
         request_id="request-" + text,
-        parent=typed_parent,
+        parent=parent,
         tombstone_sequence=0,
         tombstone_set_root=ROOT,
         created_at=NOW,

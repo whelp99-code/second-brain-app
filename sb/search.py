@@ -15,6 +15,7 @@ from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
 from sb.config import APP_ROOT
 from sb.effect_values import strict_loads
+from sb.search_errors import GenerationIndexError
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
@@ -160,7 +161,7 @@ def _validate_sealed_index(db_path: Path, root: Path) -> None:
         )
         connection.close()
     except (OSError, ValueError, sqlite3.Error) as exc:
-        raise RuntimeError("GENERATION_INDEX_INVALID") from exc
+        raise GenerationIndexError from exc
     expected = (
         manifest.get("generation_id"),
         manifest.get("head"),
@@ -170,7 +171,7 @@ def _validate_sealed_index(db_path: Path, root: Path) -> None:
         manifest.get("lexical_manifest_digest"),
     )
     if row != expected:
-        raise RuntimeError("GENERATION_INDEX_INVALID")
+        raise GenerationIndexError
 
 
 def _lexical(db_path: Path, query: str, limit: int) -> tuple[SearchHit, ...]:

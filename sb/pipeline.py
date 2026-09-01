@@ -19,7 +19,7 @@ from uuid import uuid4
 from sb.config import Config
 from sb.connectors.base import SourceAdapter
 from sb.contracts import Blob, BriefingInputs, PageSpec, Unit
-from sb.erasure import ErasureError, ReingressGate
+from sb.erasure import ErasureError, IngressIdentity, ReingressGate
 from sb.generation_runtime import (
     GenerationAuthority,
     GenerationMutation,
@@ -453,10 +453,10 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     ).hexdigest()
                 )
                 try:
-                    reingress.check(
-                        source_identity=source_identity,
-                        content_identity=digest,
-                    )
+                    reingress.check(IngressIdentity(
+                        source=source_identity,
+                        content=digest,
+                    ))
                     reingress.check_content(data)
                 except ErasureError:
                     blocked = True

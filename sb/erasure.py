@@ -1,203 +1,42 @@
-"""Permanent tombstone reingress gates and managed-copy generation sanitation.
-# noqa: SIZE_OK -- one closed managed-surface erasure boundary
-"""
+"""Generation erasure plus compatibility exports for scan and reingress boundaries."""
 
 from __future__ import annotations
 
 import hashlib
 import os
-import sqlite3
-import stat
-import subprocess
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import cast, final
+from typing import final
 
-from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant
+from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_models import CorrectionPayloadModelV2, MemoryEffectWriteRequestV2
+from sb.managed_surface_scan import (
+    SurfaceInventory,
+    SurfaceInventoryEntry,
+    scan_managed_surfaces,
+)
+from sb.provider_reingress_observations import observe_reingress_guards
+from sb.provider_surface_scanner import scan_provider_surfaces
+from sb.provider_surface_scanner_types import ProviderSurfaceLayout
+from sb.reingress import ErasureError, IngressIdentity, NewVersionAuthority, ReingressGate
 
-
-class ErasureError(RuntimeError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class SurfaceInventoryEntry:
-    owner: str
-    surface_id: str
-    manifest_digest: str
-    readable: bool
-    file_count: int
-    row_count: int
-    object_count: int
-    fd_count: int
-    scan_digest: str
-    matches: int
-    errors: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class SurfaceInventory:
-    entries: tuple[SurfaceInventoryEntry, ...]
-    manifest_digest: str
-    scan_errors: int
-    matches: int
-
-
-@final
-class ReingressGate:
-    """Persist blocked stable source/subject identities before every ingress write."""
-
-    def __init__(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self.path = path
-        self.db = sqlite3.connect(path, isolation_level=None)
-        _ = self.db.execute("PRAGMA journal_mode=DELETE")
-        _ = self.db.execute("PRAGMA synchronous=FULL")
-        _ = self.db.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS blocked_identities(
-              identity_kind TEXT NOT NULL CHECK(identity_kind IN ('source','subject','content','citation')),
-              identity_digest TEXT NOT NULL,
-              tombstone_sequence INTEGER NOT NULL,
-              tombstone_set_root TEXT NOT NULL,
-              blocked_at TEXT NOT NULL,
-              PRIMARY KEY(identity_kind,identity_digest)
-            );
-            CREATE TABLE IF NOT EXISTS new_version_exceptions(
-              source_identity_digest TEXT NOT NULL,
-              content_identity_digest TEXT NOT NULL,
-              authority_digest TEXT NOT NULL UNIQUE,
-              approved_at TEXT NOT NULL,
-              PRIMARY KEY(source_identity_digest,content_identity_digest)
-            );
-            CREATE TRIGGER IF NOT EXISTS blocked_no_update BEFORE UPDATE ON blocked_identities
-              BEGIN SELECT RAISE(ABORT,'immutable blocked identity'); END;
-            CREATE TRIGGER IF NOT EXISTS blocked_no_delete BEFORE DELETE ON blocked_identities
-              BEGIN SELECT RAISE(ABORT,'immutable blocked identity'); END;
-            """
-        )
-        path.chmod(0o600)
-
-    def close(self) -> None:
-        self.db.close()
-
-    def block_request(self, request: MemoryEffectWriteRequestV2, now: datetime) -> None:
-        if request.operation not in {"correct", "forget"}:
-            return
-        rows: list[tuple[str, str, int, str, str]] = []
-        for target in request.targets:
-            rows.extend(
-                (
-                    (
-                        "source",
-                        target.source_identity_full,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root,
-                        format_instant(now),
-                    ),
-                    (
-                        "content",
-                        target.content_identity_full,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root,
-                        format_instant(now),
-                    ),
-                    (
-                        "citation",
-                        target.citation_identity_full,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root,
-                        format_instant(now),
-                    ),
-                    (
-                        "subject",
-                        target.subject_digest,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root,
-                        format_instant(now),
-                    ),
-                )
-            )
-        _ = self.db.executemany(
-            "INSERT OR IGNORE INTO blocked_identities VALUES(?,?,?,?,?)",
-            rows,
-        )
-
-    def check(
-        self,
-        *,
-        source_identity: str,
-        content_identity: str,
-        subject_identity: str | None = None,
-        citation_identity: str | None = None,
-    ) -> None:
-        checks = [
-            ("source", source_identity),
-            ("content", content_identity),
-        ]
-        if subject_identity is not None:
-            checks.append(("subject", subject_identity))
-        if citation_identity is not None:
-            checks.append(("citation", citation_identity))
-        blocked = False
-        for kind, identity in checks:
-            row = cast(
-                tuple[int] | None,
-                self.db.execute(
-                    "SELECT 1 FROM blocked_identities WHERE identity_kind=? AND identity_digest=?",
-                    (kind, identity),
-                ).fetchone(),
-            )
-            blocked = blocked or row is not None
-        if not blocked:
-            return
-        exception = cast(
-            tuple[int] | None,
-            self.db.execute(
-                "SELECT 1 FROM new_version_exceptions WHERE source_identity_digest=? AND content_identity_digest=?",
-                (source_identity, content_identity),
-            ).fetchone(),
-        )
-        if exception is None:
-            raise ErasureError("TOMBSTONE_REINGRESS_BLOCKED")
-
-    def check_content(self, content: bytes) -> None:
-        candidates = {hashlib.sha256(content).hexdigest()}
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            text = ""
-        candidates.update(
-            hashlib.sha256(part.encode("utf-8")).hexdigest()
-            for part in {text, *text.splitlines(), *text.split("\n\n")}
-            if part
-        )
-        placeholders = ",".join("?" for _candidate in candidates)
-        row = cast(
-            tuple[int] | None,
-            self.db.execute(
-                "SELECT 1 FROM blocked_identities WHERE identity_kind='content' "
-                + f"AND identity_digest IN ({placeholders}) LIMIT 1",
-                tuple(sorted(candidates)),
-            ).fetchone(),
-        )
-        if row is not None:
-            raise ErasureError("TOMBSTONE_REINGRESS_BLOCKED")
-
-    def allow_new_version(
-        self,
-        source_identity: str,
-        content_identity: str,
-        authority_digest: str,
-        now: datetime,
-    ) -> None:
-        _ = self.db.execute(
-            "INSERT INTO new_version_exceptions VALUES(?,?,?,?)",
-            (source_identity, content_identity, authority_digest, format_instant(now)),
-        )
+__all__ = (
+    "ErasureEngine",
+    "ErasureError",
+    "IngressIdentity",
+    "NewVersionAuthority",
+    "ProviderSurfaceLayout",
+    "ReingressGate",
+    "SurfaceInventory",
+    "SurfaceInventoryEntry",
+    "inventory_json",
+    "observe_reingress_guards",
+    "purge_matching_managed_copies",
+    "scan_managed_surfaces",
+    "scan_provider_surfaces",
+)
 
 
 @final
@@ -264,10 +103,9 @@ class ErasureEngine:
             else:
                 successor = body[:start] + body[end:]
             self._write_private(page, successor)
+        targets = {self._page(root, target.page_id) for target in request.targets}
         for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
-            if not path.is_file() or ".git" in path.relative_to(root).parts:
-                continue
-            if path in {self._page(root, target.page_id) for target in request.targets}:
+            if not path.is_file() or ".git" in path.relative_to(root).parts or path in targets:
                 continue
             try:
                 body = path.read_bytes()
@@ -302,159 +140,6 @@ class ErasureEngine:
                     raise ErasureError("MANAGED_COPY_REMAINS")
         self.reingress.block_request(request, now)
         return tuple(sorted(removed))
-
-
-def _process_fd_count(root: Path) -> int:
-    resolved = root.resolve()
-    count = 0
-    for process in Path("/proc").glob("[0-9]*"):
-        try:
-            if process.stat().st_uid != os.getuid():
-                continue
-            descriptors = tuple((process / "fd").iterdir())
-        except OSError:
-            continue
-        for descriptor in descriptors:
-            try:
-                target = Path(os.readlink(descriptor).removesuffix(" (deleted)"))
-                if target.is_absolute() and target.resolve().is_relative_to(resolved):
-                    count += 1
-            except OSError:
-                continue
-    return count
-
-
-def _sqlite_rows(path: Path) -> tuple[int, tuple[str, ...]]:
-    errors: list[str] = []
-    rows = 0
-    try:
-        connection = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
-        check = cast(
-            tuple[str] | None,
-            connection.execute("PRAGMA quick_check").fetchone(),
-        )
-        if check != ("ok",):
-            errors.append("SQLITE_INTEGRITY_FAILED")
-        tables = cast(
-            list[tuple[str]],
-            connection.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            ).fetchall(),
-        )
-        for (table,) in tables:
-            if not table.replace("_", "").isalnum():
-                errors.append("SQLITE_TABLE_INVALID")
-                continue
-            value = cast(
-                tuple[int] | None,
-                connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone(),
-            )
-            if value is not None:
-                rows += value[0]
-        connection.close()
-    except sqlite3.Error:
-        errors.append("SQLITE_SCAN_FAILED")
-    return rows, tuple(errors)
-
-
-def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry:
-    file_count = 0
-    matches = 0
-    errors: list[str] = []
-    rows: list[dict[str, JsonValue]] = []
-    row_count = 0
-    object_count = 0
-    fd_count = 0
-    try:
-        if not root.is_dir() or root.is_symlink():
-            raise OSError("managed root missing or unsafe")
-        for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
-            metadata = path.stat(follow_symlinks=False)
-            if stat.S_ISDIR(metadata.st_mode):
-                continue
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
-                errors.append("NON_REGULAR_SURFACE")
-                continue
-            try:
-                raw = path.read_bytes()
-            except OSError:
-                errors.append("UNREADABLE_SURFACE")
-                continue
-            count = sum(raw.count(needle) for needle in needles)
-            matches += count
-            file_count += 1
-            if path.suffix == ".db":
-                found_rows, sqlite_errors = _sqlite_rows(path)
-                row_count += found_rows
-                errors.extend(sqlite_errors)
-            rows.append(
-                {
-                    "surface_id": hashlib.sha256(
-                        path.relative_to(root).as_posix().encode("utf-8")
-                    ).hexdigest(),
-                    "digest": "sha256:" + hashlib.sha256(raw).hexdigest(),
-                    "bytes": len(raw),
-                    "matches": count,
-                }
-            )
-        git_root = root if (root / ".git").is_dir() else None
-        if git_root is not None:
-            listed = subprocess.run(
-                ["git", "cat-file", "--batch-all-objects", "--batch-check=%(objectname)"],
-                cwd=git_root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if listed.returncode != 0:
-                errors.append("GIT_OBJECT_SCAN_FAILED")
-            else:
-                for oid in listed.stdout.splitlines():
-                    item = subprocess.run(
-                        ["git", "cat-file", "-p", oid],
-                        cwd=git_root,
-                        check=False,
-                        capture_output=True,
-                    )
-                    if item.returncode != 0:
-                        errors.append("GIT_OBJECT_SCAN_FAILED")
-                        continue
-                    object_count += 1
-                    matches += sum(item.stdout.count(needle) for needle in needles)
-        fd_count = _process_fd_count(root)
-    except OSError:
-        errors.append("SURFACE_ENUMERATION_FAILED")
-    scan_digest = digest(
-        "surface",
-        {"files": rows, "objects": object_count, "fds": fd_count, "errors": sorted(errors)},
-    )
-    return SurfaceInventoryEntry(
-        owner="second_brain",
-        surface_id=hashlib.sha256(str(root).encode("utf-8")).hexdigest(),
-        manifest_digest=digest("surface", {"root": hashlib.sha256(str(root).encode()).hexdigest()}),
-        readable=not errors,
-        file_count=file_count,
-        row_count=row_count,
-        object_count=object_count,
-        fd_count=fd_count,
-        scan_digest=scan_digest,
-        matches=matches,
-        errors=tuple(sorted(errors)),
-    )
-
-
-def scan_managed_surfaces(
-    roots: Iterable[Path],
-    needles: Sequence[bytes],
-) -> SurfaceInventory:
-    entries = tuple(_scan_regular(root, needles) for root in roots)
-    payload = {"entries": [asdict(entry) for entry in entries]}
-    return SurfaceInventory(
-        entries=entries,
-        manifest_digest=digest("surface", payload),
-        scan_errors=sum(len(entry.errors) for entry in entries),
-        matches=sum(entry.matches for entry in entries),
-    )
 
 
 def purge_matching_managed_copies(roots: Iterable[Path], needles: Sequence[bytes]) -> int:
