@@ -18,7 +18,10 @@ from pathlib import Path
 from typing import Annotated, Final, Literal, cast, override
 
 import anyio
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
@@ -34,7 +37,9 @@ from sb.effect_write_models import (
 )
 from sb.effect_write_values import model_object
 from sb.erasure import ErasureError, ReingressGate
+from sb.export_status import sign_export_status
 from sb.exports import ExportPublisher
+from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import RememberRejected, write_inbox
@@ -42,6 +47,12 @@ from sb.mcp_write_models import (
     MemoryWriteRequest,
     MemoryWriteRequestModel,
     MemoryWriteResultModel,
+)
+from sb.memory_records import (
+    MemoryRecordError,
+    find_record,
+    records_for_page,
+    target_for_record,
 )
 from sb.page_ids import git_rel
 from sb.provider_lifecycle import ProviderLifecycle
@@ -81,6 +92,7 @@ LEGACY_TOOLS: Final = (
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
 _TASK30_PROFILE: Final = "task30-schema3"
+_TASK32_PROFILE: Final = "task32-schema4"
 
 
 class ContractProfileError(RuntimeError):
@@ -197,6 +209,7 @@ def build_server(
     request_root: Path | str | None = None,
     *,
     task30: bool | None = None,
+    contract_schema: Literal[3, 4] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
 ) -> MCPServer:
     """Build a stdio server in legacy V1 or proof-bound Task 30 mode.
@@ -239,6 +252,15 @@ def build_server(
         except ValueError:
             public_keys = None
 
+    provider_private_key: Ed25519PrivateKey | None = None
+    if config.provider_private_key is not None:
+        try:
+            provider_private_key = Ed25519PrivateKey.from_private_bytes(
+                base64.urlsafe_b64decode(config.provider_private_key + "==")
+            )
+        except ValueError:
+            provider_private_key = None
+
     external_public_keys: dict[str, Ed25519PublicKey] | None = None
     configured_external_keys = config.external_erasure_public_keys
     if configured_external_keys:
@@ -250,16 +272,26 @@ def build_server(
         except ValueError:
             external_public_keys = None
 
-    if task30 is not None:
+    if contract_schema is not None:
+        task30_enabled = True
+        contract_schema_version = contract_schema
+    elif task30 is not None:
         task30_enabled = task30
+        contract_schema_version = 3
     elif vault_root is not None:
         task30_enabled = True
+        contract_schema_version = 3
     else:
         profile = os.environ.get(_CONTRACT_PROFILE_ENV)
         if profile is None:
             task30_enabled = False
+            contract_schema_version = 3
         elif profile == _TASK30_PROFILE:
             task30_enabled = True
+            contract_schema_version = 3
+        elif profile == _TASK32_PROFILE:
+            task30_enabled = True
+            contract_schema_version = 4
         else:
             raise ContractProfileError
     generation_store: GenerationStore | None = None
@@ -387,18 +419,11 @@ def build_server(
         generation: GenerationIdentityV1,
         current: tuple[int, str],
     ) -> ToolResult:
-        if generation_store is None:
+        if generation_store is None and contract_schema_version == 3:
             return dict(payload)
-        sequence, set_root = current
         return cast(ToolResult, {
             **payload,
-            "provider_instance_id": generation.provider_instance_id,
-            "generation_id": generation.generation_id,
-            "generation_manifest_digest": generation.generation_manifest_digest,
-            "vault_head": generation.vault_head,
-            "vault_tree": generation.vault_tree,
-            "tombstone_sequence": sequence,
-            "tombstone_set_root": set_root,
+            **generation_read_binding(generation, current).as_dict(),
         })
 
     def sb_search(
@@ -412,8 +437,22 @@ def build_server(
             require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             hits = SearchIndex(vault_root=current_root).search(query, limit)
-            payload = cast(ToolResult, {"results": [hit.as_dict() for hit in hits]})
-            return bind_read(payload, generation, current)
+            results: list[ToolResult] = []
+            for hit in hits:
+                row: ToolResult = {
+                    "page_id": hit.page_id,
+                    "section": hit.section,
+                    "snippet": hit.snippet,
+                    "score": hit.score,
+                }
+                if contract_schema_version == 4:
+                    records = records_for_page(current_root, hit.page_id, generation)
+                    if not records:
+                        continue
+                    row = {**row, "record_id": records[0].record_id,
+                           "record_digest": records[0].record_digest}
+                results.append(row)
+            return bind_read({"results": results}, generation, current)
 
     def sb_read_page(
         id: str,
@@ -426,9 +465,14 @@ def build_server(
             require_active_high_water(generation, current)
             try:
                 page = read_page(current_root, id)
-            except (PathEscapeError, PageNotFoundError) as exc:
+                payload: ToolResult = {"frontmatter": dict(page.frontmatter), "body": page.body}
+                if contract_schema_version == 4:
+                    payload = {**payload, "records": [
+                        record.as_dict() for record in records_for_page(current_root, id, generation)
+                    ]}
+            except (PathEscapeError, PageNotFoundError, MemoryRecordError) as exc:
                 raise ToolError(str(exc)) from exc
-            return bind_read(page.as_dict(), generation, current)
+            return bind_read(payload, generation, current)
 
     def sb_recent_changes(
         days: int = 7,
@@ -450,8 +494,20 @@ def build_server(
             current = high_water()
             require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
-            payload = {"conflicts": [row.as_dict() for row in open_conflicts(current_root)]}
-            return bind_read(payload, generation, current)
+            conflicts: list[ToolResult] = []
+            for row in open_conflicts(current_root):
+                value: ToolResult = {
+                    "conflict_id": row.conflict_id,
+                    "page_id": row.page_id,
+                    "summary": row.summary,
+                }
+                if contract_schema_version == 4:
+                    records = records_for_page(
+                        current_root, f"conflicts/{row.conflict_id}", generation
+                    )
+                    value = {**value, "records": [record.as_dict() for record in records]}
+                conflicts.append(value)
+            return bind_read({"conflicts": conflicts}, generation, current)
 
     def sb_remember(content: str, title: str | None = None) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
@@ -488,7 +544,7 @@ def build_server(
                 manifest = generation_store.active().manifest
                 if (manifest.tombstone_sequence, manifest.tombstone_set_root) != current:
                     pointer_health = "tombstone_stale"
-            return {
+            status: ToolResult = {
                 "schema_version": 1,
                 "provider_instance_id": generation.provider_instance_id,
                 "provider_release_sha": config.provider_release_sha,
@@ -502,6 +558,13 @@ def build_server(
                 "journal_health": "healthy",
                 "features": ["memory_effect_write_v2"],
             }
+            if contract_schema_version == 4:
+                status.update({
+                    "contract_schema_version": 4,
+                    "contract_digest": _contract_digest(),
+                    "features": ["memory_effect_write_v2", "memory_record_identity_v1"],
+                })
+            return status
 
     def sb_request_status(
         request_id: str,
@@ -515,6 +578,7 @@ def build_server(
             try:
                 status = store.get(request_id)
                 observations = store.observations(request_id)
+                export_lifecycle = store.exports.get(request_id)
             finally:
                 store.close()
             if status is None:
@@ -542,7 +606,35 @@ def build_server(
                 result["proof"] = json.loads(status.proof_json)
                 if observations is not None:
                     result["observations"] = model_object(observations)
+            if (
+                contract_schema_version == 4
+                and status.identity.operation == "export"
+                and export_lifecycle is not None
+            ):
+                key_id = config.provider_signing_key_id
+                if (
+                    key_id is None
+                    or provider_private_key is None
+                    or status.identity.scope_digest is None
+                ):
+                    raise ToolError("EFFECT_TARGET_INVALID")
+                result["export_status"] = sign_export_status(
+                    export_lifecycle,
+                    status.identity.scope_digest,
+                    key_id,
+                    provider_private_key,
+                ).as_dict()
             return bind_read(result, generation, current)
+
+    def _contract_digest() -> str:
+        sidecar = Path(__file__).resolve().parent.parent / "contracts" / "second-brain-mcp-v1.json.sha256"
+        try:
+            value = sidecar.read_text(encoding="ascii").strip()
+        except OSError as exc:
+            raise ToolError("SECOND_BRAIN_CONTRACT_MISMATCH") from exc
+        if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+            raise ToolError("SECOND_BRAIN_CONTRACT_MISMATCH")
+        return value
 
     def sb_resolve_memory_target(
         page_id: str,
@@ -584,6 +676,32 @@ def build_server(
                     now=datetime.now(UTC),
                 )
             except ValueError as exc:
+                raise ToolError(str(exc)) from exc
+            return cast(ToolResult, target.as_dict())
+
+    def sb_resolve_memory_record(
+        record_id: str,
+        record_digest: str,
+        generation_id: str,
+        generation_manifest_digest: str,
+        read_fence: dict[str, JsonValue] | None = None,
+    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+        """Resolve only a schema-4 record identity under its exact generation pin."""
+        with pin_generation() as (current_root, generation):
+            current = high_water()
+            require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            require_active_high_water(generation, current)
+            if (generation.generation_id != generation_id
+                    or generation.generation_manifest_digest != generation_manifest_digest):
+                raise ToolError("MEMORY_GENERATION_CHANGED")
+            try:
+                page_id, record = find_record(
+                    current_root, generation, (record_id, record_digest)
+                )
+                target = target_for_record(
+                    current_root, generation, (page_id, record, datetime.now(UTC))
+                )
+            except MemoryRecordError as exc:
                 raise ToolError(str(exc)) from exc
             return cast(ToolResult, target.as_dict())
 
@@ -725,7 +843,8 @@ def build_server(
     if task30_enabled:
         _ = server.tool(name="sb_generation_status")(sb_generation_status)
         _ = server.tool(name="sb_request_status")(sb_request_status)
-        _ = server.tool(name="sb_resolve_memory_target")(sb_resolve_memory_target)
+        resolver = sb_resolve_memory_record if contract_schema_version == 4 else sb_resolve_memory_target
+        _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server
 
 

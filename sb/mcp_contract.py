@@ -18,8 +18,8 @@ from sb.mcp_write_models import MemoryWriteRequest
 
 type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 type JsonObject = dict[str, JsonValue]
-SCHEMA_VERSION: Final = 3
-IMPLEMENTATION_COMMIT: Final = "30cebe1670c0b65dc9832066a09c2c64f8371b20"
+SCHEMA_VERSION: Final = 4
+IMPLEMENTATION_COMMIT: Final = "313adfb90accb6b9687d4826c305887066166170"
 MISMATCH: Final = "SECOND_BRAIN_CONTRACT_MISMATCH"
 
 
@@ -99,6 +99,48 @@ def _write_arguments() -> JsonObject:
     }
 
 
+def _schema4_record() -> JsonObject:
+    core: JsonObject = {
+        "schema_version": 1,
+        "sid": "a8920f4d",
+        "record_text": "ExampleAlpha 예시기록.",
+        "record_text_digest": "sha256:" + hashlib.sha256(
+            "ExampleAlpha 예시기록.".encode()
+        ).hexdigest(),
+        "citation_span_start": 128,
+        "citation_span_end": 155,
+        "source_identity_full": "6" * 64,
+        "content_identity_full": hashlib.sha256(
+            "ExampleAlpha 예시기록.".encode()
+        ).hexdigest(),
+        "citation_identity_full": "8" * 64,
+        "sensitivity": "personal",
+        "source_owner_class": "provider_owned",
+        "source_owner_id_digest": "sha256:" + "a" * 64,
+        "origin_label": "Second Brain",
+        "valid_from": "2026-08-31T00:00:00.000Z",
+        "valid_until": "2026-09-01T00:00:00.000Z",
+    }
+    record_digest = _digest(b"second-brain/memory-record/v1\0", core)
+    return {
+        **core,
+        "record_id": "sbrecord:v1:" + record_digest[7:],
+        "record_digest": record_digest,
+    }
+
+
+def _generation_binding() -> JsonObject:
+    return {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:" + "1" * 64,
+        "generation_manifest_digest": "sha256:" + "2" * 64,
+        "vault_head": "3" * 40,
+        "vault_tree": "4" * 40,
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:" + "5" * 64,
+    }
+
+
 def _write_errors() -> list[JsonValue]:
     codes = (
         "WRITE_REQUEST_INVALID", "WRITE_REQUEST_OVERSIZE", "WRITE_REQUEST_OPERATION_INVALID",
@@ -172,9 +214,19 @@ def build_contract() -> JsonObject:
             "happy": {
                 "arguments": {"limit": 10, "query": "ExampleAlpha"},
                 "normalized": {"kind": "data", "value": {"result_count": 1}},
-                "raw_response": {"results": [{"page_id": "wiki/example-alpha", "score": "<finite-number>", "section": "Intro", "snippet": "...xampleAlph..."}]},
+                "raw_response": {
+                    **_generation_binding(),
+                    "results": [{
+                        "page_id": "wiki/example-alpha",
+                        "record_id": _schema4_record()["record_id"],
+                        "record_digest": _schema4_record()["record_digest"],
+                        "score": "<finite-number>",
+                        "section": "Intro",
+                        "snippet": "...xampleAlph...",
+                    }],
+                },
             },
-            "no_data": {"raw_response": {"results": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
+            "no_data": {"raw_response": {**_generation_binding(), "results": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
         },
         "sb_read_page": {
             "arguments": _arguments({"id": {"type": "string"},
@@ -184,8 +236,10 @@ def build_contract() -> JsonObject:
                 "arguments": {"id": "wiki/example-alpha"},
                 "normalized": {"kind": "data", "value": {"page_id": "wiki/example-alpha"}},
                 "raw_response": {
+                    **_generation_binding(),
                     "body": "# Intro\nExampleAlpha 예시기록.[^a8920f4d]\n\n[^a8920f4d]: synthetic:ExampleAlpha\n",
                     "frontmatter": {"compiled_by": "sb/0.1.0|v1|unknown", "id": "wiki/example-alpha", "sources": "", "status": "active", "title": "ExampleAlpha", "updated": "<YYYY-MM-DD>"},
+                    "records": [_schema4_record()],
                 },
             },
             "no_data": None,
@@ -197,18 +251,21 @@ def build_contract() -> JsonObject:
             "happy": {
                 "arguments": {"days": 7},
                 "normalized": {"kind": "data", "value": {"change_count": 2}},
-                "raw_response": {"changes": [{"change": "added", "date": "<YYYY-MM-DD>", "page_id": "conflicts/2026-08-26-example-alpha"}, {"change": "added", "date": "<YYYY-MM-DD>", "page_id": "wiki/example-alpha"}]},
+                "raw_response": {**_generation_binding(), "changes": [{"change": "added", "date": "<YYYY-MM-DD>", "page_id": "conflicts/2026-08-26-example-alpha"}, {"change": "added", "date": "<YYYY-MM-DD>", "page_id": "wiki/example-alpha"}]},
             },
-            "no_data": {"raw_response": {"changes": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
+            "no_data": {"raw_response": {**_generation_binding(), "changes": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
         },
         "sb_open_conflicts": {
             "arguments": _arguments({"read_fence": {"default": None, "type": ["object", "null"]}}, []),
             "happy": {
                 "arguments": {},
                 "normalized": {"kind": "data", "value": {"conflict_count": 1}},
-                "raw_response": {"conflicts": [{"conflict_id": "2026-08-26-example-alpha", "page_id": "example-alpha", "summary": "예시기록[^a8920f4d]"}]},
+                "raw_response": {
+                    **_generation_binding(),
+                    "conflicts": [{"conflict_id": "2026-08-26-example-alpha", "page_id": "example-alpha", "summary": "예시기록[^a8920f4d]", "records": [_schema4_record()] }],
+                },
             },
-            "no_data": {"raw_response": {"conflicts": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
+            "no_data": {"raw_response": {**_generation_binding(), "conflicts": []}, "normalized": {"kind": "no_data", "reason": "empty_result"}},
         },
         "sb_remember": {
             "arguments": _arguments({"content": {"type": "string"}, "title": {"default": None, "type": ["string", "null"]}}, ["content"]),
@@ -240,7 +297,9 @@ def build_contract() -> JsonObject:
                     "tombstone_set_root": "<sha256>",
                     "pointer_health": "healthy",
                     "journal_health": "healthy",
-                    "features": ["memory_effect_write_v2"],
+                    "contract_schema_version": 4,
+                    "contract_digest": "<contract-digest>",
+                    "features": ["memory_effect_write_v2", "memory_record_identity_v1"],
                 },
             },
             "no_data": None,
@@ -257,6 +316,7 @@ def build_contract() -> JsonObject:
                 "arguments": {"request_id": "memeff:req:v2:" + "1" * 64},
                 "normalized": {"kind": "data", "value": {"state": "not_found"}},
                 "raw_response": {
+                    **_generation_binding(),
                     "schema_version": 1,
                     "request_id": "<request-id>",
                     "state": "not_found",
@@ -267,21 +327,20 @@ def build_contract() -> JsonObject:
         "sb_resolve_memory_target": {
             "arguments": _arguments(
                 {
-                    "page_id": {"type": "string"},
-                    "exact_record": {"type": "string"},
-                    "source_identity_full": {"type": "string"},
-                    "sensitivity": {"default": "personal", "type": "string"},
-                    "source_owner_class": {"default": "provider_owned", "type": "string"},
-                    "source_owner_id": {"default": "provider", "type": "string"},
+                    "record_id": {"type": "string"},
+                    "record_digest": {"type": "string"},
+                    "generation_id": {"type": "string"},
+                    "generation_manifest_digest": {"type": "string"},
                     "read_fence": {"default": None, "type": ["object", "null"]},
                 },
-                ["page_id", "exact_record", "source_identity_full"],
+                ["record_id", "record_digest", "generation_id", "generation_manifest_digest"],
             ),
             "happy": {
                 "arguments": {
-                    "page_id": "wiki/example-alpha",
-                    "exact_record": "ExampleAlpha 예시기록.",
-                    "source_identity_full": "6" * 64,
+                    "record_id": _schema4_record()["record_id"],
+                    "record_digest": _schema4_record()["record_digest"],
+                    "generation_id": "sbgen:v1:" + "1" * 64,
+                    "generation_manifest_digest": "sha256:" + "2" * 64,
                 },
                 "normalized": {"kind": "data", "value": {"target": "full"}},
                 "raw_response": vector_target,
@@ -311,7 +370,7 @@ def build_contract() -> JsonObject:
     if tuple(sorted(tools)) != K5_TOOLS:
         raise RuntimeError(MISMATCH)
     return {
-        "application": {"implementation_commit": IMPLEMENTATION_COMMIT, "implementation_commit_role": "task28_entry_baseline"},
+        "application": {"implementation_commit": IMPLEMENTATION_COMMIT, "implementation_commit_role": "task32_entry_baseline"},
         "canonicalization": {"encoding": "utf-8", "json": "sorted_keys_compact_separators_trailing_newline", "sha256_sidecar": "64_lowercase_hex_newline"},
         "errors": [
             {"class": "pydantic.ValidationError", "code": "INVALID_ARGUMENTS", "raw_error_pattern": "^Error executing tool sb_search: 1 validation error for sb_searchArguments\\nlimit\\n  Input should be a valid integer, unable to parse string as an integer \\[type=int_parsing, input_value='bad', input_type=str\\]\\n    For further information visit https://errors[.]pydantic[.]dev/2[.][0-9]+/v/int_parsing$"},
@@ -336,7 +395,7 @@ def build_contract() -> JsonObject:
             "export": frozen["export"],
             "forget": frozen["forget"],
             "delegation_revocation": frozen["delegation_revocation"],
-            "features": ["memory_effect_write_v2", "sealed_generations", "tombstone_high_water"],
+            "features": ["memory_effect_write_v2", "memory_record_identity_v1", "sealed_generations", "tombstone_high_water"],
             "tool_count": 9,
         },
     }

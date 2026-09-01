@@ -112,7 +112,11 @@ def runtime(monkeypatch: MonkeyPatch) -> Iterator[tuple[Path, MCPServer, MCPServ
     _ = init_vault(empty_root)
     monkeypatch.setattr(mcp_module, "datetime", FrozenTask30DateTime)
     try:
-        yield root, build_server(root), build_server(empty_root)
+        yield (
+            root,
+            build_server(root, task30=True, contract_schema=4),
+            build_server(empty_root, task30=True, contract_schema=4),
+        )
     finally:
         for path in base.rglob("*"):
             if not path.is_symlink():
@@ -153,12 +157,22 @@ def test_invalid_arguments_fixture_matches_runtime_validation_pattern(runtime: t
 def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, MCPServer]) -> None:
     """Given synthetic state, when K5 runs, then all frozen raw shapes remain compatible."""
     _, server, empty_server = runtime
+    page = _call(server, "sb_read_page", {"id": "wiki/example-alpha"})
+    page_value = _mapping(page.structured_content or {})
+    records = page_value["records"]
+    assert isinstance(records, list) and records and isinstance(records[0], dict)
+    record = records[0]
+    resolver_arguments: JsonObject = {
+        "record_id": record["record_id"],
+        "record_digest": record["record_digest"],
+        "generation_id": page_value["generation_id"],
+        "generation_manifest_digest": page_value["generation_manifest_digest"],
+    }
     happy = {
         "sb_search": _call(server, "sb_search", {"query": "ExampleAlpha", "limit": 10}),
-        "sb_read_page": _call(server, "sb_read_page", {"id": "wiki/example-alpha"}),
+        "sb_read_page": page,
         "sb_recent_changes": _call(server, "sb_recent_changes", {"days": 7}),
         "sb_open_conflicts": _call(server, "sb_open_conflicts", {}),
-        "sb_remember": _call(server, "sb_remember", {"content": "예시기록", "title": "ExampleAlpha"}),
         "sb_generation_status": _call(server, "sb_generation_status", {}),
         "sb_request_status": _call(
             server,
@@ -168,13 +182,14 @@ def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, 
         "sb_resolve_memory_target": _call(
             server,
             "sb_resolve_memory_target",
-            _mapping(_mapping(_entry("sb_resolve_memory_target")["happy"])["arguments"]),
+            resolver_arguments,
         ),
         "sb_write_request": _call(
             server,
             "sb_write_request",
             _mapping(_mapping(_entry("sb_write_request")["happy"])["arguments"]),
         ),
+        "sb_remember": _call(server, "sb_remember", {"content": "예시기록", "title": "ExampleAlpha"}),
     }
     assert tuple(sorted(happy)) == K5_TOOLS
     for tool, envelope in happy.items():
@@ -190,7 +205,7 @@ def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, 
     for tool, arguments in empty_calls:
         actual = _call(empty_server, tool, arguments).structured_content
         expected = _mapping(_mapping(_entry(tool)["no_data"])["raw_response"])
-        assert actual == expected
+        _assert_shape(actual, expected)
     missing = _call(server, "sb_read_page", {"id": "wiki/missing"})
     rejected = _call(server, "sb_remember", {"content": "x" * (1024 * 1024 + 1), "title": "ExampleAlpha"})
     assert missing.content[0].text == _error("PAGE_NOT_FOUND")["raw_error"]

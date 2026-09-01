@@ -90,7 +90,7 @@ def _contract() -> _Contract:
 def test_contract_has_exact_tools_and_version() -> None:
     """Given the fixture, when parsed, then its version and tool set are exact."""
     contract = _contract()
-    assert contract.schema_version == 3
+    assert contract.schema_version == 4
     assert set(contract.tools) == TOOLS
 
 
