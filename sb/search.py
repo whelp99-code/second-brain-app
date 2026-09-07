@@ -9,9 +9,10 @@ import shutil
 import sqlite3
 import subprocess
 from collections.abc import Generator, Sequence
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import islice
 from pathlib import Path
 from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
@@ -21,6 +22,7 @@ from sb.knowledge_registry import (
     APPROVED,
     CANDIDATE,
     KnowledgeRegistry,
+    missing_state,
 )
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -208,16 +210,11 @@ class SearchIndex:
         """Refresh from Git HEAD only when needed, then BM25-search `query`."""
         root = self.vault_root.resolve()
         if (root / "generation.json").is_file():
-            from sb.sealed_search import sealed_rows
-
-            rows = sealed_rows(root, query, limit)
-            # Sealing attests provenance, not owner approval. Never invent ACTIVE approval.
-            if scope in {"active", "candidate"}:
-                return ()
-            return tuple(SearchHit(page, section, text, score, kind=page.split("/")[0],
-                                   knowledge_status="UNKNOWN", approval_status="UNKNOWN")
-                         for page, section, text, score in rows
-                         if not kinds or page.split("/")[0] in kinds)
+            with closing(self.iter_lexical_hits(
+                query, kinds=kinds, status=status, updated_from=updated_from,
+                updated_to=updated_to, scope=scope,
+            )) as hits:
+                return tuple(islice(hits, max(0, limit)))
         db_path = _db_path(root)
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(db_path, root, registry)
@@ -235,12 +232,74 @@ class SearchIndex:
             return hits
         return _hybrid_or_lexical(hits, query, limit, root)
 
+    def iter_lexical_hits(
+        self, query: str, *, kinds: Sequence[str] | None = None,
+        status: str | None = None, updated_from: str | None = None,
+        updated_to: str | None = None, scope: str | None = None,
+    ) -> Generator[SearchHit, None, None]:
+        """Stream filtered hits so callers can limit after record selection/deduplication.
+
+        The caller owns the generation pin and closes this iterator on early exit.
+        """
+        root = self.vault_root.resolve()
+        if not (root / "generation.json").is_file():
+            registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
+            db_path = _db_path(root)
+            _refresh(db_path, root, registry)
+            offset = 0
+            while True:
+                rows = _lexical(db_path, query, 128, kinds=kinds, status=status,
+                                updated_from=updated_from, updated_to=updated_to, scope=scope,
+                                offset=offset)
+                yield from rows
+                if len(rows) < 128:
+                    return
+                offset += len(rows)
+        else:
+            from sb.sealed_search import iter_sealed_rows
+
+            states = {state.page_id: state for state in KnowledgeRegistry(
+                resolve_registry_path(root, self.registry_path)
+            ).read_snapshot()}
+            chosen = _normalize_scope(scope or "reference")
+            metadata: dict[str, tuple[str, str, str]] = {}
+            with closing(iter_sealed_rows(root, query)) as rows:
+                for page, section, snippet, score in rows:
+                    kind = page.split("/")[0]
+                    if kinds and kind not in kinds:
+                        continue
+                    state = states.get(page, missing_state(page))
+                    if chosen == _CANDIDATE_SCOPE and state.knowledge_status != CANDIDATE:
+                        continue
+                    if chosen == _ACTIVE_SCOPE and (
+                        state.knowledge_status != ACTIVE or state.approval_status != APPROVED
+                    ):
+                        continue
+                    if page not in metadata:
+                        text = committed_text(root, page + ".md")
+                        if text is None:
+                            from sb.search_errors import GenerationIndexError
+
+                            raise GenerationIndexError
+                        metadata[page] = (_frontmatter_value(text, "status"),
+                                          _frontmatter_value(text, "updated"),
+                                          _frontmatter_value(text, "source_ref"))
+                    index_status, updated, source_ref = metadata[page]
+                    if status and status != index_status:
+                        continue
+                    if updated_from and updated < updated_from or updated_to and updated > updated_to:
+                        continue
+                    yield SearchHit(page, section, snippet, score, kind, index_status,
+                                    state.knowledge_status, state.approval_status, state.canonical,
+                                    source_ref, updated)
+
     def project(self) -> None:
-        """Re-read the registry and project status columns onto search.db. No vault write."""
+        """Refresh registry projection; sealed indexes project at read time."""
         root = self.vault_root
-        if (root / "generation.json").is_file():
-            raise RuntimeError("SEALED_GENERATION_REQUIRES_SUCCESSOR")
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
+        if (root / "generation.json").is_file():
+            _ = registry.read_snapshot()
+            return
         _refresh(_db_path(root), root, registry)
 
 
@@ -513,6 +572,7 @@ def _lexical(
     updated_from: str | None = None,
     updated_to: str | None = None,
     scope: str | None = None,
+    offset: int = 0,
 ) -> tuple[SearchHit, ...]:
     stripped = query.strip()
     if stripped == "" or limit <= 0:
@@ -543,12 +603,13 @@ def _lexical(
         where.append("approval_status=?")
         params.extend((ACTIVE, APPROVED))
     params.append(int(limit))
+    params.append(offset)
     sql = (
         "SELECT page_id, section, snippet(docs, 2, '', '', '...', 8), bm25(docs), "
         + "kind, status, knowledge_status, approval_status, canonical, source_ref, "
         + "updated FROM docs WHERE "
         + " AND ".join(where)
-        + " ORDER BY bm25(docs), page_id, section LIMIT ?"
+        + " ORDER BY bm25(docs), page_id, section, rowid LIMIT ? OFFSET ?"
     )
     if short:
         sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace("bm25(docs)", "0.0")

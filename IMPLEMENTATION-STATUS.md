@@ -8,7 +8,7 @@
 |---|---|---|---|
 | B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 완료 | 4da09b9; 520 passed, 2 skipped; Ruff·diff check 통과 |
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 진행 중 | R2 공개 필드/ID 수정, R3 CAS·정정 후 인용 보강. R4 및 자비스 중복 판정 미완료 |
-| B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 미완료 | 동일 필터 의미, 선택 뒤 limit, 동시 세대 변경 읽기 |
+| B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | 미완료 | 강제 종료·전환 중 읽기·deadline 내 응답 |
 | B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 미완료 | 독립 클라이언트 A 저장/B 조회, 요청 ID/receipt/record 연결, 범위 검사 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
@@ -49,3 +49,13 @@
 R9의 CLI status/search/sources/retention/metrics, doctor 조회, gc/migrate 미적용 조회, compile dry-run을 공통 read_config에 연결했다. reader pin이 반환한 generation root를 그대로 사용하며 별도 active 재조회는 제거했다. doctor --rebuild-ledger는 쓰기를 마친 뒤 읽기 pin을 얻으므로 잠금 중첩을 피한다. CLI 처리 실패에서도 reader lease가 해제되는지 검증했다.
 
 집중 검사: CLI·runtime 관련 56개 통과. 테스트는 실제 generation의 등록 reader와 배타 잠금 차단을 확인하고 CLI 출력의 root가 고정된 generation인지 검사한다. 갱신 중 응답 지연 개선은 B3에 남으며, 이 커밋만으로 동시성 전체 완료를 선언하지 않는다.
+
+
+### B2 검색 필터·최종 record 개수 검증
+
+- Sealed 검색은 상태·수정 날짜·종류를 반영하고 기존 knowledge registry를 읽기 전용 snapshot으로 조회한다. 미등록 상태는 UNKNOWN, 승인/철회/후보 상태는 registry의 실제 값을 사용한다. 조회나 compile --state-report가 immutable 인덱스를 수정하지 않는다.
+- `iter_lexical_hits`는 결과를 순차 처리한다. MCP schema 4는 title/heading만 일치하는 결과를 제외한 뒤 유효 record 개수에 limit를 적용한다. 페이지와 record의 중복 처리를 줄이고 구형 저장소의 128행 구간 이후도 이어서 탐색한다. Frozen wire schema와 도구 수는 변경하지 않았다.
+- 검증: 집중 108개, 전체 **534 passed, 2 skipped (123.58초)**. Ruff·diff check 통과, 타입 **0 errors, 55 warnings**(기존 60개에서 감소).
+- 운영 자료 실조회: 소스 CLI status가 generation root와 wiki 18/daily 2를 반환. `업무`의 9월 5일/wiki 필터 9건, 자료 없는 날짜 범위 0건. 테스트에서도 조회 전후 generation의 모든 파일 해시가 동일함을 확인했다.
+- 증거: `/var/tmp/sb-b2-full-tests.log`, `/var/tmp/sb-b2-search-retest.log`, `/var/tmp/sb-b2-real-cli.json`, `/var/tmp/sb-b2-types-final.log`.
+- 지식 상태 scope는 프로젝트 접근 권한 scope와 다르다. 프로젝트 범위는 B4, hybrid의 메타데이터/범위 보존은 B8에 계속 남는다. 이번 source MCP/CLI 검증으로 운영 배포나 자비스의 전체 기억 순환 완료를 주장하지 않는다.

@@ -168,3 +168,10 @@ R2 추가 조율 사항: 자비스 resolveDuplicates는 page_id+sid 기준으로
 - R3: request remember가 원문 CAS·SourceCite·Vault writer를 사용한다. 동일 후보 재시도와 다른 후보의 동일 내용 출처를 구분하며 여러 줄 기록도 인용한다. 실제 executor의 proved 결과를 runtime backup으로 만들고 독립 경로에서 복원·CAS·페이지 바이트 일치를 확인했다.
 - 추가 연쇄 결함: 정정이 기존 CAS를 제거한 뒤 페이지에 낡은 인용이 남았다. 의도적으로 제거한 CAS에 한해 생존 문장을 effect receipt에 연결된 새 스냅샷으로 재결합했고 remember→correct→export→forget 전 과정의 인용 감사를 추가했다.
 - 전체 527개 통과, 2개 건너뜀. 운영 배포, R4 시간 의미, 실제 자비스 전체 업무 순환, 두 앱의 교차 기억 인수는 아직 남아 있다.
+
+
+## 9. B2 후속 — 검색 의미와 읽기 일관성
+
+R5/R7/R9의 소스 수정을 진행했다. Sealed 모드에서도 상태/날짜/종류 필터와 기존 승인 원장의 read-only 조회를 적용한다. title-only 결과와 중복 section을 건너뛴 뒤 record limit를 계산한다. CLI 조회는 고정된 generation과 reader lease를 사용하며 오류 종료에서도 해제한다. CLI pin 커밋은 `9ba9588`이다.
+
+전체 534 passed/2 skipped, Ruff 통과, 타입 오류 0/기존 경고 55. 운영 자료를 새 소스 CLI로 읽어 날짜 필터의 포함/제외를 확인했다. 운영 release는 아직 전환하지 않았다. R6 reader 강제 종료 복구, I3 갱신 중 지연, R4 시간 및 자비스 중복 소비, 프로젝트 범위는 이 변경의 완료 범위에 포함하지 않는다. 상세 증거는 구현 원장 B2를 따른다.

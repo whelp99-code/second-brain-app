@@ -496,7 +496,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             command == Command.DOCTOR and not _opt_flag(ns, "rebuild_ledger")
         ) or (
             command in {Command.GC, Command.MIGRATE} and not _opt_flag(ns, "apply")
-        ) or (command == Command.COMPILE and _opt_flag(ns, "dry_run"))
+        ) or (command == Command.COMPILE and (
+            _opt_flag(ns, "dry_run") or _opt_flag(ns, "state_report")
+        ))
         if read_only:
             with read_config(config) as snapshot:
                 config = snapshot

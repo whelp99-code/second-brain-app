@@ -11,7 +11,7 @@ import json
 import os
 import sys
 from collections.abc import Generator, Mapping
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -473,26 +473,37 @@ def build_server(
             current = high_water()
             require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
-            hits = SearchIndex(vault_root=current_root).search(query, limit, scope="reference")
+            if limit <= 0 or not query.strip():
+                return bind_read({"results": []}, generation, current)
+            index = SearchIndex(vault_root=current_root)
             results: list[ToolResult] = []
             seen_records: set[str] = set()
-            for hit in hits:
-                row: ToolResult = {
-                    "page_id": hit.page_id,
-                    "section": hit.section,
-                    "snippet": hit.snippet,
-                    "score": hit.score,
-                }
-                if contract_schema_version == 4:
-                    records = records_for_page(current_root, hit.page_id, generation)
-                    for record in records:
-                        if record.record_id in seen_records or query.casefold() not in record.record_text.casefold():
+            seen_pages: set[str] = set()
+            with closing(index.iter_lexical_hits(query, scope="reference")) as hits:
+                for hit in hits:
+                    row: ToolResult = {
+                        "page_id": hit.page_id,
+                        "section": hit.section,
+                        "snippet": hit.snippet,
+                        "score": hit.score,
+                    }
+                    if contract_schema_version == 4:
+                        if hit.page_id in seen_pages:
                             continue
-                        seen_records.add(record.record_id)
-                        results.append({**row, "snippet": record.record_text[:400],
-                                        "record_id": record.record_id, "record_digest": record.record_digest})
-                    continue
-                results.append(row)
+                        seen_pages.add(hit.page_id)
+                        records = records_for_page(current_root, hit.page_id, generation)
+                        for record in records:
+                            if record.record_id in seen_records or query.strip().casefold() not in record.record_text.casefold():
+                                continue
+                            seen_records.add(record.record_id)
+                            results.append({**row, "snippet": record.record_text[:400],
+                                            "record_id": record.record_id, "record_digest": record.record_digest})
+                            if len(results) >= limit:
+                                break
+                    else:
+                        results.append(row)
+                    if len(results) >= limit:
+                        break
             return bind_read({"results": results[:limit]}, generation, current)
 
     def sb_read_page(

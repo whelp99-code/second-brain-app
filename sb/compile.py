@@ -323,7 +323,7 @@ def compile_state_report(
     explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
     path = resolve_registry_path(root, explicit)
     registry = KnowledgeRegistry(path)
-    states = registry.all_states()
+    states = registry.read_snapshot()
     counts: dict[str, int] = {}
     for state in states:
         counts[state.knowledge_status] = counts.get(state.knowledge_status, 0) + 1
@@ -337,6 +337,7 @@ def compile_state_report(
         "vault_written": False,
         "status_created": False,
         "projected": projected,
+        "projection_mode": "read-time" if (root / "generation.json").is_file() else "index",
         "registry_path": str(path),
         "pages": [state.as_dict() for state in states],
         "counts": counts,

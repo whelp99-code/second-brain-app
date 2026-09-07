@@ -87,7 +87,24 @@ class KnowledgeRegistry:
     """SQLite registry keyed by page_id. Missing keys stay UNKNOWN."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path)
+        self.path: Path = Path(path)
+
+    def read_snapshot(self) -> tuple[KnowledgeState, ...]:
+        """Read one registry snapshot without schema creation or any cache write."""
+        if not self.path.is_file():
+            return ()
+        conn = sqlite3.connect(f"{self.path.resolve().as_uri()}?mode=ro", uri=True)
+        try:
+            rows = cast(list[tuple[object, ...]], conn.execute(
+                "SELECT page_id, knowledge_status, approval_status, canonical, "
+                + "decided_by, decided_at, reason, source_hash, revision FROM pages ORDER BY page_id"
+            ).fetchall())
+        finally:
+            conn.close()
+        return tuple(KnowledgeState(
+            str(row[0]), str(row[1]), str(row[2]), str(row[3]), str(row[4]),
+            str(row[5]), str(row[6]), str(row[7]), int(str(row[8])),
+        ) for row in rows)
 
     def get(self, page_id: str) -> KnowledgeState:
         if not self.path.is_file():
