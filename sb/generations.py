@@ -271,13 +271,27 @@ def _connect_fresh(path: Path) -> sqlite3.Connection:
 
 
 def _close_fresh(connection: sqlite3.Connection, path: Path) -> None:
-    _ = connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
-    _ = connection.execute("VACUUM").fetchall()
-    connection.close()
+    try:
+        _ = connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+        _ = connection.execute("VACUUM").fetchall()
+    finally:
+        connection.close()
     path.chmod(0o600)
     for suffix in ("-wal", "-shm", "-journal"):
         if Path(f"{path}{suffix}").exists():
             raise GenerationError("GENERATION_SQLITE_RESIDUE")
+
+
+@contextmanager
+def _derived_transaction(connection: sqlite3.Connection) -> Generator[None, None, None]:
+    """Commit a derived table and its binding together, without per-row fsync."""
+    _ = connection.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+        connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
 
 
 def _write_private(path: Path, payload: bytes) -> None:
@@ -350,17 +364,18 @@ def _build_derived_stores(
             );
             """
         )
-        _ = ledger.executemany(
-            "INSERT INTO records VALUES(?,?,?)",
-            [
-                (page_id, "sha256:" + hashlib.sha256(raw).hexdigest(), len(raw))
-                for page_id, raw in pages
-            ],
-        )
-        _ = ledger.execute(
-            "INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?)",
-            (*binding, manifest.ledger_manifest_digest, len(pages)),
-        )
+        with _derived_transaction(ledger):
+            _ = ledger.executemany(
+                "INSERT INTO records VALUES(?,?,?)",
+                [
+                    (page_id, "sha256:" + hashlib.sha256(raw).hexdigest(), len(raw))
+                    for page_id, raw in pages
+                ],
+            )
+            _ = ledger.execute(
+                "INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?)",
+                (*binding, manifest.ledger_manifest_digest, len(pages)),
+            )
     finally:
         _close_fresh(ledger, ledger_path)
 
@@ -382,11 +397,12 @@ def _build_derived_stores(
             CREATE VIRTUAL TABLE docs USING fts5(page_id,section,text,tokenize='trigram');
             """
         )
-        _ = search.executemany("INSERT INTO docs(page_id,section,text) VALUES(?,?,?)", lexical_rows)
-        _ = search.execute(
-            "INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?)",
-            (*binding, manifest.lexical_manifest_digest, len(lexical_rows)),
-        )
+        with _derived_transaction(search):
+            _ = search.executemany("INSERT INTO docs(page_id,section,text) VALUES(?,?,?)", lexical_rows)
+            _ = search.execute(
+                "INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?)",
+                (*binding, manifest.lexical_manifest_digest, len(lexical_rows)),
+            )
     finally:
         _close_fresh(search, search_path)
 

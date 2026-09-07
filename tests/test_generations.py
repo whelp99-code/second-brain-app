@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -141,5 +142,66 @@ def test_sealing_excludes_raw_cas_even_when_stored_ignore_omits_it(tmp_path: Pat
         assert generation.root.joinpath("raw/source.txt").read_text() == "private source remains in CAS"
         assert git_run(generation.root, "ls-files", "raw") == ""
         assert git_run(generation.root, "log", "--all", "--format=%H", "--", "raw") == ""
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("table", ("records", "docs"))
+def test_failed_derived_binding_rolls_back_rows_and_preserves_active_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, table: str,
+) -> None:
+    import sqlite3
+    from collections.abc import Generator
+    from contextlib import contextmanager
+
+    import sb.generations as module
+
+    store = GenerationStore(tmp_path / "state", tmp_path / "share",
+                            provider_instance_id="provider:test", provider_release_sha="a" * 40)
+    transaction = module._derived_transaction  # pyright: ignore[reportPrivateUsage]
+    rolled_back: list[int] = []
+
+    @contextmanager
+    def fail_binding(connection: sqlite3.Connection) -> Generator[None, None, None]:
+        present = cast(tuple[int] | None, connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE name=?", (table,)).fetchone())
+        if present is None:
+            with transaction(connection):
+                yield
+            return
+
+        def deny_metadata(action: int, name: str | None, column: str | None,
+                          database: str | None, trigger: str | None) -> int:
+            del column, database, trigger
+            if action == sqlite3.SQLITE_INSERT and name == "generation_meta":
+                return sqlite3.SQLITE_DENY
+            return sqlite3.SQLITE_OK
+
+        connection.set_authorizer(deny_metadata)
+        try:
+            with transaction(connection):
+                yield
+        except sqlite3.DatabaseError:
+            connection.set_authorizer(None)
+            assert not connection.in_transaction
+            row = cast(tuple[int], connection.execute(f"SELECT count(*) FROM {table}").fetchone())
+            rolled_back.append(row[0])
+            raise
+        finally:
+            connection.set_authorizer(None)
+
+    try:
+        first = build_generation(store, text="first")
+        store.activate(first, None, NOW)
+        with monkeypatch.context() as patch:
+            patch.setattr(module, "_derived_transaction", fail_binding)
+            with pytest.raises(sqlite3.DatabaseError, match="not authorized"):
+                _ = build_generation(store, first, "replacement")
+        assert rolled_back == [0]
+        assert store.active().generation_id == first.generation_id
+        assert not tuple(store.staging.iterdir())
+        replacement = build_generation(store, first, "replacement")
+        store.activate(replacement, first, NOW)
+        assert store.active().generation_id == replacement.generation_id
     finally:
         store.close()

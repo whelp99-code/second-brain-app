@@ -306,3 +306,11 @@ SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MC
 실제 CLI/MCP의 혼합 4개/일반 LF 64개 sensitive record, 두 클라이언트, control completed/dashboard stored=true, 삭제 후 재저장·rollback·컴파일 중 조회를 확인했다. Python 621 passed/2 skipped. 자비스 결합 검사 245 passed/1 timeout 후 동일 실패 검사 단독 1 passed이며 처음부터 전체 통과라고 보고하지 않는다. [V3 인수·새 profile 설정·기존 계약 보존·원장 전환](REMEMBER-V3-ACCEPTANCE-2026-09-08.md).
 
 다음 범위는 실제 정정 UI와 앱별 기억 공급/범위, context pack·전달 이력, 원본 차단 전파, 운영 전환/복원과 검색 품질이다. 네 OSS의 장점만 흡수한다는 방향과 기존 B0~B8 전체 완료 기준은 유지한다.
+
+## 23. 공통 기억 운영 선행 부하 — 2026-09-08
+
+기존 CAPACITY-PLAN의 구조 데이터 규모를 실제 CLI/원장/봉인 검색/백업 복원으로 검증했다. 5,000 원본과 실제 정규화 100,000 units, 인용 page 10,000/conflict 1,000 fixture, 100회 CLI 검색을 확인했다. [인수 보고서](CAPACITY-ACCEPTANCE-2026-09-08.md). 실제 앱별 접근 범위나 문맥 공급 완료로 확대하지 않는다.
+
+보존 조회의 봉인 DB 쓰기 접근을 제거하고 파생 인덱스 batch transaction으로 세대 생성 단일 실측을 59.36→23.78초로 줄였다. FULL durability와 세대 검증을 유지하며 실패 rollback·기존 active 유지·재시도를 검사했다. 검색 p95 약 344ms는 CLI startup을 포함한 합성 한 문구 100회 값이다. 새 graph/벡터 의존성의 근거로 쓰지 않는다.
+
+새로 재현한 unit cap의 파일 수 적용 결함은 I5/P1에 추가했다. 원본/단위 예산과 초과 파일 보존 계약을 먼저 고치며 운영 cap 증대는 보류한다. 100회 managed 쓰기·대용량 동시 조회·실제 압축/공간 성장·한국어 질문 평가는 계속 남는다. 앞서 확정한 앱/범위→공통 context pack·전달 이력→운영 전환 순서를 유지한다.

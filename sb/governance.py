@@ -5,16 +5,16 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import os
+import sqlite3
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 from sb.config import Config
 from sb.security import source_policy_snapshot
-from sb.store import parse_page_frontmatter
-from sb.store.ledger import Ledger
+from sb.store import LedgerCorrupt, parse_page_frontmatter
 
 _HEX: Final = frozenset("0123456789abcdef")
 _PAGE_FOLDERS: Final = ("wiki", "daily", "conflicts")
@@ -170,11 +170,22 @@ def _page_hashes(root: Path) -> set[str]:
 
 
 def _ledger_hashes(root: Path) -> set[str]:
-    if not (root / ".sb" / "ledger.db").is_file():
+    path = root / ".sb" / "ledger.db"
+    if not path.is_file():
         return set()
-    with Ledger(root) as ledger:
-        return {
-            item.content_hash
-            for item in ledger.list_source_items()
-            if _valid_digest(item.content_hash)
-        }
+    # A sealed generation cannot open the writer, which migrates and enables WAL.
+    # Read only the protecting source hashes, not every normalized unit in the DB.
+    try:
+        with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as connection:
+            _ = connection.execute("BEGIN")
+            integrity = cast(tuple[str] | None,
+                             connection.execute("PRAGMA integrity_check").fetchone())
+            if integrity != ("ok",):
+                raise LedgerCorrupt(path=str(path), detail="integrity_check failed")
+            rows = cast(list[tuple[object]], connection.execute(
+                "SELECT DISTINCT content_hash FROM source_item").fetchall())
+            if any(not isinstance(row[0], str) for row in rows):
+                raise LedgerCorrupt(path=str(path), detail="invalid source content hash")
+            return {value for (value,) in rows if isinstance(value, str) and _valid_digest(value)}
+    except sqlite3.DatabaseError as exc:
+        raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
