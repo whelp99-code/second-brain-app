@@ -1,6 +1,6 @@
 # 자비스 공통 기억 계약 조율 자료
 
-2026-09-07. Second Brain 작업에서 작성한 후속 인계 파일이다. 자비스 코드 수정이나 외부 메시지 발송을 수행한 문서가 아니다.
+2026-09-07. Second Brain 작업에서 작성한 후속 인계 파일이다. 후속으로 사용자의 연동 완성 지시에 따라 자비스 기억 소비 코드도 좁은 범위에서 수정했다. 최신 상태는 마지막 절을 따른다. 외부 메시지는 발송하지 않았다.
 
 ## 적용한 방향
 
@@ -42,3 +42,11 @@ Second Brain `fb47313`, `77f3bad`에서 공개 metadata와 경로가 동등한 �
 자비스 쪽 다음 변경 지점은 parser의 resolveDuplicates뿐 아니라 `second-brain-read-values.ts`의 집계 중복 키도 포함한다. 양쪽 모두 bound record의 ID/digest를 기준으로 하고, 같은 sid인 서로 다른 사실을 출처 중복만으로 충돌 처리하지 않아야 한다. 시간 계약은 producer valid_until 하루 고정과 consumer 페이지 expiry·record expiry·freshness를 함께 정리해야 한다. 현재 응답 검증을 끄거나 단순히 1일을 임의의 큰 수로 바꾸지 않는다.
 
 요청 기억의 CAS/인용과 정정 이후 출처를 보강했으며 전체 Python 테스트 527개 통과·2개 건너뜀. 아직 운영 배포나 실제 자비스 outbox/settled 인수는 수행하지 않았다. 상세 증거는 [구현 원장](IMPLEMENTATION-STATUS.md)과 `/var/tmp/sb-b1-20260907/`에 있다.
+
+## 최신 조율 결과 — 다중 record와 시간 처리
+
+자비스 `5c44b1f`에서 두 중복 판정과 page별 선택 유실을 수정했다. `f9513d0`에서는 정상 유효기간 경과를 ID 오류와 분리하고, 조회 TTL을 사실의 종료와 구분했다. Second Brain의 하루 기본값 제거와 함께 실제 `업무` 검색이 invalid에서 **current / evidence 10**으로 바뀌었다. 현재·다음 날·35일 후의 주입 시계에서도 같은 record ID와 유한 응답 TTL을 확인했다. 단순 transport 응답이나 mock만의 검증이 아니다.
+
+Python 전체 548개 통과·2개 건너뜀, 자비스 기억 관련 단위 244개 통과, 양쪽 변경 파일 lint 및 자비스 backend build 통과. strict wire 필드·계약 해시·generation binding·record digest 계산은 완화하지 않았다. `current`가 실행 성공이나 현실의 사실 검증을 뜻하지 않으며 untrusted/authority none을 유지한다.
+
+배포 시 주의할 계약은 [시간 계약](MEMORY-TIME-CONTRACT-2026-09-07.md)에 있다. 소비자 선행, provider 실행 파일과 새 generation의 유지보수 경계 내 전환, 구형 selection/target 재조회가 필요하다. 기존 요청의 서명/digest를 새 값으로 치환하지 않는다. 이번 변경은 운영 배포가 아니며 actual candidate→outbox→settled→재사용과 실제 에이전트 앱 간 공유는 다음 인수 단계다.

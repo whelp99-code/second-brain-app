@@ -6,11 +6,11 @@ import hashlib
 import re
 import subprocess
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
-from sb.effect_values import JsonObject, canonical_bytes, digest, format_instant
+from sb.effect_values import JsonObject, canonical_bytes, digest, format_instant, parse_instant
 from sb.page_ids import git_rel
 from sb.targets import GenerationIdentityV1, ResolvedMemoryTargetV1
 
@@ -18,6 +18,9 @@ _RECORD_DOMAIN: Final = b"second-brain/memory-record/v1\0"
 _CITATION: Final = re.compile(r"\[\^([0-9a-f]{8,64})\]")
 _DEFINITION: Final = re.compile(r"^\[\^([0-9a-f]{8,64})\]:\s*(\S.*)$")
 _MAX_RECORDS: Final = 64
+# Open bounds encode missing applicability dates, not observation or verification.
+_OPEN_START: Final = "0001-01-01T00:00:00.000Z"
+_OPEN_END: Final = "9999-12-31T23:59:59.000Z"
 
 
 class MemoryRecordError(ValueError):
@@ -92,15 +95,24 @@ def _sensitivity(value: str | None) -> Literal["public", "personal", "sensitive"
     return selected
 
 
-def _validity(updated: str | None, observed: datetime) -> tuple[str, str]:
-    if updated is None:
-        start = observed
-    else:
-        try:
+def _validity(metadata: dict[str, str]) -> tuple[str, str]:
+    try:
+        if "valid_from" in metadata:
+            start = parse_instant(metadata["valid_from"])
+        elif "updated" in metadata:
+            updated = metadata["updated"]
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", updated) is None:
+                raise ValueError("invalid updated date")
             start = datetime.fromisoformat(f"{updated}T00:00:00+00:00")
-        except ValueError as exc:
-            raise MemoryRecordError("EFFECT_TARGET_INVALID") from exc
-    return format_instant(start), format_instant(start + timedelta(days=1))
+        else:
+            # Sealed commits have a synthetic date; they cannot supply observation time.
+            start = parse_instant(_OPEN_START)
+        end = parse_instant(metadata.get("valid_until", _OPEN_END))
+        if start.tzinfo is None or start >= end:
+            raise ValueError("invalid validity interval")
+        return format_instant(start), format_instant(end)
+    except ValueError as exc:
+        raise MemoryRecordError("EFFECT_TARGET_INVALID") from exc
 
 
 def records_for_page(
@@ -109,7 +121,11 @@ def records_for_page(
     generation: GenerationIdentityV1,
     observed: datetime | None = None,
 ) -> tuple[MemoryRecordV1, ...]:
-    """Derive closed records from exact committed statement bytes under one generation pin."""
+    """Derive records from committed bytes; observed is retained for caller compatibility.
+
+    Record identity and validity never depend on the time at which a page is read.
+    """
+    del observed
     rel = git_rel(page_id)
     head = _git(root, "rev-parse", "HEAD")
     tree = _git(root, "rev-parse", "HEAD^{tree}")
@@ -126,7 +142,7 @@ def records_for_page(
         if matched is not None:
             definitions[matched.group(1)] = matched.group(2)
     sensitivity = _sensitivity(metadata.get("sensitivity"))
-    valid_from, valid_until = _validity(metadata.get("updated"), observed or datetime.now(UTC))
+    valid_from, valid_until = _validity(metadata)
     rows: list[MemoryRecordV1] = []
     search_offset = body_start
     previous_statement: tuple[str, int] | None = None

@@ -22,7 +22,7 @@
 - 수정: 성공적으로 수집한 항목만 처리 완료로 전이하고 미처리·실패·보류 항목은 후속 세대에 보존한다. 기록 단위의 durable ingress 상태를 기준으로 정리한다. 별도 서버 큐나 watcher 도입 없이 기존 원장·inbox 구조에서 해결한다.
 - 완료 기준: 모든 세대 변경 명령을 미처리 inbox와 조합해 검증한다. `limit=1`, source 미선택, LLM 실패, parser 실패, 재시작을 거쳐도 접수한 각 입력이 pending·처리 완료·명시적 거부 중 하나로 설명되어야 한다. 설명되지 않는 유실 0건.
 
-### R2. 실제 자비스 read adapter가 생성 페이지를 거부 — P0 / 공개 응답 소스 수정, 소비 중복 판정 미완료 / 양쪽 리포
+### R2. 실제 자비스 read adapter가 생성 페이지를 거부 — P0 / 양쪽 소스 수정·실제 읽기 검증, 운영 미전환 / 양쪽 리포
 
 - 근거: [mcp.py](sb/mcp.py#L502), 자비스 `src/second-brain-evidence-parser.ts:22,70`.
 - 실제 운영 MCP의 `운영 복구` 검색은 data/1건을 반환하지만 자비스 `createSecondBrainReadAdapter(... contract_profile: schema4)`는 `SECOND_BRAIN_PAGE_MALFORMED`를 반환했다. `업무`도 transport는 결과를 반환하지만 adapter는 동일하게 거부했다.
@@ -38,7 +38,7 @@
 - 수정: provider-owned 기억과 외부 CAS 자료의 출처 계약을 정렬한다. 요청 원장과 결합된 인용을 검증 가능하게 보존하거나 CAS 및 출처를 정상적으로 생성한다. Vault 단일 writer 경계를 지키는 저장 API로 통합한다. 인용 검증을 끄는 방식으로 통과시키지 않는다.
 - 완료 기준: remember·correct·forget·export를 포함한 요청 처리 후 backup → 새 경로 restore → 원장·인용·검색·삭제 상태 검증이 성공한다.
 
-### R4. 장기기억 유효기간이 일괄 하루 — P1 / 코드 확인 및 진단 재현 / 양쪽 리포
+### R4. 장기기억 유효기간이 일괄 하루 — P1 / 양쪽 소스 수정·시간 경계 검증, 운영 미전환 / 양쪽 리포
 
 - 근거: [memory_records.py](sb/memory_records.py#L95), 자비스 `src/second-brain-evidence-parser.ts:150`.
 - 모든 record의 valid_until을 updated 날짜의 UTC 자정 + 1일로 만든다. 자비스는 현재 시각이 valid_until 이상이면 identity invalid로 거부한다. 실제 저장 시각 기준 24시간도 아니다.

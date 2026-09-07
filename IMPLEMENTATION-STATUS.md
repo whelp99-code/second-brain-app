@@ -7,7 +7,7 @@
 | 단위 | 범위 | 상태 | 완료 증거 |
 |---|---|---|---|
 | B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 완료 | 4da09b9; 520 passed, 2 skipped; Ruff·diff check 통과 |
-| B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 진행 중 | R2 공개 필드/ID 수정, R3 CAS·정정 후 인용 보강. R4 및 자비스 중복 판정 미완료 |
+| B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
 | B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 미완료 | 독립 클라이언트 A 저장/B 조회, 요청 ID/receipt/record 연결, 범위 검사 |
@@ -71,3 +71,16 @@ R9의 CLI status/search/sources/retention/metrics, doctor 조회, gc/migrate 미
 - I3의 LLM 실행 중 장시간 배타 잠금은 여전히 남아 있다. 이번 reader 복구가 조회 지연 개선을 의미하지 않는다. 운영 코드 배포는 아직 하지 않았다.
 
 검증 결과: 전체 **540 passed, 2 skipped (127.40초)**, Ruff·diff check 통과, 타입 **0 errors, 55 warnings**. 새 process identity/reader recovery 관련 소스·테스트는 타입 오류·경고 0. 로그는 `/var/tmp/sb-b3-full-tests.log`, `/var/tmp/sb-b3-types-final.log`에 있다.
+
+
+### B1 완료 보강 — 자비스 다중 기억 소비·시간 처리
+
+- 자비스 `5c44b1f`: parser/집계 중복 키를 bound record ID/digest로 변경. page별 모든 검색 선택을 보존하며 한 번 읽고 각각 검증한다. 같은 출처의 여러 문장, 중복 선택, 같은 페이지의 잘못된 첫 선택이 정상 마지막 선택에 가려지는 경우를 검사했다.
+- 자비스 `f9513d0`: bound record는 페이지 작성일만으로 하드 만료하지 않는다. 사실 구간 밖은 stale이며 즉시 응답 만료, 구간 안은 조회 시각에 설정 TTL을 더하되 명시적 종료일로 제한한다. strict identity/digest·generation·legacy 검사를 유지했다. 날짜 형식은 Python과 동일한 연도 1~9999의 24자 canonical UTC로 검증한다.
+- Second Brain: 하루 일괄 만료를 제거하고 내부 명시적 기간을 검증·보존한다. 종료 미상은 열린 종료, 시작 미상은 열린 시작으로 표현한다. 이는 사실 검증일을 새로 추론하는 것이 아니다. 읽는 시각이나 합성 Git timestamp를 record ID에 넣지 않는다. 실제 sealed 두 세대의 날짜 없는 기록도 같은 ID를 유지한다.
+- 독립 검토에서 지적한 page 선택 유실, 합성 commit 시각, 확장 연도·0년 불일치를 반영했다. `trust=untrusted`/`authority=none`과 target의 5분 만료는 유지한다.
+- 최종 Python 전체 **548 passed, 2 skipped (123.92초)**; Ruff 통과; 타입 **0 errors, 55 warnings**. 새 시간 소스·테스트 타입 오류·경고 0. 자비스 기억 관련 단위 **244 passed / 26 files**, 변경 파일 ESLint 및 backend build 통과. 임시 복제 디렉터리의 중복 테스트는 최종 수치에서 제외했다.
+- 실제 프로세스: 소스 MCP와 빌드한 자비스 transport/read adapter로 운영 자료를 읽어 `운영 복구` current 1개, `업무` current 10개. 소비자 시계를 현재/다음 날/35일 뒤로 바꿔도 같은 record ID 10개, bounded expiry, untrusted를 확인했다. 사용자 내용을 테스트 fixture로 복제하지 않았다.
+- 증거: `/var/tmp/sb-time-final-tests.log`, `/var/tmp/sb-time-final-types.log`, `/var/tmp/jarvis-memory-time-final-tests.log`, `/var/tmp/jarvis-memory-time-build.log`, `/var/tmp/jarvis-memory-time-probe.jsonl`, `/var/tmp/jarvis-memory-future-probe.jsonl`.
+
+R4는 기존 기록의 digest를 바꾸므로 실행 파일만 바꾸는 배포는 하지 않는다. [시간 계약](MEMORY-TIME-CONTRACT-2026-09-07.md)의 유지보수 경계에서 새 provider release 세대와 실행 파일을 함께 전환하고 기존 target은 재조회해야 한다. 운영 release/서비스/active 포인터는 이번에 전환하지 않았다. 현재·미래 시계 프로브는 읽기 검증이며 35일 실운영, 자비스 candidate/outbox/settled 순환, 두 에이전트 앱 공유 완료의 증거가 아니다. B4~B8 및 I3 지연·B3 과거 잔여물은 계속 진행 대상이다.
