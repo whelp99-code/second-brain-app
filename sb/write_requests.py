@@ -30,7 +30,12 @@ from sb.effect_values import is_json_object
 from sb.effect_write_models import MemoryEffectWriteAcceptedV2
 from sb.effect_write_requests import accept_effect_request
 from sb.page_ids import git_rel
-from sb.stable_requests import StableRequestError, accept_stable_v1_request
+from sb.remember_contracts import MemoryWriteResultV3
+from sb.stable_requests import (
+    StableRequestError,
+    accept_stable_v1_request,
+    accept_stable_v3_request,
+)
 from sb.task30_barriers import Task30BarrierSink
 from sb.write_request_values import (
     MAX_ENVELOPE_BYTES,
@@ -299,11 +304,16 @@ def accept_memory_write_request(
     revoked_delegations: AbstractSet[str] | None = None,
     external_public_keys: dict[str, Ed25519PublicKey] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
-) -> MemoryWriteResultV1 | MemoryEffectWriteAcceptedV2:
-    """Dispatch the exact V1/V2 discriminated union without mutating V1 bytes."""
+) -> MemoryWriteResultV1 | MemoryWriteResultV3 | MemoryEffectWriteAcceptedV2:
+    """Dispatch the additive V1/V2/V3 union without mutating existing request bytes."""
     if not is_json_object(value):
         reject("WRITE_REQUEST_INVALID")
     schema_version = value.get("schema_version")
+    if schema_version == 3:
+        try:
+            return accept_stable_v3_request(request_root, value, now, barrier_sink)
+        except StableRequestError as exc:
+            raise WriteRequestRejected(str(exc)) from exc
     if schema_version == 1:
         try:
             return accept_stable_v1_request(request_root, value, now, barrier_sink)

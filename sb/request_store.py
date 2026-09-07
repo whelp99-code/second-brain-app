@@ -20,6 +20,7 @@ from sb.effect_write_values import model_object
 from sb.export_journal import ExportJournal
 from sb.process_identity import observe_process
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
+from sb.request_schema import migrate_remember_v3
 from sb.sqlite_values import OPTIONAL_TEXT_ROW
 from sb.tombstone_snapshot import (
     TombstoneSnapshot,
@@ -122,7 +123,7 @@ class RequestProofSettlement:
 _SCHEMA: Final = """
 CREATE TABLE IF NOT EXISTS requests(
   request_id TEXT PRIMARY KEY,
-  schema_version INTEGER NOT NULL CHECK(schema_version IN (1,2)),
+  schema_version INTEGER NOT NULL CHECK(schema_version IN (1,2,3)),
   request_digest TEXT NOT NULL,
   envelope_digest TEXT,
   idempotency_key TEXT NOT NULL,
@@ -347,6 +348,11 @@ class RequestStore:
         _ = self.db.execute("PRAGMA synchronous=FULL")
         _ = self.db.execute("PRAGMA foreign_keys=ON")
         _ = self.db.executescript(_SCHEMA)
+        try:
+            migrate_remember_v3(self.db)
+        except BaseException:
+            self.db.close()
+            raise
         self.exports = ExportJournal(self.db)
         self.db.commit()
         self.path.chmod(0o600)

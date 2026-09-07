@@ -90,7 +90,7 @@ def main() -> None:
     from sb import mcp
     # Only the test host clock is injected; publication/locks/storage/transport are real.
     with patch.object(mcp, "datetime", _Clock):
-        anyio.run(mcp.build_server(contract_schema=4).run_stdio_async)
+        anyio.run(mcp.build_server().run_stdio_async)
 
 
 if __name__ == "__main__":

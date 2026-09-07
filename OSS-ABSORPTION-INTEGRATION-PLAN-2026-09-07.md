@@ -298,3 +298,11 @@ SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MC
 자비스 `30e2024` 커밋을 격리 빌드하고 실제 Python V1 접수와 자비스 요청/후보 본문 검증기를 12개 입력으로 비교했다. LF/CRLF/CR/탭은 모두 거부한다. 선행 BOM은 provider만 허용하고 선행 NEL은 자비스만 허용한다. 65개 record와 인용 이스케이프 뒤 크기 초과는 후보 본문 검사를 통과하지만 양쪽 요청 경계에서 거부된다. 수락 4개는 원문 보존·정확 재시도, 거부 8개는 요청 파일/DB 생성 없음을 검사했다.
 
 이는 일반 여러 줄 기능 추가가 아니다. 새 명시적 본문 계약과 원장 migration·처리 분기·원문 승인·완료 소비를 묶어 구현해야 하며 V1 검증만 완화하는 우회는 보류한다. [상세 원인·14개 실행 묶음·전환 완료 조건](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md). 기존 24개 항목과 B0~B8 범위를 유지하며 별도 OSS 서버나 기억 정본을 추가하지 않는다.
+
+## 22. I1-d 구현 — 실제 일반 Enter 입력 순환
+
+21절의 공백을 새 후보/body/request/MCP 계약으로 연결했다. 원문을 치환하지 않고 일반 LF/CRLF/CR/탭을 CAS·인용·자비스 전체 결과 검증에 대응한다. 기존 기억 서버·원장·writer·권한 구조를 재사용하고 별도 OSS 서비스는 추가하지 않았다. 접수 파일/원장 사이 종료 복구와 envelope 전체 digest 결합도 수정했다.
+
+실제 CLI/MCP의 혼합 4개/일반 LF 64개 sensitive record, 두 클라이언트, control completed/dashboard stored=true, 삭제 후 재저장·rollback·컴파일 중 조회를 확인했다. Python 621 passed/2 skipped. 자비스 결합 검사 245 passed/1 timeout 후 동일 실패 검사 단독 1 passed이며 처음부터 전체 통과라고 보고하지 않는다. [V3 인수·새 profile 설정·기존 계약 보존·원장 전환](REMEMBER-V3-ACCEPTANCE-2026-09-08.md).
+
+다음 범위는 실제 정정 UI와 앱별 기억 공급/범위, context pack·전달 이력, 원본 차단 전파, 운영 전환/복원과 검색 품질이다. 네 OSS의 장점만 흡수한다는 방향과 기존 B0~B8 전체 완료 기준은 유지한다.

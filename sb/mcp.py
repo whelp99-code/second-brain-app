@@ -50,6 +50,7 @@ from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import RememberRejected, write_inbox
+from sb.mcp_remember_models import MemoryRememberWriteRequest
 from sb.mcp_write_models import (
     MemoryWriteRequest,
     MemoryWriteRequestModel,
@@ -65,6 +66,7 @@ from sb.page_ids import git_rel
 from sb.pipeline import RunOutcome, run_all
 from sb.provider_lifecycle import ProviderLifecycle
 from sb.public_page import public_frontmatter
+from sb.remember_contracts import MemoryWriteResultV3
 from sb.request_store import RequestStore
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
@@ -102,6 +104,8 @@ _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
+_REMEMBER_PROFILE: Final = "remember-schema5"
+_REMEMBER_CONTRACT_DIGEST: Final = "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
 _TASK32_CONTRACT_DIGEST: Final = "ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0"
 
 
@@ -248,7 +252,7 @@ def build_server(
     request_root: Path | str | None = None,
     *,
     task30: bool | None = None,
-    contract_schema: Literal[3, 4] | None = None,
+    contract_schema: Literal[3, 4, 5] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
     config: Config | None = None,
 ) -> MCPServer:
@@ -336,6 +340,9 @@ def build_server(
         elif profile == _TASK32_PROFILE:
             task30_enabled = True
             contract_schema_version = 4
+        elif profile == _REMEMBER_PROFILE:
+            task30_enabled = True
+            contract_schema_version = 5
         else:
             raise ContractProfileError
     generation_store: GenerationStore | None = None
@@ -494,7 +501,7 @@ def build_server(
                         "snippet": hit.snippet,
                         "score": hit.score,
                     }
-                    if contract_schema_version == 4:
+                    if contract_schema_version >= 4:
                         if hit.page_id in seen_pages:
                             continue
                         seen_pages.add(hit.page_id)
@@ -525,7 +532,7 @@ def build_server(
             try:
                 page = read_page(current_root, id)
                 payload: ToolResult = {"frontmatter": public_frontmatter(page.frontmatter, id), "body": page.body}
-                if contract_schema_version == 4:
+                if contract_schema_version >= 4:
                     payload = {**payload, "records": [
                         record.as_dict() for record in records_for_page(current_root, id, generation)
                     ]}
@@ -560,7 +567,7 @@ def build_server(
                     "page_id": row.page_id,
                     "summary": row.summary,
                 }
-                if contract_schema_version == 4:
+                if contract_schema_version >= 4:
                     records = records_for_page(
                         current_root, f"conflicts/{row.conflict_id}", generation
                     )
@@ -622,11 +629,12 @@ def build_server(
                 "journal_health": "healthy",
                 "features": ["memory_effect_write_v2"],
             }
-            if contract_schema_version == 4:
+            if contract_schema_version >= 4:
                 status.update({
-                    "contract_schema_version": 4,
+                    "contract_schema_version": contract_schema_version,
                     "contract_digest": _contract_digest(),
-                    "features": ["memory_effect_write_v2", "memory_record_identity_v1"],
+                    "features": ["memory_effect_write_v2", "memory_record_identity_v1"]
+                    + (["memory_remember_v3"] if contract_schema_version == 5 else []),
                 })
             return status
 
@@ -671,7 +679,7 @@ def build_server(
                 if observations is not None:
                     result["observations"] = model_object(observations)
             if (
-                contract_schema_version == 4
+                contract_schema_version >= 4
                 and status.identity.operation == "export"
                 and export_lifecycle is not None
             ):
@@ -695,14 +703,16 @@ def build_server(
             return bind_read(result, generation, current)
 
     def _contract_digest() -> str:
-        sidecar = Path(__file__).resolve().parent.parent / "contracts" / "second-brain-mcp-v1.json.sha256"
+        filename = "second-brain-mcp-v3.json.sha256" if contract_schema_version == 5 else "second-brain-mcp-v1.json.sha256"
+        expected = _REMEMBER_CONTRACT_DIGEST if contract_schema_version == 5 else _TASK32_CONTRACT_DIGEST
+        sidecar = Path(__file__).resolve().parent.parent / "contracts" / filename
         try:
             value = sidecar.read_text(encoding="ascii").strip()
         except FileNotFoundError:
-            return _TASK32_CONTRACT_DIGEST
+            return expected
         except OSError as exc:
             raise ToolError("SECOND_BRAIN_CONTRACT_MISMATCH") from exc
-        if value != _TASK32_CONTRACT_DIGEST:
+        if value != expected:
             raise ToolError("SECOND_BRAIN_CONTRACT_MISMATCH")
         return value
 
@@ -778,7 +788,7 @@ def build_server(
     def accept_request(raw: JsonObject, is_effect: bool) -> ToolResult:
         maintain(datetime.now(UTC))
 
-        def accept() -> MemoryEffectWriteAcceptedV2 | MemoryWriteResultV1:
+        def accept() -> MemoryEffectWriteAcceptedV2 | MemoryWriteResultV1 | MemoryWriteResultV3:
             return accept_memory_write_request(
                 root,
                 requests,
@@ -814,7 +824,7 @@ def build_server(
                 ).model_dump(mode="json")
             else:
                 error = {
-                    "schema_version": 1,
+                    "schema_version": 3 if raw.get("schema_version") == 3 else 1,
                     "kind": "error",
                     "code": exc.code,
                     "retryable": False,
@@ -830,6 +840,15 @@ def build_server(
         """Accept the exact closed V1/V2 request union into the stable queue."""
         raw = cast(JsonObject, request.model_dump(mode="json"))
         return accept_request(raw, isinstance(request, MemoryEffectWriteRequestV2))
+
+    def sb_write_remember_request(
+        request: MemoryRememberWriteRequest,
+    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+        """Accept closed V1/V2 requests or explicit plain-text-v1 remember V3."""
+        raw = cast(JsonObject, request.model_dump(mode="json"))
+        return accept_request(raw, isinstance(request, MemoryEffectWriteRequestV2))
+
+    sb_write_remember_request.__name__ = "sb_write_request"
 
     def require_legacy_genesis() -> None:
         if high_water()[0] != 0:
@@ -920,12 +939,12 @@ def build_server(
     )
     _ = server.tool(name="sb_remember")(sb_remember if task30_enabled else legacy_remember)
     _ = server.tool(name="sb_write_request")(
-        sb_write_request if task30_enabled else legacy_write_request
+        sb_write_remember_request if contract_schema_version == 5 else sb_write_request if task30_enabled else legacy_write_request
     )
     if task30_enabled:
         _ = server.tool(name="sb_generation_status")(sb_generation_status)
         _ = server.tool(name="sb_request_status")(sb_request_status)
-        resolver = sb_resolve_memory_record if contract_schema_version == 4 else sb_resolve_memory_target
+        resolver = sb_resolve_memory_record if contract_schema_version >= 4 else sb_resolve_memory_target
         _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server
 

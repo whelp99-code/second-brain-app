@@ -20,6 +20,8 @@ from sb.contracts import (
     WriteOperation,
 )
 from sb.page_ids import git_rel
+from sb.remember_body import plain_text_body
+from sb.remember_contracts import MemoryWriteInboxEnvelopeV3, MemoryWriteRequestV3
 from sb.remember_values import remember_lines
 from sb.vault import PathEscapeError
 
@@ -31,10 +33,13 @@ DOMAINS: Final = {
     "idempotency": b"orca-jarvis/memory-write-idempotency/v1\0",
     "request": b"orca-jarvis/memory-write-request/v1\0",
     "file": b"second-brain/inbox-write-request/v1\0",
+    "request_v3": b"orca-jarvis/memory-write-request/v3\0",
+    "file_v3": b"second-brain/inbox-write-request/v3\0",
 }
 DIGEST: Final = re.compile(r"sha256:[0-9a-f]{64}\Z")
 CANDIDATE: Final = re.compile(r"memcand:pos:v1:[0-9a-f]{64}\Z")
 REQUEST: Final = re.compile(r"memreq:pos:v1:[0-9a-f]{64}\Z")
+REQUEST_V3: Final = re.compile(r"memreq:pos:v3:[0-9a-f]{64}\Z")
 IDEMPOTENCY: Final = re.compile(r"memidem:pos:v1:[0-9a-f]{64}\Z")
 RECEIPT: Final = re.compile(r"receipt:memory:[0-9a-f]{64}\Z")
 INSTANT: Final = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\Z")
@@ -223,10 +228,14 @@ def _prior(raw: JsonValue) -> ExpectedPriorV1 | None:
     return ExpectedPriorV1(source_id, version, Digest(source_digest))
 
 
-def _payload(operation: WriteOperation, raw: JsonValue) -> dict[str, str]:
+def _payload(operation: WriteOperation, raw: JsonValue, *, multiline: bool = False) -> dict[str, str]:
     expected = {WriteOperation.REMEMBER: {"content"}, WriteOperation.CORRECT: {"content"}, WriteOperation.FORGET: {"disposition"}, WriteOperation.EXPORT: {"format", "scope"}}[operation]
     value = _record(raw, frozenset(expected))
-    parsed = {key: _text(item, 4_096) for key, item in value.items()}
+    try:
+        parsed = {key: plain_text_body(item) if multiline else _text(item, 4_096)
+                  for key, item in value.items()}
+    except ValueError:
+        reject("WRITE_REQUEST_INVALID")
     if operation == WriteOperation.REMEMBER:
         try:
             _ = remember_lines(parsed["content"])
@@ -242,16 +251,29 @@ def _payload(operation: WriteOperation, raw: JsonValue) -> dict[str, str]:
 
 def parse_request(raw: JsonValue, now: datetime) -> MemoryWriteRequestV1:
     """Parse external JSON-compatible input into the closed V1 contract."""
-    value = _record(raw, ROOT_KEYS)
+    return _parse_request(raw, now, 1)
+
+
+def parse_request_v3(raw: JsonValue, now: datetime) -> MemoryWriteRequestV3:
+    """Parse only the explicit plain-text-v1 remember contract."""
+    request = _parse_request(raw, now, 3)
+    assert isinstance(request, MemoryWriteRequestV3)
+    return request
+
+
+def _parse_request(raw: JsonValue, now: datetime, version: Literal[1, 3]) -> MemoryWriteRequestV1:
+    value = _record(raw, ROOT_KEYS if version == 1 else ROOT_KEYS | {"body_profile"})
     if len(canonical_bytes(value)) > MAX_REQUEST_BYTES:
         reject("WRITE_REQUEST_OVERSIZE")
-    if value["schema_version"] != 1:
+    if value["schema_version"] != version:
+        reject("WRITE_REQUEST_INVALID")
+    if version == 3 and (value["body_profile"] != "plain-text-v1" or value["operation"] != "remember"):
         reject("WRITE_REQUEST_INVALID")
     candidate = _text(value["candidate_id"], 79, CANDIDATE)
     candidate_digest = _text(value["candidate_digest"], 71, DIGEST)
     classification = _text(value["classification_digest"], 71, DIGEST)
     idempotency = _text(value["idempotency_key"], 80, IDEMPOTENCY)
-    request_id = _text(value["request_id"], 79, REQUEST)
+    request_id = _text(value["request_id"], 79, REQUEST if version == 1 else REQUEST_V3)
     request_digest = _text(value["request_digest"], 71, DIGEST)
     operation = _operation(value["operation"])
     created, expires = _instant(value["created_at"]), _instant(value["expires_at"])
@@ -276,9 +298,38 @@ def parse_request(raw: JsonValue, now: datetime) -> MemoryWriteRequestV1:
     if idempotency != "memidem:pos:v1:" + expected_idempotency[7:]:
         reject("WRITE_REQUEST_IDENTITY_INVALID")
     base = {key: item for key, item in value.items() if key not in {"request_id", "request_digest"}}
-    expected_request = digest("request", base)
-    if request_id != "memreq:pos:v1:" + request_digest[7:]:
+    expected_request = digest("request" if version == 1 else "request_v3", base)
+    if request_id != f"memreq:pos:v{version}:" + request_digest[7:]:
         reject("WRITE_REQUEST_IDENTITY_INVALID")
     if request_digest != expected_request:
         reject("WRITE_REQUEST_REPLAY_CONFLICT")
-    return MemoryWriteRequestV1(CandidateId(candidate), Digest(candidate_digest), Digest(classification), idempotency, RequestId(request_id), Digest(request_digest), operation, _text(value["subject"], 512), purpose, sensitivity, retention_days, _text(value["created_at"], 24), _text(value["expires_at"], 24), prior, receipt, Digest(_text(value["receipt_digest"], 71)), _payload(operation, value["payload"]))
+    constructor = MemoryWriteRequestV1 if version == 1 else MemoryWriteRequestV3
+    return constructor(CandidateId(candidate), Digest(candidate_digest), Digest(classification), idempotency, RequestId(request_id), Digest(request_digest), operation, _text(value["subject"], 512), purpose, sensitivity, retention_days, _text(value["created_at"], 24), _text(value["expires_at"], 24), prior, receipt, Digest(_text(value["receipt_digest"], 71)), _payload(operation, value["payload"], multiline=version == 3))
+
+
+def parse_remember_envelope(raw: bytes) -> MemoryWriteInboxEnvelopeV1 | MemoryWriteInboxEnvelopeV3:
+    """Read original V1 bytes or the new V3 envelope without upgrading either."""
+    if len(raw) > MAX_ENVELOPE_BYTES:
+        reject("WRITE_REQUEST_INVALID")
+    try:
+        loaded = _loads()(raw, object_pairs_hook=_unique_pairs, parse_constant=_invalid_constant)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise WriteRequestRejected("WRITE_REQUEST_INVALID") from exc
+    value = _record(loaded, ENVELOPE_KEYS)
+    if value["schema_version"] == 1:
+        return parse_envelope_bytes(raw)
+    if value["schema_version"] != 3 or value["state"] != "pending":
+        reject("WRITE_REQUEST_INVALID")
+    accepted = _instant(value["accepted_at"])
+    stored = value["request"]
+    if not isinstance(stored, dict) or "schema_version" in stored:
+        reject("WRITE_REQUEST_INVALID")
+    receipt = stored.get("receipt")
+    if not isinstance(receipt, dict) or "schema_version" in receipt:
+        reject("WRITE_REQUEST_INVALID")
+    request = parse_request_v3({"schema_version": 3, **stored,
+                               "receipt": {"schema_version": 1, **receipt}}, accepted)
+    envelope = MemoryWriteInboxEnvelopeV3(3, "pending", str(value["accepted_at"]), request)
+    if canonical_bytes(asdict(envelope)) + b"\n" != raw:
+        reject("WRITE_REQUEST_INVALID")
+    return envelope

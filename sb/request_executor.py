@@ -8,7 +8,7 @@ import hashlib
 import os
 import sqlite3
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol, final
@@ -64,7 +64,8 @@ from sb.task30_barriers import (
     NoopBarrierSink,
     Task30BarrierSink,
 )
-from sb.write_request_values import parse_envelope_bytes
+from sb.write_request_values import digest as write_digest
+from sb.write_request_values import parse_remember_envelope
 
 
 class RequestExecutionError(RuntimeError):
@@ -195,7 +196,9 @@ class RequestExecutor:
         status = self.store.get(lease.request_id)
         if status is None:
             raise RequestExecutionError("REQUEST_NOT_FOUND")
-        suffix = "v2" if status.identity.schema_version == 2 else "v1"
+        if status.identity.schema_version not in (1, 2, 3):
+            raise RequestExecutionError("REQUEST_SCHEMA_UNSUPPORTED")
+        suffix = f"v{status.identity.schema_version}"
         pending = self.config.request_root / "pending" / f"{lease.request_id}.{suffix}.json"
         processing = self.config.request_root / "processing"
         target = processing / f"{lease.request_id}.{lease.fence}.{suffix}.json"
@@ -254,7 +257,7 @@ class RequestExecutor:
         path: Path,
         now: datetime,
     ) -> tuple[RequestLease, Generation, Mapping[str, JsonValue]]:
-        envelope = parse_envelope_bytes(path.read_bytes())
+        envelope = parse_remember_envelope(path.read_bytes())
         request = envelope.request
         if request.operation.value != "remember":
             raise RequestExecutionError("REAPPROVAL_REQUIRED")
@@ -268,6 +271,16 @@ class RequestExecutor:
         status = self.store.get(lease.request_id)
         if status is None:
             raise RequestExecutionError("REQUEST_NOT_FOUND")
+        if (envelope.schema_version != status.identity.schema_version
+                or request.request_id != lease.request_id
+                or request.request_digest != status.identity.request_digest):
+            raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
+        acceptance = strict_loads(status.result_json, 17_408)
+        file_digest = write_digest("file_v3" if envelope.schema_version == 3 else "file", asdict(envelope))
+        if (not is_json_object(acceptance) or envelope.accepted_at != status.accepted_at
+                or acceptance.get("accepted_at") != envelope.accepted_at
+                or acceptance.get("request_file_digest") != file_digest):
+            raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
         resume_id = status.result_generation_id
         parent = (
             self.generations.generation(status.base_generation_id)
@@ -690,7 +703,7 @@ class RequestExecutor:
             if status is None:
                 raise RequestExecutionError("REQUEST_NOT_FOUND")
             claimed_at = status.accepted_at
-            if status.identity.schema_version == 1:
+            if status.identity.schema_version in (1, 3):
                 lease, generation, artifact = self._remember(lease, path, observed)
                 proof_digest = digest("surface", artifact)
                 final_status = self.store.prove(lease, RequestProofSettlement(
@@ -703,7 +716,7 @@ class RequestExecutor:
                     now=observed,
                 ))
                 activated = True
-            else:
+            elif status.identity.schema_version == 2:
                 request = self._parse_v2(path, observed)
                 lease, parent, generation, prior_needles, export_manifest = self._effect(
                     lease, request, observed
@@ -719,6 +732,8 @@ class RequestExecutor:
                     now=observed,
                 ))
                 final_status = self.store.prove(lease, settlement)
+            else:
+                raise RequestExecutionError("REQUEST_SCHEMA_UNSUPPORTED")
             self.barrier("proof_write_fsync")
             path.unlink(missing_ok=True)
             self._fsync(path.parent)

@@ -24,6 +24,13 @@ if (duringCompile && !runtimeCli) throw new Error('--during-compile requires --r
 if (afterDelete && !runtimeCli) throw new Error('--after-delete requires --runtime-cli');
 if (runtimeCli && !ownerConfirmed) throw new Error('--runtime-cli requires --owner-confirmed');
 if (approvalRollback && !ownerConfirmed) throw new Error('--approval-rollback requires --owner-confirmed');
+const plainTextV3 = process.argv.includes('--plain-text-v3');
+if (plainTextV3 && !ownerConfirmed) throw new Error('--plain-text-v3 requires --owner-confirmed');
+const transportProfile = plainTextV3 ? 'remember-schema5' : 'task32-schema4';
+const profileEnv = process.argv.includes('--profile-env');
+if (profileEnv && !plainTextV3) throw new Error('--profile-env requires --plain-text-v3');
+if (profileEnv) process.env.JARVIS_SECOND_BRAIN_CONTRACT_PROFILE = transportProfile;
+const transportSelection = profileEnv ? {} : {contractProfile:transportProfile};
 const recordSet = process.argv.includes('--record-set');
 const recordLimit = process.argv.includes('--record-limit');
 const recordBudget = process.argv.includes('--record-budget');
@@ -62,8 +69,11 @@ try {
     ...(recordSet ? {statement:'공통 기억 첫째\u2028  반복 기억  \u0085\u0085반복 기억\u2029사용자 [^deadbeef] 기록'} : {}),
     ...(recordLimit ? {statement:Array(64).fill('a'.repeat(60)).join('\u2028')} : {}),
     ...(sensitive ? {sensitivity:'sensitive'} : {}),
+    ...(plainTextV3 ? {schema_version:2,body_profile:'plain-text-v1',statement:recordLimit
+      ? Array(64).fill('a'.repeat(60)).join('\n')
+      : ' \n공통 기억 첫째\t내용\r\n\r\n  반복 기억  \r반복 기억\n사용자 [^deadbeef] 기록\n'} : {}),
   }, approvalRollback, candidateIntake) : await outboxFixture();
-  transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
+  transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml'),...transportSelection});
   const deleted = afterDelete ? await prepareReadFenceDeletion({load,fixture,transport,provider,now:OUTBOX_NOW}) : undefined;
   const readFence = afterDelete ? createProductionMemoryReadFence(fixture.database.authority) : undefined;
   const budgetProfile = recordBudget ? 'record-set-v1' : 'interactive';
@@ -75,7 +85,7 @@ try {
   const spoolRoots = {candidate_dispatch_spool_root:join(fixture.database.root,'candidate-dispatch'),
     candidate_review_spool_root:join(fixture.database.root,'candidate-review')};
   const cliDependencies = {clock:()=>OUTBOX_NOW,memoryOutboxOptions:{...spoolRoots,
-    transport_options:{launcherPath:launcher,configPath:join(root,'config.toml')}}};
+    transport_options:{launcherPath:launcher,configPath:join(root,'config.toml'),...transportSelection}}};
   const cli = args => execute([...args,'--db',fixture.database.path],cliDependencies);
   const content = fixture.request.payload.content;
   const expectation = memoryRememberArtifact(fixture.request);
@@ -127,7 +137,7 @@ try {
     : await service.reconcileOnce('real-provider-worker',1);
   const reused = await reader.readPage(expected.page_id);
   const recent = await reader.recentChanges(1);
-  secondTransport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
+  secondTransport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml'),...transportSelection});
   const secondReader = createSecondBrainReadAdapter({transport:secondTransport,contract_profile:'schema4',budget_profile:budgetProfile,clock:()=>OUTBOX_NOW,
     budgets:readBudgets,read_fence:readFence,
     max_age_ms:86400000,expiry_ms:172800000});
@@ -163,6 +173,8 @@ try {
     } finally { dashboard.close(); }
   }
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
+    request_schema:fixture.request.schema_version,plain_text_v3:plainTextV3,
+    contract_selection:profileEnv ? 'environment' : 'explicit_option',
     candidate_intake:candidateIntake,dashboard_stored:dashboardStored,
     runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,after_delete:deleted?.result ?? null,
     during_compile:duringCompile,compile_read_ms:compileReadMs,compile_completed:compiled?.event ?? null,

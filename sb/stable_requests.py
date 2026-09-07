@@ -1,4 +1,4 @@
-"""Stable Task 29 V1 queue compatibility and one-time legacy import."""
+"""Stable V1/V3 remember publication, replay and original acceptance recovery."""
 
 from __future__ import annotations
 
@@ -17,7 +17,18 @@ from sb.contracts import (
     MemoryWriteResultV1,
     WriteOperation,
 )
-from sb.effect_values import canonical_bytes, format_instant, is_json_object, strict_loads
+from sb.effect_values import (
+    canonical_bytes,
+    format_instant,
+    is_json_object,
+    parse_instant,
+    strict_loads,
+)
+from sb.remember_contracts import (
+    MemoryWriteInboxEnvelopeV3,
+    MemoryWriteRequestV3,
+    MemoryWriteResultV3,
+)
 from sb.request_store import ReplayConflict, RequestIdentity, RequestStore
 from sb.task30_barriers import (
     BarrierContext,
@@ -25,7 +36,14 @@ from sb.task30_barriers import (
     NoopBarrierSink,
     Task30BarrierSink,
 )
-from sb.write_request_values import JsonValue, digest, parse_request
+from sb.write_request_values import (
+    MAX_ENVELOPE_BYTES,
+    JsonValue,
+    digest,
+    parse_remember_envelope,
+    parse_request,
+    parse_request_v3,
+)
 
 
 class StableRequestError(ValueError):
@@ -34,7 +52,7 @@ class StableRequestError(ValueError):
 
 def _identity(request: MemoryWriteRequestV1) -> RequestIdentity:
     return RequestIdentity(
-        schema_version=1,
+        schema_version=3 if isinstance(request, MemoryWriteRequestV3) else 1,
         request_id=str(request.request_id),
         request_digest=str(request.request_digest),
         envelope_digest=None,
@@ -56,7 +74,7 @@ def _identity(request: MemoryWriteRequestV1) -> RequestIdentity:
 
 def request_value(request: MemoryWriteRequestV1) -> dict[str, JsonValue]:
     value: dict[str, JsonValue] = asdict(request)
-    value["schema_version"] = 1
+    value["schema_version"] = 3 if isinstance(request, MemoryWriteRequestV3) else 1
     receipt = value.get("receipt")
     if isinstance(receipt, dict):
         value["receipt"] = {"schema_version": 1, **receipt}
@@ -68,7 +86,14 @@ def _result(
     accepted_at: str,
     request_file_digest: str,
     replayed: bool,
-) -> MemoryWriteResultV1:
+) -> MemoryWriteResultV1 | MemoryWriteResultV3:
+    values = (
+        "accepted", "pending", request.candidate_id, request.request_id,
+        request.request_digest, request.idempotency_key, request.operation, accepted_at,
+        f"inbox/.requests/pending/{request.request_id}.json", Digest(request_file_digest), replayed,
+    )
+    if isinstance(request, MemoryWriteRequestV3):
+        return MemoryWriteResultV3(3, *values)
     return MemoryWriteResultV1(
         schema_version=1,
         kind="accepted",
@@ -101,7 +126,39 @@ class _PendingPublication:
     emitter: BoundBarrierEmitter
 
 
-def _publish(directory: Path, publication: _PendingPublication) -> None:
+def _recover_publication(path: Path, expected: bytes, *, links: int = 1) -> bytes:
+    """Adopt only an exact earlier request, retaining its original acceptance."""
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    try:
+        before = os.fstat(fd)
+        if not safe_request_file(before, links) or before.st_size > MAX_ENVELOPE_BYTES:
+            raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+        payload = bytearray()
+        while len(payload) <= MAX_ENVELOPE_BYTES:
+            block = os.read(fd, MAX_ENVELOPE_BYTES + 1 - len(payload))
+            if not block:
+                break
+            payload.extend(block)
+        after = os.fstat(fd)
+        visible = path.stat(follow_symlinks=False)
+        if (not safe_request_file(after, links) or not safe_request_file(visible, links)
+                or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+                != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+                or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+                != (visible.st_dev, visible.st_ino, visible.st_size, visible.st_mtime_ns, visible.st_ctime_ns)
+                or len(payload) > MAX_ENVELOPE_BYTES):
+            raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+        original = parse_remember_envelope(bytes(payload))
+        current = parse_remember_envelope(expected)
+        if (original.request != current.request or original.schema_version != current.schema_version
+                or parse_instant(original.accepted_at) > parse_instant(current.accepted_at)):
+            raise StableRequestError("WRITE_REQUEST_REPLAY_CONFLICT")
+        return bytes(payload)
+    finally:
+        os.close(fd)
+
+
+def _publish(directory: Path, publication: _PendingPublication) -> bytes:
     name = publication.name
     payload = publication.payload
     directory_fd = os.open(
@@ -116,16 +173,25 @@ def _publish(directory: Path, publication: _PendingPublication) -> None:
         if len(owned_temps) > 1:
             raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
         if (directory / name).exists():
+            final_meta = (directory / name).stat(follow_symlinks=False)
+            linked = final_meta.st_nlink == 2 and len(owned_temps) == 1
+            if linked:
+                if not owned_temps:
+                    raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+                temp_meta = owned_temps[0].stat(follow_symlinks=False)
+                if (temp_meta.st_dev, temp_meta.st_ino) != (final_meta.st_dev, final_meta.st_ino):
+                    raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+            links = 2 if linked else 1
+            payload = _recover_publication(directory / name, payload, links=links)
             for candidate in owned_temps:
-                if not safe_request_file(candidate.stat(follow_symlinks=False)) or candidate.read_bytes() != payload:
+                if _recover_publication(candidate, payload, links=links) != payload:
                     raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
                 candidate.unlink()
                 os.fsync(directory_fd)
-            return
+            return payload
         if owned_temps:
             candidate = owned_temps[0]
-            if not safe_request_file(candidate.stat(follow_symlinks=False)) or candidate.read_bytes() != payload:
-                raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+            payload = _recover_publication(candidate, payload)
             temporary = candidate.name
             file_fd = os.open(
                 temporary,
@@ -162,8 +228,9 @@ def _publish(directory: Path, publication: _PendingPublication) -> None:
         os.unlink(temporary, dir_fd=directory_fd)
         os.fsync(directory_fd)
         publication.emitter.emit("pending_publish_fsync")
+        return payload
     except FileExistsError:
-        return
+        return _recover_publication(directory / name, payload)
     finally:
         if file_fd is not None:
             os.close(file_fd)
@@ -182,11 +249,37 @@ def accept_stable_v1_request(
     barrier_sink: Task30BarrierSink | None = None,
 ) -> MemoryWriteResultV1:
     request = parse_request(value, now)
+    result = _accept_stable_remember(request_root, request, now, barrier_sink)
+    assert isinstance(result, MemoryWriteResultV1)
+    return result
+
+
+def accept_stable_v3_request(
+    request_root: Path,
+    value: JsonValue,
+    now: datetime,
+    barrier_sink: Task30BarrierSink | None = None,
+) -> MemoryWriteResultV3:
+    request = parse_request_v3(value, now)
+    result = _accept_stable_remember(request_root, request, now, barrier_sink)
+    assert isinstance(result, MemoryWriteResultV3)
+    return result
+
+
+def _accept_stable_remember(
+    request_root: Path,
+    request: MemoryWriteRequestV1,
+    now: datetime,
+    barrier_sink: Task30BarrierSink | None,
+) -> MemoryWriteResultV1 | MemoryWriteResultV3:
     if request.operation is not WriteOperation.REMEMBER:
         raise StableRequestError("REAPPROVAL_REQUIRED")
     stamp = format_instant(now)
-    envelope = asdict(MemoryWriteInboxEnvelopeV1(1, "pending", stamp, request))
-    file_digest = digest("file", envelope)
+    version = 3 if isinstance(request, MemoryWriteRequestV3) else 1
+    envelope = asdict(MemoryWriteInboxEnvelopeV3(3, "pending", stamp, request)) if isinstance(
+        request, MemoryWriteRequestV3
+    ) else asdict(MemoryWriteInboxEnvelopeV1(1, "pending", stamp, request))
+    file_digest = digest("file_v3" if version == 3 else "file", envelope)
     result = _result(request, stamp, file_digest, False)
     store = RequestStore(request_root)
     try:
@@ -202,8 +295,8 @@ def accept_stable_v1_request(
                 raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
             return _result(request, accepted_value, digest_value, True)
         payload = canonical_bytes(envelope) + b"\n"
-        final = store.pending / f"{request.request_id}.v1.json"
-        _publish(
+        final = store.pending / f"{request.request_id}.v{version}.json"
+        payload = _publish(
             store.pending,
             _PendingPublication(
                 final.name,
@@ -217,7 +310,11 @@ def accept_stable_v1_request(
         metadata = final.stat(follow_symlinks=False)
         if not safe_request_file(metadata) or final.read_bytes() != payload:
             raise StableRequestError("WRITE_REQUEST_REPLAY_CONFLICT")
-        status, replayed = store.accept(identity, asdict(result), now)
+        published = parse_remember_envelope(payload)
+        stamp = published.accepted_at
+        file_digest = digest("file_v3" if version == 3 else "file", asdict(published))
+        result = _result(request, stamp, file_digest, False)
+        status, replayed = store.accept(identity, asdict(result), parse_instant(stamp))
         if replayed:
             loaded = strict_loads(status.result_json, 17_408)
             if not is_json_object(loaded):

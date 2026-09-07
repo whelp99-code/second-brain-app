@@ -17,6 +17,10 @@ export async function ownerMemoryFixture(load, now, options = {}, rollback = fal
     const review = join(database.root,'candidate-review');
     const dispatchRoot = join(database.root,'candidate-dispatch');
     const input = inferredMemoryInput(options);
+    if (options.schema_version === 2) {
+      input.schema_version = 2;
+      input.body_profile = options.body_profile;
+    }
     for (const ref of input.source.references) {
       ref.observed_at = now.toISOString();
       ref.fresh_until = new Date(now.getTime()+3600000).toISOString();

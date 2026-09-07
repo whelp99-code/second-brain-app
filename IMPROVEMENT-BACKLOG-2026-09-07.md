@@ -230,3 +230,11 @@ mtime만으로 backup을 정상 판정하지 않는다. 격리 복원 검증 rec
 [인계 병합 후 상세 분석](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md)에 수정·개선·고도화 14개 실행 묶음을 기존 ID로 정리했다. 추가 재현: 일반 LF/CR은 후보/요청/접수에서 거부되며, 선행 BOM/NEL에서 Python과 JS 판정이 반대다. 후보 본문 검사를 통과해도 저장 record 수/이스케이프 후 크기 제한에 걸리는 사례가 있다.
 
 실제 두 언어의 검증기와 isolated stable 접수 12개 대조, 수락 4개 정확 재시도·원문 불변, 거부 8개 요청 파일/DB 미생성을 확인했다. 본문 기능 수정·새 버전 도입은 아직 아니다. 후보 원문부터 승인·요청/재시도·원장 migration·처리·복원·완료 검증까지 함께 바꾸며, 기존 V1/기존 V2 effect 계약 우회는 보류한다.
+
+## 17. I1-d 구현 — 명시적 일반 텍스트 V3
+
+16절의 신규 계약을 구현했다. 새 후보 입력 schema2/plain-text-v1을 review/dispatch·권한·provider request3·MCP schema5에 결합하고, 기존 V1/V2와 frozen schema4는 유지한다. 일반 LF/CRLF/CR/탭·공백·반복·footnote의 전체 원문과 결과를 대응한다. 같은 원문/출처의 프로필 변경 중복도 차단했다.
+
+함께 발견한 접수 orphan의 시간 변경 충돌을 원래 파일·시각/digest 채택으로 복구하고, 실행 전 원장 접수 digest와 전체 envelope를 대조한다. 두 원장의 migration은 기존 데이터·FK·제약을 보존한다. 전체 Python 621 passed/2 skipped, 실제 CLI/MCP에서 혼합 4개 및 일반 LF 64개 sensitive record·두 클라이언트·명령 완료·stored=true, 삭제 이후/rollback/컴파일 중 조회를 검증했다. [정확한 검사 결과·시간 초과 재검·설정·한계](REMEMBER-V3-ACCEPTANCE-2026-09-08.md).
+
+일반 여러 줄의 소스/격리 인수는 완료이며 운영 활성화는 아니다. I8 추가: 기존 자비스 권한 만료 경계 테스트가 9개 DB 생성 시나리오를 하나의 5초 검사로 묶어 부하 중 timeout을 냈다. 동일 조건 단독 재검은 통과했으며 후속으로 같은 시나리오를 개별 테스트로 분리해 원인을 명확히 표시한다. 정정 UI·실제 앱/범위·context pack·원본 차단 전파·운영 복원/부하/검색 품질은 유지한다.

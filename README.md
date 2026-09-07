@@ -131,6 +131,8 @@ failure_window_hours = 48
 
 ## MCP
 
+자비스의 일반 여러 줄 기억은 명시적 `remember-schema5` 계약과 V3 요청을 사용한다. 기존 프로필은 유지한다. 새 후보 입력·`JARVIS_SECOND_BRAIN_CONTRACT_PROFILE` 설정·실제 검증과 운영 미배포 범위는 [V3 인수 보고서](REMEMBER-V3-ACCEPTANCE-2026-09-08.md)를 따른다.
+
 도구:
 
 ```text
