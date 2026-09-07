@@ -10,6 +10,8 @@ import {ownerMemoryFixture} from './jarvis-owner-memory-fixture.mjs';
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jarvis = resolve(process.argv[2] ?? join(sb, '../Orca-JARVIS'));
 const ownerConfirmed = process.argv.includes('--owner-confirmed');
+const approvalRollback = process.argv.includes('--approval-rollback');
+if (approvalRollback && !ownerConfirmed) throw new Error('--approval-rollback requires --owner-confirmed');
 const recordSet = process.argv.includes('--record-set');
 const recordLimit = process.argv.includes('--record-limit');
 const recordBudget = process.argv.includes('--record-budget');
@@ -44,7 +46,7 @@ try {
     ...(recordSet ? {statement:'공통 기억 첫째\u2028  반복 기억  \u0085\u0085반복 기억\u2029사용자 [^deadbeef] 기록'} : {}),
     ...(recordLimit ? {statement:Array(64).fill('a'.repeat(60)).join('\u2028')} : {}),
     ...(sensitive ? {sensitivity:'sensitive'} : {}),
-  }) : await outboxFixture();
+  }, approvalRollback) : await outboxFixture();
   transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
   const budgetProfile = recordBudget ? 'record-set-v1' : 'interactive';
   const readBudgets = {max_hits:10,max_excerpt_bytes:4096,max_page_bytes:262144,max_total_bytes:recordBudget ? 262144 : 65536};
@@ -100,6 +102,7 @@ try {
   const terminalReplay = service.get(queued.outbox_id)?.state === 'settled' ? service.enqueue(claimed) : undefined;
   const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
+    approval_rollback_recovered:approvalRollback,
     record_set:recordSet,record_limit:recordLimit,budget_profile:budgetProfile,sensitive,initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
     provider_status:status.value?.state,reconciled,outbox:service.get(queued.outbox_id)?.state,
     reused:reused.kind,reuse_code:reused.code,evidence_count:reused.evidence?.length,

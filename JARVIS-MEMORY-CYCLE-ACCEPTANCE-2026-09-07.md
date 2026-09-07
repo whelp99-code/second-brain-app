@@ -57,7 +57,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS
 | ID / 우선순위 | 확인된 문제 | 수정·완료 기준 |
 |---|---|---|
 | I1-a / P0 | 운영 src에서 MemoryOutboxService 생성이 없고 dashboard/CLI executor는 outbox에 undefined를 전달 | 기존 transport·권한·fence를 사용하는 outbox를 실제 진입점에 구성하고 승인된 요청의 실행을 확인 |
-| I1-b / P0 | 원문 수명·owner-confirmed remember의 권한 연결은 소스 수정 및 실제 프로세스 순환 통과 | 자비스 64b255b/d553327. 바깥 DB rollback 후 metadata 재승인 복구, 운영 정리/layout 연결은 남음 |
+| I1-b / P0 | 원문 수명·owner-confirmed 권한 및 바깥 rollback 후 새 receipt 재승인 복구 소스 검증 통과 | 자비스 64b255b/d553327/316b8f2. 운영 정리/layout·배포 연결은 남음 |
 | I1-c / P1 | c7c5182에서 영속 publication/권한 기반 selector 구성기 구현·격리 실제 순환 통과 | runtime/UI 명령 staging 호출에 연결. 사용자에게 내부 hash 계산을 요구하지 않음 |
 | I1-d / P1 | c7c5182의 전체 record 대응과 provider 민감도·입력 한도 보강으로 64개 격리 순환 통과 | 일반 LF 본문 계약은 여전히 미완료. 완료 reader의 record-set-v1 예산을 운영에 명시 주입 |
 | I1-e / P1 | provider 비동기 완료 이후 outbox reconciliation의 운영 호출이 없음 | 기존 주기적 진입점에 연결. 접수만으로 완료 표시하지 않고 재시작·중복·uncertain을 검증 |
@@ -110,3 +110,26 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 기존 V1 memory.confirm 서명 args에는 correction target/prior가 없고, attempt의 expected_prior_json은 변경 방지된 정본이 아니다. 이 열만 비교하면 승인 이후 다른 prior에 같은 owner 서명을 적용할 수 있다는 독립 검토 결과가 있었다. 따라서 신규 owner-confirmed 권한 경로는 **remember만 허용**한다. correct는 기존 V2 target/delegation 계약에 연결하는 방식으로 완성해야 한다. 단순 비교로 V1을 열거나 기존 서명을 새 대상으로 재해시하지 않는다.
 
 재개 기준: immutable target version/membership와 정정 prior가 승인·provider 요청에 결합되고, 승인 후 대상 변경을 주입한 거부 검사 및 실제 정정·재조회가 통과할 것. 바깥 rollback의 dispatch metadata 잔여물 재승인 복구와 I1-a/c/d/e는 계속 남아 있다.
+
+## 2026-09-08 후속 — 승인 rollback 뒤 새 receipt 재승인 복구
+
+자비스 `316b8f2`에서 앞 절의 I1-b metadata 잔여물 문제를 수정했다. 실제 ControlPlane 승인 뒤 event insert를 실패시키거나 호출자 바깥 transaction을 rollback하면, SQLite는 pending으로 돌아가지만 파일 발행은 남았다. 수정 전 두 경로 모두 새 receipt 승인 시 `MEMORY_DISPATCH_REPLAY_CONFLICT`로 실패했다.
+
+복구는 ControlPlane receipt INSERT가 SQLite writer lock을 얻은 뒤, candidate owner decision을 쓰기 전에 수행한다. 동일 후보 파일의 digest를 검사하고 DB에 기존 receipt·owner decision·dispatch publication·outbox가 하나도 없을 때만 재발행 대상이 될 수 있다. 후보가 awaiting_confirmation이고 기존 파일의 후보·분류·내용·review digest·operation이 원문과 일치해야 한다. 같은 receipt의 재시도는 기존 파일의 정확한 digest 비교를 그대로 사용한다. 영속 publication이 있거나 내용이 달라진/손상된 파일은 삭제하지 않는다.
+
+이 변경은 서명이나 권한을 새로 발급하지 않는다. 유효한 새 승인이 기존 ControlPlane을 통과해야 한다. 이미 확정된 요청을 변경하거나 재전송하는 복구도 아니다. 파일 삭제 직후 다시 중단되더라도 승인 DB는 확정되지 않고 review 원문은 남아 다음 재시도에서 다시 발행할 수 있다.
+
+검증:
+
+- 변경 전 재현: **2 failed / 7 passed**, 두 실패 모두 dispatch replay conflict. `/var/tmp/jarvis-dispatch-rollback-before.log`.
+- 변경 후 승인 경로 **13 passed**, 관련 최종 회귀 **92 passed / 35 files (40.47초)**. `/var/tmp/jarvis-dispatch-rollback-final-tests.log`. 처음 넓은 검색에서 발견한 `.runtime-tmp` 복제본은 최종 실행에서 명시 제외했다. 그 실행 결과는 집계하지 않는다.
+- 변경 ESLint·backend build·Node 구문·diff 검사 통과, 독립 읽기 전용 검토에서 추가 actionable 결함 없음. Python 소스는 변경하지 않아 전체 Python suite를 재실행하지 않았다.
+- 격리 실제 MCP: 승인 바깥 rollback→새 receipt 승인→민감 기억 64개 provider proved→outbox settled→두 MCP 클라이언트 current. provider replayed=true, 재apply idle, 추가 dispatch 0, terminal 재확인 settled, review 파일 0, cleanup 오류 없음. `/var/tmp/sb-jarvis-approval-rollback-acceptance.log`.
+
+```bash
+TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner-confirmed --approval-rollback --record-limit --record-budget --sensitive
+```
+
+합성 owner 승인·격리 DB와 실제 별도 provider 프로세스를 이용한 검증이다. 운영 사용자 승인·현실 업무 성공·실제 Codex/Claude 앱 공유는 검증하지 않았다. 운영 서비스는 재시작/배포하지 않았다.
+
+다음 I1-a/c/e 연결 지점은 현재 소스에서 다시 확인했다. `src/dashboard/memory-production.ts`의 기본 executorFactory와 `src/cli-control-commands.ts`는 outbox를 주입하지 않으며, dashboard의 memory-runtime은 읽기·mutation staging만 구성한다. 따라서 이번 복구만으로 운영 자동 저장이 활성화되지는 않는다. 완료 reader의 record-set-v1 예산과 spool root를 공유하는 outbox를 기존 executor/주기 실행에 연결하고, 실제 진입점 기반 검증을 이어간다.

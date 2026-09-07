@@ -1,7 +1,8 @@
 // Synthetic owner approval in a fresh JARVIS authority DB; never production authority.
 import {join} from 'node:path';
+import assert from 'node:assert/strict';
 
-export async function ownerMemoryFixture(load, now, options = {}) {
+export async function ownerMemoryFixture(load, now, options = {}, rollback = false) {
   const {memoryDatabase, closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.js');
   const {inferredMemoryInput, memoryPolicy} = await load('tests/fixtures/memory-candidate-fixture.js');
   const {localKey} = await load('tests/helpers.js');
@@ -30,12 +31,26 @@ export async function ownerMemoryFixture(load, now, options = {}) {
     const command = mutation.stageCandidateDecision({candidate_id:candidate.candidate_id,
       operation:'remember',decision:'confirm',intent_id:`memui:intent:v1:${'1'.repeat(64)}`});
     if (!command) throw new Error('owner confirmation was not staged');
-    new ControlPlane(database.authority).decide(signCommandApproval({schema_version:1,
+    const approval = {schema_version:1,
       receipt_id:'isolated-owner-confirmation',request_id:command.request_id,decision:'approve',
       command_digest:command.command_digest,signer_principal_id:'principal:owner',
       authenticated_session_id:'isolated-owner-acceptance',key_id:'decision-test',algorithm:'Ed25519',
       issued_at:now.toISOString(),not_before:now.toISOString(),expires_at:command.expires_at,
-      nonce:'isolated-owner-confirmation',max_uses:1,status:'issued'},localKey(database.authority)),now);
+      nonce:'isolated-owner-confirmation',max_uses:1,status:'issued'};
+    if (rollback) {
+      assert.throws(() => database.authority.db.transaction(() => {
+        new ControlPlane(database.authority).decide(signCommandApproval(approval,localKey(database.authority)),now);
+        throw new Error('isolated approval rollback');
+      })(), /isolated approval rollback/);
+      assert.equal(new MemoryCandidateDispatchSpool(dispatchRoot).read(candidate.candidate_id).control_receipt_id,
+        approval.receipt_id);
+      assert.equal(database.authority.db.prepare('SELECT 1 FROM memory_candidate_dispatch_publications').get(),undefined);
+      assert.equal(database.authority.db.prepare('SELECT 1 FROM control_command_receipts WHERE receipt_id=?')
+        .get(approval.receipt_id),undefined);
+      approval.receipt_id = 'isolated-owner-retry';
+      approval.nonce = 'isolated-owner-retry';
+    }
+    new ControlPlane(database.authority).decide(signCommandApproval(approval,localKey(database.authority)),now);
     const dispatch = new MemoryCandidateDispatchSpool(dispatchRoot).read(candidate.candidate_id);
     const request = resolveSpooledDispatch({candidate_id:candidate.candidate_id,
       dispatch_spool_digest:dispatch.dispatch_spool_digest,roots:{review,dispatch:dispatchRoot},now});

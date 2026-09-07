@@ -60,7 +60,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 ## 다음 완료 조건
 
 1. I1-a/c/e: 실제 runtime에서 outbox·완료 reader·명령 구성기를 연결하고 기존 주기적 실행으로 비동기 완료/정리 오류를 관측한다.
-2. I1-b: 승인 바깥 SQL rollback으로 남은 dispatch metadata가 재승인을 막지 않는 복구를 검증한다.
+2. I1-b 후속: 자비스 `316b8f2`에서 승인 바깥 SQL rollback metadata 복구를 구현하고 새 receipt·실제 MCP 순환을 검증했다. 운영 반영은 남아 있으며 상세는 순환 인수 보고서의 마지막 절을 따른다.
 3. I1-d: 일반 LF 본문 계약을 양쪽에 명시적으로 추가하고 전체 원문 승인·저장·재조회까지 검사한다.
 4. 기존 V2 target/delegation으로 정정·재조회를 연결한다. V1 owner-confirmed correct의 승인 범위 부족을 우회하지 않는다.
 5. 실제 서로 다른 에이전트 앱, 프로젝트 범위 거부, 세션별 문맥 전달, 운영 release 전환·복구를 순서대로 검증한다. B3/B5~B8 잔여 범위는 구현 원장에 유지한다.
