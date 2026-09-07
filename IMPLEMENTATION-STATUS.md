@@ -9,7 +9,7 @@
 | B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 완료 | 4da09b9; 520 passed, 2 skipped; Ruff·diff check 통과 |
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
-| B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
+| B3 | R6/I3 reader 복구·읽기 가용성 | 복구·LLM 준비 중 동시 조회 소스 검증, 운영 부하/잔여물 미완료 | 실제 reader/writer 강제 종료·PID 재사용·전환 정리, 두 writer·MCP/자비스 동시 조회 확인. 대표 p95·기존 잔여물 인수 남음 |
 | B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | CLI/dashboard·명령 완료·기본 signed fence 소스 검증, 운영 전체 인수 미완료 | 삭제 후 64개 record·rollback·CLI cycle settled와 control completed. 운영 구성·후보/UI 전체 흐름·일반 LF·실제 앱·범위 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
@@ -147,3 +147,13 @@ I1-b의 이 소스 결함은 수정됐다. 운영 실행기 outbox 주입과 주
 기본 CLI/dashboard가 기존 자비스 등록 키·provider identity·현재 DB 삭제 원장으로 read fence를 생성하도록 연결했다. 키 만료/철회는 매 조회 확인하고 DB별 outbox를 분리한다. 실제 삭제에서 발견한 SB 빈 `sources: []` 공개 응답도 기존 scalar로 정규화했다. frozen 계약과 승인 구조는 유지한다.
 
 자비스 관련 회귀 **149 passed / 26 files**, Python 공개 응답·MCP 계약·삭제/복원 **18 passed**, backend build·lint·독립 검토 통과. 격리 실제 MCP에서 삭제 proved/sequence 1, 무서명·과거 fence 거부, 삭제 record 0, 이후 민감 record 64개 저장→control completed→두 클라이언트 회수 성공. 상세 설정과 증거는 [삭제 이후 조회 보고서](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md). 운영 구성·배포, 실제 후보/UI·앱별 수집/주입·접근 범위, 일반 LF/V2 정정, B3/B5~B8은 남는다.
+
+### B3 진행 — LLM 준비 중 조회와 writer/삭제 경계
+
+세대 writer 전용 mutex를 유지한 채 sealed 부모에서 successor를 준비하는 구간만 reader와 공유한다. 전환/폐기 전에는 EX로 복구하고 실제 부모와 삭제 원장을 다시 검사한다. MCP 조회가 유지보수의 writer 잠금에 재차 막히던 경로도 idle 조건의 정리로 바꿨다. 만료 export 상태는 cleanup이 미뤄져도 available로 서명하지 않는다.
+
+별도 pipeline process를 준비 중 유지한 상태에서 실제 stdio MCP 검색·페이지·상태 조회, 두 writer의 순서/내용 보존, reader pin 보호, writer kill 복구, 삭제 접수 시 오래된 조회/전환 거부를 검증했다. 실제 자비스 CLI 완료 cycle과 두 MCP 클라이언트의 64개 민감 record 회수는 약 **1.394초**, control completed/outbox settled, 추가 dispatch 0, cleanup/control 오류 없음이었다. `/var/tmp/sb-jarvis-concurrent-compile-verified-acceptance.log`.
+
+검증 중 발견한 첫 기억→export의 필수 log 누락도 Vault 초기화로 수정하고 raw/.sb의 Git 제외를 seal 경계에서 보장했다. 기존 제외 취소 규칙보다 강제 규칙을 뒤에 배치하며 CAS 원문은 보존한다. 최종 전체 **564 passed / 2 skipped, 138.84초**, 독립 검토 지적 두 건 수정 후 추가 actionable 없음, 변경 타입 오류/경고 0, 전체 Ruff·하네스 구문 검사 통과. 세부 한계는 [갱신 중 조회 보고서](GENERATION-READ-CONCURRENCY-2026-09-08.md).
+
+운영 p95·부하 인수, 과거 `.staging`/미활성 세대의 원장 기반 복구는 남는다. 임시 디렉터리 일괄 삭제를 보류했고 자비스 signed export status 소비 미구현도 I1 후속으로 기록했다. 운영 서비스·release/active generation·push는 변경하지 않았다.

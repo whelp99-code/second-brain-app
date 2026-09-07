@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import final
@@ -11,6 +12,7 @@ from uuid import uuid4
 
 from sb.config import Config
 from sb.exports import ExportPublisher
+from sb.generation_locks import GenerationWriterBusy
 from sb.generation_runtime_models import (
     GenerationActivation,
     GenerationAuthority,
@@ -98,10 +100,25 @@ class GenerationMutationService:
 
     def maintain(self, now: datetime) -> MaintenanceResult:
         with self.store.exclusive():
-            parent, _legacy = self._current_or_legacy()
-            if parent is not None:
-                self.store.activate(parent, None, now, lock_held=True)
-            return self.lifecycle.maintain(now)
+            return self._maintain_locked(now)
+
+    def maintain_if_idle(self, now: datetime) -> MaintenanceResult | None:
+        """A read must not wait behind a writer merely to run physical cleanup.
+
+        Writer entry/exit and the maintenance surface still recover disposal.
+        This does not bypass the reader pin, tombstone fence, or export expiry.
+        """
+        try:
+            with self.store.try_exclusive():
+                return self._maintain_locked(now)
+        except GenerationWriterBusy:
+            return None
+
+    def _maintain_locked(self, now: datetime) -> MaintenanceResult:
+        parent, _legacy = self._current_or_legacy()
+        if parent is not None:
+            self.store.activate(parent, None, now, lock_held=True)
+        return self.lifecycle.maintain(now)
 
     @staticmethod
     def _allowed(relative: Path) -> bool:
@@ -184,7 +201,7 @@ class GenerationMutationService:
         return GenerationMutationResult(parent, mutation.recover(parent), predecessor)
 
     def mutate[T](self, mutation: GenerationMutation[T]) -> GenerationMutationResult[T]:
-        with self.store.exclusive():
+        with self.store.writer() as writer:
             _ = self.lifecycle.maintain(mutation.now)
             parent, legacy = self._current_or_legacy()
             target = mutation.authority.result_high_water or self.requests.tombstone_high_water()
@@ -204,7 +221,9 @@ class GenerationMutationService:
                         copy_legacy_content(source, root)
                     copy_pending_inbox(source, root, self.store.state_root)
                     copy_operational_ledger(source, root)
-                    _ = init_vault(root)
+                # Genesis also needs the canonical log and gitignore; otherwise
+                # a first remember cannot pass the required export inventory.
+                _ = init_vault(root)
                 (root / ".sb").mkdir(parents=True, exist_ok=True, mode=0o700)
                 _ = migrate_ledger(root / ".sb" / "ledger.db", backup=False)
                 values.append(mutation.apply(root))
@@ -214,16 +233,26 @@ class GenerationMutationService:
                 remove_provisional_git(root)
                 self._require_authority(parent, mutation.authority, target)
 
-            generation = self.store.build(
-                request_id=mutation.mutation_id,
-                parent=parent,
-                tombstone_sequence=target[0],
-                tombstone_set_root=target[1],
-                created_at=mutation.now.astimezone(UTC),
-                allowed=self._allowed,
-                mutate=staged,
-                barrier=mutation.barrier,
-            )
+            # A sealed parent stays immutable and protected by generation.lock
+            # while the successor is built. Legacy migration still excludes reads.
+            with writer.preparing() if parent is not None else nullcontext():
+                generation = self.store.build(
+                    request_id=mutation.mutation_id,
+                    parent=parent,
+                    tombstone_sequence=target[0],
+                    tombstone_set_root=target[1],
+                    created_at=mutation.now.astimezone(UTC),
+                    allowed=self._allowed,
+                    mutate=staged,
+                    barrier=mutation.barrier,
+                )
+            # flock conversion is not an atomic upgrade. The writer mutex
+            # serializes current writers; reject an out-of-protocol pointer move.
+            current, current_legacy = self._current_or_legacy()
+            if (None if current is None else current.generation_id) != (
+                None if parent is None else parent.generation_id
+            ) or current_legacy != legacy:
+                raise GenerationMutationError("EFFECT_PRIOR_STALE")
             self._require_authority(parent, mutation.authority, target)
             if mutation.hooks is not None:
                 mutation.hooks.sealed(generation)

@@ -96,7 +96,7 @@
 |---|---|---|---|
 | I1 / P1 | 자비스 전체 기억 순환 검증. 이전 테스트는 transport·fixture·개별 saga 증거이며 실제 업무 소비까지는 부족하다. | JARVIS 완료 사건 → candidate → outbox → provider → settled → read adapter → 재사용을 연결한 시나리오를 마련한다. 기존 권한 구조를 사용한다. | 유효 기록 1건이 끝까지 연결되고 중복·timeout·재시작에서도 원인과 최종 상태가 추적됨. |
 | I2 / P1 | 파일 복원과 서버 재가동을 포함한 재해 복구는 다르다. | 키·설정·provider identity·원장·tombstone·활성 포인터를 묶은 새 호스트 복구 절차를 자동 검증한다. | 새 디렉터리뿐 아니라 깨끗한 런타임에서 읽기·쓰기 재개. 삭제한 기억의 부활 0건. 실제 RPO/RTO 기록. |
-| I3 / P1 | 갱신 중 장시간 읽기 잠금. mutation 전체가 exclusive이며 자비스 read deadline은 10초다. | 준비·LLM 처리와 활성 전환의 잠금 범위를 분리한다. 이전 세대 reader 수명과 삭제 정책을 함께 설계한다. | 대표 데이터에서 갱신 중에도 자비스 deadline 내 응답. 목표 p95 2초, timeout 0을 제안하되 실측으로 확정. |
+| I3 / P1 | 갱신 중 읽기 차단 소스 수정·격리 실측 완료, 운영 부하 인수 남음. | writer mutex와 generation SH/EX 분리, 조회 유지보수 nonblocking, pin·삭제 재검증. [상세 검증](GENERATION-READ-CONCURRENCY-2026-09-08.md). | 격리 실제 자비스 완료 확인·두 클라이언트 조회 약 1.38초. 대표 데이터 p95 2초·timeout 0 목표는 별도 측정. |
 | I4 / P1 | 배포 준비 이후 설정·symlink·systemd 활성화는 수작업이며 코드/설정 조합의 회귀 위험이 있다. | 검증된 wheel·잠금 의존성·비밀이 아닌 설정 템플릿·서비스 자산·contract digest·검증 결과를 release manifest로 묶는다. prepare/verify/activate/rollback을 구분한다. | 다른 호스트에서 재현 설치. 중간 실패 때 이전 실행 환경 복구. dirty 소스를 커밋 릴리스로 표기하지 않음. |
 | I5 / P1 | 부하·증가량·반복 운영 근거가 부족하다. 세대 변경 시 원본을 다시 복사하고 백업도 큰 잠금을 유지한다. | CAPACITY-PLAN의 5천 파일·10만 unit·1만 page·100회 실행을 실제 managed generation 경로에서 측정한다. 이후 증분 처리·복사량·백업 잠금을 최적화한다. | 데이터 보존·정합성·검색 지연·디스크 증가·복원 시간 보고. 단순 hardlink는 현재 nlink=1·삭제 계약과 충돌하므로 금지. |
 | I6 / P1 | 지표는 존재하나 처리 정체·오류·용량을 운영자가 즉시 판단하기 어렵다. | 접수→수집→편집→회수 지연, oldest pending, 현재 실패와 과거 실패, 검증된 백업 나이·가용 공간을 분리한다. 백업 보존기간과 외부 사본 정책을 명시한다. | 실패 원인과 재처리 대상을 한 화면/명령에서 파악. 중요 상태 변화만 알림. 복원 증거 없는 오래된 백업을 임의로 삭제하지 않음. |
@@ -196,3 +196,11 @@ OSS 인계의 작은 공통 기억 순환을 우선 완성하는 변경이다. �
 기본 signed fence 구성을 CLI/dashboard/완료 reader에 연결하고, 실제 삭제로 드러난 빈 출처 목록의 공개 응답 결함을 수정했다. 삭제된 record 0개와 이후 새 sensitive record 64개의 저장 완료·두 MCP 클라이언트 재사용을 실측했다. 자비스 회귀 149개, Python 계약·삭제/복원 회귀 18개 통과. [변경·설정·검증과 남은 실행 목록](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md).
 
 기본 서명 **소스 연결**은 완료, 운영 키 구성·release 인수는 남는다. 추가 검증 개선: 최근 변경 목록 `current`만 확인하면 빈 목록도 통과한다. 고정 테스트 시각과 Git `--since` host 시각을 일치시키고 expected page/record를 확인해야 한다. 이번 실제 저장 성공은 최근 목록 상태 대신 원문 페이지와 전체 record 대응으로 판정했다.
+
+## 13. I3 후속 — 갱신 중 실제 기억 조회
+
+writer mutex로 모든 generation writer를 직렬화하면서 sealed 부모에서 준비하는 동안 reader를 허용한다. MCP 조회의 유지보수도 busy 상태에서 기다리지 않게 했다. 실제 자비스 완료 cycle과 두 클라이언트의 64개 민감 record 회수를 컴파일 진행 중 약 1.4초에 검증했다. reader pin, writer kill 후 복구, 중간 삭제 접수 시 활성화/조회 거부, 만료 export 상태 거부와 후속 물리 정리를 검사했다. [원인·변경·검증 보고서](GENERATION-READ-CONCURRENCY-2026-09-08.md).
+
+동시에 최초 remember의 필수 log/gitignore 초기화 누락을 수정해 바로 export할 때 inventory 검사를 통과하도록 했다. raw/.sb 강제 제외 규칙은 상속 negation보다 뒤에 두고 원문 CAS 보존과 Git 이력 제외를 검증한다.
+
+**추가 개선/보류:** 과거 `.staging`/미활성 generation 일괄 삭제는 요청·원장·현재 writer 대응 검증 없이 실행하지 않는다(B3). 자비스의 signed export status/expires_at 소비는 신규 I1 후속이다. 이번 SB 만료 오류는 현 transport에서 일반 오류로 실패 처리된다. 운영 부하 p95·전환·실제 앱 인수는 계속 남는다.

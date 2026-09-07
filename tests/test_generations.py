@@ -120,3 +120,26 @@ def test_unexpected_pointer_is_split_brain(tmp_path: Path) -> None:
     with pytest.raises(GenerationError, match="GENERATION_SPLIT_BRAIN"):
         _ = store.active()
     store.close()
+
+
+@pytest.mark.parametrize("stored_ignore", (".sb/\ngeneration.json\n", "raw/\n!raw/\n!raw/**\n"))
+def test_sealing_excludes_raw_cas_even_when_stored_ignore_omits_it(tmp_path: Path, stored_ignore: str) -> None:
+    from sb.search import git_run
+
+    store = GenerationStore(tmp_path / "state", tmp_path / "share",
+                            provider_instance_id="provider:test", provider_release_sha="a" * 40)
+
+    def materialize(root: Path) -> None:
+        (root / "raw").mkdir()
+        _ = (root / "raw" / "source.txt").write_text("private source remains in CAS")
+        _ = (root / ".gitignore").write_text(stored_ignore)
+
+    try:
+        generation = store.build(request_id="old-ignore", parent=None, tombstone_sequence=0,
+                                 tombstone_set_root=ROOT, created_at=NOW, allowed=lambda _path: True,
+                                 mutate=materialize)
+        assert generation.root.joinpath("raw/source.txt").read_text() == "private source remains in CAS"
+        assert git_run(generation.root, "ls-files", "raw") == ""
+        assert git_run(generation.root, "log", "--all", "--format=%H", "--", "raw") == ""
+    finally:
+        store.close()

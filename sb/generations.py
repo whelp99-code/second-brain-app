@@ -28,6 +28,7 @@ from sb.effect_values import (
     format_instant,
     strict_loads,
 )
+from sb.generation_locks import GenerationWriteLease, generation_writer
 from sb.request_store import RequestStore
 
 
@@ -576,14 +577,19 @@ class GenerationStore:
         self.journal.close()
 
     @contextmanager
+    def writer(self) -> Generator[GenerationWriteLease, None, None]:
+        with generation_writer(self.lock_path) as lease:
+            yield lease
+
+    @contextmanager
     def exclusive(self) -> Generator[None, None, None]:
-        descriptor = os.open(self.lock_path, os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW)
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        with self.writer():
             yield
-        finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-            os.close(descriptor)
+
+    @contextmanager
+    def try_exclusive(self) -> Generator[None, None, None]:
+        with generation_writer(self.lock_path, blocking=False):
+            yield
 
     @contextmanager
     def pin(
@@ -750,10 +756,10 @@ class GenerationStore:
                     raise GenerationError("GENERATION_SURFACE_UNSAFE")
             ignore = staging / ".gitignore"
             existing_ignore = ignore.read_text(encoding="utf-8") if ignore.is_file() else ""
-            rules = [line for line in existing_ignore.splitlines() if line]
-            for rule in (".sb/", "generation.json"):
-                if rule not in rules:
-                    rules.append(rule)
+            required_rules = ("raw/", ".sb/", "generation.json")
+            rules = [line for line in existing_ignore.splitlines() if line and line not in required_rules]
+            # Required private surfaces must win over inherited negation rules.
+            rules.extend(required_rules)
             _ = ignore.write_text("\n".join(rules) + "\n", encoding="utf-8")
             ignore.chmod(0o600)
             _ = self._git(staging, "init", "-q", "--template=", "-b", "main")

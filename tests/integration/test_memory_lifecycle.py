@@ -20,6 +20,7 @@ from sb.mcp_contract import write_fixture_request
 from sb.pipeline import audit_citations
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
 from sb.request_executor import ExecutorConfig, RequestExecutor
+from sb.search import git_run
 from sb.stable_requests import accept_stable_v1_request
 from tests.task30_effect_factory import effect_request
 
@@ -52,7 +53,9 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     remembered_generation = executor.generations.active()
     # The request memory carries its original CAS blob in addition to the page
     # and derived manifest, so citation validation also survives restoration.
-    assert remembered_generation.manifest.file_count == 3
+    assert remembered_generation.manifest.file_count == 4
+    assert remembered_generation.root.joinpath("log.md").is_file()
+    assert git_run(remembered_generation.root, "ls-files", "raw") == ""
     assert remembered_generation.root.joinpath(".sb", "derived-manifest.json").is_file()
 
     correction_time = NOW + timedelta(minutes=1)

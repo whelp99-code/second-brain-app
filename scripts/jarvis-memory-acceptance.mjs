@@ -7,6 +7,7 @@ import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {ownerMemoryFixture} from './jarvis-owner-memory-fixture.mjs';
 import {prepareReadFenceDeletion} from './jarvis-read-fence-fixture.mjs';
+import {pausedCompile} from './jarvis-compile-fixture.mjs';
 
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jarvis = resolve(process.argv[2] ?? join(sb, '../Orca-JARVIS'));
@@ -14,6 +15,8 @@ const ownerConfirmed = process.argv.includes('--owner-confirmed');
 const approvalRollback = process.argv.includes('--approval-rollback');
 const runtimeCli = process.argv.includes('--runtime-cli');
 const afterDelete = process.argv.includes('--after-delete');
+const duringCompile = process.argv.includes('--during-compile');
+if (duringCompile && !runtimeCli) throw new Error('--during-compile requires --runtime-cli');
 if (afterDelete && !runtimeCli) throw new Error('--after-delete requires --runtime-cli');
 if (runtimeCli && !ownerConfirmed) throw new Error('--runtime-cli requires --owner-confirmed');
 if (approvalRollback && !ownerConfirmed) throw new Error('--approval-rollback requires --owner-confirmed');
@@ -44,6 +47,7 @@ const provider = mode => JSON.parse(execFileSync(python,
 let fixture;
 let transport;
 let secondTransport;
+let compiler;
 const initialCwd = process.cwd();
 try {
   provider('init');
@@ -113,6 +117,8 @@ try {
   const accepted = await transport.call('sb_request_status',statusArgs());
   const applied = provider('apply');
   const status = await transport.call('sb_request_status',statusArgs());
+  if(duringCompile) compiler = await pausedCompile({python,sb,config:join(root,'config.toml')});
+  const readStarted = performance.now();
   const reconciled = runtimeCli ? (await cli(['memory','outbox','--once','--limit','1'])).cycle
     : await service.reconcileOnce('real-provider-worker',1);
   const reused = await reader.readPage(expected.page_id);
@@ -122,6 +128,8 @@ try {
     budgets:readBudgets,read_fence:readFence,
     max_age_ms:86400000,expiry_ms:172800000});
   const shared = await secondReader.readPage(expected.page_id);
+  const compileReadMs = duringCompile ? performance.now()-readStarted : null;
+  const compiled = compiler === undefined ? undefined : await compiler.finish();
   // Simulate a duplicate network delivery of exactly the already accepted envelope.
   const replay = await transport.call('sb_write_request',{request:fixture.request});
   const idle = provider('apply');
@@ -130,6 +138,7 @@ try {
   const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
     runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,after_delete:deleted?.result ?? null,
+    during_compile:duringCompile,compile_read_ms:compileReadMs,compile_completed:compiled?.event ?? null,
     approval_rollback_recovered:approvalRollback,
     record_set:recordSet,record_limit:recordLimit,budget_profile:budgetProfile,sensitive,initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
     provider_status:status.value?.state,reconciled,outbox:service.get(queued.outbox_id)?.state,
@@ -157,6 +166,7 @@ try {
   assert.equal(result.cleanup_error,null);
   assert.equal(result.control_error,null);
 } finally {
+  await compiler?.close();
   await transport?.close();
   await secondTransport?.close();
   if (fixture) closeMemoryDatabase(fixture.database);

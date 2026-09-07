@@ -52,7 +52,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 |---|---|---|---|
 | 소스 완료 / 운영 P1 | 수정 | 기본 CLI/dashboard signed read fence 설정 | 후속 [삭제 이후 조회 보고서](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md)에서 삭제→64개 새 기억 저장→조회 검증. 운영 구성·배포 인수 남음 |
 | P0 | 개선 | 실제 후보 수집→publication→저장 명령 준비→확인 UI | 실제 업무/owner 입력 하나가 기존 권한 경로를 거쳐 요청 ID와 원문 출처를 유지하며 완료·재사용 |
-| P0 | 수정 | LLM 갱신 중 읽기 잠금/시간초과 | 느린 갱신과 동시 검색에서 deadline·single writer·reader pin·삭제 보장 검증 |
+| 소스 완료 / 운영 P1 | 수정 | LLM 갱신 중 읽기 잠금/시간초과 | [동시 조회 보고서](GENERATION-READ-CONCURRENCY-2026-09-08.md)에서 실제 자비스·MCP·두 writer·삭제 검증. 대표 p95 및 운영 인수 남음 |
 | P1 | 개선 | 일반 Enter 여러 줄 입력과 V2 정정 | 버전 계약, 정정 대상 변경 거부, 정정된 최신 기억 재조회 및 이전 출처 추적 |
 | P1 | 개선 | 실제 에이전트 앱 연결과 프로젝트/사용자 범위 | 클라이언트별 읽기/쓰기/수집/주입 지원표, A 기록→B 출처·버전 회수, 허용되지 않은 범위 거부 |
 | P1 | 고도화 | 관련 문맥 선택·세션 전달 이력·예산 | 선택 이유·버전·실제 전달 receipt, 세션 중복과 compaction 후 재시도 검사 |

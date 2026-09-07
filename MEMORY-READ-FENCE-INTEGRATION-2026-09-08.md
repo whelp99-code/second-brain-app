@@ -55,7 +55,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 
 | 순서·관점 | 남은 작업 | 완료 증거 |
 |---|---|---|
-| P0 수정 | 느린 LLM 갱신 중 읽기 잠금과 10초 조회 deadline | 동시 검색·writer·중단 복구·삭제 보장을 함께 확인 |
+| 소스 완료 / 운영 P1 | 느린 LLM 갱신 중 읽기 잠금과 10초 조회 deadline | [후속 동시성 검증](GENERATION-READ-CONCURRENCY-2026-09-08.md)에서 실제 자비스·MCP 동시 조회·writer kill·삭제 재검증. 대표 데이터 부하 인수 남음 |
 | P0 개선 | 실제 후보 수집→publication→저장 명령 준비→UI 확인 | 실제 입력 하나가 출처·요청 ID를 유지하며 완료되고 다음 요청에서 재사용 |
 | P1 개선 | 운영 read fence 구성·release/generation 전환·백업/복원 | 실행 소스·키·원장 대응, 운영 저장/삭제/조회, 독립 복원 및 롤백 |
 | P1 개선 | 실제 에이전트 앱 연결 및 프로젝트/사용자 범위 | 앱별 조회/쓰기/수집/주입 지원표, A 저장→B 회수, 범위 밖 조회 거부 |

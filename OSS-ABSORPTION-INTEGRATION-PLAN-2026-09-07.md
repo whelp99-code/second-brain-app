@@ -178,7 +178,7 @@ R4는 다음처럼 의미를 분리했다. 자세한 경계·배포 조건은 [�
 |---|---|---|
 | P0 수정 — 자비스 자동 연결 | CLI/dashboard·주기 실행·control completed·기본 signed fence를 격리 MCP에서 검증 | I1-a/c/e: 후보/publication/UI 전체 흐름과 운영 구성·배포 인수 진행. 최신 결과·우선순위는 [삭제 이후 조회 보고서](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md) |
 | P0 수정 — 승인 rollback 복구 | 316b8f2 소스 수정·격리 실제 MCP 검증 완료, 운영 미반영 | I1-b: event/바깥 transaction 실패 후 원문 보존·새 receipt 재발행 검증. 영속 권한/변경 파일 보존. 운영 반영은 B6에서 확인 |
-| P0 수정 — 갱신 중 읽기 | I3의 LLM 실행 중 배타 잠금은 소비자 10초 deadline과 충돌 가능 | 준비와 활성화 잠금 구간을 분리하되 단일 writer·reader pin·삭제 보장을 유지. 느린 갱신 중 조회와 중단 복구를 실측 |
+| 소스 완료 / 운영 P1 — 갱신 중 읽기 | I3의 LLM 준비 중 조회 차단 및 조회 진입 유지보수 대기를 수정 | writer mutex/SH 준비/EX 전환, 실제 자비스 동시 조회와 writer kill·삭제 원장 변경 검증. 대표 데이터 p95와 운영 인수는 [후속 보고서](GENERATION-READ-CONCURRENCY-2026-09-08.md) |
 | P1 개선 — 일상 입력과 정정 | 일반 Enter 여러 줄 미지원, V1 owner correct 승인 대상 결합 부족 | 버전이 있는 본문 계약과 기존 V2 target/delegation 정정을 연결. 원문 전체 대응 및 승인 후 대상 변경 거부 검사 |
 | P1 개선 — 에이전트 공통 사용 | 두 MCP 프로세스 검증은 실제 다른 앱의 저장·주입 지원 증거가 아님 | 실제 Codex/Claude 등 사용 클라이언트별 읽기·쓰기·수집·주입 지원표, A 저장→B 출처/버전 회수 실사용 검증 |
 | P1 개선 — 프로젝트 범위 | sensitivity와 지식 상태 scope만으로 접근 범위를 제한할 수 없음 | 공통 project/user/agent 범위 계약과 버전 호환. 검색·원문·관계 확장 모두 범위 밖 거부 검사 |

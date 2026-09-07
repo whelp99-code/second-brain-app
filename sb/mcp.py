@@ -29,7 +29,14 @@ from pydantic import TypeAdapter
 from sb.config import Config, load_config
 from sb.contracts import MemoryWriteResultV1
 from sb.delegations import DelegationRejected, verify_read_fence
-from sb.effect_values import JsonObject, JsonValue, digest, is_json_object, strict_loads
+from sb.effect_values import (
+    JsonObject,
+    JsonValue,
+    digest,
+    is_json_object,
+    parse_instant,
+    strict_loads,
+)
 from sb.effect_write_models import (
     MemoryEffectWriteAcceptedV2,
     MemoryEffectWriteErrorV2,
@@ -368,11 +375,11 @@ def build_server(
             tree,
         )
 
-    def maintain(now: datetime) -> None:
+    def maintain(now: datetime, *, read_only: bool = False) -> None:
         if vault_root is None:
             mutations = GenerationMutationService.from_config(runtime_config)
             try:
-                _ = mutations.maintain(now)
+                _ = mutations.maintain_if_idle(now) if read_only else mutations.maintain(now)
             finally:
                 mutations.close()
             return
@@ -389,7 +396,7 @@ def build_server(
 
     @contextmanager
     def pin_generation() -> Generator[tuple[Path, GenerationIdentityV1], None, None]:
-        maintain(datetime.now(UTC))
+        maintain(datetime.now(UTC), read_only=True)
         if generation_store is None:
             yield root, legacy_generation_identity(root)
             return
@@ -668,6 +675,10 @@ def build_server(
                 and status.identity.operation == "export"
                 and export_lifecycle is not None
             ):
+                # A concurrent writer can defer physical expiry cleanup. Do not
+                # sign stale availability, or invent completed physical disposal.
+                if export_lifecycle.state == "available" and parse_instant(export_lifecycle.expires_at) <= datetime.now(UTC):
+                    raise ToolError("EXPORT_EXPIRED")
                 key_id = config.provider_signing_key_id
                 if (
                     key_id is None
