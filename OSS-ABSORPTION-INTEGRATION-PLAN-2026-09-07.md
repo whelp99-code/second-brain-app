@@ -1,6 +1,6 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
-기준일: 2026-09-07, 후속 대조: 2026-09-08. 상태: 사용자 확정 방향 병합. R1~R3 및 검색·reader 복구, 자비스 다중 record 소비·R4 시간 처리에 이어 64개 record 저장 결과 검증을 보강했다. 최신 검증은 13절과 구현 원장을 따른다. 전체 인수·운영 배포 완료를 뜻하지 않는다.
+기준일: 2026-09-07, 후속 대조: 2026-09-08. 상태: 사용자 확정 방향 병합. R1~R4 및 검색·reader 복구, 자비스 다중 record 소비·명령 완료·삭제 이후 조회·컴파일 중 조회를 보강했다. 최신 코드 대조와 검증은 14절과 구현 원장을 따른다. 전체 인수·운영 배포 완료를 뜻하지 않는다.
 
 인계 원문: [자비스 작업 인계](../Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md).
 기존 결함·개선 정본: [24개 항목 분석](IMPROVEMENT-BACKLOG-2026-09-07.md).
@@ -12,7 +12,7 @@
 3. LightRAG, TencentDB-Agent-Memory, code-brain, memory-bank에서 필요한 계약·알고리즘·설계만 흡수한다. 기본 방식은 기존 코드 재사용과 설계 반영이며, 코드 복사나 라이브러리 추가는 파일별 필요성을 확인한 뒤 결정한다.
 4. 자비스는 작업 제어·결과 검증, Second Brain은 기억, dev-wiki/Git은 개발 규칙·결정의 원문과 이력을 유지한다. 개발 문서 검색 연결은 정본의 대체나 dev-wiki 전체 자동 색인을 뜻하지 않는다.
 5. 별도 기억 서버·에이전트별 기억 DB·모델 Proxy·워커 오케스트레이터·전역 훅을 도입하지 않는다. 사용 에이전트마다 얇은 연결부만 둔다.
-6. R1 입력 유실, R2 자비스 해석 실패, R3 요청 기억 복원 실패는 여전히 먼저 해결한다. OSS 채택은 이 결함들을 우회하는 방법이 아니다.
+6. R1 입력 유실, R2 자비스 해석 실패, R3 요청 기억 복원 실패는 선행 수정·검증했다. 해당 회귀를 유지하고 운영 인수를 이어간다. OSS 채택은 핵심 결함을 우회하는 방법이 아니다.
 
 인계 문서의 '도구 목록이 보이는 것만으로 완료하지 않는다'는 기준은 이번 작업의 R2 재현과 정확히 일치한다. 이전 517개 테스트 통과 및 transport 응답 증거는 보존하되, 공통 기억 완료 증거로 확대 해석하지 않는다.
 
@@ -57,8 +57,8 @@
 | 연결부 | 공통 조회 | 기록/변경 | 로그 자동 수집 | 자동 문맥 공급 | 현재 증거·다음 검증 |
 |---|---|---|---|---|---|
 | 자비스 | adapter 수정·실제 MCP 회수 검증 | CLI 요청→outbox settled→control completed, 삭제 후 64개 record 재저장 검증 | 자비스 사건/결과 계약 담당, 실제 후보 전체 흐름 미완료 | 공통 context pack 미완료 | 운영 구성·배포와 실제 후보/UI 인수는 남음. [최신 검증](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md) |
-| Codex | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 가능, R1 해결 선행 | 전용 JSONL 파서·fixture 있음 | 공통 context pack 연동 신규 | 실제 Codex 클라이언트 설정과 읽기/쓰기 재현 필요 |
-| Claude Code | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 가능, R1 해결 선행 | 전용 JSONL 파서·fixture 있음 | 전용 훅 복제 대신 공통 공급 서비스 | 실제 Claude 클라이언트와 Codex 간 교차 회수 필요 |
+| Codex | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 구현·R1 회귀 통과, 앱 연결 미검증 | 전용 JSONL 파서·fixture 있음 | 공통 context pack 연동 신규 | 실제 Codex 클라이언트 설정과 읽기/쓰기 재현 필요 |
+| Claude Code | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 구현·R1 회귀 통과, 앱 연결 미검증 | 전용 JSONL 파서·fixture 있음 | 전용 훅 복제 대신 공통 공급 서비스 | 실제 Claude 클라이언트와 Codex 간 교차 회수 필요 |
 | OpenCode / OMO | MCP 클라이언트별 설정 실측 필요 | 지원 API 프로필 연결 필요 | 각각 파서·fixture 있음 | 미확인 | 사용 클라이언트와 버전을 먼저 확정 |
 | Orca / GJC | 현 실행면·자비스 연결 경로 확인 필요 | 검증 결과는 자비스 경유 원칙 | record/session 파서·fixture 있음 | 미확인 | 기억 접근 지원과 워커 실행 지원을 분리 |
 | 기타 MCP 에이전트 | 프로토콜 호환 후보 | 도구 프로필/권한 지원 범위 확인 | 파서가 없으면 미지원 | 자동 주입은 미지원으로 표시 | 목록에 추가할 때 네 열을 각각 실측 |
@@ -188,3 +188,59 @@ R4는 다음처럼 의미를 분리했다. 자세한 경계·배포 조건은 [�
 | 조건부 고도화 — hybrid | 기존 RRF/벡터 코드의 sealed 읽기 쓰기 부작용·메타데이터 손실 | B8: 읽기 전용·출처/범위 보존부터 수정 후 같은 질문 기준선과 비교. 이점이 확인될 때 활성화 |
 
 검증된 변경은 기능 단위로 커밋하고 운영 반영 여부를 별도 기록한다. 신규 OSS 코드를 복사하지 않았으므로 이번 단위에서 외부 파일 라이선스 고지 추가는 없다. 향후 복사 시에는 인계서 기준의 파일·커밋·라이선스/NOTICE를 기록한다. 계획의 네 제품 비교는 고정 커밋 인계 자료이며 최신 upstream 재조사·실측을 의미하지 않는다.
+
+## 14. 현재 소스 재대조와 작업별 인수 조건
+
+2026-09-08 사용자 인계 재확인. Second Brain 기준 소스 `ee4fc13`, 자비스 HEAD `e61893e`. 자비스에는 별도 작업의 task 실행·Git publication 관련 미커밋 변경이 있으므로 이번 대조를 자비스의 깨끗한 커밋 전체 검증으로 표현하지 않는다. 이번 단위는 세컨드브레인 작업공간의 분석·계획 갱신과 기존 구현 재검증이며, 아래 남은 기능을 새로 구현했다는 뜻은 아니다.
+
+### 현재 동작 판정
+
+저장 엔진·자비스 소비·완료 상태 연결은 격리 실제 프로세스에서 통과했다. 입력/CAS/인용/복원, 여러 record의 동일성, 시간 의미, 검색 필터, reader 복구, 삭제 이후 서명 조회, 컴파일 준비 중 조회의 기존 수정을 재사용한다. 반면 실제 사용자 후보와 앱에서 시작하는 흐름 및 운영 서비스 인수는 남아 있다. 저장소 완성률을 테스트 개수로 환산하지 않는다.
+
+### P0 후보 화면 연결의 구체적인 공백
+
+| 현 코드에서 확인한 사실 | 사용자에게 미치는 영향 | 재사용할 구현과 필요한 연결 |
+|---|---|---|
+| 자비스 `dashboard/src/memory-candidates.tsx`는 종류·작업·민감도·이유·보존일만 렌더링 | 후보를 열어 원문·출처를 검토하거나 화면에서 확인/거절할 수 없음 | 기존 후보 상세 read API와 제공된 actions를 연결. 목록에 원문을 무조건 추가하지 않고 상세 조회 수명과 정리 정책 유지 |
+| `src/dashboard/memory-mutation-routes.ts`에 `candidates/:id/actions/stage-decision`이 있지만 `dashboard/src/memory-api.ts`에 호출 메서드가 없음 | 후보 결정 백엔드가 있어도 기억 화면에서 사용할 수 없음 | 기존 stageCandidateDecision과 approvals 흐름 사용. 후보 변경·만료·원문 소실 오류 및 재시도 표시 |
+| `stageMemoryRememberDispatch`의 제품 호출자는 현재 `src/cli-control-commands.ts` | 후보 확인 뒤 publication이 생겨도 화면에서 저장 명령 준비까지 이어지지 않음 | `src/memory-remember-dispatch.ts`의 영속 authority 검사·expected artifact·멱등 command ID 재사용. 별도 서명/승인 구조나 임의 자동 승인 추가 금지 |
+| `dashboard/src/memory-api.ts`의 effects 조회는 `operation=export`와 네 상태만 요청 | 기억 화면에서 remember 저장의 접수·진행·완료·실패를 추적하는 연결이 부족 | 기존 control/outbox 상태를 request ID에 연결해 조회. remember가 export effects API에 이미 있다고 가정하지 않음. accepted/pending을 completed로 표시하지 않음 |
+
+이 네 항목은 **제품 코드 확인**이며 실제 브라우저 클릭 재현 결과는 아니다. 인수 테스트는 실제 후보 생성→상세 검토→기존 사용자 확인→저장 명령→provider proved→outbox settled→control completed→다음 조회의 같은 record·출처 회수까지 이어져야 한다. 새로고침·중복 클릭·명령 재시도·권한 만료·저장 실패에서 중복 효과 0과 정확한 상태 표시를 확인한다. 자비스의 독립 실행 결과 인증 작업은 별도로 진행 중이므로 그 결과 계약을 대조해 후보 수집에 연결하고 요약문을 성공 증거로 대체하지 않는다.
+
+### 수정·개선·고도화 실행 목록
+
+아래는 기존 24개 ID를 세분한 실행 단위다. 중복된 새 백로그를 만드는 것이 아니며 우선순위는 1차 공통 기억 완성에 따른다.
+
+| 순서 / 분류 / 기존 ID | 구현할 범위와 책임 | 완료 증거 |
+|---|---|---|
+| 1 / P0 개선 / I1·G5·G6 | 위 후보/UI 네 연결. 자비스가 수집·검증·확인·명령을 담당하고 SB는 저장/조회 계약 유지 | 실제 입력 하나의 후보·명령·요청·결과 ID 연속 추적. 실패/미확정 결과는 성공 기억으로 승격되지 않음 |
+| 2 / P1 개선 / I1·G4 | 일반 Enter 입력과 V2 정정. `mcp_write_models`, frozen 계약, 자비스 본문/target 소비를 버전별 대조 | CR/LF·반복 문장·공백·인용이 있는 원문 전체 대응. 승인 후 대상 교체 거부, 정정된 사실 회수 및 이전 출처 추적 |
+| 3 / P1 개선 / B4·I7 | 실제 Codex/Claude 등 클라이언트 연결. 기존 MCP 프로필·에이전트별 connector 재사용 | A 기록→B 동일 record·원문·버전 회수. 조회/쓰기/수집/주입을 각기 지원·미지원·미검증으로 표시 |
+| 4 / P1 신규 개선 / B4·I7 | 공통 프로젝트/사용자 범위와 생산 에이전트 출처. 기존 schema4에 없는 범위 계약을 버전 관리 | 허용 범위 밖 자료가 검색·직접 page 조회·후속 확장 어디서도 노출되지 않음. producer_agent를 접근 권한으로 취급하지 않음 |
+| 5 / P1 고도화 / G1·G3·G4·G6 | 기억 유형·시간·근거, 작은 문맥 선택과 세션 전달 이력. 공통 범위 확정 후 적용 | 바이트/토큰 예산, 제외 사유, 실제 전달 receipt. 수정된 기억 재전달, compaction/전달 실패 후 재시도, 오래된 결정 구분 |
+| 6 / P1 수정 / R6·I3 | writer 종료 후 과거 `.staging`/미활성 세대와 원장 대조. SB generation runtime/ops | active·reader·pending 요청·삭제 증거에 필요한 자료 보존. 복구 재실행 수렴. 오래되었다는 이유만으로 일괄 삭제하지 않음 |
+| 7 / P1 수정 / I1·I2·G5 | 자비스의 서명된 export 수명 상태 소비. `second-brain-effect-service`, lifecycle observer/export store 대조 | provider identity·request·manifest·서명·expires_at 대응. 만료/철회/삭제된 export를 available로 표시하지 않고 물리 폐기 전 완료를 주장하지 않음 |
+| 8 / P1 수정·개선 / R8·I2·I4·I6 | SB readiness와 검증된 백업, 릴리스·설정·세대의 전환/복구 | 오래된 성공·손상 backup/journal·정체 요청의 degraded 사유. 깨끗한 런타임 복원 후 읽기/쓰기, 삭제 기억 부활 0, rollback 실측 |
+| 9 / P2 개선 / I8·I5·G2 | 최근 변경 평가의 시계 일치와 예상 record 검증, 재현 설치·타입 경고·부하·한국어 검색 평가 | 빈 changes의 current를 회수 성공으로 오판하지 않음. 고정 100~300문항 및 계획 규모/100회 반복의 근거 회수·지연·성장량 |
+| 10 / 조건부 고도화 / R10·B8 | 기존 cosine/RRF의 읽기 전용화와 메타데이터 보존, 이후 hybrid 연결 판단 | 조회 전후 인덱스 불변, 범위·출처 보존, lexical 기준선 대비 품질/비용 이득. 효과가 없으면 비활성 유지 |
+
+7번의 구체적 근거: 자비스 `second-brain-effect-service.ts:requestStatus`는 상위 schema/request/state를 확인하고, lifecycle observer는 proved/proof를 소비한다. export store의 자체 만료 처리만으로 SB의 서명된 export lifecycle 검증을 대체할 수 없다. SB의 `EXPORT_EXPIRED` 거부와 물리 정리 회귀가 통과해도 양쪽 export 사용자 흐름의 완료 증거는 아니다.
+
+8번의 현재 근거: `sb/readiness.py`는 최근 백업 파일 mtime을 사용하며 검증 receipt를 확인하지 않는다. 마지막 실행의 경과 시간과 오래 정체된 요청도 준비 상태에 충분히 반영하지 않는다. 상태 명령의 성공을 복원 가능한 백업의 증거로 사용하지 않는다.
+
+10번의 현재 근거: `sb/hybrid_search.py:query_cosine`은 `knn_out`을 DROP/CREATE하고 `rrf_merge`는 네 필드로 SearchHit를 재생성한다. 이 경로를 sealed generation에 곧바로 연결하지 않는다. 외부 LightRAG 코드 도입보다 이 기존 읽기 부작용과 출처 보존 문제를 먼저 해결한다.
+
+### 이번 재검증과 한계
+
+- `TMPDIR=/var/tmp uv run pytest -q --ignore=tests/test_embeddings.py`: **564 passed, 2 skipped, 137.99초**. `/var/tmp/sb-handoff-refresh-tests.log`.
+- `uv run ruff check sb tests`: 통과. optional embeddings extra의 전체 검증과 실제 모델 품질 평가는 포함하지 않는다.
+- 다음 실제 MCP/JARVIS 하네스 통과. `/var/tmp/sb-handoff-refresh-acceptance.log`.
+
+```bash
+TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner-confirmed --approval-rollback --runtime-cli --record-limit --record-budget --sensitive --after-delete --during-compile
+```
+
+결과는 control completed, provider proved, outbox settled, sensitive record 64개, 두 클라이언트 current, rollback 복구, replay 후 추가 dispatch 0, review 원문 0개, cleanup/control 오류 없음이다. 삭제 sequence 1 이후 무서명·과거 fence는 각각 거부됐고 삭제 record 회수는 0개였다. 컴파일 준비 중 완료 확인과 두 클라이언트 조회 묶음은 약 **1.384초**였다. 단일 요청 지연이나 p95 수치가 아니다.
+
+합성 owner 입력/승인과 격리 vault를 사용한 실제 프로세스 통합 검사다. 실제 사용자의 업무 결과, Codex/Claude 앱 화면, 운영 설치·수집·주입을 검증한 것은 아니다. 최신 upstream 기능·라이선스를 재조사하거나 외부 코드를 복사하지 않았다. 이번 단위에서 서비스 재시작·배포·활성 세대 전환·push와 자비스 제품 소스 수정은 하지 않았다.

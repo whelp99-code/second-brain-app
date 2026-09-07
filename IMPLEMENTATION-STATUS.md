@@ -4,6 +4,8 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+최신 인계 대조: [통합 계획 14절](OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md#14-현재-소스-재대조와-작업별-인수-조건). 현재 판정과 과거 결함 재현을 분리하고 후보/UI의 실제 미연결 지점 및 다음 10개 실행 단위를 기존 ID에 대응했다. 2026-09-08 재검증은 전체 **564 passed / 2 skipped**, Ruff 통과, 격리 실제 MCP/JARVIS에서 삭제 이후 64개 민감 record 저장·control completed·두 클라이언트 회수·갱신 중 조회 통과다. 문서 갱신 및 기존 소스 재검증 단위이며 후보/UI 신규 구현이나 운영 인수 완료가 아니다.
+
 | 단위 | 범위 | 상태 | 완료 증거 |
 |---|---|---|---|
 | B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 완료 | 4da09b9; 520 passed, 2 skipped; Ruff·diff check 통과 |
