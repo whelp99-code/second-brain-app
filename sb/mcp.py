@@ -57,6 +57,7 @@ from sb.memory_records import (
 from sb.page_ids import git_rel
 from sb.pipeline import RunOutcome, run_all
 from sb.provider_lifecycle import ProviderLifecycle
+from sb.public_page import public_frontmatter
 from sb.request_store import RequestStore
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
@@ -505,7 +506,7 @@ def build_server(
             require_active_high_water(generation, current)
             try:
                 page = read_page(current_root, id)
-                payload: ToolResult = {"frontmatter": dict(page.frontmatter), "body": page.body}
+                payload: ToolResult = {"frontmatter": public_frontmatter(page.frontmatter), "body": page.body}
                 if contract_schema_version == 4:
                     payload = {**payload, "records": [
                         record.as_dict() for record in records_for_page(current_root, id, generation)

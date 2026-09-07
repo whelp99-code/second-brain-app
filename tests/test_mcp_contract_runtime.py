@@ -100,7 +100,8 @@ def runtime(monkeypatch: MonkeyPatch) -> Iterator[tuple[Path, MCPServer, MCPServ
     cite = SourceCite(digest[:8], "synthetic:ExampleAlpha", digest)
     marker = digest[:8]
     pages = (
-        PageSpec("wiki/example-alpha", "ExampleAlpha", f"# Intro\nExampleAlpha 예시기록.[^{marker}]", [cite], "active"),
+        PageSpec("wiki/example-alpha", "ExampleAlpha", f"# Intro\nExampleAlpha 예시기록.[^{marker}]", [cite], "active",
+                 derivation_key="compile:internal-example-alpha"),
         PageSpec("conflicts/2026-08-26-example-alpha", "ExampleAlpha", f"# Conflict\n예시기록[^{marker}]", [cite], "active"),
     )
     _ = vault.write_pages(pages, "task-6-remediation", _HashLedger())
@@ -136,6 +137,23 @@ def test_read_page_fixture_matches_complete_runtime_frontmatter(runtime: tuple[P
     # Fixture pins the schema, while the producer version follows the installed release.
     expected_frontmatter["compiled_by"] = str(expected_frontmatter["compiled_by"]).replace("sb/0.1.0|", "sb/1.0.0|")
     assert actual_frontmatter == expected_frontmatter
+
+
+def test_public_projection_preserves_internal_derivation_and_record_spans(
+    runtime: tuple[Path, MCPServer, MCPServer],
+) -> None:
+    root, server, _ = runtime
+    actual = _call(server, "sb_read_page", {"id": "wiki/example-alpha"}).structured_content
+    assert actual is not None
+    assert "derivation_key" not in _mapping(actual["frontmatter"])
+    raw = (root / "wiki/example-alpha.md").read_bytes()
+    assert b"derivation_key: compile:internal-example-alpha" in raw
+    records = actual["records"]
+    assert isinstance(records, list) and len(records) == 1
+    record = _mapping(records[0])
+    start, end = record["citation_span_start"], record["citation_span_end"]
+    assert isinstance(start, int) and isinstance(end, int)
+    assert raw[start:end].decode() == record["record_text"]
 
 
 def test_schema4_status_uses_pinned_digest_without_repository_sidecar(
