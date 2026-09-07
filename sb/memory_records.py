@@ -134,6 +134,11 @@ def records_for_page(
     raw = _git(root, "cat-file", "blob", f"HEAD:{rel}", binary=True)
     if not isinstance(raw, bytes):
         raise MemoryRecordError("EFFECT_TARGET_INVALID")
+    return parse_page_records(raw, page_id)
+
+
+def parse_page_records(raw: bytes, page_id: str) -> tuple[MemoryRecordV1, ...]:
+    """Parse bounded citation records; callers establish committed/prospective ownership."""
     metadata, body_start = _frontmatter(raw)
     body = raw[body_start:].decode("utf-8")
     definitions: dict[str, str] = {}

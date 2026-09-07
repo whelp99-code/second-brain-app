@@ -25,6 +25,8 @@ def effect_request(
     high_water: tuple[int, str],
     private_key: Ed25519PrivateKey,
     lane_char: str,
+    *,
+    correction_content: str = "corrected runtime record",
 ) -> JsonObject:
     lane = {"correct": "correction", "forget": "deletion", "export": "export"}[operation]
     prefix = {"correct": "memcorr:req:v1:", "forget": "memdel:req:v1:", "export": "memexp:req:v1:"}[operation]
@@ -61,7 +63,7 @@ def effect_request(
         "target_scope", {"target_digests": [target["target_digest"]], "scope": scope}
     )
     if operation == "correct":
-        content = "corrected runtime record"
+        content = correction_content
         payload: JsonObject = {
             "content": content,
             "content_digest": digest("effect_content", {"content": content}),

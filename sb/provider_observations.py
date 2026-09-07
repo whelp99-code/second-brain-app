@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import stat
 from dataclasses import dataclass
 from typing import assert_never
 
+from sb.correction_rendering import render_correction
 from sb.effect_values import JsonInput, digest
 from sb.effect_write_models import CorrectionPayloadModelV2, MemoryEffectWriteRequestV2
 from sb.effect_write_values import model_object
@@ -52,8 +54,14 @@ def _artifact(input_: ProviderObservationInput) -> ProviderArtifactObservationV1
         raw = page.read_bytes()
     except OSError as exc:
         raise ProviderObservationError("PROVIDER_ARTIFACT_INVALID") from exc
-    replacement = payload.content.encode("utf-8")
-    match_count = raw.count(replacement)
+    # Erasure rebinds removed source citations to the effect snapshot. Validate
+    # the exact same rendering with the committed page's resulting citation.
+    sids = {match.group(1).decode("ascii")
+            for match in re.finditer(rb"\[\^([0-9a-f]{8,64})\]", raw)}
+    replacements = {render_correction(payload.content, sid).encode("utf-8") for sid in sids}
+    if not replacements:
+        replacements.add(render_correction(payload.content, None).encode("utf-8"))
+    match_count = sum(raw.count(replacement) for replacement in replacements)
     if match_count != 1:
         raise ProviderObservationError("PROVIDER_ARTIFACT_INVALID")
     file_digest = "sha256:" + hashlib.sha256(raw).hexdigest()

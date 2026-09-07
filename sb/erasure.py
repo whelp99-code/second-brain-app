@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import final
 
+from sb.correction_rendering import correction_marker, render_correction
 from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_models import CorrectionPayloadModelV2, MemoryEffectWriteRequestV2
 from sb.managed_surface_scan import (
@@ -17,6 +18,7 @@ from sb.managed_surface_scan import (
     SurfaceInventoryEntry,
     scan_managed_surfaces,
 )
+from sb.memory_records import MemoryRecordError, parse_page_records
 from sb.provider_reingress_observations import observe_reingress_guards
 from sb.provider_surface_scanner import scan_provider_surfaces
 from sb.provider_surface_scanner_types import ProviderSurfaceLayout
@@ -102,7 +104,16 @@ class ErasureEngine:
                 payload = request.payload
                 if not isinstance(payload, CorrectionPayloadModelV2):
                     raise ErasureError("EFFECT_OPERATION_CONFUSION")
-                successor = body[:start] + payload.content.encode("utf-8") + body[end:]
+                sid = correction_marker(body[end:])
+                replacement = render_correction(payload.content, sid)
+                successor = body[:start] + replacement.encode("utf-8") + body[end:]
+                if sid is not None:
+                    try:
+                        prospective = parse_page_records(successor, target.page_id)
+                        if any(len(row.record_text.encode("utf-8")) > 4_096 for row in prospective):
+                            raise MemoryRecordError("MEMORY_RECORD_PAGE_OVERSIZE")
+                    except MemoryRecordError as exc:
+                        raise ErasureError("CORRECTION_RECORDS_INVALID") from exc
             else:
                 successor = body[:start] + body[end:]
             self._write_private(page, successor)

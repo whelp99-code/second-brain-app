@@ -187,3 +187,13 @@ task completion 수집 초안은 task_id 차단 누락과 원본 차단의 파�
 SB query_cosine의 조회 중 DROP/CREATE를 readonly SQLite CTE로 바꾸고 RRF가 출처/상태 필드를 보존하도록 수정했다. 없는 DB 생성, 모델/revision 불일치 허용, 제어문자 원문 손상과 잘못된 거리의 완전 일치 오판도 수정했다. 수정 전 6건 실패로 재현했고 실제 SQLite 동시 조회 전후 DB 불변·readonly 쓰기 거부를 검증했다.
 
 표준 전체 **566 passed, 2 skipped (138.94초)**, optional 포함 집중 **32 passed, 1 skipped (2.28초)**이며 두 실행은 일부 중복이다. Ruff·diff check 통과, 변경 소스 타입 오류/경고 0. [상세 보고서](HYBRID-READONLY-2026-09-08.md). 실제 모델 품질·cosine 전용 출처/필터·세대/삭제 수명 결합과 hybrid 활성화는 남는다. B4~B8 전체나 운영 전환 완료를 의미하지 않는다.
+
+### B4 진행 — V2 정정의 줄바꿈·인용·완료 관측
+
+실제 요청에서 `PROVIDER_ARTIFACT_INVALID`로 reconciling에 남던 CRLF 정정과 중간 문장 인용 누락을 수정했다. LF/CRLF·빈 줄을 보존하고 각 문장에 기존 citation을 연결한 뒤 effect snapshot으로 재결합한다. 사용자 인용 구문은 문자로 escape한다. 출력 record 수/길이를 대상 쓰기 전에 검증하며 raw content digest와 frozen V1/V2/MCP 필드는 유지한다.
+
+격리 실제 MCP에서 새 문장 4개를 두 자비스 소비자가 current로 회수했고 내용 digest·effect 출처가 모두 일치했다. 자비스 서명 proof/관측 검증기 통과, 이전 기억 0건, replay=true/추가 적용 idle, 변경 원문과 과거 fence 거부를 확인했다. [상세 인수 및 한계](CORRECTION-RENDERING-2026-09-08.md).
+
+전체 **571 passed, 2 skipped (157.58초)**, 관련 집중 **22 passed (20.48초)**이며 일부 중복이다. Ruff·Node 구문·diff check 통과, 변경 소스 타입 오류/경고 0.
+
+V1 신규 remember의 일반 줄바꿈, 자비스 정정 UI/사용자 승인/production saga/control 완료의 전체 인수와 B4~B8 운영 완료는 여전히 남는다. 자비스 제품 소스·서비스·운영 세대·push는 변경하지 않았다.

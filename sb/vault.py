@@ -98,7 +98,7 @@ class Vault:
         """
         for folder in ("wiki", "daily", "conflicts"):
             for path in (self.root / folder).rglob("*.md"):
-                split = _split_rendered(path.read_text(encoding="utf-8"))
+                split = _split_rendered(path.read_bytes().decode("utf-8"))
                 if split is None:
                     continue
                 block, body = split
@@ -117,15 +117,15 @@ class Vault:
                     continue
                 sids = {str(item["sid"]) for item in missing if "sid" in item}
                 lines: list[str] = []
-                for line in body.splitlines():
+                for line in body.splitlines(keepends=True):
                     if any(line.strip().startswith(f"[^{sid}]:") for sid in sids):
                         continue
                     plain = line
                     for sid in sids:
                         plain = plain.replace(f"[^{sid}]", "")
                     # A deleted statement's orphan marker is not a surviving fact.
-                    lines.append(line if plain.strip() else "")
-                body = "\n".join(lines).strip()
+                    lines.append(line if plain.strip() or not line.strip() else "")
+                body = "".join(lines).strip()
                 snapshot = body
                 for sid in sids:
                     snapshot = snapshot.replace(f"[^{sid}]", "")
