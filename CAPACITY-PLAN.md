@@ -1,5 +1,7 @@
 # Capacity and performance plan
 
+Korean retrieval baseline (2026-09-08): [fixed synthetic 100-query CLI/MCP evaluation](KOREAN-SEARCH-BASELINE-2026-09-08.md) completed with Recall@5 40/90 positive cases. All 50 reordered/natural/paraphrased questions missed. This is a small-corpus regression baseline, not the required real-user 100–300 query acceptance or a capacity SLO. Keep the full write-cycle run and real-user evaluation as separate gates.
+
 ## Supported topology
 
 Second Brain 1.0 supports one operator, one local Vault and one active writer. The file lock prevents concurrent pipeline writers. Search and read-only clients may operate while no write transaction is in progress, but this release does not claim distributed-writer support.
