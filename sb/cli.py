@@ -71,7 +71,8 @@ def _parser() -> argparse.ArgumentParser:
     _ = sub.add_parser(Command.INIT.value)
     ingest = sub.add_parser(Command.INGEST.value)
     _ = ingest.add_argument("--source")
-    _ = ingest.add_argument("--limit", type=int)
+    _ = ingest.add_argument("--limit", type=int,
+                           help="maximum source items attempted; the configured unit budget also applies")
     compile_cmd = sub.add_parser(Command.COMPILE.value)
     _ = compile_cmd.add_argument("--llm")
     _ = compile_cmd.add_argument("--dry-run", action="store_true")
@@ -192,6 +193,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         source = _opt_str(ns, "source")
         selected = (source,) if source is not None else config.configured_source_ids
         outcome = run_ingest(config, selected, limit=_opt_int(ns, "limit"))
+        if outcome.failure is not None:
+            print(outcome.failure, file=sys.stderr)
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def compile_cmd() -> int:
@@ -212,6 +215,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
 
     def run() -> int:
         outcome = run_all(config, config.configured_source_ids)
+        if outcome.failure is not None:
+            print(outcome.failure, file=sys.stderr)
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def status() -> int:

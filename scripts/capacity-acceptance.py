@@ -123,6 +123,8 @@ class Acceptance:
         content = "\n".join(f"{key} = {json.dumps(value)}" for key, value in self.raw.items())
         content += (f'\n[[sources]]\nid = "capacity"\nadapter = "markdown-vault"\n'
                     f'root = {json.dumps(str(self.sources))}\n')
+        content += (f'\n[caps]\nmax_new_units_per_run = {self.source_count * 20}\n'
+                    f'max_source_items_per_run = {self.source_count}\n')
         _ = self.config_file.write_text(content)
         return Config(raw=self.raw)
 

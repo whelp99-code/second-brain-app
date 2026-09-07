@@ -28,6 +28,7 @@ DEFAULT_CAPS: dict[str, int] = {
     "max_llm_calls_briefing": 10,
     "max_briefing_validation_attempts": 1,
     "max_new_units_per_run": 500,
+    "max_source_items_per_run": 500,
     "max_db_rows_per_run": 5000,
     "max_derivation_attempts": 3,
 }
@@ -333,6 +334,9 @@ class Config:
             parsed = _as_int(value)
             if parsed is not None:
                 merged[key] = parsed
+        if _as_int(section.get("max_source_items_per_run")) is None:
+            # Preserve the old source-count ceiling while enforcing the unit budget too.
+            merged["max_source_items_per_run"] = merged["max_new_units_per_run"]
         return merged
 
     @property

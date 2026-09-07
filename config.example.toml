@@ -9,6 +9,9 @@ max_llm_calls_compile = 200
 max_llm_calls_conflict = 200
 max_llm_calls_briefing = 10
 max_new_units_per_run = 500
+# Distinct source versions attempted, including empty/skipped/failed items.
+# If omitted, inherits max_new_units_per_run for legacy source-count compatibility.
+max_source_items_per_run = 500
 max_db_rows_per_run = 5000
 max_derivation_attempts = 3
 

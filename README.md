@@ -64,6 +64,10 @@ sensitive = "mask"
 
 외부 LLM에 보낼 수 없는 소스는 `llm_policy = "deny"` 또는 로컬 모델과 함께 `local-only`로 설정한다.
 
+수집 예산은 `[caps]`의 `max_new_units_per_run`(신규 고유 unit 수)과 `max_source_items_per_run`(원본 버전 처리 시도 수)으로 나눈다. 기본값은 각각 500이다. 파일 수 키를 생략한 이전 설정은 unit 제한값을 파일 수 상한으로도 계승한다. `sb ingest --limit N`은 파일 수만 조정하며 unit 제한은 그대로 적용한다.
+
+한 원본이 전체 unit 예산을 넘으면 `INGEST_UNIT_BUDGET_EXCEEDED`와 종료 코드 1을 반환하고 원본을 보존한다. 해당 원본의 규모를 확인해 설정을 조정하거나 원본을 나눈 뒤 재실행한다. 잔여 예산에만 맞지 않는 원본은 `capped`로 남고 다음 실행에서 처리한다. [예산 계약과 인수](INGEST-BUDGET-CONTRACT-2026-09-08.md).
+
 ## macOS 앱
 
 맥에 저장소를 체크아웃한 뒤:

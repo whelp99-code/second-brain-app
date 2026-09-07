@@ -57,6 +57,7 @@ class StageReport:
     written: int = 0
     derivations: tuple[tuple[str, DerivationOutput], ...] = ()
     compiled_by: tuple[str, str] | None = None
+    failure: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +71,7 @@ class RunOutcome:
     git_commit: str | None
     already_running: bool = False
     written: int = 0
+    failure: str | None = None
 
 
 class StageFn(Protocol):
@@ -476,7 +478,9 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
             line = f"{started} run {run_id} failed pages=0 conflicts=0 errors=1"
             _append_run_log(root, line)
             return RunOutcome(run_id, "failed", 0, 0, 1, 1, None)
-        if report.capped:
+        if report.failure is not None:
+            status, exit_code = "failed", 1
+        elif report.capped:
             status, exit_code = "capped", 0
         elif report.attempted > 0 and report.errors * 2 > report.attempted:
             status, exit_code = "failed", 1
@@ -522,11 +526,13 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
                 report.attempted,
                 report.written or pages,
                 errors,
+                report.failure,
             )
         )
         _append_run_log(root, rendered.format(pages, conflicts, errors))
         return RunOutcome(
-            run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written
+            run_id, status, pages, conflicts, errors, exit_code, commit, False, report.written,
+            report.failure,
         )
 
 
@@ -566,6 +572,7 @@ class _PreparedIngest:
     written: int
     capped: bool
     cursor: tuple[str, str] | None
+    failure: str | None
 
 
 def _prepare_adapter_ingest(
@@ -576,12 +583,16 @@ def _prepare_adapter_ingest(
     run_id: str,
     remaining: int,
     reingress: ReingressGate,
+    unit_remaining: int,
+    unit_cap: int,
 ) -> _PreparedIngest:
     items = adapter.scan(ledger.get_cursor(adapter.source_id))
     source_items: list[SourceItem] = []
     unit_rows: list[UnitRow] = []
     version_keys: list[tuple[str, str, str]] = []
     accepted: set[tuple[str, str, str]] = set()
+    allocated_units: set[str] = set()
+    failure: str | None = None
     errors = attempted = written = 0
     capped = adapter_failed = False
     for ref, data, meta in items:
@@ -591,6 +602,7 @@ def _prepare_adapter_ingest(
         if attempted >= remaining:
             capped = True
             break
+        attempted += 1
         if meta.get("skip_reason"):
             skip_digest = hashlib.sha256(f"skip:{ref.source_version}".encode()).hexdigest()
             source_items.append(
@@ -613,13 +625,26 @@ def _prepare_adapter_ingest(
         except ErasureError:
             adapter_failed = True
             continue
-        attempted += 1
         units = _materialize(
             data,
             digest,
             ref.source_uri,
             f"{ref.source_id}:{ref.source_uri}",
         )
+        new_units = [unit for unit in units
+                     if unit.unit_id not in allocated_units and ledger.get_unit(unit.unit_id) is None]
+        if len(new_units) > unit_cap:
+            errors += 1
+            adapter_failed = True
+            failure = failure or (
+                f"INGEST_UNIT_BUDGET_EXCEEDED: source requires {len(new_units)} new units; "
+                f"caps.max_new_units_per_run={unit_cap}. Source retained; "
+                "increase the configured budget or split the source before retrying."
+            )
+            continue
+        if len(new_units) > unit_remaining - len(allocated_units):
+            capped = True
+            continue
         try:
             _ = cas.put(data)
         except OSError:
@@ -636,7 +661,8 @@ def _prepare_adapter_ingest(
                 run_id,
             )
         )
-        unit_rows.extend(_unit_rows(units))
+        unit_rows.extend(_unit_rows(new_units))
+        allocated_units.update(unit.unit_id for unit in new_units)
         version_keys.append(version_key)
         accepted.add(version_key)
         if units or not data:
@@ -653,6 +679,7 @@ def _prepare_adapter_ingest(
         written,
         capped,
         cursor,
+        failure,
     )
 
 
@@ -664,25 +691,33 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         chosen = discover_adapters(source_config)
         adapters = _select_adapters(chosen, source_ids, config)
         cas = ContentAddressedStore(vault.root)
-        cap = config.caps["max_new_units_per_run"] if limit is None else limit
+        cap = config.caps["max_source_items_per_run"] if limit is None else limit
+        unit_cap = config.caps["max_new_units_per_run"]
+        if cap < 0 or unit_cap < 0:
+            return StageReport((), 0, 1, 0, False,
+                               failure="INGEST_BUDGET_INVALID: budgets must be nonnegative")
         seen = {
             (item.source_id, item.source_uri, item.source_version)
             for item in ledger.list_source_items()
         }
         errors = attempted = written = 0
         capped = False
+        used_units = 0
+        failure: str | None = None
         for adapter in adapters:
             try:
                 reingress = ReingressGate(Path(config.state_root) / "reingress.db")
                 try:
                     prepared = _prepare_adapter_ingest(
-                    adapter,
-                    ledger,
-                    cas,
-                    seen,
-                    run_id,
-                    max(cap - attempted, 0),
-                    reingress,
+                        adapter,
+                        ledger,
+                        cas,
+                        seen,
+                        run_id,
+                        max(cap - attempted, 0),
+                        reingress,
+                        unit_cap - used_units,
+                        unit_cap,
                     )
                 finally:
                     reingress.close()
@@ -707,13 +742,15 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 except OSError:
                     errors += 1
             seen.update(prepared.version_keys)
+            used_units += len(prepared.units)
             errors += prepared.errors
             attempted += prepared.attempted
             written += prepared.written
-            capped = prepared.capped
-            if capped:
+            capped = capped or prepared.capped
+            failure = failure or prepared.failure
+            if capped and attempted >= cap:
                 break
-        return StageReport((), 0, errors, attempted, capped, None, written)
+        return StageReport((), 0, errors, attempted, capped, None, written, failure=failure)
 
     return stage
 

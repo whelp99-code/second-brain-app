@@ -35,7 +35,7 @@ This is a validation dataset, not a product hard limit. Full-load results, envir
 Current controls include:
 
 - maximum source files, source bytes and single-file size in the safe filesystem layer;
-- configured ingest and database-row caps; `max_new_units_per_run` currently counts source files, not normalized units (verified defect; see acceptance report below);
+- separate new-unit and source-attempt caps (`max_new_units_per_run`, `max_source_items_per_run`), plus database-row caps; whole sources that exceed the unit budget remain available for retry;
 - separate LLM-call caps for compile, conflict and briefing stages;
 - a single-writer Vault lock;
 - SQLite WAL mode, integrity checks and explicit migration status;
@@ -75,4 +75,4 @@ Increase run caps only after observing stable memory, disk and recovery behavior
 
 [Results, fixes, evidence and limitations](CAPACITY-ACCEPTANCE-2026-09-08.md): real CLI ingestion of 5,000 files produced 100,000 normalized units. The fixture committed 10,000 pages and 1,000 conflicts, sealed them, ran 100 in-process and 100 fresh CLI reads, then backed up and restored with ledger/search/CAS comparisons. Sealing improved from 59.36 to 23.78 seconds after grouping derived rows and their binding in transactions.
 
-The opt-in command is `TMPDIR=/var/tmp uv run python scripts/capacity-acceptance.py --full`; omit `--full` for smoke. It creates and retains a new isolated directory and writes evidence and command logs there. Pages/conflicts are synthetic fixtures, not measured LLM outputs. Read repetition does not fulfill the 100 scheduled write-cycle gate. Managed concurrent writes/reads, realistic growth/compression, operational restore, and Korean relevance evaluation remain required. Do not increase operational ingest caps on the assumption that the current unit-named setting bounds actual unit count.
+The opt-in command is `TMPDIR=/var/tmp uv run python scripts/capacity-acceptance.py --full`; omit `--full` for smoke. It creates and retains a new isolated directory and writes evidence and command logs there. Pages/conflicts are synthetic fixtures, not measured LLM outputs. Read repetition does not fulfill the 100 scheduled write-cycle gate. Managed concurrent writes/reads, realistic growth/compression, operational restore, and Korean relevance evaluation remain required. The unit/source accounting defect found in this run is addressed by the subsequent [ingest budget contract](INGEST-BUDGET-CONTRACT-2026-09-08.md). Operational cap changes still require sizing against the actual source workload; this source fix does not change deployed binaries or configuration.
