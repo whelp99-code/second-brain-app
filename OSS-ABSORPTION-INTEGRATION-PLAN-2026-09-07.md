@@ -176,7 +176,7 @@ R4는 다음처럼 의미를 분리했다. 자세한 경계·배포 조건은 [�
 
 | 우선순위 / 관점 | 남은 작업과 영향 | 구체적 개선 및 완료 기준 |
 |---|---|---|
-| P0 수정 — 자비스 자동 연결 | 라이브러리·하네스 성공만으로 운영 요청이 저장되지 않음 | I1-a/c/e: 기존 runtime에 outbox·selector 구성·완료 reader를 주입. 기존 주기 실행으로 pending→proved→settled 재확인, 재시작·중복 처리·cleanup 오류 표시 검증 |
+| P0 수정 — 자비스 자동 연결 | a680fd5에서 CLI/dashboard 주입과 기존 주기 실행 연결. outbox 완료 뒤 control uncertain 잔존 실측 | I1-a/c/e: 완료 영수증에 결합한 제어 명령 최종 상태, 기본 signed fence, 후보/publication/UI 전체 흐름과 운영 배포 인수 진행. 상세는 실행기 연결 보고서 |
 | P0 수정 — 승인 rollback 복구 | 316b8f2 소스 수정·격리 실제 MCP 검증 완료, 운영 미반영 | I1-b: event/바깥 transaction 실패 후 원문 보존·새 receipt 재발행 검증. 영속 권한/변경 파일 보존. 운영 반영은 B6에서 확인 |
 | P0 수정 — 갱신 중 읽기 | I3의 LLM 실행 중 배타 잠금은 소비자 10초 deadline과 충돌 가능 | 준비와 활성화 잠금 구간을 분리하되 단일 writer·reader pin·삭제 보장을 유지. 느린 갱신 중 조회와 중단 복구를 실측 |
 | P1 개선 — 일상 입력과 정정 | 일반 Enter 여러 줄 미지원, V1 owner correct 승인 대상 결합 부족 | 버전이 있는 본문 계약과 기존 V2 target/delegation 정정을 연결. 원문 전체 대응 및 승인 후 대상 변경 거부 검사 |

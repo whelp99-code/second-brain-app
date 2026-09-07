@@ -10,7 +10,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 격리 owner-confirmed 64개 record·승인 rollback 재시도 통과, 운영 연결·범위 미완료 | 전체 결과 검증·민감도·명시 예산·rollback 복구 보강. 일반 LF, I1-a/e 및 c 운영 연결, 실제 앱·프로젝트 범위 남음 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | CLI 실행·dashboard 주기 연결 소스 검증, 운영 전체 인수 미완료 | 64개 record·rollback·CLI 후속 cycle settled. control uncertain 최종 반영·운영 signed fence·후보/UI 전체 흐름·일반 LF·실제 앱·범위 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
@@ -127,3 +127,11 @@ I1-b는 전체 승인 쓰기까지 완료가 아니다. 승인된 inference의 a
 변경 전 두 경로 replay conflict 재현, 변경 후 최종 회귀 **92 passed / 35 files (40.47초)**, 변경 ESLint·backend build·독립 검토 통과. 실제 격리 MCP에서 rollback→새 승인→민감 기억 64개 proved/settled→두 클라이언트 회수·추가 dispatch 0·원문 정리까지 검증했다. 재현 명령과 한계는 [순환 인수 보고서](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)의 마지막 절에 있다.
 
 I1-b의 이 소스 결함은 수정됐다. 운영 실행기 outbox 주입과 주기적 완료 확인은 여전히 없으며 I1-a/c/e를 이어간다. B3 지연/과거 잔여물, 일반 LF·V2 정정·프로젝트 범위·실제 앱, B5~B8과 운영 배포/복원 검증은 계속 미완료다.
+
+### B4 진행 — CLI/dashboard 실행기와 주기 완료 확인 연결
+
+자비스 `a680fd5`: 공통 production outbox factory를 CLI control.execute와 dashboard executor에 연결했다. stage-dispatch는 예상 결과를 계산해 기존 승인용 명령을 구성한다. memory outbox --once/list로 처리·상태 확인이 가능하며 dashboard 기존 interval이 bounded cycle을 실행한다. 완료 reader의 예산/read fence, 공통 spool root, transport 소유권을 보존한다. HTTP 실행과 tick을 drain한 뒤 DB를 닫고 상태 변경을 명시 통지한다.
+
+회귀 **100 passed / 39 files**, 추가 tick/SSE 검사 **11 passed / 4 files**(일부 중복), 변경 ESLint·backend build·독립 검토 통과. 실제 격리 MCP에 CLI execute 경로로 민감 기억 64개를 보내고 다음 CLI cycle에서 settled와 독립 클라이언트 회수, 재전송 중복 0을 확인했다. Python 소스는 변경하지 않았다.
+
+실측에서 control command는 outbox settled 뒤에도 uncertain으로 남는다. 영수증 기반 최종 상태 반영을 다음 필수 수정으로 지정했다. 기본 운영 signed-fence 구성, 후보/publication/UI 전체 흐름, 배포·실제 앱/범위 및 B3/B5~B8은 계속 미완료다. 상세 재현·변경·한계는 [기억 실행기 연결 보고서](JARVIS-MEMORY-RUNTIME-2026-09-08.md)를 따른다.

@@ -11,6 +11,8 @@ const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jarvis = resolve(process.argv[2] ?? join(sb, '../Orca-JARVIS'));
 const ownerConfirmed = process.argv.includes('--owner-confirmed');
 const approvalRollback = process.argv.includes('--approval-rollback');
+const runtimeCli = process.argv.includes('--runtime-cli');
+if (runtimeCli && !ownerConfirmed) throw new Error('--runtime-cli requires --owner-confirmed');
 if (approvalRollback && !ownerConfirmed) throw new Error('--approval-rollback requires --owner-confirmed');
 const recordSet = process.argv.includes('--record-set');
 const recordLimit = process.argv.includes('--record-limit');
@@ -21,6 +23,8 @@ const load = path => import(pathToFileURL(join(jarvis, 'dist', path)).href);
 const {outboxFixture, OUTBOX_NOW} = await load('tests/fixtures/memory-outbox-fixture.js');
 const {closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.js');
 const {localKey} = await load('tests/helpers.js');
+const {execute} = await load('src/cli-runtime.mjs');
+const {MemoryOutboxRecordReader} = await load('src/memory-outbox-record.js');
 const {ControlPlane, signCommandApproval, MemoryOutboxService, createSecondBrainReadAdapter,
   createSecondBrainWriteRequestAdapter, createSecondBrainTransport, memoryRememberArtifact,
   prepareMemoryRememberDispatch} = await load('src/index.js');
@@ -54,6 +58,11 @@ try {
     budgets:readBudgets,
     max_age_ms:86400000,expiry_ms:172800000});
   const writer = createSecondBrainWriteRequestAdapter(transport,fixture.database.authority,()=>OUTBOX_NOW);
+  const spoolRoots = {candidate_dispatch_spool_root:join(fixture.database.root,'candidate-dispatch'),
+    candidate_review_spool_root:join(fixture.database.root,'candidate-review')};
+  const cliDependencies = {clock:()=>OUTBOX_NOW,memoryOutboxOptions:{...spoolRoots,
+    transport_options:{launcherPath:launcher,configPath:join(root,'config.toml')}}};
+  const cli = args => execute([...args,'--db',fixture.database.path],cliDependencies);
   const content = fixture.request.payload.content;
   const expectation = memoryRememberArtifact(fixture.request);
   const expected = expectation.artifact;
@@ -69,25 +78,35 @@ try {
     requested_by:'principal:owner',requested_at:OUTBOX_NOW.toISOString(),
     expires_at:new Date(OUTBOX_NOW.getTime()+900000).toISOString(),target:JSON.parse(previous.target_json),
     args:{...JSON.parse(previous.args_json),expected_artifact:expected}};
-  const staged = control.stage(action,OUTBOX_NOW);
+  const staged = runtimeCli ? (await cli(['memory','stage-dispatch',fixture.request.candidate_id])).request
+    : control.stage(action,OUTBOX_NOW);
   control.decide(signCommandApproval({schema_version:1,receipt_id:'memory-real-provider-receipt',
-    request_id:action.request_id,decision:'approve',command_digest:staged.command_digest,
+    request_id:staged.request_id,decision:'approve',command_digest:staged.command_digest,
     signer_principal_id:'principal:owner',authenticated_session_id:'isolated-acceptance',key_id:'decision-test',
     algorithm:'Ed25519',issued_at:OUTBOX_NOW.toISOString(),not_before:OUTBOX_NOW.toISOString(),
-    expires_at:action.expires_at,nonce:'memory-real-provider-receipt-nonce',max_uses:1,status:'issued'},
+    expires_at:staged.expires_at,nonce:'memory-real-provider-receipt-nonce',max_uses:1,status:'issued'},
     localKey(fixture.database.authority)),OUTBOX_NOW);
   const service = new MemoryOutboxService({authority:fixture.database.authority,writer,reader,clock:()=>OUTBOX_NOW,
     candidate_dispatch_spool_root:join(fixture.database.root,'candidate-dispatch'),
     candidate_review_spool_root:join(fixture.database.root,'candidate-review')});
   const query = recordLimit ? 'a'.repeat(60) : recordSet ? '기억' : content;
   const initial = await reader.search(query);
-  const claimed = control.claim(action.request_id,'real-provider-worker',OUTBOX_NOW);
-  const queued = service.enqueue(claimed);
-  const dispatched = await service.runOnce('real-provider-worker',1);
+  let claimed, queued, dispatched;
+  if (runtimeCli) {
+    dispatched = (await cli(['control','execute',staged.request_id])).execution;
+    assert.equal(dispatched.state,'uncertain');
+    queued = service.get(dispatched.result.outbox_id);
+    claimed = new MemoryOutboxRecordReader(fixture.database.authority,spoolRoots).command(queued.outbox_id);
+  } else {
+    claimed = control.claim(staged.request_id,'real-provider-worker',OUTBOX_NOW);
+    queued = service.enqueue(claimed);
+    dispatched = await service.runOnce('real-provider-worker',1);
+  }
   const accepted = await transport.call('sb_request_status',{request_id:fixture.request.request_id});
   const applied = provider('apply');
   const status = await transport.call('sb_request_status',{request_id:fixture.request.request_id});
-  const reconciled = await service.reconcileOnce('real-provider-worker',1);
+  const reconciled = runtimeCli ? (await cli(['memory','outbox','--once','--limit','1'])).cycle
+    : await service.reconcileOnce('real-provider-worker',1);
   const reused = await reader.readPage(expected.page_id);
   const recent = await reader.recentChanges(1);
   secondTransport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
@@ -102,6 +121,7 @@ try {
   const terminalReplay = service.get(queued.outbox_id)?.state === 'settled' ? service.enqueue(claimed) : undefined;
   const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
+    runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,
     approval_rollback_recovered:approvalRollback,
     record_set:recordSet,record_limit:recordLimit,budget_profile:budgetProfile,sensitive,initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
     provider_status:status.value?.state,reconciled,outbox:service.get(queued.outbox_id)?.state,

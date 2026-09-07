@@ -56,11 +56,11 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS
 
 | ID / 우선순위 | 확인된 문제 | 수정·완료 기준 |
 |---|---|---|
-| I1-a / P0 | 운영 src에서 MemoryOutboxService 생성이 없고 dashboard/CLI executor는 outbox에 undefined를 전달 | 기존 transport·권한·fence를 사용하는 outbox를 실제 진입점에 구성하고 승인된 요청의 실행을 확인 |
+| I1-a / P0 | a680fd5에서 CLI/dashboard executor에 production outbox 구성·소스 검증 통과 | 운영 signed-fence 기본 구성, 실제 후보/publication 전체 흐름과 배포 인수는 남음 |
 | I1-b / P0 | 원문 수명·owner-confirmed 권한 및 바깥 rollback 후 새 receipt 재승인 복구 소스 검증 통과 | 자비스 64b255b/d553327/316b8f2. 운영 정리/layout·배포 연결은 남음 |
-| I1-c / P1 | c7c5182에서 영속 publication/권한 기반 selector 구성기 구현·격리 실제 순환 통과 | runtime/UI 명령 staging 호출에 연결. 사용자에게 내부 hash 계산을 요구하지 않음 |
+| I1-c / P1 | c7c5182 구성기에 이어 a680fd5 CLI stage-dispatch 연결·실제 MCP 순환 통과 | dashboard 후보→저장 명령 준비 흐름과 실제 에이전트 앱 검증 남음 |
 | I1-d / P1 | c7c5182의 전체 record 대응과 provider 민감도·입력 한도 보강으로 64개 격리 순환 통과 | 일반 LF 본문 계약은 여전히 미완료. 완료 reader의 record-set-v1 예산을 운영에 명시 주입 |
-| I1-e / P1 | provider 비동기 완료 이후 outbox reconciliation의 운영 호출이 없음 | 기존 주기적 진입점에 연결. 접수만으로 완료 표시하지 않고 재시작·중복·uncertain을 검증 |
+| I1-e / P1 | a680fd5의 CLI --once 및 dashboard 기존 주기에 완료 확인 연결 | outbox settled 뒤 control uncertain 최종 상태 반영, 운영 배포 인수 남음 |
 
 이 다섯 항목은 보류할 선택 기능이 아니라 B4 완료 조건이다. 별도 큐 서버나 두 번째 기억 DB를 만들지 않고 기존 자비스 상태기계와 세컨드브레인 단일 writer를 연결한다. source-level 승인 정책을 우회하거나 예전 요청의 서명·digest를 치환하지 않는다.
 
@@ -133,3 +133,5 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 합성 owner 승인·격리 DB와 실제 별도 provider 프로세스를 이용한 검증이다. 운영 사용자 승인·현실 업무 성공·실제 Codex/Claude 앱 공유는 검증하지 않았다. 운영 서비스는 재시작/배포하지 않았다.
 
 다음 I1-a/c/e 연결 지점은 현재 소스에서 다시 확인했다. `src/dashboard/memory-production.ts`의 기본 executorFactory와 `src/cli-control-commands.ts`는 outbox를 주입하지 않으며, dashboard의 memory-runtime은 읽기·mutation staging만 구성한다. 따라서 이번 복구만으로 운영 자동 저장이 활성화되지는 않는다. 완료 reader의 record-set-v1 예산과 spool root를 공유하는 outbox를 기존 executor/주기 실행에 연결하고, 실제 진입점 기반 검증을 이어간다.
+
+후속 `a680fd5`에서 위 실행기 주입/주기 호출을 구현했다. 실제 CLI→MCP 64개 기억 전달과 다음 CLI cycle의 settled를 확인했으며, control command는 uncertain으로 남는 별도 결함도 실측했다. 최신 변경·검증·필수 잔여는 [2026-09-08 실행기 연결 보고서](JARVIS-MEMORY-RUNTIME-2026-09-08.md)를 따른다.
