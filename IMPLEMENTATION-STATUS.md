@@ -197,3 +197,12 @@ SB query_cosine의 조회 중 DROP/CREATE를 readonly SQLite CTE로 바꾸고 RR
 전체 **571 passed, 2 skipped (157.58초)**, 관련 집중 **22 passed (20.48초)**이며 일부 중복이다. Ruff·Node 구문·diff check 통과, 변경 소스 타입 오류/경고 0.
 
 V1 신규 remember의 일반 줄바꿈, 자비스 정정 UI/사용자 승인/production saga/control 완료의 전체 인수와 B4~B8 운영 완료는 여전히 남는다. 자비스 제품 소스·서비스·운영 세대·push는 변경하지 않았다.
+
+
+### B4 진행 — 자비스 V2 정정 명령 완료와 중단 복구
+
+자비스 `4721358`: 기존 correction saga의 settled와 control 완료 사이 commit 간격, 만료/시각 재사용, compaction 이후 명령 원형 소실, settled 주기 복구 누락을 수정했다. 원문 없는 immutable binding과 원 승인·전송 fence·서명 provider proof·동일 lane purge를 대조한 뒤 원장/완료/effect/event를 함께 commit한다. 이미 compaction이 끝났으면 provider가 중단돼도 로컬 증거로 복구한다.
+
+새 회귀 11개를 포함한 관련 **34 passed / 9 files (50.15초)**, backend build·변경 lint·독립 재검토 통과. 격리 실제 SB MCP에서 후보 확인→승인 dispatch→정정 proved→최종 event 실패→20분 후 control completed, 전송/compaction 각 1회, 복구 중 provider 추가 관측 0회를 검증했다. 두 reader의 같은 정정 record 4개·내용/출처 digest 일치와 이전 기억 0개를 확인했다. [수정 내역·검증 한계·후속 목록](CORRECTION-CONTROL-COMPLETION-2026-09-08.md).
+
+이 검증은 합성 owner 서명을 쓰는 실제 backend 순환이다. 정정 UI/실제 사용자 승인 화면, 실제 앱별 수집·주입, V1 일반 LF, 접근 범위, task 원본 차단 전파와 운영 인수는 남는다. 운영 DB migration·배포·서비스 재시작·push는 수행하지 않았다.

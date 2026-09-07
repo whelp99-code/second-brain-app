@@ -274,3 +274,12 @@ task completion 대조에서 신규 요약은 기존 labeled_inference로 취급
 실제 V2 정정에서 CRLF를 LF로 바꾸어 artifact proof가 실패하고 중간 문장 인용이 빠지는 결함을 확인해 수정했다. 원문 digest와 frozen wire는 유지하고 문장별 인용 렌더링·effect snapshot·완료 관측을 일치시킨다. record 수/바이트 초과는 대상 쓰기 전에 검사한다.
 
 빈 줄·LF/CRLF·반복·인용 문자를 포함한 4개 문장의 실제 provider proved→서명/관측 검증→두 자비스 MCP 클라이언트 current와 내용·출처 일치를 확인했다. [상세 보고서](CORRECTION-RENDERING-2026-09-08.md). V1 신규 기억의 일반 줄바꿈과 자비스 정정 UI/승인/saga 전체 인수는 완료로 계산하지 않는다. 다음 I1-d/G4의 작업은 이 두 경로의 제품 계약과 완료 상태 연결이다.
+
+
+## 19. I1-d/G4 후속 — 정정 완료의 자비스 상태 연결
+
+SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MCP로 연결했다. provider proved와 control completed 사이의 중단/만료 복구를 구현했다. 이전 18절에서 미완료였던 backend saga/control 연결은 격리 인수를 통과했다. 정정 UI와 실제 앱·운영 전환은 계속 미완료다.
+
+수정·개선 항목: 원문 없는 원 명령 binding, 원 승인/redemption/전송 fence 검증, signed proof와 동일 lane purge 검증, 원장/효과/event의 atomic 완료, completed purge의 offline 재사용, bounded cursor 복구와 cursor 실패 rollback, compaction 이후 clock 재조회. 새 회귀 11개 포함 관련 34개 통과; 실제 event 실패 후 20분 재개에서 provider 추가 호출 없이 completed, 두 클라이언트 같은 정정 기억 4개, 이전 기억 0개, 전송/compaction 각 1회.
+
+[상세 보고서](CORRECTION-CONTROL-COMPLETION-2026-09-08.md)의 다음 항목을 기존 R/I/G 목록에 합친다. V1 일반 LF·정정 UI·실제 앱별 공유·context pack/범위·readiness/운영 복원·검색 품질 순으로 남은 경계를 검증한다. task 수집은 원본 차단 전파 계약이 갖춰질 때 재개한다. OSS별 별도 정본/서버/승인 체계를 추가하지 않는다.

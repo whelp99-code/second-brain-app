@@ -8,9 +8,9 @@
 
 우선순위: P0는 중앙 기억 쓰기 확대 전에 반드시 해결, P1은 안정 운영 완료 조건, P2는 품질·사용성 확장이다. 근거는 **재현**, **코드 확인**, **검증 공백**, **제안**으로 구분한다. 시간·성능 목표는 달성 실적이 아니라 제안된 완료 기준이다.
 
-최신 후속: [후보 CLI 접수 보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md). 실제 시각의 원문/DB 불일치와 미커밋 원문 재시도 결함을 수정하고 제품 파일 접수에서 실제 저장 순환까지 검증했다. 실제 task 결과 수집과 approved/no_data 본문 인계는 별도 미완료다.
+직전 후속: [후보 CLI 접수 보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md). 실제 시각의 원문/DB 불일치와 미커밋 원문 재시도 결함을 수정하고 제품 파일 접수에서 실제 저장 순환까지 검증했다. 실제 task 결과 수집과 approved/no_data 본문 인계는 별도 미완료다.
 
-최신 I1 상태: CLI/dashboard outbox·완료·signed fence에 이어 후보 검토·확인/거절·저장 명령 준비·진행 화면을 연결했다. 실제 MCP/HTTP에서 64개 record의 `completed / settled / stored=true`와 두 클라이언트 회수를 확인했다. 실제 업무 후보 수집, private 후보 UI, 일반 LF/V2 정정, 앱별 공유/주입과 운영 배포는 남는다. [후보 UI 인수 보고서](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md), 통합 계획 15절 및 [구현 원장](IMPLEMENTATION-STATUS.md)을 최신 판정으로 삼는다.
+최신 I1 상태: CLI/dashboard 후보 접수·검토·저장 진행에 이어 **V2 정정의 production saga/control 완료와 중단 복구를 격리 실제 MCP에서 검증했다.** 정정 4개 record를 두 소비자가 회수했고, 최종 완료 저장 실패 뒤 승인 시간이 지나도 재전송 없이 완료됐다. [정정 완료 연결 보고서](CORRECTION-CONTROL-COMPLETION-2026-09-08.md). 실제 task 수집·private 후보/정정 UI·V1 일반 LF·앱별 공유/주입·접근 범위와 운영 배포는 남는다. 아래 과거 분석과 각 후속 기록의 시점을 구분하며 [구현 원장](IMPLEMENTATION-STATUS.md)을 최신 판정으로 삼는다.
 
 
 > **인계 방향 병합:** [OSS 장점 흡수 통합 분석·구현 계획](OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md)을 추가했다. Second Brain을 유지하며 자비스와 여러 에이전트의 공통 기억을 1차 범위로 한다. 다른 업무 실행자 연결은 후속으로 이동하고, G3 문맥 공급·세션 중복 방지를 공통 기억 단계로 앞당긴다. 아래 24개 ID와 결함 증거는 유지한다.
@@ -210,3 +210,10 @@ writer mutex로 모든 generation writer를 직렬화하면서 sealed 부모에�
 동시에 최초 remember의 필수 log/gitignore 초기화 누락을 수정해 바로 export할 때 inventory 검사를 통과하도록 했다. raw/.sb 강제 제외 규칙은 상속 negation보다 뒤에 두고 원문 CAS 보존과 Git 이력 제외를 검증한다.
 
 **추가 개선/보류:** 과거 `.staging`/미활성 generation 일괄 삭제는 요청·원장·현재 writer 대응 검증 없이 실행하지 않는다(B3). 자비스의 signed export status/expires_at 소비는 신규 I1 후속이다. 이번 SB 만료 오류는 현 transport에서 일반 오류로 실패 처리된다. 운영 부하 p95·전환·실제 앱 인수는 계속 남는다.
+
+
+## 14. I1-d/G4 후속 — 정정 완료 연결 및 재시도
+
+provider의 정정 완료 이후 control이 claimed/uncertain에 남는 결함을 수정했다. 변경 사항·원인·남은 P1/P2 항목은 [정정 완료 연결 보고서](CORRECTION-CONTROL-COMPLETION-2026-09-08.md)에 상세히 기록했다. 과거 결함의 재현 설명을 현재 소스 상태로 읽지 않는다.
+
+관련 회귀 34개 통과, 실제 정정 proved/control completed/두 클라이언트 4개 record/이전 기억 0개. 최종 event 실패와 20분 만료 후 복구 시 전송·compaction은 각 1회였다. 이는 운영 전환, 정정 UI와 모든 앱의 자동 기억 사용 완료가 아니다. 원본 task 차단 전파 없는 자동 수집과 근거 없는 hybrid 활성화는 계속 보류한다.

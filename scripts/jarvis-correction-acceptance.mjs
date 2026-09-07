@@ -1,6 +1,7 @@
 // Opt-in V2 correction against an isolated real provider and two JARVIS readers.
 // Delegation uses a synthetic owner fixture; this is not the full correction UI.
 import assert from 'node:assert/strict';
+import {correctionControlFixture} from './jarvis-correction-control-fixture.mjs';
 import {execFileSync} from 'node:child_process';
 import {createHash, createPublicKey} from 'node:crypto';
 import {chmodSync, lstatSync, mkdtempSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
@@ -31,7 +32,8 @@ const release = path => {
   chmodSync(path, 0o700);
   for (const name of readdirSync(path)) release(join(path, name));
 };
-let database, transport, secondTransport;
+const controlCycle = process.argv.includes('--control-cycle');
+let database, transport, secondTransport, lifecycle;
 try {
   provider('init');
   const launcher = join(root, 'mcp');
@@ -72,12 +74,18 @@ try {
   const laneId = `memcorr:req:v1:${'a'.repeat(64)}`;
   const chain = new MemoryTombstoneChain(database.authority,Buffer.alloc(32,11));
   const staleFence = effects.readFence('memory_read',now);
-  const appended = chain.append({operation:'correct',lane_id:laneId,targets,target_manifest_digest:targetDigest,
+  let appended, request;
+  if (controlCycle) {
+    lifecycle = await correctionControlFixture({load,jarvis,database,key,config,transport,targets,scope,content,now,root});
+    request = lifecycle.request;
+    appended = {high_water:request.tombstone_high_water};
+  } else {
+  appended = chain.append({operation:'correct',lane_id:laneId,targets,target_manifest_digest:targetDigest,
     scope_digest:scopeDigest,authority_receipt_digest:`sha256:${'c'.repeat(64)}`,
     payload_digest:memoryEffectDigest('effect_payload',payload),effective_at:now.toISOString()});
   const expectedPrior = Object.fromEntries(['provider_instance_id','generation_id','generation_manifest_digest',
     'vault_head','vault_tree','page_blob_oid','page_content_digest','citation_identity_full'].map(name=>[name,target[name]]));
-  const request = createMemoryEffectWriteRequest({schema_version:2,kind:'memory_effect',provider_instance_id:config.provider_instance_id,
+  request = createMemoryEffectWriteRequest({schema_version:2,kind:'memory_effect',provider_instance_id:config.provider_instance_id,
     lane:'correction',lane_id:laneId,operation:'correct',target_manifest_digest:targetDigest,targets,scope,scope_digest:scopeDigest,
     expected_prior:expectedPrior,tombstone_high_water:appended.high_water,tombstone_chain_delta:[appended.entry],
     created_at:now.toISOString(),expires_at:new Date(now.getTime()+600000).toISOString(),payload},
@@ -85,11 +93,25 @@ try {
   const accepted = await transport.call('sb_write_request',{request});
   assert.equal(accepted.kind,'data',JSON.stringify(accepted));
   assert.equal(accepted.value.state,'pending');
+  }
   const changed = await transport.call('sb_write_request',{request:{...request,
     payload:{...payload,content:'changed after approval'}}});
   assert.equal(changed.kind,'error');
   const applied = provider('apply');
   assert.equal(applied.state,'proved',JSON.stringify(applied));
+  if (lifecycle) {
+    lifecycle.failNextCompletion();
+    await assert.rejects(()=>lifecycle.service.reconcilePending(10),/INJECTED_FINAL_EVENT_FAILURE/);
+    assert.equal(lifecycle.controlState(),'claimed');
+    database.authority.db.exec('DROP TRIGGER fail_correction_completion');
+    const before = lifecycle.counts();
+    lifecycle.advance();
+    await lifecycle.service.reconcilePending(10);
+    assert.equal(lifecycle.controlState(),'completed');
+    assert.deepEqual(lifecycle.counts(),before);
+    assert.equal(before.writes,1);
+    assert.equal(before.compactions,1);
+  }
   const status = await effects.requestStatus(request.request_id);
   assert.equal(status.kind,'data',JSON.stringify(status));
   assert.equal(status.value.state,'proved');
@@ -126,8 +148,10 @@ try {
     corrected:corrected.kind,shared:shared.kind,record_count:corrected.evidence.length,
     all_content_digests_matched:true,effect_provenance_matched:true,old_record_count:old.evidence?.length ?? 0,
     changed_payload:changed.code,stale_fence:stale.code,observation_verified:observations.result.kind,
-    replayed:replay.value.replayed,additional_apply:'idle'},null,2));
+    replayed:replay.value.replayed,additional_apply:'idle',
+    ...(lifecycle?{control_state:lifecycle.controlState(),...lifecycle.counts(),expired_recovery_without_provider:true}:{} )},null,2));
 } finally {
+  await lifecycle?.service.close();
   await secondTransport?.close();
   await transport?.close();
   if (database) await closeMemoryDatabase(database);
