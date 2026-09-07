@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sb.connectors import discover_adapters
-from sb.connectors.base import ItemMeta
+from sb.connectors.base import AcknowledgingSourceAdapter, ItemMeta
 from sb.connectors.inbox_documents import ADAPTER_ID as INBOX_ID
 from sb.connectors.inbox_documents import MAX_INBOX_BYTES, create
 from sb.contracts import SourceRef
@@ -106,8 +106,11 @@ def test_inbox_moves_parsed_file_to_done_after_success(tmp_path: Path) -> None:
     # When: the adapter ingests the document.
     items = list(adapter.scan(None))
 
-    # Then: the file is gone from inbox/ and only exists under inbox/.done/.
+    # Scanning is read-only; only durable intake acknowledgment permits the move.
     assert _delivered(items)
+    assert source.is_file()
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    adapter.acknowledge(tuple(ref for ref, _body, _meta in items))
     assert not source.exists()
     assert (inbox / ".done" / "keep.md").is_file()
     assert (inbox / ".done" / "keep.md").read_text(encoding="utf-8") == "move-me\n"
@@ -202,10 +205,29 @@ def test_inbox_does_not_write_outside_inbox_when_nested_file_succeeds(tmp_path: 
     # When: the adapter ingests the nested document.
     items = list(adapter.scan(None))
 
-    # Then: the only write is under inbox/.done/ and parent paths stay untouched.
+    # Then: explicit acknowledgment writes only inside inbox/.done/.
     assert _delivered(items) == [("nested/inner.md", b"nested-ok\n")]
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    adapter.acknowledge(tuple(ref for ref, _body, _meta in items))
     assert (inbox / ".done" / "nested" / "inner.md").is_file()
     assert set(tmp_path.iterdir()) == {inbox}
+
+
+def test_inbox_ignores_memory_request_queue(tmp_path: Path) -> None:
+    # Given: a pending write request beneath the reserved queue directory.
+    inbox = tmp_path / "inbox"
+    pending = inbox / ".requests" / "pending"
+    pending.mkdir(parents=True)
+    _ = (pending / "memreq.json").write_text('{"state":"pending"}\n', encoding="utf-8")
+    adapter = create(_cfg(inbox))
+
+    # When: generic inbox intake scans the inbox.
+    items = list(adapter.scan(None))
+
+    # Then: request files are neither parsed nor moved by the connector.
+    assert items == []
+    assert (pending / "memreq.json").is_file()
+    assert not (inbox / ".done").exists()
 
 
 def test_registry_auto_discovers_inbox_documents_adapter() -> None:
@@ -218,3 +240,15 @@ def test_registry_auto_discovers_inbox_documents_adapter() -> None:
     # Then: the inbox adapter is registered under its unique ADAPTER_ID.
     assert INBOX_ID in registry
     assert registry[INBOX_ID].source_id
+
+
+def test_acknowledgment_does_not_move_changed_input(tmp_path: Path) -> None:
+    source = tmp_path / "note.md"
+    _ = source.write_text("old content")
+    adapter = create(_cfg(tmp_path))
+    scanned = list(adapter.scan(None))
+    _ = source.write_text("new content must remain pending")
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    adapter.acknowledge(tuple(ref for ref, _body, _meta in scanned))
+    assert source.read_text() == "new content must remain pending"
+    assert not (tmp_path / ".done").exists()

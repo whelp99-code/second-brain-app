@@ -68,13 +68,17 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     cites = _input_sources(inputs)
     prompt = _fill_prompt(inputs, cites)
     cap = config.caps["max_llm_calls_briefing"]
-    if cap >= 1:
+    recs = EMPTY_PLACEHOLDER
+    allowed = frozenset(cite.sid for cite in cites)
+    attempts = min(cap, max(1, config.caps.get("max_briefing_validation_attempts", 1)))
+    for _ in range(attempts):
         recs = _require_cited_recs(
-            _mark_uncited_bullets(_recommendation_body(llm.generate(prompt))),
-            frozenset(cite.sid for cite in cites),
+            _mark_uncited_bullets(_recommendation_body(llm.generate(prompt))), allowed,
         )
-    else:
-        recs = EMPTY_PLACEHOLDER
+        invalid = {match.group(1) for match in SID_RE.finditer(recs)} - allowed
+        if not invalid:
+            break
+        prompt += "\n이전 응답에 유효하지 않은 인용이 있었다. available-citations의 각주만 사용해 다시 작성하라."
     status = inputs.previous_run_status
     if status is None:
         recs = f"{WARN_NONE}\n{recs}"

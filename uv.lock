@@ -2642,6 +2642,7 @@ name = "second-brain"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "defusedxml" },
     { name = "llama-index-core" },
     { name = "mcp" },
@@ -2667,6 +2668,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography" },
     { name = "defusedxml" },
     { name = "llama-index-core", specifier = "==0.14.24" },
     { name = "mcp" },

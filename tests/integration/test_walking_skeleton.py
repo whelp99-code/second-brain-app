@@ -18,7 +18,7 @@ from sb.cli import main
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
 from sb.llm import FakeLLM
-from sb.store.ledger import Ledger, load_ledger_tables
+from sb.store.ledger import load_ledger_tables
 from sb.vault import Vault, VaultLintError
 
 ME_WIKI_FILE: Path = (
@@ -163,7 +163,9 @@ def _prepare(tmp_path: Path, monkeypatch: MonkeyPatch) -> tuple[Path, SourceSnap
     cfg = tmp_path / "config.toml"
     _ = cfg.write_text(
         (
-            f'vault_root = "{vault}"\n\n'
+            f'vault_root = "{vault}"\n'
+            f'share_root = "{tmp_path}"\n'
+            f'state_root = "{tmp_path / ".state"}"\n\n'
             f"[[sources]]\n"
             f'id = "me-wiki"\n'
             f'adapter = "markdown-vault"\n'
@@ -181,8 +183,7 @@ def _prepare(tmp_path: Path, monkeypatch: MonkeyPatch) -> tuple[Path, SourceSnap
 
 
 def _arm_fake(vault: Path, slot: _LlmSlot) -> tuple[FakeLLM, str]:
-    with Ledger(vault) as ledger:
-        items = ledger.list_source_items()
+    items = list(load_ledger_tables(vault / ".sb" / "ledger.db").source_items.values())
     assert len(items) == 1
     digest = items[0].content_hash
     sid = digest[:8]
@@ -216,13 +217,13 @@ def test_walking_skeleton_end_to_end_with_idempotency_when_one_me_wiki_file(
         fake, _digest = _arm_fake(vault, slot)
         code, _out, err = _cli(["compile", "--llm", "fake"])
         assert code == 0, err
-        assert _git_count(vault) == 2
+        assert _git_count(vault) == 1
 
         before = datetime.now().astimezone().date().isoformat()
         code, _out, err = _cli(["brief", "--llm", "fake"])
         after = datetime.now().astimezone().date().isoformat()
         assert code == 0, err
-        assert _git_count(vault) == 3
+        assert _git_count(vault) == 1
         assert _git(vault, "status", "--porcelain").stdout == ""
 
         wiki = _wiki_pages(vault)
@@ -252,13 +253,11 @@ def test_walking_skeleton_end_to_end_with_idempotency_when_one_me_wiki_file(
         assert ingest_id not in log_text
 
         shas = _git(vault, "log", "--reverse", "--format=%H").stdout.splitlines()
-        assert len(shas) == 3
-        compile_log = _git(vault, "show", f"{shas[1]}:log.md").stdout
-        brief_log = _git(vault, "show", f"{shas[2]}:log.md").stdout
-        assert compile_id in compile_log
-        assert brief_id not in compile_log
-        assert compile_id in brief_log
-        assert brief_id in brief_log
+        assert len(shas) == 1
+        sealed = _git(vault, "rev-list", "--parents", "-n", "1", "HEAD").stdout.strip()
+        assert sealed.count(" ") == 0
+        current_log = _git(vault, "show", "HEAD:log.md").stdout
+        assert compile_id in current_log and brief_id in current_log
 
         assert fake.calls == 2
         before_deriv = _deriv_count(vault)
@@ -271,7 +270,7 @@ def test_walking_skeleton_end_to_end_with_idempotency_when_one_me_wiki_file(
         code, _out, err = _cli(["brief", "--llm", "fake"])
         assert code == 0, err
 
-        assert _git_count(vault) == 3
+        assert _git_count(vault) == 1
         assert _deriv_count(vault) == before_deriv
         assert fake.calls == 2
         assert (vault / "log.md").read_bytes() == before_log

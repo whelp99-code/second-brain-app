@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from typing import Protocol, TypedDict
+from collections.abc import Iterator, Sequence
+from typing import Protocol, TypedDict, runtime_checkable
 
 from sb.contracts import SourceRef
 
@@ -28,3 +28,10 @@ class SourceAdapter(Protocol):
     def next_cursor(self) -> str:
         """Return the cursor to persist after a completed scan."""
         ...
+
+
+@runtime_checkable
+class AcknowledgingSourceAdapter(Protocol):
+    """Optional intake cleanup, only after source rows are durably committed."""
+
+    def acknowledge(self, committed: Sequence[SourceRef]) -> None: ...

@@ -15,6 +15,7 @@ dependencies = [
     "llama-index-core==0.14.24",
     "psycopg[binary]",
     "mcp",
+    "cryptography",
 ]
 
 [project.optional-dependencies]

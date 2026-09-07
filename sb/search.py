@@ -105,7 +105,12 @@ class SearchHit:
 @runtime_checkable
 class HybridModule(Protocol):
     def hybrid_search(
-        self, lexical_results: tuple[SearchHit, ...], query: str, limit: int
+        self,
+        lexical_results: tuple[SearchHit, ...],
+        query: str,
+        limit: int,
+        *,
+        vault_root: Path | None = None,
     ) -> Sequence[SearchHit]: ...
 
 
@@ -201,7 +206,18 @@ class SearchIndex:
         scope: str | None = None,
     ) -> tuple[SearchHit, ...]:
         """Refresh from Git HEAD only when needed, then BM25-search `query`."""
-        root = self.vault_root
+        root = self.vault_root.resolve()
+        if (root / "generation.json").is_file():
+            from sb.sealed_search import sealed_rows
+
+            rows = sealed_rows(root, query, limit)
+            # Sealing attests provenance, not owner approval. Never invent ACTIVE approval.
+            if scope in {"active", "candidate"}:
+                return ()
+            return tuple(SearchHit(page, section, text, score, kind=page.split("/")[0],
+                                   knowledge_status="UNKNOWN", approval_status="UNKNOWN")
+                         for page, section, text, score in rows
+                         if not kinds or page.split("/")[0] in kinds)
         db_path = _db_path(root)
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(db_path, root, registry)
@@ -217,11 +233,13 @@ class SearchIndex:
         )
         if not _wants_hybrid(self.hybrid):
             return hits
-        return _hybrid_or_lexical(hits, query, limit)
+        return _hybrid_or_lexical(hits, query, limit, root)
 
     def project(self) -> None:
         """Re-read the registry and project status columns onto search.db. No vault write."""
         root = self.vault_root
+        if (root / "generation.json").is_file():
+            raise RuntimeError("SEALED_GENERATION_REQUIRES_SUCCESSOR")
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(_db_path(root), root, registry)
 
@@ -500,8 +518,9 @@ def _lexical(
     if stripped == "" or limit <= 0:
         return ()
     match = '"' + stripped.replace('"', '""') + '"'
-    where = ["docs MATCH ?"]
-    params: list[str | int] = [match]
+    short = len(stripped) < 3
+    where = ["(instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 OR instr(lower(section),lower(?))>0)" if short else "docs MATCH ?"]
+    params: list[str | int] = [stripped, stripped, stripped] if short else [match]
     selected_kinds = tuple(dict.fromkeys(kind for kind in (kinds or ()) if kind))
     if selected_kinds:
         where.append("kind IN (" + ",".join("?" for _ in selected_kinds) + ")")
@@ -531,6 +550,8 @@ def _lexical(
         + " AND ".join(where)
         + " ORDER BY bm25(docs), page_id, section LIMIT ?"
     )
+    if short:
+        sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace("bm25(docs)", "0.0")
     try:
         with _connect(db_path) as conn:
             rows = cast(
@@ -602,7 +623,7 @@ def _hybrid_from_config() -> bool:
 
 
 def _hybrid_or_lexical(
-    hits: tuple[SearchHit, ...], query: str, limit: int
+    hits: tuple[SearchHit, ...], query: str, limit: int, root: Path
 ) -> tuple[SearchHit, ...]:
     try:
         module = importlib.import_module("sb.hybrid_search")
@@ -610,7 +631,7 @@ def _hybrid_or_lexical(
         _LOGGER.warning("hybrid search unavailable; using lexical results")
         return hits
     if isinstance(module, HybridModule):
-        return tuple(module.hybrid_search(hits, query, limit))
+        return tuple(module.hybrid_search(hits, query, limit, vault_root=root))
     _LOGGER.warning("hybrid search unavailable; using lexical results")
     return hits
 

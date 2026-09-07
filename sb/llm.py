@@ -297,4 +297,9 @@ class CliLLM:
                 text = completed.stdout or ""
                 return _extract_first_json_object(text) if json_mode else text
             last_reason = f"exit {completed.returncode}"
+            for line in (completed.stderr or "").splitlines():
+                text = line.strip()
+                if text:
+                    last_reason = f"{last_reason}: {text[:200]}"
+                    break
         raise LLMUnavailable(attempts=ATTEMPT_LIMIT, reason=last_reason)

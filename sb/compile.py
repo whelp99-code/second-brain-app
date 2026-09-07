@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
 from typing import Final, Protocol
@@ -107,6 +107,8 @@ def compile_pending(
     *,
     existing_bodies: Mapping[str, str] | None = None,
     existing_pages: Mapping[str, PageSpec] | None = None,
+    on_page: Callable[[PendingCompile], None] | None = None,
+    on_error: Callable[[LLMUnavailable], None] | None = None,
 ) -> tuple[list[PendingCompile], bool]:
     """Generate pages but leave successful derivations running until the caller commits them."""
     units = protect_units(units, config)
@@ -138,7 +140,15 @@ def compile_pending(
         if used >= cap:
             remaining = True
             break
-        pending.append(_compile_one(_PageJob(page_id, key, grouped), ctx))
+        try:
+            item = _compile_one(_PageJob(page_id, key, grouped), ctx)
+            pending.append(item)
+            if on_page is not None:
+                on_page(item)
+        except LLMUnavailable as exc:
+            if on_error is None:
+                raise
+            on_error(exc)
         used += 1
     return pending, remaining
 

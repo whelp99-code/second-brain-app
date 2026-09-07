@@ -1,0 +1,4 @@
+{"type":"export_meta","export_version":"claude-project-jsonl-v1"}
+{"type":"project_meta","id":"fixture-project"}
+{"type":"message","id":"user-1","role":"user","text":"VISIBLE_USER_1"}
+{"type":"message","id":"assistant-1","role":"assistant","text":"VISIBLE_ASSISTANT_1"}

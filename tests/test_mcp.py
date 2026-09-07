@@ -1,4 +1,4 @@
-"""In-process MCP handshake, K5 tools, path containment, remember guards."""
+"""In-process MCP search, read, conflict, and remember behavior."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from pytest import MonkeyPatch, raises
 
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
-from sb.mcp import K5_TOOLS, RememberRejected, build_server, write_inbox
+from sb.mcp import LEGACY_TOOLS, RememberRejected, build_server, write_inbox
 from sb.pipeline import RunOutcome
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
@@ -207,7 +207,7 @@ def _call(
 def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> None:
     """Given a vault, when the client handshakes, then the complete tool set is listed."""
     root = _seed(tmp_path)
-    server = build_server(root)
+    server = build_server(root, config=Config(raw={"vault_root":str(root)}))
 
     async def _go() -> tuple[tuple[str, ...], list[CallToolResult]]:
         async with Client(server, mode="legacy", cache=None) as client:
@@ -223,7 +223,7 @@ def test_mcp_handshake_lists_exact_k5_tools_and_round_trips(tmp_path: Path) -> N
             return names, results
 
     names, results = anyio.run(_go)
-    assert names == K5_TOOLS
+    assert names == tuple(sorted((*LEGACY_TOOLS, "sb_run")))
     assert len(results) == 5
     assert _search_rows(results[0])
     read_payload = _structured(results[1])
@@ -276,38 +276,30 @@ def test_mcp_run_delegates_to_locked_pipeline_and_returns_full_outcome(
 
 
 def test_mcp_search_finds_korean_and_english_terms(tmp_path: Path) -> None:
-    """Given committed bilingual pages, when searching via MCP, then both hit."""
-    server = build_server(_seed(tmp_path))
-
+    server = build_server(_seed(tmp_path), config=Config(raw={}))
     en = _search_rows(_call(server, "sb_search", {"query": EN_TERM}))
     ko = _search_rows(_call(server, "sb_search", {"query": KO_TERM}))
     assert en and ko
 
 
 def test_mcp_read_page_rejects_path_traversal(tmp_path: Path) -> None:
-    """Given a vault, when read_page is given .., then it errors without leaking."""
     root = _seed(tmp_path)
-    server = build_server(root)
-
-    result = _call(server, "sb_read_page", {"id": "../.sb/ledger.db"})
+    result = _call(build_server(root, config=Config(raw={"vault_root":str(root)})), "sb_read_page", {"id": "../.sb/ledger.db"})
     assert result.is_error is True
     leaked = result.model_dump_json().lower()
     assert "ledger" not in leaked or "not found" in leaked or "escape" in leaked
 
 
 def test_mcp_read_page_ignores_uncommitted_working_tree(tmp_path: Path) -> None:
-    """Given an uncommitted wiki file, when read_page runs, then it errors."""
     root = _seed(tmp_path)
     _ = (root / "wiki" / "dirty.md").write_text("# dirty\n", encoding="utf-8")
-    server = build_server(root)
-
-    result = _call(server, "sb_read_page", {"id": "wiki/dirty"})
+    result = _call(build_server(root, config=Config(raw={"vault_root":str(root)})), "sb_read_page", {"id": "wiki/dirty"})
     assert result.is_error is True
 
 
 def test_mcp_recent_changes_includes_committed_page(tmp_path: Path) -> None:
     """Given a committed page, when recent_changes runs, then that page is listed."""
-    server = build_server(_seed(tmp_path))
+    server = build_server(_seed(tmp_path), config=Config(raw={}))
 
     assert any(
         "alpha" in row.page_id
@@ -316,59 +308,45 @@ def test_mcp_recent_changes_includes_committed_page(tmp_path: Path) -> None:
 
 
 def test_mcp_open_conflicts_lists_committed_conflict(tmp_path: Path) -> None:
-    """Given a committed conflict file, when open_conflicts runs, then it is listed."""
-    server = build_server(_seed(tmp_path))
-
-    rows = _conflict_rows(_call(server, "sb_open_conflicts", {}))
+    rows = _conflict_rows(_call(build_server(_seed(tmp_path), config=Config(raw={})), "sb_open_conflicts", {}))
     assert rows
     assert all(row.conflict_id and row.page_id and row.summary for row in rows)
 
 
 def test_mcp_remember_writes_collision_safe_inbox_file(tmp_path: Path) -> None:
-    """Given two remembers, when both succeed, then two inbox files exist."""
     root = _seed(tmp_path)
-    server = build_server(root)
-
+    server = build_server(root, config=Config(raw={"vault_root":str(root)}))
     first = _remember(_call(server, "sb_remember", {"content": "one", "title": "dup"}))
     second = _remember(_call(server, "sb_remember", {"content": "two", "title": "dup"}))
     assert first is not None and second is not None
     assert first.inbox_path != second.inbox_path
-    listing = sorted(p.name for p in (root / "inbox").iterdir() if p.is_file())
+    listing = sorted(path.name for path in (root / "inbox").iterdir() if path.is_file())
     assert len(listing) == 2
     assert all(name.endswith(".md") for name in listing)
-    wiki_files = {p.name for p in (root / "wiki").iterdir() if p.is_file()}
-    assert "dup.md" not in wiki_files
+    assert "dup.md" not in {path.name for path in (root / "wiki").iterdir() if path.is_file()}
 
 
 def test_mcp_remember_2mb_payload_leaves_inbox_unchanged(tmp_path: Path) -> None:
-    """Given a 2MB payload, when remember runs, then it errors and inbox is unchanged."""
     root = _seed(tmp_path)
-    before = sorted(p.name for p in (root / "inbox").iterdir())
-    server = build_server(root)
-
+    before = sorted(path.name for path in (root / "inbox").iterdir())
+    server = build_server(root, config=Config(raw={"vault_root":str(root)}))
     result = _call(server, "sb_remember", {"content": "a" * (2 * MAX_BYTES), "title": "big"})
     assert result.is_error is True
-    after = sorted(p.name for p in (root / "inbox").iterdir())
-    assert after == before
+    assert sorted(path.name for path in (root / "inbox").iterdir()) == before
 
 
 def test_write_inbox_rejects_invalid_utf8_without_creating_file(tmp_path: Path) -> None:
-    """Given a surrogate string, when write_inbox runs, then inbox stays empty."""
     root = _seed(tmp_path)
-    before = sorted(p.name for p in (root / "inbox").iterdir())
-
+    before = sorted(path.name for path in (root / "inbox").iterdir())
     with raises(RememberRejected):
         _ = write_inbox(root, "\ud800", "bad")
-    after = sorted(p.name for p in (root / "inbox").iterdir())
-    assert after == before
+    assert sorted(path.name for path in (root / "inbox").iterdir()) == before
 
 
 def test_mcp_remember_does_not_write_outside_inbox(tmp_path: Path) -> None:
-    """Given a title with path parts, when remember runs, then only inbox/ changes."""
     root = _seed(tmp_path)
-    server = build_server(root)
-    wiki_before = sorted(p.name for p in (root / "wiki").iterdir())
-
+    server = build_server(root, config=Config(raw={"vault_root":str(root)}))
+    wiki_before = sorted(path.name for path in (root / "wiki").iterdir())
     remembered = _remember(
         _call(server, "sb_remember", {"content": "stay", "title": "../../wiki/hack"})
     )
@@ -383,15 +361,13 @@ def test_mcp_remember_does_not_write_outside_inbox(tmp_path: Path) -> None:
 def test_mcp_sb_search_schema_includes_scope(tmp_path: Path) -> None:
     """Given the MCP server, when listing tools, then sb_search advertises scope."""
     root = _seed(tmp_path)
-    server = build_server(root)
+    server = build_server(root, config=Config(raw={"vault_root":str(root)}))
 
-    async def _go() -> object:
+    async def _go() -> str:
         async with Client(server, mode="legacy", cache=None) as client:
             listed = await client.list_tools()
-            return next(tool for tool in listed.tools if tool.name == "sb_search")
+            return next(tool for tool in listed.tools if tool.name == "sb_search").model_dump_json()
 
-    tool = anyio.run(_go)
-    dumped = tool.model_dump() if hasattr(tool, "model_dump") else tool.__dict__
-    blob = str(dumped).lower()
+    blob = anyio.run(_go).lower()
     assert "scope" in blob
     assert "reference" in blob

@@ -17,7 +17,7 @@ IOSchedulingPriority=6
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=-%h/.local/share/second-brain -%h/.config/second-brain
+ReadWritePaths=-%h/.local/share/second-brain -%h/.local/state/second-brain -%h/.config/second-brain
 UMask=0077
 
 [Install]

@@ -114,7 +114,7 @@ class KnowledgeRegistry:
             str(row[5]),
             str(row[6]),
             str(row[7]),
-            int(row[8]),
+            int(str(row[8])),
         )
 
     def put(
@@ -138,7 +138,7 @@ class KnowledgeRegistry:
                 tuple[object] | None,
                 conn.execute("SELECT revision FROM pages WHERE page_id=?", (page_id,)).fetchone(),
             )
-            revision = 1 if current is None else int(current[0]) + 1
+            revision = 1 if current is None else int(str(current[0])) + 1
             _ = conn.execute(
                 "INSERT INTO pages(page_id, knowledge_status, approval_status, canonical, "
                 + "decided_by, decided_at, reason, source_hash, revision) "
@@ -199,7 +199,7 @@ class KnowledgeRegistry:
                 str(row[5]),
                 str(row[6]),
                 str(row[7]),
-                int(row[8]),
+                int(str(row[8])),
             )
             for row in rows
         )

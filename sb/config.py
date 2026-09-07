@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import assert_never
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 
@@ -25,6 +26,7 @@ DEFAULT_CAPS: dict[str, int] = {
     "max_llm_calls_compile": 200,
     "max_llm_calls_conflict": 200,
     "max_llm_calls_briefing": 10,
+    "max_briefing_validation_attempts": 1,
     "max_new_units_per_run": 500,
     "max_db_rows_per_run": 5000,
     "max_derivation_attempts": 3,
@@ -50,6 +52,8 @@ def _as_str(value: TomlValue | None) -> str | None:
             return text
         case int() | float() | date() | time() | list() | Mapping() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_int(value: TomlValue | None) -> int | None:
@@ -60,6 +64,8 @@ def _as_int(value: TomlValue | None) -> int | None:
             return count
         case str() | float() | date() | time() | list() | Mapping() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_bool(value: TomlValue | None) -> bool | None:
@@ -72,6 +78,8 @@ def _as_mapping(value: TomlValue | None) -> Mapping[str, TomlValue] | None:
             return mapping
         case str() | int() | float() | date() | time() | list() | None:
             return None
+        case _:
+            assert_never(value)
 
 
 def _as_str_list(value: TomlValue | None) -> list[str] | None:
@@ -86,6 +94,21 @@ def _as_str_list(value: TomlValue | None) -> list[str] | None:
             return texts
         case str() | int() | float() | date() | time() | Mapping() | None:
             return None
+        case _:
+            assert_never(value)
+
+
+def _as_str_mapping(value: TomlValue | None) -> dict[str, str]:
+    mapping = _as_mapping(value)
+    if mapping is None:
+        return {}
+    result: dict[str, str] = {}
+    for key, item in mapping.items():
+        parsed = _as_str(item)
+        if parsed is None:
+            return {}
+        result[key] = parsed
+    return result
 
 
 def _as_source_roots(value: TomlValue | None) -> list[dict[str, str]]:
@@ -106,6 +129,8 @@ def _as_source_roots(value: TomlValue | None) -> list[dict[str, str]]:
             return roots
         case str() | int() | float() | date() | time() | Mapping() | None:
             return []
+        case _:
+            assert_never(value)
 
 
 def _xdg_config_home() -> Path:
@@ -131,6 +156,14 @@ def default_knowledge_registry_path() -> Path:
 
 
 DEFAULT_VAULT_ROOT = str(default_vault_root())
+DEFAULT_ACTIVE_VAULT = DEFAULT_VAULT_ROOT
+DEFAULT_STATE_ROOT = str(Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "second-brain")
+DEFAULT_REQUEST_ROOT = str(Path(DEFAULT_STATE_ROOT) / "requests")
+DEFAULT_EXPORT_ROOT = str(Path(DEFAULT_STATE_ROOT) / "exports")
+DEFAULT_GENERATION_ROOT = str(default_vault_root().parent / "vault-generations")
+DEFAULT_BACKUP_ROOT = str(Path(DEFAULT_STATE_ROOT) / "backups")
+DEFAULT_PROVIDER_INSTANCE_ID = "provider:second-brain:linux"
+
 
 
 def _config_search_path() -> Path:
@@ -199,7 +232,7 @@ class Config:
         raw = str(default) if value is None else value
         expanded = Path(os.path.expandvars(raw)).expanduser()
         resolved = expanded if expanded.is_absolute() else self.base_dir / expanded
-        return str(resolved.resolve(strict=False))
+        return os.path.abspath(resolved)
 
     @property
     def vault_root(self) -> str:
@@ -210,6 +243,85 @@ class Config:
     def knowledge_registry(self) -> str:
         text = _as_str(self.raw.get("knowledge_registry"))
         return self._path(text, default_knowledge_registry_path())
+
+    @property
+    def request_root(self) -> str:
+        text = _as_str(self.raw.get("request_root"))
+        return DEFAULT_REQUEST_ROOT if text is None else text
+
+    @property
+    def export_root(self) -> str:
+        text = _as_str(self.raw.get("export_root"))
+        return DEFAULT_EXPORT_ROOT if text is None else text
+
+    @property
+    def state_root(self) -> str:
+        text = _as_str(self.raw.get("state_root"))
+        return DEFAULT_STATE_ROOT if text is None else text
+
+    @property
+    def share_root(self) -> str:
+        text = _as_str(self.raw.get("share_root"))
+        if text is not None:
+            return text
+        return str(Path(DEFAULT_ACTIVE_VAULT).parent)
+
+    @property
+    def generation_root(self) -> str:
+        text = _as_str(self.raw.get("generation_root"))
+        return DEFAULT_GENERATION_ROOT if text is None else text
+
+    @property
+    def backup_root(self) -> str:
+        text = _as_str(self.raw.get("backup_root"))
+        return DEFAULT_BACKUP_ROOT if text is None else text
+
+    @property
+    def provider_instance_id(self) -> str:
+        text = _as_str(self.raw.get("provider_instance_id"))
+        return DEFAULT_PROVIDER_INSTANCE_ID if text is None else text
+
+    @property
+    def provider_release_sha(self) -> str:
+        text = _as_str(self.raw.get("provider_release_sha"))
+        return "development" if text is None else text
+
+    @property
+    def jarvis_signing_key_id(self) -> str | None:
+        return _as_str(self.raw.get("jarvis_signing_key_id"))
+
+    @property
+    def jarvis_public_key(self) -> str | None:
+        return _as_str(self.raw.get("jarvis_public_key"))
+
+    @property
+    def jarvis_public_keys(self) -> dict[str, str]:
+        keys = _as_str_mapping(self.raw.get("jarvis_public_keys"))
+        key_id = self.jarvis_signing_key_id
+        key = self.jarvis_public_key
+        if key_id is not None and key is not None:
+            _ = keys.setdefault(key_id, key)
+        return keys
+
+    @property
+    def revoked_jarvis_signing_key_ids(self) -> frozenset[str]:
+        return frozenset(_as_str_list(self.raw.get("revoked_jarvis_signing_key_ids")) or [])
+
+    @property
+    def revoked_delegation_ids(self) -> frozenset[str]:
+        return frozenset(_as_str_list(self.raw.get("revoked_delegation_ids")) or [])
+
+    @property
+    def external_erasure_public_keys(self) -> dict[str, str]:
+        return _as_str_mapping(self.raw.get("external_erasure_public_keys"))
+
+    @property
+    def provider_signing_key_id(self) -> str | None:
+        return _as_str(self.raw.get("provider_signing_key_id"))
+
+    @property
+    def provider_private_key(self) -> str | None:
+        return _as_str(self.raw.get("provider_private_key"))
 
     @property
     def caps(self) -> dict[str, int]:
@@ -306,6 +418,10 @@ class Config:
         external = _as_bool(section.get("allow_external_llm"))
         pii = _as_bool(section.get("redact_pii"))
         return SecurityConfig(bool(external), bool(pii))
+
+    @property
+    def legacy_request_roots(self) -> tuple[str, ...]:
+        return tuple(_as_str_list(self.raw.get("legacy_request_roots")) or ())
 
 
 def load_config(path: str | Path | None = None) -> Config:

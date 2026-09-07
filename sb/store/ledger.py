@@ -6,7 +6,7 @@ import hashlib
 import shutil
 import sqlite3
 from collections.abc import Generator, Sequence
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -68,7 +68,7 @@ def ledger_schema_version(path: Path) -> int:
     if not path.is_file() or path.stat().st_size == 0:
         return 0
     try:
-        with sqlite3.connect(str(path)) as conn:
+        with closing(sqlite3.connect(str(path))) as conn:
             table = cast(
                 tuple[object, ...] | None,
                 conn.execute(
@@ -104,7 +104,7 @@ def migrate_ledger(path: Path, *, backup: bool = True) -> Path | None:
         backup_path = folder / f"ledger-v{version}-{stamp}.db"
         _ = shutil.copy2(path, backup_path)
     try:
-        with sqlite3.connect(str(path)) as conn:
+        with closing(sqlite3.connect(str(path))) as conn:
             _ = conn.executescript(_SCHEMA)
             _ = conn.execute(
                 "INSERT INTO schema_meta(key,value) VALUES('schema_version',?) "

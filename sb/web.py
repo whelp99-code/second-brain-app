@@ -16,12 +16,14 @@ from typing import Final, cast, override
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from sb.config import Config, load_config
+from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
 from sb.ops import status_snapshot
 from sb.pipeline import read_status, run_all
+from sb.runtime_access import mutate_root, read_root
 from sb.search import SearchIndex, committed_paths, committed_text
 from sb.uploads import (
     MAX_UPLOAD_BYTES,
@@ -245,13 +247,17 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             if not self._authorized():
                 return
             try:
-                self._get()
+                if urlsplit(self.path).path in {"/", "/health", "/ready"}:
+                    self._get(context.root)
+                else:
+                    with read_root(context.config) as pinned:
+                        self._get(pinned)
             except (ValueError, PageNotFoundError, PathEscapeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except (OSError, GitCommandError) as exc:
+            except (OSError, GitCommandError, RuntimeError) as exc:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
 
-        def _get(self) -> None:
+        def _get(self, root: Path) -> None:
             parsed = urlsplit(self.path)
             if parsed.path == "/":
                 body = _INDEX_HTML.encode("utf-8")
@@ -261,6 +267,12 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 _ = self.wfile.write(body)
+                return
+            if parsed.path == "/ready":
+                from sb.readiness import readiness
+
+                result = readiness(context.config)
+                self._json(HTTPStatus.OK if result["status"] == "ready" else HTTPStatus.SERVICE_UNAVAILABLE, result)
                 return
             if parsed.path == "/health":
                 self._json(HTTPStatus.OK, {"status": "ok"})
@@ -297,12 +309,12 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 )
                 return
             if parsed.path == "/api/briefing/latest":
-                self._json(HTTPStatus.OK, {"briefing": _latest_briefing(context.root)})
+                self._json(HTTPStatus.OK, {"briefing": _latest_briefing(root)})
                 return
             if parsed.path == "/api/search":
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 query = values.get("q", [""])[0]
-                hits = SearchIndex(context.root).search(
+                hits = SearchIndex(root).search(
                     query,
                     _query_int(values, "limit", 10, 100),
                     kinds=_query_many(values, "kind"),
@@ -315,20 +327,20 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path.startswith("/api/pages/"):
                 page_id = unquote(parsed.path.removeprefix("/api/pages/"))
-                self._json(HTTPStatus.OK, read_page(context.root, page_id).as_dict())
+                self._json(HTTPStatus.OK, read_page(root, page_id).as_dict())
                 return
             if parsed.path == "/api/changes":
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 days = _query_int(values, "days", 7, 3650)
                 self._json(
                     HTTPStatus.OK,
-                    {"changes": [row.as_dict() for row in recent_changes(context.root, days)]},
+                    {"changes": [row.as_dict() for row in recent_changes(root, days)]},
                 )
                 return
             if parsed.path == "/api/conflicts":
                 self._json(
                     HTTPStatus.OK,
-                    {"conflicts": [row.as_dict() for row in open_conflicts(context.root)]},
+                    {"conflicts": [row.as_dict() for row in open_conflicts(root)]},
                 )
                 return
             if parsed.path == "/api/sources":
@@ -338,12 +350,12 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 )
                 return
             if parsed.path == "/api/retention":
-                self._json(HTTPStatus.OK, retention_report(context.root).as_dict())
+                self._json(HTTPStatus.OK, retention_report(root).as_dict())
                 return
             if parsed.path == "/api/metrics":
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 limit = _query_int(values, "limit", 1000, 10_000)
-                self._json(HTTPStatus.OK, metrics_summary(context.root, limit).as_dict())
+                self._json(HTTPStatus.OK, metrics_summary(root, limit).as_dict())
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -361,7 +373,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 VaultLintError,
             ) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except (OSError, GitCommandError) as exc:
+            except (OSError, GitCommandError, RuntimeError) as exc:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
 
         def _post(self) -> None:
@@ -373,14 +385,14 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 relative_path = _string_field(data, "relative_path", default=filename)
                 device_id = _string_field(data, "device_id", default="mac")
                 declared = _string_field(data, "content_sha256", default="") or None
-                receipt = accept_upload(
-                    context.root,
+                receipt = mutate_root(context.config, GenerationOperation.INBOX, lambda root: accept_upload(
+                    root,
                     filename,
                     _decode_upload(data),
                     device_id=device_id,
                     relative_path=relative_path,
                     declared_sha256=declared,
-                )
+                ))
                 status = HTTPStatus.CREATED if receipt.state == "queued" else HTTPStatus.OK
                 self._json(status, receipt.as_dict())
                 return
@@ -391,7 +403,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     raise ValueError("content is required")
                 if title is not None and not isinstance(title, str):
                     raise ValueError("title must be a string")
-                rel = write_inbox(context.root, content, title)
+                rel = mutate_root(context.config, GenerationOperation.INBOX, lambda root: write_inbox(root, content, title))
                 self._json(HTTPStatus.CREATED, {"inbox_path": rel.as_posix()})
                 return
             if parsed.path == "/api/run":
@@ -417,12 +429,12 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 note = data.get("note", "")
                 if not isinstance(decision, str) or not isinstance(note, str):
                     raise ValueError("decision and note must be strings")
-                commit = Vault(context.root).resolve_conflict(
+                commit = mutate_root(context.config, GenerationOperation.EFFECT, lambda root: Vault(root).resolve_conflict(
                     conflict_id,
                     decision,
                     note,
                     f"web-{conflict_id}",
-                )
+                ))
                 self._json(HTTPStatus.OK, {"commit": commit})
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})

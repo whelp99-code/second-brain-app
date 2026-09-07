@@ -14,3 +14,8 @@ config.toml
 
 # Editors
 .DS_Store
+.jarvis-integration-tmp/
+.pytest_cache/
+.ruff_cache/
+.omo/
+node_modules/

@@ -13,7 +13,7 @@ import stat
 import subprocess
 import tarfile
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib import metadata
@@ -131,7 +131,7 @@ def _checkpoint_ledger(root: Path) -> None:
         return
     assert_ledger_integrity(path)
     try:
-        with sqlite3.connect(str(path), timeout=10.0) as conn:
+        with closing(sqlite3.connect(str(path), timeout=10.0)) as conn:
             _ = cast(
                 tuple[object, ...] | None,
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone(),
@@ -147,7 +147,7 @@ def _backup_files(root: Path, output: Path) -> list[Path]:
         if not path.is_file() or path.is_symlink():
             continue
         relative = path.relative_to(root).as_posix()
-        if relative in _BACKUP_EXCLUDES or path.resolve(strict=False) == output_resolved:
+        if (relative in _BACKUP_EXCLUDES and not (relative == ".sb/search.db" and (root / "generation.json").is_file())) or path.resolve(strict=False) == output_resolved:
             continue
         if relative.endswith((".tmp", ".swp")):
             continue
@@ -471,6 +471,17 @@ def doctor(config: Config) -> tuple[DoctorCheck, ...]:
         add(
             f"source:{source.get('id', source.get('adapter', 'unknown'))}", status, str(source_path)
         )
+    if root.is_symlink():
+        try:
+            from sb.generation_runtime_models import generation_runtime_paths
+            from sb.generations import GenerationStore
+            paths = generation_runtime_paths(config)
+            manifest = GenerationStore._read_manifest(paths.active.resolve())
+            valid = (_git_value(root, "rev-parse", "HEAD") == manifest.head
+                     and _git_value(root, "rev-parse", "HEAD^{tree}") == manifest.tree)
+            add("generation", "pass" if valid else "fail", manifest.generation_id)
+        except (OSError, RuntimeError, ValueError) as exc:
+            add("generation", "fail", str(exc))
     command = config.llm.argv_template[0] if config.llm.argv_template else ""
     llm_status = "pass" if command and shutil.which(command) else "warn"
     add(

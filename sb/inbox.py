@@ -22,20 +22,32 @@ class RememberRejected(Exception):
         return self.reason
 
 
-def write_inbox(root: Path, content: str, title: str | None) -> Path:
-    """Write UTF-8 text <=1MB to a new `inbox/<ISO>-<slug>.md`. Never overwrites."""
+@dataclass(frozen=True, slots=True)
+class ParsedRemember:
+    data: bytes
+    title: str | None
+
+
+def parse_remember(content: str, title: str | None) -> ParsedRemember:
+    """Parse one remember payload before acquiring generation resources."""
     try:
         data = content.encode("utf-8")
     except UnicodeEncodeError as exc:
         raise RememberRejected("invalid utf-8") from exc
     if len(data) > MAX_REMEMBER_BYTES:
         raise RememberRejected("content exceeds 1MB")
+    return ParsedRemember(data, title)
+
+
+def publish_inbox(root: Path, note: ParsedRemember) -> Path:
+    """Publish one parsed note to a collision-safe inbox path."""
+    data = note.data
     vault = root.resolve()
     inbox = (root / "inbox").resolve()
     if not inbox.is_relative_to(vault):
         raise RememberRejected("inbox escapes vault")
     inbox.mkdir(parents=True, exist_ok=True)
-    slug = _slug(title)
+    slug = _slug(note.title)
     stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%S%f")
     dest = inbox / f"{stamp}-{slug}.md"
     suffix = 1
@@ -48,6 +60,11 @@ def write_inbox(root: Path, content: str, title: str | None) -> Path:
     _ = tmp.write_bytes(data)
     os.replace(tmp, dest)
     return dest.relative_to(vault)
+
+
+def write_inbox(root: Path, content: str, title: str | None) -> Path:
+    """Write UTF-8 text <=1MB to a new `inbox/<ISO>-<slug>.md`. Never overwrites."""
+    return publish_inbox(root, parse_remember(content, title))
 
 
 def _slug(title: str | None) -> str:

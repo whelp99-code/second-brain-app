@@ -1,0 +1,16 @@
+[Unit]
+Description=Maintain Second Brain export lifecycle
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env sb maintain --once
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/second-brain %h/.local/share/second-brain
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+UMask=0077

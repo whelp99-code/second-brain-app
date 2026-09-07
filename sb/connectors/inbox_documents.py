@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -28,7 +28,7 @@ ADAPTER_ID: Final = "inbox-documents"
 DEFAULT_SOURCE_ID: Final = "inbox"
 _ADAPTERS: Final = frozenset({ADAPTER_ID, "inbox", "inbox_documents", "documents"})
 MAX_INBOX_BYTES: Final = 10 * 1024 * 1024
-_SKIP_DIRS: Final = frozenset({".done", ".git"})
+_SKIP_DIRS: Final = frozenset({".done", ".git", ".requests"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,8 +53,10 @@ class InboxDocumentsAdapter:
         self.source_id: str = source_id
         self._root: Path = root
         self._next_cursor: str = "0"
+        self._scanned: dict[str, tuple[Path, str]] = {}
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
+        self._scanned.clear()
         previous = _token_map(cursor)
         current: dict[str, str] = {}
         if not self._root.exists() or not self._root.is_dir() or self._root.is_symlink():
@@ -76,6 +78,18 @@ class InboxDocumentsAdapter:
 
     def next_cursor(self) -> str:
         return self._next_cursor
+
+    def acknowledge(self, committed: Sequence[SourceRef]) -> None:
+        """Move only the exact scanned versions whose CAS and ledger commits succeeded."""
+        versions = {(ref.source_uri, ref.source_version) for ref in committed
+                    if ref.source_id == self.source_id}
+        for rel, (path, token) in self._scanned.items():
+            if (rel, token) not in versions or path.is_symlink() or not path.is_file():
+                continue
+            metadata = path.stat()
+            observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(path.read_bytes()).hexdigest()}"
+            if observed == token:
+                _move_done(self._root, path, rel)
 
     def _ingest(
         self, path: Path, rel: str, previous: str | None
@@ -100,11 +114,11 @@ class InboxDocumentsAdapter:
         except OSError:
             return self._resume_skip(rel, "unreadable", previous)
         token = f"{stat.st_mtime_ns}:{stat.st_size}:{sha256(body).hexdigest()}"
+        self._scanned[rel] = (path, token)
         if previous == token:
             return token, None
         parsed = _parse_body(path.suffix, body)
         if isinstance(parsed, _InboxText):
-            _move_done(self._root, path, rel)
             meta: ItemMeta = {"relative_path": rel, "cursor": token}
             return token, (SourceRef(self.source_id, rel, token), parsed.text.encode(), meta)
         return token, _skip(self.source_id, rel, parsed)

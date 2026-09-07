@@ -1,0 +1,4 @@
+{"type":"export_meta","export_version":"codex-session-jsonl-v1"}
+{"type":"session_meta","payload":{"id":"fixture-codex","session_id":"fixture-codex"}}
+{"type":"response_item","payload":{"type":"message","id":"user-1","role":"user","content":[{"type":"input_text","text":"VISIBLE_USER_1"}]}}
+{"type":"response_item","payload":{"type":"message","id":"assistant-1","role":"assistant","content":[{"type":"output_text","text":"VISIBLE_ASSISTANT_1"}]}}

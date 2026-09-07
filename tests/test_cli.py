@@ -7,7 +7,7 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from io import StringIO
@@ -497,9 +497,9 @@ def test_rollback_missing_id_returns_controlled_cli_error(tmp_path: Path) -> Non
     _config, root = _ready(tmp_path)
     code, out, err = _cli_with_config(tmp_path, root, ["rollback", "missing-run"])
     assert code != 0
-    text = f"{out}{err}".lower()
-    assert "traceback" not in text
-    assert "missing-run" in text
+    text = f"{out}{err}"
+    assert "traceback" not in text.lower()
+    assert text.strip() == "ROLLBACK_REQUIRES_GENERATION_AUTHORITY"
 
 
 def _deriv_count(root: Path) -> int:
@@ -507,7 +507,11 @@ def _deriv_count(root: Path) -> int:
 
 
 def _seed_status(root: Path, status: str = "ok") -> None:
-    _ = (root / ".sb" / "runs.log").write_text(
+    runs = root / ".sb" / "runs.log"
+    if root.is_symlink():
+        runs.parent.chmod(0o700)
+        runs.chmod(0o600)
+    _ = runs.write_text(
         f"2026-08-25T00:00:00+00:00 run seed {status} pages=0 conflicts=0 errors=0\n",
         encoding="utf-8",
     )
@@ -581,12 +585,14 @@ def test_changed_briefing_facts_open_new_derivation_and_commit(
     first = run_brief(config, llm_mode="fake")
     assert fake.calls == 1
     before_deriv = _deriv_count(root)
-    before_commits = _git_count(root)
+    before_head = _git(root, "rev-parse", "HEAD").stdout
+    (root / "conflicts").chmod(0o700)
     _ = (root / "conflicts" / "open-x.md").write_text("conflict\n", encoding="utf-8")
     second = run_brief(config, llm_mode="fake")
     assert fake.calls == 2
     assert _deriv_count(root) == before_deriv + 1
-    assert _git_count(root) == before_commits + 1
+    assert _git_count(root) == 3
+    assert _git(root, "rev-parse", "HEAD").stdout != before_head
     assert second.git_commit is not None
     assert first.run_id != second.run_id
 
@@ -752,8 +758,10 @@ def test_run_all_records_failed_run_without_traceback(
         config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
+        on_page: Callable[[PendingCompile], None] | None = None,
+        on_error: Callable[[LLMUnavailable], None] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
-        del existing_pages
+        del existing_pages, on_page, on_error
         del units, llm, config
         key = "compile-bad"
         existing = ledger.get_derivation(key)
@@ -843,8 +851,10 @@ def test_compile_routes_conflict_pages_through_vault(
         config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
+        on_page: Callable[[PendingCompile], None] | None = None,
+        on_error: Callable[[LLMUnavailable], None] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
-        del existing_pages
+        del existing_pages, on_page, on_error
         del units, llm, config
         key = "compile-conflict-route"
         ledger.ensure_derivation(key, "compile", "test")
@@ -935,8 +945,10 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
         config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
+        on_page: Callable[[PendingCompile], None] | None = None,
+        on_error: Callable[[LLMUnavailable], None] | None = None,
     ) -> tuple[list[object], bool]:
-        del existing_pages
+        del existing_pages, on_page, on_error
         del units, ledger, llm, config
         return [], False
 
@@ -1118,8 +1130,10 @@ def test_quarantine_only_ingest_is_ok_or_capped(tmp_path: Path, monkeypatch: Mon
         config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
+        on_page: Callable[[PendingCompile], None] | None = None,
+        on_error: Callable[[LLMUnavailable], None] | None = None,
     ) -> tuple[list[object], bool]:
-        del existing_pages
+        del existing_pages, on_page, on_error
         del units, ledger, llm, config
         return [], False
 
@@ -1175,8 +1189,10 @@ def test_brief_skipped_when_compile_pages_zero_and_no_new_units(
         config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
+        on_page: Callable[[PendingCompile], None] | None = None,
+        on_error: Callable[[LLMUnavailable], None] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
-        del existing_pages
+        del existing_pages, on_page, on_error
         del units, ledger, llm, config
         return [], False
 
@@ -1250,8 +1266,10 @@ def test_rebucketed_existing_source_dates_do_not_change_brief_key(
         config: Config,
         *,
         existing_pages: Mapping[str, PageSpec] | None = None,
+        on_page: Callable[[PendingCompile], None] | None = None,
+        on_error: Callable[[LLMUnavailable], None] | None = None,
     ) -> tuple[list[PendingCompile], bool]:
-        del existing_pages
+        del existing_pages, on_page, on_error
         del units, ledger, llm, config
         return [], False
 

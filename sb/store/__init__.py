@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from collections.abc import Iterator, Sequence
+from contextlib import closing
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -246,7 +247,7 @@ class LedgerTables:
 
 def assert_ledger_integrity(path: Path) -> None:
     try:
-        with sqlite3.connect(str(path)) as conn:
+        with closing(sqlite3.connect(str(path))) as conn:
             row = cast(SqlRow | None, conn.execute("PRAGMA integrity_check").fetchone())
     except sqlite3.DatabaseError as exc:
         raise LedgerCorrupt(path=str(path), detail=str(exc)) from exc
@@ -267,7 +268,7 @@ def load_ledger_tables(path: Path) -> LedgerTables:
         + "error,run_id,finished_at FROM derivation"
     )
     try:
-        with sqlite3.connect(str(path)) as conn:
+        with closing(sqlite3.connect(str(path))) as conn:
             for cells in _query_rows(conn, src_sql):
                 item = SourceItem(
                     _cell_text(cells[0]),

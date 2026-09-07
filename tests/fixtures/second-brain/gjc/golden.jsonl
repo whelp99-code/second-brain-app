@@ -1,0 +1,6 @@
+{"type":"export_meta","export_version":"gjc-public-session-v1","source_profile":"fictional"}
+{"type":"session_meta","session_id":"fixture-gjc"}
+{"type":"conversation","id":"user-1","role":"user","text":"VISIBLE_USER_1"}
+{"type":"conversation","id":"assistant-1","role":"assistant","text":"VISIBLE_ASSISTANT_1"}
+{"type":"tool","id":"tool-1","phase":"result","text":"VISIBLE_TOOL_RESULT_1"}
+{"type":"artifact","id":"artifact-1","text":"VISIBLE_ARTIFACT_1"}

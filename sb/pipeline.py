@@ -14,8 +14,16 @@ from typing import Final, Protocol
 from uuid import uuid4
 
 from sb.config import Config
-from sb.connectors.base import SourceAdapter
-from sb.contracts import Blob, BriefingInputs, PageSpec, Unit
+from sb.connectors.base import AcknowledgingSourceAdapter, SourceAdapter
+from sb.contracts import Blob, BriefingInputs, PageSpec, SourceRef, Unit
+from sb.erasure import ErasureError, IngressIdentity, ReingressGate
+from sb.generation_runtime import GenerationMutationService
+from sb.generation_runtime_models import (
+    GenerationAuthority,
+    GenerationMutation,
+    GenerationOperation,
+    generation_runtime_paths,
+)
 from sb.llm import LLMClient, LLMUnavailable
 from sb.store import (
     DerivationOutput,
@@ -295,8 +303,12 @@ def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
     from sb.normalize import normalize
     from sb.parsers import ParseError, UnsupportedSuffix, parser_for
 
+    path_part = uri.split("#", 1)[0]
+    suffix = Path(path_part).suffix.lower()
+    if suffix in {".jsonl", ".json"}:
+        suffix = ".md"
     try:
-        text = parser_for(Path(uri).suffix or ".md")(data)
+        text = parser_for(suffix or ".md")(data)
     except (ParseError, UnsupportedSuffix, UnicodeDecodeError):
         return []
     return normalize(Blob(digest, len(data)), text, origin)
@@ -365,9 +377,8 @@ def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]
 
 
 def _commit_pages(
-    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled
+    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled, *, project: bool = True
 ) -> tuple[str | None, int, int]:
-    del root
     result = vault.write_pages(
         report.pages,
         run_id,
@@ -376,7 +387,34 @@ def _commit_pages(
         compiled_by=report.compiled_by,
     )
     compiled.remember(report.pages)
+    _register_compiled(root, report.pages, project=project)
     return result.commit, result.pages, result.conflicts
+
+
+def _register_compiled(
+    root: Path, pages: Sequence[PageSpec], *, project: bool = True
+) -> None:
+    if not pages or ".staging" in root.parts:
+        return
+    from sb.config import load_config
+    from sb.knowledge_registry import ACTIVE, APPROVED, KnowledgeRegistry
+    from sb.search import SearchIndex, resolve_registry_path
+
+    config = load_config()
+    explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+    registry = KnowledgeRegistry(resolve_registry_path(root, explicit))
+    for page in pages:
+        if page.page_id.startswith("wiki/_proposed/"):
+            continue
+        registry.put(
+            page.page_id,
+            knowledge_status=ACTIVE,
+            approval_status=APPROVED,
+            decided_by="sb-compile",
+            reason="ai-first auto ingest",
+        )
+    if project:
+        SearchIndex(vault_root=root, registry_path=explicit).project()
 
 
 def _finish_deriv(ledger: Ledger, key: str | None, digest: str, path: str) -> None:
@@ -469,6 +507,7 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
                 _fail_deriv(ledger, report.deriv_key, str(exc))
                 _fail_pending(ledger, report.derivations, str(exc))
                 status, exit_code, errors = "failed", 1, max(errors, 1)
+        pages = pages or report.written
         if status == "failed":
             rendered = f"{started} run {run_id} {status} pages={{0}} conflicts={{1}} errors={{2}}"
         finished = datetime.now(UTC).isoformat()
@@ -493,13 +532,28 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
 
 def _execute(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
     root = Path(config.vault_root)
-    fd = _try_lock(root)
+    managed = root.is_symlink() or "share_root" in config.raw
+    lock_root = generation_runtime_paths(config).state if managed else root
+    fd = _try_lock(lock_root)
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
     try:
-        return _run_locked(root, stage, stage_name)
+        if not managed:
+            return _run_locked(root, stage, stage_name)
+        service = GenerationMutationService.from_config(config)
+        try:
+            result = service.mutate(GenerationMutation(
+                mutation_id=f"pipeline:{stage_name}:{uuid4().hex}",
+                operation=GenerationOperation(stage_name), now=datetime.now(UTC),
+                authority=GenerationAuthority(None, None),
+                apply=lambda staging: _run_locked(staging, stage, stage_name),
+            ))
+            return replace(result.value, git_commit=result.generation.head if result.value.git_commit else None)
+        finally:
+            service.close()
     finally:
         _unlock(fd)
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -521,6 +575,7 @@ def _prepare_adapter_ingest(
     seen: set[tuple[str, str, str]],
     run_id: str,
     remaining: int,
+    reingress: ReingressGate,
 ) -> _PreparedIngest:
     items = adapter.scan(ledger.get_cursor(adapter.source_id))
     source_items: list[SourceItem] = []
@@ -536,7 +591,6 @@ def _prepare_adapter_ingest(
         if attempted >= remaining:
             capped = True
             break
-        attempted += 1
         if meta.get("skip_reason"):
             skip_digest = hashlib.sha256(f"skip:{ref.source_version}".encode()).hexdigest()
             source_items.append(
@@ -553,6 +607,13 @@ def _prepare_adapter_ingest(
             accepted.add(version_key)
             continue
         digest = hashlib.sha256(data).hexdigest()
+        try:
+            reingress.check(IngressIdentity(source=ref.source_id, content=digest))
+            reingress.check_content(data)
+        except ErasureError:
+            adapter_failed = True
+            continue
+        attempted += 1
         units = _materialize(
             data,
             digest,
@@ -599,7 +660,8 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         from sb.connectors import discover_adapters
 
-        chosen = discover_adapters(config)
+        source_config = Config(raw={**config.raw, "vault_root": str(vault.root)}, base_dir=config.base_dir)
+        chosen = discover_adapters(source_config)
         adapters = _select_adapters(chosen, source_ids, config)
         cas = ContentAddressedStore(vault.root)
         cap = config.caps["max_new_units_per_run"] if limit is None else limit
@@ -611,14 +673,19 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         capped = False
         for adapter in adapters:
             try:
-                prepared = _prepare_adapter_ingest(
+                reingress = ReingressGate(Path(config.state_root) / "reingress.db")
+                try:
+                    prepared = _prepare_adapter_ingest(
                     adapter,
                     ledger,
                     cas,
                     seen,
                     run_id,
                     max(cap - attempted, 0),
-                )
+                    reingress,
+                    )
+                finally:
+                    reingress.close()
             except (OSError, RuntimeError):
                 errors += 1
                 attempted += 1
@@ -629,6 +696,16 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 if prepared.cursor is not None:
                     position, updated_at = prepared.cursor
                     ledger.set_cursor(adapter.source_id, position, updated_at)
+            if isinstance(adapter, AcknowledgingSourceAdapter):
+                try:
+                    adapter.acknowledge(tuple(
+                        SourceRef(item.source_id, item.source_uri, item.source_version)
+                        for item in ledger.list_source_items()
+                        if item.source_id == adapter.source_id
+                        and cas.exists(item.content_hash)
+                    ))
+                except OSError:
+                    errors += 1
             seen.update(prepared.version_keys)
             errors += prepared.errors
             attempted += prepared.attempted
@@ -661,7 +738,7 @@ def _page_ready(root: Path, page: PageSpec) -> bool:
 def _compile_stage(config: Config, llm_mode: str) -> StageFn:
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         try:
-            from sb.compile import compile_pending, page_id_for_origin
+            from sb.compile import PendingCompile, compile_pending, page_id_for_origin
         except ModuleNotFoundError:
             return StageReport((), 0, 0, 0, False)
         units = _load_units(ledger, vault.root)
@@ -671,16 +748,60 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
             page = read_page_spec(vault.root, page_id)
             if page is not None:
                 existing[page_id] = page
+        compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+        committed_pages: list[PageSpec] = []
+        write_errors = 0
+
+        def on_page(item: PendingCompile) -> None:
+            nonlocal write_errors
+            page = item.page
+            if not _page_ready(vault.root, page):
+                ledger.mark_failed(item.key, "compile page failed citation readiness")
+                write_errors += 1
+                return
+            single = StageReport(
+                (page,),
+                0,
+                0,
+                1,
+                False,
+                compiled_by=(config.llm.prompt_version, config.llm.model_id),
+            )
+            try:
+                _ = _commit_pages(
+                    vault.root,
+                    vault,
+                    run_id,
+                    single,
+                    f"{run_id} compile {page.page_id}",
+                    compiled,
+                    project=False,
+                )
+            except (VaultLintError, GitCommandError, OSError) as exc:
+                ledger.mark_failed(item.key, str(exc))
+                write_errors += 1
+                return
+            ledger.mark_done(item.key, item.output)
+            committed_pages.append(page)
+
+        def on_error(_exc: LLMUnavailable) -> None:
+            nonlocal write_errors
+            write_errors += 1
+
         pending, capped = compile_pending(
             units,
             ledger,
             llm,
             config,
             existing_pages=existing,
+            on_page=on_page,
+            on_error=on_error,
         )
-        kept = [item.page for item in pending]
-        derivations = [(item.key, item.output) for item in pending]
-        errors = 0
+        committed_ids = {page.page_id for page in committed_pages}
+        leftover = [item for item in pending if item.page.page_id not in committed_ids]
+        kept = committed_pages + [item.page for item in leftover]
+        derivations = [(item.key, item.output) for item in leftover]
+        errors = write_errors
         checker = None
         try:
             from sb.conflict import check as checker
@@ -708,12 +829,20 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                     row = ledger.get_derivation(deriv[0])
                     if row is not None and row.status == DerivStatus.RUNNING.value:
                         ledger.mark_failed(deriv[0], "conflict page failed citation readiness")
+        if committed_pages and ".staging" not in vault.root.parts:
+            from sb.config import load_config as _load_cfg
+            from sb.search import SearchIndex
+
+            cfg = _load_cfg()
+            explicit = Path(cfg.knowledge_registry) if "knowledge_registry" in cfg.raw else None
+            SearchIndex(vault_root=vault.root, registry_path=explicit).project()
         return StageReport(
-            tuple(kept),
+            tuple(page for page in kept if page.page_id not in committed_ids),
             sum(1 for page in kept if page.page_id.startswith("conflicts/")),
             errors,
-            max(len(kept), int(bool(run_id))),
+            max(len(kept) + errors, int(bool(run_id))),
             capped,
+            written=len(committed_pages),
             derivations=tuple(derivations),
             compiled_by=(config.llm.prompt_version, config.llm.model_id),
         )
@@ -800,6 +929,31 @@ def run_brief(
 
 def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
     root = Path(config.vault_root)
+    if not root.is_symlink() and "share_root" not in config.raw:
+        return _run_all_mutable(config, sources)
+    lock_root = generation_runtime_paths(config).state
+    fd = _try_lock(lock_root)
+    if fd is None:
+        return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    try:
+        service = GenerationMutationService.from_config(config)
+        try:
+            def staged(root: Path) -> RunOutcome:
+                raw = {**config.raw, "vault_root": str(root)}
+                return _run_all_mutable(Config(raw=raw, base_dir=config.base_dir), sources)
+            result = service.mutate(GenerationMutation(
+                mutation_id=f"pipeline:run:{uuid4().hex}", operation=GenerationOperation.RUN,
+                now=datetime.now(UTC), authority=GenerationAuthority(None, None), apply=staged,
+            ))
+            return replace(result.value, git_commit=result.generation.head if result.value.git_commit else None)
+        finally:
+            service.close()
+    finally:
+        _unlock(fd)
+
+
+def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
+    root = Path(config.vault_root)
     fd = _try_lock(root)
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
@@ -820,6 +974,11 @@ def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
             return outcome
         if outcome.status == "capped":
             chosen = outcome
+    if brief.exit_code == 0 and (
+        brief.status == "capped"
+        or (ingest.status != "capped" and compiled.status != "capped")
+    ):
+        chosen = brief
     return chosen
 
 

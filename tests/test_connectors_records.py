@@ -7,6 +7,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+FIXTURES = Path(__file__).parent / "fixtures" / "second-brain"
+
 from sb.connectors import discover_adapters
 from sb.connectors.base import ItemMeta
 from sb.connectors.records_orca import ADAPTER_ID as ORCA_ID
@@ -32,7 +34,7 @@ def _cfg(adapter_id: str, root: Path, source_id: str) -> _Cfg:
 def _copy_spike(tmp: Path, family: str, name: str) -> Path:
     dest = tmp / family / name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    _ = dest.write_bytes((SPIKE / family / name).read_bytes())
+    _ = dest.write_bytes((FIXTURES / family / name).read_bytes())
     return dest
 
 

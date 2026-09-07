@@ -186,6 +186,41 @@ def test_derivation_transitions_pending_to_running_to_failed(tmp_path: Path) -> 
     assert row.error == "llm timeout"
 
 
+def test_derivation_reload_preserves_null_and_empty_string_when_reopened(tmp_path: Path) -> None:
+    """Given NULL and empty fields, when reloaded, then their distinct values survive."""
+    key = deriv_key((_UNIT_A,), _STAGE, _PROMPT, _MODEL)
+    with Ledger(tmp_path) as ledger:
+        ledger.ensure_derivation(key, _STAGE, "run-1")
+        ledger.mark_running(key, "run-1")
+        ledger.mark_done(key, DerivationOutput(output_hash="", output_path=""))
+
+    with Ledger(tmp_path) as reopened:
+        row = reopened.get_derivation(key)
+
+    assert row is not None
+    assert row.output_hash == ""
+    assert row.output_path == ""
+    assert row.error is None
+
+
+def test_derivation_reload_preserves_pipe_multiline_and_cjk_when_reopened(tmp_path: Path) -> None:
+    """Given special text, when reloaded, then subprocess transport preserves it exactly."""
+    key = deriv_key((_UNIT_A,), _STAGE, _PROMPT, _MODEL)
+    error = "pipe|value\n둘째 줄\n끝"
+    with Ledger(tmp_path) as ledger:
+        ledger.ensure_derivation(key, _STAGE, "run-1")
+        ledger.mark_running(key, "run-1")
+        ledger.mark_failed(key, error)
+
+    with Ledger(tmp_path) as reopened:
+        row = reopened.get_derivation(key)
+
+    assert row is not None
+    assert row.output_hash is None
+    assert row.output_path is None
+    assert row.error == error
+
+
 def test_mark_done_from_pending_raises_invalid_transition(tmp_path: Path) -> None:
     """Given a pending derivation, when mark_done is called, then the transition is rejected."""
     key = deriv_key((_UNIT_A,), _STAGE, _PROMPT, _MODEL)

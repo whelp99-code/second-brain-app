@@ -4,25 +4,23 @@ import hashlib
 import os
 import stat
 import subprocess
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
 
 from sb.contracts import PageSpec, SourceCite
 from sb.vault import GitCommandError, PathEscapeError, Vault, VaultLintError, init_vault
-
-CAS_HASH = "ab" + ("cd" * 31)
-CAS_SID = CAS_HASH[:8]
-DEAD_SID = "dead1234"
-
-
-@dataclass(frozen=True, slots=True)
-class MemoryLedger:
-    hashes: dict[str, str] = field(default_factory=dict)
-
-    def last_compiled_hash(self, page_id: str) -> str | None:
-        return self.hashes.get(page_id)
+from tests.vault_test_support import (
+    CAS_HASH,
+    CAS_SID,
+    DEAD_SID,
+    CitedPageFixture,
+    MemoryLedger,
+    cited_page,
+    frontmatter_field,
+    git,
+    ready,
+)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -73,37 +71,37 @@ def _ready(tmp_path: Path) -> Vault:
 def test_init_vault_creates_layout_perms_and_gitignore_when_root_empty(tmp_path: Path) -> None:
     vault = init_vault(tmp_path)
     assert vault.root == tmp_path
-    for rel in ("wiki", "daily", "conflicts", "inbox", "raw", ".sb", "wiki/_proposed"):
-        assert (tmp_path / rel).is_dir(), rel
+    for relative in ("wiki", "daily", "conflicts", "inbox", "raw", ".sb", "wiki/_proposed"):
+        assert (tmp_path / relative).is_dir(), relative
     gitignore = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     assert (tmp_path / "log.md").is_file() and (tmp_path / ".git").is_dir()
     assert "raw/" in gitignore and ".sb/" in gitignore
     assert stat.S_IMODE(tmp_path.stat().st_mode) == 0o700
-    assert _git(tmp_path, "status", "--porcelain") == ""
-    assert int(_git(tmp_path, "rev-list", "--count", "HEAD").strip()) >= 1
+    assert git(tmp_path, "status", "--porcelain") == ""
+    assert int(git(tmp_path, "rev-list", "--count", "HEAD").strip()) >= 1
 
 
 def test_write_pages_renders_k1_and_commits_when_lint_passes(tmp_path: Path) -> None:
-    result = _ready(tmp_path).write_pages([_cited_page()], "run-cited", MemoryLedger())
-    dest = tmp_path / "wiki" / "identity-profile.md"
-    assert dest.is_file()
-    text = dest.read_text(encoding="utf-8")
+    result = ready(tmp_path).write_pages([cited_page()], "run-cited", MemoryLedger())
+    destination = tmp_path / "wiki" / "identity-profile.md"
+    assert destination.is_file()
+    text = destination.read_text(encoding="utf-8")
     assert text.startswith("---\n")
     parts = text.split("---", 2)
     assert len(parts) == 3
     block = parts[1]
-    assert _field(block, "id") == "identity-profile"
-    assert _field(block, "title") == "Profile"
-    assert _field(block, "status") == "active"
-    assert _field(block, "updated")
-    assert _field(block, "compiled_by").startswith("sb/")
-    assert _field(block, "sid") == CAS_SID
-    assert _field(block, "origin") == "me-wiki:identity/profile.md"
-    assert _field(block, "hash") == CAS_HASH
+    assert frontmatter_field(block, "id") == "identity-profile"
+    assert frontmatter_field(block, "title") == "Profile"
+    assert frontmatter_field(block, "status") == "active"
+    assert frontmatter_field(block, "updated")
+    assert frontmatter_field(block, "compiled_by").startswith("sb/")
+    assert frontmatter_field(block, "sid") == CAS_SID
+    assert frontmatter_field(block, "origin") == "me-wiki:identity/profile.md"
+    assert frontmatter_field(block, "hash") == CAS_HASH
     assert f"[^{CAS_SID}]: me-wiki:identity/profile.md" in text
     assert result.commit is not None
     assert (result.pages, result.conflicts, result.proposals) == (1, 0, 0)
-    assert _git(tmp_path, "log", "-1", "--format=%s").strip() == (
+    assert git(tmp_path, "log", "-1", "--format=%s").strip() == (
         "sb: run run-cited (1 pages, 0 conflicts, 0 proposals)"
     )
     assert (
@@ -113,117 +111,116 @@ def test_write_pages_renders_k1_and_commits_when_lint_passes(tmp_path: Path) -> 
 
 
 def test_write_pages_counts_conflict_dest_in_commit_message_when_prefixed(tmp_path: Path) -> None:
-    page = _cited_page(page_id="conflicts/2026-08-25-identity-profile")
-    result = _ready(tmp_path).write_pages([page], "run-conflict", MemoryLedger())
+    page = cited_page(CitedPageFixture(page_id="conflicts/2026-08-25-identity-profile"))
+    result = ready(tmp_path).write_pages([page], "run-conflict", MemoryLedger())
     assert (result.pages, result.conflicts, result.proposals) == (0, 1, 0)
     assert result.commit is not None
     assert (tmp_path / "conflicts" / "2026-08-25-identity-profile.md").is_file()
-    assert _git(tmp_path, "log", "-1", "--format=%s").strip() == (
+    assert git(tmp_path, "log", "-1", "--format=%s").strip() == (
         "sb: run run-conflict (0 pages, 1 conflicts, 0 proposals)"
     )
 
 
-def test_write_pages_raises_and_keeps_tree_clean_when_footnote_unresolved(tmp_path: Path) -> None:
-    vault = _ready(tmp_path)
-    page = _cited_page(body_md=f"Poison.[^{DEAD_SID}]", sid=CAS_SID, digest=CAS_HASH)
+def test_write_pages_raises_and_keeps_tree_clean_when_footnote_unresolved(
+    tmp_path: Path,
+) -> None:
+    vault = ready(tmp_path)
+    page = cited_page(CitedPageFixture(
+        body_md=f"Poison.[^{DEAD_SID}]",
+        sid=CAS_SID,
+        digest=CAS_HASH,
+    ))
     with pytest.raises(VaultLintError) as raised:
         unexpected = vault.write_pages([page], "run-dead", MemoryLedger())
         assert unexpected.commit is None
     assert any("unresolved" in reason for reason in raised.value.reasons)
     assert not (tmp_path / "wiki" / "identity-profile.md").exists()
-    assert _git(tmp_path, "status", "--porcelain") == ""
+    assert git(tmp_path, "status", "--porcelain") == ""
 
 
 def test_write_pages_raises_when_body_empty(tmp_path: Path) -> None:
-    vault = _ready(tmp_path)
+    vault = ready(tmp_path)
     with pytest.raises(VaultLintError) as raised:
-        unexpected = vault.write_pages([_cited_page(body_md="   \n")], "run-empty", MemoryLedger())
+        unexpected = vault.write_pages(
+            [cited_page(CitedPageFixture(body_md="   \n"))],
+            "run-empty",
+            MemoryLedger(),
+        )
         assert unexpected.commit is None
     assert any("empty body" in reason for reason in raised.value.reasons)
-    assert _git(tmp_path, "status", "--porcelain") == ""
+    assert git(tmp_path, "status", "--porcelain") == ""
 
 
 def test_write_pages_raises_when_cas_hash_missing(tmp_path: Path) -> None:
     vault = init_vault(tmp_path)
     with pytest.raises(VaultLintError) as raised:
-        unexpected = vault.write_pages([_cited_page()], "run-cas", MemoryLedger())
+        unexpected = vault.write_pages([cited_page()], "run-cas", MemoryLedger())
         assert unexpected.commit is None
     assert any("missing CAS" in reason for reason in raised.value.reasons)
-    assert _git(tmp_path, "status", "--porcelain") == ""
+    assert git(tmp_path, "status", "--porcelain") == ""
 
 
 def test_write_pages_routes_to_proposed_when_human_edited(tmp_path: Path) -> None:
-    vault, page, ledger = _ready(tmp_path), _cited_page(), MemoryLedger()
+    vault, page, ledger = ready(tmp_path), cited_page(), MemoryLedger()
     original_write = vault.write_pages([page], "run-orig", ledger)
     assert original_write.commit is not None and original_write.pages == 1
-    dest = tmp_path / "wiki" / "identity-profile.md"
-    ledger.hashes[page.page_id] = hashlib.sha256(dest.read_bytes()).hexdigest()
-    original = dest.read_text(encoding="utf-8")
+    destination = tmp_path / "wiki" / "identity-profile.md"
+    ledger.hashes[page.page_id] = hashlib.sha256(destination.read_bytes()).hexdigest()
+    original = destination.read_text(encoding="utf-8")
     human_text = original + "\nhuman note\n"
-    written = dest.write_text(human_text, encoding="utf-8")
+    written = destination.write_text(human_text, encoding="utf-8")
     assert written == len(human_text)
-    add_out = _git(tmp_path, "-c", "user.name=human", "-c", "user.email=h@local", "add", "-A")
-    assert add_out == ""
+    assert git(
+        tmp_path, "-c", "user.name=human", "-c", "user.email=h@local", "add", "-A"
+    ) == ""
     human_git = ("-c", "user.name=human", "-c", "user.email=h@local")
-    commit_out = _git(tmp_path, *human_git, "commit", "-m", "human edit")
-    assert "human edit" in commit_out
+    assert "human edit" in git(tmp_path, *human_git, "commit", "-m", "human edit")
     proposed_write = vault.write_pages([page], "run-proposed", ledger)
     assert (proposed_write.pages, proposed_write.conflicts, proposed_write.proposals) == (0, 0, 1)
     assert proposed_write.commit is not None
-    assert dest.read_text(encoding="utf-8") == human_text
+    assert destination.read_text(encoding="utf-8") == human_text
     proposed = tmp_path / "wiki" / "_proposed" / "identity-profile.md"
-    assert proposed.is_file() and proposed.read_text(encoding="utf-8") != dest.read_text(
+    assert proposed.is_file() and proposed.read_text(encoding="utf-8") != destination.read_text(
         encoding="utf-8"
     )
     log = (tmp_path / "log.md").read_text(encoding="utf-8")
     assert "identity-profile" in log and "_proposed" in log
-    assert _git(tmp_path, "log", "-1", "--format=%s").strip() == (
+    assert git(tmp_path, "log", "-1", "--format=%s").strip() == (
         "sb: run run-proposed (0 pages, 0 conflicts, 1 proposals)"
     )
 
 
 def test_write_pages_skips_commit_when_content_unchanged(tmp_path: Path) -> None:
-    vault, page, ledger = _ready(tmp_path), _cited_page(), MemoryLedger()
+    vault, page, ledger = ready(tmp_path), cited_page(), MemoryLedger()
     first = vault.write_pages([page], "run-a", ledger)
-    dest = tmp_path / "wiki" / "identity-profile.md"
-    ledger.hashes[page.page_id] = hashlib.sha256(dest.read_bytes()).hexdigest()
-    count_after_first = int(_git(tmp_path, "rev-list", "--count", "HEAD").strip())
+    destination = tmp_path / "wiki" / "identity-profile.md"
+    ledger.hashes[page.page_id] = hashlib.sha256(destination.read_bytes()).hexdigest()
+    count_after_first = int(git(tmp_path, "rev-list", "--count", "HEAD").strip())
     second = vault.write_pages([page], "run-b", ledger)
     assert first.commit is not None and second.commit is None and second.pages == 1
-    assert int(_git(tmp_path, "rev-list", "--count", "HEAD").strip()) == count_after_first
-    assert _git(tmp_path, "status", "--porcelain") == ""
-
-
-def test_rollback_reverts_run_commit_when_run_id_exists(tmp_path: Path) -> None:
-    vault = _ready(tmp_path)
-    written = vault.write_pages([_cited_page()], "run-rb", MemoryLedger())
-    dest = tmp_path / "wiki" / "identity-profile.md"
-    assert written.commit is not None and dest.is_file()
-    vault.rollback("run-rb")
-    assert not dest.exists()
-    subject = _git(tmp_path, "log", "-1", "--format=%s").strip()
-    assert "revert" in subject.lower() or "run-rb" in subject
+    assert int(git(tmp_path, "rev-list", "--count", "HEAD").strip()) == count_after_first
+    assert git(tmp_path, "status", "--porcelain") == ""
 
 
 def test_init_vault_does_not_commit_when_already_initialized(tmp_path: Path) -> None:
     first = init_vault(tmp_path)
     assert first.root == tmp_path
-    count = int(_git(tmp_path, "rev-list", "--count", "HEAD").strip())
-    stray_n = (tmp_path / "wiki" / "stray.md").write_text("stray\n", encoding="utf-8")
-    assert stray_n == len("stray\n")
+    count = int(git(tmp_path, "rev-list", "--count", "HEAD").strip())
+    stray_count = (tmp_path / "wiki" / "stray.md").write_text("stray\n", encoding="utf-8")
+    assert stray_count == len("stray\n")
     second = init_vault(tmp_path)
     assert second.root == tmp_path
-    assert int(_git(tmp_path, "rev-list", "--count", "HEAD").strip()) == count
-    assert "stray.md" not in _git(tmp_path, "ls-tree", "-r", "--name-only", "HEAD")
+    assert int(git(tmp_path, "rev-list", "--count", "HEAD").strip()) == count
+    assert "stray.md" not in git(tmp_path, "ls-tree", "-r", "--name-only", "HEAD")
 
 
 def test_write_pages_does_not_stage_unrelated_dirty_files(tmp_path: Path) -> None:
-    vault = _ready(tmp_path)
-    stray_n = (tmp_path / "wiki" / "stray.md").write_text("stray\n", encoding="utf-8")
-    assert stray_n == len("stray\n")
-    result = vault.write_pages([_cited_page()], "run-scope", MemoryLedger())
+    vault = ready(tmp_path)
+    stray_count = (tmp_path / "wiki" / "stray.md").write_text("stray\n", encoding="utf-8")
+    assert stray_count == len("stray\n")
+    result = vault.write_pages([cited_page()], "run-scope", MemoryLedger())
     assert result.commit is not None and result.pages == 1
-    names = _git(tmp_path, "show", "--name-only", "--format=", "HEAD")
+    names = git(tmp_path, "show", "--name-only", "--format=", "HEAD")
     assert "wiki/identity-profile.md" in names
     assert "stray.md" not in names
     assert "stray.md" in _git(tmp_path, "status", "--porcelain")

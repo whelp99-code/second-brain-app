@@ -134,7 +134,7 @@ def test_app_bundle_is_menu_bar_native_and_build_scripts_are_executable() -> Non
 def test_mcp_exposes_explicit_immediate_run_tool() -> None:
     mcp = _text(ROOT / "sb" / "mcp.py")
     assert '"sb_run"' in mcp
-    assert '@server.tool(name="sb_run")' in mcp
+    assert 'server.tool(name="sb_run")(sb_run)' in mcp
     assert "run_all(runtime_config, runtime_config.configured_source_ids)" in mcp
     assert "already_running" in mcp
 

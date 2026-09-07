@@ -8,20 +8,21 @@ import json
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from time import monotonic
 from typing import cast
 
+from sb.cli_requests import apply_requests_once
 from sb.config import load_config
+from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
-from sb.inbox import RememberRejected, write_inbox
+from sb.inbox import RememberRejected
 from sb.metrics import record_command
 from sb.metrics import summary as metrics_summary
 from sb.ops import (
     OperationError,
-    create_backup,
     migrate_status,
     restore_backup,
     retry_failed,
@@ -31,9 +32,10 @@ from sb.ops import (
     doctor as run_doctor,
 )
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
+from sb.runtime_access import mutate_root
 from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
-from sb.vault import RunCommitNotFoundError, Vault, VaultLintError, init_vault
+from sb.vault import Vault, VaultLintError, init_vault
 
 
 class Command(StrEnum):
@@ -58,6 +60,8 @@ class Command(StrEnum):
     RETENTION = "retention"
     GC = "gc"
     METRICS = "metrics"
+    APPLY_REQUESTS = "apply-requests"
+    MAINTAIN = "maintain"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -97,11 +101,16 @@ def _parser() -> argparse.ArgumentParser:
     _ = search_cmd.add_argument(
         "--scope",
         choices=("active", "candidate", "reference"),
-        default="active",
+        default=None,
     )
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
+    apply_requests = sub.add_parser(Command.APPLY_REQUESTS.value)
+    _ = apply_requests.add_argument("--once", action="store_true")
+    _ = apply_requests.add_argument("--test-control-socket")
+    maintain = sub.add_parser(Command.MAINTAIN.value)
+    _ = maintain.add_argument("--once", action="store_true")
     retry = sub.add_parser(Command.RETRY.value)
     _ = retry.add_argument("--stage", choices=("compile", "conflict", "brief"))
     _ = retry.add_argument("--limit", type=int)
@@ -210,20 +219,12 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     def rollback() -> int:
-        run_id = _opt_str(ns, "run_id")
-        if run_id is None:
-            print("rollback requires run_id", file=sys.stderr)
-            return 2
-        try:
-            Vault(root=Path(config.vault_root)).rollback(run_id)
-        except RunCommitNotFoundError as exc:
-            print(str(exc), file=sys.stderr)
-            return 1
-        return 0
+        print("ROLLBACK_REQUIRES_GENERATION_AUTHORITY", file=sys.stderr)
+        return 1
 
     def doctor() -> int:
         if _opt_flag(ns, "rebuild_ledger"):
-            rebuild_from_vault(config.vault_root)
+            mutate_root(config, GenerationOperation.EFFECT, rebuild_from_vault)
         checks = run_doctor(config)
         if _opt_flag(ns, "json"):
             print(json.dumps([check.as_dict() for check in checks], ensure_ascii=False, indent=2))
@@ -252,7 +253,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             status=_opt_str(ns, "status"),
             updated_from=_opt_str(ns, "updated_from"),
             updated_to=_opt_str(ns, "updated_to"),
-            scope=_opt_str(ns, "scope") or "active",
+            scope=_opt_str(ns, "scope") or ("reference" if (Path(config.vault_root) / "generation.json").is_file() else "active"),
         )
         if _opt_flag(ns, "json"):
             print(json.dumps([hit.as_dict() for hit in hits], ensure_ascii=False, indent=2))
@@ -270,20 +271,45 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if content is None or not content.strip():
             print("remember requires content", file=sys.stderr)
             return 2
+        mutations = GenerationMutationService.from_config(config)
         try:
-            rel = write_inbox(Path(config.vault_root), content, _opt_str(ns, "title"))
+            rel = mutations.remember(content, _opt_str(ns, "title"), datetime.now(UTC))
         except RememberRejected as exc:
             print(str(exc), file=sys.stderr)
             return 1
+        finally:
+            mutations.close()
         print(rel.as_posix())
         return 0
 
-    def retry() -> int:
-        changed = retry_failed(
-            config.vault_root,
-            stage=_opt_str(ns, "stage"),
-            limit=_opt_int(ns, "limit"),
+    def maintain() -> int:
+        if not _opt_flag(ns, "once"):
+            print("maintain requires --once", file=sys.stderr)
+            return 2
+        mutations = GenerationMutationService.from_config(config)
+        try:
+            result = mutations.maintain(datetime.now(UTC))
+        finally:
+            mutations.close()
+        print(
+            json.dumps(
+                {"disposed_exports": len(result.disposed_export_digests)},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
         )
+        return 0
+
+    def apply_requests() -> int:
+        if not _opt_flag(ns, "once"):
+            print("apply-requests requires --once", file=sys.stderr)
+            return 2
+        return apply_requests_once(config, _opt_str(ns, "test_control_socket"))
+
+    def retry() -> int:
+        changed = mutate_root(config, GenerationOperation.EFFECT, lambda root: retry_failed(
+            root, stage=_opt_str(ns, "stage"), limit=_opt_int(ns, "limit"),
+        ))
         print(f"requeued={changed}")
         return 0
 
@@ -292,11 +318,13 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if destination is None:
             stamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%z")
             destination_path = (
-                Path(config.vault_root).parent / "backups" / f"second-brain-{stamp}.tar.gz"
+                Path(config.backup_root) / f"second-brain-{stamp}.tar.gz"
             )
         else:
             destination_path = Path(destination)
-        result = create_backup(config.vault_root, destination_path)
+        from sb.runtime_backup import backup_runtime
+
+        result = backup_runtime(config, destination_path)
         print(
             json.dumps(
                 {
@@ -316,6 +344,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             print("restore requires archive", file=sys.stderr)
             return 2
         destination = _opt_str(ns, "to") or config.vault_root
+        if Path(destination).is_symlink() or Path(destination).absolute() == Path(config.vault_root).absolute() and "share_root" in config.raw:
+            print("RESTORE_REQUIRES_ISOLATED_DESTINATION: use --to with a new directory", file=sys.stderr)
+            return 1
         result = restore_backup(archive, destination, force=_opt_flag(ns, "force"))
         print(
             json.dumps(
@@ -331,7 +362,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     def migrate() -> int:
-        result = migrate_status(config.vault_root, apply=_opt_flag(ns, "apply"))
+        result = (mutate_root(config, GenerationOperation.EFFECT,
+                              lambda root: migrate_status(root, apply=True))
+                  if _opt_flag(ns, "apply") else migrate_status(config.vault_root, apply=False))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
@@ -343,12 +376,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             print("resolve requires conflict_id and decision", file=sys.stderr)
             return 2
         try:
-            commit = Vault(root=Path(config.vault_root)).resolve_conflict(
-                conflict_id,
-                decision,
-                note,
-                f"manual-{conflict_id}",
-            )
+            commit = mutate_root(config, GenerationOperation.EFFECT,
+                                 lambda root: Vault(root=root).resolve_conflict(
+                                     conflict_id, decision, note, f"manual-{conflict_id}"))
         except (FileNotFoundError, ValueError, VaultLintError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -403,11 +433,11 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     def gc() -> int:
-        report = collect_orphans(
-            config.vault_root,
-            apply=_opt_flag(ns, "apply"),
-            confirmed=_opt_flag(ns, "confirm"),
-        )
+        report = (mutate_root(config, GenerationOperation.EFFECT,
+                              lambda root: collect_orphans(root, apply=True,
+                                                           confirmed=_opt_flag(ns, "confirm")))
+                  if _opt_flag(ns, "apply") else collect_orphans(config.vault_root, apply=False,
+                                                               confirmed=_opt_flag(ns, "confirm")))
         if _opt_flag(ns, "json"):
             print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
         else:
@@ -451,6 +481,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.RETENTION: retention,
         Command.GC: gc,
         Command.METRICS: metrics,
+        Command.APPLY_REQUESTS: apply_requests,
+        Command.MAINTAIN: maintain,
     }
     started = monotonic()
     exit_code = 1
