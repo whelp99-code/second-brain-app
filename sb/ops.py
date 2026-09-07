@@ -169,7 +169,9 @@ def _safe_detail(value: str | None, *, limit: int = 240) -> str:
     return redacted if len(redacted) <= limit else redacted[: limit - 1] + "…"
 
 
-def create_backup(vault_root: Path | str, output: Path | str) -> BackupResult:
+def create_backup(
+    vault_root: Path | str, output: Path | str, *, origin: str | None = None,
+) -> BackupResult:
     """Create an atomic, checksummed full-vault backup while no run is active."""
     root = Path(vault_root).resolve(strict=False)
     archive = Path(output).expanduser().resolve(strict=False)
@@ -196,6 +198,7 @@ def create_backup(vault_root: Path | str, output: Path | str) -> BackupResult:
             )
         manifest = {
             "format": BACKUP_FORMAT,
+            "origin": f"vault:{root}" if origin is None else origin,
             "created_at": datetime.now(UTC).isoformat(),
             "app_version": _package_version(),
             "schema_version": ledger_schema_version(root / ".sb" / "ledger.db"),
@@ -239,7 +242,7 @@ def _safe_relative(value: str) -> Path:
     return Path(*pure.parts)
 
 
-def _read_manifest(bundle: tarfile.TarFile) -> dict[str, JsonValue]:
+def read_backup_manifest(bundle: tarfile.TarFile) -> dict[str, JsonValue]:
     try:
         member = bundle.getmember("manifest.json")
     except KeyError as exc:
@@ -299,7 +302,7 @@ def restore_backup(
     total = 0
     try:
         with tarfile.open(archive, mode="r:*") as bundle:
-            manifest = _read_manifest(bundle)
+            manifest = read_backup_manifest(bundle)
             entries = _manifest_entries(manifest)
             if len(entries) > _MAX_BACKUP_FILES:
                 raise OperationError("backup file count exceeds the resource budget")

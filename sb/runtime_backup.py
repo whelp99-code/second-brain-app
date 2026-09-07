@@ -11,9 +11,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from sb.backup_verification import BackupGeneration, BackupVerification, verify_backup
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
-from sb.ops import BackupResult, create_backup
+from sb.ops import BackupResult, OperationError, create_backup
 
 
 def _copy_database(source: Path, target: Path) -> None:
@@ -83,6 +84,25 @@ def backup_runtime(config: Config, destination: Path) -> BackupResult:
                             target.parent.mkdir(parents=True, exist_ok=True)
                             shutil.copyfile(path, target)
                             target.chmod(0o600)
-                return create_backup(snapshot, destination)
+                return create_backup(snapshot, destination, origin=f"provider:{config.provider_instance_id}")
+    finally:
+        service.close()
+
+
+def verify_runtime_backup(config: Config, archive: Path) -> BackupVerification:
+    """Exclude destructive writers and tombstone acceptance while a copy exists."""
+    if not Path(config.vault_root).is_symlink() and "share_root" not in config.raw:
+        return verify_backup(archive)
+    if not (Path(config.request_root) / "journal.db").is_file() or not (
+        Path(config.state_root) / "generation-journal.db"
+    ).is_file():
+        raise OperationError("backup verification requires initialized control journals")
+    service = GenerationMutationService.from_config(config)
+    try:
+        with service.store.exclusive(), _freeze_requests(Path(config.request_root)):
+            sequence, set_root = service.requests.tombstone_high_water()
+            return verify_backup(archive, expected_generation=BackupGeneration(
+                provider_instance_id=config.provider_instance_id,
+                tombstone_sequence=sequence, tombstone_set_root=set_root))
     finally:
         service.close()

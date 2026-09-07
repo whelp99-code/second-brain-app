@@ -99,14 +99,34 @@ sb sources --json
 sb retention --json
 sb metrics --json
 sb backup
+sb verify-backup /path/to/second-brain-backup.tar.gz
 ```
 
 전체 명령:
 
 ```text
 init, ingest, compile, brief, run, status, rollback, doctor,
-mcp, search, remember, retry, backup, restore, migrate,
+mcp, search, remember, retry, backup, verify-backup, restore, migrate,
 resolve, web, sources, retention, gc, metrics
+```
+
+`sb backup`은 생성 후 임시 저장소로 복원하여 체크섬·원장·인용을 검사하고
+`*.tar.gz.verified.json` 검증 기록을 남긴다. 기존 백업은 `verify-backup`으로 검사한다.
+검증에는 복원용 추가 디스크 공간이 필요하며 임시 저장소는 검사 후 제거된다.
+관리형 검증은 현재 provider·삭제 이력과 다른 백업을 복원 전에 거부한다.
+운영 세대 활성화와 복원 권한 검사는 별도다. 출처가 없는 기존 백업은
+준비 상태의 정상 근거로 사용하지 않으므로 새 백업을 생성해 검증한다.
+
+웹의 `/health`는 프로세스 생존 여부, `/ready`는 작업·백업·요청 상태를 반환한다.
+검증되지 않았거나 변경된 최신 백업, 오래된 성공 실행, 정체된 요청 등은
+`/ready`에서 HTTP 503과 `reasons` 코드로 표시한다. 시간 기준은 설정할 수 있다.
+
+```toml
+[readiness]
+max_run_age_hours = 48
+max_backup_age_hours = 48
+max_request_age_minutes = 15
+failure_window_hours = 48
 ```
 
 ## MCP

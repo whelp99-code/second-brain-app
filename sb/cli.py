@@ -52,6 +52,7 @@ class Command(StrEnum):
     REMEMBER = "remember"
     RETRY = "retry"
     BACKUP = "backup"
+    VERIFY_BACKUP = "verify-backup"
     RESTORE = "restore"
     MIGRATE = "migrate"
     RESOLVE = "resolve"
@@ -116,6 +117,8 @@ def _parser() -> argparse.ArgumentParser:
     _ = retry.add_argument("--limit", type=int)
     backup = sub.add_parser(Command.BACKUP.value)
     _ = backup.add_argument("destination", nargs="?")
+    verification = sub.add_parser(Command.VERIFY_BACKUP.value)
+    _ = verification.add_argument("archive")
     restore = sub.add_parser(Command.RESTORE.value)
     _ = restore.add_argument("archive")
     _ = restore.add_argument("--to")
@@ -325,20 +328,31 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             )
         else:
             destination_path = Path(destination)
-        from sb.runtime_backup import backup_runtime
+        from sb.runtime_backup import backup_runtime, verify_runtime_backup
 
         result = backup_runtime(config, destination_path)
+        verification = verify_runtime_backup(config, result.archive)
         print(
             json.dumps(
                 {
                     "archive": str(result.archive),
                     "checksum": result.checksum,
+                    "verification": verification.model_dump(mode="json"),
                     "files": result.files,
                     "bytes": result.bytes,
                 },
                 ensure_ascii=False,
             )
         )
+        return 0
+
+    def verify_backup_command() -> int:
+        from sb.runtime_backup import verify_runtime_backup
+
+        archive = _opt_str(ns, "archive")
+        assert archive is not None
+        result = verify_runtime_backup(config, Path(archive))
+        print(result.model_dump_json())
         return 0
 
     def restore() -> int:
@@ -476,6 +490,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.REMEMBER: remember,
         Command.RETRY: retry,
         Command.BACKUP: backup,
+        Command.VERIFY_BACKUP: verify_backup_command,
         Command.RESTORE: restore,
         Command.MIGRATE: migrate,
         Command.RESOLVE: resolve,

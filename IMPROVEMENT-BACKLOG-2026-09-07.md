@@ -72,7 +72,7 @@
 - 수정: record 단위 인덱스 또는 제한된 후속 페이지 탐색을 사용한다. 최종 필터·중복 제거 이후의 결과 개수가 limit 기준이 되어야 한다.
 - 완료 기준: 앞 N개가 제외되거나 중복이어도 뒤의 유효 결과를 찾는다. 과도한 전체 스캔을 피할 수 있는 상한과 continuation 규칙을 둔다.
 
-### R8. readiness의 잘못된 정상 판정과 오류 처리 — P1 / 코드 확인 / Second Brain
+### R8. readiness의 잘못된 정상 판정과 오류 처리 — P1 / 소스 수정·CLI/HTTP 검증, 운영 인수 미완료 / Second Brain
 
 - 근거: [readiness.py](sb/readiness.py#L29).
 - 마지막 실행의 성공 여부만 보고 경과 시간을 검사하지 않는다. 백업은 최근 tar.gz의 mtime만 보며 체크섬 검증 여부를 확인하지 않는다. 요청 상태 수는 출력하지만 장시간 pending·failed 여부를 정상 판정에 반영하지 않는다. 요청 DB와 백업 디렉터리 조회의 일부 예외는 정상적인 degraded 응답으로 변환되지 않는다.
@@ -217,3 +217,10 @@ writer mutex로 모든 generation writer를 직렬화하면서 sealed 부모에�
 provider의 정정 완료 이후 control이 claimed/uncertain에 남는 결함을 수정했다. 변경 사항·원인·남은 P1/P2 항목은 [정정 완료 연결 보고서](CORRECTION-CONTROL-COMPLETION-2026-09-08.md)에 상세히 기록했다. 과거 결함의 재현 설명을 현재 소스 상태로 읽지 않는다.
 
 관련 회귀 34개 통과, 실제 정정 proved/control completed/두 클라이언트 4개 record/이전 기억 0개. 최종 event 실패와 20분 만료 후 복구 시 전송·compaction은 각 1회였다. 이는 운영 전환, 정정 UI와 모든 앱의 자동 기억 사용 완료가 아니다. 원본 task 차단 전파 없는 자동 수집과 근거 없는 hybrid 활성화는 계속 보류한다.
+
+
+## 15. R8/I6 후속 — 운영 준비 상태와 검증 백업
+
+mtime만으로 backup을 정상 판정하지 않는다. 격리 복원 검증 receipt와 현재 archive identity·생성/검증 시각·원 저장소/provider·삭제 이력을 대조한다. 새 백업 실패를 예전 정상 백업으로 가리지 않고, 마지막 run 경과·미해결 derivation·oldest request·최근 failure·journal/cleanup 상태를 code와 HTTP 503으로 표시한다.
+
+전체 591 passed / 2 skipped, 실제 CLI/HTTP ready 503→200→503 및 health 200 유지, 관리형 CLI backup 검증을 확인했다. [보고서와 운영 설정](READINESS-VERIFICATION-2026-09-08.md). 실제 운영 배포/백업·독립 runtime 복원 인수, adapter receipt 결합과 I5 대용량 잠금·공간 검증은 계속 미완료다.

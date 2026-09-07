@@ -283,3 +283,10 @@ SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MC
 수정·개선 항목: 원문 없는 원 명령 binding, 원 승인/redemption/전송 fence 검증, signed proof와 동일 lane purge 검증, 원장/효과/event의 atomic 완료, completed purge의 offline 재사용, bounded cursor 복구와 cursor 실패 rollback, compaction 이후 clock 재조회. 새 회귀 11개 포함 관련 34개 통과; 실제 event 실패 후 20분 재개에서 provider 추가 호출 없이 completed, 두 클라이언트 같은 정정 기억 4개, 이전 기억 0개, 전송/compaction 각 1회.
 
 [상세 보고서](CORRECTION-CONTROL-COMPLETION-2026-09-08.md)의 다음 항목을 기존 R/I/G 목록에 합친다. V1 일반 LF·정정 UI·실제 앱별 공유·context pack/범위·readiness/운영 복원·검색 품질 순으로 남은 경계를 검증한다. task 수집은 원본 차단 전파 계약이 갖춰질 때 재개한다. OSS별 별도 정본/서버/승인 체계를 추가하지 않는다.
+
+
+## 20. R8/I6 후속 — 정본 기억의 운영 준비 상태
+
+공통 기억 순환의 운영 인수 선행 조건으로 백업 검증과 readiness를 보완했다. 최신 tar.gz의 mtime만 보는 경로를 검증된 archive identity/원 저장소·provider/삭제 이력 검사로 바꾸고, stale run·정체 요청·최근 실패·손상 journal·세대 정리 지연을 반영한다. 기존 복원 검사와 generation/request lock을 재사용한다.
+
+표준 전체 591 passed/2 skipped, 실제 CLI/HTTP에서 검증 전 503→검증 후 200→손상 후 503, health 200 유지와 managed backup identity를 확인했다. [상세 보고서](READINESS-VERIFICATION-2026-09-08.md). 이 검증은 fixture 기반 실제 CLI/서버 인수이며 운영 전환은 아니다. 기존 업무 결과 수집 차단 전파·실제 앱별 공급·문맥/범위·검색 품질과 운영 runtime 복원 완료 조건은 유지한다.

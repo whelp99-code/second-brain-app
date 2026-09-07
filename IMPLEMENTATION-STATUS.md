@@ -16,7 +16,7 @@
 | B3 | R6/I3 reader 복구·읽기 가용성 | 복구·LLM 준비 중 동시 조회 소스 검증, 운영 부하/잔여물 미완료 | 실제 reader/writer 강제 종료·PID 재사용·전환 정리, 두 writer·MCP/자비스 동시 조회 확인. 대표 p95·기존 잔여물 인수 남음 |
 | B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 후보 UI·명령 완료·기본 signed fence 소스 검증, 운영 전체 인수 미완료 | 원문 검토→승인 실행→저장 준비 브라우저 검증. 별도 실제 MCP의 64개 record·stored=true. 실제 입력 수집·일반 LF·실제 앱·범위·운영 인수 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
-| B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
+| B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 준비 상태·검증 백업 선행 수정, 운영 인수 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
 | B8 | R10 선택적 hybrid/관계 확장 | 조회 부작용·RRF 메타데이터 유실 수정, 활성화 보류 | cosine 출처/필터·세대 결합·삭제 수명 및 기준 검색 대비 이득 검증 필요 |
 
@@ -206,3 +206,12 @@ V1 신규 remember의 일반 줄바꿈, 자비스 정정 UI/사용자 승인/pro
 새 회귀 11개를 포함한 관련 **34 passed / 9 files (50.15초)**, backend build·변경 lint·독립 재검토 통과. 격리 실제 SB MCP에서 후보 확인→승인 dispatch→정정 proved→최종 event 실패→20분 후 control completed, 전송/compaction 각 1회, 복구 중 provider 추가 관측 0회를 검증했다. 두 reader의 같은 정정 record 4개·내용/출처 digest 일치와 이전 기억 0개를 확인했다. [수정 내역·검증 한계·후속 목록](CORRECTION-CONTROL-COMPLETION-2026-09-08.md).
 
 이 검증은 합성 owner 서명을 쓰는 실제 backend 순환이다. 정정 UI/실제 사용자 승인 화면, 실제 앱별 수집·주입, V1 일반 LF, 접근 범위, task 원본 차단 전파와 운영 인수는 남는다. 운영 DB migration·배포·서비스 재시작·push는 수행하지 않았다.
+
+
+### B6 진행 — 검증 백업과 운영 준비 상태
+
+R8/I6의 mtime 기반 백업 정상 오판, 오래된 실행·정체 요청·최근 실패·손상 journal 누락을 수정했다. CLI backup은 격리 복원 검증 후 receipt를 남기고 기존 archive는 verify-backup으로 검사한다. 원 저장소/provider·생성 시각·파일 identity·삭제 sequence/root를 확인하며, 관리형 검증은 기존 generation/request 잠금을 유지하고 오래된 삭제 이력의 archive를 복원 전에 거부한다.
+
+표준 전체 **591 passed / 2 skipped (158.89초)**, 관련 집중 **36 passed (13.36초)**. 전체 Ruff·신규 모듈/CLI 타입 오류·경고 0, 실제 CLI/HTTP에서 health 200과 ready 503→200→503 분리, 손상 verify exit 1, 임시 복원 잔여 0, 관리형 backup origin/삭제 이력 보존을 확인했다. [상세 동작·설정·검증 및 한계](READINESS-VERIFICATION-2026-09-08.md).
+
+실제 운영 백업 검사·배포·runtime 재기동/활성화 인수, 자비스 adapter 인수 receipt의 readiness 결합, 대용량 검증 잠금/공간 최적화는 남는다. 출처가 없는 과거 백업과 오래된 삭제 이력을 추정으로 정상 승격하지 않는다. 운영 서비스·세대·push는 변경하지 않았다.
