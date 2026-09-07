@@ -10,7 +10,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 미완료 | 독립 클라이언트 A 저장/B 조회, 요청 ID/receipt/record 연결, 범위 검사 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 격리 단일 줄 순환 통과, 운영 연결·범위 미완료 | 실제 MCP/outbox pending→proved→settled→재조회, 두 번째 프로세스 회수. I1-a~e 및 실제 앱·프로젝트 범위 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
@@ -84,3 +84,12 @@ R9의 CLI status/search/sources/retention/metrics, doctor 조회, gc/migrate 미
 - 증거: `/var/tmp/sb-time-final-tests.log`, `/var/tmp/sb-time-final-types.log`, `/var/tmp/jarvis-memory-time-final-tests.log`, `/var/tmp/jarvis-memory-time-build.log`, `/var/tmp/jarvis-memory-time-probe.jsonl`, `/var/tmp/jarvis-memory-future-probe.jsonl`.
 
 R4는 기존 기록의 digest를 바꾸므로 실행 파일만 바꾸는 배포는 하지 않는다. [시간 계약](MEMORY-TIME-CONTRACT-2026-09-07.md)의 유지보수 경계에서 새 provider release 세대와 실행 파일을 함께 전환하고 기존 target은 재조회해야 한다. 운영 release/서비스/active 포인터는 이번에 전환하지 않았다. 현재·미래 시계 프로브는 읽기 검증이며 35일 실운영, 자비스 candidate/outbox/settled 순환, 두 에이전트 앱 공유 완료의 증거가 아니다. B4~B8 및 I3 지연·B3 과거 잔여물은 계속 진행 대상이다.
+
+
+### B4 진행 — 실제 MCP/outbox 순환과 재사용
+
+자비스 `471cab3`에서 세션 전체 generation 고정을 public 조회 단위로 분리하고 schema4 recentChanges의 generation 유실을 수정했다. 수정 전 실제 격리 순환은 settled 이후 reader 재사용에서 실패했다. 수정 후 pending→proved→settled→같은 reader current 1개, 독립 두 번째 MCP 프로세스의 동일 record 회수, replayed=true→apply idle→outbox 추가 dispatch 0을 확인했다.
+
+재현 가능한 `scripts/jarvis-memory-acceptance.mjs`와 격리 provider fixture를 추가했다. 자비스의 합성 검증 결과·서명 fixture를 사용하며, 하네스가 expected selector를 만들고 apply/reconcile을 호출한다. 따라서 실제 업무 검증, 운영 자동 연결, 실제 Codex/Claude 앱 공유, 여러 줄 입력 완료와 구분한다.
+
+검증: 자비스 관련 단위 **247 passed / 26 files**, ESLint·backend build 통과, 독립 코드 검토 완료. 새 Python fixture Ruff·타입 오류/경고 0, Node 구문 검사 통과. 상세 관측 및 새로 확인한 필수 잔여 I1-a~e는 [순환 인수 보고서](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)에 있다. 핵심 잔여는 운영 outbox 생성·승인 원문 보존·selector 생성·여러 줄 판정·비동기 reconciliation이다. 운영 배포나 권한 우회는 수행하지 않았다.
