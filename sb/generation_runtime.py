@@ -98,6 +98,9 @@ class GenerationMutationService:
 
     def maintain(self, now: datetime) -> MaintenanceResult:
         with self.store.exclusive():
+            parent, _legacy = self._current_or_legacy()
+            if parent is not None:
+                self.store.activate(parent, None, now, lock_held=True)
             return self.lifecycle.maintain(now)
 
     @staticmethod
@@ -188,6 +191,10 @@ class GenerationMutationService:
             if parent is not None and mutation.authority.resume_generation_id == parent.generation_id:
                 return self._resume(mutation, parent, target)
             self._require_authority(parent, mutation.authority, target)
+            if parent is not None:
+                # Finish a prior pointer switch before creating another successor.
+                # Otherwise its undisposed predecessor can become an orphan forever.
+                self.store.activate(parent, None, mutation.now, lock_held=True)
             values: list[T] = []
 
             def staged(root: Path) -> None:

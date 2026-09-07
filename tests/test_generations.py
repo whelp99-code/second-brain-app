@@ -13,10 +13,12 @@ NOW = datetime(2026, 8, 31, tzinfo=UTC)
 ROOT = "sha256:" + "0" * 64
 
 
-def _build(
+def build_generation(
     store: GenerationStore,
     parent: Generation | None = None,
     text: str = "unrelated",
+    *,
+    tombstone_set_root: str = ROOT,
 ) -> Generation:
 
     def materialize(root: Path) -> None:
@@ -27,7 +29,7 @@ def _build(
         request_id="request-" + text,
         parent=parent,
         tombstone_sequence=0,
-        tombstone_set_root=ROOT,
+        tombstone_set_root=tombstone_set_root,
         created_at=NOW,
         allowed=lambda _path: True,
         mutate=materialize,
@@ -39,7 +41,7 @@ def test_fresh_generation_has_orphan_git_and_atomic_pointer(tmp_path: Path) -> N
         tmp_path / "state", tmp_path / "share",
         provider_instance_id="provider:test", provider_release_sha="a" * 40,
     )
-    generation = _build(store)
+    generation = build_generation(store)
     store.activate(generation, None, NOW)
     active = store.active()
     assert active.generation_id == generation.generation_id
@@ -56,10 +58,10 @@ def test_reader_lease_blocks_predecessor_disposal(tmp_path: Path) -> None:
         provider_instance_id="provider:test", provider_release_sha="a" * 40,
         requests=requests,
     )
-    first = _build(store, text="first")
+    first = build_generation(store, text="first")
     store.activate(first, None, NOW)
-    second = _build(store, first, "second")
-    requests.register_reader("reader:1", first.generation_id, 123, NOW)
+    second = build_generation(store, first, "second")
+    requests.register_reader("reader:1", first.generation_id, os.getpid(), NOW)
     with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
         store.activate(second, first, NOW)
     requests.release_reader("reader:1")
@@ -73,9 +75,9 @@ def test_open_predecessor_descriptor_blocks_disposal(tmp_path: Path) -> None:
         tmp_path / "state", tmp_path / "share",
         provider_instance_id="provider:test", provider_release_sha="a" * 40,
     )
-    first = _build(store, text="first")
+    first = build_generation(store, text="first")
     store.activate(first, None, NOW)
-    second = _build(store, first, "second")
+    second = build_generation(store, first, "second")
     descriptor = os.open(first.root, os.O_RDONLY | os.O_DIRECTORY)
     try:
         with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
@@ -91,7 +93,7 @@ def test_generation_rebuilds_every_named_derived_store(tmp_path: Path) -> None:
         tmp_path / "state", tmp_path / "share",
         provider_instance_id="provider:test", provider_release_sha="a" * 40,
     )
-    generation = _build(store)
+    generation = build_generation(store)
     expected = {
         ".sb/ledger.db",
         ".sb/search.db",

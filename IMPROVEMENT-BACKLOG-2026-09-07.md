@@ -175,3 +175,10 @@ R2 추가 조율 사항: 자비스 resolveDuplicates는 page_id+sid 기준으로
 R5/R7/R9의 소스 수정을 진행했다. Sealed 모드에서도 상태/날짜/종류 필터와 기존 승인 원장의 read-only 조회를 적용한다. title-only 결과와 중복 section을 건너뛴 뒤 record limit를 계산한다. CLI 조회는 고정된 generation과 reader lease를 사용하며 오류 종료에서도 해제한다. CLI pin 커밋은 `9ba9588`이다.
 
 전체 534 passed/2 skipped, Ruff 통과, 타입 오류 0/기존 경고 55. 운영 자료를 새 소스 CLI로 읽어 날짜 필터의 포함/제외를 확인했다. 운영 release는 아직 전환하지 않았다. R6 reader 강제 종료 복구, I3 갱신 중 지연, R4 시간 및 자비스 중복 소비, 프로젝트 범위는 이 변경의 완료 범위에 포함하지 않는다. 상세 증거는 구현 원장 B2를 따른다.
+
+
+## 10. B3 후속 — reader 종료 복구
+
+R6의 종료된 reader lease 회수와 현재 전환의 정리 재개를 구현했다. 생존 여부만이 아니라 Linux boot/start identity로 PID 재사용을 구분한다. 과거 형식의 lease와 알 수 없는 생존 상태는 보수적으로 유지한다. 실제 reader 프로세스 SIGKILL 후 세대 전환/폐기, live reader 보존, PID 재사용, 유지보수 및 다음 mutation의 중단 정리 재개를 검사했다.
+
+전체 540 passed/2 skipped, Ruff 통과, 타입 오류 0/기존 경고 55. 다만 실제 운영에는 디렉터리가 없는데 activated로 남은 과거 이력 2건과 잔여 generation 디렉터리가 존재한다. 기존 자료 대조/복구와 I3의 읽기 지연은 미완료이며, 이번 소스 변경을 그 해결 증거로 사용하지 않는다.

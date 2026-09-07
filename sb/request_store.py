@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant, strict_loads
 from sb.effect_write_values import model_object
 from sb.export_journal import ExportJournal
+from sb.process_identity import observe_process
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
 from sb.sqlite_values import OPTIONAL_TEXT_ROW
 from sb.tombstone_snapshot import (
@@ -237,6 +238,10 @@ CREATE TABLE IF NOT EXISTS reader_leases(
   generation_id TEXT NOT NULL,
   process_id INTEGER NOT NULL,
   opened_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reader_process_identities(
+  lease_id TEXT PRIMARY KEY REFERENCES reader_leases(lease_id) ON DELETE CASCADE,
+  process_identity TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS request_observations(
   request_id TEXT PRIMARY KEY REFERENCES requests(request_id),
@@ -967,10 +972,20 @@ class RequestStore:
         return row[0], row[1]
 
     def register_reader(self, lease_id: str, generation_id: str, process_id: int, now: datetime) -> None:
-        _ = self.db.execute(
-            "INSERT INTO reader_leases VALUES(?,?,?,?)",
-            (lease_id, generation_id, process_id, format_instant(now)),
-        )
+        observation = observe_process(process_id)
+        self._begin()
+        try:
+            _ = self.db.execute(
+                "INSERT INTO reader_leases VALUES(?,?,?,?)",
+                (lease_id, generation_id, process_id, format_instant(now)),
+            )
+            if observation.identity is not None:
+                _ = self.db.execute("INSERT INTO reader_process_identities VALUES(?,?)",
+                                    (lease_id, observation.identity))
+            self._commit()
+        except Exception:
+            self._rollback()
+            raise
 
     def release_reader(self, lease_id: str) -> None:
         _ = self.db.execute("DELETE FROM reader_leases WHERE lease_id=?", (lease_id,))
@@ -981,7 +996,32 @@ class RequestStore:
             (generation_id,),
         ).fetchall()
         rows = cast(list[tuple[str, int]], raw_rows)
-        return tuple(rows)
+        return tuple((lease_id, process_id) for lease_id, process_id in rows)
+
+    def prune_dead_readers(self, generation_id: str) -> int:
+        """Retire leases only when death or a changed boot/start identity is observed.
+
+        Call under the generation writer lock. Legacy rows without an identity
+        stay conservative when a PID is alive; elapsed age alone proves nothing.
+        """
+        rows = cast(list[tuple[str, int, str, str | None]], self.db.execute(
+            "SELECT r.lease_id,r.process_id,r.opened_at,p.process_identity "
+            + "FROM reader_leases r LEFT JOIN reader_process_identities p USING(lease_id) "
+            + "WHERE r.generation_id=?", (generation_id,),
+        ).fetchall())
+        removed = 0
+        for lease_id, process_id, opened_at, identity in rows:
+            observed = observe_process(process_id)
+            if observed.state != "dead" and not (
+                identity is not None and observed.identity is not None and identity != observed.identity
+            ):
+                continue
+            removed += self.db.execute(
+                "DELETE FROM reader_leases WHERE lease_id=? AND generation_id=? "
+                + "AND process_id=? AND opened_at=?",
+                (lease_id, generation_id, process_id, opened_at),
+            ).rowcount
+        return removed
 
     def record_import(
         self,

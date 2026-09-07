@@ -9,7 +9,7 @@
 | B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 완료 | 4da09b9; 520 passed, 2 skipped; Ruff·diff check 통과 |
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 진행 중 | R2 공개 필드/ID 수정, R3 CAS·정정 후 인용 보강. R4 및 자비스 중복 판정 미완료 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
-| B3 | R6/I3 reader 복구·읽기 가용성 | 미완료 | 강제 종료·전환 중 읽기·deadline 내 응답 |
+| B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
 | B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 미완료 | 독립 클라이언트 A 저장/B 조회, 요청 ID/receipt/record 연결, 범위 검사 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
@@ -59,3 +59,15 @@ R9의 CLI status/search/sources/retention/metrics, doctor 조회, gc/migrate 미
 - 운영 자료 실조회: 소스 CLI status가 generation root와 wiki 18/daily 2를 반환. `업무`의 9월 5일/wiki 필터 9건, 자료 없는 날짜 범위 0건. 테스트에서도 조회 전후 generation의 모든 파일 해시가 동일함을 확인했다.
 - 증거: `/var/tmp/sb-b2-full-tests.log`, `/var/tmp/sb-b2-search-retest.log`, `/var/tmp/sb-b2-real-cli.json`, `/var/tmp/sb-b2-types-final.log`.
 - 지식 상태 scope는 프로젝트 접근 권한 scope와 다르다. 프로젝트 범위는 B4, hybrid의 메타데이터/범위 보존은 B8에 계속 남는다. 이번 source MCP/CLI 검증으로 운영 배포나 자비스의 전체 기억 순환 완료를 주장하지 않는다.
+
+
+### B3 진행 — 종료된 reader와 중단된 disposal 복구
+
+- Linux boot ID + process starttime을 reader lease에 연결한다. 기존 reader_leases 열/호출 계약은 보존하고 별도 identity 테이블을 추가하여 구형 journal과 프로세스의 호환성을 유지한다.
+- 실제 종료, zombie 또는 확인된 PID 재사용일 때만 lease를 정리한다. 생존 확인 실패·권한 오류·식별자가 없는 구형 live PID는 유지하고 오래되었다는 이유로 삭제하지 않는다. 실제 descriptor 검사는 기존대로 계속 적용한다.
+- maintenance와 다음 mutation은 이미 전환된 활성 세대의 predecessor 정리를 먼저 마친다. 포인터 전환 후 실패한 정리를 건너뛰어 추가 세대를 만드는 경로를 막았다.
+- 실제 spawn 프로세스가 pin을 잡은 상태에서 SIGKILL된 뒤, lease 잔여→정리→다음 generation 활성화→이전 디렉터리 폐기까지 검증했다. PID 재사용, 불확실한 생존 상태, 유지보수/다음 mutation의 재개도 검사한다.
+- 운영 읽기 전용 관측: generation 디렉터리 7개, activation 상태 proved 11/activated 2. activated 2건의 generation 디렉터리는 이미 없어졌고 현재 active도 아니다. 이 과거 불일치와 잔여물은 최신 active 재개만으로 정리됐다고 간주하지 않는다. 백업/원장 대조 후 별도 복구해야 한다.
+- I3의 LLM 실행 중 장시간 배타 잠금은 여전히 남아 있다. 이번 reader 복구가 조회 지연 개선을 의미하지 않는다. 운영 코드 배포는 아직 하지 않았다.
+
+검증 결과: 전체 **540 passed, 2 skipped (127.40초)**, Ruff·diff check 통과, 타입 **0 errors, 55 warnings**. 새 process identity/reader recovery 관련 소스·테스트는 타입 오류·경고 0. 로그는 `/var/tmp/sb-b3-full-tests.log`, `/var/tmp/sb-b3-types-final.log`에 있다.

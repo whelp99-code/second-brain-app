@@ -1025,6 +1025,8 @@ class GenerationStore:
             )
             self.journal.commit()
             return
+        if self.requests is not None:
+            _ = self.requests.prune_dead_readers(predecessor.generation_id)
         readers = () if self.requests is None else self.requests.readers(predecessor.generation_id)
         descriptors = _proc_descriptors(predecessor.root)
         if readers or descriptors:
