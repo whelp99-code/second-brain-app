@@ -244,3 +244,12 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 결과는 control completed, provider proved, outbox settled, sensitive record 64개, 두 클라이언트 current, rollback 복구, replay 후 추가 dispatch 0, review 원문 0개, cleanup/control 오류 없음이다. 삭제 sequence 1 이후 무서명·과거 fence는 각각 거부됐고 삭제 record 회수는 0개였다. 컴파일 준비 중 완료 확인과 두 클라이언트 조회 묶음은 약 **1.384초**였다. 단일 요청 지연이나 p95 수치가 아니다.
 
 합성 owner 입력/승인과 격리 vault를 사용한 실제 프로세스 통합 검사다. 실제 사용자의 업무 결과, Codex/Claude 앱 화면, 운영 설치·수집·주입을 검증한 것은 아니다. 최신 upstream 기능·라이선스를 재조사하거나 외부 코드를 복사하지 않았다. 이번 단위에서 서비스 재시작·배포·활성 세대 전환·push와 자비스 제품 소스 수정은 하지 않았다.
+
+
+## 15. 후보 UI 공백 구현 후 갱신
+
+14절의 P0 네 공백은 후속 구현으로 연결했다. 상세 검토 API·digest를 결합한 확인/거절·기존 승인 흐름·저장 명령 준비·request별 진행 표시가 있다. 실제 브라우저에서는 검토→서명 fixture 승인 실행→저장 pending→새로고침 유지를 확인했고, 별도 실제 MCP 인수에서는 provider proved→outbox settled→control completed→dashboard stored=true 및 두 클라이언트의 64개 record 회수를 확인했다. 브라우저 전체 경로가 실제 provider 저장까지 완료됐다는 주장과 구분한다.
+
+remember 확인 실행기가 correct 경로로 실패하던 결함과 Overview의 비동기 진단 중 정상 외부 DB 변경을 쓰기로 오판하던 결함도 수정했다. 기존 후보·원문·권한·outbox를 재사용했으며 신규 OSS 서버와 frozen MCP 변경은 없다. 변경·회귀 수치·화면 증거·경계는 [후보 UI 인수 보고서](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md)를 따른다.
+
+14절 실행 목록 1번의 실제 사용자/업무 결과 후보 수집은 아직 남는다. 자동 요약을 검증된 실행 결과로 취급하지 않는다. 다음 순서는 **실제 후보 수집 → 일반 입력/V2 정정 → 앱별 공통 접근·범위 → 문맥 예산·전달 이력 → 운영 복구·한국어 검색 평가**다. 2~10번의 미완료 판정과 위험 보류는 유지한다. 이번 소스 검증으로 B4 전체나 운영 설치 완료를 선언하지 않는다.

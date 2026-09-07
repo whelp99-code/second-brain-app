@@ -4,7 +4,7 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-최신 인계 대조: [통합 계획 14절](OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md#14-현재-소스-재대조와-작업별-인수-조건). 현재 판정과 과거 결함 재현을 분리하고 후보/UI의 실제 미연결 지점 및 다음 10개 실행 단위를 기존 ID에 대응했다. 2026-09-08 재검증은 전체 **564 passed / 2 skipped**, Ruff 통과, 격리 실제 MCP/JARVIS에서 삭제 이후 64개 민감 record 저장·control completed·두 클라이언트 회수·갱신 중 조회 통과다. 문서 갱신 및 기존 소스 재검증 단위이며 후보/UI 신규 구현이나 운영 인수 완료가 아니다.
+최신 구현: [후보 화면·완료 상태 인수](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md). 인계와 기존 24개 개선 항목을 유지하고 후보 검토·확인/거절·저장 명령 준비·진행 표시를 연결했다. 격리 실제 MCP에서 64개 민감 record 저장·두 클라이언트 재조회와 dashboard `stored=true`를 확인했다. 실제 입력 자동 수집, 앱별 수집/주입·범위와 운영 인수는 미완료다. 이전 코드 대조는 통합 계획 14절, 최신 변경은 15절을 따른다.
 
 | 단위 | 범위 | 상태 | 완료 증거 |
 |---|---|---|---|
@@ -12,7 +12,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | 복구·LLM 준비 중 동시 조회 소스 검증, 운영 부하/잔여물 미완료 | 실제 reader/writer 강제 종료·PID 재사용·전환 정리, 두 writer·MCP/자비스 동시 조회 확인. 대표 p95·기존 잔여물 인수 남음 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | CLI/dashboard·명령 완료·기본 signed fence 소스 검증, 운영 전체 인수 미완료 | 삭제 후 64개 record·rollback·CLI cycle settled와 control completed. 운영 구성·후보/UI 전체 흐름·일반 LF·실제 앱·범위 남음 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 후보 UI·명령 완료·기본 signed fence 소스 검증, 운영 전체 인수 미완료 | 원문 검토→승인 실행→저장 준비 브라우저 검증. 별도 실제 MCP의 64개 record·stored=true. 실제 입력 수집·일반 LF·실제 앱·범위·운영 인수 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
@@ -159,3 +159,12 @@ I1-b의 이 소스 결함은 수정됐다. 운영 실행기 outbox 주입과 주
 검증 중 발견한 첫 기억→export의 필수 log 누락도 Vault 초기화로 수정하고 raw/.sb의 Git 제외를 seal 경계에서 보장했다. 기존 제외 취소 규칙보다 강제 규칙을 뒤에 배치하며 CAS 원문은 보존한다. 최종 전체 **564 passed / 2 skipped, 138.84초**, 독립 검토 지적 두 건 수정 후 추가 actionable 없음, 변경 타입 오류/경고 0, 전체 Ruff·하네스 구문 검사 통과. 세부 한계는 [갱신 중 조회 보고서](GENERATION-READ-CONCURRENCY-2026-09-08.md).
 
 운영 p95·부하 인수, 과거 `.staging`/미활성 세대의 원장 기반 복구는 남는다. 임시 디렉터리 일괄 삭제를 보류했고 자비스 signed export status 소비 미구현도 I1 후속으로 기록했다. 운영 서비스·release/active generation·push는 변경하지 않았다.
+
+
+### B4 진행 — 후보 검토 화면과 실제 저장 진행 상태
+
+자비스 `c4c5c98`: 기억 후보 상세를 영속 원문·출처·정책 digest에 결합하고 검토한 내용으로 확인/거절 명령을 준비한다. 승인된 후보의 저장 명령 준비와 control/outbox 진행 API·화면을 연결했다. remember 확인 실행기의 잘못된 correct 분기와 Overview 동시 DB 변경 오판도 재현·수정했다. 기존 owner 승인·outbox·SB 계약을 재사용한다.
+
+최종 커밋 기준 `49446db`와 이 단위 소스를 격리하여 build 및 후보/HTTP/동시성 15개 통과. frontend 전체 143개, 관련 회귀 72개·투영 26개·최종 Overview 13개는 일부 중복으로 별도 기록한다. Playwright 1440/375px의 검토→승인 실행→저장 pending→새로고침 유지, 콘솔 오류/serious·critical 접근성 위반/가로 넘침 0. 실제 MCP/CLI 인수는 64개 민감 record·두 클라이언트 current·control completed/outbox settled에 dashboard stored=true까지 확인했다. 독립 재검토 추가 지적 없음.
+
+상세 증거와 잔여는 [인수 보고서](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md). 실제 업무 후보 수집·private 후보 UI·일반 LF/V2 정정·앱별 공유/주입·접근 범위·운영 전환 및 B5~B8은 남는다. 서비스·운영 세대·push는 변경하지 않았다.

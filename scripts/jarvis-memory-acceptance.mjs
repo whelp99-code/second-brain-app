@@ -16,6 +16,8 @@ const approvalRollback = process.argv.includes('--approval-rollback');
 const runtimeCli = process.argv.includes('--runtime-cli');
 const afterDelete = process.argv.includes('--after-delete');
 const duringCompile = process.argv.includes('--during-compile');
+const dashboardProgress = process.argv.includes('--dashboard-progress');
+if (dashboardProgress && !runtimeCli) throw new Error('--dashboard-progress requires --runtime-cli');
 if (duringCompile && !runtimeCli) throw new Error('--during-compile requires --runtime-cli');
 if (afterDelete && !runtimeCli) throw new Error('--after-delete requires --runtime-cli');
 if (runtimeCli && !ownerConfirmed) throw new Error('--runtime-cli requires --owner-confirmed');
@@ -136,7 +138,30 @@ try {
   const repeated = await service.runOnce('real-provider-worker',1);
   const terminalReplay = service.get(queued.outbox_id)?.state === 'settled' ? service.enqueue(claimed) : undefined;
   const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
+  let dashboardStored = null;
+  if (dashboardProgress) {
+    const {createDashboardServer} = await load('src/dashboard/server.js');
+    const dashboard = createDashboardServer({db:fixture.database.authority,staticRoot:root,
+      host:'127.0.0.1',port:0,clock:()=>OUTBOX_NOW,memoryAdapter:reader,
+      memoryCandidateReviewSpoolRoot:spoolRoots.candidate_review_spool_root,
+      memoryCandidateDispatchSpoolRoot:spoolRoots.candidate_dispatch_spool_root});
+    try {
+      const base = `http://${dashboard.address.host}:${dashboard.address.port}`;
+      const session = await (await fetch(`${base}/api/v1/session`)).json();
+      const response = await fetch(`${base}/api/v1/memory/remember-progress?limit=20`,
+        {headers:{'X-JARVIS-CSRF':session.csrf_token}});
+      assert.equal(response.status,200);
+      const progress = await response.json();
+      const row = progress.items.find(item=>item.request_id===staged.request_id);
+      assert.equal(row?.state,'completed');
+      assert.equal(row?.outbox_state,'settled');
+      assert.equal(row?.failure_code,null);
+      assert.equal(row?.stored,true);
+      dashboardStored = row.stored;
+    } finally { dashboard.close(); }
+  }
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
+    dashboard_stored:dashboardStored,
     runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,after_delete:deleted?.result ?? null,
     during_compile:duringCompile,compile_read_ms:compileReadMs,compile_completed:compiled?.event ?? null,
     approval_rollback_recovered:approvalRollback,
