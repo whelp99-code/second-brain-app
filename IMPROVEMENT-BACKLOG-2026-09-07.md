@@ -190,3 +190,9 @@ R6의 종료된 reader lease 회수와 현재 전환의 정리 재개를 구현�
 기존 CLI/dashboard outbox 구성 후 남았던 `settled / uncertain` 상태 불일치를 수정했다. 영수증·원래 실행 fence·완료 증거를 결합한 terminal 반영, 취소 보존, 재시작/만료/오류 복구, 순환 검사와 원문 없는 cursor 정리를 구현했다. 실제 격리 MCP·CLI API에서 control completed, 64개 sensitive record, 두 클라이언트 current, 재전송 0을 확인했다.
 
 OSS 인계의 작은 공통 기억 순환을 우선 완성하는 변경이다. 운영 signed fence·후보/publication/UI·일반 LF/V2 정정·실제 앱별 수집/주입·project/user 범위·문맥 예산·운영 복원·한국어 품질/부하는 계속 미완료다. 수정/개선/고도화별 다음 목록과 검증 범위는 [명령 완료 연결 보고서](MEMORY-CONTROL-COMPLETION-2026-09-08.md)에 합쳤다.
+
+## 12. I1 후속 — 삭제 이후 공통 기억 조회
+
+기본 signed fence 구성을 CLI/dashboard/완료 reader에 연결하고, 실제 삭제로 드러난 빈 출처 목록의 공개 응답 결함을 수정했다. 삭제된 record 0개와 이후 새 sensitive record 64개의 저장 완료·두 MCP 클라이언트 재사용을 실측했다. 자비스 회귀 149개, Python 계약·삭제/복원 회귀 18개 통과. [변경·설정·검증과 남은 실행 목록](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md).
+
+기본 서명 **소스 연결**은 완료, 운영 키 구성·release 인수는 남는다. 추가 검증 개선: 최근 변경 목록 `current`만 확인하면 빈 목록도 통과한다. 고정 테스트 시각과 Git `--since` host 시각을 일치시키고 expected page/record를 확인해야 한다. 이번 실제 저장 성공은 최근 목록 상태 대신 원문 페이지와 전체 record 대응으로 판정했다.

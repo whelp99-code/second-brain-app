@@ -50,7 +50,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 
 | 우선순위 | 분류 | 미완료 항목 | 완료 판정에 필요한 증거 |
 |---|---|---|---|
-| P0 | 수정 | 기본 CLI/dashboard signed read fence 설정 | tombstone이 있는 vault에서 현재 provider identity/high-water와 서명 fence로 삭제→새 기억 저장→조회 성공 |
+| 소스 완료 / 운영 P1 | 수정 | 기본 CLI/dashboard signed read fence 설정 | 후속 [삭제 이후 조회 보고서](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md)에서 삭제→64개 새 기억 저장→조회 검증. 운영 구성·배포 인수 남음 |
 | P0 | 개선 | 실제 후보 수집→publication→저장 명령 준비→확인 UI | 실제 업무/owner 입력 하나가 기존 권한 경로를 거쳐 요청 ID와 원문 출처를 유지하며 완료·재사용 |
 | P0 | 수정 | LLM 갱신 중 읽기 잠금/시간초과 | 느린 갱신과 동시 검색에서 deadline·single writer·reader pin·삭제 보장 검증 |
 | P1 | 개선 | 일반 Enter 여러 줄 입력과 V2 정정 | 버전 계약, 정정 대상 변경 거부, 정정된 최신 기억 재조회 및 이전 출처 추적 |

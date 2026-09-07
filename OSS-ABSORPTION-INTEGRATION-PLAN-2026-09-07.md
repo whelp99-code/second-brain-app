@@ -56,7 +56,7 @@
 
 | 연결부 | 공통 조회 | 기록/변경 | 로그 자동 수집 | 자동 문맥 공급 | 현재 증거·다음 검증 |
 |---|---|---|---|---|---|
-| 자비스 | transport 실연결, adapter 결함 R2 | request/outbox 구현·fixture 검사, 전체 운영 순환 미완료 | 자비스 사건/결과 계약 담당 | 소비 adapter 경로 보강 필요 | R2 → 실제 한 요청의 저장·상태·재사용 |
+| 자비스 | adapter 수정·실제 MCP 회수 검증 | CLI 요청→outbox settled→control completed, 삭제 후 64개 record 재저장 검증 | 자비스 사건/결과 계약 담당, 실제 후보 전체 흐름 미완료 | 공통 context pack 미완료 | 운영 구성·배포와 실제 후보/UI 인수는 남음. [최신 검증](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md) |
 | Codex | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 가능, R1 해결 선행 | 전용 JSONL 파서·fixture 있음 | 공통 context pack 연동 신규 | 실제 Codex 클라이언트 설정과 읽기/쓰기 재현 필요 |
 | Claude Code | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 가능, R1 해결 선행 | 전용 JSONL 파서·fixture 있음 | 전용 훅 복제 대신 공통 공급 서비스 | 실제 Claude 클라이언트와 Codex 간 교차 회수 필요 |
 | OpenCode / OMO | MCP 클라이언트별 설정 실측 필요 | 지원 API 프로필 연결 필요 | 각각 파서·fixture 있음 | 미확인 | 사용 클라이언트와 버전을 먼저 확정 |
@@ -176,7 +176,7 @@ R4는 다음처럼 의미를 분리했다. 자세한 경계·배포 조건은 [�
 
 | 우선순위 / 관점 | 남은 작업과 영향 | 구체적 개선 및 완료 기준 |
 |---|---|---|
-| P0 수정 — 자비스 자동 연결 | CLI/dashboard 주입·주기 실행 연결과 후속 증거 기반 control completed 복구를 격리 MCP에서 검증 | I1-a/c/e: 기본 signed fence, 후보/publication/UI 전체 흐름과 운영 배포 인수 진행. 최신 결과·우선순위는 [명령 완료 연결 보고서](MEMORY-CONTROL-COMPLETION-2026-09-08.md) |
+| P0 수정 — 자비스 자동 연결 | CLI/dashboard·주기 실행·control completed·기본 signed fence를 격리 MCP에서 검증 | I1-a/c/e: 후보/publication/UI 전체 흐름과 운영 구성·배포 인수 진행. 최신 결과·우선순위는 [삭제 이후 조회 보고서](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md) |
 | P0 수정 — 승인 rollback 복구 | 316b8f2 소스 수정·격리 실제 MCP 검증 완료, 운영 미반영 | I1-b: event/바깥 transaction 실패 후 원문 보존·새 receipt 재발행 검증. 영속 권한/변경 파일 보존. 운영 반영은 B6에서 확인 |
 | P0 수정 — 갱신 중 읽기 | I3의 LLM 실행 중 배타 잠금은 소비자 10초 deadline과 충돌 가능 | 준비와 활성화 잠금 구간을 분리하되 단일 writer·reader pin·삭제 보장을 유지. 느린 갱신 중 조회와 중단 복구를 실측 |
 | P1 개선 — 일상 입력과 정정 | 일반 Enter 여러 줄 미지원, V1 owner correct 승인 대상 결합 부족 | 버전이 있는 본문 계약과 기존 V2 target/delegation 정정을 연결. 원문 전체 대응 및 승인 후 대상 변경 거부 검사 |

@@ -14,8 +14,10 @@ from unittest.mock import patch
 import anyio
 
 from sb.generations import GenerationStore
+from sb.mcp_contract import write_fixture_request
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
+from sb.stable_requests import accept_stable_v1_request
 from tests.task30_process_harness import executor_config
 
 NOW = datetime(2026, 8, 31, 3, 30, tzinfo=UTC)
@@ -30,7 +32,7 @@ class _Clock(datetime):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    _ = parser.add_argument("mode", choices=("init", "serve", "apply"))
+    _ = parser.add_argument("mode", choices=("init", "serve", "apply", "seed"))
     _ = parser.add_argument("root", type=Path)
     values: dict[str, object] = vars(parser.parse_args())
     root = values["root"]
@@ -75,7 +77,9 @@ def main() -> None:
         return
     if not marker.is_file():
         raise ValueError("not an isolated probe directory")
-    if mode == "apply":
+    if mode == "seed":
+        _ = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
+    if mode in {"apply", "seed"}:
         executor = RequestExecutor(config)
         try:
             print(json.dumps(asdict(executor.apply_once(now=NOW))))

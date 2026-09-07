@@ -45,7 +45,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 ## 필수 잔여와 다음 순서
 
 1. I1-e의 `uncertain → terminal` 소스 수정·격리 MCP 검증은 후속 보고서에 기록했다. 운영 release와 DB에 이 변경을 반영하고 확인하는 B6 인수는 남아 있다.
-2. 운영 read fence: 기본 CLI/dashboard 구성에는 서명키·provider identity·삭제 high-water를 자동 조합하는 설정이 아직 없다. 주입 가능한 factory 전달만 구현됐다. tombstone이 있는 운영 저장소는 서명된 최신 fence 설정과 실제 삭제→추가 저장→조회 검증이 필요하다.
+2. 기본 CLI/dashboard의 서명키·provider identity·현재 삭제 high-water 연결은 후속 구현했다. 격리 실제 MCP에서 삭제→추가 저장→조회 통과. 운영 환경변수·키 대응·배포 인수는 남는다. [삭제 이후 조회 보고서](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md).
 3. I1-a/c 후속: 실제 후보 수집→review/dispatch publication 생성과 dashboard에서 저장 명령을 준비하는 전체 사용자 흐름을 검증한다. 현재 CLI helper 존재만으로 모든 auto-staged 후보나 실제 에이전트 앱의 흐름이 연결됐다고 하지 않는다.
 4. I1-d 일반 LF 입력, V2 정정·재조회, 프로젝트/사용자/에이전트 범위, 실제 다른 앱의 공유를 이어간다.
 5. B3 읽기 잠금 지연/과거 잔여물, B5 문맥 선택·전달 기록·검증된 결과, B6 운영 전환/복구, B7 품질/부하, B8 조건부 hybrid는 기존 원장 범위를 유지한다.

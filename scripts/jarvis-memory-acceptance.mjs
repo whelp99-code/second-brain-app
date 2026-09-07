@@ -6,12 +6,15 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {ownerMemoryFixture} from './jarvis-owner-memory-fixture.mjs';
+import {prepareReadFenceDeletion} from './jarvis-read-fence-fixture.mjs';
 
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jarvis = resolve(process.argv[2] ?? join(sb, '../Orca-JARVIS'));
 const ownerConfirmed = process.argv.includes('--owner-confirmed');
 const approvalRollback = process.argv.includes('--approval-rollback');
 const runtimeCli = process.argv.includes('--runtime-cli');
+const afterDelete = process.argv.includes('--after-delete');
+if (afterDelete && !runtimeCli) throw new Error('--after-delete requires --runtime-cli');
 if (runtimeCli && !ownerConfirmed) throw new Error('--runtime-cli requires --owner-confirmed');
 if (approvalRollback && !ownerConfirmed) throw new Error('--approval-rollback requires --owner-confirmed');
 const recordSet = process.argv.includes('--record-set');
@@ -25,6 +28,7 @@ const {closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.
 const {localKey} = await load('tests/helpers.js');
 const {execute} = await load('src/cli-runtime.mjs');
 const {MemoryOutboxRecordReader} = await load('src/memory-outbox-record.js');
+const {createProductionMemoryReadFence} = await load('src/memory-read-fence-production.js');
 const {ControlPlane, signCommandApproval, MemoryOutboxService, createSecondBrainReadAdapter,
   createSecondBrainWriteRequestAdapter, createSecondBrainTransport, memoryRememberArtifact,
   prepareMemoryRememberDispatch} = await load('src/index.js');
@@ -52,10 +56,12 @@ try {
     ...(sensitive ? {sensitivity:'sensitive'} : {}),
   }, approvalRollback) : await outboxFixture();
   transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
+  const deleted = afterDelete ? await prepareReadFenceDeletion({load,fixture,transport,provider,now:OUTBOX_NOW}) : undefined;
+  const readFence = afterDelete ? createProductionMemoryReadFence(fixture.database.authority) : undefined;
   const budgetProfile = recordBudget ? 'record-set-v1' : 'interactive';
   const readBudgets = {max_hits:10,max_excerpt_bytes:4096,max_page_bytes:262144,max_total_bytes:recordBudget ? 262144 : 65536};
   const reader = createSecondBrainReadAdapter({transport,contract_profile:'schema4',budget_profile:budgetProfile,clock:()=>OUTBOX_NOW,
-    budgets:readBudgets,
+    budgets:readBudgets,read_fence:readFence,
     max_age_ms:86400000,expiry_ms:172800000});
   const writer = createSecondBrainWriteRequestAdapter(transport,fixture.database.authority,()=>OUTBOX_NOW);
   const spoolRoots = {candidate_dispatch_spool_root:join(fixture.database.root,'candidate-dispatch'),
@@ -102,16 +108,18 @@ try {
     queued = service.enqueue(claimed);
     dispatched = await service.runOnce('real-provider-worker',1);
   }
-  const accepted = await transport.call('sb_request_status',{request_id:fixture.request.request_id});
+  const statusArgs = () => ({request_id:fixture.request.request_id,
+    ...(deleted === undefined ? {} : {read_fence:deleted.statusFence()})});
+  const accepted = await transport.call('sb_request_status',statusArgs());
   const applied = provider('apply');
-  const status = await transport.call('sb_request_status',{request_id:fixture.request.request_id});
+  const status = await transport.call('sb_request_status',statusArgs());
   const reconciled = runtimeCli ? (await cli(['memory','outbox','--once','--limit','1'])).cycle
     : await service.reconcileOnce('real-provider-worker',1);
   const reused = await reader.readPage(expected.page_id);
   const recent = await reader.recentChanges(1);
   secondTransport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
   const secondReader = createSecondBrainReadAdapter({transport:secondTransport,contract_profile:'schema4',budget_profile:budgetProfile,clock:()=>OUTBOX_NOW,
-    budgets:readBudgets,
+    budgets:readBudgets,read_fence:readFence,
     max_age_ms:86400000,expiry_ms:172800000});
   const shared = await secondReader.readPage(expected.page_id);
   // Simulate a duplicate network delivery of exactly the already accepted envelope.
@@ -121,7 +129,7 @@ try {
   const terminalReplay = service.get(queued.outbox_id)?.state === 'settled' ? service.enqueue(claimed) : undefined;
   const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
-    runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,
+    runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,after_delete:deleted?.result ?? null,
     approval_rollback_recovered:approvalRollback,
     record_set:recordSet,record_limit:recordLimit,budget_profile:budgetProfile,sensitive,initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
     provider_status:status.value?.state,reconciled,outbox:service.get(queued.outbox_id)?.state,
