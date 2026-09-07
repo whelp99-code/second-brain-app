@@ -224,3 +224,9 @@ provider의 정정 완료 이후 control이 claimed/uncertain에 남는 결함�
 mtime만으로 backup을 정상 판정하지 않는다. 격리 복원 검증 receipt와 현재 archive identity·생성/검증 시각·원 저장소/provider·삭제 이력을 대조한다. 새 백업 실패를 예전 정상 백업으로 가리지 않고, 마지막 run 경과·미해결 derivation·oldest request·최근 failure·journal/cleanup 상태를 code와 HTTP 503으로 표시한다.
 
 전체 591 passed / 2 skipped, 실제 CLI/HTTP ready 503→200→503 및 health 200 유지, 관리형 CLI backup 검증을 확인했다. [보고서와 운영 설정](READINESS-VERIFICATION-2026-09-08.md). 실제 운영 배포/백업·독립 runtime 복원 인수, adapter receipt 결합과 I5 대용량 잠금·공간 검증은 계속 미완료다.
+
+## 16. I1-d/I8 후속 — 본문 호환성과 완성 우선 목록
+
+[인계 병합 후 상세 분석](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md)에 수정·개선·고도화 14개 실행 묶음을 기존 ID로 정리했다. 추가 재현: 일반 LF/CR은 후보/요청/접수에서 거부되며, 선행 BOM/NEL에서 Python과 JS 판정이 반대다. 후보 본문 검사를 통과해도 저장 record 수/이스케이프 후 크기 제한에 걸리는 사례가 있다.
+
+실제 두 언어의 검증기와 isolated stable 접수 12개 대조, 수락 4개 정확 재시도·원문 불변, 거부 8개 요청 파일/DB 미생성을 확인했다. 본문 기능 수정·새 버전 도입은 아직 아니다. 후보 원문부터 승인·요청/재시도·원장 migration·처리·복원·완료 검증까지 함께 바꾸며, 기존 V1/기존 V2 effect 계약 우회는 보류한다.

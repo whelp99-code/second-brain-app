@@ -5,6 +5,8 @@
 인계 원문: [자비스 작업 인계](../Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md).
 기존 결함·개선 정본: [24개 항목 분석](IMPROVEMENT-BACKLOG-2026-09-07.md).
 
+현재 읽기용 종합: [인계 재대조·완성 우선 목록](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md). 아래 초반 대조표는 발견 당시 기록이며 후속 구현 상태는 이 종합과 구현 원장을 우선한다.
+
 ## 1. 병합한 결정과 범위
 
 1. Second Brain을 유일한 개인·업무 기억 정본으로 유지한다. 기존 CAS·원장·세대·MCP·삭제/복원 구조 위에서 개선한다.
@@ -290,3 +292,9 @@ SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MC
 공통 기억 순환의 운영 인수 선행 조건으로 백업 검증과 readiness를 보완했다. 최신 tar.gz의 mtime만 보는 경로를 검증된 archive identity/원 저장소·provider/삭제 이력 검사로 바꾸고, stale run·정체 요청·최근 실패·손상 journal·세대 정리 지연을 반영한다. 기존 복원 검사와 generation/request lock을 재사용한다.
 
 표준 전체 591 passed/2 skipped, 실제 CLI/HTTP에서 검증 전 503→검증 후 200→손상 후 503, health 200 유지와 managed backup identity를 확인했다. [상세 보고서](READINESS-VERIFICATION-2026-09-08.md). 이 검증은 fixture 기반 실제 CLI/서버 인수이며 운영 전환은 아니다. 기존 업무 결과 수집 차단 전파·실제 앱별 공급·문맥/범위·검색 품질과 운영 runtime 복원 완료 조건은 유지한다.
+
+## 21. I1-d 후속 — 본문 계약의 실제 양쪽 대조
+
+자비스 `30e2024` 커밋을 격리 빌드하고 실제 Python V1 접수와 자비스 요청/후보 본문 검증기를 12개 입력으로 비교했다. LF/CRLF/CR/탭은 모두 거부한다. 선행 BOM은 provider만 허용하고 선행 NEL은 자비스만 허용한다. 65개 record와 인용 이스케이프 뒤 크기 초과는 후보 본문 검사를 통과하지만 양쪽 요청 경계에서 거부된다. 수락 4개는 원문 보존·정확 재시도, 거부 8개는 요청 파일/DB 생성 없음을 검사했다.
+
+이는 일반 여러 줄 기능 추가가 아니다. 새 명시적 본문 계약과 원장 migration·처리 분기·원문 승인·완료 소비를 묶어 구현해야 하며 V1 검증만 완화하는 우회는 보류한다. [상세 원인·14개 실행 묶음·전환 완료 조건](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md). 기존 24개 항목과 B0~B8 범위를 유지하며 별도 OSS 서버나 기억 정본을 추가하지 않는다.

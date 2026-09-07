@@ -4,6 +4,8 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+최신 종합 판정: [인계 병합 후 상세 분석](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md). 현재 검증된 기능과 운영 미완료를 분리하고 수정·개선·고도화 14개 실행 묶음을 기존 R/I/G에 대응했다. 일반 LF/CR의 양쪽 거부, BOM/NEL의 허용 불일치, 후보/요청의 분량 판정 차이를 12개 실제 validator/접수 사례로 재현했다. 새 본문 계약의 후보·승인·MCP·원장 migration·처리·복원·완료 소비 변경은 설계 범위이며 미구현이다.
+
 최신 후속: [후보 CLI 접수·원문/DB 원자성](MEMORY-CANDIDATE-INTAKE-2026-09-08.md). 파일 접수부터 owner 확인·실제 MCP 저장/재조회까지 검증했으며 실제 task 결과 자동 수집·approved/no_data 본문 인계는 남는다.
 
 이전 구현: [후보 화면·완료 상태 인수](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md). 인계와 기존 24개 개선 항목을 유지하고 후보 검토·확인/거절·저장 명령 준비·진행 표시를 연결했다. 격리 실제 MCP에서 64개 민감 record 저장·두 클라이언트 재조회와 dashboard `stored=true`를 확인했다. 실제 입력 자동 수집, 앱별 수집/주입·범위와 운영 인수는 미완료다. 이전 코드 대조는 통합 계획 14절, 최신 변경은 15절을 따른다.
