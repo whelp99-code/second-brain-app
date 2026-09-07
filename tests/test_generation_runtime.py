@@ -108,3 +108,112 @@ def test_erasure_rejection_is_a_zero_write_ingress_barrier(
         ledger.close()
     assert not tuple(path for path in active.joinpath("raw").rglob("*") if path.is_file())
     assert not tuple(active.joinpath("inbox").glob("*.md"))
+
+
+def test_generated_page_updates_across_generations_without_becoming_a_proposal(tmp_path: Path) -> None:
+    import hashlib
+
+    from sb.contracts import PageSpec, SourceCite
+
+    config, active = _config(tmp_path)
+    payload = b'original source'
+    digest = hashlib.sha256(payload).hexdigest()
+    page = PageSpec('updating', 'Updating', f'first [^{digest[:8]}]',
+                    [SourceCite(digest[:8], 'inbox:updating.md', digest)], 'active')
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, run_id
+        target = vault.root / 'raw' / digest[:2] / digest
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _ = target.write_bytes(payload)
+        return StageReport((page,), 0, 0, 1, False)
+
+    first = run_compile(config, compiler=stage)
+    assert first.exit_code == 0
+    first_generation = active.resolve()
+    page = PageSpec('updating', 'Updating', f'second [^{digest[:8]}]', page.sources, 'active')
+    second = run_compile(config, compiler=stage)
+    assert second.exit_code == 0 and active.resolve() != first_generation
+    assert 'second' in (active / 'wiki/updating.md').read_text()
+    assert not tuple((active / 'wiki/_proposed').glob('*.md'))
+
+
+def test_repeated_proposals_never_bless_or_overwrite_a_human_edit(tmp_path: Path) -> None:
+    import hashlib
+
+    from sb.contracts import PageSpec, SourceCite
+    from sb.generation_runtime import GenerationMutationService
+    from sb.generation_runtime_models import (
+        GenerationAuthority,
+        GenerationMutation,
+        GenerationOperation,
+    )
+
+    config, active = _config(tmp_path)
+    payload = b'human edit evidence'
+    digest = hashlib.sha256(payload).hexdigest()
+    page = PageSpec('protected', 'Protected', f'generated [^{digest[:8]}]',
+                    [SourceCite(digest[:8], 'inbox:protected.md', digest)], 'active')
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, run_id
+        target = vault.root / 'raw' / digest[:2] / digest
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _ = target.write_bytes(payload)
+        return StageReport((page,), 0, 0, 1, False)
+
+    assert run_compile(config, compiler=stage).exit_code == 0
+    marker = active / '.sb/compiled/protected.sha'
+    expected_marker = marker.read_bytes()
+    service = GenerationMutationService.from_config(config)
+    try:
+        def human_edit(root: Path) -> None:
+            # Simulate an operator edit without changing the last generated hash.
+            path = root / 'wiki/protected.md'
+            _ = path.write_text(path.read_text().replace('generated', 'human-edited'))
+
+        _ = service.mutate(GenerationMutation('test:human-edit', GenerationOperation.RUN, NOW,
+                                             GenerationAuthority(None, None), human_edit))
+    finally:
+        service.close()
+    for replacement in ('next-one', 'next-two'):
+        page = PageSpec('protected', 'Protected', f'{replacement} [^{digest[:8]}]', page.sources, 'active')
+        outcome = run_compile(config, compiler=stage)
+        assert outcome.exit_code == 1 and outcome.status == 'failed'
+        assert 'human-edited' in (active / 'wiki/protected.md').read_text()
+        assert replacement in (active / 'wiki/_proposed/protected.md').read_text()
+        assert marker.read_bytes() == expected_marker
+
+
+def test_invalid_compiled_marker_cannot_replace_active_generation(tmp_path: Path) -> None:
+    import pytest
+
+    from sb.generation_runtime_models import GenerationMutationError
+
+    for kind in ('symlink', 'hardlink', 'directory', 'malformed'):
+        case = tmp_path / kind
+        config, active = _config(case)
+        with Ledger(active):
+            pass
+        outside = case / 'outside.sha'
+        _ = outside.write_text('a' * 64)
+        compiled = active / '.sb/compiled'
+        compiled.mkdir(parents=True)
+        marker = compiled / 'page.sha'
+        if kind == 'symlink':
+            marker.symlink_to(outside)
+        elif kind == 'hardlink':
+            marker.hardlink_to(outside)
+        elif kind == 'directory':
+            marker.mkdir()
+        else:
+            _ = marker.write_text('not-a-digest')
+
+        def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+            del ledger, vault, run_id
+            raise AssertionError('unsafe marker must be rejected before mutation')
+
+        with pytest.raises(GenerationMutationError, match='GENERATION_SOURCE_UNSAFE'):
+            _ = run_compile(config, compiler=stage)
+        assert active.is_dir() and not active.is_symlink()
+        assert outside.read_text() == 'a' * 64

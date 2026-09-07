@@ -1434,3 +1434,29 @@ def test_compile_dry_run_and_state_report_do_not_write_vault(tmp_path: Path) -> 
         if "knowledge-registry" in path.name:
             continue
         assert after.get(path) == data
+
+
+def test_brief_policy_upgrade_regenerates_once_without_new_sources(
+    tmp_path: Path, monkeypatch: MonkeyPatch,
+) -> None:
+    from sb.briefing import BRIEFING_RECORD_POLICY
+    from sb.llm import FakeLLM
+
+    config, root = _ready(tmp_path)
+    _seed_status(root, 'ok')
+    fake = FakeLLM(['없음', '없음'])
+
+    def provide(config: Config, llm_mode: str) -> FakeLLM:
+        del config, llm_mode
+        return fake
+
+    monkeypatch.setattr('sb.pipeline._llm', provide)
+    monkeypatch.setattr('sb.briefing.BRIEFING_RECORD_POLICY', 'previous-policy')
+    assert run_brief(config).exit_code == 0
+    before = _deriv_count(root)
+    monkeypatch.setattr('sb.briefing.BRIEFING_RECORD_POLICY', BRIEFING_RECORD_POLICY)
+    upgraded = run_brief(config)
+    assert upgraded.exit_code == 0 and upgraded.git_commit is not None
+    assert fake.calls == 2 and _deriv_count(root) == before + 1
+    assert run_brief(config).git_commit is None
+    assert fake.calls == 2 and _deriv_count(root) == before + 1

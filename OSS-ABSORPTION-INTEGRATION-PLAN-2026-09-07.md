@@ -326,3 +326,7 @@ SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MC
 [Codex/Claude 실제 CLI 인수](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md)로 SDK 두 프로세스의 간접 증거를 보강했다. 실제 도구 6건과 양방향 검색·원문·generation/record version을 대응했다. 명시적 배치와 결정적 compile fixture를 사용했으며 실제 요약 품질·자동 로그 수집/문맥 주입과 구분한다.
 
 첫 Codex 호출은 승인 설정으로 실패했는데 process exit는 0이었다. native tool status/result 검사로 이를 실패 처리하고, 해당 격리 MCP 도구만 허용한 설정으로 실제 인수를 완료했다. 일반 stdio의 sb_run 오안내도 수정했다. [범위 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md)에 기존 단일 owner fence와 project 분류 결손, 자비스 발급/SB 소비, 정정·삭제·복원·context 경계를 남겼다. 일반 검색 필터를 프로젝트 권한으로 승격하거나 새 SB 승인 엔진을 만드는 방식은 보류한다.
+
+## 26. 실제 반복 쓰기 선행 검사에서 발견한 회수/갱신 결함
+
+[브리핑 예산과 세대 갱신 수정](BRIEFING-RECORD-BUDGET-2026-09-08.md): 과대 브리핑의 MCP 읽기 실패와 `.sb/compiled` 미승계로 자동 갱신이 제안으로 잘못 분류되는 문제를 재현·수정했다. 실제 3회 저장/배치/동시 조회 및 구버전 자료 갱신·백업 복원을 확인했다. 선택적 문맥과 실제 결과 증거를 강화하되, 이 브리핑 분량 제한을 B5 공통 context pack·전달 receipt 완료로 간주하지 않는다. 계획 규모의 100회 쓰기는 새 인수 도구의 full 실행으로 확인하며 앞선 범위·주입·운영·검색 품질 순서의 잔여 조건을 유지한다.

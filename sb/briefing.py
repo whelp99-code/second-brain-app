@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Final
 
@@ -21,6 +22,11 @@ CANONICAL_RE: Final = re.compile(
     r"origin=(\S+)\s+hash=([0-9a-fA-F]{64})\s+\[\^([^\]]+)\]\s+text=(.+)$"
 )
 MIN_CITED_RECS: Final = 3
+BRIEFING_RECORD_POLICY: Final = "brief-record-budget-v1:48+16"
+_INPUT_RECORD_BUDGET: Final = 48
+_RECOMMENDATION_RECORD_BUDGET: Final = 16
+_RECORD_CITE: Final = re.compile(r"\[\^([0-9a-f]{8,64})\]")
+_RECOMMENDATION_START: Final = re.compile(r"^(?:[-*+] |\d+[.)] )")
 
 PROMPT_TEMPLATE: Final = """다음 입력만 근거로 오늘의 추천 불릿만 한국어로 작성하라.
 규칙:
@@ -64,7 +70,7 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     Pipeline and vault own I/O. This function only fills prompt slots, calls
     the LLM at most `max_llm_calls_briefing` times, and returns a PageSpec.
     """
-    inputs = protect_briefing_inputs(inputs, config)
+    inputs, omitted = _bounded_inputs(protect_briefing_inputs(inputs, config))
     cites = _input_sources(inputs)
     prompt = _fill_prompt(inputs, cites)
     cap = config.caps["max_llm_calls_briefing"]
@@ -72,9 +78,12 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     allowed = frozenset(cite.sid for cite in cites)
     attempts = min(cap, max(1, config.caps.get("max_briefing_validation_attempts", 1)))
     for _ in range(attempts):
-        recs = _require_cited_recs(
-            _mark_uncited_bullets(_recommendation_body(llm.generate(prompt))), allowed,
-        )
+        recs = _mark_uncited_bullets(_recommendation_body(llm.generate(prompt)))
+        # Do not hide invalid citations by trimming them away. Minimum cited
+        # recommendation validation runs after the display budget is applied.
+        if not ({match.group(1) for match in SID_RE.finditer(recs)} - allowed):
+            recs = _bounded_recommendations(recs)
+        recs = _require_cited_recs(recs, allowed)
         invalid = {match.group(1) for match in SID_RE.finditer(recs)} - allowed
         if not invalid:
             break
@@ -89,10 +98,10 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
         (
             f"# {day} 브리핑",
             f"## 오늘의 추천\n{recs}",
-            f"## 새로 들어온 것\n{_render_items(inputs.yesterday_items)}",
-            f"## 충돌\n{_render_items(inputs.open_conflict_pages)}",
-            f"## 오래된 페이지\n{_render_items(inputs.stale_pages)}",
-            f"## 다가오는 것\n{_render_items(inputs.upcoming_items)}",
+            f"## 새로 들어온 것\n{_render_items(inputs.yesterday_items, omitted[0])}",
+            f"## 충돌\n{_render_items(inputs.open_conflict_pages, omitted[1])}",
+            f"## 오래된 페이지\n{_render_items(inputs.stale_pages, omitted[2])}",
+            f"## 다가오는 것\n{_render_items(inputs.upcoming_items, omitted[3])}",
         )
     )
     return PageSpec(
@@ -136,16 +145,59 @@ def _optional_text(value: str | None) -> str:
     return value
 
 
-def _render_items(items: tuple[str, ...]) -> str:
-    if not items:
-        return EMPTY_PLACEHOLDER
+def _bounded_inputs(inputs: BriefingInputs) -> tuple[BriefingInputs, tuple[int, ...]]:
+    groups = (inputs.yesterday_items, inputs.open_conflict_pages,
+              inputs.stale_pages, inputs.upcoming_items)
+    selected: list[list[str]] = [[], [], [], []]
+    omitted = [0, 0, 0, 0]
+    remaining = _INPUT_RECORD_BUDGET
+    for position in range(max(map(len, groups))):
+        for group, items in enumerate(groups):
+            if position >= len(items):
+                continue
+            item = items[position]
+            cost = max(1, len(_RECORD_CITE.findall(item)))
+            if cost <= remaining:
+                selected[group].append(item)
+                remaining -= cost
+            else:
+                omitted[group] += 1
+    return replace(inputs, yesterday_items=tuple(selected[0]), open_conflict_pages=tuple(selected[1]),
+                   stale_pages=tuple(selected[2]), upcoming_items=tuple(selected[3])), tuple(omitted)
+
+
+def _bounded_recommendations(recs: str) -> str:
+    remaining = _RECOMMENDATION_RECORD_BUDGET
+    selected: list[str] = []
+    omitted = 0
+    blocks: list[list[str]] = []
+    for line in recs.splitlines():
+        if not blocks or _RECOMMENDATION_START.match(line) or not line.strip():
+            blocks.append([])
+        blocks[-1].append(line)
+    for block in blocks:
+        text = "\n".join(block)
+        cost = sum(max(1, len(_RECORD_CITE.findall(line))) for line in block if line.strip())
+        if cost <= remaining:
+            selected.append(text)
+            remaining -= cost
+        else:
+            omitted += sum(bool(line.strip()) for line in block)
+    if omitted:
+        selected.append(f"추천 {omitted}줄은 브리핑 표시 한도로 생략했습니다.")
+    return "\n".join(selected)
+
+
+def _render_items(items: tuple[str, ...], omitted: int = 0) -> str:
     lines: list[str] = []
     for item in items:
         if item.lstrip().startswith("-"):
             lines.append(item)
         else:
             lines.append(f"- {item}")
-    return "\n".join(lines)
+    if omitted:
+        lines.append(f"추가 항목 {omitted}개는 브리핑 표시 한도로 생략했습니다. 원본 목록에서 확인하세요.")
+    return "\n".join(lines) or EMPTY_PLACEHOLDER
 
 
 def _recommendation_body(raw: str) -> str:

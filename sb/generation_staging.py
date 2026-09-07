@@ -85,6 +85,43 @@ def copy_operational_ledger(source: Path, destination: Path) -> None:
         destination_log = destination / ".sb" / "runs.log"
         _ = destination_log.write_bytes(source_log.read_bytes())
         destination_log.chmod(0o600)
+    _copy_compiled_markers(source, destination)
+
+
+def _copy_compiled_markers(source: Path, destination: Path) -> None:
+    folder = source / ".sb" / "compiled"
+    if not folder.exists() and not folder.is_symlink():
+        return
+    try:
+        descriptor = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as exc:
+        raise GenerationMutationError("GENERATION_SOURCE_UNSAFE") from exc
+    try:
+        for name in sorted(os.listdir(descriptor)):
+            if not name.endswith(".sha"):
+                continue
+            try:
+                source_fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                                    dir_fd=descriptor)
+            except OSError as exc:
+                raise GenerationMutationError("GENERATION_SOURCE_UNSAFE") from exc
+            try:
+                metadata = os.fstat(source_fd)
+                if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1
+                        or metadata.st_uid != os.getuid() or metadata.st_dev != source.stat().st_dev):
+                    raise GenerationMutationError("GENERATION_SOURCE_UNSAFE")
+                marker = os.read(source_fd, 66)
+                digest = marker.removesuffix(b"\n")
+                if len(digest) != 64 or any(value not in b"0123456789abcdef" for value in digest):
+                    raise GenerationMutationError("GENERATION_SOURCE_UNSAFE")
+            finally:
+                os.close(source_fd)
+            target = destination / ".sb" / "compiled" / name
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            _ = target.write_bytes(marker)
+            target.chmod(0o600)
+    finally:
+        os.close(descriptor)
 
 
 def remove_provisional_git(root: Path) -> None:

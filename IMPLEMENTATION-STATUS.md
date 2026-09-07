@@ -4,7 +4,9 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-최신 인수: [실제 Codex·Claude 공통 기억](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md). 두 종류의 실제 CLI에서 같은 격리 provider의 양방향 capture→명시적 배치→검색/원문 회수를 확인했다. 성공 도구 6건·source 2개·CAS 원문 일치이며 CLI 종료 0/실패 도구를 구별하는 감사기를 추가했다. 이는 단일 owner/genesis 인수로 scope·자동 수집/주입·운영 전환은 남는다. [접근 범위 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md).
+최신 수정: [브리핑 인용 예산과 세대별 자동 갱신](BRIEFING-RECORD-BUDGET-2026-09-08.md). 70개 충돌에서 배치 exit 0 뒤 MCP 브리핑 읽기가 실패하던 결함, 세대 전환 시 자동 생성 해시 소실, 제안만 저장된 페이지를 완료로 처리하던 결함을 수정했다. 실제 3회 capture/run·동시 MCP 조회·백업/복원 및 구버전 과대 브리핑의 갱신을 확인했다. 계획 규모의 100회 쓰기는 별도 인수이며 운영 전환은 남는다.
+
+직전 인수: [실제 Codex·Claude 공통 기억](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md). 두 종류의 실제 CLI에서 같은 격리 provider의 양방향 capture→명시적 배치→검색/원문 회수를 확인했다. 성공 도구 6건·source 2개·CAS 원문 일치이며 CLI 종료 0/실패 도구를 구별하는 감사기를 추가했다. 이는 단일 owner/genesis 인수로 scope·자동 수집/주입·운영 전환은 남는다. [접근 범위 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md).
 
 직전 수집 수정: [신규 unit 예산과 원본 보존 계약·인수](INGEST-BUDGET-CONTRACT-2026-09-08.md). 파일 수/실제 신규 unit 예산을 분리하고, 전체 예산 초과 원본은 명확한 실패와 함께 보존하며 잔여 예산 초과 원본은 다음 실행에서 처리한다. 실제 관리형 CLI 5 source/53 units·원문 보존·재실행 증가 0 및 5천 원본/10만 unit 구조 부하 재검증 통과. 운영 전환과 B4~B8 전체 인수는 남는다.
 

@@ -260,3 +260,9 @@ mtime만으로 backup을 정상 판정하지 않는다. 격리 복원 검증 rec
 Codex CLI 0.153.4와 Claude Code 2.1.261에서 같은 격리 기억 저장소의 양방향 기록·회수를 검증했다. 성공 MCP 6건, source 2개, 원문 CAS 일치와 검색/page의 generation·record ID/digest 일치다. CLI exit 0이면서 도구는 승인 오류로 실패하는 경우를 실제 재현하여, native 이벤트/결과/최종 답변을 대조하는 감사기를 추가했다. [실제 인수 보고서](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md).
 
 README의 일반 stdio sb_run 안내를 실제 노출 도구와 맞췄다. batch/fixture compile·단일 owner/genesis 인수이므로 실제 자동 수집/주입, GUI·다른 client, 삭제 이후 일반 agent fence, 운영 연결은 남는다. project/user/agent 범위는 [구현 전 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md)의 자비스 발급·SB 소비 및 출처 분류/수명주기를 함께 구현한다. active/reference 검색 필터만으로 접근 격리를 주장하는 구현은 보류한다.
+
+## 21. B4/B7 후속 — 배치 완료와 실제 회수의 불일치 수정
+
+대용량 반복 쓰기 도구의 70개 충돌 선행 실행에서 `sb run`은 성공했으나 daily MCP 조회는 `MEMORY_RECORD_PAGE_OVERSIZE`였다. 브리핑의 입력/추천을 기존 64개 레코드 계약 안에서 제한하고 생략 수를 표시한다. 원본과 개별 기억은 보존한다. 이어 재현한 `.sb/compiled` 해시 승계 누락과 제안만 저장된 결과의 완료 오판도 수정했다. 사람 수정본의 반복 보호와 구버전 생성본의 실제 갱신을 검사했다. [결함·수정·증거](BRIEFING-RECORD-BUDGET-2026-09-08.md).
+
+실제 3회 capture/run·동시 MCP 검색/원문·백업 복원은 작은 선행 인수다. `scripts/write-cycle-acceptance.py --full`의 5천 원본/10만 units/1만 wiki/1천 conflict와 100회 실제 쓰기, B4 scope·일반 agent fence·정정 UI, B5 공통 문맥 공급, B6 운영 인수, 한국어 품질과 B8은 남는다. 기존 잘못된 완료/해시 이력을 무조건 자동 승인해 복구하는 기능은 보류한다.

@@ -15,7 +15,17 @@ from sb.briefing import generate_briefing
 from sb.config import Config
 from sb.contracts import BriefingInputs, PageSpec, SourceCite
 from sb.llm import FakeLLM
+from sb.memory_records import parse_page_records
 from sb.vault import VaultLintError, init_vault
+
+
+def _committed_records(root: Path, page: PageSpec) -> int:
+    for cite in page.sources:
+        _seed_cas(root, cite.hash)
+    vault = init_vault(root)
+    _ = vault.write_pages([page], "budget-regression", MemoryLedger())
+    raw = (root / f"{page.page_id}.md").read_bytes()
+    return len(parse_page_records(raw, page.page_id))
 
 CAS_HASH = "ab" + ("cd" * 31)
 CAS_SID = CAS_HASH[:8]
@@ -331,3 +341,66 @@ def test_generate_briefing_substitutes_fields_and_lists_available_citations() ->
     for slot in PROMPT_SLOTS:
         assert slot not in prompt
     assert PLACEHOLDER not in prompt
+
+
+def test_large_briefing_stays_readable_with_input_and_recommendation_omissions(tmp_path: Path) -> None:
+    items = tuple(_canon('me-wiki:notes/a.md', CAS_HASH, f'conflict-{n:03d}') for n in range(70))
+    inputs = _inputs(yesterday_items=(), open_conflict_pages=items, last_brief=None)
+    recommendations = '\n'.join(f'- recommendation-{n:02d} [^{CAS_SID}]' for n in range(20))
+    page = _spec(recommendations, inputs)
+    assert _committed_records(tmp_path, page) == 64
+    assert '추가 항목 22개' in page.body_md
+    assert '추천 4줄' in page.body_md
+    assert 'conflict-047' in page.body_md and 'conflict-048' not in page.body_md
+    assert inputs.open_conflict_pages == items and len(items) == 70
+    assert _spec(recommendations, inputs) == page
+
+
+def test_briefing_shares_budget_across_all_four_input_sections(tmp_path: Path) -> None:
+    groups = tuple(tuple(_canon('me-wiki:notes/a.md', CAS_HASH, f'{label}-{n:02d}')
+                         for n in range(20)) for label in ('new', 'conflict', 'stale', 'upcoming'))
+    inputs = BriefingInputs(groups[0], groups[1], groups[2], groups[3], None, 'ok')
+    recorder = RecordingLLM(CITED_RECS)
+    page = generate_briefing(inputs, recorder, _config())
+    for heading, label in zip(K4_H2[1:], ('new', 'conflict', 'stale', 'upcoming'), strict=True):
+        section = _section(page.body_md, heading)
+        assert f'{label}-11' in section and f'{label}-12' not in section
+        assert '추가 항목 8개' in section
+        assert f'{label}-12' not in recorder.prompts[0]
+    assert _committed_records(tmp_path, page) == 50
+
+
+def test_large_multi_citation_item_does_not_block_later_fitting_item(tmp_path: Path) -> None:
+    large = _canon('me-wiki:notes/a.md', CAS_HASH, 'large-item ' + f'[^{CAS_SID}]' * 48)
+    small = _canon('me-wiki:notes/a.md', CAS_HASH, 'small-item')
+    recorder = RecordingLLM(CITED_RECS)
+    page = generate_briefing(_inputs(yesterday_items=(large, small), last_brief=None), recorder, _config())
+    assert 'large-item' not in page.body_md and 'large-item' not in recorder.prompts[0]
+    assert 'small-item' in page.body_md and '추가 항목 1개' in page.body_md
+    assert _committed_records(tmp_path, page) == 3
+
+
+def test_budget_does_not_hide_unknown_citation_after_valid_recommendations(tmp_path: Path) -> None:
+    text = '\n'.join(f'- rec-{n} [^{CAS_SID}]' for n in range(20)) + f'\n- invalid [^{DEAD_SID}]'
+    page = _spec(text)
+    assert DEAD_SID in page.body_md
+    _seed_cas(tmp_path, CAS_HASH)
+    _ = _reject_write(tmp_path, page, 'budget-must-not-hide-invalid')
+
+
+def test_budget_keeps_minimum_recommendation_validation(tmp_path: Path) -> None:
+    inputs = _inputs(yesterday_items=(CITE_A, CITE_B, CITE_C), last_brief=None)
+    response = '- huge ' + f'[^{SID_A}]' * 17 + f'\n- b [^{SID_B}]\n- c [^{SID_C}]'
+    page = _spec(response, inputs)
+    assert UNCITED_SENTINEL in page.body_md
+    for digest in (HASH_A, HASH_B, HASH_C):
+        _seed_cas(tmp_path, digest)
+    _ = _reject_write(tmp_path, page, 'budget-must-not-hide-missing-recommendations')
+
+
+def test_budget_does_not_separate_recommendation_from_its_continuation(tmp_path: Path) -> None:
+    response = '- too-large ' + f'[^{CAS_SID}]' * 17 + f'\n  attached-evidence [^{CAS_SID}]\n' + CITED_RECS
+    page = _spec(response)
+    assert 'too-large' not in page.body_md and 'attached-evidence' not in page.body_md
+    assert '추천 2줄' in page.body_md
+    assert _committed_records(tmp_path, page) == 3

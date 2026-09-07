@@ -82,6 +82,7 @@ class WriteResult:
     conflicts: int
     proposals: int
     commit: str | None
+    applied_page_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,7 +213,8 @@ class Vault:
         except (GitCommandError, OSError):
             _restore(self.root, snapshots, log_path, log_prev)
             raise
-        return WriteResult(n_pages, n_conflicts, n_proposals, commit)
+        return WriteResult(n_pages, n_conflicts, n_proposals, commit,
+                           tuple(page_id for _dest, _text, kind, page_id in jobs if kind != "proposal"))
 
     def append_log(self, line: str) -> None:
         path = self.root / "log.md"

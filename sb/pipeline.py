@@ -361,8 +361,11 @@ def _source_content_ids(ledger: Ledger, root: Path) -> tuple[str, ...]:
 
 
 def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]) -> str:
+    from sb.briefing import BRIEFING_RECORD_POLICY
+
     payload = "\0".join(
         (
+            BRIEFING_RECORD_POLICY,
             day.isoformat(),
             *content_ids,
             "\x1e",
@@ -388,8 +391,11 @@ def _commit_pages(
         log_line=line,
         compiled_by=report.compiled_by,
     )
-    compiled.remember(report.pages)
-    _register_compiled(root, report.pages, project=project)
+    applied = tuple(page for page in report.pages if page.page_id in result.applied_page_ids)
+    compiled.remember(applied)
+    _register_compiled(root, applied, project=project)
+    if result.proposals:
+        raise VaultLintError((f"AUTOMATIC_PAGE_UPDATE_CONFLICT: {result.proposals} proposal(s); active pages preserved",))
     return result.commit, result.pages, result.conflicts
 
 
