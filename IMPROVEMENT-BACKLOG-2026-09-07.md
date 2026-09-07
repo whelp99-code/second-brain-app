@@ -184,3 +184,9 @@ R5/R7/R9의 소스 수정을 진행했다. Sealed 모드에서도 상태/날짜/
 R6의 종료된 reader lease 회수와 현재 전환의 정리 재개를 구현했다. 생존 여부만이 아니라 Linux boot/start identity로 PID 재사용을 구분한다. 과거 형식의 lease와 알 수 없는 생존 상태는 보수적으로 유지한다. 실제 reader 프로세스 SIGKILL 후 세대 전환/폐기, live reader 보존, PID 재사용, 유지보수 및 다음 mutation의 중단 정리 재개를 검사했다.
 
 전체 540 passed/2 skipped, Ruff 통과, 타입 오류 0/기존 경고 55. 다만 실제 운영에는 디렉터리가 없는데 activated로 남은 과거 이력 2건과 잔여 generation 디렉터리가 존재한다. 기존 자료 대조/복구와 I3의 읽기 지연은 미완료이며, 이번 소스 변경을 그 해결 증거로 사용하지 않는다.
+
+## 11. B4 후속 — 자비스 저장 완료와 명령 상태 연결
+
+기존 CLI/dashboard outbox 구성 후 남았던 `settled / uncertain` 상태 불일치를 수정했다. 영수증·원래 실행 fence·완료 증거를 결합한 terminal 반영, 취소 보존, 재시작/만료/오류 복구, 순환 검사와 원문 없는 cursor 정리를 구현했다. 실제 격리 MCP·CLI API에서 control completed, 64개 sensitive record, 두 클라이언트 current, 재전송 0을 확인했다.
+
+OSS 인계의 작은 공통 기억 순환을 우선 완성하는 변경이다. 운영 signed fence·후보/publication/UI·일반 LF/V2 정정·실제 앱별 수집/주입·project/user 범위·문맥 예산·운영 복원·한국어 품질/부하는 계속 미완료다. 수정/개선/고도화별 다음 목록과 검증 범위는 [명령 완료 연결 보고서](MEMORY-CONTROL-COMPLETION-2026-09-08.md)에 합쳤다.

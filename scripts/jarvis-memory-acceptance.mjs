@@ -128,11 +128,13 @@ try {
     reused:reused.kind,reuse_code:reused.code,evidence_count:reused.evidence?.length,
     recent:recent.kind,second_client:shared.kind,replayed:replay.value?.replayed,
     reapply:idle.state,redispatched:repeated.dispatched,terminal_replay:terminalReplay?.state ?? null,
-    remaining_review_files:reviewFiles.length,cleanup_error:reconciled.cleanup_error ?? null};
+    remaining_review_files:reviewFiles.length,cleanup_error:reconciled.cleanup_error ?? null,
+    control_error:reconciled.control_error ?? null};
   console.log(JSON.stringify(result));
   assert.equal(result.accepted,'pending');
   assert.equal(result.provider_status,'proved');
   assert.equal(result.outbox,'settled');
+  if (runtimeCli) assert.equal(result.control_state,'completed');
   assert.equal(result.reused,'current');
   assert.equal(result.evidence_count,expectation.record_texts.length);
   if (sensitive) assert(reused.evidence.every(row=>row.sensitivity==='sensitive' && row.excerpt===null && row.omission==='policy_redacted'));
@@ -145,6 +147,7 @@ try {
   assert.equal(result.terminal_replay,'settled');
   assert.equal(result.remaining_review_files,0);
   assert.equal(result.cleanup_error,null);
+  assert.equal(result.control_error,null);
 } finally {
   await transport?.close();
   await secondTransport?.close();

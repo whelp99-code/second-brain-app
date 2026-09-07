@@ -10,7 +10,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | CLI 실행·dashboard 주기 연결 소스 검증, 운영 전체 인수 미완료 | 64개 record·rollback·CLI 후속 cycle settled. control uncertain 최종 반영·운영 signed fence·후보/UI 전체 흐름·일반 LF·실제 앱·범위 남음 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | CLI/dashboard 연결 및 명령 완료 복구 소스 검증, 운영 전체 인수 미완료 | 64개 record·rollback·CLI 후속 cycle settled와 control completed. 운영 signed fence·후보/UI 전체 흐름·일반 LF·실제 앱·범위 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
@@ -135,3 +135,9 @@ I1-b의 이 소스 결함은 수정됐다. 운영 실행기 outbox 주입과 주
 회귀 **100 passed / 39 files**, 추가 tick/SSE 검사 **11 passed / 4 files**(일부 중복), 변경 ESLint·backend build·독립 검토 통과. 실제 격리 MCP에 CLI execute 경로로 민감 기억 64개를 보내고 다음 CLI cycle에서 settled와 독립 클라이언트 회수, 재전송 중복 0을 확인했다. Python 소스는 변경하지 않았다.
 
 실측에서 control command는 outbox settled 뒤에도 uncertain으로 남는다. 영수증 기반 최종 상태 반영을 다음 필수 수정으로 지정했다. 기본 운영 signed-fence 구성, 후보/publication/UI 전체 흐름, 배포·실제 앱/범위 및 B3/B5~B8은 계속 미완료다. 상세 재현·변경·한계는 [기억 실행기 연결 보고서](JARVIS-MEMORY-RUNTIME-2026-09-08.md)를 따른다.
+
+### B4 진행 — 기억 완료 증거에서 원래 명령 최종 상태 복구
+
+자비스 `20c8936`: 앞 절의 uncertain 잔존 결함을 후속 수정했다. 기존 command/receipt/redemption/fence와 dispatch·observation·settlement 증거를 검증하고 uncertain 또는 lease 만료 claimed를 completed/failed로 반영한다. 취소/철회와 과거 uncertain 이력을 보존하며 재전송하지 않는다. 오류 작업을 지나가는 영속 순환 커서와 원자적 상태/effect/event 기록을 추가했다. cursor 저장 실패가 이미 성공한 다른 실행을 failed로 바꾸지 않는 회귀도 포함한다.
+
+최종 회귀 **160 passed / 52 files (85.42초)**, backend build·변경 ESLint·독립 재검토 통과. 실제 격리 MCP·CLI API에서 민감 기억 64개가 proved→outbox settled→control completed로 연결됐다. 두 클라이언트 current, 추가 dispatch 0, review 원문 0개, cleanup/control 오류 없음. 소스·검증·잔여 우선순위는 [명령 완료 연결 보고서](MEMORY-CONTROL-COMPLETION-2026-09-08.md)를 따른다. 운영 배포·서명 fence 기본 구성·실제 앱/범위·B3/B5~B8의 전체 완료로 확대하지 않는다.

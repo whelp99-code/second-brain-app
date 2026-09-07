@@ -40,11 +40,11 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 
 관측 결과: rollback→새 합성 owner 승인→CLI dispatch→provider pending/proved→다음 CLI cycle settled. 민감 기억 64개를 원래 reader와 독립 MCP 클라이언트에서 회수했다. provider 재전송 replayed=true, 재apply idle, 추가 dispatch 0, terminal 재확인 settled, review 원문 0개, cleanup 오류 없음. `/var/tmp/sb-jarvis-runtime-cli-acceptance.log`.
 
-**원래 control command는 `uncertain`으로 남는다.** 이 값도 하네스 출력에 기록했다. outbox settled를 명령 전체 완료로 보고하지 않는다.
+`a680fd5` 당시 원래 control command는 `uncertain`으로 남았다. 후속 소스 수정에서는 과거 실행 증거를 검증해 `completed`로 반영하고, 실제 MCP·CLI API에서 확인했다. 최신 검증과 취소·만료·오류/순환 복구 경계는 [명령 완료 연결 보고서](MEMORY-CONTROL-COMPLETION-2026-09-08.md)를 따른다.
 
 ## 필수 잔여와 다음 순서
 
-1. I1-e 후속: outbox 완료 영수증·원래 제어 명령·fence를 결합해 `uncertain → terminal` 상태를 반영한다. 새 provider dispatch나 새 승인으로 해결하지 않는다. 취소·만료·replay·중복 완료 시나리오 필요.
+1. I1-e의 `uncertain → terminal` 소스 수정·격리 MCP 검증은 후속 보고서에 기록했다. 운영 release와 DB에 이 변경을 반영하고 확인하는 B6 인수는 남아 있다.
 2. 운영 read fence: 기본 CLI/dashboard 구성에는 서명키·provider identity·삭제 high-water를 자동 조합하는 설정이 아직 없다. 주입 가능한 factory 전달만 구현됐다. tombstone이 있는 운영 저장소는 서명된 최신 fence 설정과 실제 삭제→추가 저장→조회 검증이 필요하다.
 3. I1-a/c 후속: 실제 후보 수집→review/dispatch publication 생성과 dashboard에서 저장 명령을 준비하는 전체 사용자 흐름을 검증한다. 현재 CLI helper 존재만으로 모든 auto-staged 후보나 실제 에이전트 앱의 흐름이 연결됐다고 하지 않는다.
 4. I1-d 일반 LF 입력, V2 정정·재조회, 프로젝트/사용자/에이전트 범위, 실제 다른 앱의 공유를 이어간다.
