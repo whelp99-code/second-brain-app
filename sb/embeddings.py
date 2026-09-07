@@ -111,12 +111,13 @@ def sqlite_vec_available() -> bool:
     return _vec_cli() is not None
 
 
-def run_vec_sql(path: Path, sql: str) -> str:
+def run_vec_sql(path: Path, sql: str, *, read_only: bool = False) -> str:
     cli, ext = _vec_cli(), _vec0_path()
     if cli is None or ext is None:
         raise EmbeddingUnavailable("sqlite-vec missing")
+    mode = ["-readonly"] if read_only else []
     done = subprocess.run(
-        [cli, "-separator", "\x1f", "-newline", "\x1e", str(path), f".load {ext}", sql],
+        [cli, *mode, "-separator", "\x1f", "-newline", "\x1e", str(path), f".load {ext}", sql],
         capture_output=True,
         text=True,
         check=False,
@@ -182,6 +183,8 @@ def rebuild(vault_root: Path, *, encoder: Encoder | None = None) -> int:
 
 def read_identity(vault_root: Path) -> ModelIdentity | None:
     path = vectors_path(vault_root)
+    if not path.is_file():
+        return None
     raw = _sqlite(path, "SELECT embedding_model_id, revision, dim FROM embedding_meta LIMIT 1")
     if not path.is_file() or raw is None or raw.strip() == "":
         return None
@@ -227,7 +230,7 @@ def _collect(vault_root: Path) -> tuple[tuple[str, str, str, str], ...]:
 def _sqlite(path: Path, sql: str) -> str | None:
     try:
         done = subprocess.run(
-            ["sqlite3", "-separator", "\x1f", "-newline", "\x1e", str(path), sql],
+            ["sqlite3", "-readonly", "-separator", "\x1f", "-newline", "\x1e", str(path), sql],
             capture_output=True,
             text=True,
             check=False,

@@ -8,6 +8,7 @@ import math
 import os
 import sys
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -27,6 +28,7 @@ from sb.embeddings import (
     main,
     read_identity,
     rebuild,
+    run_vec_sql,
     vectors_path,
 )
 from sb.hybrid_search import hybrid_search, query_cosine, rrf_merge
@@ -151,6 +153,74 @@ def test_vec0_roundtrip_returns_exact_section_when_query_matches_text(tmp_path: 
     hits = query_cosine(root, EN_TERM, 3, encoder=FakeEncoder())
     assert written >= 1 and hits and hits[0].page_id.endswith("alpha")
     assert read_identity(root) == FakeEncoder().identity
+
+
+def test_cosine_reads_do_not_mutate_index(tmp_path: Path) -> None:
+    root = _ready(tmp_path)
+    path = vectors_path(root)
+    before = path.read_bytes()
+    entries = set(path.parent.iterdir())
+    assert query_cosine(root, EN_TERM, 3, encoder=FakeEncoder())
+    assert query_cosine(root, KO_TERM, 3, encoder=FakeEncoder())
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(query_cosine, root, query, 3, encoder=FakeEncoder())
+                   for query in (EN_TERM, KO_TERM) * 4]
+        assert all(future.result() for future in futures)
+    assert path.read_bytes() == before
+    assert set(path.parent.iterdir()) == entries
+
+
+@pytest.mark.parametrize("identity", [
+    ModelIdentity("another-model", "fake-rev", VECTOR_DIM),
+    ModelIdentity(DEFAULT_MODEL_ID, "another-revision", VECTOR_DIM),
+])
+def test_cosine_rejects_same_dimension_different_model(
+    tmp_path: Path, identity: ModelIdentity,
+) -> None:
+    root = _ready(tmp_path)
+    with pytest.raises(EmbeddingUnavailable, match="identity"):
+        query_cosine(root, EN_TERM, 3, encoder=FakeEncoder(identity))
+
+
+def test_cosine_preserves_control_characters_in_text(tmp_path: Path) -> None:
+    root = _ready(tmp_path)
+    body = "quoted ' text\x1f field\x1e row\n한국어"
+    escaped = body.replace("'", "''")
+    run_vec_sql(vectors_path(root), f"UPDATE chunks SET text = '{escaped}'")
+    hits = query_cosine(root, EN_TERM, 3, encoder=FakeEncoder())
+    assert hits and all(hit.snippet == body for hit in hits)
+
+
+def test_read_only_vec_connection_rejects_writes(tmp_path: Path) -> None:
+    root = _ready(tmp_path)
+    path = vectors_path(root)
+    before = path.read_bytes()
+    with pytest.raises(EmbeddingUnavailable, match="readonly"):
+        run_vec_sql(path, "DELETE FROM chunks", read_only=True)
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("vectors", [(), ((1.0,),), ((float("nan"),) * VECTOR_DIM,),
+                                    ((0.0,) * VECTOR_DIM,)])
+def test_invalid_query_vectors_fall_back(
+    tmp_path: Path, vectors: tuple[tuple[float, ...], ...], monkeypatch: MonkeyPatch,
+) -> None:
+    root = _ready(tmp_path)
+    lexical = _lexical(root)
+    monkeypatch.setattr(FakeEncoder, "encode", lambda self, texts: vectors)
+    assert hybrid_search(lexical, EN_TERM, 3, vault_root=root, encoder=FakeEncoder()) == lexical
+
+
+@pytest.mark.parametrize("raw", ['["wiki/a","section","text",null]',
+                                 '["wiki/a","section","text","bad"]',
+                                 '["wiki/a","section","text",NaN]', 'broken'])
+def test_malformed_results_do_not_become_perfect_matches(
+    tmp_path: Path, raw: str, monkeypatch: MonkeyPatch,
+) -> None:
+    root = _ready(tmp_path)
+    lexical = _lexical(root)
+    monkeypatch.setattr("sb.embeddings.run_vec_sql", lambda *args, **kwargs: raw)
+    assert hybrid_search(lexical, EN_TERM, 3, vault_root=root, encoder=FakeEncoder()) == lexical
 
 
 def test_rrf_orders_by_fused_score_then_page_id_when_ranks_differ() -> None:

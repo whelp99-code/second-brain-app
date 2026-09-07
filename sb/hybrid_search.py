@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import math
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import sb.embeddings as emb
 from sb.embeddings import EmbeddingUnavailable, Encoder
@@ -38,7 +41,7 @@ def rrf_merge(
     fused: list[SearchHit] = []
     for key in ranked[:limit]:
         hit = chosen[key]
-        fused.append(SearchHit(hit.page_id, hit.section, hit.snippet, scores[key]))
+        fused.append(replace(hit, score=scores[key]))
     return tuple(fused)
 
 
@@ -55,16 +58,25 @@ def query_cosine(
         raise EmbeddingUnavailable("vectors missing")
     stored = emb.read_identity(vault_root)
     enc = encoder if encoder is not None else emb.resolve_encoder()
-    if stored is None or stored.dim != enc.identity.dim:
-        raise EmbeddingUnavailable("embedding metadata missing or dim mismatch")
-    literal = "[" + ",".join(format(value, ".9g") for value in enc.encode((query,))[0]) + "]"
+    if stored is None or stored != enc.identity:
+        raise EmbeddingUnavailable("embedding identity missing or mismatch")
+    vectors = enc.encode((query,))
+    if (
+        len(vectors) != 1
+        or len(vectors[0]) != stored.dim
+        or not all(math.isfinite(value) for value in vectors[0])
+        or not any(vectors[0])
+    ):
+        raise EmbeddingUnavailable("invalid query embedding")
+    literal = "[" + ",".join(format(value, ".9g") for value in vectors[0]) + "]"
     raw = emb.run_vec_sql(
         path,
-        "DROP TABLE IF EXISTS knn_out; CREATE TABLE knn_out AS "
+        "WITH nearest AS MATERIALIZED ("
         + f"SELECT rowid AS id, distance FROM vec_chunks WHERE embedding MATCH '{literal}' "
-        + f"AND k = {int(limit)}; "
-        + "SELECT c.page_id, c.section, c.text, k.distance FROM knn_out k "
+        + f"AND k = {int(limit)}) "
+        + "SELECT json_array(c.page_id, c.section, c.text, k.distance) FROM nearest k "
         + "JOIN chunks c ON c.id = k.id ORDER BY k.distance, c.page_id, c.section",
+        read_only=True,
     )
     if raw == "":
         return ()
@@ -72,15 +84,24 @@ def query_cosine(
     for record in raw.split("\x1e"):
         if not record:
             continue
-        parts = record.split("\x1f")
-        page_id = parts[0] if parts else ""
-        section = parts[1] if len(parts) > 1 else ""
-        text = parts[2] if len(parts) > 2 else ""
-        dist_text = parts[3] if len(parts) > 3 else ""
         try:
-            distance = float(dist_text) if dist_text else 0.0
-        except ValueError:
-            distance = 0.0
+            decoded = cast(object, json.loads(record))
+            if not isinstance(decoded, list):
+                raise TypeError("invalid result shape")
+            parts = cast(list[object], decoded)
+            if len(parts) != 4:
+                raise ValueError("invalid result shape")
+            page_id, section, text, value = parts
+            if not (
+                isinstance(page_id, str) and isinstance(section, str) and isinstance(text, str)
+                and isinstance(value, (int, float)) and not isinstance(value, bool)
+            ):
+                raise TypeError("invalid result shape")
+            distance = float(value)
+            if not math.isfinite(distance):
+                raise ValueError("invalid distance")
+        except (TypeError, ValueError) as exc:
+            raise EmbeddingUnavailable("invalid vector result") from exc
         hits.append(SearchHit(page_id, section, text, 1.0 - distance))
     return tuple(hits)
 

@@ -260,3 +260,11 @@ remember 확인 실행기가 correct 경로로 실패하던 결함과 Overview�
 기존 분류기의 제품 호출 부재를 CLI 파일 접수로 연결했다. 같은 writer transaction의 계산으로 원문/DB를 결합하며 권한을 실제 시각으로 재검증하고, 유효한 동일 미커밋 원문만 복구한다. CLI 접수→owner 확인→실제 MCP 저장→64개 record 재조회→dashboard 저장 완료를 검증했다. [후보 접수 보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md).
 
 실제 task completion은 자비스 `7129b9d`로 확정돼 해당 source/검증 결합을 다음으로 진행한다. 기존 verified authority를 CLI 주장으로 새로 발행하지 않는다. approved/no_data 본문 인계는 별도 미완료이며 실제 앱 수집/주입·범위와 나머지 B5~B8 순서는 유지한다.
+
+## 17. 작업 원본 차단 전파 보류와 기존 검색 선행 수정
+
+task completion 대조에서 신규 요약은 기존 labeled_inference로 취급해야 함을 확인했다. collector 초안의 독립 소스 검토에서 task_id 차단 누락과 생성 후 원본 차단의 후보·승인·저장 전파 부재를 확인하여 제품 소스 반영을 보류했다. 자비스 `73d59df`의 [재개 계약](../Orca-JARVIS/docs/planning/task-memory-source-privacy-hold.md)에 수집 전/후·승인 후·전송 중·저장 후/복원까지의 회귀 조건을 기록했다. 작업 완료 인증이 요약문 검증을 대신하지 않는다.
+
+독립적으로 진행할 수 있는 R10의 기존 조회 부작용·RRF 출처 유실·모델 identity·결과 구분자 결함을 수정했다. [읽기 전용 검증 보고서](HYBRID-READONLY-2026-09-08.md). 이는 LightRAG식 검색 확장 전 선행 보강이며 새 OSS 도입이나 sealed hybrid 활성화가 아니다. cosine 전용 메타데이터·동일 세대·범위/삭제 수명·평가를 계속 요구한다.
+
+우선순위는 자비스 공통 기억 완성으로 유지한다. 작업 수집은 원본→파생 기억의 차단 전파 계약을 먼저 확정하고, 기존 제품 접수/검토/저장 흐름은 계속 사용한다. 일반 입력/V2 정정·앱별 공통 범위·문맥 예산/전달 이력·운영 복구/품질 평가의 미완료 판정을 유지한다.

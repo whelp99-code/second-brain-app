@@ -18,7 +18,7 @@
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
-| B8 | R10 선택적 hybrid/관계 확장 | 판단 필요 | sealed 읽기·정책·출처 보존과 기준 검색 대비 이득 |
+| B8 | R10 선택적 hybrid/관계 확장 | 조회 부작용·RRF 메타데이터 유실 수정, 활성화 보류 | cosine 출처/필터·세대 결합·삭제 수명 및 기준 검색 대비 이득 검증 필요 |
 
 ## 위험에 따른 보류
 
@@ -179,3 +179,11 @@ I1-b의 이 소스 결함은 수정됐다. 운영 실행기 outbox 주입과 주
 CLI 접수에서 시작한 실제 MCP 인수는 민감 기억 64개·두 클라이언트 current·completed/settled/dashboard stored=true, 중복 추가 dispatch 0을 확인했다. 실제 시계의 CLI subprocess 재시도/원문 검토도 통과했다. 관련 37개 및 추가 회귀 123개, backend build·lint·독립 재검토 통과. [보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md).
 
 이번 중 확정된 자비스 task completion `7129b9d`와 기억 verifier authority 연결을 다음에 대조한다. 바로 approved 또는 no_data 후보의 본문 인계, 일반 LF/V2·실제 앱/범위 및 B5~B8과 운영 인수는 남는다.
+
+### B4 보류 판정·B8 선행 수정 — 원본 차단 전파와 벡터 읽기
+
+task completion 수집 초안은 task_id 차단 누락과 원본 차단의 파생 후보/저장 전파 부재를 확인해 제품에 반영하지 않았다. 자비스 `73d59df`에 수집 전/후·전송 중·저장/복원 후까지의 재개 조건을 기록했다. 기존 classify·검토·owner 확인·outbox는 유지한다.
+
+SB query_cosine의 조회 중 DROP/CREATE를 readonly SQLite CTE로 바꾸고 RRF가 출처/상태 필드를 보존하도록 수정했다. 없는 DB 생성, 모델/revision 불일치 허용, 제어문자 원문 손상과 잘못된 거리의 완전 일치 오판도 수정했다. 수정 전 6건 실패로 재현했고 실제 SQLite 동시 조회 전후 DB 불변·readonly 쓰기 거부를 검증했다.
+
+표준 전체 **566 passed, 2 skipped (138.94초)**, optional 포함 집중 **32 passed, 1 skipped (2.28초)**이며 두 실행은 일부 중복이다. Ruff·diff check 통과, 변경 소스 타입 오류/경고 0. [상세 보고서](HYBRID-READONLY-2026-09-08.md). 실제 모델 품질·cosine 전용 출처/필터·세대/삭제 수명 결합과 hybrid 활성화는 남는다. B4~B8 전체나 운영 전환 완료를 의미하지 않는다.
