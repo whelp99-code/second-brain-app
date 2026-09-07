@@ -63,7 +63,8 @@ try {
     candidate_dispatch_spool_root:join(fixture.database.root,'candidate-dispatch'),
     candidate_review_spool_root:join(fixture.database.root,'candidate-review')});
   const initial = await reader.search(content);
-  const queued = service.enqueue(control.claim(action.request_id,'real-provider-worker',OUTBOX_NOW));
+  const claimed = control.claim(action.request_id,'real-provider-worker',OUTBOX_NOW);
+  const queued = service.enqueue(claimed);
   const dispatched = await service.runOnce('real-provider-worker',1);
   const accepted = await transport.call('sb_request_status',{request_id:fixture.request.request_id});
   const applied = provider('apply');
@@ -80,11 +81,14 @@ try {
   const replay = await transport.call('sb_write_request',{request:fixture.request});
   const idle = provider('apply');
   const repeated = await service.runOnce('real-provider-worker',1);
+  const terminalReplay = service.enqueue(claimed);
+  const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
   const result = {initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
     provider_status:status.value?.state,reconciled,outbox:service.get(queued.outbox_id)?.state,
     reused:reused.kind,reuse_code:reused.code,evidence_count:reused.evidence?.length,
     recent:recent.kind,second_client:shared.kind,replayed:replay.value?.replayed,
-    reapply:idle.state,redispatched:repeated.dispatched};
+    reapply:idle.state,redispatched:repeated.dispatched,terminal_replay:terminalReplay.state,
+    remaining_review_files:reviewFiles.length,cleanup_error:reconciled.cleanup_error ?? null};
   console.log(JSON.stringify(result));
   assert.equal(result.accepted,'pending');
   assert.equal(result.provider_status,'proved');
@@ -97,6 +101,9 @@ try {
   assert.equal(result.replayed,true);
   assert.equal(result.reapply,'idle');
   assert.equal(result.redispatched,0);
+  assert.equal(result.terminal_replay,'settled');
+  assert.equal(result.remaining_review_files,0);
+  assert.equal(result.cleanup_error,null);
 } finally {
   await transport?.close();
   await secondTransport?.close();

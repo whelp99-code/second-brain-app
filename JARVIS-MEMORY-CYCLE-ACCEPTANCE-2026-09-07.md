@@ -57,9 +57,32 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS
 | ID / 우선순위 | 확인된 문제 | 수정·완료 기준 |
 |---|---|---|
 | I1-a / P0 | 운영 src에서 MemoryOutboxService 생성이 없고 dashboard/CLI executor는 outbox에 undefined를 전달 | 기존 transport·권한·fence를 사용하는 outbox를 실제 진입점에 구성하고 승인된 요청의 실행을 확인 |
-| I1-b / P0 | memory-surface-authority는 승인 직후 review spool을 제거하지만 resolveSpooledDispatch는 해당 subject/statement를 다시 읽음 | 승인→dispatch→완료 사이 원문을 유실 없이 인계. 거절·만료·삭제·실패 시 원문 정리 정책도 함께 검증 |
+| I1-b / P0 | 승인 직후 원문 제거는 소스 수정 완료. 전체 owner confirmation→쓰기 권한 연결은 추가 결함이 남음 | 원문 수명·terminal replay는 자비스 64b255b에서 검증. 아래 후속 권한/복구 항목과 실제 운영 연결까지 확인 |
 | I1-c / P1 | expected_artifact를 생성하는 운영 경로가 없음 | candidate/request와 provider 결과에 결합된 selector 또는 완료 관측 계약을 만들고 사용자에게 내부 hash 계산을 요구하지 않음 |
 | I1-d / P1 | provider는 여러 줄을 동일 sid의 여러 record로 만들지만 outbox는 한 sid의 digest가 모두 같아야 한다고 검사 | 여러 줄·빈 줄·공백·사용자 footnote 입력의 전체 결과 대응을 검증. 첫 줄만 성공으로 처리 금지 |
 | I1-e / P1 | provider 비동기 완료 이후 outbox reconciliation의 운영 호출이 없음 | 기존 주기적 진입점에 연결. 접수만으로 완료 표시하지 않고 재시작·중복·uncertain을 검증 |
 
 이 다섯 항목은 보류할 선택 기능이 아니라 B4 완료 조건이다. 별도 큐 서버나 두 번째 기억 DB를 만들지 않고 기존 자비스 상태기계와 세컨드브레인 단일 writer를 연결한다. source-level 승인 정책을 우회하거나 예전 요청의 서명·digest를 치환하지 않는다.
+
+## 2026-09-08 후속 — 승인 원문 보존과 종료 후 정리
+
+자비스 `64b255b`에서 승인/거절 처리 중 원문 unlink를 제거했다. 바깥 ControlPlane DB transaction이 뒤에서 실패하더라도 원문은 남는다. 별도 cleanup은 확정된 candidate/outbox 종료 상태만 대상으로 하며, caller transaction 안에서는 실행을 거부한다. queued/claimed/dispatching/reconciling은 확인 기한이 지나도 원문을 보존한다. 원문 envelope와 원장 digest를 확인하고, 없는 파일만 멱등 성공으로 취급한다.
+
+완료 후 원문이 없어도 같은 claimed command는 저장된 terminal 결과를 재확인한다. target/args/digest/receipt/fence가 바뀐 명령은 거부한다. cleanup 오류는 저장 완료를 명령 실패로 바꾸지 않으며 cycle의 `cleanup_error=MEMORY_REVIEW_CLEANUP_FAILED`로 반환하고 다음 cycle에서 재시도한다. **이 오류의 운영 표시와 주기적 cleanup 호출은 I1-a/e에 남아 있다.**
+
+실제 CandidateStore→dashboard mutation staging→서명된 ControlPlane 결정→dispatch 복원 검사에서 또 다른 결함을 재현했다. review의 후보 입력용 idempotency key는 provider 요청용 key와 해시 domain·입력이 달랐다. 새 dispatch는 기존 provider 계약대로 immutable candidate/classification/operation에서 key를 만든다. 이미 발급한 dispatch/서명 자료를 자동 재작성하지 않는다.
+
+검증:
+
+- 자비스 집중 회귀 **91 passed / 37 files / 39.27초**. 승인/거절 transaction rollback, 거절 후 정리, 변조된 원문 보존, timeout 이후 진행 중 원문 유지, terminal 재확인·변조 거부, 삭제 실패 후 재시도를 포함한다.
+- 변경 파일 ESLint와 backend build 통과. 독립 검토의 terminal cleanup 오류 지적을 반영하고 재검토했다.
+- 실제 격리 MCP/outbox 순환 재실행: pending→proved→settled, 같은 reader/두 번째 MCP client current, provider replayed=true, 추가 apply idle/dispatch 0. **review 파일 0개, terminal 재확인 settled, cleanup_error 없음**을 추가 확인했다.
+- 로그: `/var/tmp/jarvis-review-handoff-final-tests.log`, `/var/tmp/jarvis-review-handoff-build.log`, `/var/tmp/sb-jarvis-review-handoff-acceptance.log`. Python 구현을 바꾸지 않았으므로 기존 전체 Python 548 passed/2 skipped를 이번 재실행 수치로 보고하지 않는다.
+
+### 승인 전체 경로에 남은 구체적 결함
+
+`hasSecondBrainWriteAuthority`는 `memory_candidate_authority_claims`를 inner join하고 원래 분류의 authority/receipt 시간을 검사한다. 반면 `labeled_inference` 분류는 이 claim을 만들지 않고, 이후 owner confirmation은 candidate와 owner decision ledger에만 기록한다. 따라서 원문 복원 성공만으로 승인된 inference의 실제 provider 쓰기가 가능해진 것은 아니다. 기존 서명 결정·취소·만료·내용 결합을 검증하는 소비자 권한 연결이 필요하다. 추론을 검증된 업무 사실로 승격시키는 우회는 하지 않는다.
+
+또한 승인 처리에서 dispatch 파일 발행은 DB transaction 안에서 이루어진다. 그 뒤 바깥 event insert/commit이 실패하면 원문은 이제 보존되지만 dispatch metadata 파일은 남을 수 있다. 다른 승인 receipt로 재시도할 때 이 파일과 충돌하는지, committed publication과 미커밋 잔여물을 어떻게 구별할지는 후속 복구 검사 대상이다. 이번 rollback 테스트는 원문 보존까지 검증했으며 모든 재승인 복구를 검증했다는 뜻은 아니다.
+
+원문 삭제 정책의 실제 compaction/layout 연동, rejected/expired 상태로의 운영 전환, 승인 전체 권한 경로는 B4/B6 완료 조건으로 계속 유지한다. 운영 서비스·release·active pointer는 전환하지 않았다.

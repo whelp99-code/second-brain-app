@@ -93,3 +93,12 @@ R4는 기존 기록의 digest를 바꾸므로 실행 파일만 바꾸는 배포�
 재현 가능한 `scripts/jarvis-memory-acceptance.mjs`와 격리 provider fixture를 추가했다. 자비스의 합성 검증 결과·서명 fixture를 사용하며, 하네스가 expected selector를 만들고 apply/reconcile을 호출한다. 따라서 실제 업무 검증, 운영 자동 연결, 실제 Codex/Claude 앱 공유, 여러 줄 입력 완료와 구분한다.
 
 검증: 자비스 관련 단위 **247 passed / 26 files**, ESLint·backend build 통과, 독립 코드 검토 완료. 새 Python fixture Ruff·타입 오류/경고 0, Node 구문 검사 통과. 상세 관측 및 새로 확인한 필수 잔여 I1-a~e는 [순환 인수 보고서](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)에 있다. 핵심 잔여는 운영 outbox 생성·승인 원문 보존·selector 생성·여러 줄 판정·비동기 reconciliation이다. 운영 배포나 권한 우회는 수행하지 않았다.
+
+
+### B4 진행 — 2026-09-08 승인 원문 수명과 종료 후 재확인
+
+자비스 `64b255b`: 승인/거절 중 원문 삭제를 제거하고 committed terminal 상태에서만 digest를 검증해 정리한다. 진행 중 원문은 confirmation 기한만으로 삭제하지 않는다. 원문 정리 뒤 동일 명령의 결과 재확인이 가능하며, 정리 실패를 이미 완료된 저장의 실패로 바꾸지 않는다. 다음 cycle에서 정리를 재시도한다. 실제 분류→승인에서 드러난 후보 키/provider 키 혼용도 새 dispatch 생성에서 수정했다.
+
+집중 검증 **91 passed / 37 files**, 변경 파일 ESLint·backend build 통과, 독립 검토 완료. 격리 실제 MCP→outbox→proved→settled→두 클라이언트 재조회 순환에서 원문 파일 0개와 terminal replay settled, 중복 dispatch 0을 확인했다. 상세 로그와 범위는 [인수 보고서 후속](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)에 기록했다.
+
+I1-b는 전체 승인 쓰기까지 완료가 아니다. 승인된 inference의 authority claim/receipt 연결, 바깥 DB rollback 후 dispatch metadata 잔여물 재승인 복구가 남는다. 실제 runtime 생성·selector·여러 줄·reconciliation 및 cleanup 오류 표시도 남아 있다. B3 지연/과거 잔여물, B5~B8 전체 범위와 운영 전환은 계속 미완료다.
