@@ -506,7 +506,7 @@ def build_server(
             require_active_high_water(generation, current)
             try:
                 page = read_page(current_root, id)
-                payload: ToolResult = {"frontmatter": public_frontmatter(page.frontmatter), "body": page.body}
+                payload: ToolResult = {"frontmatter": public_frontmatter(page.frontmatter, id), "body": page.body}
                 if contract_schema_version == 4:
                     payload = {**payload, "records": [
                         record.as_dict() for record in records_for_page(current_root, id, generation)
