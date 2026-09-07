@@ -25,10 +25,17 @@ def read_root(config: Config) -> Generator[Path, None, None]:
         return
     service = GenerationMutationService.from_config(config)
     try:
-        with service.store.pin():
-            yield service.store.active().root
+        with service.store.pin(f"desktop-read:{uuid4().hex}", datetime.now(UTC)) as pin:
+            yield pin.generation.root
     finally:
         service.close()
+
+
+@contextmanager
+def read_config(config: Config) -> Generator[Config, None, None]:
+    """Preserve configuration while binding every vault lookup to one reader pin."""
+    with read_root(config) as root:
+        yield Config(raw={**config.raw, "vault_root": str(root)})
 
 
 def mutate_root[T](config: Config, operation: GenerationOperation, apply: Callable[[Path], T]) -> T:

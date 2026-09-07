@@ -32,7 +32,7 @@ from sb.ops import (
     doctor as run_doctor,
 )
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
-from sb.runtime_access import mutate_root
+from sb.runtime_access import mutate_root, read_config
 from sb.search import SearchIndex
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import Vault, VaultLintError, init_vault
@@ -225,7 +225,10 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     def doctor() -> int:
         if _opt_flag(ns, "rebuild_ledger"):
             mutate_root(config, GenerationOperation.EFFECT, rebuild_from_vault)
-        checks = run_doctor(config)
+            with read_config(config) as snapshot:
+                checks = run_doctor(snapshot)
+        else:
+            checks = run_doctor(config)
         if _opt_flag(ns, "json"):
             print(json.dumps([check.as_dict() for check in checks], ensure_ascii=False, indent=2))
         else:
@@ -487,7 +490,19 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     started = monotonic()
     exit_code = 1
     try:
-        exit_code = handlers[command]()
+        read_only = command in {
+            Command.STATUS, Command.SEARCH, Command.SOURCES, Command.RETENTION, Command.METRICS,
+        } or (
+            command == Command.DOCTOR and not _opt_flag(ns, "rebuild_ledger")
+        ) or (
+            command in {Command.GC, Command.MIGRATE} and not _opt_flag(ns, "apply")
+        ) or (command == Command.COMPILE and _opt_flag(ns, "dry_run"))
+        if read_only:
+            with read_config(config) as snapshot:
+                config = snapshot
+                exit_code = handlers[command]()
+        else:
+            exit_code = handlers[command]()
         return exit_code
     finally:
         root = Path(config.vault_root)
