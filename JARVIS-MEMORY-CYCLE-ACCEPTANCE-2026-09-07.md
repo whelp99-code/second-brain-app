@@ -57,7 +57,7 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS
 | ID / 우선순위 | 확인된 문제 | 수정·완료 기준 |
 |---|---|---|
 | I1-a / P0 | 운영 src에서 MemoryOutboxService 생성이 없고 dashboard/CLI executor는 outbox에 undefined를 전달 | 기존 transport·권한·fence를 사용하는 outbox를 실제 진입점에 구성하고 승인된 요청의 실행을 확인 |
-| I1-b / P0 | 승인 직후 원문 제거는 소스 수정 완료. 전체 owner confirmation→쓰기 권한 연결은 추가 결함이 남음 | 원문 수명·terminal replay는 자비스 64b255b에서 검증. 아래 후속 권한/복구 항목과 실제 운영 연결까지 확인 |
+| I1-b / P0 | 원문 수명·owner-confirmed remember의 권한 연결은 소스 수정 및 실제 프로세스 순환 통과 | 자비스 64b255b/d553327. 바깥 DB rollback 후 metadata 재승인 복구, 운영 정리/layout 연결은 남음 |
 | I1-c / P1 | expected_artifact를 생성하는 운영 경로가 없음 | candidate/request와 provider 결과에 결합된 selector 또는 완료 관측 계약을 만들고 사용자에게 내부 hash 계산을 요구하지 않음 |
 | I1-d / P1 | provider는 여러 줄을 동일 sid의 여러 record로 만들지만 outbox는 한 sid의 digest가 모두 같아야 한다고 검사 | 여러 줄·빈 줄·공백·사용자 footnote 입력의 전체 결과 대응을 검증. 첫 줄만 성공으로 처리 금지 |
 | I1-e / P1 | provider 비동기 완료 이후 outbox reconciliation의 운영 호출이 없음 | 기존 주기적 진입점에 연결. 접수만으로 완료 표시하지 않고 재시작·중복·uncertain을 검증 |
@@ -79,10 +79,34 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS
 - 실제 격리 MCP/outbox 순환 재실행: pending→proved→settled, 같은 reader/두 번째 MCP client current, provider replayed=true, 추가 apply idle/dispatch 0. **review 파일 0개, terminal 재확인 settled, cleanup_error 없음**을 추가 확인했다.
 - 로그: `/var/tmp/jarvis-review-handoff-final-tests.log`, `/var/tmp/jarvis-review-handoff-build.log`, `/var/tmp/sb-jarvis-review-handoff-acceptance.log`. Python 구현을 바꾸지 않았으므로 기존 전체 Python 548 passed/2 skipped를 이번 재실행 수치로 보고하지 않는다.
 
-### 승인 전체 경로에 남은 구체적 결함
+### 64b255b 시점에 확인한 후속 결함
 
 `hasSecondBrainWriteAuthority`는 `memory_candidate_authority_claims`를 inner join하고 원래 분류의 authority/receipt 시간을 검사한다. 반면 `labeled_inference` 분류는 이 claim을 만들지 않고, 이후 owner confirmation은 candidate와 owner decision ledger에만 기록한다. 따라서 원문 복원 성공만으로 승인된 inference의 실제 provider 쓰기가 가능해진 것은 아니다. 기존 서명 결정·취소·만료·내용 결합을 검증하는 소비자 권한 연결이 필요하다. 추론을 검증된 업무 사실로 승격시키는 우회는 하지 않는다.
 
 또한 승인 처리에서 dispatch 파일 발행은 DB transaction 안에서 이루어진다. 그 뒤 바깥 event insert/commit이 실패하면 원문은 이제 보존되지만 dispatch metadata 파일은 남을 수 있다. 다른 승인 receipt로 재시도할 때 이 파일과 충돌하는지, committed publication과 미커밋 잔여물을 어떻게 구별할지는 후속 복구 검사 대상이다. 이번 rollback 테스트는 원문 보존까지 검증했으며 모든 재승인 복구를 검증했다는 뜻은 아니다.
 
 원문 삭제 정책의 실제 compaction/layout 연동, rejected/expired 상태로의 운영 전환, 승인 전체 권한 경로는 B4/B6 완료 조건으로 계속 유지한다. 운영 서비스·release·active pointer는 전환하지 않았다.
+
+## 2026-09-08 후속 — owner-confirmed remember의 실제 저장 순환
+
+자비스 `d553327`은 required_confirmation 기억 추가를 기존 owner decision/attempt/family, ControlPlane 요청과 서명 영수증, personal redemption에 연결한다. 기존 분류·원문·주제·보관 정책과 실제 승인 대상이 일치해야 하며, 승인 서명·취소·만료를 확인한다. 원래 분류의 시간 대신 실제 owner receipt 발급 시간을 사용한다. 새 dispatch 만료는 후보/confirmation/실제 승인 영수증 중 가장 이른 기한으로 제한한다.
+
+기존 auto-staged 경로에도 요청 원문·주제·보관 기간·민감도·목적·생성 시각을 실제 후보와 비교하는 검사를 추가했다. 이전 adapter 단위 fixture는 승인된 입력과 다른 원문/주제를 보내도 통과하고 있었으므로, 올바르게 일치하는 fixture로 수정하고 다른 내용의 재해시 요청을 거부하는 검사를 추가했다. inference의 input_class는 그대로 유지하며 검증된 업무 사실로 바꾸지 않는다.
+
+검증은 **91 passed / 36 files / 41.40초**, transport fixture의 필수 reason 타입 보정 뒤 승인 경로 **7 passed** 재검사, 변경 파일 ESLint와 backend build 통과다. 독립 검토에서 발견된 V1 정정 대상 결합 문제는 아래와 같이 보류했다. 로그는 `/var/tmp/jarvis-owner-confirmation-final-tests.log`, `/var/tmp/jarvis-owner-confirmation-posttype-tests.log`, `/var/tmp/jarvis-owner-confirmation-build.log`다.
+
+새 `scripts/jarvis-owner-memory-fixture.mjs`는 합성 inference 입력을 실제 CandidateStore로 분류하고, dashboard mutation staging과 서명된 ControlPlane 결정을 거쳐 요청을 만든다. 이를 다음 명령으로 별도 provider MCP에 전달한다.
+
+```bash
+TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner-confirmed
+```
+
+실제 관측: **pending→proved→settled, reader 재사용 current 1개, 독립 MCP 클라이언트 current/동일 record ID, replayed=true, 재apply idle, 추가 dispatch 0, review 파일 0, terminal 재확인 settled, cleanup 오류 없음**. 로그는 `/var/tmp/sb-jarvis-owner-confirmed-acceptance.log`. 기존 verified fixture 경로도 같은 결과로 통과했다(`/var/tmp/sb-jarvis-owner-auto-regression.log`).
+
+이 검사는 실제 운영자 승인이나 현실 업무 수행이 아닌 격리 DB의 합성 승인이다. 하네스가 expected selector를 만들고 apply/reconcile을 호출한다는 범위는 그대로다. 실제 앱 연결과 runtime 자동 생성/주기적 관측 완료를 뜻하지 않는다.
+
+### 보류: owner-confirmed V1 correct 확장
+
+기존 V1 memory.confirm 서명 args에는 correction target/prior가 없고, attempt의 expected_prior_json은 변경 방지된 정본이 아니다. 이 열만 비교하면 승인 이후 다른 prior에 같은 owner 서명을 적용할 수 있다는 독립 검토 결과가 있었다. 따라서 신규 owner-confirmed 권한 경로는 **remember만 허용**한다. correct는 기존 V2 target/delegation 계약에 연결하는 방식으로 완성해야 한다. 단순 비교로 V1을 열거나 기존 서명을 새 대상으로 재해시하지 않는다.
+
+재개 기준: immutable target version/membership와 정정 prior가 승인·provider 요청에 결합되고, 승인 후 대상 변경을 주입한 거부 검사 및 실제 정정·재조회가 통과할 것. 바깥 rollback의 dispatch metadata 잔여물 재승인 복구와 I1-a/c/d/e는 계속 남아 있다.

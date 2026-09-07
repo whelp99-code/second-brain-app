@@ -6,9 +6,11 @@ import {chmodSync, lstatSync, mkdtempSync, readdirSync, writeFileSync, rmSync} f
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {ownerMemoryFixture} from './jarvis-owner-memory-fixture.mjs';
 
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jarvis = resolve(process.argv[2] ?? join(sb, '../Orca-JARVIS'));
+const ownerConfirmed = process.argv.includes('--owner-confirmed');
 const python = process.env.SB_TEST_PYTHON ?? join(sb, '.venv/bin/python');
 const load = path => import(pathToFileURL(join(jarvis, 'dist', path)).href);
 const {outboxFixture, OUTBOX_NOW} = await load('tests/fixtures/memory-outbox-fixture.js');
@@ -35,7 +37,7 @@ try {
   const launcher = join(root, 'mcp');
   writeFileSync(launcher, `#!/bin/sh\ncd ${quote(sb)}\nexec ${quote(python)} -m tests.fixtures.jarvis_memory_provider serve ${quote(root)}\n`, {mode:0o700});
   process.chdir(jarvis);
-  fixture = await outboxFixture();
+  fixture = ownerConfirmed ? await ownerMemoryFixture(load,OUTBOX_NOW) : await outboxFixture();
   transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
   const reader = createSecondBrainReadAdapter({transport,contract_profile:'schema4',clock:()=>OUTBOX_NOW,
     budgets:{max_hits:10,max_excerpt_bytes:4096,max_page_bytes:262144,max_total_bytes:65536},
@@ -46,7 +48,9 @@ try {
   const expected = {page_id:`wiki/memory-${hash(`${fixture.request.candidate_id}\0${contentHash}`)}`,
     sid:contentHash.slice(0,8),source_digest:`sha256:${contentHash}`};
   const control = new ControlPlane(fixture.database.authority);
-  const previous = fixture.database.authority.db.prepare('SELECT args_json,target_json FROM control_command_requests WHERE request_id=?').get(fixture.commandId);
+  const previous = ownerConfirmed
+    ? {args_json:JSON.stringify(fixture.dispatch_args),target_json:JSON.stringify(fixture.dispatch_target)}
+    : fixture.database.authority.db.prepare('SELECT args_json,target_json FROM control_command_requests WHERE request_id=?').get(fixture.commandId);
   const action = {schema_version:1,action:'memory.outbox.dispatch',action_level:3,
     request_id:'memory-real-provider',nonce:'memory-real-provider-nonce',reversible:false,
     requested_by:'principal:owner',requested_at:OUTBOX_NOW.toISOString(),
@@ -83,7 +87,8 @@ try {
   const repeated = await service.runOnce('real-provider-worker',1);
   const terminalReplay = service.enqueue(claimed);
   const reviewFiles = readdirSync(join(fixture.database.root,'candidate-review'));
-  const result = {initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
+  const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
+    initial:initial.kind,dispatched,accepted:accepted.value?.state,applied,
     provider_status:status.value?.state,reconciled,outbox:service.get(queued.outbox_id)?.state,
     reused:reused.kind,reuse_code:reused.code,evidence_count:reused.evidence?.length,
     recent:recent.kind,second_client:shared.kind,replayed:replay.value?.replayed,

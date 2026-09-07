@@ -10,7 +10,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 격리 단일 줄 순환 통과, 운영 연결·범위 미완료 | 실제 MCP/outbox pending→proved→settled→재조회, 두 번째 프로세스 회수. I1-a~e 및 실제 앱·프로젝트 범위 남음 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 격리 단일 줄·owner-confirmed remember 통과, 운영 연결·범위 미완료 | 실제 MCP/outbox pending→proved→settled→재조회, 두 번째 프로세스 회수. I1-a/c/d/e, 승인 rollback 복구·실제 앱·프로젝트 범위 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
@@ -22,6 +22,7 @@
 - 일반 graph DB/멀티모달 전체 도입: 현재 회수 결함을 해결하지 못하며 파생 데이터 삭제·정책·성능 검증 범위를 늘리므로 검색 평가 전에는 보류.
 - LLM 요약만으로 실행 성공/승인된 사실 자동 승격: 자비스의 실행 증거 계약과 충돌하므로 구현하지 않는다. 검증 결과에 연결된 기억 후보·근거만 사용한다.
 - 로컬 캐시를 에이전트별 기억 정본으로 운영: 공통 기억 일관성을 깨므로 보류. 캐시/전달 receipt는 재생성 가능한 운영 자료로 한정한다.
+- owner-confirmed V1 correct 확장: 기존 승인 서명에 정정 target/prior가 포함되지 않아 보류. 신규 권한 소비는 remember에 한정하고, 정정은 기존 V2 target/delegation에 연결한다. 승인 후 대상 변경 거부와 실제 정정/재조회 검증이 재개 조건이다.
 
 보류는 핵심 R1~R9나 실제 기억 저장·해석·복구를 회피하는 근거로 사용하지 않는다. 추가 보류에는 원인, 대신 제공할 동작, 재개 기준을 기록한다.
 
@@ -102,3 +103,11 @@ R4는 기존 기록의 digest를 바꾸므로 실행 파일만 바꾸는 배포�
 집중 검증 **91 passed / 37 files**, 변경 파일 ESLint·backend build 통과, 독립 검토 완료. 격리 실제 MCP→outbox→proved→settled→두 클라이언트 재조회 순환에서 원문 파일 0개와 terminal replay settled, 중복 dispatch 0을 확인했다. 상세 로그와 범위는 [인수 보고서 후속](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)에 기록했다.
 
 I1-b는 전체 승인 쓰기까지 완료가 아니다. 승인된 inference의 authority claim/receipt 연결, 바깥 DB rollback 후 dispatch metadata 잔여물 재승인 복구가 남는다. 실제 runtime 생성·selector·여러 줄·reconciliation 및 cleanup 오류 표시도 남아 있다. B3 지연/과거 잔여물, B5~B8 전체 범위와 운영 전환은 계속 미완료다.
+
+### B4 진행 — owner-confirmed remember 권한 연결
+
+자비스 `d553327`: 이후 owner confirmation에서 발생한 실제 결정·서명·개인 redemption을 검사하여 remember를 허용한다. 원문·주제·정책 값과 후보를 일치시키고 실제 receipt 만료를 넘지 않는다. 기존 auto-staged 경로의 내용 불일치도 거부한다. inference 분류는 유지한다. V1 correct는 승인과 prior 결합이 부족하므로 신규 경로에서 허용하지 않고 기존 V2 연결로 진행한다.
+
+집중 **91 passed / 36 files**, 타입 보정 후 해당 경로 **7 passed**, ESLint·backend build·독립 검토 완료. 실제 분류→합성 owner 승인→별도 MCP→provider proved→outbox settled→두 번째 클라이언트 동일 기억 회수까지 통과했다. 기존 verified fixture 순환도 통과했다. 상세 명령·증거·보류 사유는 [인수 보고서](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)에 있다.
+
+원문/권한 경로의 소스 검증과 runtime 배포를 구분한다. 실제 서비스 자동 outbox 생성, selector, 여러 줄, reconciliation, project/user/agent 범위, rollback metadata 복구 및 B3/B5~B8의 미완료 범위는 유지한다.
