@@ -8,7 +8,7 @@ import hashlib
 import os
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
@@ -87,6 +87,78 @@ class WriteResult:
 @dataclass(frozen=True, slots=True)
 class Vault:
     root: Path
+
+    def rebind_erased_sources(
+        self, effect_id: str, erased_hashes: frozenset[str], store_snapshot: Callable[[bytes], str],
+    ) -> None:
+        """Bind surviving statements to an effect snapshot when their raw source was erased.
+
+        The effect receipt is the new provenance; a removed source is never
+        represented as still available. Pages without affected citations stay byte-identical.
+        """
+        for folder in ("wiki", "daily", "conflicts"):
+            for path in (self.root / folder).rglob("*.md"):
+                split = _split_rendered(path.read_text(encoding="utf-8"))
+                if split is None:
+                    continue
+                block, body = split
+                loaded = cast(object, yaml.safe_load(block))
+                if not isinstance(loaded, dict):
+                    continue
+                fields = cast(dict[str, object], loaded)
+                sources = fields.get("sources")
+                if not isinstance(sources, list):
+                    continue
+                entries = [cast(dict[str, object], item) for item in cast(list[object], sources)
+                           if isinstance(item, dict)]
+                missing = [item for item in entries if isinstance(item.get("hash"), str)
+                           and item["hash"] in erased_hashes]
+                if not missing:
+                    continue
+                sids = {str(item["sid"]) for item in missing if "sid" in item}
+                lines: list[str] = []
+                for line in body.splitlines():
+                    if any(line.strip().startswith(f"[^{sid}]:") for sid in sids):
+                        continue
+                    plain = line
+                    for sid in sids:
+                        plain = plain.replace(f"[^{sid}]", "")
+                    # A deleted statement's orphan marker is not a surviving fact.
+                    lines.append(line if plain.strip() else "")
+                body = "\n".join(lines).strip()
+                snapshot = body
+                for sid in sids:
+                    snapshot = snapshot.replace(f"[^{sid}]", "")
+                retained = [item for item in entries if item not in missing]
+                if any(f"[^{sid}]" in body for sid in sids):
+                    content_hash = store_snapshot(snapshot.encode("utf-8"))
+                    marker = content_hash[:8]
+                    for sid in sids:
+                        body = body.replace(f"[^{sid}]", f"[^{marker}]")
+                    origin = f"memory-effect:{effect_id}"
+                    retained.append({"sid": marker, "origin": origin, "hash": content_hash})
+                    body += f"\n\n[^{marker}]: {origin}"
+                fields["sources"] = retained
+                dumped = yaml.safe_dump(fields, sort_keys=False, allow_unicode=True)
+                _atomic_write(path, f"---\n{dumped}---\n\n{body}\n")
+
+    def write_staged_page(self, page: PageSpec, *, compiled_by: str, updated: str) -> None:
+        """Write a validated immutable request page before generation sealing.
+
+        The generation mutation owns the staging directory and its later commit.
+        Existing different bytes are never overwritten by this insertion surface.
+        """
+        reasons = _lint(self.root, page)
+        if reasons:
+            raise VaultLintError(tuple(reasons))
+        destination = _safe_rel(self.root, _rel_for(page.page_id))
+        rendered = _render(page, compiled_by=compiled_by, updated=updated)
+        if destination.exists():
+            if destination.read_text(encoding="utf-8") != rendered:
+                raise VaultLintError((f"{page.page_id}: staged page identity collision",))
+            return
+        _atomic_write(destination, rendered)
+        destination.chmod(0o600)
 
     def write_pages(
         self,

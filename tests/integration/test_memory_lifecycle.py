@@ -17,6 +17,7 @@ from sb.effect_write_requests import accept_effect_request
 from sb.effect_write_values import model_object
 from sb.mcp import build_server
 from sb.mcp_contract import write_fixture_request
+from sb.pipeline import audit_citations
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.stable_requests import accept_stable_v1_request
@@ -49,7 +50,9 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     remember = executor.apply_once(now=NOW)
     assert remember.request_id == accepted.request_id and remember.state == "proved"
     remembered_generation = executor.generations.active()
-    assert remembered_generation.manifest.file_count == 2
+    # The request memory carries its original CAS blob in addition to the page
+    # and derived manifest, so citation validation also survives restoration.
+    assert remembered_generation.manifest.file_count == 3
     assert remembered_generation.root.joinpath(".sb", "derived-manifest.json").is_file()
 
     correction_time = NOW + timedelta(minutes=1)
@@ -62,6 +65,7 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         public_keys=config.jarvis_public_keys, provider_instance_id="provider:fixture",
     )
     assert executor.apply_once(now=correction_time + timedelta(seconds=1)).state == "proved"
+    assert audit_citations(executor.generations.active().root) == ()
     correction_observations = executor.store.observations(correction_accepted.request_id)
     assert correction_observations is not None
     provider_inventory = correction_observations.surface_manifest.provider_inventory
@@ -141,6 +145,7 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     )
     forget_result = executor.apply_once(now=forget_time + timedelta(seconds=1))
     assert forget_result.state == "proved", forget_result
+    assert audit_citations(executor.generations.active().root) == ()
     final_bytes = b"".join(
         path.read_bytes()
         for path in executor.generations.active().root.rglob("*")

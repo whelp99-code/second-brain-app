@@ -5,9 +5,13 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from sb.config import Config
 from sb.mcp_contract import write_fixture_request
+from sb.ops import restore_backup
+from sb.pipeline import audit_citations
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.request_store import RequestStore
+from sb.runtime_backup import backup_runtime
 from sb.stable_requests import accept_stable_v1_request
 from sb.task30_barriers import RecordingBarrierSink
 
@@ -72,3 +76,31 @@ def test_apply_once_is_idle_after_completed_request(tmp_path: Path) -> None:
     assert executor.apply_once(now=NOW).state == "proved"
     assert executor.apply_once(now=NOW).state == "idle"
     executor.close()
+
+
+def test_proved_remember_preserves_cas_citations_through_backup_restore(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    _ = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
+    executor = RequestExecutor(config)
+    try:
+        assert executor.apply_once(now=NOW).state == "proved"
+        root = executor.generations.active().root
+        assert audit_citations(root) == ()
+        raw = tuple((root / "raw").glob("*/*"))
+        assert len(raw) == 1 and raw[0].read_text() == "ExampleAlpha 예시기록"
+        archive = tmp_path / "remember.tar.gz"
+        _ = backup_runtime(Config(raw={
+            "vault_root": str(config.share_root / "vault"),
+            "state_root": str(config.state_root), "share_root": str(config.share_root),
+            "request_root": str(config.request_root), "export_root": str(config.export_root),
+            "provider_instance_id": config.provider_instance_id,
+            "provider_release_sha": config.provider_release_sha,
+        }), archive)
+        destination = tmp_path / "restored"
+        _ = restore_backup(archive, destination)
+        assert audit_citations(destination) == ()
+        assert (destination / raw[0].relative_to(root)).read_bytes() == raw[0].read_bytes()
+        original = next((root / "wiki").glob("*.md"))
+        assert (destination / original.relative_to(root)).read_bytes() == original.read_bytes()
+    finally:
+        executor.close()

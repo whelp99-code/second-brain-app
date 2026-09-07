@@ -22,7 +22,7 @@
 - 수정: 성공적으로 수집한 항목만 처리 완료로 전이하고 미처리·실패·보류 항목은 후속 세대에 보존한다. 기록 단위의 durable ingress 상태를 기준으로 정리한다. 별도 서버 큐나 watcher 도입 없이 기존 원장·inbox 구조에서 해결한다.
 - 완료 기준: 모든 세대 변경 명령을 미처리 inbox와 조합해 검증한다. `limit=1`, source 미선택, LLM 실패, parser 실패, 재시작을 거쳐도 접수한 각 입력이 pending·처리 완료·명시적 거부 중 하나로 설명되어야 한다. 설명되지 않는 유실 0건.
 
-### R2. 실제 자비스 read adapter가 생성 페이지를 거부 — P0 / 재현 / 양쪽 리포
+### R2. 실제 자비스 read adapter가 생성 페이지를 거부 — P0 / 공개 응답 소스 수정, 소비 중복 판정 미완료 / 양쪽 리포
 
 - 근거: [mcp.py](sb/mcp.py#L502), 자비스 `src/second-brain-evidence-parser.ts:22,70`.
 - 실제 운영 MCP의 `운영 복구` 검색은 data/1건을 반환하지만 자비스 `createSecondBrainReadAdapter(... contract_profile: schema4)`는 `SECOND_BRAIN_PAGE_MALFORMED`를 반환했다. `업무`도 transport는 결과를 반환하지만 adapter는 동일하게 거부했다.
@@ -30,7 +30,7 @@
 - 수정: 저장용 frontmatter와 외부 읽기 응답을 분리하여 명시적인 API 투영을 제공하거나, 두 리포가 합의한 버전에서 계약을 확장한다. 원장 재구축에 쓰는 derivation_key를 원본에서 무조건 삭제하거나 검증기를 느슨하게 풀면 안 된다.
 - 완료 기준: 실제 compile 산출물을 실제 자비스 adapter와 상위 소비 경로까지 통과시킨다. 합성 계약 fixture뿐 아니라 raw → compile → MCP → adapter → evidence 검증을 릴리스 게이트에 포함한다.
 
-### R3. 자비스 요청으로 저장한 기억의 백업 복원 실패 — P0 / 재현 / Second Brain
+### R3. 자비스 요청으로 저장한 기억의 백업 복원 실패 — P0 / 소스 수정·회귀 검증, 운영 미배포 / Second Brain
 
 - 근거: [request_executor.py](sb/request_executor.py#L282), [pipeline.py](sb/pipeline.py#L979), [ops.py](sb/ops.py#L343).
 - 재현: 기존 서명 fixture 요청을 정상 executor로 처리하면 proved가 된다. 백업 파일도 생성된다. 그러나 복원은 `restored vault citation audit failed`로 실패한다.
@@ -158,3 +158,13 @@
 OSS 인계 병합과 함께 R1을 작업공간에서 수정했다. scan의 선제 이동을 제거하고 CAS·원장 확정 뒤 정확한 입력 버전에 대해서만 완료 통지를 한다. 세대 변경 때 미처리 inbox를 보존한다. 전체 테스트 520 passed / 2 skipped, Ruff 통과, BasedPyright 오류 0 / 경고 60. 상세 파일·증거는 [통합 계획 10절](OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md#10-이번-구현검증-결과)에 있다. 운영에는 아직 적용하지 않았으며 R2/R3/R4의 해소를 의미하지 않는다.
 
 R2 추가 조율 사항: 자비스 resolveDuplicates는 page_id+sid 기준으로 여러 문장을 묶어, 같은 출처의 정상적인 서로 다른 record도 conflicts로 분류할 수 있다. metadata 계약 외에 record ID 기반 중복과 실제 사실 충돌의 구분도 자비스 작업에서 해결해야 한다.
+
+
+## 8. 구현 후속 — 공개 응답과 요청 기억 출처
+
+최신 세부 진행은 [구현 원장](IMPLEMENTATION-STATUS.md)에 기록한다. 기존 결함 설명은 수정 전 재현 증거이며 최신 동작은 이 절과 원장을 우선한다.
+
+- R2: 내부 frontmatter 필드 유출을 고쳤다. 추가로 검색의 `wiki/foo`와 저장 metadata의 `foo`가 같은 파일임에도 SOURCE_ID_MISSING으로 거부되는 결함을 확인하고, 경로 동등성이 검증될 때만 공개 ID를 정규화했다. 실제 별도 MCP 프로세스에서 자비스 기존 adapter가 단일 기억을 current로 소비했다. 여러 사실을 같은 sid로 묶는 자비스 측 오판은 미완료다.
+- R3: request remember가 원문 CAS·SourceCite·Vault writer를 사용한다. 동일 후보 재시도와 다른 후보의 동일 내용 출처를 구분하며 여러 줄 기록도 인용한다. 실제 executor의 proved 결과를 runtime backup으로 만들고 독립 경로에서 복원·CAS·페이지 바이트 일치를 확인했다.
+- 추가 연쇄 결함: 정정이 기존 CAS를 제거한 뒤 페이지에 낡은 인용이 남았다. 의도적으로 제거한 CAS에 한해 생존 문장을 effect receipt에 연결된 새 스냅샷으로 재결합했고 remember→correct→export→forget 전 과정의 인용 감사를 추가했다.
+- 전체 527개 통과, 2개 건너뜀. 운영 배포, R4 시간 의미, 실제 자비스 전체 업무 순환, 두 앱의 교차 기억 인수는 아직 남아 있다.

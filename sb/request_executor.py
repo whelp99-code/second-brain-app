@@ -49,6 +49,7 @@ from sb.legacy_requests import LegacyRequestImporterV1
 from sb.provider_lifecycle import ProviderLifecycle
 from sb.provider_observations import ProviderObservationInput, create_provider_observations
 from sb.provider_surface_scanner import ProviderSurfaceLayout
+from sb.remember_page import materialize_remember
 from sb.request_store import (
     PHASES,
     Phase,
@@ -281,27 +282,10 @@ class RequestExecutor:
         )
 
         def materialize(root: Path) -> None:
-            page_id = "wiki/memory-" + content_identity[:16]
-            page = root / f"{page_id}.md"
-            page.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            updated = request.created_at[:10]
-            citation_id = source_identity[:16]
-            text = "\n".join((
-                "---",
-                f"compiled_by: sb/0.1.0|v1|{self.config.provider_release_sha}",
-                f"id: {page_id}",
-                "sensitivity: personal",
-                "sources:",
-                "status: active",
-                "title: Memory record",
-                f"updated: {updated}",
-                "---",
-                f"{content} [^{citation_id}]",
-                f"[^{citation_id}]: memory-candidate:{request.candidate_id}",
-                "",
-            ))
-            _ = page.write_text(text, encoding="utf-8")
-            page.chmod(0o600)
+            materialize_remember(
+                root, content=content, candidate_id=str(request.candidate_id),
+                created_at=request.created_at, release_sha=self.config.provider_release_sha,
+            )
 
         def sealed(generation: Generation) -> None:
             nonlocal lease

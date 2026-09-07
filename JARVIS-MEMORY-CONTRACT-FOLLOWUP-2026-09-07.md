@@ -31,3 +31,14 @@
 하나의 실제 업무 결과를 자비스가 검증하고 저장 요청한다. receipt와 완료 상태를 확인한 뒤 다른 연결부가 같은 record를 회수한다. 같은 출처의 여러 사실, 다음 날 조회, 중복 요청, 정정·삭제, 프로세스 종료, 백업 복원을 포함한다. 운영 데이터의 사용자 내용을 테스트용 고정 fixture에 복제하지 않는다.
 
 이 파일은 합의 요청이며 frozen schema·해시를 변경하지 않았다. 자비스 내부 실행·권한 결함을 Second Brain의 우회 코드로 해결하지 않는다.
+
+
+## 후속 구현 증거 — 2026-09-07
+
+Second Brain `fb47313`, `77f3bad`에서 공개 metadata와 경로가 동등한 논리 page ID 투영을 수정했다. frozen schema 4/계약 해시/도구 수는 그대로다. 인계 문서의 초기 PAGE_MALFORMED는 수정 전 재현이며, 수정 소스 MCP로는 해당 오류가 사라졌다.
+
+별도 managed generation에 실제 Vault로 기록한 한국어 단일 사실을 **기존 자비스 dist transport + read adapter**로 소비하여 `data 1`, `current`, `evidence 1`을 확인했다. mock transport나 adapter 검증 완화는 사용하지 않았다. 운영의 다중 사실/과거 기억은 아직 `conflicts` / `SECOND_BRAIN_RECORD_IDENTITY_INVALID`로 실패한다.
+
+자비스 쪽 다음 변경 지점은 parser의 resolveDuplicates뿐 아니라 `second-brain-read-values.ts`의 집계 중복 키도 포함한다. 양쪽 모두 bound record의 ID/digest를 기준으로 하고, 같은 sid인 서로 다른 사실을 출처 중복만으로 충돌 처리하지 않아야 한다. 시간 계약은 producer valid_until 하루 고정과 consumer 페이지 expiry·record expiry·freshness를 함께 정리해야 한다. 현재 응답 검증을 끄거나 단순히 1일을 임의의 큰 수로 바꾸지 않는다.
+
+요청 기억의 CAS/인용과 정정 이후 출처를 보강했으며 전체 Python 테스트 527개 통과·2개 건너뜀. 아직 운영 배포나 실제 자비스 outbox/settled 인수는 수행하지 않았다. 상세 증거는 [구현 원장](IMPLEMENTATION-STATUS.md)과 `/var/tmp/sb-b1-20260907/`에 있다.

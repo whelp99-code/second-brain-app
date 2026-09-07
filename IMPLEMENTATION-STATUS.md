@@ -6,8 +6,8 @@
 
 | 단위 | 범위 | 상태 | 완료 증거 |
 |---|---|---|---|
-| B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 검증 완료, 기준선 커밋 | 520 passed, 2 skipped; Ruff·diff check 통과 |
-| B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 다음 구현 | 실제 producer → 자비스 adapter, 서명 요청 backup/restore, 오래된 기억 회수 |
+| B0 | 기존 generation/provider 기반 + 운영 복구 + R1 입력 보존 | 완료 | 4da09b9; 520 passed, 2 skipped; Ruff·diff check 통과 |
+| B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 진행 중 | R2 공개 필드/ID 수정, R3 CAS·정정 후 인용 보강. R4 및 자비스 중복 판정 미완료 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 미완료 | 동일 필터 의미, 선택 뒤 limit, 동시 세대 변경 읽기 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | 미완료 | 강제 종료·전환 중 읽기·deadline 내 응답 |
 | B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 미완료 | 독립 클라이언트 A 저장/B 조회, 요청 ID/receipt/record 연결, 범위 검사 |
@@ -28,3 +28,17 @@
 ## 커밋/검증 기록
 
 2026-09-07 KST 기준 작업 재개 시 HEAD `0ef3866`, 기존 대규모 staged provider 구현과 후속 수정이 미커밋 상태였다. 사용자의 변경을 보존한 스냅샷은 `/var/tmp/sb-goal-development-20260907/`에 저장했다. 별도 `phone-history/`, 임시 `2n`, `.bak-*` 파일은 이 개발 단위에서 제외한다.
+
+
+### B1 진행 — 공개 응답·요청 출처 보강
+
+- `fb47313`: MCP 공개 frontmatter를 기존 계약 필드에 투영. 내부 derivation_key와 원본 인용 span 보존.
+- `77f3bad`: 같은 Git 경로로 검증되는 논리 ID/`wiki/` ID만 요청 ID와 일치시킴. 다른 페이지·잘못된 ID는 정상 ID로 위장하지 않음.
+- 요청 remember는 원문 CAS와 8자리 hash 인용을 만들고 Vault를 통해 기록. 동일 후보 재처리는 동일 페이지, 다른 후보의 동일 원문은 출처별 페이지·공유 CAS로 보존.
+- 정정/삭제에서 의도적으로 제거한 CAS를 참조하는 생존 문장은 해당 effect의 새 스냅샷에 연결. 원래부터 누락된 CAS를 정상 출처로 위장하지 않음.
+- 검증: 전체 **527 passed, 2 skipped (119.23초)**, Ruff·diff check 통과. 추가 타입 경고는 수정했고 변경된 Vault/요청 복원 테스트는 **0 errors, 0 warnings**. 기준선의 다른 파일 경고 60개는 I8에 남음.
+- 실프로세스: 독립된 managed generation의 단일 한국어 기억 → 실제 MCP → 수정하지 않은 자비스 transport/read adapter: **data 1 / current / evidence 1**. 내부 derivation_key와 논리 ID가 있는 실제 Vault 산출물을 사용.
+- 운영 데이터 읽기 진단(소스 MCP만 교체): `운영 복구`는 conflicts, `업무`는 RECORD_IDENTITY_INVALID. 자비스 중복 키와 R4 시간 의미가 아직 차단 요인이다.
+- 증거: `/var/tmp/sb-b1-20260907/`. 이번 후속 변경은 소스 검증이며 운영 release 전환은 아직 하지 않았다. 실제 자비스 candidate→outbox→settled 및 두 에이전트 앱 교차 사용은 미완료.
+
+기존 병합 진행 상태는 기준선 커밋 `4da09b9`에서 마무리되었다(부모 `0ef3866`, `b5811d1`). 후속 작업 브랜치는 `codex/shared-memory-completion-20260907`이다. 무관한 미추적 자료는 계속 제외한다.

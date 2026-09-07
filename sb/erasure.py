@@ -21,6 +21,8 @@ from sb.provider_reingress_observations import observe_reingress_guards
 from sb.provider_surface_scanner import scan_provider_surfaces
 from sb.provider_surface_scanner_types import ProviderSurfaceLayout
 from sb.reingress import ErasureError, IngressIdentity, NewVersionAuthority, ReingressGate
+from sb.store.cas import ContentAddressedStore
+from sb.vault import Vault
 
 __all__ = (
     "ErasureEngine",
@@ -78,6 +80,7 @@ class ErasureEngine:
         if request.operation == "export":
             return ()
         removed: list[str] = []
+        erased_hashes: set[str] = set()
         prior_records: list[bytes] = []
         for index, target in enumerate(request.targets):
             page = self._page(root, target.page_id)
@@ -113,8 +116,13 @@ class ErasureEngine:
                 raise ErasureError("SURFACE_SCAN_FAILED") from exc
             if any(prior in body for prior in prior_records):
                 relative = path.relative_to(root).as_posix()
+                if relative.startswith("raw/"):
+                    erased_hashes.add(path.name)
                 path.unlink()
                 removed.append(hashlib.sha256(relative.encode("utf-8")).hexdigest())
+        Vault(root).rebind_erased_sources(
+            str(request.request_id), frozenset(erased_hashes), ContentAddressedStore(root).put,
+        )
         marker_root = root / ".sb" / "memory-effects"
         for target in request.targets:
             marker = {
