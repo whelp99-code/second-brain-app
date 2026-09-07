@@ -5,24 +5,33 @@ from __future__ import annotations
 
 import hashlib
 import re
-import unicodedata
-from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from importlib.resources import files
 from typing import Final
 
 from sb.config import Config
+from sb.conflict_lexical import LEXICAL_FLOOR, LEXICAL_TOP, LexicalMatch, lexical_top
 from sb.contracts import ConflictVerdict, PageSpec, SourceCite, Unit
 from sb.llm import LLMBadJson, LLMClient, LLMUnavailable
 from sb.security import protect_units
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
 from sb.store.ledger import Ledger
 
+__all__ = (
+    "CONTRADICTION_FLOOR",
+    "LEXICAL_FLOOR",
+    "LEXICAL_TOP",
+    "SECTIONS",
+    "SUPERSEDE_FLOOR",
+    "ConflictFinding",
+    "LexicalMatch",
+    "check",
+    "lexical_top",
+)
+
 CONTRADICTION_FLOOR: Final = 0.8
 SUPERSEDE_FLOOR: Final = 0.9
-LEXICAL_FLOOR: Final = 1
-LEXICAL_TOP: Final = 10
 SECTIONS: Final = ("주장A", "주장B", "판정", "status")
 _ROUTES: Final = frozenset({"conflict", "supersede", "note", "unrelated"})
 _STR: Final = re.compile(r'"((?:\\.|[^"\\])*)"')
@@ -39,13 +48,6 @@ type _Pack = tuple[
     Mapping[str, str | None],
     _Evidence,
 ]
-
-
-@dataclass(frozen=True, slots=True)
-class LexicalMatch:
-    left_id: str
-    unit_id: str
-    score: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,71 +164,6 @@ def _pair_sources(pair: LexicalMatch, evidence: _Evidence) -> list[SourceCite]:
 
 def _citation_marks(cites: Sequence[SourceCite]) -> str:
     return "".join(f"[^{cite.sid}]" for cite in cites)
-
-
-def _tokens(text: str) -> tuple[str, ...]:
-    tokens: list[str] = []
-    buf: list[str] = []
-    for char in unicodedata.normalize("NFC", text).casefold():
-        if char.isalnum():
-            buf.append(char)
-        elif buf:
-            tokens.append("".join(buf))
-            buf = []
-    if buf:
-        tokens.append("".join(buf))
-    return tuple(tokens)
-
-
-def lexical_top(units: Sequence[Unit], pages: Sequence[PageSpec]) -> tuple[LexicalMatch, ...]:
-    docs = [(unit.unit_id, _tokens(unit.text)) for unit in units]
-    docs.extend((page.page_id, _tokens(page.body_md)) for page in pages)
-    ids = {unit.unit_id for unit in units}
-    hits = [hit for unit in units for hit in _rank(_tokens(unit.text), docs, unit.unit_id)]
-    hits.sort(key=lambda h: (0 if h.left_id in ids and h.unit_id in ids else 1, -h.score, h.left_id, h.unit_id))
-    seen: set[tuple[str, str]] = set()
-    unique: list[LexicalMatch] = []
-    for hit in hits:
-        pair = (min(hit.left_id, hit.unit_id), max(hit.left_id, hit.unit_id))
-        if pair in seen:
-            continue
-        seen.add(pair)
-        unique.append(hit)
-        if len(unique) == LEXICAL_TOP:
-            break
-    return tuple(unique)
-
-
-def _rank(query: tuple[str, ...], docs: Sequence[tuple[str, tuple[str, ...]]], exclude: str) -> list[LexicalMatch]:
-    keys = list(dict.fromkeys(query))
-    if not keys:
-        return []
-    grouped: dict[str, Counter[str]] = {}
-    ordinals: dict[str, int] = {}
-    df: dict[str, int] = {}
-    count = 0
-    want = set(keys)
-    for ordinal, (doc_id, tokens) in enumerate(docs):
-        if doc_id == exclude:
-            continue
-        count += 1
-        ordinals[doc_id] = ordinal
-        freqs = Counter(tokens)
-        grouped[doc_id] = freqs
-        for token in freqs:
-            if token in want:
-                df[token] = df.get(token, 0) + 1
-    ranked: list[tuple[int, int, str, int]] = []
-    for doc_id, freqs in grouped.items():
-        score = 0
-        for key in keys:
-            tf = freqs.get(key)
-            if tf is not None:
-                score += tf * max(count - df.get(key, 0) + 1, 1)
-        if score >= LEXICAL_FLOOR:
-            ranked.append((-score, ordinals[doc_id], doc_id, score))
-    ranked.sort()
-    return [LexicalMatch(exclude, doc_id, float(score)) for _n, _o, doc_id, score in ranked[:LEXICAL_TOP]]
 
 
 def _stamp(unit: Unit, pages: Sequence[PageSpec]) -> str | None:

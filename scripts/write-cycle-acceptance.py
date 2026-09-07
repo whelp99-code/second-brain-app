@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+import platform
 import shutil
 import sqlite3
 import subprocess
@@ -88,6 +89,8 @@ class Acceptance:
                                   text=True, capture_output=True, check=False)
         self.evidence: dict[str, object] = {"state": "running", "full": full,
             "workspace": str(self.base), "started_at": datetime.now(UTC).isoformat(),
+            "python": sys.version, "platform": platform.platform(), "cpu_count": os.cpu_count(),
+            "load_average_before": os.getloadavg(), "disk_available_before": shutil.disk_usage(self.base).free,
             "target_cycles": self.cycles, "completed_cycles": 0,
             "commit": revision.stdout.strip() if revision.returncode == 0 else None,
             "source_tree_sha256": self.source_hash(),
