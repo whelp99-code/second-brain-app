@@ -59,8 +59,8 @@
 | 연결부 | 공통 조회 | 기록/변경 | 로그 자동 수집 | 자동 문맥 공급 | 현재 증거·다음 검증 |
 |---|---|---|---|---|---|
 | 자비스 | adapter 수정·실제 MCP 회수 검증 | CLI 요청→outbox settled→control completed, 삭제 후 64개 record 재저장 검증 | 자비스 사건/결과 계약 담당, 실제 후보 전체 흐름 미완료 | 공통 context pack 미완료 | 운영 구성·배포와 실제 후보/UI 인수는 남음. [최신 검증](MEMORY-READ-FENCE-INTEGRATION-2026-09-08.md) |
-| Codex | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 구현·R1 회귀 통과, 앱 연결 미검증 | 전용 JSONL 파서·fixture 있음 | 공통 context pack 연동 신규 | 실제 Codex 클라이언트 설정과 읽기/쓰기 재현 필요 |
-| Claude Code | MCP 표준 서버·설정 예시 재사용 가능 | 일반 inbox 경로 구현·R1 회귀 통과, 앱 연결 미검증 | 전용 JSONL 파서·fixture 있음 | 전용 훅 복제 대신 공통 공급 서비스 | 실제 Claude 클라이언트와 Codex 간 교차 회수 필요 |
+| Codex CLI 0.153.4 | 실제 schema5 검색/원문 및 Claude 기억 회수 | 실제 inbox capture·CAS 확인 | 전용 JSONL 파서·fixture 있음; 자동 연결 미검증 | 미완료 | 단일 owner/genesis 격리 인수. GUI·scope·삭제 이후 fence·운영 연결 남음 |
+| Claude Code 2.1.261 | 실제 schema5 검색/원문 및 Codex 기억 회수 | 실제 inbox capture·CAS 확인 | 전용 JSONL 파서·fixture 있음; 자동 연결 미검증 | 미완료 | 실제 CLI 상호 회수 통과. scope·자동 수집/주입·운영 연결 남음 |
 | OpenCode / OMO | MCP 클라이언트별 설정 실측 필요 | 지원 API 프로필 연결 필요 | 각각 파서·fixture 있음 | 미확인 | 사용 클라이언트와 버전을 먼저 확정 |
 | Orca / GJC | 현 실행면·자비스 연결 경로 확인 필요 | 검증 결과는 자비스 경유 원칙 | record/session 파서·fixture 있음 | 미확인 | 기억 접근 지원과 워커 실행 지원을 분리 |
 | 기타 MCP 에이전트 | 프로토콜 호환 후보 | 도구 프로필/권한 지원 범위 확인 | 파서가 없으면 미지원 | 자동 주입은 미지원으로 표시 | 목록에 추가할 때 네 열을 각각 실측 |
@@ -320,3 +320,9 @@ SB `ec2a758`의 여러 줄 정정과 자비스 production lifecycle을 실제 MC
 23절의 unit cap 결함을 실제 신규 unit 계수와 별도 원본 시도 수 상한으로 수정했다. 원본의 일부분을 완료 처리하는 별도 저장 상태는 추가하지 않고, 초과 원본 보존·다음 실행 재개와 오류 안내를 기존 CLI/원장/단일 writer에 연결했다. [예산 계약 및 실제 CLI/대용량 인수](INGEST-BUDGET-CONTRACT-2026-09-08.md).
 
 원본·파생 기억·검색 인덱스의 기존 관계와 자비스 요청 V1/V2/V3 계약은 유지한다. 이번 변경으로 앱별 접근 범위·공통 context pack이나 운영 배포까지 완료된 것은 아니다. I5 신규 행 제한 결함은 소스에서 해소됐으며, 앞서 유지한 B4~B8 전체 순서와 보류 조건은 계속 적용한다.
+
+## 25. 실제 두 client의 공통 기억 인수 — 2026-09-08
+
+[Codex/Claude 실제 CLI 인수](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md)로 SDK 두 프로세스의 간접 증거를 보강했다. 실제 도구 6건과 양방향 검색·원문·generation/record version을 대응했다. 명시적 배치와 결정적 compile fixture를 사용했으며 실제 요약 품질·자동 로그 수집/문맥 주입과 구분한다.
+
+첫 Codex 호출은 승인 설정으로 실패했는데 process exit는 0이었다. native tool status/result 검사로 이를 실패 처리하고, 해당 격리 MCP 도구만 허용한 설정으로 실제 인수를 완료했다. 일반 stdio의 sb_run 오안내도 수정했다. [범위 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md)에 기존 단일 owner fence와 project 분류 결손, 자비스 발급/SB 소비, 정정·삭제·복원·context 경계를 남겼다. 일반 검색 필터를 프로젝트 권한으로 승격하거나 새 SB 승인 엔진을 만드는 방식은 보류한다.

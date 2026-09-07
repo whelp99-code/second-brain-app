@@ -4,7 +4,9 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-최신 구현: [신규 unit 예산과 원본 보존 계약·인수](INGEST-BUDGET-CONTRACT-2026-09-08.md). 파일 수/실제 신규 unit 예산을 분리하고, 전체 예산 초과 원본은 명확한 실패와 함께 보존하며 잔여 예산 초과 원본은 다음 실행에서 처리한다. 실제 관리형 CLI 5 source/53 units·원문 보존·재실행 증가 0 및 5천 원본/10만 unit 구조 부하 재검증 통과. 운영 전환과 B4~B8 전체 인수는 남는다.
+최신 인수: [실제 Codex·Claude 공통 기억](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md). 두 종류의 실제 CLI에서 같은 격리 provider의 양방향 capture→명시적 배치→검색/원문 회수를 확인했다. 성공 도구 6건·source 2개·CAS 원문 일치이며 CLI 종료 0/실패 도구를 구별하는 감사기를 추가했다. 이는 단일 owner/genesis 인수로 scope·자동 수집/주입·운영 전환은 남는다. [접근 범위 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md).
+
+직전 수집 수정: [신규 unit 예산과 원본 보존 계약·인수](INGEST-BUDGET-CONTRACT-2026-09-08.md). 파일 수/실제 신규 unit 예산을 분리하고, 전체 예산 초과 원본은 명확한 실패와 함께 보존하며 잔여 예산 초과 원본은 다음 실행에서 처리한다. 실제 관리형 CLI 5 source/53 units·원문 보존·재실행 증가 0 및 5천 원본/10만 unit 구조 부하 재검증 통과. 운영 전환과 B4~B8 전체 인수는 남는다.
 
 직전 운영 선행 수정: [대용량 인수와 보존/봉인 수정](CAPACITY-ACCEPTANCE-2026-09-08.md). 실제 5,000 원본/100,000 units와 10,000 페이지/1,000 충돌 fixture, 100회 CLI 조회 및 백업·새 경로 복원을 검증했다. 봉인 보존 조회의 쓰기 접근을 수정하고 세대 생성은 59.36→23.78초로 개선했다. unit cap의 파일 수 적용 결함을 추가 재현했으며, 100회 쓰기·운영 부하/한국어 품질과 기존 전체 범위는 남는다.
 
@@ -22,7 +24,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | 복구·LLM 준비 중 동시 조회 소스 검증, 운영 부하/잔여물 미완료 | 실제 reader/writer 강제 종료·PID 재사용·전환 정리, 두 writer·MCP/자비스 동시 조회 확인. 대표 p95·기존 잔여물 인수 남음 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 후보 UI·명령 완료·서명 fence·일반 여러 줄 V3 소스 검증, 운영 전체 인수 미완료 | 원문 검토→승인 실행→저장 준비 브라우저 검증. V3 실제 CLI/MCP의 혼합 4개/일반 LF 64개 record·stored=true. 자동 업무 결과 수집·정정 UI·실제 앱·범위·운영 인수 남음 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 후보 UI·명령 완료·서명 fence·일반 여러 줄 V3 소스 검증, 운영 전체 인수 미완료 | 원문 검토→승인 실행→저장 준비 브라우저 검증. V3 실제 CLI/MCP의 혼합 4개/일반 LF 64개 record·stored=true. 실제 Codex/Claude CLI 양방향 회수 추가. 자동 업무 결과 수집·정정 UI·GUI/다른 앱·범위·운영 인수 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 준비 상태·검증 백업 선행 수정, 운영 인수 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 구조 부하 인수·봉인 병목 수정, 전체 미완료 | 5천 원본/10만 unit/1만 page/1천 conflict·100회 CLI 읽기·백업 복원. unit cap 수정·원본 보존 검증. 100회 쓰기·동시성·한국어 품질 남음 |
@@ -235,3 +237,9 @@ R8/I6의 mtime 기반 백업 정상 오판, 오래된 실행·정체 요청·최
 발견된 `max_new_units_per_run=1`→20 units 저장 결함을 수정했다. 신규 unit과 source 시도 수를 분리하고, `--limit`의 기존 원본 수 의미와 unit 제한을 함께 적용한다. 전체 예산 초과는 원본을 보존한 failed/error 응답, 잔여 예산 초과는 다음 실행에서 재개하는 capped로 처리한다. 부분 unit/source 완료는 보류하며 기존 원자적 원장 및 inbox 완료 경계를 유지한다.
 
 실제 관리형 CLI에서 5 sources/53 units·원문 CAS 일치·재실행 증가 0, 대용량 5천 source/10만 units·100회 CLI 검색·백업 복원 재검증 통과. **전체 638 passed/2 skipped (165.25초)**, Ruff/diff 통과, 타입 오류 0/기존 경고 1. [계약·검사·증거](INGEST-BUDGET-CONTRACT-2026-09-08.md). 운영 cap/배포는 변경하지 않았으며 B4 실제 앱/범위·정정 UI, B5 문맥 공급, B6 운영 전환/DR, B7 100회 쓰기/동시성/한국어 평가 및 B8은 유지한다.
+
+### B4 진행 — 실제 Codex CLI·Claude Code 상호 기억 회수
+
+Codex CLI 0.153.4와 Claude Code 2.1.261의 실제 로그인/모델/MCP 도구로 A 기록→Claude 회수 및 B 기록→새 Codex 회수를 검증했다. 각각 모르는 무작위 답을 원문과 함께 회수했고 search/page 세대와 record ID/digest를 대조했다. source_item 2개, CAS 원문 일치, 성공 MCP 6건. 관련 회귀 22 passed/7.14초. [실행·권한 설정·감사·한계](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md).
+
+검증 서버 compile은 결정적 fixture이며 실제 LLM 요약 품질을 의미하지 않는다. 일반 stdio에 없는 sb_run을 안내하던 README를 수정했다. scope를 일반 검색 필터로 대체하는 방식은 보류하고 [권한/분류 계약 경계](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md)를 기록했다. 실제 GUI·다른 client·삭제 후 일반 agent fence 연결·자동 수집/주입, B4~B8 운영 및 전체 인수는 유지한다.

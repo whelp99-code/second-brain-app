@@ -254,3 +254,9 @@ mtime만으로 backup을 정상 판정하지 않는다. 격리 복원 검증 rec
 실제 관리형 `remember→ingest` CLI에서 cap 1의 큰 원본 보존/작은 원본 처리, 예산 조정 후 복구, 12/12/8의 두 차례 분할 처리 및 재실행 증가 0을 검증했다. 최종 source 5/unit 53·원문 일치·orphan/invalid 0. 5천 source/10만 unit 구조 부하도 명시적 예산으로 재검증했다. [계약·검사·증거·한계](INGEST-BUDGET-CONTRACT-2026-09-08.md).
 
 부분 unit 저장은 별도 완료/보호 계약 없이 활성화하지 않는다. 운영 배포·cap 증대는 하지 않았고 100회 managed 쓰기, 대용량 동시 조회/성장·한국어 품질 및 B4 실제 앱/접근 범위·B5 문맥 공급은 유지한다.
+
+## 20. I1/I7·B4 후속 — 실제 client 간 공유와 범위 계약
+
+Codex CLI 0.153.4와 Claude Code 2.1.261에서 같은 격리 기억 저장소의 양방향 기록·회수를 검증했다. 성공 MCP 6건, source 2개, 원문 CAS 일치와 검색/page의 generation·record ID/digest 일치다. CLI exit 0이면서 도구는 승인 오류로 실패하는 경우를 실제 재현하여, native 이벤트/결과/최종 답변을 대조하는 감사기를 추가했다. [실제 인수 보고서](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md).
+
+README의 일반 stdio sb_run 안내를 실제 노출 도구와 맞췄다. batch/fixture compile·단일 owner/genesis 인수이므로 실제 자동 수집/주입, GUI·다른 client, 삭제 이후 일반 agent fence, 운영 연결은 남는다. project/user/agent 범위는 [구현 전 ADR](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md)의 자비스 발급·SB 소비 및 출처 분류/수명주기를 함께 구현한다. active/reference 검색 필터만으로 접근 격리를 주장하는 구현은 보류한다.

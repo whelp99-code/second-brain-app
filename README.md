@@ -137,16 +137,9 @@ failure_window_hours = 48
 
 자비스의 일반 여러 줄 기억은 명시적 `remember-schema5` 계약과 V3 요청을 사용한다. 기존 프로필은 유지한다. 새 후보 입력·`JARVIS_SECOND_BRAIN_CONTRACT_PROFILE` 설정·실제 검증과 운영 미배포 범위는 [V3 인수 보고서](REMEMBER-V3-ACCEPTANCE-2026-09-08.md)를 따른다.
 
-도구:
+일반 stdio 기본 프로필에는 `sb_search`, `sb_read_page`, `sb_recent_changes`, `sb_open_conflicts`, `sb_remember`, `sb_write_request`의 6개 도구가 있다. `remember-schema5`는 이 6개와 `sb_generation_status`, `sb_request_status`, `sb_resolve_memory_target`의 총 9개를 제공한다. `sb_run`은 desktop용 서버 표면에만 있으며 일반 stdio 목록에는 없다.
 
-```text
-sb_search
-sb_read_page
-sb_recent_changes
-sb_open_conflicts
-sb_remember
-sb_run
-```
+실제 Codex CLI와 Claude Code의 같은 기억 저장소 양방향 기록·회수는 [에이전트 클라이언트 인수 보고서](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md)를 따른다. 이는 단일 소유자·삭제 이전의 격리 프로필 검증이며 프로젝트 접근 격리·자동 수집/문맥 주입·운영 연결을 보장하지 않는다.
 
 Ubuntu 서버에 SSH로 연결하는 맥 MCP 설정 예:
 
@@ -169,11 +162,13 @@ Ubuntu 서버에 SSH로 연결하는 맥 MCP 설정 예:
 }
 ```
 
-즉시 반영이 필요한 AI 흐름:
+기록 후 회수 흐름:
 
 ```text
-sb_remember → sb_run → sb_search → sb_read_page
+sb_remember → 운영 배치 또는 명시적 CLI 처리 → sb_search → sb_read_page
 ```
+
+`sb_remember` 응답은 inbox 접수이다. 일반 stdio 클라이언트는 이 응답만으로 검색 반영 완료를 알 수 없다. 명시적 처리에는 서버의 `sb ingest`와 `sb compile`을 사용하며, 실제 compile에는 설정된 LLM이 필요하다. 자비스의 승인된 쓰기·완료 확인 경로는 V3 인수 보고서의 요청/outbox 계약을 따른다.
 
 ## 데이터 구조
 
