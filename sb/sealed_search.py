@@ -11,6 +11,7 @@ from typing import cast
 
 from sb.effect_values import is_json_object, strict_loads
 from sb.search_errors import GenerationIndexError
+from sb.search_query import LexicalQuery
 
 
 def sealed_rows(root: Path, query: str, limit: int) -> list[tuple[str, str, str, float]]:
@@ -20,7 +21,8 @@ def sealed_rows(root: Path, query: str, limit: int) -> list[tuple[str, str, str,
 
 def iter_sealed_rows(root: Path, query: str) -> Generator[tuple[str, str, str, float], None, None]:
     """Validate the generation binding, then query even one/two character terms."""
-    if not query.strip():
+    parsed = LexicalQuery.parse(query)
+    if not parsed.terms:
         return
     try:
         manifest = strict_loads((root / "generation.json").read_bytes(), 65_536)
@@ -39,21 +41,12 @@ def iter_sealed_rows(root: Path, query: str) -> Generator[tuple[str, str, str, f
             ))
             if row != expected:
                 raise GenerationIndexError
-            term = query.strip()
-            if len(term) < 3:
-                rows = conn.execute(
-                    "SELECT page_id,section,substr(text,1,400),0.0 FROM docs "
-                    + "WHERE instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 "
-                    + "OR instr(lower(section),lower(?))>0 ORDER BY page_id,section,rowid",
-                    (term, term, term),
-                )
-            else:
-                match = '"' + term.replace('"', '""') + '"'
-                rows = conn.execute(
-                    "SELECT page_id,section,snippet(docs,2,'','','...',24),-bm25(docs) "
-                    + "FROM docs WHERE docs MATCH ? ORDER BY bm25(docs),page_id,section,rowid",
-                    (match,),
-                )
+            predicate, params = parsed.predicate()
+            ordering, order_params = parsed.ordering()
+            snippet = "snippet(docs,2,'','','...',24)" if parsed.uses_fts else "substr(text,1,400)"
+            score = "-bm25(docs)" if parsed.uses_fts else "0.0"
+            rows = conn.execute(f"SELECT page_id,section,{snippet},{score} FROM docs "
+                                + f"WHERE {predicate} ORDER BY {ordering}", params + order_params)
             yield from cast(Iterable[tuple[str, str, str, float]], rows)
         finally:
             conn.close()

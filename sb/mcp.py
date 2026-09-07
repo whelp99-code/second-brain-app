@@ -483,6 +483,9 @@ def build_server(
         read_fence: dict[str, JsonValue] | None = None,
     ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
         """Search the pinned compiled wiki, daily briefs, and conflict pages."""
+        from sb.search_query import LexicalQuery
+
+        parsed = LexicalQuery.parse(query)
         with pin_generation() as (current_root, generation):
             current = high_water()
             require_read_fence(read_fence, "memory_read", "read", current)
@@ -506,8 +509,8 @@ def build_server(
                             continue
                         seen_pages.add(hit.page_id)
                         records = records_for_page(current_root, hit.page_id, generation)
-                        for record in records:
-                            if record.record_id in seen_records or query.strip().casefold() not in record.record_text.casefold():
+                        for record in sorted(records, key=lambda record: parsed.record_priority(record.record_text)):
+                            if record.record_id in seen_records or not parsed.matches_record(record.record_text):
                                 continue
                             seen_records.add(record.record_id)
                             results.append({**row, "snippet": record.record_text[:400],

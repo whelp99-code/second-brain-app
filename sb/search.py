@@ -24,6 +24,7 @@ from sb.knowledge_registry import (
     KnowledgeRegistry,
     missing_state,
 )
+from sb.search_query import LexicalQuery
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
@@ -574,13 +575,13 @@ def _lexical(
     scope: str | None = None,
     offset: int = 0,
 ) -> tuple[SearchHit, ...]:
-    stripped = query.strip()
-    if stripped == "" or limit <= 0:
+    parsed = LexicalQuery.parse(query)
+    if not parsed.terms or limit <= 0:
         return ()
-    match = '"' + stripped.replace('"', '""') + '"'
-    short = len(stripped) < 3
-    where = ["(instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 OR instr(lower(section),lower(?))>0)" if short else "docs MATCH ?"]
-    params: list[str | int] = [stripped, stripped, stripped] if short else [match]
+    predicate, query_params = parsed.predicate()
+    ordering, order_params = parsed.ordering()
+    where = [predicate]
+    params: list[str | int] = list(query_params)
     selected_kinds = tuple(dict.fromkeys(kind for kind in (kinds or ()) if kind))
     if selected_kinds:
         where.append("kind IN (" + ",".join("?" for _ in selected_kinds) + ")")
@@ -602,6 +603,7 @@ def _lexical(
         where.append("knowledge_status=?")
         where.append("approval_status=?")
         params.extend((ACTIVE, APPROVED))
+    params.extend(order_params)
     params.append(int(limit))
     params.append(offset)
     sql = (
@@ -609,9 +611,9 @@ def _lexical(
         + "kind, status, knowledge_status, approval_status, canonical, source_ref, "
         + "updated FROM docs WHERE "
         + " AND ".join(where)
-        + " ORDER BY bm25(docs), page_id, section, rowid LIMIT ? OFFSET ?"
+        + f" ORDER BY {ordering} LIMIT ? OFFSET ?"
     )
-    if short:
+    if not parsed.uses_fts:
         sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace("bm25(docs)", "0.0")
     try:
         with _connect(db_path) as conn:
