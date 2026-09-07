@@ -16,6 +16,8 @@ const approvalRollback = process.argv.includes('--approval-rollback');
 const runtimeCli = process.argv.includes('--runtime-cli');
 const afterDelete = process.argv.includes('--after-delete');
 const duringCompile = process.argv.includes('--during-compile');
+const candidateIntake = process.argv.includes('--candidate-intake');
+if (candidateIntake && !ownerConfirmed) throw new Error('--candidate-intake requires --owner-confirmed');
 const dashboardProgress = process.argv.includes('--dashboard-progress');
 if (dashboardProgress && !runtimeCli) throw new Error('--dashboard-progress requires --runtime-cli');
 if (duringCompile && !runtimeCli) throw new Error('--during-compile requires --runtime-cli');
@@ -60,7 +62,7 @@ try {
     ...(recordSet ? {statement:'공통 기억 첫째\u2028  반복 기억  \u0085\u0085반복 기억\u2029사용자 [^deadbeef] 기록'} : {}),
     ...(recordLimit ? {statement:Array(64).fill('a'.repeat(60)).join('\u2028')} : {}),
     ...(sensitive ? {sensitivity:'sensitive'} : {}),
-  }, approvalRollback) : await outboxFixture();
+  }, approvalRollback, candidateIntake) : await outboxFixture();
   transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
   const deleted = afterDelete ? await prepareReadFenceDeletion({load,fixture,transport,provider,now:OUTBOX_NOW}) : undefined;
   const readFence = afterDelete ? createProductionMemoryReadFence(fixture.database.authority) : undefined;
@@ -161,7 +163,7 @@ try {
     } finally { dashboard.close(); }
   }
   const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
-    dashboard_stored:dashboardStored,
+    candidate_intake:candidateIntake,dashboard_stored:dashboardStored,
     runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,after_delete:deleted?.result ?? null,
     during_compile:duringCompile,compile_read_ms:compileReadMs,compile_completed:compiled?.event ?? null,
     approval_rollback_recovered:approvalRollback,

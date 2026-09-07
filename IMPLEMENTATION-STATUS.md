@@ -4,7 +4,9 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-최신 구현: [후보 화면·완료 상태 인수](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md). 인계와 기존 24개 개선 항목을 유지하고 후보 검토·확인/거절·저장 명령 준비·진행 표시를 연결했다. 격리 실제 MCP에서 64개 민감 record 저장·두 클라이언트 재조회와 dashboard `stored=true`를 확인했다. 실제 입력 자동 수집, 앱별 수집/주입·범위와 운영 인수는 미완료다. 이전 코드 대조는 통합 계획 14절, 최신 변경은 15절을 따른다.
+최신 후속: [후보 CLI 접수·원문/DB 원자성](MEMORY-CANDIDATE-INTAKE-2026-09-08.md). 파일 접수부터 owner 확인·실제 MCP 저장/재조회까지 검증했으며 실제 task 결과 자동 수집·approved/no_data 본문 인계는 남는다.
+
+이전 구현: [후보 화면·완료 상태 인수](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md). 인계와 기존 24개 개선 항목을 유지하고 후보 검토·확인/거절·저장 명령 준비·진행 표시를 연결했다. 격리 실제 MCP에서 64개 민감 record 저장·두 클라이언트 재조회와 dashboard `stored=true`를 확인했다. 실제 입력 자동 수집, 앱별 수집/주입·범위와 운영 인수는 미완료다. 이전 코드 대조는 통합 계획 14절, 최신 변경은 15절을 따른다.
 
 | 단위 | 범위 | 상태 | 완료 증거 |
 |---|---|---|---|
@@ -168,3 +170,12 @@ I1-b의 이 소스 결함은 수정됐다. 운영 실행기 outbox 주입과 주
 최종 커밋 기준 `49446db`와 이 단위 소스를 격리하여 build 및 후보/HTTP/동시성 15개 통과. frontend 전체 143개, 관련 회귀 72개·투영 26개·최종 Overview 13개는 일부 중복으로 별도 기록한다. Playwright 1440/375px의 검토→승인 실행→저장 pending→새로고침 유지, 콘솔 오류/serious·critical 접근성 위반/가로 넘침 0. 실제 MCP/CLI 인수는 64개 민감 record·두 클라이언트 current·control completed/outbox settled에 dashboard stored=true까지 확인했다. 독립 재검토 추가 지적 없음.
 
 상세 증거와 잔여는 [인수 보고서](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md). 실제 업무 후보 수집·private 후보 UI·일반 LF/V2 정정·앱별 공유/주입·접근 범위·운영 전환 및 B5~B8은 남는다. 서비스·운영 세대·push는 변경하지 않았다.
+
+
+### B4 진행 — 제품 후보 접수와 원문/DB 시간 일치
+
+자비스 `b89dab6`: `memory classify <input.json> <policy.json>` 제품 진입점과 기존 owner 확인/저장 흐름을 연결했다. 실제 시계에서 원문/DB 해시가 달라지던 결함, commit 전 남은 원문의 재시도 충돌, 부적격 원문 발행과 만료 감사행 제약 충돌을 수정했다. 동일 원문만 제한적으로 복구하며 새 승인 구조나 임의 자동 승인을 만들지 않는다.
+
+CLI 접수에서 시작한 실제 MCP 인수는 민감 기억 64개·두 클라이언트 current·completed/settled/dashboard stored=true, 중복 추가 dispatch 0을 확인했다. 실제 시계의 CLI subprocess 재시도/원문 검토도 통과했다. 관련 37개 및 추가 회귀 123개, backend build·lint·독립 재검토 통과. [보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md).
+
+이번 중 확정된 자비스 task completion `7129b9d`와 기억 verifier authority 연결을 다음에 대조한다. 바로 approved 또는 no_data 후보의 본문 인계, 일반 LF/V2·실제 앱/범위 및 B5~B8과 운영 인수는 남는다.

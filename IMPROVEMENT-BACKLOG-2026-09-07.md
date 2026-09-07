@@ -8,6 +8,8 @@
 
 우선순위: P0는 중앙 기억 쓰기 확대 전에 반드시 해결, P1은 안정 운영 완료 조건, P2는 품질·사용성 확장이다. 근거는 **재현**, **코드 확인**, **검증 공백**, **제안**으로 구분한다. 시간·성능 목표는 달성 실적이 아니라 제안된 완료 기준이다.
 
+최신 후속: [후보 CLI 접수 보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md). 실제 시각의 원문/DB 불일치와 미커밋 원문 재시도 결함을 수정하고 제품 파일 접수에서 실제 저장 순환까지 검증했다. 실제 task 결과 수집과 approved/no_data 본문 인계는 별도 미완료다.
+
 최신 I1 상태: CLI/dashboard outbox·완료·signed fence에 이어 후보 검토·확인/거절·저장 명령 준비·진행 화면을 연결했다. 실제 MCP/HTTP에서 64개 record의 `completed / settled / stored=true`와 두 클라이언트 회수를 확인했다. 실제 업무 후보 수집, private 후보 UI, 일반 LF/V2 정정, 앱별 공유/주입과 운영 배포는 남는다. [후보 UI 인수 보고서](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md), 통합 계획 15절 및 [구현 원장](IMPLEMENTATION-STATUS.md)을 최신 판정으로 삼는다.
 
 

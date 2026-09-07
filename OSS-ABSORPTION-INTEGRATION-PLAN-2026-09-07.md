@@ -253,3 +253,10 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS --owner
 remember 확인 실행기가 correct 경로로 실패하던 결함과 Overview의 비동기 진단 중 정상 외부 DB 변경을 쓰기로 오판하던 결함도 수정했다. 기존 후보·원문·권한·outbox를 재사용했으며 신규 OSS 서버와 frozen MCP 변경은 없다. 변경·회귀 수치·화면 증거·경계는 [후보 UI 인수 보고서](JARVIS-MEMORY-CANDIDATE-UI-2026-09-08.md)를 따른다.
 
 14절 실행 목록 1번의 실제 사용자/업무 결과 후보 수집은 아직 남는다. 자동 요약을 검증된 실행 결과로 취급하지 않는다. 다음 순서는 **실제 후보 수집 → 일반 입력/V2 정정 → 앱별 공통 접근·범위 → 문맥 예산·전달 이력 → 운영 복구·한국어 검색 평가**다. 2~10번의 미완료 판정과 위험 보류는 유지한다. 이번 소스 검증으로 B4 전체나 운영 설치 완료를 선언하지 않는다.
+
+
+## 16. 후보 접수 경로와 실제 시각·재시도 보강
+
+기존 분류기의 제품 호출 부재를 CLI 파일 접수로 연결했다. 같은 writer transaction의 계산으로 원문/DB를 결합하며 권한을 실제 시각으로 재검증하고, 유효한 동일 미커밋 원문만 복구한다. CLI 접수→owner 확인→실제 MCP 저장→64개 record 재조회→dashboard 저장 완료를 검증했다. [후보 접수 보고서](MEMORY-CANDIDATE-INTAKE-2026-09-08.md).
+
+실제 task completion은 자비스 `7129b9d`로 확정돼 해당 source/검증 결합을 다음으로 진행한다. 기존 verified authority를 CLI 주장으로 새로 발행하지 않는다. approved/no_data 본문 인계는 별도 미완료이며 실제 앱 수집/주입·범위와 나머지 B5~B8 순서는 유지한다.

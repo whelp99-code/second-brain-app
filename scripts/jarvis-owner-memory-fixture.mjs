@@ -1,8 +1,9 @@
 // Synthetic owner approval in a fresh JARVIS authority DB; never production authority.
 import {join} from 'node:path';
+import {writeFileSync, readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 
-export async function ownerMemoryFixture(load, now, options = {}, rollback = false) {
+export async function ownerMemoryFixture(load, now, options = {}, rollback = false, intake = false) {
   const {memoryDatabase, closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.js');
   const {inferredMemoryInput, memoryPolicy} = await load('tests/fixtures/memory-candidate-fixture.js');
   const {localKey} = await load('tests/helpers.js');
@@ -21,9 +22,30 @@ export async function ownerMemoryFixture(load, now, options = {}, rollback = fal
       ref.fresh_until = new Date(now.getTime()+3600000).toISOString();
       ref.expires_at = new Date(now.getTime()+86400000).toISOString();
     }
-    const store = new MemoryCandidateStore(database.authority,memoryPolicy(),()=>now);
-    store.attachReviewSpool(review);
-    const candidate = store.classify(input);
+    let candidate;
+    if (intake) {
+      const {execute} = await load('src/cli-runtime.mjs');
+      const {readMemoryCandidate} = await load('src/memory-candidate-reader.js');
+      const file = join(database.root,'candidate-input.json');
+      const policyFile = join(database.root,'candidate-policy.json');
+      const bytes = JSON.stringify(input);
+      writeFileSync(file,bytes,{mode:0o600});
+      writeFileSync(policyFile,JSON.stringify(memoryPolicy()),{mode:0o600});
+      const args = ['memory','classify',file,policyFile,'--db',database.path];
+      const dependencies = {clock:()=>now,memoryOutboxOptions:{candidate_review_spool_root:review,
+        candidate_dispatch_spool_root:dispatchRoot}};
+      const result = await execute(args,dependencies);
+      assert.equal(result.stored,false);
+      assert.equal(result.candidate.state,'awaiting_confirmation');
+      assert.deepEqual(await execute(args,dependencies),result);
+      assert.equal(readFileSync(file,'utf8'),bytes);
+      candidate = readMemoryCandidate(database.authority.db,result.candidate.candidate_id);
+      assert.ok(candidate);
+    } else {
+      const store = new MemoryCandidateStore(database.authority,memoryPolicy(),()=>now);
+      store.attachReviewSpool(review);
+      candidate = store.classify(input);
+    }
     const mutation = new MemoryMutationService({authority:database.authority,clock:()=>now,
       session:createDashboardSession('isolated-owner-acceptance'),
       tokens:new MemoryTokenCache(Buffer.alloc(32,1),()=>now),
