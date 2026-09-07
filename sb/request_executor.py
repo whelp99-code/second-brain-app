@@ -285,6 +285,7 @@ class RequestExecutor:
             materialize_remember(
                 root, content=content, candidate_id=str(request.candidate_id),
                 created_at=request.created_at, release_sha=self.config.provider_release_sha,
+                sensitivity=request.sensitivity,
             )
 
         def sealed(generation: Generation) -> None:

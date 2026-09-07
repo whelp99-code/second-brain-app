@@ -1,6 +1,6 @@
 # 자비스 기억 순환: 실제 프로세스 인수 검사
 
-상태: 격리된 합성 자료의 단일 줄 remember 순환 통과. 운영 진입점·실제 업무 결과·여러 줄 입력까지 완료됐다는 뜻은 아니다.
+상태: 단일 줄 및 Unicode 줄 구분자로 구성한 64개 record의 격리 remember 순환 통과. 최신 검증은 [2026-09-08 결과 대응 계약](REMEMBER-ARTIFACT-CONTRACT-2026-09-08.md)을 따른다. 아래 초기 관측은 이력이며 운영 진입점·실제 업무 결과·일반 LF 입력까지 완료됐다는 뜻은 아니다.
 
 ## 실행 경로
 
@@ -58,8 +58,8 @@ TMPDIR=/var/tmp node scripts/jarvis-memory-acceptance.mjs ../Orca-JARVIS
 |---|---|---|
 | I1-a / P0 | 운영 src에서 MemoryOutboxService 생성이 없고 dashboard/CLI executor는 outbox에 undefined를 전달 | 기존 transport·권한·fence를 사용하는 outbox를 실제 진입점에 구성하고 승인된 요청의 실행을 확인 |
 | I1-b / P0 | 원문 수명·owner-confirmed remember의 권한 연결은 소스 수정 및 실제 프로세스 순환 통과 | 자비스 64b255b/d553327. 바깥 DB rollback 후 metadata 재승인 복구, 운영 정리/layout 연결은 남음 |
-| I1-c / P1 | expected_artifact를 생성하는 운영 경로가 없음 | candidate/request와 provider 결과에 결합된 selector 또는 완료 관측 계약을 만들고 사용자에게 내부 hash 계산을 요구하지 않음 |
-| I1-d / P1 | provider는 여러 줄을 동일 sid의 여러 record로 만들지만 outbox는 한 sid의 digest가 모두 같아야 한다고 검사 | 여러 줄·빈 줄·공백·사용자 footnote 입력의 전체 결과 대응을 검증. 첫 줄만 성공으로 처리 금지 |
+| I1-c / P1 | c7c5182에서 영속 publication/권한 기반 selector 구성기 구현·격리 실제 순환 통과 | runtime/UI 명령 staging 호출에 연결. 사용자에게 내부 hash 계산을 요구하지 않음 |
+| I1-d / P1 | c7c5182의 전체 record 대응과 provider 민감도·입력 한도 보강으로 64개 격리 순환 통과 | 일반 LF 본문 계약은 여전히 미완료. 완료 reader의 record-set-v1 예산을 운영에 명시 주입 |
 | I1-e / P1 | provider 비동기 완료 이후 outbox reconciliation의 운영 호출이 없음 | 기존 주기적 진입점에 연결. 접수만으로 완료 표시하지 않고 재시작·중복·uncertain을 검증 |
 
 이 다섯 항목은 보류할 선택 기능이 아니라 B4 완료 조건이다. 별도 큐 서버나 두 번째 기억 DB를 만들지 않고 기존 자비스 상태기계와 세컨드브레인 단일 writer를 연결한다. source-level 승인 정책을 우회하거나 예전 요청의 서명·digest를 치환하지 않는다.

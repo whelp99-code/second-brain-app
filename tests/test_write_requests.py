@@ -338,3 +338,14 @@ def test_pending_file_is_canonical_private_and_mode_0600(tmp_path: Path) -> None
     assert path.stat().st_mode & 0o777 == 0o600 and path.stat().st_nlink == 1
     assert path.read_bytes().endswith(b"\n") and json.loads(path.read_bytes())["state"] == "pending"
     assert not list(path.parent.glob(".*.tmp"))
+
+
+@pytest.mark.parametrize("content", ["\u2028".join(["a"] * 65), "[^x]" * 800])
+def test_remember_rejects_unreadable_record_sets_without_publishing(tmp_path: Path, content: str) -> None:
+    _queue(tmp_path)
+    request = _request()
+    request["payload"] = {"content": content}
+    _rederive(request)
+    with pytest.raises(WriteRequestRejected):
+        _ = accept_write_request(tmp_path, request, NOW)
+    assert not list((tmp_path / "inbox" / ".requests" / "pending").iterdir())

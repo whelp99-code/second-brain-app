@@ -20,6 +20,7 @@ from sb.contracts import (
     WriteOperation,
 )
 from sb.page_ids import git_rel
+from sb.remember_values import remember_lines
 from sb.vault import PathEscapeError
 
 type JsonValue = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
@@ -226,6 +227,11 @@ def _payload(operation: WriteOperation, raw: JsonValue) -> dict[str, str]:
     expected = {WriteOperation.REMEMBER: {"content"}, WriteOperation.CORRECT: {"content"}, WriteOperation.FORGET: {"disposition"}, WriteOperation.EXPORT: {"format", "scope"}}[operation]
     value = _record(raw, frozenset(expected))
     parsed = {key: _text(item, 4_096) for key, item in value.items()}
+    if operation == WriteOperation.REMEMBER:
+        try:
+            _ = remember_lines(parsed["content"])
+        except ValueError:
+            reject("WRITE_REQUEST_INVALID")
     valid = operation in {WriteOperation.REMEMBER, WriteOperation.CORRECT}
     valid = valid or operation == WriteOperation.FORGET and parsed == {"disposition": "owner_requested"}
     valid = valid or operation == WriteOperation.EXPORT and parsed == {"format": "json", "scope": "subject"}

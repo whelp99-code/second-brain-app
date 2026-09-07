@@ -318,6 +318,9 @@ def read_page_spec(root: Path | str, page_id: str) -> PageSpec | None:
     compiled_by = fields.get("compiled_by")
     lineage = parse_compiled_by(compiled_by) if isinstance(compiled_by, str) else None
     derivation_key = fields.get("derivation_key")
+    sensitivity = fields.get("sensitivity")
+    if sensitivity is not None and (not isinstance(sensitivity, str) or sensitivity not in {"public", "personal", "sensitive", "restricted"}):
+        return None
     return PageSpec(
         page_id,
         title,
@@ -327,6 +330,7 @@ def read_page_spec(root: Path | str, page_id: str) -> PageSpec | None:
         None if lineage is None else lineage[0],
         None if lineage is None else lineage[1],
         derivation_key if isinstance(derivation_key, str) else None,
+        sensitivity if isinstance(sensitivity, str) else None,
     )
 
 
@@ -465,6 +469,8 @@ def _safe_rel(root: Path, rel: Path) -> Path:
 
 
 def _render(page: PageSpec, *, compiled_by: str, updated: str) -> str:
+    if page.sensitivity not in {None, "public", "personal", "sensitive", "restricted"}:
+        raise VaultLintError((f"{page.page_id}: invalid sensitivity",))
     sources: list[dict[str, str | list[str]]] = []
     for cite in page.sources:
         entry: dict[str, str | list[str]] = {
@@ -485,6 +491,8 @@ def _render(page: PageSpec, *, compiled_by: str, updated: str) -> str:
     }
     if page.derivation_key is not None:
         payload["derivation_key"] = page.derivation_key
+    if page.sensitivity is not None:
+        payload["sensitivity"] = page.sensitivity
     dumped = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     definitions = "\n".join(f"[^{cite.sid}]: {cite.origin}" for cite in page.sources)
     body = page.body_md.rstrip()

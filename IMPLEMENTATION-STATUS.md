@@ -10,7 +10,7 @@
 | B1 | R2 public metadata / record 소비, R3 요청 기억 복원, R4 시간 계약 | 소스 구현·검증 완료, 운영 전환 미완료 | 공개 필드/ID·다중 record 소비·CAS 인용·시간 처리 수정. 실제 MCP→자비스 10개 기억 회수. 전체 업무 인수는 B4 |
 | B2 | R5/R7/R9 검색 필터·결과 개수·읽기 세대 고정 | 소스 구현·검증 완료, 운영 미배포 | 필터·원장 read-only 투영, record 선택 뒤 limit, CLI pin. 동시 갱신 성능/복구는 B3에서 검증 |
 | B3 | R6/I3 reader 복구·읽기 가용성 | R6 복구 소스·회귀 검증 완료, 잔여물/지연 미완료 | 실제 reader 강제 종료·PID 재사용·전환 후 정리 재개. I3 지연과 기존 잔여물 복구는 미완료 |
-| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 격리 단일 줄·owner-confirmed remember 통과, 운영 연결·범위 미완료 | 실제 MCP/outbox pending→proved→settled→재조회, 두 번째 프로세스 회수. I1-a/c/d/e, 승인 rollback 복구·실제 앱·프로젝트 범위 남음 |
+| B4 | I1/I7 공통 agent 접근·범위·자비스 전체 순환 | 격리 owner-confirmed 64개 record remember 통과, 운영 연결·범위 미완료 | 전체 결과 selector/검증·민감도·명시 예산 보강. 일반 LF, I1-a/e 및 c 운영 연결, 승인 rollback 복구·실제 앱·프로젝트 범위 남음 |
 | B5 | G1/G3/G4/G6 기억 시간·문맥 예산·전달 이력·검증된 결과 | 미완료 | 정정·compaction·중복 전달·실패 사실 취급 |
 | B6 | R8/I2/I4/I6/G5 readiness·운영 UI·배포·복구 | 미완료 | 실제 서비스·검증 백업·독립 복원·운영 상태 일치 |
 | B7 | I5/G2 부하·한국어 품질·100회 반복, I8 문서/모듈 검증 | 미완료 | 실측 평가·반복·용량·재현 설치 |
@@ -111,3 +111,11 @@ I1-b는 전체 승인 쓰기까지 완료가 아니다. 승인된 inference의 a
 집중 **91 passed / 36 files**, 타입 보정 후 해당 경로 **7 passed**, ESLint·backend build·독립 검토 완료. 실제 분류→합성 owner 승인→별도 MCP→provider proved→outbox settled→두 번째 클라이언트 동일 기억 회수까지 통과했다. 기존 verified fixture 순환도 통과했다. 상세 명령·증거·보류 사유는 [인수 보고서](JARVIS-MEMORY-CYCLE-ACCEPTANCE-2026-09-07.md)에 있다.
 
 원문/권한 경로의 소스 검증과 runtime 배포를 구분한다. 실제 서비스 자동 outbox 생성, selector, 여러 줄, reconciliation, project/user/agent 범위, rollback metadata 복구 및 B3/B5~B8의 미완료 범위는 유지한다.
+
+### B4 진행 — 전체 record 검증·민감도·완료 관측 예산
+
+자비스 `c7c5182`: 영속 publication/권한에서 expected_artifact 명령을 구성하며, canonical remember 결과는 원문 전체와 모든 record의 개수·순서·출처·span·세대·민감도를 대응해 판정한다. Second Brain은 요청 민감도를 Vault에 보존하고 읽을 수 없는 record 묶음을 접수/CAS 쓰기 전에 거부한다. 기본 예산은 유지하고 schema4에 명시적 record-set-v1 완료 관측 프로필을 추가했다.
+
+전체 Python **556 passed, 2 skipped (124.09초)**, 자비스 집중 **287 passed / 32 files (36.09초)**, Ruff·변경 ESLint·backend build·Node 구문 검사 통과. 변경 Python 타입 오류/경고 0, 자비스 독립 검토 완료. 실제 격리 MCP에서 4개 반복/공백/footnote 및 64개 record의 일반·sensitive 입력이 proved→settled→두 클라이언트 회수, replay/추가 dispatch 0, terminal 원문 정리를 통과했다.
+
+기본 64KB 예산으로 64개를 읽으면 AGGREGATE_OVERSIZE로 reconciling에 남고 원문은 유지된다. 운영 완료 reader에 새 프로필을 명시 주입해야 한다. 일반 LF는 V1에서 여전히 거부되므로 일상 여러 줄 입력 완료가 아니다. 상세 재현과 한계는 [결과 대응 계약](REMEMBER-ARTIFACT-CONTRACT-2026-09-08.md)에 기록했다. 운영 자동 구성·주기적 재확인·승인 rollback metadata 복구·V2 정정·프로젝트 범위·실제 앱 검증과 B3/B5~B8은 미완료다.

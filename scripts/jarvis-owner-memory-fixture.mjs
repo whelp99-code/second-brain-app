@@ -1,7 +1,7 @@
 // Synthetic owner approval in a fresh JARVIS authority DB; never production authority.
 import {join} from 'node:path';
 
-export async function ownerMemoryFixture(load, now) {
+export async function ownerMemoryFixture(load, now, options = {}) {
   const {memoryDatabase, closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.js');
   const {inferredMemoryInput, memoryPolicy} = await load('tests/fixtures/memory-candidate-fixture.js');
   const {localKey} = await load('tests/helpers.js');
@@ -14,7 +14,7 @@ export async function ownerMemoryFixture(load, now) {
   try {
     const review = join(database.root,'candidate-review');
     const dispatchRoot = join(database.root,'candidate-dispatch');
-    const input = inferredMemoryInput();
+    const input = inferredMemoryInput(options);
     for (const ref of input.source.references) {
       ref.observed_at = now.toISOString();
       ref.fresh_until = new Date(now.getTime()+3600000).toISOString();

@@ -146,6 +146,7 @@ class PageSpec:
     prompt_version: str | None = None
     model_id: str | None = None
     derivation_key: str | None = None
+    sensitivity: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
