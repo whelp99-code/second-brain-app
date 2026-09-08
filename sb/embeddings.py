@@ -5,16 +5,20 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import subprocess
 import sys
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Protocol, override
+from typing import Final, Protocol, TextIO
 
 from sb.config import load_config
-from sb.search import committed_paths, committed_text
+from sb.search import committed_paths, committed_text, git_run
+from sb.vector_rebuild import EmbeddingUnavailable as EmbeddingUnavailable  # noqa: PLC0414
+from sb.vector_rebuild import publish_vectors
 
 VECTOR_DIM: Final = 1024
 DEFAULT_MODEL_ID: Final = "BAAI/bge-m3"
@@ -31,25 +35,6 @@ _ENCODE_SCRIPT: Final = (
     "for row in m.encode(json.load(sys.stdin), normalize_embeddings=True):\n"
     " print(','.join(str(float(x)) for x in row))\n"
 )
-_SCHEMA: Final = (
-    "DROP TABLE IF EXISTS knn_out;DROP TABLE IF EXISTS vec_chunks;"
-    "DROP TABLE IF EXISTS chunks;DROP TABLE IF EXISTS embedding_meta;"
-    "CREATE TABLE embedding_meta(embedding_model_id TEXT NOT NULL,"
-    " revision TEXT NOT NULL, dim INTEGER NOT NULL);"
-    "CREATE TABLE chunks(id INTEGER PRIMARY KEY, page_id TEXT NOT NULL, "
-    "section TEXT NOT NULL, text TEXT NOT NULL, content_hash TEXT NOT NULL, "
-    "deriv_key TEXT NOT NULL);CREATE VIRTUAL TABLE vec_chunks USING vec0("
-    "embedding float[1024] distance_metric=cosine);"
-)
-
-
-@dataclass(frozen=True, slots=True)
-class EmbeddingUnavailable(Exception):
-    reason: str
-
-    @override
-    def __str__(self) -> str:
-        return self.reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +112,20 @@ def run_vec_sql(path: Path, sql: str, *, read_only: bool = False) -> str:
     return done.stdout
 
 
+def run_vec_script(path: Path, script: TextIO, *, lock_fd: int) -> None:
+    """Execute a generated ASCII SQL stream; callers hex-encode all text values."""
+    cli, ext = _vec_cli(), _vec0_path()
+    if cli is None or ext is None:
+        raise EmbeddingUnavailable("sqlite-vec missing")
+    _ = script.seek(0)
+    done = subprocess.run(
+        [cli, "-batch", "-bail", str(path), f".load {ext}", ".read /dev/stdin"],
+        stdin=script, capture_output=True, text=True, check=False, pass_fds=(lock_fd,),
+    )
+    if done.returncode != 0:
+        raise EmbeddingUnavailable(done.stderr.strip() or "vec rebuild failed")
+
+
 def _env_identity() -> ModelIdentity:
     return ModelIdentity(
         os.environ.get("SB_EMBED_MODEL", DEFAULT_MODEL_ID),
@@ -153,32 +152,77 @@ def warmup() -> ModelIdentity:
     return ModelIdentity(identity.model_id, revision, VECTOR_DIM)
 
 
+_SCHEMA = (
+    "BEGIN;CREATE TABLE embedding_meta(embedding_model_id TEXT NOT NULL,"
+    "revision TEXT NOT NULL,dim INTEGER NOT NULL,git_head TEXT NOT NULL);"
+    "CREATE TABLE chunks(id INTEGER PRIMARY KEY,page_id TEXT NOT NULL,"
+    "section TEXT NOT NULL,text TEXT NOT NULL,content_hash TEXT NOT NULL,"
+    "deriv_key TEXT NOT NULL);CREATE VIRTUAL TABLE vec_chunks USING vec0("
+    "embedding float[1024] distance_metric=cosine);\n"
+)
+
+
+def _text(value: str) -> str:
+    # sqlite3's stdin parser normalizes CRLF, including inside string literals.
+    # ASCII hex also prevents user content from becoming CLI dot commands.
+    return "CAST(X'" + value.encode("utf-8").hex() + "' AS TEXT)"
+
+
+def _head(root: Path) -> str:
+    value = git_run(root, "rev-parse", "--verify", "HEAD^{commit}")
+    if value is None:
+        raise EmbeddingUnavailable("committed embedding source unavailable")
+    return value.strip()
+
+
+def _write_script(script: TextIO, chunks: tuple[tuple[str, str, str, str], ...],
+                  vectors: tuple[tuple[float, ...], ...], identity: ModelIdentity,
+                  head: str) -> None:
+    if len(vectors) != len(chunks):
+        raise EmbeddingUnavailable("embedding result count mismatch")
+    _ = script.write(_SCHEMA + "INSERT INTO embedding_meta VALUES ("
+                     + f"{_text(identity.model_id)},{_text(identity.revision)},"
+                     + f"{identity.dim},{_text(head)});\n")
+    for index, ((page, section, body, digest), vector) in enumerate(
+        zip(chunks, vectors, strict=True), start=1,
+    ):
+        if (len(vector) != identity.dim or not all(math.isfinite(v) for v in vector)
+            or not 1.1754943508222875e-38 <= sum(v * v for v in vector) <= 3.4028234663852886e38):
+            raise EmbeddingUnavailable("invalid embedding vector")
+        key = embedding_deriv_key(ChunkRef(page, section, digest), identity)
+        _ = script.write(f"INSERT INTO chunks VALUES ({index},"
+                         + ",".join(_text(v) for v in (page, section, body, digest, key))
+                         + ");\nINSERT INTO vec_chunks(rowid,embedding) VALUES ("
+                         + f"{index},{_text('[' + ','.join(format(v, '.9g') for v in vector) + ']')});\n")
+    _ = script.write("COMMIT;\n")
+    script.flush()
+
+
 def rebuild(vault_root: Path, *, encoder: Encoder | None = None) -> int:
+    root = Path(vault_root)
     enc = encoder if encoder is not None else resolve_encoder()
     if enc.identity.dim != VECTOR_DIM or not sqlite_vec_available():
         raise EmbeddingUnavailable("sqlite-vec 1024-d store unavailable")
-    path = vectors_path(vault_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.is_file():
-        path.unlink()
-    chunks = _collect(vault_root)
-    vectors = enc.encode(tuple(item[2] for item in chunks)) if chunks else ()
-    ident = enc.identity
-    parts = [
-        _SCHEMA,
-        "INSERT INTO embedding_meta VALUES ("
-        + f"{_quote(ident.model_id)},{_quote(ident.revision)},{ident.dim});",
-    ]
-    for index, (page_id, section, text, digest) in enumerate(chunks, start=1):
-        key = embedding_deriv_key(ChunkRef(page_id, section, digest), ident)
-        literal = _quote(_vec_literal(vectors[index - 1]))
-        parts.append(
-            f"INSERT INTO chunks VALUES ({index},{_quote(page_id)},{_quote(section)},"
-            + f"{_quote(text)},{_quote(digest)},{_quote(key)});"
-        )
-        parts.append(f"INSERT INTO vec_chunks(rowid, embedding) VALUES ({index},{literal});")
-    _ = run_vec_sql(path, "\n".join(parts))
-    return len(chunks)
+
+    def build(staging: Path, lock_fd: int) -> int:
+        head, identity = _head(root), enc.identity
+        chunks = collect_chunks(root, revision=head)
+        vectors = enc.encode(tuple(item[2] for item in chunks)) if chunks else ()
+        if enc.identity != identity:
+            raise EmbeddingUnavailable("embedding identity changed during rebuild")
+        with tempfile.TemporaryFile(mode="w+", encoding="ascii", dir=staging.parent) as script:
+            _write_script(script, chunks, vectors, identity, head)
+            run_vec_script(staging, script, lock_fd=lock_fd)
+        check = run_vec_sql(staging, ("PRAGMA quick_check;SELECT "
+                            "(SELECT count(*) FROM chunks),"
+                            "(SELECT count(*) FROM vec_chunks);"), read_only=True)
+        if check != f"ok\x1e{len(chunks)}\x1f{len(chunks)}\x1e":
+            raise EmbeddingUnavailable("vector database validation failed")
+        if _head(root) != head:
+            raise EmbeddingUnavailable("committed source changed during rebuild; retry")
+        return len(chunks)
+
+    return publish_vectors(root, build)
 
 
 def read_identity(vault_root: Path) -> ModelIdentity | None:
@@ -215,12 +259,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 2
 
 
-def _collect(vault_root: Path) -> tuple[tuple[str, str, str, str], ...]:
+def collect_chunks(vault_root: Path, *, revision: str = "HEAD") -> tuple[tuple[str, str, str, str], ...]:
     found: list[tuple[str, str, str, str]] = []
-    for rel in committed_paths(vault_root, _PREFIXES):
-        text = committed_text(vault_root, rel)
+    try:
+        paths = committed_paths(vault_root, _PREFIXES, revision=revision, required=True)
+    except ValueError as exc:
+        raise EmbeddingUnavailable("committed embedding paths unavailable") from exc
+    for rel in paths:
+        text = committed_text(vault_root, rel, revision=revision)
         if text is None:
-            continue
+            raise EmbeddingUnavailable("committed embedding source unavailable")
         page_id = rel.removesuffix(".md")
         for section, body in _sections(text):
             found.append((page_id, section, body, hashlib.sha256(body.encode()).hexdigest()))
@@ -263,14 +311,6 @@ def _sections(text: str) -> tuple[tuple[str, str], ...]:
     if chunk:
         parts.append((name, chunk))
     return tuple(parts)
-
-
-def _quote(text: str):
-    return "'" + text.replace("'", "''") + "'"
-
-
-def _vec_literal(vector: Sequence[float]) -> str:
-    return "[" + ",".join(format(value, ".9g") for value in vector) + "]"
 
 
 def _vec0_path() -> Path | None:
