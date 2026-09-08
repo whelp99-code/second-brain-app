@@ -68,6 +68,16 @@ try {
     .replace(`session = "${previous}"`, `session = "${sessionId}"`), { mode: 0o600 });
   const headers = { ...identity, Origin: FIXTURE_ORIGIN, Cookie: `__Host-jarvis-phone=${cookie}`,
     'X-JARVIS-CSRF': csrf, 'Content-Type': 'application/json; charset=utf-8' };
+  const capabilities = await request(`${base}/api/v1/memory/context/capabilities`, { headers });
+  assert.equal(capabilities.statusCode, 200);
+  const supported = await capabilities.body.json();
+  assert.equal(supported.configured, true); assert.equal(supported.writes_supported, false);
+  assert.deepEqual(supported.supported_operations, ['context']);
+  assert.equal(supported.readiness, 'not_checked');
+  const forbiddenWrite = await request(`${base}/api/v1/memory/remember`, { method: 'POST', headers,
+    body: JSON.stringify({ schema_version: 1, content: 'must-not-write' }) });
+  assert.equal(forbiddenWrite.statusCode, 404); await forbiddenWrite.body.text();
+  assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/remember'));
   const call = (extra = {}, selected = headers) => request(`${base}/api/v1/memory/context`, {
     method: 'POST', headers: selected,
     body: JSON.stringify({ schema_version: 1, query: 'Cited', limit: 8, max_bytes: 32768, ...extra }),
@@ -154,6 +164,7 @@ try {
   assert.ok(String(expired.headers['set-cookie']).includes('Max-Age=0'));
   assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/context'));
   process.stdout.write(JSON.stringify({ agent_policy_new_sessions_without_policy_edits: 2,
+    capabilities_verified: true, unsupported_write_http_status: forbiddenWrite.statusCode,
     independent_agent_shared_records_equal: true, restricted_peer_records: isolatedContext.records.length,
     original_agent_records_after_peer_restriction: 2,
     agent_policy_withdrawal_denied: true, cli_activation_parsed: true, records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
