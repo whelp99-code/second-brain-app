@@ -37,6 +37,7 @@ try {
   assert.equal(prepared.payload.content, f.request.payload.content);
   assert.deepEqual(memoryTableCounts(authority), before);
   let writePolicyPreparation = null;
+  let scopedRequest = null;
   if (process.argv.includes("--write-policy")) {
     const { writeFileSync } = await import("node:fs");
     const { createFileMemoryWriteScopeResolver, createFileMemoryAccessScopeResolver } = await load("src/memory-access-policy.js");
@@ -53,6 +54,13 @@ try {
     const check = () => prepareMemoryScopedWriteWithPolicy(authority, proposal, command.request_id, dispatch, resolve, now);
     save(policy);
     const result = check(); assert.deepEqual(result.preparation, prepared);
+    if (process.argv.includes("--write-request")) {
+      const { prepareMemoryScopedWriteRequest } = await load("src/memory-scoped-write-request.js");
+      scopedRequest = prepareMemoryScopedWriteRequest(authority, proposal, command.request_id, dispatch, resolve, "provider:fixture", now);
+      assert.deepEqual(prepareMemoryScopedWriteRequest(authority, proposal, command.request_id, dispatch, resolve, "provider:fixture", now), scopedRequest);
+      assert.throws(() => prepareMemoryScopedWriteRequest(authority, proposal, command.request_id, dispatch, resolve, "provider:other", now),
+        error => error.code === "MEMORY_SCOPED_REQUEST_PROVIDER_MISMATCH");
+    }
     assert.equal(result.valid_until, session.expires_at);
     assert.equal(read(now, { method: "sb_write_request", arguments: {} }), undefined);
     assert.ok(read(now, { method: "sb_search", arguments: {} }));
@@ -101,6 +109,7 @@ try {
     ...(process.argv.includes("--include-preparation") ? { preparation: prepared } : {}),
     expiredUnusedCleanup,
     writePolicyPreparation,
+    ...(scopedRequest === null ? {} : { scoped_request: scopedRequest }),
     private_spool_payload_equal: true, preparation_table_counts_unchanged: true,
     signed_scope_review_still_valid: true, revoked_source_preparation_rejected: true,
     provider_write_calls: f.writer?.calls.length ?? null, scoped_write_completed: false,

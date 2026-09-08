@@ -27,7 +27,7 @@ try {
   const dispatch = { dispatch_spool_digest: control.get(f.commandId).args.dispatch_spool_digest,
     roots: { review: join(f.database.root, 'candidate-review'), dispatch: join(f.database.root, 'candidate-dispatch') } };
   const scope = () => ({ principal_id: 'principal:owner', agent_id: 'agent:fixture', session_id: 'session:fixture',
-    method: 'sb_write_request', projects: ['project:a'], policy_revision: 'policy:1', valid_until: until });
+    provider_instance_id: 'provider:fixture', method: 'sb_write_request', projects: ['project:a'], policy_revision: 'policy:1', valid_until: until });
   const prepare = () => prepareMemoryScopedWriteWithPolicy(authority, proposal, command.request_id, dispatch, scope, now);
   assert.equal(prepare().writes_authorized, false);
   const saga = f.service.enqueue(claimAction(f)); const before = memoryTableCounts(authority);

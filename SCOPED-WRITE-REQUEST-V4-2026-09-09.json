@@ -1,0 +1,30 @@
+{
+  "fixture": true,
+  "independent_read_processes": 3,
+  "read_results": [
+    {
+      "records": 4,
+      "source_refs": [
+        "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4"
+      ],
+      "page_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6"
+    },
+    {
+      "records": 4,
+      "source_refs": [
+        "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4"
+      ],
+      "page_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6"
+    },
+    {
+      "denied": "MEMORY_ACCESS_DENIED"
+    }
+  ],
+  "source_bytes": 51,
+  "mcp_write_completed": false,
+  "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+  "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+  "idempotency_key": "memidem:scoped:v4:39d170dad9f6a58395aea309cde8d6abfe442c3d85ee302fb8774e754887d90d",
+  "provider_instance_id": "provider:fixture",
+  "codec_validated": true
+}
