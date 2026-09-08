@@ -56,16 +56,17 @@ try {
       launcherPath: body.transport.launcher, configPath: body.transport.config, contractPath: body.transport.contract });
     let withdrawAfterResponse = false;
     let substituteEmptyGeneration = false;
-    const client = createMemoryScopedClient({ issue, profile,
-      status_issue: createProductionMemoryAccessClaim(db.authority, config, resolve, "memory_status"), now: () => new Date(body.issued_at),
-      transport: { call: async (...args) => {
+    const monitoredTransport = { call: async (...args) => {
         const outcome = await transport.call(...args);
         if (withdrawAfterResponse) writeFileSync(policyPath, JSON.stringify({ ...policy, sessions: [] }));
         if (substituteEmptyGeneration && outcome.kind === 'data' && Array.isArray(outcome.value.results)
           && outcome.value.results.length === 0) return { kind: 'data', value: { ...outcome.value,
             generation_id: 'sbgen:v1:' + '0'.repeat(64) } };
         return outcome;
-      }, restart: () => transport.restart(), close: () => transport.close(), diagnostics: () => transport.diagnostics() },
+      }, restart: () => transport.restart(), close: () => transport.close(), diagnostics: () => transport.diagnostics() };
+    const client = createMemoryScopedClient({ issue, profile,
+      status_issue: createProductionMemoryAccessClaim(db.authority, config, resolve, "memory_status"), now: () => new Date(body.issued_at),
+      transport: monitoredTransport,
       budgets: { max_hits: 50, max_excerpt_bytes: 8192, max_total_bytes: 1000000, max_page_bytes: 100000 },
       max_age_ms: 86400000, expiry_ms: 172800000 });
     try {
@@ -80,10 +81,21 @@ try {
       let reader;
       let callbacks = 0;
       if (profile === 'scoped-record-read-v2') {
-        const { createScopedMemoryReference } = await moduleAt('src/memory-scoped-reference.js');
-        const { createMemoryMembership } = await moduleAt('src/memory-membership.js');
-        reader = createScopedMemoryReference(db.authority, { client, membership: createMemoryMembership(Buffer.alloc(32, 7)),
-          clock: () => new Date(body.issued_at), search_limit: 2 });
+        const { createProductionScopedMemory } = await moduleAt('src/memory-scoped-production.js');
+        const projectionPath = join(db.root, 'memory-projection.key');
+        writeFileSync(projectionPath, Buffer.alloc(32, 7), { mode: 0o600 });
+        const productionOptions = { policy_path: policyPath, authenticated_session: sessionSource,
+          read_fence_config: config, projection_key_path: projectionPath, clock: () => new Date(body.issued_at),
+          transport_options: { launcherPath: body.transport.launcher, configPath: body.transport.config,
+            contractPath: body.transport.contract } };
+        const owned = createProductionScopedMemory(db.authority, productionOptions);
+        try {
+          const found = await owned.reader.read('Cited', { max_records: 8, max_record_bytes: 4096, max_bytes: 32768 });
+          if (found.payload.records.length === 0) throw new Error('owned production transport returned no records');
+        } finally { await owned.close(); await owned.close(); }
+        const shared = createProductionScopedMemory(db.authority, { ...productionOptions, transport: monitoredTransport });
+        reader = shared.reader;
+        await shared.close(); // Injected transport remains caller-owned and usable.
         const budgets = { max_records: 8, max_record_bytes: 4096, max_bytes: 32768 };
         const reference = await reader.read('Cited', budgets);
         if (reference.payload.records.length === 0) throw new Error('reference did not contain actual records');
@@ -104,7 +116,7 @@ try {
         substituteEmptyGeneration = false;
         if (!generationDenied) throw new Error('empty generation substitution accepted');
         pendingReference = await reader.read('Cited', budgets);
-        referenceCheck = { records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
+        referenceCheck = { production_factory_owned_and_shared: true, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
       }
       currentCookie = undefined;
       if (reader) {
