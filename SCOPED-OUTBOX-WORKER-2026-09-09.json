@@ -1,0 +1,23 @@
+{
+  "fixture_authority": true,
+  "child_processes": 13,
+  "provider_calls": 0,
+  "scenarios": [
+    {
+      "scenario": "fence-and-ack-loss",
+      "attempts": 1,
+      "outbox_state": "reconciling",
+      "candidate_state": "accepted_unsettled",
+      "foreign_key_errors": 0,
+      "re_dispatch_claims": 0
+    },
+    {
+      "scenario": "transaction-crash",
+      "attempts": 1,
+      "outbox_state": "reconciling",
+      "candidate_state": "accepted_unsettled",
+      "foreign_key_errors": 0,
+      "re_dispatch_claims": 0
+    }
+  ]
+}
