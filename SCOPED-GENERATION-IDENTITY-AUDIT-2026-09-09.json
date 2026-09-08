@@ -1,0 +1,41 @@
+{
+  "fixture": true,
+  "independent_read_processes": 4,
+  "different_access_same_generation": true,
+  "generations": [
+    {
+      "classification_project": "project:a",
+      "generation_id": "sbgen:v1:743656b3e62aa38adbe8588e2a4053a3a49770110d253081b574abbf2a8c338f",
+      "ledger_manifest_digest": "sha256:856d979b39d2c3568547abe795679acb6491adc60801728bb7c9c40a91027173",
+      "reads": {
+        "project:a": {
+          "records": 1,
+          "source_refs": [
+            "sha256:ead656d3726bdb14da00e471d60c9a9325fb47b96ff833fd20ae64b285680f70"
+          ],
+          "page_digest": "sha256:32176a9065a2018aa02d95177c0be39061cb4be1ae840842a91f4a6fe3db17d5"
+        },
+        "project:b": {
+          "denied": "MEMORY_ACCESS_DENIED"
+        }
+      }
+    },
+    {
+      "classification_project": "project:b",
+      "generation_id": "sbgen:v1:743656b3e62aa38adbe8588e2a4053a3a49770110d253081b574abbf2a8c338f",
+      "ledger_manifest_digest": "sha256:856d979b39d2c3568547abe795679acb6491adc60801728bb7c9c40a91027173",
+      "reads": {
+        "project:a": {
+          "denied": "MEMORY_ACCESS_DENIED"
+        },
+        "project:b": {
+          "records": 1,
+          "source_refs": [
+            "sha256:ead656d3726bdb14da00e471d60c9a9325fb47b96ff833fd20ae64b285680f70"
+          ],
+          "page_digest": "sha256:32176a9065a2018aa02d95177c0be39061cb4be1ae840842a91f4a6fe3db17d5"
+        }
+      }
+    }
+  ]
+}

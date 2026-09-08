@@ -1,5 +1,7 @@
 # 자비스 인계 추가 대조와 구현 우선순위
 
+**2026-09-09 JARVIS `9be13b1` proof 대조·새 P0 발견:** [26검사·독립8프로세스 proof/세대 대조](SCOPED-PROOF-VALIDATION-2026-09-09.md). 별도 [접근 분류 identity 감사](SCOPED-GENERATION-IDENTITY-AUDIT-2026-09-09.md)에서 project:a/b가 같은 generation ID/ledger digest를 생성함을 독립 읽기4건으로 재현. 접근 차단은 각각 정상이며 세대 식별자 결합 결손이다. `proof_consistent`만 반환하고 자동 settled/control completed는 보류. M2/M3/M7/M12 선행 P0 수정·전체 운영 목표는 유지한다.
+
 **2026-09-09 JARVIS `edd850f` 등록 요청 복원·후보 무결성 수정:** [현재 범위/원본 재검사·독립 reader 인수](SCOPED-OUTBOX-READER-2026-09-09.md). queued 상태 누락·최초 분류 해시 불일치 재현 후 수정. 확대64통과·최종18통과(중복), 타입/lint/격리emit, 독립4프로세스에서 본문51bytes 일치·파일 정책/원본 철회 거부. worker lease/전송·공개 계약/영수증·운영 연결은 남는다.
 
 ## 2026-09-09 인계 재대조: 등록 단계 구현 반영

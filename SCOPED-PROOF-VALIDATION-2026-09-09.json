@@ -1,0 +1,43 @@
+{
+  "fixture_authority": true,
+  "python_processes": 4,
+  "consumer_processes": 4,
+  "acknowledgement_loss_exit": 73,
+  "transport": "internal APIs; no public MCP V4 route",
+  "accepted": {
+    "schema_version": 4,
+    "kind": "accepted",
+    "state": "pending",
+    "provider_instance_id": "provider:fixture",
+    "request_id": "memreq:scoped:v4:fd4f54b9ccbca86140895cd6d2970f6711513d30628769b626c0c542acd2468a",
+    "request_digest": "sha256:fd4f54b9ccbca86140895cd6d2970f6711513d30628769b626c0c542acd2468a",
+    "idempotency_key": "memidem:scoped:v4:af4cb8133e02b905e3ac896c6b5d94a9e960c2d5dd10a1a82763014dc1685cf8",
+    "scope_digest": "sha256:ea19a7fbe2d3730416a70a15ed04f7eaadea01ecd74f1c3062d1c17c682a9595",
+    "accepted_at": "2026-08-28T12:00:00.000Z",
+    "inbox_path": "pending/memreq:scoped:v4:fd4f54b9ccbca86140895cd6d2970f6711513d30628769b626c0c542acd2468a.v4.json",
+    "request_file_digest": "sha256:a0e14559afd794cdfe79bb3295aff97048a16920a38b89c5c3bdc77c89866f40",
+    "replayed": false
+  },
+  "recorded": {
+    "kind": "acceptance_recorded",
+    "outbox_id": "memout:scoped:v4:1d818d9ab8873c7b8cae9b9b8f4b4c9e370c716c21cdcd7b039f7174e564b83e",
+    "attempt_id": "memattempt:pos:v2:3d326620df7c7bbc6c23f0b0e250cab9488ccccf3165c1e541a13b37238b93f4",
+    "acceptance_receipt_digest": "sha256:aab89099ea7d97d211f7658916722f4abb2532a21a7eab3385cab62822abd4e9",
+    "replayed": true
+  },
+  "provider_state": "proved",
+  "proof_hashes_and_generation_match": true,
+  "independent_generation": {
+    "provider_instance_id": "provider:fixture",
+    "generation_id": "sbgen:v1:ac6998a0dcf865a049e3004457c03f44db645f2f7c6dbd24c1abd04e58c5355a",
+    "generation_manifest_digest": "sha256:ac6998a0dcf865a049e3004457c03f44db645f2f7c6dbd24c1abd04e58c5355a",
+    "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+    "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+    "tombstone_sequence": 0,
+    "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+  },
+  "wrong_generation_rejected": true,
+  "jarvis_state": "reconciling",
+  "acceptance_events": 1,
+  "foreign_key_errors": 0
+}
