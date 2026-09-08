@@ -13,6 +13,7 @@ from typing import Final, cast
 import sb.embeddings as emb
 from sb.embeddings import EmbeddingUnavailable, Encoder
 from sb.search import SearchHit
+from sb.search_filters import SearchFilters
 
 _LOGGER: Final = logging.getLogger(__name__)
 RRF_K: Final = 60
@@ -113,6 +114,7 @@ def hybrid_search(
     *,
     vault_root: Path | None = None,
     encoder: Encoder | None = None,
+    filters: SearchFilters | None = None,
 ) -> tuple[SearchHit, ...]:
     """Cosine retrieve + RRF. Missing deps/model/vectors warn and return lexical."""
     try:
@@ -122,7 +124,9 @@ def hybrid_search(
         if not emb.vectors_path(root).is_file():
             raise EmbeddingUnavailable("vectors missing")
         enc = encoder if encoder is not None else emb.resolve_encoder()
-        cosine = query_cosine(root, query, limit, encoder=enc)
+        from sb.filtered_vectors import query_filtered_cosine
+
+        cosine = query_filtered_cosine(root, query, limit, encoder=enc, filters=filters or SearchFilters())
     except (EmbeddingUnavailable, ImportError, OSError):
         _LOGGER.warning("vector retrieval unavailable; using lexical results")
         return lexical_results

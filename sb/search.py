@@ -24,6 +24,7 @@ from sb.knowledge_registry import (
     KnowledgeRegistry,
     missing_state,
 )
+from sb.search_filters import SearchFilters
 from sb.search_query import LexicalQuery
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -114,6 +115,7 @@ class HybridModule(Protocol):
         limit: int,
         *,
         vault_root: Path | None = None,
+        filters: SearchFilters | None = None,
     ) -> Sequence[SearchHit]: ...
 
 
@@ -232,7 +234,8 @@ class SearchIndex:
         )
         if not _wants_hybrid(self.hybrid):
             return hits
-        return _hybrid_or_lexical(hits, query, limit, root)
+        return _hybrid_or_lexical(hits, query, limit, root,
+                                  SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope))
 
     def iter_lexical_hits(
         self, query: str, *, kinds: Sequence[str] | None = None,
@@ -584,27 +587,9 @@ def _lexical(
     ordering, order_params = parsed.ordering()
     where = [predicate]
     params: list[str | int] = list(query_params)
-    selected_kinds = tuple(dict.fromkeys(kind for kind in (kinds or ()) if kind))
-    if selected_kinds:
-        where.append("kind IN (" + ",".join("?" for _ in selected_kinds) + ")")
-        params.extend(selected_kinds)
-    if status:
-        where.append("status=?")
-        params.append(status)
-    if updated_from:
-        where.append("updated>=?")
-        params.append(updated_from)
-    if updated_to:
-        where.append("updated<=?")
-        params.append(updated_to)
-    chosen = _normalize_scope(scope)
-    if chosen == _CANDIDATE_SCOPE:
-        where.append("knowledge_status=?")
-        params.append(CANDIDATE)
-    elif chosen != _REFERENCE_SCOPE:
-        where.append("knowledge_status=?")
-        where.append("approval_status=?")
-        params.extend((ACTIVE, APPROVED))
+    metadata, metadata_params = SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope).predicate()
+    where.append(metadata)
+    params.extend(metadata_params)
     params.extend(order_params)
     params.append(int(limit))
     params.append(offset)
@@ -688,7 +673,7 @@ def _hybrid_from_config() -> bool:
 
 
 def _hybrid_or_lexical(
-    hits: tuple[SearchHit, ...], query: str, limit: int, root: Path
+    hits: tuple[SearchHit, ...], query: str, limit: int, root: Path, filters: SearchFilters
 ) -> tuple[SearchHit, ...]:
     try:
         module = importlib.import_module("sb.hybrid_search")
@@ -696,7 +681,7 @@ def _hybrid_or_lexical(
         _LOGGER.warning("hybrid search unavailable; using lexical results")
         return hits
     if isinstance(module, HybridModule):
-        return tuple(module.hybrid_search(hits, query, limit, vault_root=root))
+        return tuple(module.hybrid_search(hits, query, limit, vault_root=root, filters=filters))
     _LOGGER.warning("hybrid search unavailable; using lexical results")
     return hits
 
