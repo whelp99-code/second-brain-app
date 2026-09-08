@@ -1,0 +1,53 @@
+{
+  "before": {
+    "fixture_material": true,
+    "unfixed": true,
+    "processes": 3,
+    "crash_exit": 73,
+    "link_count_before": 2,
+    "reader_before": {
+      "error": "MEMORY_SPOOL_FILE_INVALID"
+    },
+    "retry": {
+      "error": "MEMORY_SPOOL_FILE_INVALID"
+    },
+    "link_count_after": 2,
+    "same_inode_and_bytes": true,
+    "provider_calls": 0,
+    "approval_consumed": false
+  },
+  "after": {
+    "fixture_material": true,
+    "unfixed": false,
+    "processes": 3,
+    "crash_exit": 73,
+    "link_count_before": 2,
+    "reader_before": {
+      "error": "MEMORY_SPOOL_FILE_INVALID"
+    },
+    "retry": {
+      "created": false,
+      "request_match": true
+    },
+    "link_count_after": 1,
+    "same_inode_and_bytes": true,
+    "provider_calls": 0,
+    "approval_consumed": false
+  },
+  "normal": {
+    "fixture_material": true,
+    "processes": 3,
+    "publication_exit": 73,
+    "replay": {
+      "created": false,
+      "request_match": true,
+      "body_match": true,
+      "same_inode": true,
+      "file_mode": 384
+    },
+    "fifo": "MEMORY_SPOOL_FILE_INVALID",
+    "provider_calls": 0,
+    "approval_consumed": false,
+    "outbox_enqueued": false
+  }
+}

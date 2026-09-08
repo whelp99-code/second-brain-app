@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `65f1e15` 발행 중단 복구:** [실제 hardlink 직후 종료·새 프로세스 재시도](SCOPED-SPOOL-CRASH-RECOVERY-2026-09-09.md). 관련19통과·타입/lint/격리emit, 전후6프로세스에서 link2 거부→동일 bytes/inode/link1 복구. live/불명 link 거부 유지. 단독 임시 파일·삭제 수명·승인 소비/outbox/운영 연결은 남는다.
+
 **2026-09-09 JARVIS `a158052` v4 private 자료 저장:** [제한 reader·재발행·독립 프로세스 인수](SCOPED-WRITE-SPOOL-2026-09-09.md). 관련36통과·타입/lint/격리emit, 실제 publish exit73→새 reader/동일 inode 재사용·FIFO 거부. 승인 소비/outbox 연결·orphan/삭제 수명·운영 권한은 남는다.
 
 **2026-09-09 JARVIS `9bc5976` v4 자료 검증:** [생성기 연결·Node/Python codec 대조](SCOPED-CODEC-PARITY-2026-09-09.md). J18/SB29통과·타입/lint/격리emit, 별도 프로세스13건 판정·정상 bytes 일치. 승인 단일 소비·outbox 확정·공개 계약과 실제 운영 권한 연결은 남는다.
