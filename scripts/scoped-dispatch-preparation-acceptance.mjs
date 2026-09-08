@@ -44,8 +44,30 @@ try {
     error => error.code === "MEMORY_SCOPED_SOURCE_AUTHORITY_INVALID");
   assert.deepEqual(memoryTableCounts(authority), afterRevocation);
   if (f.writer) assert.equal(f.writer.calls.length, 0);
+  let expiredUnusedCleanup = null;
+  if (process.argv.includes('--expire-unused')) {
+    const { MemoryOutboxService } = await load('src/memory-outbox.js');
+    const { MemoryCandidateReviewSpool } = await load('src/memory-candidate-review-spool.js');
+    const spool = new MemoryCandidateReviewSpool(dispatch.roots.review);
+    const beforeFiles = spool.paths().length;
+    let providerCalls = 0;
+    const unexpected = async () => { providerCalls++; throw new Error('unexpected provider call'); };
+    const service = new MemoryOutboxService({ authority, clock: () => new Date(candidate.candidate_expires_at),
+      candidate_review_spool_root: dispatch.roots.review, candidate_dispatch_spool_root: dispatch.roots.dispatch,
+      writer: { write: unexpected }, reader: { search: unexpected, readPage: unexpected,
+        recentChanges: unexpected, openConflicts: unexpected } });
+    const cycle = await service.reconcileOnce('expiry-fixture', 1);
+    assert.equal(cycle.cleanup_error, undefined);
+    assert.equal(beforeFiles, 1); assert.equal(spool.paths().length, 0);
+    assert.deepEqual(readMemoryCandidate(authority.db, candidate.candidate_id), candidate);
+    assert.deepEqual(memoryTableCounts(authority), afterRevocation);
+    assert.equal(providerCalls, 0);
+    expiredUnusedCleanup = { before_files: beforeFiles, after_files: spool.paths().length,
+      classification_unchanged: true, ledger_counts_unchanged: true, provider_calls: providerCalls };
+  }
   process.stdout.write(JSON.stringify({ fixture: true, prior_request_schema: f.request.schema_version,
     cli_published: f.cli_published === true,
+    expiredUnusedCleanup,
     private_spool_payload_equal: true, preparation_table_counts_unchanged: true,
     signed_scope_review_still_valid: true, revoked_source_preparation_rejected: true,
     provider_write_calls: f.writer?.calls.length ?? null, scoped_write_completed: false,
