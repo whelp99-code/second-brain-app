@@ -18,10 +18,17 @@ class GenerationWriterBusy(BlockingIOError):
 class GenerationWriteLease:
     """Keep writer ownership while changing only the reader exclusion mode."""
 
-    def __init__(self, descriptor: int) -> None:
+    def __init__(self, descriptor: int, writer_descriptor: int) -> None:
         self._descriptor = descriptor
+        self._writer_descriptor = writer_descriptor
         self._preparing = False
         self._closed = False
+
+    @property
+    def child_descriptors(self) -> tuple[int, int]:
+        if self._closed:
+            raise RuntimeError("GENERATION_LOCK_INVALID")
+        return self._writer_descriptor, self._descriptor
 
     @contextmanager
     def preparing(self) -> Generator[None, None, None]:
@@ -61,7 +68,7 @@ def generation_writer(lock_path: Path, *, blocking: bool = True) -> Generator[Ge
             fcntl.flock(descriptor, mode)
         except BlockingIOError as exc:
             raise GenerationWriterBusy("GENERATION_WRITER_BUSY") from exc
-        lease = GenerationWriteLease(descriptor)
+        lease = GenerationWriteLease(descriptor, writer)
         yield lease
     finally:
         if lease is not None:

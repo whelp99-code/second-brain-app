@@ -766,6 +766,7 @@ class GenerationStore:
         mutate: Callable[[Path], None],
         derived_manifests: dict[str, str] | None = None,
         barrier: Callable[[str], None] | None = None,
+        model_pass_fds: tuple[int, ...] = (),
     ) -> Generation:
         emit: Callable[[str], None] = barrier or _no_barrier
         request_key = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
@@ -809,7 +810,7 @@ class GenerationStore:
             content_rows, byte_count = _content_rows(staging)
             pages = _page_rows(staging)
             vector_content = prepare_vectors(staging, pages, parent_root=None if parent is None else parent.root,
-                                             enabled=self.hybrid)
+                                             enabled=self.hybrid, pass_fds=model_pass_fds)
             logical = _logical_derived_digests(
                 pages,
                 head=head,

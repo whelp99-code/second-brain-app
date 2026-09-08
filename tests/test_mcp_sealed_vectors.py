@@ -37,7 +37,8 @@ class _NoPreviousPage:
         return None
 
 
-def runtime_fixture(base: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Config, GenerationMutationService, Generation]:
+def runtime_fixture(base: Path, monkeypatch: pytest.MonkeyPatch, *,
+                    real_encoder: bool = False) -> tuple[Config, GenerationMutationService, Generation]:
     values = {"vault_root": str(base / "share/vault"), "share_root": str(base / "share"),
               "state_root": str(base / "state"), "request_root": str(base / "requests"),
               "export_root": str(base / "exports"), "backup_root": str(base / "backups"),
@@ -47,7 +48,8 @@ def runtime_fixture(base: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Config
     _ = path.write_text("\n".join(key + " = " + json.dumps(value) for key, value in values.items())
                         + "\n[search]\nhybrid = true\n")
     monkeypatch.setenv("SB_CONFIG", str(path))
-    monkeypatch.setattr(embeddings, "resolve_encoder", SemanticEncoder)
+    if not real_encoder:
+        monkeypatch.setattr(embeddings, "resolve_encoder", SemanticEncoder)
     config = load_config(path)
     service = GenerationMutationService.from_config(config)
 

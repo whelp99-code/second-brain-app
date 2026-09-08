@@ -1,6 +1,7 @@
 """Opt-in native MCP/CLI correction, deletion, and restore of sealed semantic records."""
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import json
@@ -31,10 +32,11 @@ from sb.search import SearchIndex
 from tests.task30_effect_factory import effect_request
 from tests.test_mcp_sealed_vectors import runtime_fixture
 
-BOOTSTRAP = """import sys
-from sb import embeddings
-from tests.test_sealed_vectors import SemanticEncoder
-embeddings.resolve_encoder=SemanticEncoder
+BOOTSTRAP = """import os,sys
+if os.environ.get('SB_ACCEPTANCE_REAL_EMBEDDING') != '1':
+    from sb import embeddings
+    from tests.test_sealed_vectors import SemanticEncoder
+    embeddings.resolve_encoder=SemanticEncoder
 mode=sys.argv.pop(1)
 if mode=='mcp':
     from sb.mcp import main
@@ -50,6 +52,9 @@ def product_hash(repository: Path) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    _ = parser.add_argument("--real-model", action="store_true")
+    real_model = cast(bool, parser.parse_args().real_model)
     base = Path(tempfile.mkdtemp(prefix="sb-sealed-vector-"))
     repository = Path(__file__).resolve().parents[1]
     source_hash = product_hash(repository)
@@ -59,7 +64,7 @@ def main() -> None:
     def b64(value: bytes) -> str:
         return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
     with MonkeyPatch.context() as patch:
-        _, service, initial = runtime_fixture(base, patch)
+        _, service, initial = runtime_fixture(base, patch, real_encoder=real_model)
         config_path = base / "config.toml"
         keys = {"provider_signing_key_id": "provider:key", "provider_private_key": b64(key.private_bytes_raw()),
                 "jarvis_signing_key_id": "jarvis:fixture", "jarvis_public_key": b64(key.public_key().public_bytes_raw())}
@@ -67,7 +72,7 @@ def main() -> None:
                                    + "\n" + config_path.read_text())
         config = load_config(config_path)
         env = dict(os.environ, SB_CONFIG=str(config_path), PYTHONPATH=str(repository), TMPDIR=str(base),
-                   SB_MCP_CONTRACT_PROFILE="remember-schema5")
+                   SB_MCP_CONTRACT_PROFILE="remember-schema5", SB_ACCEPTANCE_REAL_EMBEDDING="1" if real_model else "0")
         params = StdioServerParameters(command=sys.executable, args=["-c", BOOTSTRAP, "mcp"], env=env)
         commands: list[dict[str, object]] = []
 
@@ -140,8 +145,9 @@ def main() -> None:
             anyio.run(exercise)
             cli("cli-search", "search", "일정", "--json", "--scope", "reference")
             assert product_hash(repository) == source_hash
-            report.update({"state": "passed", "commands": commands,
-                           "limitations": ["deterministic encoder; not Korean model quality",
+            report.update({"state": "passed", "commands": commands, "real_model": real_model,
+                           "limitations": ["real model lifecycle fixture; not full Korean quality" if real_model
+                                            else "deterministic encoder; not Korean model quality",
                                            "two native MCP processes; queries observe stable mutation boundaries",
                                            "isolated fixture; no operational activation"]})
         except BaseException:

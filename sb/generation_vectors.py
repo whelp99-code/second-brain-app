@@ -138,7 +138,8 @@ def _fill(conn: sqlite3.Connection, previous: sqlite3.Connection | None,
 
 
 def prepare_vectors(root: Path, pages: Sequence[tuple[str, bytes]], *,
-                    parent_root: Path | None, enabled: bool) -> VectorContent | None:
+                    parent_root: Path | None, enabled: bool,
+                    pass_fds: tuple[int, ...] = ()) -> VectorContent | None:
     """Expected encoder unavailability produces a disabled successor, never stale vectors."""
     if not enabled:
         return None
@@ -146,7 +147,7 @@ def prepare_vectors(root: Path, pages: Sequence[tuple[str, bytes]], *,
     previous: sqlite3.Connection | None = None
     created = False
     try:
-        from sb.embeddings import resolve_encoder
+        from sb.embeddings import encoder_session, resolve_encoder
 
         encoder = resolve_encoder()
         identity = encoder.identity
@@ -171,8 +172,8 @@ def prepare_vectors(root: Path, pages: Sequence[tuple[str, bytes]], *,
                     text_digest TEXT NOT NULL,embedding BLOB NOT NULL CHECK(length(embedding)=4096));
                 CREATE INDEX vectors_by_page ON record_vectors(page_id,record_id);
             """)
-            with conn:
-                content = _fill(conn, previous, pages, encoder, identity)
+            with conn, encoder_session(encoder, pass_fds=pass_fds) as session:
+                content = _fill(conn, previous, pages, session, identity)
         finally:
             conn.close()
         return content

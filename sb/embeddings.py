@@ -10,7 +10,8 @@ import os
 import subprocess
 import sys
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol, TextIO
@@ -166,6 +167,18 @@ def resolve_encoder() -> Encoder:
     if not snap.is_dir():
         raise EmbeddingUnavailable("embedding model unavailable")
     return _RemoteEncoder(identity)
+
+
+@contextmanager
+def encoder_session(encoder: Encoder, *, pass_fds: tuple[int, ...] = ()) -> Generator[Encoder, None, None]:
+    """Reuse only the real encoder process during one unpublished generation."""
+    if not isinstance(encoder, _RemoteEncoder):
+        yield encoder
+        return
+    from sb.embedding_session import ModelSession
+
+    with ModelSession(encoder.identity, pass_fds=pass_fds) as session:
+        yield session
 
 
 def warmup() -> ModelIdentity:

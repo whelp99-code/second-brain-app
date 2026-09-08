@@ -249,6 +249,7 @@ class GenerationMutationService:
                     allowed=self._allowed,
                     mutate=staged,
                     barrier=mutation.barrier,
+                    model_pass_fds=writer.child_descriptors,
                 )
             # flock conversion is not an atomic upgrade. The writer mutex
             # serializes current writers; reject an out-of-protocol pointer move.
