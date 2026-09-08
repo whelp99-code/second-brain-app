@@ -126,7 +126,13 @@ try {
     storedResult = { result_digest: result.result_digest, exit_after_record: child.status,
       exact_replay: true, result_rows: 1, current_revocation_rejected: true };
   }
-  process.stdout.write(JSON.stringify({ local_recovery: localRecovery, local_compaction: localCompaction, stored_result: storedResult, node_pid: process.pid, mcp_pids: pids, exit_after_provider_commit: exits[0].code, response_loss: lost,
+  let followup;
+  if (input.dispatch_result) {
+    const { dispatchAfterCancellation } = await import('./cancellation-dispatch-acceptance.mjs');
+    followup = await dispatchAfterCancellation(input, f, moduleAt);
+    cursor = followup.cursor;
+  }
+  process.stdout.write(JSON.stringify({ followup, local_recovery: localRecovery, local_compaction: localCompaction, stored_result: storedResult, node_pid: process.pid, mcp_pids: pids, exit_after_provider_commit: exits[0].code, response_loss: lost,
     no_automatic_write_retry: true, exact_replay_after_restart: true, live_provider_revocation_rejected: true,
     intent_id: accepted.intent_id, original_transport_calls: f.writer.calls.length, spool_preserved: !input.compact_result, cursor }) + "\n");
 } finally { await transport.close(); await f.close(); }

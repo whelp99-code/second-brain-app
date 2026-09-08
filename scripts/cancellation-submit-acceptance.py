@@ -19,13 +19,13 @@ from tests.task30_effect_factory import effect_request
 from tests.test_correction_cancellation import HISTORICAL
 from tests.test_request_executor import _config
 
-if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in ('--record-result', '--compact-result', '--rebuild-result', '--swap-result', '--settle-result')):
-    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result|--compact-result|--rebuild-result|--swap-result|--settle-result]')
+if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in ('--record-result', '--compact-result', '--rebuild-result', '--swap-result', '--settle-result', '--dispatch-result')):
+    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result|--compact-result|--rebuild-result|--swap-result|--settle-result|--dispatch-result]')
 record_result = len(sys.argv) == 3
-compact_result = record_result and sys.argv[2] in ("--compact-result", "--rebuild-result", "--swap-result", "--settle-result")
+compact_result = record_result and sys.argv[2] in ("--compact-result", "--rebuild-result", "--swap-result", "--settle-result", "--dispatch-result")
 rebuild_result = record_result and sys.argv[2] == "--rebuild-result"
 swap_result = record_result and sys.argv[2] == "--swap-result"
-settle_result = record_result and sys.argv[2] == "--settle-result"
+settle_result = record_result and sys.argv[2] in ("--settle-result", "--dispatch-result")
 work = Path(tempfile.mkdtemp(prefix='cancellation-submit-acceptance-', dir='/var/tmp'))
 c = _config(work)
 seed = write_fixture_request()
@@ -83,12 +83,12 @@ module.main()
         private = base64.urlsafe_b64encode(HISTORICAL.private_bytes_raw()).decode().rstrip('=')
         execution_config.write_text('provider_signing_key_id = "provider:key"\nprovider_private_key = "'+private+'"\n'+config.read_text())
         execution_config.chmod(0o600)
-    payload = {'settle_result': settle_result, 'swap_result': swap_result, 'rebuild_result': rebuild_result, 'compact_result': compact_result, 'record_result': record_result, 'execution_config': str(execution_config),
+    payload = {'dispatch_result': record_result and sys.argv[2] == '--dispatch-result', 'work': str(work), 'settle_result': settle_result, 'swap_result': swap_result, 'rebuild_result': rebuild_result, 'compact_result': compact_result, 'record_result': record_result, 'execution_config': str(execution_config),
         'python': sys.executable, 'sb_root': str(ROOT), 'build': str(Path(sys.argv[1]).resolve()), 'launcher': str(launcher), 'config': str(config),
         'contract': str(ROOT / 'contracts/second-brain-mcp-v5.json'),
         'resolved': {'target': original['targets'][0], 'scope': original['scope']}}
     run = subprocess.run(['node', str(ROOT / 'scripts/cancellation-submit-acceptance.mjs')],
-        input=json.dumps(payload), text=True, capture_output=True, timeout=60, cwd=ROOT.parent / "Orca-JARVIS")
+        input=json.dumps(payload), text=True, capture_output=True, timeout=120, cwd=ROOT.parent / "Orca-JARVIS")
     if run.returncode:
         print(run.stderr, file=sys.stderr)
         raise SystemExit(run.returncode)
@@ -97,11 +97,11 @@ module.main()
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellations').fetchone()[0] == 1
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellation_aliases').fetchone()[0] == 8
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellation_results').fetchone()[0] == int(record_result)
-    assert executor.store.tombstone_high_water()[0] == 1
+    assert executor.store.tombstone_high_water()[0] == (2 if payload['dispatch_result'] else 1)
     report = {**observed, 'python_parent_pid': os.getpid(), 'accepted_rows': 1, 'alias_rows': 8,
-        'result_rows': int(record_result), 'generation_unchanged': not record_result, 'provider_tombstone_sequence': 1,
-        'private_key_in_mcp_config': False, 'clock': 'isolated fixed 2026-08-28T12:00:01.000Z',
-        'scope': ('actual provider cancellation, local compaction and atomic settlement; cursor advanced to 1' if settle_result else 'actual provider execution and JARVIS durable result reception; cursor not advanced' if record_result else 'actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed')}
+        'result_rows': int(record_result), 'generation_unchanged': not record_result, 'provider_tombstone_sequence': executor.store.tombstone_high_water()[0],
+        'private_key_in_mcp_config': False, 'clock': 'cancellation admission fixed 2026-08-28; execution and followup actual UTC',
+        'scope': ('actual JARVIS seq2 dispatch through MCP and provider proved; JARVIS lifecycle reconciling' if payload['dispatch_result'] else 'actual provider cancellation, local compaction and atomic settlement; cursor advanced to 1' if settle_result else 'actual provider execution and JARVIS durable result reception; cursor not advanced' if record_result else 'actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed')}
     (work / 'result.json').write_text(json.dumps(report, indent=2)+'\n')
     print(work / 'result.json')
     print(json.dumps(report))
