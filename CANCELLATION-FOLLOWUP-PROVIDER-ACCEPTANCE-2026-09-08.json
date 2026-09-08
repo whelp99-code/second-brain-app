@@ -1,0 +1,36 @@
+{
+  "prior_settlement_evidence": "/var/tmp/cancellation-submit-acceptance-771sdp6_/result.json",
+  "python_pid": 633920,
+  "jarvis_wire_validation": {
+    "pid": 634498,
+    "request_id": "memeff:req:v2:1e44de6d60b0147b09df04b1e1b96737e53dc63156c65f7aa28b34bf05227d86",
+    "tombstone_sequence": 2,
+    "delta_length": 1
+  },
+  "provider_state": "proved",
+  "provider_tombstone_sequence": 2,
+  "request_id": "memeff:req:v2:1e44de6d60b0147b09df04b1e1b96737e53dc63156c65f7aa28b34bf05227d86",
+  "result_generation": "sbgen:v1:556e2f68092386e5625f166cf936349424f56834dd98c70faf9e8de26298b4a9",
+  "committed_replacement_found": true,
+  "old_and_cancelled_records_absent_from_committed_wiki": true,
+  "repeat_executor_state": "idle",
+  "jarvis_dispatch_cursor": 1,
+  "scope": "real provider seq2 execution and both wire validators; JARVIS seq2 dispatch/completion not exercised",
+  "acceptance_commit": "42ceb35",
+  "jarvis_product": "ea076ae",
+  "second_brain_product": "9e30115",
+  "source": "/var/tmp/cancellation-submit-acceptance-771sdp6_/followup-result.json",
+  "prior_settlement": {
+    "correction_id": "memcorr:v1:6f7dc7051d18af323ca1d80b2ee441e5a91153d94d74248cc4ef908f3f1af5b9",
+    "purge_id": "mempurge:v2:acbf8104a01598747dd439fa097c43cc9c324da49b8c2154f28135234890f477",
+    "result_digest": "sha256:9c35e4dc2ead9704f80c0a3cde7dfec1e40159d42b461203c6ea9d521144984e",
+    "local_receipt_digest": "sha256:1e1715dc63198a52817b131232c676154c5182c2c63a7aaa697fc211c65e4bf2",
+    "tombstone_sequence": 1,
+    "tombstone_set_root": "sha256:543f16a76aeab7d062d7b0419bb6ce6e3bdb549e34ef0078b5e4a2a5a6ced457",
+    "settled_at": "2026-09-08T14:38:15.218Z"
+  },
+  "prior_cursor": {
+    "active_lane_id": null,
+    "accepted_through_sequence": 1
+  }
+}
