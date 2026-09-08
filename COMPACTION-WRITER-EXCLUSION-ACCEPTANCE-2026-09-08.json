@@ -1,0 +1,16 @@
+{
+  "pid": 450564,
+  "watcher_observed_fresh_creation": true,
+  "concurrent_writer": "AUTHORITY_DATABASE_QUIESCING",
+  "inode_changed": true,
+  "post_compaction_write_reopened": [
+    {
+      "state": "revoked"
+    }
+  ],
+  "integrity_check": "ok",
+  "provider_observations": "synthetic fixture",
+  "scope": "actual local compaction and runtime writer exclusion",
+  "jarvis_commit": "830ca2d",
+  "source": "/var/tmp/cancellation-compaction-writer-bIOiwp/result.json"
+}
