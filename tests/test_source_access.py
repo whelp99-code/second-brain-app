@@ -78,7 +78,7 @@ def test_legacy_migration_does_not_infer_access_for_existing_sources(tmp_path: P
     with Ledger(tmp_path) as migrated:
         assert migrated.list_source_items() == (ITEM,)
         assert migrated.source_access_for(ITEM) is None
-        assert ledger_schema_version(path) == 3
+        assert ledger_schema_version(path) == 4
     backups = tuple((path.parent / "migrations").glob("ledger-v2-*.db"))
     assert len(backups) == 1
     assert ledger_schema_version(backups[0]) == 2

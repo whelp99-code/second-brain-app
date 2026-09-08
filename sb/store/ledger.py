@@ -14,6 +14,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Final, Self, cast
 
+from sb.page_access import PageAccess
 from sb.source_access import SourceAccess, source_access_digest, source_access_identity
 
 from . import (
@@ -35,7 +36,7 @@ from . import (
 )
 
 _HEX: Final = frozenset("0123456789abcdef")
-CURRENT_SCHEMA_VERSION: Final = 3
+CURRENT_SCHEMA_VERSION: Final = 4
 _SCHEMA: Final = (
     "CREATE TABLE IF NOT EXISTS source_item ("
     "source_id TEXT NOT NULL, source_uri TEXT NOT NULL, source_version TEXT NOT NULL, "
@@ -48,6 +49,14 @@ _SCHEMA: Final = (
     "CREATE TRIGGER IF NOT EXISTS source_access_no_replace BEFORE INSERT ON source_access "
     "WHEN EXISTS(SELECT 1 FROM source_access WHERE source_ref_digest=NEW.source_ref_digest) "
     "BEGIN SELECT RAISE(ABORT, 'immutable source access'); END;"
+    "CREATE TABLE IF NOT EXISTS page_access ("
+    "page_id TEXT NOT NULL,content_digest TEXT NOT NULL,requirements_json TEXT NOT NULL,"
+    "PRIMARY KEY(page_id,content_digest));"
+    "CREATE TRIGGER IF NOT EXISTS page_access_no_update BEFORE UPDATE ON page_access "
+    "BEGIN SELECT RAISE(ABORT, 'immutable page access'); END;"
+    "CREATE TRIGGER IF NOT EXISTS page_access_no_replace BEFORE INSERT ON page_access "
+    "WHEN EXISTS(SELECT 1 FROM page_access WHERE page_id=NEW.page_id AND content_digest=NEW.content_digest) "
+    "BEGIN SELECT RAISE(ABORT, 'immutable page access'); END;"
     "CREATE TABLE IF NOT EXISTS cursor ("
     "source_id TEXT PRIMARY KEY, position TEXT NOT NULL, updated_at TEXT NOT NULL);"
     "CREATE TABLE IF NOT EXISTS unit ("
@@ -328,6 +337,41 @@ class Ledger:
         except (ValueError, TypeError, KeyError) as exc:
             raise ValueError("SOURCE_ACCESS_CORRUPT") from exc
         return access
+
+    def compiled_page_access(self, sources: Sequence[tuple[str, str]], parent: PageAccess | None = None,
+        *, unknown_parent: bool = False) -> PageAccess:
+        refs = set(() if parent is None else parent.source_refs)
+        complete = not unknown_parent and (parent is None or parent.complete) and bool(sources or refs)
+        for origin, content_hash in sources:
+            matches = [item for item in self._tables.source_items.values()
+                if f"{item.source_id}:{item.source_uri}" == origin and item.content_hash == content_hash]
+            if len(matches) != 1:
+                complete = False
+                continue
+            item = matches[0]
+            refs.add(source_access_identity(item.source_id, item.source_uri, item.content_hash))
+            if self.source_access_for(item) is None:
+                complete = False
+        return PageAccess(tuple(sorted(refs)), complete)
+
+    def page_access_for(self, page_id: str, content_digest: str) -> PageAccess | None:
+        row = cast(tuple[str] | None, self._db().execute(
+            "SELECT requirements_json FROM page_access WHERE page_id=? AND content_digest=?",
+            (page_id, content_digest)).fetchone())
+        return None if row is None else PageAccess.decode(row[0])
+
+    def bind_page_access(self, page_id: str, content_digest: str, access: PageAccess) -> None:
+        encoded = access.encode()
+        _ = PageAccess.decode(encoded)
+        if not page_id or not content_digest.startswith("sha256:") or len(content_digest) != 71 or not set(content_digest[7:]) <= _HEX:
+            raise ValueError("PAGE_ACCESS_IDENTITY_INVALID")
+        with self.transaction():
+            prior = self.page_access_for(page_id, content_digest)
+            if prior is not None:
+                if prior != access:
+                    raise ValueError("PAGE_ACCESS_RECLASSIFICATION_REQUIRED")
+                return
+            _ = self._exec("INSERT INTO page_access VALUES (?,?,?)", (page_id, content_digest, encoded))
 
     def list_source_items(self) -> tuple[SourceItem, ...]:
         items = list(self._tables.source_items.values())

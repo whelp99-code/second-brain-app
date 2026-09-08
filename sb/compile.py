@@ -46,6 +46,8 @@ class PendingCompile:
     page: PageSpec
     key: str
     output: DerivationOutput
+    input_sources: tuple[tuple[str, str], ...] = ()
+    untracked_context: bool = True
 
 
 class _BodyCache:
@@ -204,7 +206,9 @@ def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
         derivation_key=job.key,
     )
     digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    return PendingCompile(page, job.key, DerivationOutput(digest, f"wiki/{job.page_id}.md"))
+    return PendingCompile(page, job.key, DerivationOutput(digest, f"wiki/{job.page_id}.md"),
+        tuple(sorted({(unit.origin, unit.content_hash) for unit in job.units})),
+        bool(existing) and previous is None)
 
 
 def _prepare_compile(ledger: CompileLedger, key: str) -> bool:

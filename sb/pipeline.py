@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import os
 import re
+import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
@@ -25,6 +26,7 @@ from sb.generation_runtime_models import (
     generation_runtime_paths,
 )
 from sb.llm import LLMClient, LLMUnavailable
+from sb.page_ids import git_rel
 from sb.store import (
     DerivationOutput,
     DerivStatus,
@@ -815,6 +817,12 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                 ledger.mark_failed(item.key, "compile page failed citation readiness")
                 write_errors += 1
                 return
+            previous_path = vault.root / git_rel(page.page_id)
+            previous_digest = ("sha256:" + hashlib.sha256(previous_path.read_bytes()).hexdigest()
+                if previous_path.is_file() else None)
+            parent = ledger.page_access_for(git_rel(page.page_id).removesuffix(".md"), previous_digest) if previous_digest is not None else None
+            access = ledger.compiled_page_access(item.input_sources,
+                parent, unknown_parent=item.untracked_context or (previous_digest is not None and parent is None))
             single = StageReport(
                 (page,),
                 0,
@@ -824,7 +832,7 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                 compiled_by=(config.llm.prompt_version, config.llm.model_id),
             )
             try:
-                _ = _commit_pages(
+                committed, _, _ = _commit_pages(
                     vault.root,
                     vault,
                     run_id,
@@ -834,6 +842,14 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                     project=False,
                 )
             except (VaultLintError, GitCommandError, OSError) as exc:
+                ledger.mark_failed(item.key, str(exc))
+                write_errors += 1
+                return
+            try:
+                raw = subprocess.check_output(["git", "-C", str(vault.root), "show",
+                    f"{committed or 'HEAD'}:{git_rel(page.page_id)}"])
+                ledger.bind_page_access(git_rel(page.page_id).removesuffix(".md"), "sha256:" + hashlib.sha256(raw).hexdigest(), access)
+            except (OSError, subprocess.CalledProcessError, ValueError) as exc:
                 ledger.mark_failed(item.key, str(exc))
                 write_errors += 1
                 return

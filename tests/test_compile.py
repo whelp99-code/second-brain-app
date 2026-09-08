@@ -294,3 +294,19 @@ def test_compile_pages_page_id_matches_solo_when_batched_with_collider(
     batched_slash = next(page for page in batch if page.sources[0].origin == ORIGIN_SLASH)
     assert solo[0].page_id == batched_slash.page_id
     assert solo[0].page_id == _expected_page_id(ORIGIN_SLASH)
+
+
+def test_pending_retains_all_inputs_even_when_citations_deduplicate(tmp_path: Path):
+    from sb.compile import _compile_one, _CompileCtx, _PageJob
+
+    units = (_unit("a", HASH_A, "0-20", "first", ORIGIN_ONE),
+             _unit("b", HASH_A, "0-20", "second", ORIGIN_TWO))
+    with Ledger(tmp_path) as ledger:
+        ctx = _CompileCtx(ledger, RecordingLLM(BODY_PROFILE), "{units_with_sids}", {}, {}, "1", "fake")
+        pending = _compile_one(_PageJob("test", "test-key", units), ctx)
+        assert len(pending.page.sources) == 1
+        assert pending.input_sources == tuple(sorted(((ORIGIN_ONE, HASH_A), (ORIGIN_TWO, HASH_A))))
+        assert not pending.untracked_context
+        # The body cache is prompt context too, even without a tracked previous page.
+        cached = _compile_one(_PageJob("test", "test-key-2", units), ctx)
+        assert cached.untracked_context
