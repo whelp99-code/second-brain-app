@@ -226,9 +226,10 @@ def test_process_exit_preserves_search_and_releases_writer_lock(tmp_path: Path) 
     assert path.read_bytes() == before
     assert query_cosine(root, "AlphaEngineer", 1, encoder=FakeEncoder())
     orphans = set(path.parent.glob(".vectors-*.db"))
-    assert len(orphans) == 1  # Retained for future ownership-aware crash cleanup.
+    assert len(orphans) == 1
     assert embeddings.rebuild(root, encoder=FakeEncoder()) == 3
-    assert set(path.parent.glob(".vectors-*.db")) == orphans
+    # Hosts with unreadable same-owner process descriptors defer orphan cleanup.
+    assert set(path.parent.glob(".vectors-*.db")) <= orphans
 
 
 def test_failed_postbuild_validation_preserves_previous_database(

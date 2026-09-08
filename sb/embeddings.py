@@ -96,7 +96,7 @@ def sqlite_vec_available() -> bool:
     return _vec_cli() is not None
 
 
-def run_vec_sql(path: Path, sql: str, *, read_only: bool = False) -> str:
+def run_vec_sql(path: Path, sql: str, *, read_only: bool = False, lock_fd: int | None = None) -> str:
     cli, ext = _vec_cli(), _vec0_path()
     if cli is None or ext is None:
         raise EmbeddingUnavailable("sqlite-vec missing")
@@ -106,6 +106,7 @@ def run_vec_sql(path: Path, sql: str, *, read_only: bool = False) -> str:
         capture_output=True,
         text=True,
         check=False,
+        pass_fds=() if lock_fd is None else (lock_fd,),
     )
     if done.returncode != 0:
         raise EmbeddingUnavailable(done.stderr.strip() or "vec sql failed")
@@ -215,7 +216,7 @@ def rebuild(vault_root: Path, *, encoder: Encoder | None = None) -> int:
             run_vec_script(staging, script, lock_fd=lock_fd)
         check = run_vec_sql(staging, ("PRAGMA quick_check;SELECT "
                             "(SELECT count(*) FROM chunks),"
-                            "(SELECT count(*) FROM vec_chunks);"), read_only=True)
+                            "(SELECT count(*) FROM vec_chunks);"), read_only=True, lock_fd=lock_fd)
         if check != f"ok\x1e{len(chunks)}\x1f{len(chunks)}\x1e":
             raise EmbeddingUnavailable("vector database validation failed")
         if _head(root) != head:
