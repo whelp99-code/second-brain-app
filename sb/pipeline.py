@@ -292,15 +292,34 @@ def _last_run_line(root: Path) -> str | None:
 def _select_adapters(
     chosen: Mapping[str, SourceAdapter], source_ids: Sequence[str] | None, config: Config
 ) -> list[SourceAdapter]:
-    del config
+    from sb.connectors import discover_adapters
+
+    candidates = list(chosen.items())
+    expanded: set[str] = set()
+    seen_ids: set[str] = set()
+    for row in config.source_roots:
+        source_id = row.get("id")
+        if not source_id:
+            continue
+        if source_id in seen_ids:
+            raise ValueError("SOURCE_ID_DUPLICATE")
+        seen_ids.add(source_id)
+        isolated = Config(raw={**config.raw, "sources": [row]}, base_dir=config.base_dir)
+        matches = [(key, adapter) for key, adapter in discover_adapters(isolated).items()
+                   if adapter.source_id == source_id]
+        if len(matches) > 1:
+            raise ValueError("SOURCE_ID_AMBIGUOUS")
+        if not matches:
+            continue
+        key, adapter = matches[0]
+        if key not in expanded:
+            candidates = [(name, item) for name, item in candidates if name != key]
+            expanded.add(key)
+        candidates.append((key, adapter))
     if source_ids is None:
-        return list(chosen.values())
+        return [adapter for _, adapter in candidates]
     names = set(source_ids)
-    return [
-        adapter
-        for adapter_id, adapter in chosen.items()
-        if adapter_id in names or adapter.source_id in names
-    ]
+    return [adapter for key, adapter in candidates if key in names or adapter.source_id in names]
 
 
 def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
@@ -706,7 +725,10 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         except ValueError as exc:
             return StageReport((), 0, 1, 0, False, failure=str(exc))
         chosen = discover_adapters(source_config)
-        adapters = _select_adapters(chosen, source_ids, config)
+        try:
+            adapters = _select_adapters(chosen, source_ids, source_config)
+        except ValueError as exc:
+            return StageReport((), 0, 1, 0, False, failure=str(exc))
         cas = ContentAddressedStore(vault.root)
         cap = config.caps["max_source_items_per_run"] if limit is None else limit
         unit_cap = config.caps["max_new_units_per_run"]

@@ -26,10 +26,7 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
         "knowledge_registry": str(tmp_path / "registry.db"), "sources": sources,
         "source_access": {name: {"owner": "principal:owner", "projects": [project], "policy_revision": "1"}
             for name, project in [("a_hidden", "project:b"), ("z_allowed", "project:a")]}})
-    # Registry currently instantiates one adapter per type; collect explicit roots separately.
-    for source in sources:
-        one = Config(raw={**config.raw, "sources": [source]})
-        assert run_ingest(one, [source["id"]]).exit_code == 0
+    assert run_ingest(config, [source["id"] for source in sources]).exit_code == 0
     class FixtureLLM:
         def generate(self, prompt, **kwargs):
             matched = re.search(r"sid=([0-9a-f]+)", prompt)
