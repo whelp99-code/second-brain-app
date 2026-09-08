@@ -28,6 +28,7 @@ from sb.effect_values import (
     format_instant,
     strict_loads,
 )
+from sb.generation_access import access_bound_ledger_digest
 from sb.generation_cleanup import discard_staging
 from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
@@ -830,7 +831,7 @@ class GenerationStore:
                 "tombstone_sequence": tombstone_sequence,
                 "tombstone_set_root": tombstone_set_root,
                 "content_manifest_digest": digest("generation", {"files": content_rows}),
-                "ledger_manifest_digest": overrides.get("ledger", logical.ledger),
+                "ledger_manifest_digest": access_bound_ledger_digest(staging, overrides.get("ledger", logical.ledger)),
                 "lexical_manifest_digest": overrides.get("lexical", logical.lexical),
                 "vector_manifest_digest": overrides.get("vector", logical.vector),
                 "briefing_manifest_digest": overrides.get("briefing", logical.briefing),

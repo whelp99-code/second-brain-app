@@ -1,0 +1,86 @@
+{
+  "scope_identity_audit": {
+    "fixture": true,
+    "independent_read_processes": 4,
+    "different_access_same_generation": false,
+    "generations": [
+      {
+        "classification_project": "project:a",
+        "generation_id": "sbgen:v1:82744bd9db7a481f909bdf0c4040b353c2a3daad05afc74708780f70ee3a8a65",
+        "ledger_manifest_digest": "sha256:210418c75a4e7190c4da7ec9b1849cb22e869b3acec1212c04db6e7e19c6c076",
+        "reads": {
+          "project:a": {
+            "records": 1,
+            "source_refs": [
+              "sha256:ead656d3726bdb14da00e471d60c9a9325fb47b96ff833fd20ae64b285680f70"
+            ],
+            "page_digest": "sha256:32176a9065a2018aa02d95177c0be39061cb4be1ae840842a91f4a6fe3db17d5"
+          },
+          "project:b": {
+            "denied": "MEMORY_ACCESS_DENIED"
+          }
+        }
+      },
+      {
+        "classification_project": "project:b",
+        "generation_id": "sbgen:v1:3952a52ff52d9e65146ec111e9fe9c05b974c2706d15381c267ba39fa39a6f49",
+        "ledger_manifest_digest": "sha256:4cc7c0d56b57734a1bcd21a71fa60033cbdffa4146f79b60392cc7d7db5e7136",
+        "reads": {
+          "project:a": {
+            "denied": "MEMORY_ACCESS_DENIED"
+          },
+          "project:b": {
+            "records": 1,
+            "source_refs": [
+              "sha256:ead656d3726bdb14da00e471d60c9a9325fb47b96ff833fd20ae64b285680f70"
+            ],
+            "page_digest": "sha256:32176a9065a2018aa02d95177c0be39061cb4be1ae840842a91f4a6fe3db17d5"
+          }
+        }
+      }
+    ]
+  },
+  "jarvis_proof_acceptance": {
+    "fixture_authority": true,
+    "python_processes": 4,
+    "consumer_processes": 4,
+    "acknowledgement_loss_exit": 73,
+    "transport": "internal APIs; no public MCP V4 route",
+    "accepted": {
+      "schema_version": 4,
+      "kind": "accepted",
+      "state": "pending",
+      "provider_instance_id": "provider:fixture",
+      "request_id": "memreq:scoped:v4:52aaccec9bcfe3f039bfb0e4b81e32d706a443c67709d8668dda7b6a1eaf68b1",
+      "request_digest": "sha256:52aaccec9bcfe3f039bfb0e4b81e32d706a443c67709d8668dda7b6a1eaf68b1",
+      "idempotency_key": "memidem:scoped:v4:029c05f1b01c440ae4da3359f656f2203ee1d461b4c5b805fd9274d99e67ccd9",
+      "scope_digest": "sha256:93d3b7d484cd21298c5168e90f490afd4436655b0652d2350f4bbc56990ba548",
+      "accepted_at": "2026-08-28T12:00:00.000Z",
+      "inbox_path": "pending/memreq:scoped:v4:52aaccec9bcfe3f039bfb0e4b81e32d706a443c67709d8668dda7b6a1eaf68b1.v4.json",
+      "request_file_digest": "sha256:f187fa7baba4f63c95fe83ec6fa5b3ed7a34183c9ed54c9ac8ee05abd749c8e3",
+      "replayed": false
+    },
+    "recorded": {
+      "kind": "acceptance_recorded",
+      "outbox_id": "memout:scoped:v4:cf16269fef4d585155d86bbe75ed141805ac5fb6280952547c1239ff00580c68",
+      "attempt_id": "memattempt:pos:v2:770cd0e022a952e640277248efedaef392d253057f22ae66946c12a4bc638942",
+      "acceptance_receipt_digest": "sha256:d87c2e632777615ddb6539d81f8cb9d6ad9cad384b5f31c9004b18f8a524a2bb",
+      "replayed": true
+    },
+    "provider_state": "proved",
+    "proof_hashes_and_generation_match": true,
+    "independent_generation": {
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+      "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+      "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+      "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    },
+    "wrong_generation_rejected": true,
+    "jarvis_state": "reconciling",
+    "acceptance_events": 1,
+    "foreign_key_errors": 0
+  }
+}

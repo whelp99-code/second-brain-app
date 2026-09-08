@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 접근 분류 generation identity 수정:** [분류 결합·교체 거부·전체1,222통과](SCOPED-GENERATION-IDENTITY-FIX-2026-09-09.md). 프로젝트/owner/policy 차이가 ID에 반영되고 동일 분류는 재현된다. FIFO 회귀 수정 후 전체1,222통과/2skip/204.85초·Ruff·새 모듈 정적검사 통과. 독립 scope reader4 및 JARVIS/Python8프로세스 인수. 옛 미결합 분류 세대는 거부하며 운영 재생성/reader 전환·자동 완료/전체 목표는 남는다.
+
 **2026-09-09 JARVIS `9be13b1` proof 대조·새 P0 발견:** [26검사·독립8프로세스 proof/세대 대조](SCOPED-PROOF-VALIDATION-2026-09-09.md). 별도 [접근 분류 identity 감사](SCOPED-GENERATION-IDENTITY-AUDIT-2026-09-09.md)에서 project:a/b가 같은 generation ID/ledger digest를 생성함을 독립 읽기4건으로 재현. 접근 차단은 각각 정상이며 세대 식별자 결합 결손이다. `proof_consistent`만 반환하고 자동 settled/control completed는 보류. M2/M3/M7/M12 선행 P0 수정·전체 운영 목표는 유지한다.
 
 **2026-09-09 JARVIS `7c9d9b6` v4 수락 소비:** [provider 수락 해시·원자적 기록·응답 유실 복구](SCOPED-OUTBOX-RESULT-2026-09-09.md). 관련16/최종3통과(중복), 타입/lint/격리emit. Python3/Node3 실제 프로세스에서 내부 provider proved·자비스 수락 event1/reconciling·commit 후 exit73 복구. fixture authority이며 공개 전송/완료 proof 소비/운영 인수는 남는다.

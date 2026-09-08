@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import sqlite3
 import stat
 import threading
 from collections import OrderedDict
@@ -16,6 +17,7 @@ from sb.effect_values import (
     is_json_object,
     strict_loads,
 )
+from sb.generation_access import verified_ledger_digest
 
 _FIELDS = frozenset((
     "schema_version", "generation_id", "generation_digest", "provider_instance_id",
@@ -51,7 +53,7 @@ def _read_digest(fd: int) -> str:
 
 
 def _file_digest(path: Path, expected_bytes: int) -> str:
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
     try:
         identity = _identity(os.fstat(fd))
         if identity[2] != expected_bytes:
@@ -77,7 +79,7 @@ def _file_digest(path: Path, expected_bytes: int) -> str:
 
 
 def _read_object(path: Path) -> JsonObject:
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
     try:
         before = _identity(os.fstat(fd))
         if before[2] > 65_536:
@@ -148,6 +150,8 @@ def load_verified_manifest(root: Path) -> JsonObject:
             seen.add(name)
             if _file_digest(folder / name, size) != checksum:
                 raise GenerationIntegrityError("derived file digest mismatch")
+        if verified_ledger_digest(root, manifest) != manifest["ledger_manifest_digest"]:
+            raise GenerationIntegrityError("access ledger digest mismatch")
         return manifest
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, sqlite3.Error) as exc:
         raise GenerationIntegrityError("GENERATION_SPLIT_BRAIN") from exc

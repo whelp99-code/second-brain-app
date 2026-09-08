@@ -1,5 +1,7 @@
 # P0: 접근 범위 차이가 봉인 세대 identity에 반영되지 않음
 
+**2026-09-09 접근 분류 generation identity 수정:** [분류 결합·교체 거부·전체1,222통과](SCOPED-GENERATION-IDENTITY-FIX-2026-09-09.md). 프로젝트/owner/policy 차이가 ID에 반영되고 동일 분류는 재현된다. FIFO 회귀 수정 후 전체1,222통과/2skip/204.85초·Ruff·새 모듈 정적검사 통과. 독립 scope reader4 및 JARVIS/Python8프로세스 인수. 옛 미결합 분류 세대는 거부하며 운영 재생성/reader 전환·자동 완료/전체 목표는 남는다.
+
 2026-09-09. 완료 proof를 독립 세대와 대조하던 중 다른 프로젝트 분류를 가진 기존 인수 결과의 generation ID가 같아 추가 재현했다.
 
 ## 확인된 사실
