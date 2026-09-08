@@ -1,0 +1,11 @@
+{
+  "fixture": true,
+  "before_enqueue_prepared": true,
+  "after_enqueue_error": "MEMORY_SCOPED_WRITE_ALREADY_DISPATCHED",
+  "outbox_state": "queued",
+  "review_state": "approved",
+  "review_consumed": false,
+  "ledger_counts_unchanged": true,
+  "provider_calls": 0,
+  "scoped_write_completed": false
+}

@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `fc40358`:** [기등록 후보 scoped 충돌 구분](SCOPED-DISPATCH-CONFLICT-2026-09-09.md). 기존 포괄 입력 오류를 재현하고 구체적 충돌 오류로 구분. 관련21통과·격리 API/DB 인수에서 기존 요청·승인 보존/provider0. scoped 요청 계약·단일 소비·영수증 전체 연결은 남는다.
+
 **2026-09-09 JARVIS `9ab8293`:** [명시적 쓰기 정책→scoped 준비](SCOPED-WRITE-POLICY-2026-09-09.md). 기존 v1/v2 읽기 유지, v3 쓰기 명시·현재 정책/원본 재검사. 관련16통과·실제 격리 CLI/정책/DB 검증. 요청 수락·단일 소비·영수증·운영 활성화는 남는다.
 
 **2026-09-09 요청 기억 분류·봉인:** [scoped remember materialization](SCOPED-REMEMBER-MATERIALIZATION-2026-09-09.md). 내부 staging의 원본/페이지 불변 분류 결합, 독립 reader 3개에서 records4/4·불허 프로젝트 거부. 전체1,169통과/2skip/220.91초·전체Ruff. 공개 쓰기 요청/승인 소비/영수증 연결은 남는다.
