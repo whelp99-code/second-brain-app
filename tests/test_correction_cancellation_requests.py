@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import multiprocessing
 import sqlite3
+from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -31,10 +34,19 @@ def intent():
         "not_before": "2026-08-31T00:00:01.000Z", "expires_at": "2026-08-31T00:05:00.000Z"})
 
 
+def journal_only_generations(root):
+    """These unit tests isolate journal/file serialization; real target binding is tested separately."""
+    return SimpleNamespace(requests=SimpleNamespace(root=root), provider_instance_id="provider:fixture",
+        exclusive=nullcontext, active=lambda: SimpleNamespace(manifest=SimpleNamespace(
+            tombstone_sequence=0, tombstone_set_root=intent()["tombstone"]["previous_root"])))
+
+
 def accept(root, value=None, clock=lambda: NOW):
-    return accept_correction_cancellation(root, intent() if value is None else value, clock=clock,
-        expected_provider="provider:fixture", historical_delegation_keys={"jarvis:fixture": HISTORICAL.public_key()},
-        current_cancellation_keys={"jarvis:current": CURRENT.public_key()})
+    with patch("sb.correction_cancellation_requests.verify_cancellation_target"):
+        return accept_correction_cancellation(root, intent() if value is None else value,
+            generations=journal_only_generations(root), clock=clock,
+            expected_provider="provider:fixture", historical_delegation_keys={"jarvis:fixture": HISTORICAL.public_key()},
+            current_cancellation_keys={"jarvis:current": CURRENT.public_key()})
 
 
 def test_accept_replay_and_restart_block_all_original_aliases(tmp_path: Path) -> None:
@@ -152,7 +164,7 @@ def test_current_key_removed_while_waiting_is_rejected(tmp_path: Path) -> None:
         return NOW
 
     with pytest.raises(ValueError, match="MEMORY_CANCELLATION_INTENT_INVALID"):
-        accept_correction_cancellation(tmp_path, intent(), clock=clock, expected_provider="provider:fixture",
+        accept_correction_cancellation(tmp_path, intent(), generations=journal_only_generations(tmp_path), clock=clock, expected_provider="provider:fixture",
             historical_delegation_keys={"jarvis:fixture": HISTORICAL.public_key()},
             current_cancellation_keys=keys)
     assert accept(tmp_path)[1] is False

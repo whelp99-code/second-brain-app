@@ -28,7 +28,7 @@ OLD = "ExampleAlpha 예시기록"
 REPLACEMENT = "replacement must never be materialized"
 
 
-def prepare(root: Path):
+def prepare_unaccepted(root: Path):
     config = _config(root)
     accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
     executor = RequestExecutor(config)
@@ -42,7 +42,14 @@ def prepare(root: Path):
         "scope": original["scope"], "tombstone": original["tombstone_chain_delta"][0],
         "issued_at": format_instant(stamp), "not_before": format_instant(stamp),
         "expires_at": format_instant(stamp + timedelta(minutes=5))})
-    accepted, replayed = accept_correction_cancellation(config.request_root, value, clock=lambda: stamp,
+    return executor, value, original
+
+
+def prepare(root: Path):
+    executor, value, original = prepare_unaccepted(root)
+    config = executor.config
+    stamp = NOW + timedelta(minutes=1, seconds=1)
+    accepted, replayed = accept_correction_cancellation(config.request_root, value, generations=executor.generations, clock=lambda: stamp,
         expected_provider=config.provider_instance_id, historical_delegation_keys=config.jarvis_public_keys,
         current_cancellation_keys={"jarvis:current": CURRENT.public_key()})
     assert not replayed

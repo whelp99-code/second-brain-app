@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import fcntl
-import hashlib
 import os
 import sqlite3
 from collections.abc import Callable, Mapping
@@ -13,6 +12,7 @@ from typing import cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from sb.cancellation_target import verify_cancellation_target
 from sb.correction_cancellation import parse_correction_cancellation_intent
 from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.effect_values import JsonObject, parse_instant, strict_loads
@@ -27,7 +27,6 @@ from sb.generation_runtime_models import (
     GenerationOperation,
 )
 from sb.generations import Generation
-from sb.search import git_run
 
 
 class CancellationExecutionError(RuntimeError):
@@ -40,28 +39,6 @@ def _text(row: sqlite3.Row, field: str) -> str:
         raise CancellationExecutionError("CANCELLATION_JOURNAL_CORRUPT")
     return value
 
-
-def _verify_base(generation: Generation, intent: CorrectionCancellationIntentV1) -> None:
-    target = intent.target
-    if (
-        generation.manifest.provider_instance_id != intent.provider_instance_id
-        or generation.generation_id != target.generation_id
-        or generation.manifest.generation_digest != target.generation_manifest_digest
-        or generation.head != target.vault_head or generation.tree != target.vault_tree
-    ):
-        raise CancellationExecutionError("EFFECT_PRIOR_STALE")
-    relative = target.page_id if target.page_id.endswith(".md") else target.page_id + ".md"
-    blob_oid = git_run(generation.root, "rev-parse", f"HEAD:{relative}")
-    if blob_oid is None or blob_oid.strip() != target.page_blob_oid:
-        raise CancellationExecutionError("EFFECT_TARGET_INVALID")
-    body = (generation.root / relative).read_bytes()
-    start, end = target.citation_span_start, target.citation_span_end
-    if (
-        "sha256:" + hashlib.sha256(body).hexdigest() != target.page_content_digest
-        or not 0 <= start < end <= len(body)
-        or hashlib.sha256(body[start:end]).hexdigest() != target.content_identity_full
-    ):
-        raise CancellationExecutionError("EFFECT_TARGET_INVALID")
 
 
 def _result(intent: CorrectionCancellationIntentV1, generation_id: str, generation_digest: str) -> JsonObject:
@@ -144,7 +121,7 @@ def apply_correction_cancellation(
             raise CancellationExecutionError("TOMBSTONE_SET_STALE")
         current = generations.active()
         if current.generation_id != result_id:
-            _verify_base(current, intent)
+            verify_cancellation_target(current, intent)
         elif execution is None or current.manifest.generation_digest != _text(execution, "generation_digest"):
             raise CancellationExecutionError("CANCELLATION_JOURNAL_CORRUPT")
 

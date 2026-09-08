@@ -11,12 +11,15 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from sb.cancellation_target import CancellationTargetError, verify_cancellation_target
 from sb.correction_cancellation import (
     ValidatedCancellationIntent,
     parse_correction_cancellation_intent,
 )
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.effect_values import JsonValue, format_instant
 from sb.effect_write_requests import EffectWriteIoError, open_request_directory
+from sb.generations import GenerationStore
 from sb.request_store import ReplayConflict, RequestStore
 
 MAX_INVENTORY_ENTRIES = 100_000
@@ -40,7 +43,8 @@ def _require_no_publication(directories: tuple[int, ...], request_id: str) -> No
 
 
 def accept_correction_cancellation(
-    root: Path, value: JsonValue, *, clock: Callable[[], datetime], expected_provider: str,
+    root: Path, value: JsonValue, *, generations: GenerationStore,
+    clock: Callable[[], datetime], expected_provider: str,
     historical_delegation_keys: Mapping[str, Ed25519PublicKey],
     current_cancellation_keys: Mapping[str, Ed25519PublicKey],
 ) -> tuple[dict[str, JsonValue], bool]:
@@ -49,6 +53,11 @@ def accept_correction_cancellation(
     Current keys must be purpose-filtered by the caller. The result is suppression_pending,
     never proof of generation activation, erasure or permission to advance a consumer cursor.
     """
+    if (generations.requests is None
+        or generations.requests.root.resolve() != root.resolve()
+        or generations.provider_instance_id != expected_provider):
+        raise EffectWriteIoError("CANCELLATION_PROVIDER_BINDING_INVALID")
+
     def authenticate(raw: JsonValue, now: datetime) -> ValidatedCancellationIntent:
         return parse_correction_cancellation_intent(
             raw, now=format_instant(now), expected_provider=expected_provider,
@@ -56,7 +65,7 @@ def accept_correction_cancellation(
             current_cancellation_keys=current_cancellation_keys,
         )
 
-    # Snapshot the caller's mutable object before waiting; authenticate again after both locks.
+    # Snapshot the caller's mutable object before waiting; authenticate again under all admission locks.
     snapshot = authenticate(value, clock()).as_dict()
     with ExitStack() as cleanup:
         store = RequestStore(root)
@@ -74,8 +83,22 @@ def accept_correction_cancellation(
             original = snapshot["original_delegation"]
             assert isinstance(original, dict) and isinstance(original["request_id"], str)
             _require_no_publication((pending, processing, receipts), original["request_id"])
+            verified = authenticate(snapshot, clock())
+            accepted_before = store.db.execute(
+                "SELECT 1 FROM correction_cancellations WHERE intent_id=?", (verified.intent_id,),
+            ).fetchone() is not None
+            if not accepted_before:
+                intent = CorrectionCancellationIntentV1.model_validate(verified.as_dict())
+                current = generations.active()
+                verify_cancellation_target(current, intent)
+                if (current.manifest.tombstone_sequence, current.manifest.tombstone_set_root) != (
+                    intent.tombstone.sequence - 1, intent.tombstone.previous_root,
+                ):
+                    raise CancellationTargetError("TOMBSTONE_SET_STALE")
+            # Target reads can take time too. Timestamp and authority are final only afterward.
             now = clock()
-            verified = authenticate(snapshot, now)
-            return verified, now
+            return authenticate(snapshot, now), now
 
-        return store.accept_cancellation(validate_locked)
+        # All generation writers use this mutex; never wait for it while holding the DB lock.
+        with generations.exclusive():
+            return store.accept_cancellation(validate_locked)
