@@ -9,7 +9,7 @@ from itertools import islice
 from pathlib import Path
 from typing import cast
 
-from sb.effect_values import is_json_object, strict_loads
+from sb.generation_integrity import load_verified_manifest
 from sb.search_errors import GenerationIndexError
 from sb.search_query import LexicalQuery
 
@@ -25,9 +25,7 @@ def iter_sealed_rows(root: Path, query: str) -> Generator[tuple[str, str, str, f
     if not parsed.terms:
         return
     try:
-        manifest = strict_loads((root / "generation.json").read_bytes(), 65_536)
-        if not is_json_object(manifest):
-            raise GenerationIndexError
+        manifest = load_verified_manifest(root)
         db = root / ".sb" / "search.db"
         conn = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True)
         try:

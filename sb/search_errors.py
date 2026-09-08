@@ -10,7 +10,7 @@ class SearchQueryError(ValueError):
     """An unsupported query is distinct from a successful search with no results."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class GenerationIndexError(RuntimeError):
     code: Literal["GENERATION_INDEX_INVALID"] = "GENERATION_INDEX_INVALID"
 

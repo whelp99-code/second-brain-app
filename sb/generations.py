@@ -29,6 +29,7 @@ from sb.effect_values import (
     strict_loads,
 )
 from sb.generation_cleanup import discard_staging
+from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
 from sb.request_store import RequestStore
 
@@ -489,7 +490,7 @@ def _validate_derived_stores(root: Path, manifest: GenerationManifestV1) -> None
     for name in ("ledger.db", "search.db", "vectors.db"):
         path = derived / name
         try:
-            connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
             valid = _same_generation_binding(connection, manifest)
             connection.close()
         except sqlite3.Error as exc:
@@ -891,11 +892,8 @@ class GenerationStore:
 
     @staticmethod
     def _read_manifest(root: Path) -> GenerationManifestV1:
-        path = root / "generation.json"
         try:
-            value = strict_loads(path.read_bytes(), 65_536)
-            if not isinstance(value, dict):
-                raise GenerationError("GENERATION_SPLIT_BRAIN")
+            value = load_verified_manifest(root)
             manifest = TypeAdapter(GenerationManifestV1).validate_python(value)
             _validate_derived_stores(root, manifest)
             return manifest
