@@ -1,0 +1,33 @@
+{
+  "fixture": true,
+  "independent_read_processes": 4,
+  "successor_preserves_artifact": true,
+  "results": [
+    {
+      "generation_id": "sbgen:v1:5e5ac8c0f69035d8f6a4ae5b0d7b106cdfdfea6f13aa508b9f1295679b97c12b",
+      "records": 4,
+      "record_ids": [
+        "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+        "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+        "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+        "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+      ]
+    },
+    {
+      "denied": "MEMORY_ACCESS_DENIED"
+    },
+    {
+      "generation_id": "sbgen:v1:f34240618cabf9cca9aac19dc50ee56637e99be3caa7b24938dedef9800a52d4",
+      "records": 4,
+      "record_ids": [
+        "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+        "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+        "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+        "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+      ]
+    },
+    {
+      "denied": "MEMORY_ACCESS_DENIED"
+    }
+  ]
+}

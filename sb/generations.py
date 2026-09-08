@@ -29,6 +29,7 @@ from sb.effect_values import (
     strict_loads,
 )
 from sb.generation_access import access_bound_ledger_digest
+from sb.generation_access_inheritance import inherit_generation_access
 from sb.generation_cleanup import discard_staging
 from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
@@ -810,6 +811,8 @@ class GenerationStore:
             emit("git_seal")
             content_rows, byte_count = _content_rows(staging)
             pages = _page_rows(staging)
+            if parent is not None:
+                inherit_generation_access(parent.root, staging, pages)
             vector_content = prepare_vectors(staging, pages, parent_root=None if parent is None else parent.root,
                                              enabled=self.hybrid, pass_fds=model_pass_fds)
             logical = _logical_derived_digests(
