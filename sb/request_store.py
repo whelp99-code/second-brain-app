@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import stat
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,6 +15,9 @@ from typing import Final, Literal, cast, final
 
 from pydantic import ValidationError
 
+from sb.cancellation_journal import has_cancelled_alias, initialize_cancellations
+from sb.correction_cancellation import ValidatedCancellationIntent
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant, strict_loads
 from sb.effect_write_values import model_object
 from sb.export_journal import ExportJournal
@@ -350,6 +353,7 @@ class RequestStore:
         _ = self.db.executescript(_SCHEMA)
         try:
             migrate_remember_v3(self.db)
+            initialize_cancellations(self.db)
         except BaseException:
             self.db.close()
             raise
@@ -455,6 +459,7 @@ class RequestStore:
         return tuple(self._status(row) for row in rows)
 
     def replay_status(self, identity: RequestIdentity) -> RequestStatus | None:
+        self.require_not_cancelled(identity)
         aliases = identity.aliases()
         values = tuple(value for _kind, value in aliases)
         existing_ids: set[str] = set()
@@ -479,6 +484,77 @@ class RequestStore:
         if status.identity != identity:
             raise ReplayConflict("REQUEST_REPLAY_CONFLICT")
         return status
+
+    def require_not_cancelled(self, identity: RequestIdentity) -> None:
+        if has_cancelled_alias(self.db, identity.aliases()):
+            raise ReplayConflict("MEMORY_REQUEST_CANCELLED")
+
+    def accept_cancellation(
+        self, validate_locked: Callable[[], tuple[ValidatedCancellationIntent, datetime]],
+    ) -> tuple[dict[str, JsonValue], bool]:
+        """Called under the publication lock; authenticate at live time inside the DB lock.
+
+        Commits non-receipt marker + replica + work metadata together, not a generation or purge.
+        """
+        self._begin()
+        try:
+            verified, now = validate_locked()
+            intent = CorrectionCancellationIntentV1.model_validate(verified.as_dict())
+            old = intent.original_delegation
+            identity = RequestIdentity(
+                2, old.request_id, old.request_digest, intent.original_envelope_digest,
+                intent.original_idempotency_key, old.lane_id, old.operation, old.payload_digest,
+                old.target_manifest_digest, old.scope_digest, old.delegation_id, old.delegation_digest,
+                old.nonce, old.tombstone_sequence, old.tombstone_set_root)
+            stamp = format_instant(now)
+            prior = cast(sqlite3.Row | None, self.db.execute(
+                "SELECT intent_json,result_json FROM correction_cancellations WHERE intent_id=?",
+                (intent.intent_id,),
+            ).fetchone())
+            if prior is not None:
+                if _text(prior, "intent_json") != verified.canonical_envelope.decode():
+                    raise ReplayConflict("MEMORY_CANCELLATION_REPLAY_CONFLICT")
+                result = strict_loads(_text(prior, "result_json"), 16_384)
+                if not isinstance(result, dict):
+                    raise RequestStoreError("REQUEST_JOURNAL_CORRUPT")
+                self._commit()
+                return result, True
+            if self.replay_status(identity) is not None:
+                raise ReplayConflict("MEMORY_CANCELLATION_ALREADY_RECEIVED")
+            # Also reject orphan execution evidence if a damaged journal lost its request row.
+            if self.db.execute("SELECT 1 FROM phase_events WHERE request_id=? LIMIT 1", (old.request_id,)).fetchone():
+                raise ReplayConflict("MEMORY_CANCELLATION_ALREADY_RECEIVED")
+            if self.db.execute(
+                """SELECT 1 FROM delegation_uses WHERE request_id=? OR delegation_id=?
+                OR delegation_digest=? OR nonce=? LIMIT 1""",
+                (old.request_id, old.delegation_id, old.delegation_digest, old.nonce),
+            ).fetchone():
+                raise ReplayConflict("MEMORY_CANCELLATION_ALREADY_RECEIVED")
+            accepted: dict[str, JsonValue] = {
+                "schema_version": 1, "kind": "correction_cancellation_accepted",
+                "state": "suppression_pending", "intent_id": intent.intent_id,
+                "intent_digest": intent.intent_digest, "original_request_id": old.request_id,
+                "provider_instance_id": intent.provider_instance_id,
+                "tombstone_sequence": old.tombstone_sequence, "tombstone_set_root": old.tombstone_set_root,
+                "accepted_at": stamp,
+            }
+            _ = self.db.execute("INSERT INTO correction_cancellations VALUES(?,?,?,?,?,?,?,?,?)", (
+                intent.intent_id, intent.intent_digest, old.request_id, intent.original_envelope_digest,
+                intent.signing_key_id, intent.nonce, verified.canonical_envelope.decode(),
+                canonical_bytes(accepted).decode(), stamp,
+            ))
+            _ = self.db.executemany("INSERT INTO correction_cancellation_aliases VALUES(?,?,?)",
+                [(value, kind, intent.intent_id) for kind, value in identity.aliases()])
+            high = self._apply_tombstones_inside((model_object(intent.tombstone),), old.request_id, stamp)
+            if high != (old.tombstone_sequence, old.tombstone_set_root):
+                raise RequestStoreError("TOMBSTONE_SET_STALE")
+            register_target_identities(self.db, high[0], (model_object(intent.target),))
+            _ = verified_snapshot(self.db)
+            self._commit()
+            return accepted, False
+        except BaseException:
+            self._rollback()
+            raise
 
     def _apply_tombstones_inside(
         self,
@@ -565,6 +641,7 @@ class RequestStore:
         result_json = canonical_bytes(result).decode("utf-8")
         self._begin()
         try:
+            self.require_not_cancelled(identity)
             aliases = identity.aliases()
             placeholders = ",".join("?" for _ in aliases)
             alias_values = tuple(value for _kind, value in aliases)

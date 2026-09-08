@@ -62,7 +62,7 @@ def _safe_file(metadata: os.stat_result, links: int = 1) -> bool:
     )
 
 
-def _open_directory(path: Path) -> int:
+def open_request_directory(path: Path) -> int:
     try:
         preview = path.stat(follow_symlinks=False)
         descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
@@ -253,7 +253,7 @@ def accept_effect_request(
         store = RequestStore(root)
     except RequestStoreError as exc:
         raise EffectWriteIoError(str(exc)) from exc
-    directory = _open_directory(store.pending)
+    directory = open_request_directory(store.pending)
     final = f"{request.request_id}.v2.json"
     envelope = {
         "schema_version": 2,
