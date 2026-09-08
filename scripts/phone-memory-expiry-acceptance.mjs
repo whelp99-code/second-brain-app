@@ -20,6 +20,8 @@ let gateway;
 let authority;
 let now = Date.parse('2026-09-09T00:00:00.000Z');
 let expire = false;
+let expireBootstrap = false;
+const bootstrapScenario = process.argv[3] === 'bootstrap';
 let reads = 0;
 const audits = [];
 try {
@@ -29,7 +31,13 @@ try {
   writeFileSync(join(assets, 'assets/app.js'), '1');
   writeFileSync(join(assets, 'manifest.json'), JSON.stringify({ 'index.html': { file: 'assets/app.js' } }));
   authority = await startFakeAuthority((request, response) => {
+    if (request.url === '/api/v1/session' && expireBootstrap) {
+      now += 16 * 60_000;
+      json(response, 200, { schema_version: 1, csrf_token: authority.csrf });
+      return true;
+    }
     if (request.url !== '/api/v1/memory/status') return false;
+    if (request.headers['x-jarvis-csrf'] !== authority.csrf) return false;
     reads++;
     if (expire) now += 16 * 60_000;
     json(response, 200, { schema_version: 1, private_memory: 'fixture-memory-marker' });
@@ -49,7 +57,13 @@ try {
   const normal = await fetchFixture(`${base}/api/v1/memory/status`, { headers });
   assert.equal(normal.status, 200);
   assert.equal((await normal.json()).private_memory, 'fixture-memory-marker');
-  expire = true;
+  if (bootstrapScenario) {
+    authority.csrf = 'rotated-csrf-token-bbbbbbbbbbbbbbbbbbbbbb';
+    const rotated = await fetchFixture(`${base}/api/v1/memory/status`, { headers });
+    assert.equal(rotated.status, 503); await rotated.text();
+    expireBootstrap = true;
+  } else { expire = true; }
+  const requestsBeforeExpiry = authority.captures.filter(row => row.url === '/api/v1/memory/status').length;
   const expired = await fetchFixture(`${base}/api/v1/memory/status`, { headers });
   assert.equal(expired.status, 401);
   const denied = await expired.text();
@@ -59,10 +73,14 @@ try {
   const retry = await fetchFixture(`${base}/api/v1/memory/status`, { headers });
   assert.equal(retry.status, 401);
   await retry.text();
-  assert.equal(reads, 2);
+  assert.equal(reads, bootstrapScenario ? 1 : 2);
+  const memoryRequests = authority.captures.filter(row => row.url === '/api/v1/memory/status').length;
+  assert.equal(memoryRequests, requestsBeforeExpiry + (bootstrapScenario ? 0 : 1));
   assert.ok(audits.some(row => row.status === 401 && row.outcome === 'rejected'));
   process.stdout.write(JSON.stringify({ normal_status: 200, expired_status: 401, retry_status: 401,
-    upstream_reads: reads, expired_payload_withheld: true, expired_cookie_cleared: true,
+    upstream_reads: reads, bootstrap_scenario: bootstrapScenario,
+    additional_upstream_requests: memoryRequests - requestsBeforeExpiry,
+    expired_payload_withheld: true, expired_cookie_cleared: true,
     scope: 'compiled HTTP gateway; fixture Tailnet headers/upstream/clock; no live Tailnet or scoped MCP composition' }) + '\n');
 } finally {
   gateway?.close();
