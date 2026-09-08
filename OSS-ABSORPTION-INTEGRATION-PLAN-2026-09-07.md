@@ -832,3 +832,7 @@ provider status/accepted 및 대상은 fixture이며 상태 reconciling이다. �
 **2026-09-09 자비스/MCP 경합 인수 `fd5e9b5`: [발행 응답 기록 전 취소·취소 제출 중 원 요청 재시도](CANCELLATION-JARVIS-MCP-RACE-2026-09-09.md).**
 원 요청 선행은 실제 MCP쓰기1/취소0, 취소 선행은 원 요청쓰기0/취소 의향1 및 응답 유실 복구를 확인했다. 실제 provider 실행·커밋 본문도 각 승자와 일치했다. 관련14통과/15.13초·Ruff/syntax/diff통과.
 선택한 같은 자비스 프로세스 async 경계의 실제 전송 인수다. 여러 runtime/직접 DB 작성자·root 정체성, ACL·계보·native·실제 앱·검색·운영 복구는 남는다. 단순 quarantine을 취소 근거로 사용하는 경로는 보류한다.
+
+**2026-09-09 제품 수정 JARVIS `f7663ca`: [완료 proof의 키 유효 시점 누락 수정·실제 재인수](PROOF-KEY-WINDOW-ACCEPTANCE-2026-09-09.md).**
+현재 활성 키라는 이유로 유효 기간 시작 전 completed_at의 proof를 수락하는 결함을 재현했다. 현재와 완료 시점 양쪽 유효 기간을 검사한다. 최종14통과/40.59초·타입/lint/격리emit통과.
+실제 MCP→proof/40영역/10guard→로컬70검사→settled/completed·독립 재조회까지 다시 통과했다. 사용자/project ACL은 미구현이며 분류/claim/record 바인딩 및 전체 운영 잔여 목표를 유지한다.
