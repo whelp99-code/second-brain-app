@@ -29,6 +29,28 @@ CREATE TABLE IF NOT EXISTS correction_cancellation_generations(
   generation_digest TEXT NOT NULL,
   state TEXT NOT NULL CHECK(state IN ('sealed','generation_active'))
 );
+CREATE TABLE IF NOT EXISTS correction_cancellation_absence(
+  intent_id TEXT PRIMARY KEY REFERENCES correction_cancellations(intent_id),
+  generation_id TEXT NOT NULL, generation_digest TEXT NOT NULL, inventory_digest TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS cancellation_absence_no_delete
+BEFORE DELETE ON correction_cancellation_absence
+BEGIN SELECT RAISE(ABORT,'immutable cancellation absence'); END;
+CREATE TRIGGER IF NOT EXISTS cancellation_absence_completed_immutable
+BEFORE UPDATE ON correction_cancellation_absence WHEN EXISTS(
+  SELECT 1 FROM correction_cancellation_results WHERE intent_id=OLD.intent_id)
+BEGIN SELECT RAISE(ABORT,'immutable completed cancellation absence'); END;
+CREATE TABLE IF NOT EXISTS correction_cancellation_results(
+  intent_id TEXT PRIMARY KEY REFERENCES correction_cancellations(intent_id),
+  result_digest TEXT NOT NULL UNIQUE,
+  result_json TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS cancellation_result_no_update
+BEFORE UPDATE ON correction_cancellation_results
+BEGIN SELECT RAISE(ABORT,'immutable cancellation result'); END;
+CREATE TRIGGER IF NOT EXISTS cancellation_result_no_delete
+BEFORE DELETE ON correction_cancellation_results
+BEGIN SELECT RAISE(ABORT,'immutable cancellation result'); END;
 CREATE TRIGGER IF NOT EXISTS cancellation_active_generation_immutable
 BEFORE UPDATE ON correction_cancellation_generations WHEN OLD.state='generation_active'
 BEGIN SELECT RAISE(ABORT,'immutable active cancellation generation'); END;

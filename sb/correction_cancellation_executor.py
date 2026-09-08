@@ -13,6 +13,7 @@ from typing import cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from sb.cancellation_absence import record_cancellation_absence
 from sb.cancellation_target import verify_cancellation_target
 from sb.correction_cancellation import parse_correction_cancellation_intent
 from sb.correction_cancellation_models import CorrectionCancellationIntentV1
@@ -60,6 +61,7 @@ def apply_correction_cancellation(
     historical_delegation_keys: Mapping[str, Ed25519PublicKey],
     current_cancellation_keys: Mapping[str, Ed25519PublicKey],
     barrier: Callable[[str], None] | None = None,
+    complete: Callable[[CorrectionCancellationIntentV1, str, str], JsonObject] | None = None,
 ) -> JsonObject:
     """Resume an already admitted intent; caller key lists retain their separate purposes.
 
@@ -129,6 +131,9 @@ def apply_correction_cancellation(
                     """UPDATE correction_cancellation_generations SET state='generation_active'
                     WHERE intent_id=? AND state='sealed'""", (intent_id,),
                 )
+                if complete is not None:
+                    with generations.exclusive():
+                        return complete(intent, _text(execution, "generation_id"), _text(execution, "generation_digest"))
                 return _result(intent, _text(execution, "generation_id"), _text(execution, "generation_digest"))
             if _text(execution, "state") == "generation_active":
                 raise CancellationExecutionError("CANCELLATION_JOURNAL_CORRUPT")
@@ -173,8 +178,14 @@ def apply_correction_cancellation(
                 identities={target.target_id, target.source_identity_full,
                     target.content_identity_full, target.citation_identity_full},
                 needles=needles, now=now, authority=authority, barrier=observe)
+            _ = record_cancellation_absence(requests.db, intent_id, generation.generation_id,
+                generation.manifest.generation_digest, generation.root, needles)
+            authority()
+
+        settlement: JsonObject | None = None
 
         def activated(generation: Generation) -> None:
+            nonlocal settlement
             # Record activation while the existing generation writer is still held.
             active = generations.active()
             if active.generation_id != generation.generation_id:
@@ -184,6 +195,9 @@ def apply_correction_cancellation(
                 WHERE intent_id=? AND generation_id=? AND state='sealed'""",
                 (intent_id, generation.generation_id),
             )
+
+            if complete is not None:
+                settlement = complete(intent, generation.generation_id, generation.manifest.generation_digest)
 
         # Permanent block precedes mutation; interrupted attempts remain fail-closed.
         erasure.reingress.block_targets((intent.target,), high, admitted_at)
@@ -198,4 +212,4 @@ def apply_correction_cancellation(
             barrier=barrier,
         ))
         active = result.generation
-        return _result(intent, active.generation_id, active.manifest.generation_digest)
+        return settlement if settlement is not None else _result(intent, active.generation_id, active.manifest.generation_digest)
