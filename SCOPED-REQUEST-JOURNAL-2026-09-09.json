@@ -1,0 +1,20 @@
+{
+  "fixture": true,
+  "independent_processes": 2,
+  "results": [
+    {
+      "replayed": false,
+      "scope_digest": "sha256:5afd350ebcabbcbf83c7dfbcf98325239a3a6ace92e94d6cb9e7db932409956f",
+      "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "conflict_preserves_journal": true
+    },
+    {
+      "replayed": true,
+      "scope_digest": "sha256:5afd350ebcabbcbf83c7dfbcf98325239a3a6ace92e94d6cb9e7db932409956f",
+      "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "conflict_preserves_journal": true
+    }
+  ],
+  "provider_acceptance_completed": false,
+  "provider_calls": 0
+}

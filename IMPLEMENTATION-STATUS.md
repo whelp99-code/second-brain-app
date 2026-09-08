@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 scoped 원장 identity:** [명시적 v4 원장·재개·중복 방지](SCOPED-REQUEST-JOURNAL-2026-09-09.md). 관련29통과·독립 프로세스2개 신규→replay/범위 변경 시 dump 불변. metadata 단계이며 provider 수락·실행·승인 소비·영수증·운영 연결은 남는다.
+
 **2026-09-09 v4 원장 전환:** [명시적 schema 전환·독립 프로세스 인수](SCOPED-REQUEST-SCHEMA-2026-09-09.md). 관련26통과·실제 임시 원장17테이블/53의존객체/pending1 보존·FK오류0. 수락/실행 연결 전 자동 초기화 활성화는 보류한다. 전체 목표는 유지한다.
 
 **2026-09-09 scoped v4 데이터:** [provider·원본·범위 요청 codec](SCOPED-WRITE-REQUEST-V4-2026-09-09.md). J13/SB33통과·실제 생성→독립 검증→내부 봉인/reader3 인수. 기존 v3 parser는 v4 거부. 공개 계약·수락·승인 소비·완료 영수증은 남는다.

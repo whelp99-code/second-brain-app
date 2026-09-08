@@ -24,7 +24,7 @@ from sb.export_journal import ExportJournal
 from sb.managed_copy_disposal import initialize_copy_disposals
 from sb.process_identity import observe_process
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
-from sb.request_schema import migrate_remember_v3
+from sb.request_schema import initialize_request_schema
 from sb.sqlite_values import OPTIONAL_TEXT_ROW
 from sb.tombstone_snapshot import (
     TombstoneSnapshot,
@@ -328,7 +328,7 @@ def _owner_alive(process_id: int, process_start: int) -> bool:
 
 @final
 class RequestStore:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, scoped_v4: bool = False) -> None:
         self.root = root
         self.pending = root / "pending"
         self.processing = root / "processing"
@@ -353,7 +353,7 @@ class RequestStore:
         _ = self.db.execute("PRAGMA foreign_keys=ON")
         _ = self.db.executescript(_SCHEMA)
         try:
-            migrate_remember_v3(self.db)
+            initialize_request_schema(self.db, scoped_v4=scoped_v4)
             initialize_cancellations(self.db)
             initialize_copy_disposals(self.db)
         except BaseException:

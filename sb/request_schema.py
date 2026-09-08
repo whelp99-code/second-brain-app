@@ -85,3 +85,12 @@ def _migrate_versions(db: sqlite3.Connection, previous: re.Pattern[str], current
     finally:
         _ = db.execute(f"PRAGMA foreign_keys={foreign_keys}")
         _ = db.execute(f"PRAGMA legacy_alter_table={legacy_alter}")
+
+
+def initialize_request_schema(db: sqlite3.Connection, *, scoped_v4: bool = False) -> None:
+    """Enable V4 only for explicit callers; default clients remain V3-only."""
+    if scoped_v4 and _SCOPED_CHECK.search(_schema(db)):
+        return
+    migrate_remember_v3(db)
+    if scoped_v4:
+        migrate_scoped_v4(db)
