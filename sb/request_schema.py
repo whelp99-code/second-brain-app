@@ -87,9 +87,12 @@ def _migrate_versions(db: sqlite3.Connection, previous: re.Pattern[str], current
         _ = db.execute(f"PRAGMA legacy_alter_table={legacy_alter}")
 
 
-def initialize_request_schema(db: sqlite3.Connection, *, scoped_v4: bool = False) -> None:
-    """Enable V4 only for explicit callers; default clients remain V3-only."""
-    if scoped_v4 and _SCOPED_CHECK.search(_schema(db)):
+def initialize_request_schema(db: sqlite3.Connection, *, scoped_v4: bool = False, existing_scoped_v4: bool = False) -> None:
+    """Only scoped_v4 upgrades V3. Maintenance may recognize an existing V4 journal.
+
+    Default legacy callers still reject V4; recognition does not run its migration.
+    """
+    if (scoped_v4 or existing_scoped_v4) and _SCOPED_CHECK.search(_schema(db)):
         return
     migrate_remember_v3(db)
     if scoped_v4:

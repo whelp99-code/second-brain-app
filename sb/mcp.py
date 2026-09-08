@@ -429,13 +429,13 @@ def build_server(
 
     def maintain(now: datetime, *, read_only: bool = False) -> None:
         if vault_root is None:
-            mutations = GenerationMutationService.from_config(runtime_config)
+            mutations = GenerationMutationService.from_config(runtime_config, maintenance_only=read_only and initial_scoped_policy is not None)
             try:
                 _ = mutations.maintain_if_idle(now) if read_only else mutations.maintain(now)
             finally:
                 mutations.close()
             return
-        store = RequestStore(requests)
+        store = RequestStore(requests, maintenance_only=initial_scoped_policy is not None)
         try:
             publisher = ExportPublisher(
                 runtime_export_root,
@@ -454,7 +454,7 @@ def build_server(
             return
         lease_id = f"mcp:{os.getpid()}:{next(lease_sequence)}"
         with generation_store.pin() as pin:
-            journal = RequestStore(requests)
+            journal = RequestStore(requests, maintenance_only=initial_scoped_policy is not None)
             journal.register_reader(lease_id, pin.generation.generation_id, os.getpid(), datetime.now(UTC))
             try:
                 manifest = pin.generation.manifest
@@ -470,7 +470,7 @@ def build_server(
                 journal.close()
 
     def high_water() -> tuple[int, str]:
-        store = RequestStore(requests)
+        store = RequestStore(requests, maintenance_only=initial_scoped_policy is not None)
         try:
             return store.tombstone_high_water()
         finally:
@@ -705,7 +705,7 @@ def build_server(
         with pin_generation() as (_current_root, generation):
             current = high_water()
             require_read_fence(read_fence, "memory_status", "status", current)
-            store = RequestStore(requests)
+            store = RequestStore(requests, maintenance_only=initial_scoped_policy is not None)
             try:
                 status = store.get(request_id)
                 observations = store.observations(request_id)

@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 자비스 기억 관찰 연결·v4 MCP 읽기 수정:** [실제 MCP 재시작/정책 철회 검증](REMEMBERED-ARTIFACT-MCP-2026-09-09.md). JARVIS readRememberedArtifact가 수락된 요청의 문장·출처를 기존 인증된 read v2로 대조한다. 실제 v4 저장 후 REQUEST_SCHEMA_UNSUPPORTED 읽기 실패를 발견해, 업그레이드/수락/claim 없이 기존 schema를 인식하는 유지보수 모드를 scoped 읽기에 연결했다. SB 전체1,237통과/2skip/215.74초, J 관련53통과/9.62초·타입/lint·격리emit. 재시작 후4레코드 일치, 다중 프로젝트 권한 포함 조회, provider/issuer 정책 철회 거절. 정확한 분류 증거/공개 v4 전송/자동 완료/운영 인수는 남는다.
+
 **2026-09-09 후속 세대 artifact 대조·분류 계승:** [상세 분석·전체1,234통과·독립reader4](SCOPED-ARTIFACT-VERIFICATION-2026-09-09.md). 직접 GenerationStore.build 경로의 접근 분류 유실을 재현하고, 바이트가 같은 현재 페이지의 검증된 분류만 계승하도록 수정했다. 일반 runtime은 기존 ledger 복사 단계가 있어 재현 범위를 구분한다. 실제 문장/출처/민감도/분류 대조 및 후속 세대 읽기 구현, 전체1,234통과/2skip/223.33초·Ruff·새 모듈 정적검사 통과. 공개 전송·현재 정책/삭제 fence 연결·자비스 자동 완료·전체 M1–M14 운영 인수는 남는다.
 
 **2026-09-09 접근 분류 generation identity 수정:** [분류 결합·교체 거부·전체1,222통과](SCOPED-GENERATION-IDENTITY-FIX-2026-09-09.md). 프로젝트/owner/policy 차이가 ID에 반영되고 동일 분류는 재현된다. FIFO 회귀 수정 후 전체1,222통과/2skip/204.85초·Ruff·새 모듈 정적검사 통과. 독립 scope reader4 및 JARVIS/Python8프로세스 인수. 옛 미결합 분류 세대는 거부하며 운영 재생성/reader 전환·자동 완료/전체 목표는 남는다.

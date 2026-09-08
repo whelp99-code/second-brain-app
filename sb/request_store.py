@@ -328,7 +328,15 @@ def _owner_alive(process_id: int, process_start: int) -> bool:
 
 @final
 class RequestStore:
-    def __init__(self, root: Path, *, scoped_v4: bool = False) -> None:
+    """Request journal; maintenance_only recognizes V4 without upgrading to it.
+
+    Maintenance may manage reader leases and disposal metadata, but cannot accept
+    a request/cancellation or claim execution. This is not a read-only SQLite DB.
+    """
+    def __init__(self, root: Path, *, scoped_v4: bool = False, maintenance_only: bool = False) -> None:
+        if scoped_v4 and maintenance_only:
+            raise RequestStoreError("REQUEST_STORE_MODE_INVALID")
+        self._maintenance_only = maintenance_only
         self.root = root
         self.pending = root / "pending"
         self.processing = root / "processing"
@@ -353,7 +361,7 @@ class RequestStore:
         _ = self.db.execute("PRAGMA foreign_keys=ON")
         _ = self.db.executescript(_SCHEMA)
         try:
-            initialize_request_schema(self.db, scoped_v4=scoped_v4)
+            initialize_request_schema(self.db, scoped_v4=scoped_v4, existing_scoped_v4=maintenance_only)
             initialize_cancellations(self.db)
             initialize_copy_disposals(self.db)
         except BaseException:
@@ -498,6 +506,8 @@ class RequestStore:
 
         Commits non-receipt marker + replica + work metadata together, not a generation or purge.
         """
+        if self._maintenance_only:
+            raise RequestStoreError("REQUEST_STORE_MAINTENANCE_ONLY")
         self._begin()
         try:
             verified, now = validate_locked()
@@ -639,6 +649,8 @@ class RequestStore:
         tombstones: Sequence[Mapping[str, JsonValue]] | None = None,
         tombstone_targets: Sequence[Mapping[str, JsonValue]] | None = None,
     ) -> tuple[RequestStatus, bool]:
+        if self._maintenance_only:
+            raise RequestStoreError("REQUEST_STORE_MAINTENANCE_ONLY")
         stamp = format_instant(now)
         result_json = canonical_bytes(result).decode("utf-8")
         self._begin()
@@ -734,6 +746,8 @@ class RequestStore:
         now: datetime,
         lease_ms: int = 60_000,
     ) -> RequestLease | None:
+        if self._maintenance_only:
+            raise RequestStoreError("REQUEST_STORE_MAINTENANCE_ONLY")
         if not worker or not 1 <= lease_ms <= 600_000:
             raise RequestStoreError("REQUEST_CLAIM_INVALID")
         stamp = format_instant(now)

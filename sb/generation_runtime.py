@@ -68,9 +68,9 @@ class GenerationMutationService:
         self.lifecycle = lifecycle
 
     @classmethod
-    def from_config(cls, config: Config) -> GenerationMutationService:
+    def from_config(cls, config: Config, *, maintenance_only: bool = False) -> GenerationMutationService:
         paths = generation_runtime_paths(config)
-        requests = RequestStore(paths.requests)
+        requests = RequestStore(paths.requests, maintenance_only=maintenance_only)
         store = GenerationStore(
             paths.state,
             paths.share,
