@@ -1,0 +1,10 @@
+{
+  "fixture": true,
+  "processes": 2,
+  "accepted_v3_request_id": "memreq:pos:v3:fa479c896460e2af3a83ef07fdc41e28bd787204bd67a7ab029a95505648fd8f",
+  "preserved_tables": 17,
+  "preserved_dependencies": 53,
+  "preserved_pending_files": 1,
+  "foreign_key_errors": 0,
+  "v4_runtime_enabled": false
+}

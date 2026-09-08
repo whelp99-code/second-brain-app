@@ -66,3 +66,64 @@ def test_failure_after_drop_restores_old_schema_and_can_retry() -> None:
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:
         db.close()
+
+
+@pytest.mark.parametrize("legacy_alter", [0, 1])
+def test_explicit_scoped_upgrade_preserves_existing_dependencies(legacy_alter):
+    from sb.request_schema import migrate_scoped_v4
+
+    db = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        db.executescript(OLD)
+        # V4 is an explicit successor; it never silently skips the V3 upgrade.
+        original = tuple(db.iterdump())
+        with pytest.raises(ValueError, match="REQUEST_SCHEMA_UNSUPPORTED"):
+            migrate_scoped_v4(db)
+        assert tuple(db.iterdump()) == original
+        migrate_remember_v3(db)
+        db.execute(f"PRAGMA legacy_alter_table={legacy_alter}")
+        db.execute("INSERT INTO requests VALUES('v3',3,'legacy multiline')")
+        migrate_scoped_v4(db)
+        migrate_scoped_v4(db)
+        db.execute("INSERT INTO requests VALUES('v4',4,'scoped')")
+        assert db.execute("SELECT request_id FROM request_view ORDER BY request_id").fetchall() == [("old",), ("v3",), ("v4",)]
+        assert db.execute("SELECT * FROM children").fetchall() == [("child", "old")]
+        assert db.execute("SELECT * FROM events").fetchall() == [("old",), ("v3",), ("v4",)]
+        assert db.execute("SELECT name FROM sqlite_master WHERE name='request_body'").fetchone()
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert db.execute("PRAGMA foreign_keys").fetchone() == (1,)
+        assert db.execute("PRAGMA legacy_alter_table").fetchone() == (legacy_alter,)
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute("INSERT INTO requests VALUES('v5',5,'unsupported')")
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute("INSERT INTO requests VALUES('empty',4,'')")
+        # An old V3-only initializer cannot silently downgrade the V4 journal.
+        with pytest.raises(ValueError, match="REQUEST_SCHEMA_UNSUPPORTED"):
+            migrate_remember_v3(db)
+    finally:
+        db.close()
+
+
+def test_scoped_upgrade_failure_is_atomic_and_retryable():
+    from sb.request_schema import migrate_scoped_v4
+
+    db = sqlite3.connect(":memory:", isolation_level=None)
+    try:
+        db.executescript(OLD)
+        migrate_remember_v3(db)
+        before = tuple(db.iterdump())
+        db.set_authorizer(lambda code, *_args: sqlite3.SQLITE_DENY
+                          if code == sqlite3.SQLITE_ALTER_TABLE else sqlite3.SQLITE_OK)
+        with pytest.raises(sqlite3.DatabaseError):
+            migrate_scoped_v4(db)
+        db.set_authorizer(None)
+        assert tuple(db.iterdump()) == before
+        assert not db.in_transaction
+        db.execute("BEGIN IMMEDIATE")
+        with pytest.raises(ValueError, match="REQUEST_SCHEMA_MIGRATION_IN_TRANSACTION"):
+            migrate_scoped_v4(db)
+        db.rollback()
+        migrate_scoped_v4(db)
+        db.execute("INSERT INTO requests VALUES('v4',4,'scoped')")
+    finally:
+        db.close()

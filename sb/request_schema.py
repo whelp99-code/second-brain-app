@@ -9,6 +9,7 @@ from typing import cast
 _VERSION_CHECK = re.compile(r"CHECK\s*\(\s*schema_version\s+IN\s*\(\s*1\s*,\s*2\s*\)\s*\)", re.IGNORECASE)
 _CURRENT_CHECK = re.compile(r"CHECK\s*\(\s*schema_version\s+IN\s*\(\s*1\s*,\s*2\s*,\s*3\s*\)\s*\)", re.IGNORECASE)
 
+_SCOPED_CHECK = re.compile(r"CHECK\s*\(\s*schema_version\s+IN\s*\(\s*1\s*,\s*2\s*,\s*3\s*,\s*4\s*\)\s*\)", re.IGNORECASE)
 
 def _schema(db: sqlite3.Connection) -> str:
     row = cast(tuple[object] | None, db.execute(
@@ -25,7 +26,21 @@ def migrate_remember_v3(db: sqlite3.Connection) -> None:
     Run only on the journal's writer connection, before any request transaction.
     The writer lock rechecks the schema so competing initializers converge.
     """
-    if _CURRENT_CHECK.search(_schema(db)):
+    _migrate_versions(db, _VERSION_CHECK, _CURRENT_CHECK, "1,2,3", "requests_v3_migration")
+
+
+def migrate_scoped_v4(db: sqlite3.Connection) -> None:
+    """Explicit V3→V4 writer upgrade. Not wired into automatic initialization.
+
+    Older schema and unknown constraints are rejected: callers must first finish
+    the existing V3 upgrade, then enable the complete V4 acceptance/runtime path.
+    """
+    _migrate_versions(db, _CURRENT_CHECK, _SCOPED_CHECK, "1,2,3,4", "requests_v4_migration")
+
+
+def _migrate_versions(db: sqlite3.Connection, previous: re.Pattern[str], current: re.Pattern[str],
+    versions: str, temporary: str) -> None:
+    if current.search(_schema(db)):
         return
     if db.in_transaction:
         raise ValueError("REQUEST_SCHEMA_MIGRATION_IN_TRANSACTION")
@@ -36,17 +51,17 @@ def migrate_remember_v3(db: sqlite3.Connection) -> None:
     try:
         _ = db.execute("BEGIN IMMEDIATE")
         original = _schema(db)
-        if _CURRENT_CHECK.search(original):
+        if current.search(original):
             db.commit()
             return
-        upgraded, count = _VERSION_CHECK.subn("CHECK(schema_version IN (1,2,3))", original)
+        upgraded, count = previous.subn(f"CHECK(schema_version IN ({versions}))", original)
         if count != 1:
             raise ValueError("REQUEST_SCHEMA_UNSUPPORTED")
         if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
             raise ValueError("REQUEST_SCHEMA_FOREIGN_KEY_INVALID")
         # Create from the actual old DDL, retaining every other check/default/column.
         upgraded, count = re.subn(r'^CREATE TABLE\s+(?:"requests"|requests)\s*\(',
-                                  'CREATE TABLE "requests_v3_migration"(', upgraded, count=1, flags=re.IGNORECASE)
+                                  f'CREATE TABLE "{temporary}"(', upgraded, count=1, flags=re.IGNORECASE)
         if count != 1:
             raise ValueError("REQUEST_SCHEMA_UNSUPPORTED")
         dependencies = cast(list[tuple[str]], db.execute(
@@ -56,9 +71,9 @@ def migrate_remember_v3(db: sqlite3.Connection) -> None:
         columns = cast(list[tuple[int, str]], db.execute("PRAGMA table_info(requests)").fetchall())
         names = ",".join('"' + row[1].replace('"', '""') + '"' for row in columns)
         _ = db.execute(upgraded)
-        _ = db.execute(f"INSERT INTO requests_v3_migration({names}) SELECT {names} FROM requests")
+        _ = db.execute(f"INSERT INTO {temporary}({names}) SELECT {names} FROM requests")
         _ = db.execute("DROP TABLE requests")
-        _ = db.execute("ALTER TABLE requests_v3_migration RENAME TO requests")
+        _ = db.execute(f"ALTER TABLE {temporary} RENAME TO requests")
         for (statement,) in dependencies:
             _ = db.execute(statement)
         if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
