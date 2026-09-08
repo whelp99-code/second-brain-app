@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "profile": "scoped-remember-preparation-v1",
+  "binding": {
+    "identity": {
+      "schema_version": 1,
+      "operation": "remember",
+      "candidate_id": "memcand:pos:v1:3584d3f33f8ad1176aa85be1d157e02600bd92cbf4ddc0ca50797d4e15f65fc6",
+      "candidate_digest": "sha256:ace55b4b643f68b2df51a6342517f12242d9a881f0a54b1e212066dc2fc1d0c9",
+      "classification_digest": "sha256:e7c8bb7ec0db4aee405cc98e252aea0ee86936483954280bbd471e76ef2f2486",
+      "source_digest": "sha256:760271e3595b3a8a9d388334434d660de9a9346e50577fa3e1e83b6b624340c9",
+      "owner": "principal:owner",
+      "projects": [
+        "project:shared-memory"
+      ],
+      "policy_revision": "policy:fixture"
+    },
+    "identity_digest": "sha256:bcc49c028237446fb19db0e66ffa8d6c90afc0c0e51a2748fd6b58eadd97de1b",
+    "proposal_digest": "sha256:48986d200d5cece42d93a59eb02bf632fb80690d175073721dda952aa52595a1",
+    "idempotency_key": "memidem:scoped:v1:bcc49c028237446fb19db0e66ffa8d6c90afc0c0e51a2748fd6b58eadd97de1b",
+    "control_request_id": "memory-scope-review:48986d200d5cece42d93a59eb02bf632fb80690d175073721dda952aa52595a1",
+    "control_receipt_id": "receipt:memory-scope-review:48986d200d5cece42d93a59eb02bf632fb80690d175073721dda952aa52595a1",
+    "command_digest": "sha256:a8c470fe0abc2a20c547923ca50a0dd0253f5c64f105717e3c7fb8eba0060d6b",
+    "expires_at": "2026-08-28T12:01:00.000Z",
+    "writes_authorized": false
+  },
+  "payload": {
+    "subject": "Task 27 verification",
+    "content": "첫 결정\r\n두 번째 결정\n반복\n반복 [^user]",
+    "subject_digest": "sha256:8db1697049f734b95744d2a566eb286ea9d32576002662bd385740763d605ceb",
+    "content_digest": "sha256:db16d7bc72fbac8aff908fdf51f14ca5356761bdcb5f45ddb0885e5e16caffad",
+    "purpose": "personal_memory",
+    "sensitivity": "personal",
+    "retention_days": 3650
+  },
+  "writes_authorized": false,
+  "preparation_digest": "sha256:2c1fb41951a6ef1f8b3e6abf809a411708e56639d43e6b4dcba4f10a2324d51e"
+}

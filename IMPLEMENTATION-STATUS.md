@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 scoped 준비값 검증:** [provider 측 codec·SourceAccess 연결](SCOPED-WRITE-PREPARATION-CODEC-2026-09-09.md). 관련23통과·실제 JARVIS CLI 생성값의 독립 Python 검증/본문51bytes·범위 일치. 실제 쓰기 수락·단일 소비·봉인 계보·완료 영수증은 남는다.
+
 **2026-09-09 미사용 자동 후보 정리:** [원문 만료 정리·인계 추가 대조](AUTO-EXPIRY-CLEANUP-2026-09-09.md). 관련21통과·격리 CLI v3 원문1→0/분류·원장 불변/provider 호출0. 처리 중 자료 보존. scoped 쓰기·native 세션 삭제·전체 운영 인수는 남는다.
 
 **2026-09-09 JARVIS `8ffc993` / SB 전체:** [자동 발행의 가변 Date 역행 수정](AUTO-PUBLICATION-CLOCK-2026-09-09.md). 재현1실패→관련19통과·실제 CLI/MCP/provider 저장·records4 재인수. SB `cc236a3` 기준 전체1,153통과/2skip/219.73초·전체Ruff통과. scoped 쓰기·orphan 수명·운영/모델 세션 인수는 남는다.

@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 scoped 준비값 검증:** [provider 측 codec·SourceAccess 연결](SCOPED-WRITE-PREPARATION-CODEC-2026-09-09.md). 관련23통과·실제 JARVIS CLI 생성값의 독립 Python 검증/본문51bytes·범위 일치. 실제 쓰기 수락·단일 소비·봉인 계보·완료 영수증은 남는다.
+
 **2026-09-09 미사용 자동 후보 정리:** [원문 만료 정리·인계 추가 대조](AUTO-EXPIRY-CLEANUP-2026-09-09.md). 관련21통과·격리 CLI v3 원문1→0/분류·원장 불변/provider 호출0. 처리 중 자료 보존. scoped 쓰기·native 세션 삭제·전체 운영 인수는 남는다.
 
 **2026-09-09 JARVIS `8ffc993`:** [발행 시각 역행 수정·누적 전체 검사](AUTO-PUBLICATION-CLOCK-2026-09-09.md). 관련19통과·실제 일반 owner 저장 재인수, SB 전체1,153통과/2skip/219.73초(`cc236a3`) 및 전체Ruff. 전체 운영 목표 완료로 확대하지 않는다.
