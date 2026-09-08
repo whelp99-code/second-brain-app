@@ -12,6 +12,7 @@ from sb.exports import ExportPublisher
 @dataclass(frozen=True, slots=True)
 class MaintenanceResult:
     disposed_export_digests: tuple[str, ...]
+    disposed_staging_keys: tuple[str, ...] = ()
 
 
 @final

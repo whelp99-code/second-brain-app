@@ -304,7 +304,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             mutations.close()
         print(
             json.dumps(
-                {"disposed_exports": len(result.disposed_export_digests)},
+                {"disposed_exports": len(result.disposed_export_digests),
+                 "disposed_staging": len(result.disposed_staging_keys)},
                 sort_keys=True,
                 separators=(",", ":"),
             )
