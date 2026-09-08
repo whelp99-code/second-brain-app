@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `a4ec505` outbox 프로필 분리:** [migration077·legacy worker 경계·실제76→77](OUTBOX-PROFILE-MIGRATION-2026-09-09.md). 확대71통과·타입/lint/격리emit, 실제 queued1/기존 열/FK 보존. scoped 승인 소비·등록·worker 활성화·운영 인수는 남는다.
+
 **2026-09-09 JARVIS `53c67b1` 최종 읽기 뒤 철회 수정:** [회귀1실패→관련23통과·실제 정책 파일 철회](SCOPED-PUBLICATION-COMPOSITION-2026-09-09.md). 타입/lint/격리emit, 독립4프로세스에서 read 직후 정책 철회 시 prepared 반환 거부. 승인 소비/outbox/provider·전체 운영 목표는 유지한다.
 
 **2026-09-09 JARVIS `862913e` 준비→발행 조합:** [현재 권한 재검사·별도 프로세스 재시도](SCOPED-PUBLICATION-COMPOSITION-2026-09-09.md). 관련20통과·타입/lint/격리emit, 실제 CLI/서명 검토/private 정책의 독립3프로세스 인수. prepared/권한false이며 승인 소비/outbox·운영 연결은 남는다.

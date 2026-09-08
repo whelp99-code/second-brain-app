@@ -1,0 +1,11 @@
+{
+  "fixture_database": true,
+  "processes": 2,
+  "queued_rows_preserved": 1,
+  "original_columns_unchanged": true,
+  "request_profile": "legacy",
+  "migration_count_before": 76,
+  "migration_count_after": 77,
+  "foreign_key_errors": 0,
+  "quick_check": "ok"
+}
