@@ -1,5 +1,7 @@
 # Second Brain 수정·개선·고도화 분석
 
+**2026-09-09 JARVIS `d020bc4` / SB `e95fa8f`:** [에이전트 정책·새 로그인 기억 사용](AGENT-POLICY-LOGIN-2026-09-09.md). 선택적 정책v2/issuer session 모드, J8·SB23통과 및 실제 서로 다른 로그인2개에서 정책 파일 수정 없이 records2 회수·agent 철회403. 기존 고정 session/v1 유지. 운영·쓰기/영수증/재사용 전체 인수는 남는다.
+
 **2026-09-09 JARVIS `167eeca` / SB `6a03110`:** [phone CLI의 명시적 scoped 활성화](SCOPED-PHONE-HTTP-CONTEXT-2026-09-09.md). 10개 필수 옵션을 기존 시작 함수에 연결, 관련50통과·lint 수정 후9통과·타입/lint 및 CLI parser→실제 HTTP/MCP 인수. 운영 서비스 적용·세션 정책 배정·전체 목표는 남는다.
 
 **2026-09-09 JARVIS `55bc647` / SB `cb637e7`:** [HTTP context 오류 분류·종료 중 세션 만료](SCOPED-PHONE-HTTP-CONTEXT-2026-09-09.md). 관련61통과·실제 MCP 정책403/입력400/자식 종료 중 만료401 및 쿠키 제거 확인. 운영 활성화·정책 배정·전체 인수는 남는다.
