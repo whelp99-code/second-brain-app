@@ -1,0 +1,107 @@
+{
+  "source_tree_sha256": "3cd2e70dcc2b362ef0ebfe029787b30bdb4bc5bbf38994150257b6b9936af08c",
+  "native": {
+    "state": "passed",
+    "workspace": "/var/tmp/sb-vector-recovery-hkcpa0ah",
+    "commands": {
+      "crash-after-sql": {
+        "exit": 17,
+        "stdout": "",
+        "stderr": ""
+      },
+      "retry": {
+        "exit": 0,
+        "stdout": "rebuilt 4 vectors\n",
+        "stderr": "vector staging cleanup deferred: reader visibility incomplete\n"
+      },
+      "unsafe-directory": {
+        "exit": 1,
+        "stdout": "",
+        "stderr": "vector rebuild I/O failed\n"
+      }
+    },
+    "prior_vector_sha256": "8fd77e8adbadcf2df5063958525c382a125bfef9e3317b4cf44141e0248f50a6",
+    "reader_previous_rows": 3,
+    "published_rows": 4,
+    "old_search_after_crash": true,
+    "unsafe_directory_unchanged": true,
+    "remaining_orphans": [
+      ".vectors-4b3e6e45a8e1405fa848f5d7117e59a8.db"
+    ],
+    "cleanup_complete": false,
+    "limitations": [
+      "deterministic encoder; not model quality",
+      "standalone vectors, not sealed hybrid activation",
+      "unverifiable host reader visibility defers disposal"
+    ]
+  },
+  "hybrid": {
+    "status": "native_cli_filtered_cosine_passed",
+    "root": "/var/tmp/sb-hybrid-filter-xbupllrz",
+    "results": {
+      "lexical": [],
+      "hybrid": [
+        {
+          "page_id": "wiki/z-allowed",
+          "section": "Body",
+          "snippet": "distant useful fact",
+          "score": 0.01639344262295082,
+          "kind": "wiki",
+          "index_status": "active",
+          "knowledge_status": "ACTIVE",
+          "approval_status": "APPROVED",
+          "canonical": "",
+          "source_ref": "origin:wiki/z-allowed",
+          "updated_at": "2026-09-08",
+          "role": "CANONICAL",
+          "verification": "VERIFIED"
+        }
+      ],
+      "candidate": [
+        {
+          "page_id": "wiki/a-hidden",
+          "section": "Body",
+          "snippet": "SemanticNeedle exact",
+          "score": 0.01639344262295082,
+          "kind": "wiki",
+          "index_status": "draft",
+          "knowledge_status": "CANDIDATE",
+          "approval_status": "PENDING",
+          "canonical": "",
+          "source_ref": "origin:wiki/a-hidden",
+          "updated_at": "2026-01-01",
+          "role": "REFERENCE",
+          "verification": "UNVERIFIED"
+        }
+      ],
+      "literal-filter": [],
+      "corrected": []
+    },
+    "vector_db_unchanged": true,
+    "encoder": "deterministic fixture; not model quality",
+    "sealed_hybrid_acceptance": false,
+    "operational_activation": false
+  },
+  "validation": {
+    "initial_failed": 7,
+    "pinned_baseline_failed": 3,
+    "focused_passed": 97,
+    "focused_skipped": 1,
+    "types_errors": 0,
+    "types_warnings": 0,
+    "ruff": "passed",
+    "full": {
+      "passed": 874,
+      "skipped": 2,
+      "seconds": 198.06,
+      "log": "/var/tmp/sb-vector-recovery-full-final.log",
+      "excluded": "tests/test_embeddings.py"
+    }
+  },
+  "remaining": [
+    "Host orphan cleanup deferred: reader visibility incomplete",
+    "Sealed hybrid inactive",
+    "JARVIS session/compaction/deletion/scope and operational acceptance incomplete"
+  ],
+  "product_commit": "d152819"
+}
