@@ -19,11 +19,12 @@ from tests.task30_effect_factory import effect_request
 from tests.test_correction_cancellation import HISTORICAL
 from tests.test_request_executor import _config
 
-if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in ('--record-result', '--compact-result', '--rebuild-result')):
-    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result|--compact-result|--rebuild-result]')
+if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in ('--record-result', '--compact-result', '--rebuild-result', '--swap-result')):
+    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result|--compact-result|--rebuild-result|--swap-result]')
 record_result = len(sys.argv) == 3
-compact_result = record_result and sys.argv[2] in ("--compact-result", "--rebuild-result")
+compact_result = record_result and sys.argv[2] in ("--compact-result", "--rebuild-result", "--swap-result")
 rebuild_result = record_result and sys.argv[2] == "--rebuild-result"
+swap_result = record_result and sys.argv[2] == "--swap-result"
 work = Path(tempfile.mkdtemp(prefix='cancellation-submit-acceptance-', dir='/var/tmp'))
 c = _config(work)
 seed = write_fixture_request()
@@ -81,7 +82,7 @@ module.main()
         private = base64.urlsafe_b64encode(HISTORICAL.private_bytes_raw()).decode().rstrip('=')
         execution_config.write_text('provider_signing_key_id = "provider:key"\nprovider_private_key = "'+private+'"\n'+config.read_text())
         execution_config.chmod(0o600)
-    payload = {'rebuild_result': rebuild_result, 'compact_result': compact_result, 'record_result': record_result, 'execution_config': str(execution_config),
+    payload = {'swap_result': swap_result, 'rebuild_result': rebuild_result, 'compact_result': compact_result, 'record_result': record_result, 'execution_config': str(execution_config),
         'python': sys.executable, 'sb_root': str(ROOT), 'build': str(Path(sys.argv[1]).resolve()), 'launcher': str(launcher), 'config': str(config),
         'contract': str(ROOT / 'contracts/second-brain-mcp-v5.json'),
         'resolved': {'target': original['targets'][0], 'scope': original['scope']}}
