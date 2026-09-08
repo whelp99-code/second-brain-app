@@ -46,3 +46,18 @@ policy_revision = "policy:1"
 v2 agents 정책은 해당 agent의 유효한 인증 세션 전체를 대상으로 한다. 특정 로그인만 허용해야 하는 경우 v1을 사용한다. 특정 세션의 인증 철회는 인증 공급자가 담당하며 v2 정책에서 agent를 제거하면 그 agent의 세션 전체가 거부된다. 같은 OS 권한을 공유하는 프로세스의 파일 접근 격리나 다른 사용자의 인증 체계를 새로 제공하는 기능은 아니다.
 
 이 단위로 로그인별 수동 정책 작성의 결손을 닫았지만 운영 활성화·준비 상태·요청 취소 정리, scoped 저장→검증된 작업 결과→영수증→다른 에이전트 재사용, 정책 rollback·정정/삭제·모델 로그/복구 및 전체 M1~M14 인수는 남는다. 기본 정책을 자동 변환하지 않고 선택적 모드로 제공한다.
+
+## 후속: 서로 다른 에이전트의 공유·프로젝트 제한 인수
+
+2026-09-09 SB 인수 `b5c192a`. 제품은 JARVIS `d020bc4` 및 SB `e95fa8f` 그대로이며 추가 제품 수정 없이 아래 실제 실행 증거를 보강했다.
+
+같은 Node 인수 프로세스 안에 서버 설정 agent ID와 쿠키 저장소가 다른 두 HTTP gateway 인스턴스를 만들었다. 각각 기존 CLI/scoped factory를 호출하고 자체 supervised MCP 자식으로 같은 정본 vault/provider와 JARVIS DB를 조회한다. 별도 에이전트 기억 DB를 생성하지 않는다. 첫 gateway는 기존 agent:test, 두 번째는 agent:shared-memory-peer다. 실제 Codex/Claude 애플리케이션 두 개를 실행한 인수나 독립 gateway OS 프로세스 격리 시험은 아니다.
+
+- 두 agent에 같은 projects/methods를 명시했을 때 두 번째 gateway의 HTTP 응답 records 2개가 첫 번째의 records와 deep equality로 일치했다. 본문뿐 아니라 반환 record의 출처·버전 등 구조 전체를 비교했다.
+- 정책 파일에서 두 번째 agent만 project:isolated-peer로 제한했다. 같은 로그인으로 다시 조회하면 HTTP 200, context.state=empty, records=[]를 반환했다. 프로젝트 밖의 기억을 빈 근거로 처리했으며 원문 record를 전달하지 않았다.
+- 그 상태에서 첫 번째 agent는 records 2개를 계속 조회했다. 한 agent의 정책 변경이 다른 agent의 허용 범위를 바꾸지 않았다.
+- 기존 로그인별 무수정 정책 재사용·agent 전체 철회403·기존 고정세션/v1·입력400·만료401·MCP 종료 관측·독립 프로세스 제출 중복 거부를 같은 인수에서 유지했다.
+
+실행 `TMPDIR=/var/tmp uv run python scripts/scoped-mcp-acceptance.py <격리 JARVIS 빌드 경로>` 통과, JS 구문과 diff 검사 통과. 원본 `/var/tmp/page-access-acceptance-kwbcvlo4/scoped-mcp-result.json`을 연결 JSON에 반영했다. 제품/회귀 테스트를 바꾸지 않았으며 전체 pytest/Vitest를 반복 실행하지 않았다. 앞선 8개/23개 수치를 이번 재실행 수치로 표현하지 않는다.
+
+이 결과는 명시된 두 agent의 HTTP/MCP 조회 공유와 반환 record 제한을 입증한다. agent별 실제 실행 도구·로그 수집·모델 주입 지원, 쓰기→영수증→새 에이전트 재사용, OS 파일 격리, 전체 표면·타이밍 정보 비노출을 입증하는 것은 아니다. Tailnet 신원·키·시각·원본은 앞선 fixture 조건이다. 운영 배포·DB 변경 없이 전체 목표를 유지한다.

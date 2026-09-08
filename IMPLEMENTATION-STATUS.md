@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 SB `b5c192a`:** [서로 다른 agent의 실제 공유·프로젝트 제한](AGENT-POLICY-LOGIN-2026-09-09.md). 두 HTTP gateway agent가 같은 정본 records2를 동일하게 회수, peer만 프로젝트 제한 후 peer0/original2 확인. 실제 Codex/Claude 실행·쓰기/영수증/주입 및 전체 운영 인수는 남는다.
+
 **2026-09-09 JARVIS `d020bc4` / SB `e95fa8f`:** [에이전트 정책·새 로그인 기억 사용](AGENT-POLICY-LOGIN-2026-09-09.md). 선택적 정책v2/issuer session 모드, J8·SB23통과 및 실제 서로 다른 로그인2개에서 정책 파일 수정 없이 records2 회수·agent 철회403. 기존 고정 session/v1 유지. 운영·쓰기/영수증/재사용 전체 인수는 남는다.
 
 **2026-09-09 JARVIS `167eeca` / SB `6a03110`:** [phone CLI의 명시적 scoped 활성화](SCOPED-PHONE-HTTP-CONTEXT-2026-09-09.md). 10개 필수 옵션을 기존 시작 함수에 연결, 관련50통과·lint 수정 후9통과·타입/lint 및 CLI parser→실제 HTTP/MCP 인수. 운영 서비스 적용·세션 정책 배정·전체 목표는 남는다.

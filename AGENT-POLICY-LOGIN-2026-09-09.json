@@ -3,6 +3,9 @@
     "reference_delivery": {
       "http_context": {
         "agent_policy_new_sessions_without_policy_edits": 2,
+        "independent_agent_shared_records_equal": true,
+        "restricted_peer_records": 0,
+        "original_agent_records_after_peer_restriction": 2,
         "agent_policy_withdrawal_denied": true,
         "cli_activation_parsed": true,
         "records": 2,
@@ -83,7 +86,7 @@
       "records": 2
     }
   ],
-  "work": "/var/tmp/page-access-acceptance-fuchw58p",
+  "work": "/var/tmp/page-access-acceptance-kwbcvlo4",
   "tools": [
     "sb_read_page",
     "sb_search"
