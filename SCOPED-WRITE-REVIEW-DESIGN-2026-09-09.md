@@ -28,3 +28,13 @@ fixture 키·고정 시각·합성 작업 근거를 사용한 실제 코드/API/
 ## 유지하는 보류
 
 서명 검토 결과를 기존 v3 remember에 억지로 붙이는 방식, 이 읽기 API의 반환을 쓰기 허가로 취급하는 방식은 보류한다. 다음 단계는 현재 작업 근거·정책 확인, 검토 영수증의 단일 소비, 양쪽 버전 요청/receipt/idempotency, 요청별 불변 분류를 함께 구현하는 것이다. capabilities의 writes_supported=false를 유지한다.
+
+## 실행기 회귀 수정 — JARVIS 5c8931b
+
+새 action의 executable=false만으로는 일반 ControlPlane 큐에서 제외되지 않았다. nextApproved가 scope review를 반환하는 실패를 회귀 테스트로 재현했다. ApprovedCommandExecutor는 claim으로 영수증을 소비한 뒤 action 지원 여부를 확인하므로 실제 실행 시 검토 승인이 손실될 수 있었다.
+
+nextApproved에서 scope review를 제외하고 직접 claim도 CONTROL_ACTION_REVIEW_ONLY로 거부한다. 기존 memory.confirm 등 별도 처리되는 action의 의미는 유지했다. 관련13통과/10.55초, 타입·변경 파일 lint·격리 emit·JS 구문·diff 검사 통과.
+
+실제 컴파일된 ApprovedCommandExecutor를 추가한 독립 프로세스7개 인수에서 일반 실행 거부, 테이블 행 불변, 이후 동일 승인 정상 조회를 확인했다. 기존 다른 범위·철회·격리 거부도 유지됐다. [결과](SCOPED-REVIEW-EXECUTOR-2026-09-09.json). fixture DB/키/시계 검증이며 운영 실행이 아니다.
+
+후속 소비 결합 위치는 MemoryOutboxStore.insertOrReplay의 기존 immediate 트랜잭션이다. personal_authority_redemptions의 현재 CHECK는 memory_deletion/memory_confirmation/remote_enrollment만 허용한다. 범위 검토를 memory_confirmation으로 위장하거나 기존 migration을 변경하지 않는다. 버전 요청 identity와 불변 소비 증거를 함께 설계해야 하며, 일반 claim으로 미리 영수증을 소진하는 방식은 사용하지 않는다. scoped 저장 요청/분류/완료 영수증은 아직 미완료다.

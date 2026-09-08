@@ -12,12 +12,18 @@ const load = path => import(pathToFileURL(join(build, path)).href);
 const { proposeMemoryCandidateScope, validateMemoryCandidateScopeProposal } = await load("src/memory-candidate-scope.js");
 const { AuthorityDb } = await load("src/db.js");
 const { stageMemoryScopeReview, readApprovedMemoryScopeReview } = await load("src/memory-scope-review.js");
-if (mode === "read" || mode === "review") {
+if (mode === "read" || mode === "review" || mode === "execute") {
   const authority = new AuthorityDb(databasePath);
   try {
     try {
       const proposal = JSON.parse(readFileSync(proposalPath, "utf8"));
-      if (mode === "review") {
+      if (mode === "execute") {
+        const { ControlPlane } = await load("src/control-plane.js");
+        const { ApprovedCommandExecutor } = await load("src/approved-executor.js");
+        assert.notEqual(new ControlPlane(authority).nextApproved(new Date(at)), requestId);
+        await new ApprovedCommandExecutor(authority).execute(requestId, "scope-review-acceptance", new Date(at));
+        throw new Error("scope review was executed");
+      } else if (mode === "review") {
         const result = readApprovedMemoryScopeReview(authority, proposal, requestId, new Date(at));
         process.stdout.write(JSON.stringify({ accepted: true, proposal_digest: result.proposal.proposal_digest,
           writes_authorized: result.writes_authorized }));
@@ -26,7 +32,7 @@ if (mode === "read" || mode === "review") {
         process.stdout.write(JSON.stringify({ accepted: true, proposal_digest: result.proposal_digest, authorization: result.authorization }));
       }
     } catch (error) {
-      if (!["MEMORY_CANDIDATE_SCOPE_INVALID", "MEMORY_SCOPE_REVIEW_INVALID"].includes(error.code)) throw error;
+      if (!["MEMORY_CANDIDATE_SCOPE_INVALID", "MEMORY_SCOPE_REVIEW_INVALID", "CONTROL_ACTION_REVIEW_ONLY"].includes(error.code)) throw error;
       process.stdout.write(JSON.stringify({ accepted: false, code: error.code }));
     }
   } finally { authority.close(); }
@@ -69,6 +75,9 @@ if (mode === "read" || mode === "review") {
       issued_at: now.toISOString(), not_before: now.toISOString(), expires_at: command.expires_at,
       nonce: command.request_id, max_uses: 1, status: "issued" }, localKey(f.authority)), now);
     const approvedCounts = fixture.memoryTableCounts(f.authority);
+    const executorRefusal = read(proposal, "execute", command.request_id);
+    assert.deepEqual(executorRefusal, { accepted: false, code: "CONTROL_ACTION_REVIEW_ONLY" });
+    assert.deepEqual(fixture.memoryTableCounts(f.authority), approvedCounts);
     const signedReview = read(proposal, "review", command.request_id);
     assert.deepEqual(signedReview, { accepted: true, proposal_digest: proposal.proposal_digest, writes_authorized: false });
     const other = proposeMemoryCandidateScope(f.authority, candidate.candidate_id, {
@@ -89,9 +98,10 @@ if (mode === "read" || mode === "review") {
     const quarantined = read(proposal);
     assert.equal(quarantined.accepted, false);
     assert.deepEqual(fixture.memoryTableCounts(f.authority), afterQuarantine);
-    process.stdout.write(JSON.stringify({ schema_version: 1, fixture: true, independent_processes: 6,
+    process.stdout.write(JSON.stringify({ schema_version: 1, fixture: true, independent_processes: 7,
       accepted, changed, quarantined, validation_table_counts_unchanged: true,
       signedReview, otherScopeReview, withdrawnReview, approval_creates_no_memory_outbox: true,
+      executorRefusal, execution_attempt_preserves_approval: true,
       scoped_write_completed: false }, null, 2) + "\n");
   } finally { fixture.closeMemoryDatabase(f); }
 }

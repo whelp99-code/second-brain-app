@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "independent_processes": 7,
+  "accepted": {
+    "accepted": true,
+    "proposal_digest": "sha256:fcf8c789502de37b2b801a6f5161d817dd4e6df3101466453af75c695c83fca2",
+    "authorization": "not_granted"
+  },
+  "changed": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "quarantined": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "validation_table_counts_unchanged": true,
+  "signedReview": {
+    "accepted": true,
+    "proposal_digest": "sha256:fcf8c789502de37b2b801a6f5161d817dd4e6df3101466453af75c695c83fca2",
+    "writes_authorized": false
+  },
+  "otherScopeReview": {
+    "accepted": false,
+    "code": "MEMORY_SCOPE_REVIEW_INVALID"
+  },
+  "withdrawnReview": {
+    "accepted": false,
+    "code": "MEMORY_SCOPE_REVIEW_INVALID"
+  },
+  "approval_creates_no_memory_outbox": true,
+  "executorRefusal": {
+    "accepted": false,
+    "code": "CONTROL_ACTION_REVIEW_ONLY"
+  },
+  "execution_attempt_preserves_approval": true,
+  "scoped_write_completed": false
+}
