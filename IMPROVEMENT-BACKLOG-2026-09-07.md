@@ -296,3 +296,10 @@ B5는 자비스에 이미 있는 문맥 snapshot/근거/삭제 projection을 재
 [문구 검색 인수](SEARCH-PHRASE-ACCEPTANCE-2026-09-08.md): AND 검색이 추가 후보를 반환할 때 큰따옴표 그룹으로 연속 문구를 지정할 수 있도록 했다. 인용문과 경로를 보존하고 4,096 UTF-8 bytes/32그룹을 넘거나 잘못된 문구는 명시적 오류로 처리한다. 실제 CLI/MCP의 문구 7/7 회수·무정답 3건, 기존 합성 100개 60/90 회수 유지, native CLI 3/MCP 5 오류 반환을 검증했다.
 
 이는 질의 입력 경계다. 실제 질문·자연어/의역·혼합 문자 처리와 공통 context pack/전달 이력은 남는다. 앞선 검색/복구 수정과 함께 격리 worktree에 구현하며 원 작업공간 100회 쓰기 인수 종료 후 병합한다.
+
+
+## 27. G3/B5 후속 — 실제 문맥 공급 경계 대조
+
+[상세 분석과 C1~C8](CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md)에 인계서와 자비스 기존 assembler/adapter/context store/projection을 병합했다. 새 격리 빌드에서 confirmed snapshot의 본문 부재, provider untrusted 제외, LF/CRLF/CR/tab 거부, 기억만 있을 때 live 관측 부족, 본문 길이가 총량에 반영되지 않음을 재현했다.
+
+우선순위는 공급 목적·신뢰 계약 → 원문 보존/최종 payload 예산 → 실제 전달 receipt·session/compaction → 삭제/정책/프로젝트 범위 결합이다. 기존 추천 조건을 완화하거나 trust를 올리고 별도 원문 DB를 만드는 우회는 보류한다. 진단 도구 exit 0은 결손 재현이며 B5 구현 또는 실사용 인수 통과가 아니다. 기존 100회 쓰기와 병합 대기 세 커밋, B4~B8 전체 완료 조건을 유지한다.

@@ -4,6 +4,8 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+B5 인계 대조: [공통 문맥 공급 공백과 8개 추가 과제](CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md). 자비스 새 격리 빌드로 snapshot 본문 부재, provider untrusted 제외, 여러 줄 입력 거부, live 관측 의존, 본문을 포함하지 않는 총량 계수를 재현했다. 기존 context/projection 재사용과 실제 전달·중복/compaction·삭제/범위 결합을 C1~C8로 세분화했다. 진단 성공은 B5 완성이 아니며 제품/운영 변경은 없다.
+
 병합 대기: 검색 `d174276` → 준비 사본 복구 `47fa507` → 정확 문구/입력 예산 `9323a6d` (`codex/korean-query-consistency-20260908`, `/var/tmp/sb-korean-query-work`). 결합 제품 전체 764 passed/2 skipped. 원 작업공간의 100회 쓰기 인수가 종료되면 이 커밋들을 병합하고 필요한 통합 검증을 수행한다. 현재 원 작업공간의 제품 소스에는 아직 적용하지 않았다.
 
 격리 검색 후속: [정확 문구·입력 오류 인수](SEARCH-PHRASE-ACCEPTANCE-2026-09-08.md). 큰따옴표 문구/경로 문자 보존과 4,096-byte/32-group 예산을 공통 검색에 연결했다. 잘못된 입력은 index refresh 전에 거부하고 CLI/HTTP/MCP에서 구체적인 오류로 반환한다. 별도 합성 문구 7/7 회수·무정답 3/3 빈 결과, 기존 100질문의 60/90 회수 유지. 실제 사용자 질문·의역·B5 문맥 예산과 전체 목표는 남으며, 대규모 쓰기 종료 후 앞선 격리 커밋들과 병합한다.
