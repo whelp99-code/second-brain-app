@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `0825e0d` / SB `6831147`:** [scoped 쓰기 계약 결손·지원 기능 API](SCOPED-WRITE-CONTRACT-GAP-2026-09-09.md). 인증 capabilities에 문맥만 지원/쓰기false/준비 미검사 명시, 관련45통과·실제 HTTP 쓰기404·proxy 미전달. 승인된 프로젝트 분류→쓰기 요청→봉인 계보→영수증 확장 없이 scoped 쓰기 개방은 보류한다. 전체 쓰기 완성 목표는 유지한다.
+
 **2026-09-09 SB `b5c192a`:** [서로 다른 agent의 실제 공유·프로젝트 제한](AGENT-POLICY-LOGIN-2026-09-09.md). 두 HTTP gateway agent가 같은 정본 records2를 동일하게 회수, peer만 프로젝트 제한 후 peer0/original2 확인. 실제 Codex/Claude 실행·쓰기/영수증/주입 및 전체 운영 인수는 남는다.
 
 **2026-09-09 JARVIS `d020bc4` / SB `e95fa8f`:** [에이전트 정책·새 로그인 기억 사용](AGENT-POLICY-LOGIN-2026-09-09.md). 선택적 정책v2/issuer session 모드, J8·SB23통과 및 실제 서로 다른 로그인2개에서 정책 파일 수정 없이 records2 회수·agent 철회403. 기존 고정 session/v1 유지. 운영·쓰기/영수증/재사용 전체 인수는 남는다.

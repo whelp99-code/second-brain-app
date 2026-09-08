@@ -1,0 +1,103 @@
+{
+  "scoped_status_client": {
+    "reference_delivery": {
+      "http_context": {
+        "agent_policy_new_sessions_without_policy_edits": 2,
+        "capabilities_verified": true,
+        "unsupported_write_http_status": 404,
+        "independent_agent_shared_records_equal": true,
+        "restricted_peer_records": 0,
+        "original_agent_records_after_peer_restriction": 2,
+        "agent_policy_withdrawal_denied": true,
+        "cli_activation_parsed": true,
+        "records": 2,
+        "bytes": 4649,
+        "cookie_required": true,
+        "client_identity_denied": true,
+        "csrf_required": true,
+        "ungranted_login_session_denied": true,
+        "policy_withdrawal_denied": true,
+        "policy_withdrawal_http_status": 403,
+        "invalid_query_http_status": 400,
+        "direct_scoped_mcp": true,
+        "cleanup_session_expiry_http_status": 401,
+        "expiry_child_exit_observed": true,
+        "scope": "real HTTP cookie and MCP; fixture Tailnet headers, keys, explicit session grant, source and clock"
+      },
+      "scoped_cli_cleanup_withdrawal_denied": true,
+      "scoped_cli_cleanup_child_exit_observed": true,
+      "scoped_cli_records": 2,
+      "scoped_cli_budget_verified": true,
+      "independent_process_replay": {
+        "independent_process": true,
+        "duplicate_denied": true,
+        "callbacks": 0,
+        "records": 2,
+        "fixture_identity_snapshot": true
+      },
+      "production_factory_owned_and_shared": true,
+      "durable_scope_binding_verified": true,
+      "durable_duplicate_denied": true,
+      "records": 2,
+      "bytes": 4412,
+      "duplicate_denied": true,
+      "empty_generation_substitution_denied": true,
+      "scoped_cli_missing_cookie_denied": true,
+      "cookie_removed_before_submit_denied": true
+    },
+    "profile": "scoped-record-read-v2",
+    "status_before_after_equal": true,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "scoped_client": {
+    "profile": "scoped-record-read-v1",
+    "status_before_after_equal": false,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "consumer_validation": [
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    }
+  ],
+  "work": "/var/tmp/page-access-acceptance-qtm9_y1m",
+  "tools": [
+    "sb_read_page",
+    "sb_search"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL"
+}
