@@ -389,3 +389,14 @@ reference JSON→native Codex 답변을 검증했다. 원문에만 있는 무작
 code-brain식 예산 있는 문맥의 소비 증거를 추가한 것이며 memory-bank식 session 중복/compaction,
 삭제 계보와 Tencent식 검증 범위의 완성을 대체하지 않는다. 기존 작업 실행기의 승인 입력·비영속
 세션을 확인했으므로 제품 자동 주입은 해당 계약을 연결하기 전까지 보류한다.
+
+
+## 36. LightRAG 흡수 선행 — 기존 벡터 검색의 필터 일치
+
+[기존 hybrid 수정](HYBRID-FILTERS-2026-09-08.md)은 새 검색 서버를 추가하지 않고 현재 sqlite-vec와
+committed search DB를 연결한다. cosine 전용 후보의 출처/지식 상태와 필터를 복원하고 정정 전
+본문을 제외했다. 실제 CLI와 전체 회귀로 검증했으며 새로운 OSS 코드/의존성은 추가하지 않았다.
+
+운영 hybrid는 아직 보류한다. 봉인 세대·삭제/복원·모델 identity 수명과 실제 한국어 품질/성능의
+완료 조건을 적용한 뒤 활성화 여부를 결정한다. 기존 자비스 승인·참고 기억·session 전달 경계와
+정본 역할을 유지한다.

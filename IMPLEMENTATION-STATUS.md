@@ -286,3 +286,15 @@ SB 100회 쓰기 인수는 65회 관측 상태이며 제품 소스 고정과 검
 제품 context/projection 세 테이블은 실제 관측 0행이며 session receipt를 구현했다고 주장하지
 않는다. 기존 작업 provider의 비영속 세션·승인 plan 입력 경계를 확인했고 자동 연결은 보류한다.
 C6/C7/C8과 B4~B8의 남은 조건, 100회 쓰기 및 세 커밋 병합 대기는 유지한다.
+
+
+### B8/R10 진행 — 벡터 검색의 필터·출처·정정 일치
+
+격리 소스 `ef3466e`: 네 가지 실패를 재현하고 cosine 후보를 현재 검색 DB의 page/section/본문에
+결합했다. lexical과 같은 종류·상태·날짜·지식 scope를 거리 정렬/limit 전에 적용하고 출처·승인
+상태를 보존한다. 읽기 snapshot의 model identity와 오류 거리를 검증하며 lexical fallback을 유지한다.
+
+집중 63 passed/1 skipped, 격리 전체 775 passed/2 skipped, 실제 CLI 5시나리오 통과. 두 DB의
+동시 읽기 불변, 정정 전 vector 제외 확인. [상세 결과·제한](HYBRID-FILTERS-2026-09-08.md).
+봉인 세대/삭제 수명·실제 품질·대용량 성능이 남아 운영 hybrid 활성화는 보류한다. full100 완료 후
+기존 세 커밋에 ef3466e를 이어 병합한다. B4~B8 전체 목표와 자비스 자동 전달 보류는 유지한다.
