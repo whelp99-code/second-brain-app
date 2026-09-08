@@ -9,7 +9,11 @@
         "csrf_required": true,
         "ungranted_login_session_denied": true,
         "policy_withdrawal_denied": true,
+        "policy_withdrawal_http_status": 403,
+        "invalid_query_http_status": 400,
         "direct_scoped_mcp": true,
+        "cleanup_session_expiry_http_status": 401,
+        "expiry_child_exit_observed": true,
         "scope": "real HTTP cookie and MCP; fixture Tailnet headers, keys, explicit session grant, source and clock"
       },
       "scoped_cli_cleanup_withdrawal_denied": true,
@@ -76,7 +80,7 @@
       "records": 2
     }
   ],
-  "work": "/var/tmp/page-access-acceptance-1flv_9sl",
+  "work": "/var/tmp/page-access-acceptance-27ktkz5w",
   "tools": [
     "sb_read_page",
     "sb_search"

@@ -1,5 +1,7 @@
 # Second Brain 수정·개선·고도화 분석
 
+**2026-09-09 JARVIS `55bc647` / SB `cb637e7`:** [HTTP context 오류 분류·종료 중 세션 만료](SCOPED-PHONE-HTTP-CONTEXT-2026-09-09.md). 관련61통과·실제 MCP 정책403/입력400/자식 종료 중 만료401 및 쿠키 제거 확인. 운영 활성화·정책 배정·전체 인수는 남는다.
+
 **2026-09-09 JARVIS `939a0d9` / SB 인수 `33f2a07`:** [인증 phone HTTP→scoped context 연결](SCOPED-PHONE-HTTP-CONTEXT-2026-09-09.md). 명시적 server 구성의 새 POST 경로, 관련46통과·실제 HTTP 쿠키→MCP records2/4,649bytes 및 신원 삽입/새 세션 무단 재사용/정책 철회 거부. standalone 설정·세션 정책 배정·운영 Tailnet 및 전체 인수는 남는다.
 
 **2026-09-09 JARVIS `e932f79` / SB 인수 `7c3fcae`:** [scoped CLI context 연결·누적 전체 검사](SCOPED-CLI-CONTEXT-2026-09-09.md). 호스트 인증 세션을 명시적으로 받는 기존 CLI execute 경로 추가, 관련27통과·실제 MCP records2/예산/쿠키 철회 거부. SB 전체1,142통과/2skip/216.57초. 독립 CLI 로그인·HTTP 세션 전달과 전체 운영 인수는 남는다.
