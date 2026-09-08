@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import anyio
 from mcp.client import Client
 
-from sb.access_claims import access_request_digest
+from sb.access_claims import access_claim_binding, access_request_digest
 from sb.config import Config
 from sb.delegations import create_read_fence
 from sb.effect_write_values import model_object
@@ -50,6 +50,8 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             assert not allowed.is_error, allowed
             assert allowed.structured_content["profile"] == "scoped-record-read-v1"
             assert allowed.structured_content["records"]
+            assert allowed.structured_content["request_digest"] == claim["request_digest"]
+            assert allowed.structured_content["access_claim_digest"] == access_claim_binding(claim)
             search_claim = signed({**claim, "request_digest": access_request_digest("sb_search", {"query": "Cited", "limit": 1})})
             searched = await client.call_tool("sb_search", {"query": "Cited", "limit": 1,
                 "read_fence": model_object(fence), "access_claim": search_claim})

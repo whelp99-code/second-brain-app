@@ -114,3 +114,7 @@ def require_claimed_page(page: ClassifiedPage, value: JsonValue, read_fence: Jso
         or context.purpose != "memory_read"):
         raise AccessClaimRejected("MEMORY_ACCESS_CLAIM_REQUIRED")
     require_scope(page, verify_access_claim(value, read_fence, keys, context, now))
+
+
+def access_claim_binding(value: JsonObject) -> str:
+    return "sha256:" + hashlib.sha256(b"orca-jarvis/memory-access-claim-binding/v1\0" + canonical_bytes(value)).hexdigest()

@@ -38,6 +38,7 @@ if len(sys.argv) > 1:
     search_bundle = json.loads(issued.stdout)
 async def run():
     outputs = []
+    consumer_inputs = []
     for _ in range(2):
         params = StdioServerParameters(command=sys.executable, args=["-c", bootstrap],
             cwd=str(Path(__file__).resolve().parents[1]), env={**os.environ, "SB_CONFIG": str(config), "TMPDIR": "/var/tmp"})
@@ -49,10 +50,15 @@ async def run():
             assert not result.is_error, result
             assert result.structured_content["profile"] == "scoped-record-read-v1"
             assert len(result.structured_content["records"]) == 2
+            consumer_inputs.append({"response": result.structured_content,
+                "bundle": {"read_fence": setup["fence_value"], "access_claim": setup["claim"]},
+                "request": {"method": "sb_read_page", "arguments": {"id": page.page_id}}})
             if len(sys.argv) > 1:
                 found = await client.call_tool("sb_search", {"query": "Cited", "limit": 2, **search_bundle})
                 assert not found.is_error, found
                 assert len(found.structured_content["results"]) == 2
+                consumer_inputs.append({"response": found.structured_content, "bundle": search_bundle,
+                    "request": {"method": "sb_search", "arguments": {"query": "Cited", "limit": 2}}})
                 wrong = await client.call_tool("sb_search", {"query": "Cited", "limit": 1, **search_bundle})
                 assert wrong.is_error
             for invalid in [{**args, "id": "wiki/other"}, {"id": page.page_id},
@@ -77,12 +83,17 @@ async def run():
             assert restored.structured_content == result.structured_content
             outputs.append(result.structured_content)
     assert outputs[0] == outputs[1]
-    return {"work": str(work), "tools": ["sb_read_page", "sb_search"], "records": 2,
+    consumer = None
+    if len(sys.argv) > 1:
+        checked = await anyio.run_process(["node", str(Path(__file__).with_name("scoped-response-validate.mjs")), sys.argv[1]],
+            input=json.dumps(consumer_inputs).encode())
+        consumer = json.loads(checked.stdout)
+    return {"consumer_validation": consumer, "work": str(work), "tools": ["sb_read_page", "sb_search"], "records": 2,
         "wrong_request_missing_claim_tampering_denied": True, "restart_equal": True,
         "production_issuer": len(sys.argv) > 1,
         "live_revocation_policy_change_invalid_missing_config_denied": True,
         "restored_policy_resumes_same_connection": True,
-        "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read only, not full operating ACL"}
+        "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, not supervised app transport or full operating ACL"}
 report = anyio.run(run)
 output = work / "scoped-mcp-result.json"
 output.write_text(json.dumps(report, indent=2) + "\n")

@@ -27,7 +27,12 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
 
-from sb.access_claims import AccessContext, access_request_digest, verify_access_claim
+from sb.access_claims import (
+    AccessContext,
+    access_claim_binding,
+    access_request_digest,
+    verify_access_claim,
+)
 from sb.cancellation_result import CancellationResultError
 from sb.cancellation_status import CancellationStatusError, read_cancellation_status
 from sb.cancellation_submission import CancellationSubmissionError, submit_correction_cancellation
@@ -1037,7 +1042,8 @@ def build_server(
                         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
                     require_active_high_water(generation, current)
                     _ = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
-                    return {"profile": "scoped-record-read-v1", **payload,
+                    return {"profile": "scoped-record-read-v1", "request_digest": context.request_digest,
+                        "access_claim_digest": access_claim_binding(access_claim), **payload,
                         **generation_read_binding(generation, current).as_dict()}
             except (ValueError, OSError, PathEscapeError) as exc:
                 raise ToolError("MEMORY_SCOPED_READ_DENIED") from exc
