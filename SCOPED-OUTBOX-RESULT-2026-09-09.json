@@ -1,0 +1,32 @@
+{
+  "fixture_authority": true,
+  "python_processes": 3,
+  "consumer_processes": 3,
+  "acknowledgement_loss_exit": 73,
+  "transport": "internal APIs; no public MCP V4 route",
+  "accepted": {
+    "schema_version": 4,
+    "kind": "accepted",
+    "state": "pending",
+    "provider_instance_id": "provider:fixture",
+    "request_id": "memreq:scoped:v4:3b7eed76edc35af6f0d2d2fa1ec2ff13a70dfca23ed035da8603645251ecaa90",
+    "request_digest": "sha256:3b7eed76edc35af6f0d2d2fa1ec2ff13a70dfca23ed035da8603645251ecaa90",
+    "idempotency_key": "memidem:scoped:v4:c9e9c76da5971c4222023afec5d423a93feb0ec38e0a356511612046c75d211b",
+    "scope_digest": "sha256:5f683d52646139bbf8d7caf1c04629f5335b746564bc9b7a81ee2d8d6c1cf00a",
+    "accepted_at": "2026-08-28T12:00:00.000Z",
+    "inbox_path": "pending/memreq:scoped:v4:3b7eed76edc35af6f0d2d2fa1ec2ff13a70dfca23ed035da8603645251ecaa90.v4.json",
+    "request_file_digest": "sha256:88aaf314566e0ba1ade6a7d268c5f3776508c44d6cd6bdb0261572b962746346",
+    "replayed": false
+  },
+  "recorded": {
+    "kind": "acceptance_recorded",
+    "outbox_id": "memout:scoped:v4:1217f32dea06ce9d1fd1f5d7e252b8eef374a41cbd98e52d71d4037651a819ca",
+    "attempt_id": "memattempt:pos:v2:84afa51ff64ba828fb73fd9bad58d0f0e9ac15cbb5cd90a53c4c9dc3881d44ae",
+    "acceptance_receipt_digest": "sha256:6733fe73f8de273f6cf9efb2c7cef01807835778669983cf94c7feeb51c91778",
+    "replayed": true
+  },
+  "provider_state": "proved",
+  "jarvis_state": "reconciling",
+  "acceptance_events": 1,
+  "foreign_key_errors": 0
+}

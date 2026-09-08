@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `7c9d9b6` v4 수락 소비:** [provider 수락 해시·원자적 기록·응답 유실 복구](SCOPED-OUTBOX-RESULT-2026-09-09.md). 관련16/최종3통과(중복), 타입/lint/격리emit. Python3/Node3 실제 프로세스에서 내부 provider proved·자비스 수락 event1/reconciling·commit 후 exit73 복구. fixture authority이며 공개 전송/완료 proof 소비/운영 인수는 남는다.
+
 **2026-09-09 JARVIS `2d7aa6b` scoped worker lease·단일 시도·복구:** [시도 commit·응답 유실·불확실 결과 복구](SCOPED-OUTBOX-WORKER-2026-09-09.md). 정책 만료 경계 회귀1실패→수정, 확대50/복구13통과(중복), 타입/lint/격리emit. 독립13프로세스에서 fence 회수·옛 worker 거부·attempt1·reconciling 후 재claim0. provider 호출0이며 전송/공개 계약/영수증/운영 인수는 남는다.
 
 **2026-09-09 JARVIS `edd850f` 등록 요청 복원·후보 무결성 수정:** [현재 범위/원본 재검사·독립 reader 인수](SCOPED-OUTBOX-READER-2026-09-09.md). queued 상태 누락·최초 분류 해시 불일치 재현 후 수정. 확대64통과·최종18통과(중복), 타입/lint/격리emit, 독립4프로세스에서 본문51bytes 일치·파일 정책/원본 철회 거부. worker lease/전송·공개 계약/영수증·운영 연결은 남는다.
