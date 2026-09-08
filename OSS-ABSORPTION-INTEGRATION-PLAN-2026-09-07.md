@@ -5,9 +5,9 @@
 인계 원문: [자비스 작업 인계](../Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md).
 기존 결함·개선 정본: [24개 항목 분석](IMPROVEMENT-BACKLOG-2026-09-07.md).
 
-현재 읽기용 종합: [인계 재대조·완성 우선 목록](SHARED-MEMORY-COMPLETION-REVIEW-2026-09-08.md). 아래 초반 대조표는 발견 당시 기록이며 후속 구현 상태는 이 종합과 구현 원장을 우선한다.
+현재 읽기용 종합: [최신 인계 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 아래 초반 대조표와 이전 종합은 발견 당시 기록이며 현재 상태는 이 종합과 구현 원장을 우선한다.
 
-최신 후속: [취소 대상 원자 접수·백업 잠금 충돌 수정](CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md).
+최신 제품 후속: [취소 결과의 증거·서명·불변 저장·교차 검증](CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md).
 
 ## 1. 병합한 결정과 범위
 

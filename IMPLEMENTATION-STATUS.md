@@ -4,6 +4,8 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
+
 **최신 SB `44ab911` / JARVIS `cabfba2`: [취소 결과의 실제 증거·서명·저장·교차 검증](CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md).**
 별도 provider_local_suppression 결과를 exact intent/target/세대/tombstone과 실제 alias·reingress·
 원본 처분·copy checkpoint·후속 세대 본문 부재에 결합한다. 원문이 있을 때 부재 검사를 저장해
