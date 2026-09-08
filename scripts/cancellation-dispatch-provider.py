@@ -11,6 +11,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import serialization
 from sb.effect_values import canonical_bytes, format_instant
 from sb.mcp_contract import write_fixture_request
 from sb.request_executor import RequestExecutor
@@ -19,8 +20,9 @@ from tests.test_request_executor import _config
 
 work = Path(sys.argv[1])
 key = Ed25519PrivateKey.from_private_bytes(bytes(range(32,64)))
+proof_key = Ed25519PrivateKey.from_private_bytes(bytes(range(64,96)))
 config_base = _config(work)
-executor = RequestExecutor(replace(config_base, jarvis_public_keys={**config_base.jarvis_public_keys, "jarvis:followup":key.public_key()}))
+executor = RequestExecutor(replace(config_base, provider_signing_key_id="provider:followup", provider_signing_key=proof_key, jarvis_public_keys={**config_base.jarvis_public_keys, "jarvis:followup":key.public_key()}))
 now = datetime.now(UTC)
 def hashed(domain, value):
     return 'sha256:' + hashlib.sha256(domain + canonical_bytes(value)).hexdigest()
@@ -52,7 +54,7 @@ try:
         launcher = work/'followup-mcp'
         launcher.write_text(f'#!{sys.executable}\nimport sys\nsys.path.insert(0, {str(ROOT)!r})\nfrom sb.mcp import main\nmain()\n')
         launcher.chmod(0o700)
-        print(json.dumps({'config':str(config),'launcher':str(launcher), 'selector': {
+        print(json.dumps({'proof_public_key':proof_key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode(), 'config':str(config),'launcher':str(launcher), 'selector': {
             'page_id':pages[0].relative_to(active.root).with_suffix('').as_posix(),
             'exact_record':'IndependentBeta 후속기억', 'source_identity_full':hashlib.sha256(seed['candidate_id'].encode()).hexdigest()}}))
     elif sys.argv[2] == 'apply':

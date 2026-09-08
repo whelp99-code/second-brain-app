@@ -10,15 +10,20 @@ export async function dispatchAfterCancellation(input, f, moduleAt) {
   const { createSecondBrainTransport } = await moduleAt('src/second-brain-transport');
   const { createSecondBrainWriteRequestAdapter } = await moduleAt('src/second-brain-write-adapter');
   const { SecondBrainEffectService } = await moduleAt('src/second-brain-effect-service');
-  const { registerMemoryEffectDelegationKey } = await moduleAt('src/memory-effect-delegation');
+  const { registerMemoryEffectDelegationKey, registerMemoryProviderProofKey } = await moduleAt('src/memory-effect-delegation');
   const { dispatchFollowupCorrection } = await moduleAt('tests/fixtures/memory-followup-correction');
   const { notProvedMemoryObserver, unreachableMemoryCompactor } = await moduleAt('tests/fixtures/memory-lifecycle-runtime');
   const key = createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),
     Buffer.from(Array.from({length:32}, (_, i) => i + 32))]), format:'der',type:'pkcs8' });
+  const { ProductionMemoryLifecycleObserver } = await moduleAt('src/memory-lifecycle-observer');
+  const { SecondBrainStatusObservationSource } = await moduleAt('src/second-brain-lifecycle-observations');
   const clock = () => new Date();
   const now = clock();
   registerMemoryEffectDelegationKey(f.db, { key_id:'jarvis:followup', principal_id:'principal:owner',
     public_key_pem:createPublicKey(key).export({format:'pem',type:'spki'}).toString(),
+    valid_from:now.toISOString(), valid_until:new Date(now.getTime()+600000).toISOString() }, now);
+  registerMemoryProviderProofKey(f.db, { key_id:'provider:followup', provider_instance_id:'provider:fixture',
+    provider_release_sha:'a'.repeat(40), public_key_pem:prepared.proof_public_key,
     valid_from:now.toISOString(), valid_until:new Date(now.getTime()+600000).toISOString() }, now);
   const transport = createSecondBrainTransport({ launcherPath:prepared.launcher, configPath:prepared.config,
     contractPath:`${input.sb_root}/contracts/second-brain-mcp-v3.json`, contractProfile:'remember-schema5' });
@@ -61,14 +66,50 @@ export async function dispatchAfterCancellation(input, f, moduleAt) {
     await transport.restart();
     const replay = await provider.requestStatus(applied.request_id);
     assert.deepEqual(replay, status);
+    const observer = new ProductionMemoryLifecycleObserver({ authority:f.db, provider,
+      observations:new SecondBrainStatusObservationSource(provider), clock });
+    const observation = await observer.correction(followup.record);
+    assert.equal(observation.kind, 'correction', JSON.stringify(observation));
     const reconciled = await followup.saga.reconcile(followup.record.correction_id);
     assert.equal(reconciled.state, 'reconciling');
     assert.equal(calls, 1);
+    const { AuthorityDatabaseRuntime } = await moduleAt('src/authority-database-runtime');
+    const { MemoryAuthorityCompactor } = await moduleAt('src/memory-authority-compactor');
+    const { MemoryManagedSurfaceScanner } = await moduleAt('src/memory-managed-surface-scanner');
+    const { MemoryCorrectionSaga } = await moduleAt('src/memory-correction-saga');
+    await f.databaseRuntime.close();
+    f.db.reopen();
+    const databaseRuntime = new AuthorityDatabaseRuntime(f.db, { registry_root:`${f.root}/registry`, watchdog_ms:5000 });
+    let settled;
+    try {
+      const layout = { spool_root:f.runtime.spool_root, state_root:`${f.root}/state`, dist_root:`${f.root}/dist`,
+        backup_root:`${f.root}/backups`, restore_root:`${f.root}/restore` };
+      const compactor = new MemoryAuthorityCompactor({ runtime:databaseRuntime, layout,
+        scanner:new MemoryManagedSurfaceScanner({ authority:f.db, layout }), clock });
+      const saga = new MemoryCorrectionSaga({ ...f.runtime, clock, writer, provider, observer, compactor,
+        signing_key_id:'jarvis:followup', private_key:key });
+      settled = await saga.reconcile(followup.record.correction_id);
+      assert.equal(settled.state, 'settled', JSON.stringify(settled));
+      assert.deepEqual(await saga.reconcile(followup.record.correction_id), settled);
+    } finally { await databaseRuntime.close(); f.db.reopen(); }
+    assert.equal(calls, 1);
     assert.equal(f.writer.calls.length, 0);
+    const recovered = JSON.parse(execFileSync(process.execPath, [`${input.sb_root}/scripts/cancellation-settled-replay.mjs`],
+      { encoding:'utf8', input:JSON.stringify({ build:input.build, database:f.database.path,
+        spool_root:f.runtime.spool_root, correction_id:settled.correction_id }), timeout:30000 }));
+    assert.deepEqual(recovered.record, settled);
+    assert.deepEqual(recovered.command, {state:'completed'});
+    assert.deepEqual(recovered.catalog, {expected_surface_count:70,observed_surface_count:70,
+      omission_count:0,error_count:0,match_count:0});
     return { node_pid:process.pid, correction_id:followup.record.correction_id,
       request_id:followup.record.request_id, dispatch_calls:calls, delta_length:emitted.tombstone_chain_delta.length, previous_root_matches:true,
-      status_replay_after_restart:true, incomplete_observation_held:true, cursor, provider:applied,
-      mcp_status:status.value.state, jarvis_state:followup.record.state,
-      scope:'same JARVIS DB command approval and real MCP target/status/write; actual provider execution; final lifecycle observation not proved' };
+      status_replay_after_restart:true, incomplete_observation_held:true,
+      verified_proof_digest:observation.proof.proof_digest,
+      provider_surface_count:observation.provider_inventory.observed_surface_count,
+      reingress_guard_count:observation.reingress_guards.observed_guard_count, cursor, provider:applied,
+      mcp_status:status.value.state, jarvis_state:settled.state,
+      settlement_replay_pid:recovered.pid, settlement_exact_replay:true,
+      command_state:recovered.command.state, surface_catalog:recovered.catalog,
+      scope:'same JARVIS DB command approval and real MCP target/status/write; actual provider execution; real proof/40 surfaces/10 guards and local compaction/settlement' };
   } finally { await transport.close(); }
 }

@@ -101,7 +101,7 @@ module.main()
     report = {**observed, 'python_parent_pid': os.getpid(), 'accepted_rows': 1, 'alias_rows': 8,
         'result_rows': int(record_result), 'generation_unchanged': not record_result, 'provider_tombstone_sequence': executor.store.tombstone_high_water()[0],
         'private_key_in_mcp_config': False, 'clock': 'cancellation admission fixed 2026-08-28; execution and followup actual UTC',
-        'scope': ('actual JARVIS seq2 dispatch through MCP and provider proved; JARVIS lifecycle reconciling' if payload['dispatch_result'] else 'actual provider cancellation, local compaction and atomic settlement; cursor advanced to 1' if settle_result else 'actual provider execution and JARVIS durable result reception; cursor not advanced' if record_result else 'actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed')}
+        'scope': ('actual JARVIS seq2 MCP dispatch, provider proof and observations, local compaction and settled; separate-process exact replay' if payload['dispatch_result'] else 'actual provider cancellation, local compaction and atomic settlement; cursor advanced to 1' if settle_result else 'actual provider execution and JARVIS durable result reception; cursor not advanced' if record_result else 'actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed')}
     (work / 'result.json').write_text(json.dumps(report, indent=2)+'\n')
     print(work / 'result.json')
     print(json.dumps(report))
