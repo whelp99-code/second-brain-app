@@ -319,6 +319,10 @@ def _select_adapters(
     if source_ids is None:
         return [adapter for _, adapter in candidates]
     names = set(source_ids)
+    available = {name for key, adapter in candidates for name in (key, adapter.source_id)}
+    missing = names - available
+    if missing:
+        raise ValueError("SOURCE_NOT_FOUND: " + ", ".join(sorted(missing)))
     return [adapter for key, adapter in candidates if key in names or adapter.source_id in names]
 
 

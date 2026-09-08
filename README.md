@@ -255,4 +255,4 @@ policy_revision = "policy:1"
 
 제한 검색은 query와 limit(1~50)을 서명에 결합하고 전체 페이지 분류 검사를 통과한 lexical record만 반환한다. 권한 밖 원본의 제목·snippet·corpus 점수는 반환하지 않으며, 허용 결과를 고른 뒤 limit을 적용한다. [검색 인수와 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md)을 참고한다.
 
-동일한 어댑터로 여러 원본을 수집할 때는 각 `[[sources]]`에 서로 다른 ID를 지정한다. pipeline이 ID별 인스턴스와 커서를 유지하며, 중복 ID는 거부한다. [markdown 다중 원본의 실제 CLI 검증](MULTI-SOURCE-INGEST-FIX-2026-09-09.md)을 참고한다.
+동일한 어댑터로 여러 원본을 수집할 때는 각 `[[sources]]`에 서로 다른 ID를 지정한다. pipeline이 ID별 인스턴스와 커서를 유지하며, 중복 ID는 거부한다. 명시적으로 선택한 source/adapter ID 중 해석되지 않는 이름이 있으면 `SOURCE_NOT_FOUND`로 실패하며 나머지 원본만 부분 수집하지 않는다. [markdown 다중 원본의 실제 CLI 검증](MULTI-SOURCE-INGEST-FIX-2026-09-09.md)을 참고한다.
