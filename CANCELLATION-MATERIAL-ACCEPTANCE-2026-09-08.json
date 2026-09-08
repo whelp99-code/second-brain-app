@@ -1,0 +1,31 @@
+{
+  "database": "/var/tmp/jarvis-task27-memory-EnvMN0/authority.sqlite",
+  "spool": "/var/tmp/jarvis-correction-control-3Ref5S/spool",
+  "at": "2026-08-28T12:00:00.000Z",
+  "capture_pid": 398480,
+  "disposed_files": 2,
+  "dispose_pid": 398494,
+  "after_disposal_matches": 0,
+  "resume_pid": 398515,
+  "checkpoint_rows": 1,
+  "resume_material_count": 0,
+  "cursor": [
+    {
+      "singleton_id": 1,
+      "fence": 0,
+      "active_lane_id": null,
+      "active_lane": null,
+      "active_sequence": null,
+      "active_request_digest": null,
+      "accepted_through_sequence": 0,
+      "updated_at": "1970-01-01T00:00:00.000Z"
+    }
+  ],
+  "jarvis_commit": "93f1344",
+  "second_brain_product": "9e30115",
+  "capture_exit": 77,
+  "dispose_exit": 77,
+  "resume_exit": 0,
+  "evidence_source": "/var/tmp/cancellation-material-acceptance-jBYT8L/result.json",
+  "scope": "isolated cancellation material capture and managed file disposal; not full compaction or cursor settlement"
+}
