@@ -8,12 +8,14 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {auditReferenceModelEvents, REFERENCE_ANSWER_FIELDS} from './reference_model_events.mjs';
+import {nativeSessionFixture} from './reference_native_session.mjs';
 import {referenceEffectFixture} from './reference_effect_fixture.mjs';
 
-if (process.argv.length < 3 || process.argv.length > 4 || (process.argv[3] && !['--lifecycle','--guarded','--journal'].includes(process.argv[3]))) {
-  throw new Error('Expected fresh JARVIS build including contracts and migrations, optional --lifecycle, --guarded or --journal');
+if (process.argv.length < 3 || process.argv.length > 4 || (process.argv[3] && !['--lifecycle','--guarded','--journal','--native-session'].includes(process.argv[3]))) {
+  throw new Error('Expected fresh JARVIS build including contracts and migrations, optional --lifecycle, --guarded --journal or --native-session');
 }
-const journal = process.argv[3] === '--journal';
+const nativeSession = process.argv[3] === '--native-session';
+const journal = process.argv[3] === '--journal' || nativeSession;
 const guarded = process.argv[3] === '--guarded' || journal;
 const lifecycle = process.argv[3] === '--lifecycle' || guarded;
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -65,7 +67,12 @@ const schema = {type: 'object', additionalProperties: false, required: ['state',
   ...Object.fromEntries(fields.map(key => [key, {type: ['string', 'null']}]))}};
 const clientRoot = join(root, 'client'); mkdirSync(clientRoot, {mode: 0o700});
 const schemaPath = join(clientRoot, 'schema.json'); writeFileSync(schemaPath, JSON.stringify(schema));
+let native = null;
+const nativeSessions = new Map();
 async function reference(label, query) {
+  if (native && ['empty','found','corrected','pending-deletion','deleted'].includes(label)) {
+    nativeSessions.set(label,native.open(label));
+  }
   if (guarded) {
     const prepared = await runtime.reader.read(query,{max_records:8,max_record_bytes:4096,max_bytes:4000});
     const value = {context:prepared.payload,context_digest:prepared.digest,context_bytes:prepared.bytes};
@@ -87,7 +94,8 @@ async function reference(label, query) {
   return value;
 }
 // Journal mode uses explicit synthetic adapter identities, not native Codex session IDs.
-const deliverySession = label => ({client_id:'native-model-fixture',session_id:`fixture-${label}`,epoch_id:'epoch-1'});
+const deliverySession = label => native ? nativeSessions.get(['stale-after-correction','retained-before-correction'].includes(label) ? 'found' : label)
+  : ({client_id:'native-model-fixture',session_id:`fixture-${label}`,epoch_id:'epoch-1'});
 const submit = (label,reference,send) => journal
   ? runtime.reader.submitInSession(reference,send,deliverySession(label))
   : runtime.reader.submit(reference,send);
@@ -108,6 +116,13 @@ function consumeNative(label, value) {
   if (value.context.records.length === 0) assert(!prompt.includes(answer));
   writeFileSync(join(root, `${label}.prompt.json`), prompt, {mode: 0o600});
   const started = performance.now();
+  if (native) {
+    const session = nativeSessions.get(label === 'during-delete' ? 'pending-deletion' : label);
+    assert(session,'Native session missing before dispatch');
+    const audited = native.resume(label,session,prompt);
+    return {response:audited.response,thread_id:audited.thread_id,elapsed_ms:Math.round(performance.now()-started),
+      prompt_digest:sha(prompt),response_digest:sha(canonicalize(audited.response)),context_digest:value.context_digest};
+  }
   const result = spawnSync('codex', ['exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check',
     '--sandbox', 'read-only', '--model', model, '--json', '--output-schema', schemaPath,
     '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', '-c', 'features.apps=false',
@@ -125,7 +140,8 @@ function consumeNative(label, value) {
 }
 let effects;
 try {
-  // No prior model context: each native invocation is ephemeral and independently constructed.
+  if (nativeSession) native = nativeSessionFixture({root,schemaPath,model});
+  // Native mode starts empty sessions and resumes them; other modes use ephemeral turns.
   const empty = await reference('empty', 'fixture-no-match-02afe');
   assert.equal(empty.context.records.length, 0);
   const negative = await consume('empty', empty);
@@ -205,11 +221,20 @@ try {
     assert.equal(extra.delivery_journal.filter(row=>row.state==='invalidated').length,4);
     assert.equal(extra.delivery_journal.filter(row=>row.state==='callback_completed').length,1);
     extra.fresh_object_duplicate_blocked = true;
-    extra.session_identity_origin = 'synthetic_adapter_fixture_not_native_session';
+    extra.session_identity_origin = native ? 'native_completed_bootstrap_thread_started' : 'synthetic_adapter_fixture_not_native_session';
+    if (native) {
+      let retiredCalls=0;
+      const ref=await runtime.reader.read('ExampleAlpha',{max_records:8,max_record_bytes:4096,max_bytes:4000});
+      await assert.rejects(()=>runtime.reader.submitInSession(ref,async()=>{retiredCalls++;},nativeSessions.get('found')),
+        /MEMORY_REFERENCE_SESSION_INVALIDATED/);
+      assert.equal(retiredCalls,0);
+      extra.retired_native_session_blocked=true;
+      extra.native_session_fixture=native.evidence();
+    }
   }
   assert.deepEqual({sb:treeDigest(join(sb,'sb'),'.py'),jarvis:treeDigest(join(build,'src'),'.js')},frozen);
   const evidence = {status: 'native_model_consumed_reference', fixture_origin: 'synthetic', root, build,
-    frozen_source:frozen,lifecycle,guarded,journal, ...extra,
+    frozen_source:frozen,lifecycle,guarded,journal,native_session:nativeSession, ...extra,
     database_root: database.root, model, codex_version: execFileSync('codex', ['--version'], {encoding: 'utf8'}).trim(),
     negative, positive, provider_rechecked_after_model: true, confirmation_level: 'native_turn_completed_and_exact_answer_with_provenance',
     automatic_injection_enabled: false, session_compaction_acceptance: false,

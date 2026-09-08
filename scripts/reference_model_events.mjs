@@ -1,11 +1,13 @@
 // Strict native completion audit for the opt-in reference/model acceptance probe.
 import assert from 'node:assert/strict';
 export const REFERENCE_ANSWER_FIELDS = ['answer', 'record_id', 'record_digest', 'text_digest', 'source_identity_full', 'generation_id'];
-export function auditReferenceModelEvents(text) {
+export function auditReferenceModelEvents(text, expectedThreadId) {
   const events = text.split('\n').filter(line => line.trim()).map(line => JSON.parse(line));
+  assert(events.every(event => ['thread.started','turn.started','turn.completed','item.started','item.updated','item.completed'].includes(event.type)), 'Unknown/error native event');
   const threads = events.filter(event => event.type === 'thread.started');
   assert.equal(threads.length, 1); assert.equal(typeof threads[0].thread_id, 'string');
   assert(threads[0].thread_id.length > 0);
+  if (expectedThreadId !== undefined) assert.equal(threads[0].thread_id, expectedThreadId, 'Native session mismatch');
   const starts = events.filter(event => event.type === 'turn.started');
   const completions = events.filter(event => event.type === 'turn.completed');
   assert.equal(starts.length, 1); assert.equal(completions.length, 1);

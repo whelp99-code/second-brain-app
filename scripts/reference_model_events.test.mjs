@@ -28,3 +28,13 @@ for (const [name, modify] of [
 ]) test(`rejects ${name} even if its process exited zero`, () => {
   assert.throws(() => auditReferenceModelEvents(encode(modify(baseline()))));
 });
+test('accepts only the exact observed session when resuming', () => {
+  assert.equal(auditReferenceModelEvents(encode(baseline()),'fixture-thread').thread_id,'fixture-thread');
+  assert.throws(()=>auditReferenceModelEvents(encode(baseline()),'different-thread'),/Native session mismatch/);
+});
+test('rejects unknown native notification types', () => {
+  assert.throws(()=>auditReferenceModelEvents(encode([...baseline(),{type:'future.success'}])),/Unknown\/error native event/);
+});
+test('rejects an approval request even with a valid final answer', () => {
+  assert.throws(()=>auditReferenceModelEvents(encode([...baseline(),{type:'approval.requested'}])),/Unknown\/error native event/);
+});
