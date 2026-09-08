@@ -91,3 +91,7 @@
 
 **2026-09-09 제한 검색 `d561f63`: [허용 record 선택 후 limit·실제 서명 검색·새 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md).**
 제한 연결에 sb_search를 추가하고 전체 페이지 범위 검사 후 lexical record를 선택한다. query/limit 서명 결합, 불허 snippet/score 제외. 최종31통과/5.56초·Ruff/diff·정적0오류/0경고, 실제 issuer→stdio 검색2개·limit 변조 거부. 같은 adapter 여러 root가 첫 source만 수집되는 P0 결손을 새로 확인했으며 다음 수정 대상이다. 나머지 운영 목표는 유지한다.
+
+
+**2026-09-09 JARVIS 파일 정책 `623ef50` / 인수 `79ede52`: [현재 정책·인증 세션 대조 공급자와 실제 MCP 연결](MEMORY-ACCESS-FILE-POLICY-2026-09-09.md).**
+소유자 전용 정책 파일을 매 발급 다시 읽고 session/project/method/provider/만료를 대조한다. 누락·손상·철회·불안전 파일은 캐시 없이 거부한다. 관련21통과/13.97초·lint/타입/격리emit통과, 실제 파일 공급자→issuer→stdio 조회/검색 인수. 실제 앱 인증 세션 연결·기발급 claim의 전역 철회 및 전체 운영 목표는 남는다.

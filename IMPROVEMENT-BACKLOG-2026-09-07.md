@@ -1,5 +1,9 @@
 # Second Brain 수정·개선·고도화 분석
 
+**2026-09-09 JARVIS 파일 정책 `623ef50` / 인수 `79ede52`: [현재 정책·인증 세션 대조 공급자와 실제 MCP 연결](MEMORY-ACCESS-FILE-POLICY-2026-09-09.md).**
+소유자 전용 정책 파일을 매 발급 다시 읽고 session/project/method/provider/만료를 대조한다. 누락·손상·철회·불안전 파일은 캐시 없이 거부한다. 관련21통과/13.97초·lint/타입/격리emit통과, 실제 파일 공급자→issuer→stdio 조회/검색 인수. 실제 앱 인증 세션 연결·기발급 claim의 전역 철회 및 전체 운영 목표는 남는다.
+
+
 **2026-09-09 선택 누락 성공 오표시 수정 `5c8fcb2`: [없는 source ID·혼합 선택의 사전 실패](INGEST-SELECTION-VALIDATION-2026-09-09.md).**
 수정 전 두 실패로 재현하고 전체 명시적 선택을 scan 전에 확인한다. 누락 ID가 있으면 SOURCE_NOT_FOUND로 실패하며 정상 원본만 부분 수집하지 않는다. 최종68통과/8.34초·Ruff/diff·정적0오류/기존경고1. 실제 CLI 원본/분류/커서 보존 확인. connector별 ID 지원과 전체 운영 목표는 남는다.
 
