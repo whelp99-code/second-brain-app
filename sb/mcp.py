@@ -62,6 +62,7 @@ from sb.memory_records import (
     records_for_page,
     target_for_record,
 )
+from sb.memory_search import merge_semantic_records
 from sb.page_ids import git_rel
 from sb.pipeline import RunOutcome, run_all
 from sb.provider_lifecycle import ProviderLifecycle
@@ -70,6 +71,7 @@ from sb.remember_contracts import MemoryWriteResultV3
 from sb.request_store import RequestStore
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.search_errors import SearchQueryError
+from sb.search_filters import SearchFilters
 from sb.search_query import LexicalQuery
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
@@ -498,7 +500,7 @@ def build_server(
             require_active_high_water(generation, current)
             if limit <= 0 or not query.strip():
                 return bind_read({"results": []}, generation, current)
-            index = SearchIndex(vault_root=current_root)
+            index = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid)
             results: list[ToolResult] = []
             seen_records: set[str] = set()
             seen_pages: set[str] = set()
@@ -527,6 +529,10 @@ def build_server(
                         results.append(row)
                     if len(results) >= limit:
                         break
+            if contract_schema_version >= 4:
+                results = merge_semantic_records(
+                    results, index.semantic_hits(query, limit, filters=SearchFilters(scope="reference")),
+                    current_root, generation, limit)
             return bind_read({"results": results[:limit]}, generation, current)
 
     def sb_read_page(
@@ -873,7 +879,7 @@ def build_server(
         _ = query_plan(query)
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            hits = SearchIndex(vault_root=current_root).search(query, limit, scope="reference")
+            hits = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid).search(query, limit, scope="reference")
             return {"results": [hit.as_dict() for hit in hits]}
 
     def legacy_read_page(id: str) -> dict[str, dict[str, str] | str]:
@@ -932,7 +938,7 @@ def build_server(
         _ = query_plan(query)
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            return {"results": [hit.as_dict() for hit in SearchIndex(current_root).search(query, limit, scope=scope)]}
+            return {"results": [hit.as_dict() for hit in SearchIndex(current_root, hybrid=config.search_hybrid).search(query, limit, scope=scope)]}
 
     def sb_run() -> RunOutcomeDict:
         """Immediately process explicit capture using the single writer pipeline."""

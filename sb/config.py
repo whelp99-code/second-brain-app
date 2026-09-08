@@ -427,6 +427,11 @@ class Config:
     def legacy_request_roots(self) -> tuple[str, ...]:
         return tuple(_as_str_list(self.raw.get("legacy_request_roots")) or ())
 
+    @property
+    def search_hybrid(self) -> bool:
+        section = _as_mapping(self.raw.get("search"))
+        return section is not None and section.get("hybrid") is True
+
 
 def load_config(path: str | Path | None = None) -> Config:
     """Load config.toml from `path`, else $SB_CONFIG, else the app root.

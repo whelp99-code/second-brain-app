@@ -31,6 +31,7 @@ from sb.effect_values import (
 from sb.generation_cleanup import discard_staging
 from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
+from sb.generation_vectors import VectorContent, prepare_vectors
 from sb.generation_walk import surface_files
 from sb.request_store import RequestStore
 
@@ -221,6 +222,7 @@ def _logical_derived_digests(
     tree: str,
     tombstone_sequence: int,
     tombstone_set_root: str,
+    vectors: VectorContent | None = None,
 ) -> DerivedStoreDigests:
     page_manifest = [
         {
@@ -252,7 +254,8 @@ def _logical_derived_digests(
         lexical=digest("generation", {"binding": binding, "rows": lexical_rows}),
         vector=digest(
             "generation",
-            {"binding": binding, "enabled": False, "model": None, "revision": None, "rows": 0},
+            {"binding": binding, "enabled": False, "model": None, "revision": None, "rows": 0}
+            if vectors is None else {"binding": binding, "enabled": True, **vectors.as_dict()},
         ),
         briefing=digest("generation", {"binding": binding, "briefs": briefing_rows}),
     )
@@ -314,6 +317,7 @@ def _build_derived_stores(
     root: Path,
     manifest: GenerationManifestV1,
     pages: Sequence[tuple[str, bytes]],
+    vector_content: VectorContent | None = None,
 ) -> None:
     derived = root / ".sb"
     derived.mkdir(mode=0o700, exist_ok=True)
@@ -405,14 +409,15 @@ def _build_derived_stores(
         _close_fresh(search, search_path)
 
     vector_path = derived / "vectors.db"
-    vectors = _connect_fresh(vector_path)
+    vectors = (_connect_fresh(vector_path) if vector_content is None
+               else sqlite3.connect(vector_path, isolation_level=None))
     try:
         _ = vectors.executescript(
             """
             CREATE TABLE generation_meta(
               generation_id TEXT PRIMARY KEY,provider_instance_id TEXT NOT NULL,head TEXT NOT NULL,
               tree TEXT NOT NULL,tombstone_sequence INTEGER NOT NULL,tombstone_set_root TEXT NOT NULL,
-              manifest_digest TEXT NOT NULL,row_count INTEGER NOT NULL,enabled INTEGER NOT NULL CHECK(enabled=0),
+              manifest_digest TEXT NOT NULL,row_count INTEGER NOT NULL,enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
               model_id TEXT,revision TEXT
             );
             CREATE TABLE chunks(
@@ -421,10 +426,12 @@ def _build_derived_stores(
             );
             """
         )
-        _ = vectors.execute(
-            "INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?,0,NULL,NULL)",
-            (*binding, manifest.vector_manifest_digest, 0),
-        )
+        _ = vectors.execute("INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                            (*binding, manifest.vector_manifest_digest,
+                             0 if vector_content is None else vector_content.row_count,
+                             int(vector_content is not None),
+                             None if vector_content is None else vector_content.model_id,
+                             None if vector_content is None else vector_content.revision))
     finally:
         _close_fresh(vectors, vector_path)
 
@@ -558,12 +565,14 @@ class GenerationStore:
         provider_instance_id: str,
         provider_release_sha: str,
         requests: RequestStore | None = None,
+        hybrid: bool = False,
     ) -> None:
         self.state_root = state_root
         self.share_root = share_root
         self.provider_instance_id = provider_instance_id
         self.provider_release_sha = provider_release_sha
         self.requests = requests
+        self.hybrid = hybrid
         self.generations = share_root / "vault-generations"
         self.staging = self.generations / ".staging"
         self.retired = self.generations / ".retired"
@@ -799,12 +808,15 @@ class GenerationStore:
             emit("git_seal")
             content_rows, byte_count = _content_rows(staging)
             pages = _page_rows(staging)
+            vector_content = prepare_vectors(staging, pages, parent_root=None if parent is None else parent.root,
+                                             enabled=self.hybrid)
             logical = _logical_derived_digests(
                 pages,
                 head=head,
                 tree=tree,
                 tombstone_sequence=tombstone_sequence,
                 tombstone_set_root=tombstone_set_root,
+                vectors=vector_content,
             )
             overrides = derived_manifests or {}
             body: dict[str, JsonValue] = {
@@ -847,7 +859,7 @@ class GenerationStore:
                 byte_count=byte_count,
                 created_at=format_instant(created_at),
             )
-            _build_derived_stores(staging, manifest, pages)
+            _build_derived_stores(staging, manifest, pages, vector_content)
             emit("ledger_build")
             emit("lexical_build")
             emit("vector_build")

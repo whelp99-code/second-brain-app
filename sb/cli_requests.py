@@ -61,6 +61,7 @@ def apply_requests_once(config: Config, control_path: str | None) -> int:
             jarvis_public_keys=jarvis_keys,
             external_public_keys=external_keys,
             legacy_request_roots=tuple(Path(root) for root in config.legacy_request_roots),
+            search_hybrid=config.search_hybrid,
         ),
         barrier_sink=barrier_sink,
     )

@@ -314,7 +314,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             if parsed.path == "/api/search":
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 query = values.get("q", [""])[0]
-                hits = SearchIndex(root).search(
+                hits = SearchIndex(root, hybrid=context.config.search_hybrid).search(
                     query,
                     _query_int(values, "limit", 10, 100),
                     kinds=_query_many(values, "kind"),

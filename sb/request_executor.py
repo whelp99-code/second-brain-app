@@ -90,6 +90,7 @@ class ExecutorConfig:
     jarvis_public_keys: Mapping[str, Ed25519PublicKey]
     external_public_keys: Mapping[str, Ed25519PublicKey] = field(default_factory=_empty_public_keys)
     legacy_request_roots: tuple[Path, ...] = ()
+    search_hybrid: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +152,7 @@ class RequestExecutor:
             provider_instance_id=config.provider_instance_id,
             provider_release_sha=config.provider_release_sha,
             requests=self.store,
+            hybrid=config.search_hybrid,
         )
         self.reingress = ReingressGate(config.state_root / "reingress.db")
         self.erasure = ErasureEngine(self.reingress)

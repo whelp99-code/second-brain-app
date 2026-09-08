@@ -22,8 +22,10 @@ from sb.knowledge_registry import (
     APPROVED,
     CANDIDATE,
     KnowledgeRegistry,
+    KnowledgeState,
     missing_state,
 )
+from sb.page_metadata import frontmatter_value as _frontmatter_value
 from sb.search_filters import SearchFilters
 from sb.search_query import LexicalQuery
 
@@ -78,6 +80,8 @@ class SearchHit:
     canonical: str = ""
     source_ref: str = ""
     updated_at: str = ""
+    record_id: str = ""
+    record_digest: str = ""
 
     def as_dict(self) -> SearchHitDict:
         role, verification = _labels(self.knowledge_status, self.approval_status)
@@ -117,6 +121,15 @@ class HybridModule(Protocol):
         vault_root: Path | None = None,
         filters: SearchFilters | None = None,
     ) -> Sequence[SearchHit]: ...
+
+
+@runtime_checkable
+class SealedVectorModule(Protocol):
+    def query_sealed_cosine(self, root: Path, query: str, limit: int, *,
+                            filters: SearchFilters, states: tuple[KnowledgeState, ...]) -> tuple[SearchHit, ...]: ...
+
+    def merge_ranked(self, lexical: tuple[SearchHit, ...], semantic: tuple[SearchHit, ...],
+                     limit: int) -> tuple[SearchHit, ...]: ...
 
 
 def git_run(root: Path, *args: str) -> str | None:
@@ -228,7 +241,13 @@ class SearchIndex:
                 query, kinds=kinds, status=status, updated_from=updated_from,
                 updated_to=updated_to, scope=scope,
             )) as hits:
-                return tuple(islice(hits, max(0, limit)))
+                lexical = tuple(islice(hits, max(0, limit)))
+            semantic = self.semantic_hits(query, limit, filters=SearchFilters(
+                tuple(kinds or ()), status, updated_from, updated_to, scope or "reference"))
+            if not semantic:
+                return lexical
+            module = _sealed_vector_module()
+            return module.merge_ranked(lexical, semantic, limit)
         db_path = _db_path(root)
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(db_path, root, registry)
@@ -309,6 +328,24 @@ class SearchIndex:
                                     state.knowledge_status, state.approval_status, state.canonical,
                                     source_ref, updated)
 
+    def semantic_hits(self, query: str, limit: int, *, filters: SearchFilters) -> tuple[SearchHit, ...]:
+        """Return exact cited-record candidates; caller retains the generation pin."""
+        _ = LexicalQuery.parse(query)
+        if limit <= 0 or not query.strip() or '"' in query or not _wants_hybrid(self.hybrid):
+            return ()
+        root = self.vault_root.resolve()
+        if not (root / "generation.json").is_file():
+            return ()
+        from sb.vector_rebuild import EmbeddingUnavailable
+
+        try:
+            module = _sealed_vector_module()
+            states = KnowledgeRegistry(resolve_registry_path(root, self.registry_path)).read_snapshot()
+            return module.query_sealed_cosine(root, query, limit, filters=filters, states=states)
+        except (EmbeddingUnavailable, ImportError, OSError):
+            _LOGGER.warning("sealed vector retrieval unavailable; using lexical results")
+            return ()
+
     def project(self) -> None:
         """Refresh registry projection; sealed indexes project at read time."""
         root = self.vault_root
@@ -357,7 +394,8 @@ def _set_meta(conn: sqlite3.Connection, key: str, value: str) -> None:
 
 
 def _docs_columns(conn: sqlite3.Connection) -> tuple[str, ...]:
-    return tuple(str(row[1]) for row in conn.execute("PRAGMA table_info(docs)"))
+    rows = cast(list[tuple[object, ...]], conn.execute("PRAGMA table_info(docs)").fetchall())
+    return tuple(str(row[1]) for row in rows)
 
 
 def _ensure_meta(conn: sqlite3.Connection) -> None:
@@ -394,7 +432,7 @@ def _backup_index(db_path: Path) -> None:
     while dest.exists():
         suffix += 1
         dest = db_path.with_name(f"{db_path.name}.{stamp}.{suffix}.bak")
-    shutil.copy2(db_path, dest)
+    _ = shutil.copy2(db_path, dest)
 
 
 def _rebuild_atomic(
@@ -410,25 +448,11 @@ def _rebuild_atomic(
                 _full_rebuild(conn, root, registry)
                 _set_meta(conn, "git_head", current)
             _set_meta(conn, "registry_fp", registry.fingerprint())
-        tmp.replace(db_path)
+        _ = tmp.replace(db_path)
     except Exception:
         if tmp.exists():
             tmp.unlink()
         raise
-
-
-def _frontmatter_value(text: str, key: str) -> str:
-    if not text.startswith("---"):
-        return ""
-    rest = text[3:].lstrip("\n")
-    end = rest.find("\n---")
-    if end < 0:
-        return ""
-    for raw in rest[:end].splitlines():
-        field, sep, value = raw.partition(":")
-        if sep and field.strip() == key:
-            return value.strip().strip("\"'")
-    return ""
 
 
 def _replace_path(
@@ -481,7 +505,8 @@ def _full_rebuild(conn: sqlite3.Connection, root: Path, registry: KnowledgeRegis
 
 
 def _project_registry(conn: sqlite3.Connection, registry: KnowledgeRegistry) -> None:
-    page_ids = [str(row[0]) for row in conn.execute("SELECT DISTINCT page_id FROM docs")]
+    rows = cast(list[tuple[object]], conn.execute("SELECT DISTINCT page_id FROM docs").fetchall())
+    page_ids = [str(row[0]) for row in rows]
     for page_id in page_ids:
         state = registry.get(page_id)
         _ = conn.execute(
@@ -661,6 +686,13 @@ def _wants_hybrid(flag: bool | None) -> bool:
     if flag is None:
         return _hybrid_from_config()
     return flag
+
+
+def _sealed_vector_module() -> SealedVectorModule:
+    module = importlib.import_module("sb.sealed_vectors")
+    if not isinstance(module, SealedVectorModule):
+        raise ImportError("sealed vector module unavailable")  # noqa: TRY004 -- optional module ABI
+    return module
 
 
 def _hybrid_from_config() -> bool:

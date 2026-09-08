@@ -259,7 +259,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             else None
         )
         explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
-        hits = SearchIndex(vault_root=Path(config.vault_root), registry_path=explicit).search(
+        hits = SearchIndex(vault_root=Path(config.vault_root), registry_path=explicit, hybrid=config.search_hybrid).search(
             query,
             _opt_int(ns, "limit") or 10,
             kinds=kinds,

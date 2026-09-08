@@ -127,6 +127,24 @@ def run_vec_script(path: Path, script: TextIO, *, lock_fd: int) -> None:
         raise EmbeddingUnavailable(done.stderr.strip() or "vec rebuild failed")
 
 
+def run_vec_read_script(path: Path, sql: str) -> str:
+    """Bounded-result read query; stream generated ASCII SQL instead of argv."""
+    cli, ext = _vec_cli(), _vec0_path()
+    if cli is None or ext is None:
+        raise EmbeddingUnavailable("sqlite-vec missing")
+    with tempfile.TemporaryFile(mode="w+", encoding="ascii") as script:
+        _ = script.write(sql)
+        _ = script.seek(0)
+        done = subprocess.run(
+            [cli, "-readonly", "-batch", "-bail", "-separator", "\x1f", "-newline", "\x1e",
+             str(path), f".load {ext}", ".read /dev/stdin"],
+            stdin=script, capture_output=True, text=True, check=False,
+        )
+    if done.returncode != 0:
+        raise EmbeddingUnavailable(done.stderr.strip() or "vec read failed")
+    return done.stdout
+
+
 def _env_identity() -> ModelIdentity:
     return ModelIdentity(
         os.environ.get("SB_EMBED_MODEL", DEFAULT_MODEL_ID),

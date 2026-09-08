@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import base64
+import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import ClassVar
 
 import anyio
+import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from mcp.client import Client
 from pydantic import BaseModel, ConfigDict
@@ -23,6 +26,7 @@ from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.search import git_run
 from sb.stable_requests import accept_stable_v1_request
 from tests.task30_effect_factory import effect_request
+from tests.test_generation_vectors import CountingEncoder
 
 NOW = datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC)
 OLD = "ExampleAlpha 예시기록"
@@ -34,10 +38,13 @@ class _StatusEnvelope(BaseModel):
     structured_content: JsonObject
 
 
+@pytest.mark.parametrize("hybrid", [False, True])
 def test_real_provider_lifecycle_remember_correct_export_forget(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
+    hybrid: bool,
 ) -> None:
+    monkeypatch.setattr("sb.embeddings.resolve_encoder", CountingEncoder)
     key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     config = ExecutorConfig(
         request_root=tmp_path / "requests", state_root=tmp_path / "state",
@@ -45,6 +52,7 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         backup_root=tmp_path / "backups", provider_instance_id="provider:fixture",
         provider_release_sha="a" * 40, provider_signing_key_id="provider:key",
         provider_signing_key=key, jarvis_public_keys={"jarvis:fixture": key.public_key()},
+        search_hybrid=hybrid,
     )
     accepted = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
     executor = RequestExecutor(config)
@@ -57,6 +65,10 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     assert remembered_generation.root.joinpath("log.md").is_file()
     assert git_run(remembered_generation.root, "ls-files", "raw") == ""
     assert remembered_generation.root.joinpath(".sb", "derived-manifest.json").is_file()
+    if hybrid:
+        with closing(sqlite3.connect(remembered_generation.root / ".sb/vectors.db")) as vectors:
+            assert vectors.execute("SELECT enabled,row_count FROM generation_meta").fetchone() == (1, 1)
+            assert vectors.execute("SELECT text FROM record_vectors").fetchone() == (OLD,)
 
     correction_time = NOW + timedelta(minutes=1)
     correction = effect_request(
@@ -67,7 +79,8 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         config.request_root, correction, correction_time + timedelta(seconds=1),
         public_keys=config.jarvis_public_keys, provider_instance_id="provider:fixture",
     )
-    assert executor.apply_once(now=correction_time + timedelta(seconds=1)).state == "proved"
+    correction_result = executor.apply_once(now=correction_time + timedelta(seconds=1))
+    assert correction_result.state == "proved", correction_result
     assert audit_citations(executor.generations.active().root) == ()
     correction_observations = executor.store.observations(correction_accepted.request_id)
     assert correction_observations is not None
@@ -98,6 +111,9 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     active = executor.generations.active()
     active_bytes = b"".join(path.read_bytes() for path in active.root.rglob("*") if path.is_file())
     assert OLD.encode() not in active_bytes and CORRECTED.encode() in active_bytes
+    if hybrid:
+        with closing(sqlite3.connect(active.root / ".sb/vectors.db")) as vectors:
+            assert vectors.execute("SELECT text FROM record_vectors").fetchall() == [(CORRECTED,)]
 
     export_time = NOW + timedelta(minutes=2)
     export = effect_request(
@@ -155,6 +171,9 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         if path.is_file()
     )
     assert OLD.encode() not in final_bytes and CORRECTED.encode() not in final_bytes
+    if hybrid:
+        with closing(sqlite3.connect(executor.generations.active().root / ".sb/vectors.db")) as vectors:
+            assert vectors.execute("SELECT count(*) FROM record_vectors").fetchone() == (0,)
     assert not (config.export_root / export_accepted.request_id).exists()
     assert all(
         executor.store.get(request_id) is not None

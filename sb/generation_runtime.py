@@ -77,6 +77,7 @@ class GenerationMutationService:
             provider_instance_id=config.provider_instance_id,
             provider_release_sha=config.provider_release_sha,
             requests=requests,
+            hybrid=config.search_hybrid,
         )
         exports = ExportPublisher(paths.exports, config.provider_release_sha, requests.exports)
         return cls(store, requests, ProviderLifecycle(exports))
