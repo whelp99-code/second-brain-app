@@ -10,10 +10,11 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {auditReferenceModelEvents, REFERENCE_ANSWER_FIELDS} from './reference_model_events.mjs';
 import {referenceEffectFixture} from './reference_effect_fixture.mjs';
 
-if (process.argv.length < 3 || process.argv.length > 4 || (process.argv[3] && !['--lifecycle','--guarded'].includes(process.argv[3]))) {
-  throw new Error('Expected fresh JARVIS build including contracts and migrations, optional --lifecycle or --guarded');
+if (process.argv.length < 3 || process.argv.length > 4 || (process.argv[3] && !['--lifecycle','--guarded','--journal'].includes(process.argv[3]))) {
+  throw new Error('Expected fresh JARVIS build including contracts and migrations, optional --lifecycle, --guarded or --journal');
 }
-const guarded = process.argv[3] === '--guarded';
+const journal = process.argv[3] === '--journal';
+const guarded = process.argv[3] === '--guarded' || journal;
 const lifecycle = process.argv[3] === '--lifecycle' || guarded;
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const build = resolve(process.argv[2]);
@@ -85,8 +86,13 @@ async function reference(label, query) {
   assert(Buffer.byteLength(result.stdout) <= 4000);
   return value;
 }
+// Journal mode uses explicit synthetic adapter identities, not native Codex session IDs.
+const deliverySession = label => ({client_id:'native-model-fixture',session_id:`fixture-${label}`,epoch_id:'epoch-1'});
+const submit = (label,reference,send) => journal
+  ? runtime.reader.submitInSession(reference,send,deliverySession(label))
+  : runtime.reader.submit(reference,send);
 async function consume(label, value) {
-  if (guarded) return runtime.reader.submit(issued.get(value),async serialized => {
+  if (guarded) return submit(label,issued.get(value),async serialized => {
     assert.equal(serialized,canonicalize(value.context));
     return consumeNative(label,value);
   });
@@ -160,7 +166,7 @@ try {
       generation_id:current.record.generation.generation_id});
     if (guarded) {
       const pending = await reference('pending-deletion','ExampleAlpha');
-      await assert.rejects(()=>runtime.reader.submit(issued.get(pending),async serialized=>{
+      await assert.rejects(()=>submit('pending-deletion',issued.get(pending),async serialized=>{
         assert.equal(serialized,canonicalize(pending.context));
         extra.during_delete_model = consumeNative('during-delete',pending);
         extra.deletion = await effects.apply('forget',current.record);
@@ -188,9 +194,22 @@ try {
       'memory_projection_dependencies'].map(table=>[table,database.authority.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n]));
     process.stdout.write('fresh_correction_deletion_model_verified\n');
   }
+  if (journal) {
+    const reloaded = await runtime.reader.read('ExampleAlpha',{max_records:8,max_record_bytes:4096,max_bytes:4000});
+    let duplicateCalls=0;
+    await assert.rejects(()=>runtime.reader.submitInSession(reloaded,async()=>{duplicateCalls++;},deliverySession('deleted')),
+      /MEMORY_REFERENCE_ALREADY_SUBMITTED/);
+    assert.equal(duplicateCalls,0);
+    extra.delivery_journal = database.authority.db.prepare('SELECT attempt_id,state FROM personal_context_reference_attempts ORDER BY attempt_id').all();
+    assert.equal(extra.delivery_journal.length,5);
+    assert.equal(extra.delivery_journal.filter(row=>row.state==='invalidated').length,4);
+    assert.equal(extra.delivery_journal.filter(row=>row.state==='callback_completed').length,1);
+    extra.fresh_object_duplicate_blocked = true;
+    extra.session_identity_origin = 'synthetic_adapter_fixture_not_native_session';
+  }
   assert.deepEqual({sb:treeDigest(join(sb,'sb'),'.py'),jarvis:treeDigest(join(build,'src'),'.js')},frozen);
   const evidence = {status: 'native_model_consumed_reference', fixture_origin: 'synthetic', root, build,
-    frozen_source:frozen,lifecycle,guarded, ...extra,
+    frozen_source:frozen,lifecycle,guarded,journal, ...extra,
     database_root: database.root, model, codex_version: execFileSync('codex', ['--version'], {encoding: 'utf8'}).trim(),
     negative, positive, provider_rechecked_after_model: true, confirmation_level: 'native_turn_completed_and_exact_answer_with_provenance',
     automatic_injection_enabled: false, session_compaction_acceptance: false,
