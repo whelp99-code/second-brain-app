@@ -2,6 +2,7 @@
   "scoped_status_client": {
     "reference_delivery": {
       "http_context": {
+        "cli_activation_parsed": true,
         "records": 2,
         "bytes": 4649,
         "cookie_required": true,
@@ -80,7 +81,7 @@
       "records": 2
     }
   ],
-  "work": "/var/tmp/page-access-acceptance-27ktkz5w",
+  "work": "/var/tmp/page-access-acceptance-qi6yh4y8",
   "tools": [
     "sb_read_page",
     "sb_search"
