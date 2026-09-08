@@ -149,17 +149,27 @@ def _git_run_bytes(root: Path, *args: str) -> bytes | None:
     return done.stdout
 
 
-def committed_text(root: Path, rel: str) -> str | None:
-    """Return HEAD blob text for a vault-relative path, or None if missing."""
+def _blob_revision(revision: str) -> str:
+    if revision != "HEAD" and (len(revision) not in (40, 64)
+                               or any(ch not in "0123456789abcdef" for ch in revision)):
+        raise ValueError("expected HEAD or full commit object ID")
+    return revision
+
+
+def committed_text(root: Path, rel: str, *, revision: str = "HEAD") -> str | None:
+    """Return committed blob text for a vault-relative path, or None if missing."""
     if rel.startswith("/") or ".." in Path(rel).parts:
         return None
-    return git_run(root, "show", f"HEAD:{rel}")
+    return git_run(root, "show", f"{_blob_revision(revision)}:{rel}")
 
 
-def committed_paths(root: Path, prefixes: tuple[str, ...]) -> tuple[str, ...]:
+def committed_paths(root: Path, prefixes: tuple[str, ...], *, revision: str = "HEAD",
+                    required: bool = False) -> tuple[str, ...]:
     """Committed `*.md` paths under `prefixes`, excluding wiki/_proposed/."""
-    raw = _git_run_bytes(root, "ls-tree", "-rz", "--name-only", "HEAD")
+    raw = _git_run_bytes(root, "ls-tree", "-rz", "--name-only", _blob_revision(revision))
     if raw is None:
+        if required:
+            raise ValueError("committed path enumeration failed")
         return ()
     found: list[str] = []
     for encoded in raw.split(b"\0"):
