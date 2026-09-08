@@ -291,14 +291,24 @@ class RequestExecutor:
                     or acceptance.get("request_file_digest") != file_digest):
                 raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
 
+        def resuming_applied_result() -> bool:
+            # The durable pointer can precede the journal's activated transition.
+            # Only the exact result bound to this validated request may recover.
+            if (scoped_request is None or status.result_generation_id is None
+                    or lease.phase not in {"switch_intent", "activated", "disposing", "proved"}):
+                return False
+            active = self._active_or_none(self.generations)
+            return active is not None and active.generation_id == status.result_generation_id
+
         def require_scoped_authority() -> None:
-            if scoped_request is not None and lease.phase not in {"activated", "disposing", "proved"} and now >= scoped_request.expires_at:
+            if scoped_request is not None and now >= scoped_request.expires_at:
                 raise RequestExecutionError("SCOPED_WRITE_REQUEST_EXPIRED")
             if scoped_request is not None and (self.scoped_authority is None
                     or self.scoped_authority(scoped_request) is not True):
                 raise RequestExecutionError("SCOPED_WRITE_AUTHORITY_INVALID")
 
-        require_scoped_authority()
+        if not resuming_applied_result():
+            require_scoped_authority()
         if request.operation.value != "remember":
             raise RequestExecutionError("REAPPROVAL_REQUIRED")
         content = request.payload["content"]
@@ -332,7 +342,10 @@ class RequestExecutor:
 
         def switching(generation: Generation) -> None:
             nonlocal lease
-            require_scoped_authority()
+            # Recheck while the mutation service holds the writer lock. A new
+            # materialization always checks live authority, even on a retry.
+            if not resuming_applied_result():
+                require_scoped_authority()
             lease = self._advance(lease, "switch_intent", now, generation.generation_id)
 
         def activated(generation: Generation) -> None:

@@ -93,3 +93,60 @@ def test_revocation_after_sealing_prevents_activation(tmp_path):
         assert executor.store.get(accepted.request_id).proof_json is None
     finally:
         executor.close()
+
+
+@pytest.mark.parametrize("barrier", ["sealed_manifest", "pointer_parent_fsync"])
+@pytest.mark.parametrize("reason", ["expired", "revoked"])
+def test_crash_recovery_distinguishes_applied_result_from_new_write(tmp_path, monkeypatch, barrier, reason):
+    import subprocess
+    import sys
+    from datetime import timedelta
+
+    raw, now, config, accepted = fixture(tmp_path)
+    child = '''
+import os, sys
+from datetime import datetime
+from pathlib import Path
+from sb.request_executor import RequestExecutor
+from tests.task30_process_harness import executor_config
+class Stop:
+    def reach(self, event):
+        if event.barrier_id.value == sys.argv[3]:
+            os._exit(73)
+executor = RequestExecutor(executor_config(Path(sys.argv[1])),
+    scoped_authority=lambda _: True, barrier_sink=Stop())
+executor.apply_once(worker="fixture:crash", now=datetime.fromisoformat(sys.argv[2]), lease_ms=1000)
+'''
+    process = subprocess.run([sys.executable, "-c", child, str(tmp_path), now.isoformat(), barrier],
+        timeout=40, check=False)
+    assert process.returncode == 73
+    later = datetime.fromisoformat(raw["expires_at"]) if reason == "expired" else now + timedelta(seconds=2)
+    executor = RequestExecutor(config, scoped_authority=lambda _: reason != "revoked")
+    def no_new_materialization(*args, **kwargs):
+        pytest.fail("Recovery must never materialize a new memory")
+    monkeypatch.setattr("sb.request_executor.materialize_remember", no_new_materialization)
+    try:
+        applied = barrier == "pointer_parent_fsync"
+        before = executor.store.get(accepted.request_id)
+        generation_id = executor.generations.active().generation_id if applied else None
+        generations = set(executor.generations.generations.iterdir())
+        result = executor.apply_once(worker="fixture:resume", now=later)
+        if applied:
+            assert before.phase == "switch_intent"
+            assert before.result_generation_id == generation_id
+            assert result.state == "proved", result
+            proof = json.loads(executor.store.get(accepted.request_id).proof_json)
+            assert proof["generation_id"] == generation_id
+            assert proof["request_id"] == raw["request_id"]
+            assert proof["scope_digest"] == raw["preparation"]["binding"]["identity_digest"]
+            assert executor.generations.active().generation_id == generation_id
+            assert set(executor.generations.generations.iterdir()) == generations
+            assert executor.apply_once(worker="fixture:replay", now=later).state == "idle"
+        else:
+            assert result.state == "failed", result
+            expected = "SCOPED_WRITE_REQUEST_EXPIRED" if reason == "expired" else "SCOPED_WRITE_AUTHORITY_INVALID"
+            assert result.code == expected
+            assert not executor.generations.active_link.exists()
+            assert executor.store.get(accepted.request_id).proof_json is None
+    finally:
+        executor.close()

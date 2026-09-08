@@ -1,0 +1,47 @@
+{
+  "fixture_authority": true,
+  "authority_at_recovery": false,
+  "request_expired": true,
+  "reused_pre_fix_crash_provider": true,
+  "phase_before": "switch_intent",
+  "proof_before": null,
+  "apply": {
+    "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+    "state": "proved",
+    "phase": "proved",
+    "code": "PROVIDER_PROVED",
+    "fence": 1
+  },
+  "same_generation": true,
+  "new_generations": 0,
+  "receipt_state": "proved",
+  "proof_scope_matches": true,
+  "replay": "idle",
+  "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+  "independent_reads": [
+    {
+      "records": 4,
+      "source_refs": [
+        "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4"
+      ],
+      "page_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6"
+    },
+    {
+      "denied": "MEMORY_ACCESS_DENIED"
+    }
+  ],
+  "normal_path_recheck": {
+    "processes": 7,
+    "provider_result": {
+      "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "state": "proved",
+      "phase": "proved",
+      "code": "PROVIDER_PROVED",
+      "fence": 1
+    },
+    "replayed": true,
+    "redispatch_idle": true,
+    "pending_files": 0,
+    "mcp_write_completed": false
+  }
+}
