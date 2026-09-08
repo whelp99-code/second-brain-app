@@ -573,3 +573,15 @@ JARVIS `4d8bdf0`, SB `aa7e76f`: [이번 수정5항목·잔여11우선과제](DAS
 정리한다. 수정 전3실패→관련14/build10통과, 타입·린트·독립 검토·정규 격리 build 통과.
 실제6프로세스에서 다른 cwd 정상 HTTP/CLI 및 잘못된 정책 거부를 확인했다. 기존 signer의
 원격 승인 미준비와 native/ACL/자동capture/검색/운영/DR 미완료 조건은 유지한다.
+
+
+## 48. B4/I1 후보 격리·차단의 승인과 V1 저장 집행
+
+JARVIS `0c0508a`, SB `7e01e2b`: [수정6항목·실제 인수·다음 V2 경계](CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md).
+읽기 화면만 숨기고 classify replay/승인/outbox/직접 writer는 허용하던 문제를 수정했다.
+실제 guard 누락4실패, 관련39·최종7·유효 adapter 집중6 통과(중복). 실제3프로세스에서
+차단 이후 호출 증가0, 재시작 attempt0, HTTP200→404 및 준비된 승인 거부를 확인했다.
+독립 검토로 발견한 correction confirmation 경합은 immediate transaction으로 수정했다.
+P0 추가: V2 correction은 별도 preparation/materialization/beginDispatch/dedicatedAuthority를
+사용해 V1 검사를 거치지 않는다. 이 경로와 자체 tombstone/원본 차단 구분을 다음에 보강한다.
+원task→후보→provider record 계보 전까지 자동 collector 보류와 전체 미완료 조건을 유지한다.

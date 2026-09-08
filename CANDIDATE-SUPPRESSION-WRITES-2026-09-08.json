@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "root": "/var/tmp/jarvis-candidate-suppression-Q2quSD",
+  "build": "/var/tmp/jarvis-candidate-suppression-build-wx8yq3iz",
+  "cases": [
+    {
+      "mode": "seed",
+      "pid": 2989182,
+      "normal_provider_fixture_calls": 1,
+      "post_quarantine_provider_calls": 0,
+      "queued_before_quarantine": true
+    },
+    {
+      "mode": "restart",
+      "pid": 2989284,
+      "replay_rejected": true,
+      "provider_calls": 0,
+      "outbox_state": "failed",
+      "dispatch_attempts": 0
+    },
+    {
+      "mode": "http",
+      "pid": 2989367,
+      "review_before": 200,
+      "stage_before": 202,
+      "review_after": 404,
+      "hidden_body_absent": true,
+      "prepared_approval_rejected": true,
+      "owner_decisions": 0,
+      "dispatch_publications": 0
+    }
+  ],
+  "provider": "deterministic transport fixture",
+  "operational_data_used": false,
+  "native_model_calls": 0,
+  "source_task_lineage_implemented": false,
+  "automatic_capture_enabled": false,
+  "commits": {
+    "jarvis": "0c0508a",
+    "second_brain_tool": "7e01e2b"
+  },
+  "tests": {
+    "related": {
+      "files": 7,
+      "passed": 39
+    },
+    "final_correction_focus": {
+      "files": 2,
+      "passed": 7
+    },
+    "valid_adapter_focus": {
+      "files": 1,
+      "passed": 6
+    },
+    "overlap_not_additive": true,
+    "typescript": "passed",
+    "changed_eslint": "passed"
+  },
+  "build_artifact_digest": "sha256:d89b7cf9896cf5366c6befa681167a46481548df589f81591b856af6201e5225",
+  "full_goal_complete": false
+}

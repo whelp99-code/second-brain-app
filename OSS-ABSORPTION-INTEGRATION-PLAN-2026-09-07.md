@@ -584,3 +584,12 @@ SQLite·백업의 보존/폐기가 필요하다는 실측을 추가했다. 설�
 자비스 compose/server/build 경로에서 수정했고 SB에는 인수 도구와 결과를 남겼다.
 새 기억 서버·OSS 설치·MCP/schema 변경은 없다. 서비스 시작 성공은 자비스 전체 기억 순환이나
 모든 에이전트 자동 연결 완료가 아니며 native 보존·범위·검증 capture·검색·운영 조건을 유지한다.
+
+
+## 53. memory-bank식 작업 기억 수집에 앞선 기존 후보 차단 집행
+
+[후보 차단의 분류·승인·remember 전송 적용](CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md).
+기존 자비스 classifier/owner decision/outbox/adapter를 보강했다. 새 기억 DB나 collector는
+추가하지 않았다. 실패/미확정 결과를 임의 성공으로 승격하지 않는 기존 signed authority 계약을
+유지하며 실제 task 자동 수집은 원본 차단 계보가 준비될 때까지 보류한다. 실제3프로세스의 HTTP/
+재시작 인수는 합성 transport 조건이며 V2 정정의 별도 쓰기 경계와 원task→SBrecord 계보는 남는다.

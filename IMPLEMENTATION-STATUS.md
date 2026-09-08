@@ -4,7 +4,15 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 JARVIS `4d8bdf0` / SB 도구 `aa7e76f`: [정책 시작 오류 수정·후속 우선 목록](DASHBOARD-POLICY-STARTUP-2026-09-08.md).**
+**최신 JARVIS `0c0508a` / SB 도구 `7e01e2b`: [후보 차단의 승인·remember 전송 집행](CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md).**
+화면에서 숨긴 후보가 classify 재생·owner 승인·outbox 전송·직접 V1 writer에서 사용되는 결함을
+수정했다. 정정 confirmation도 검사/승인/settlement를 immediate transaction으로 결합했다.
+관련39·최종7·유효 wire 입력 집중6 통과(중복), 타입/린트/격리 build 통과. 실제3프로세스에서
+정상 transport 진입 후 차단 호출 증가0, 재시작 후 attempt0, HTTP200→404/준비승인 거부 확인.
+V2 정정의 별도 preparation/dispatch 후보 차단은 다음 필수 수정이며 모든 write 완료가 아니다.
+원task→provider record 계보·native/ACL/capture/검색/운영 전체 목표는 유지한다.
+
+**이전 JARVIS `4d8bdf0` / SB 도구 `aa7e76f`: [정책 시작 오류 수정·후속 우선 목록](DASHBOARD-POLICY-STARTUP-2026-09-08.md).**
 실행 cwd 정책 의존·HTTP 요청마다 서비스 조립·배포 정책 자산 누락을 수정했다. 시작 시 정책을
 고정하며 잘못된 정책은 listen 전 거부하고 CLI DB를 닫는다. 관련14개/build10개·타입·린트·
 독립 검토, 정규 격리 build 및 실제6프로세스 HTTP/CLI 인수 통과. 이전 화면 보고서의 다음 수정
