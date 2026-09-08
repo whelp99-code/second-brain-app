@@ -1,0 +1,57 @@
+{
+  "consumer_validation": [
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    }
+  ],
+  "work": "/var/tmp/page-access-acceptance-1m6srv8f",
+  "tools": [
+    "sb_read_page",
+    "sb_search"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL",
+  "jarvis_commit": "ff0aecc",
+  "sb_commit": "687ecf6",
+  "jarvis_tests": {
+    "passed": 91,
+    "files": 11,
+    "seconds": 6.2
+  },
+  "python_tests": {
+    "passed": 6,
+    "seconds": 4.07
+  },
+  "packaging": {
+    "output": "/var/tmp/scoped-contract-package-1skm1_nh",
+    "contracts_verified": 5
+  },
+  "contract_sha256": "2c0bc8a467cb3f89f7c8cdb7df0a4eceb9790250b05d3fecffc13fb485417a7b",
+  "deployed": false
+}

@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `ff0aecc` / SB `687ecf6`:** [고정 scoped 계약→기존 supervised transport→실제 MCP→소비자·재시작 검증](SCOPED-SUPERVISED-TRANSPORT-2026-09-09.md). 전송 관련91통과·SB6통과, 격리 패키징 계약5개 확인. M1 전송 연결은 검증했으며 실제 인증 세션/제품 context 연결·M2~M14와 전체 운영 목표는 남는다. 일반 adapter의 프로필 일괄 전환은 보류한다.
+
 기준일: 2026-09-09. [자비스 인계 원문](../Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md), [상세 구현 원장](IMPLEMENTATION-STATUS.md), [기존 전체 개선 목록](IMPROVEMENT-BACKLOG-2026-09-07.md)을 합친 현재 판단이다. 이전 기록의 미완료 항목은 아래 최신 완료 증거가 있는 범위에 한해 갱신한다.
 
 **판정: 저장·검색 및 여러 연동 구간은 동작을 검증했다. 자비스와 여러 에이전트의 메인 기억 장소로 운영 인수할 조건은 아직 모두 충족하지 못했다.** 서비스 active나 MCP 목록만으로 정상 완료를 선언하지 않는다. 이번에는 운영 서비스 상태를 새로 관측하거나 배포·재시작하지 않았다.
