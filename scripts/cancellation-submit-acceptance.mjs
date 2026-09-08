@@ -25,7 +25,8 @@ if (process.argv.includes("--compact-actor") || process.argv.includes("--recover
   }
   const receipt = process.argv.includes("--compact-actor") ? await compactor.compactCancellation(input.correction_id)
     : await compactor.recoverCancellation(input.correction_id);
-  writeFileSync(1, JSON.stringify({ pid: process.pid, receipt }));
+  const settlement = input.settle_result ? await compactor.settleCancellation(input.correction_id) : undefined;
+  writeFileSync(1, JSON.stringify({ pid: process.pid, receipt, settlement }));
   process.exit(process.argv.includes("--compact-actor") ? 77 : 0);
 }
 if (process.argv.includes("--record-actor")) {
@@ -64,7 +65,7 @@ try {
     'revoked_jarvis_signing_key_ids = ["jarvis:fixture"]'));
   await assert.rejects(submit, /MEMORY_CANCELLATION_INTENT_INVALID/);
   assert.deepEqual(readFileSync(f.spoolPath), spool);
-  const cursor = f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get();
+  let cursor = f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get();
   assert.deepEqual(cursor, { active_lane_id: null, accepted_through_sequence: 0 });
   let storedResult; let localCompaction; let localRecovery;
   if (input.record_result) {
@@ -81,7 +82,7 @@ try {
       input: JSON.stringify({ build: input.build, database: f.database.path, correction_id: f.record.correction_id, result }) });
     assert.equal(child.status, 77, child.stderr);
     if (input.compact_result) {
-      const actorInput = { swap_result: input.swap_result, rebuild_result: input.rebuild_result, build: input.build, database: f.database.path, correction_id: f.record.correction_id,
+      const actorInput = { settle_result: input.settle_result, swap_result: input.swap_result, rebuild_result: input.rebuild_result, build: input.build, database: f.database.path, correction_id: f.record.correction_id,
         registry_root: `${f.root}/registry`, layout: { spool_root: f.runtime.spool_root, state_root: `${f.root}/state`,
           dist_root: `${f.root}/dist`, backup_root: `${f.root}/backups`, restore_root: `${f.root}/restore` } };
       f.db.close();
@@ -97,7 +98,8 @@ try {
           assert.equal(replay.status, 0, replay.stderr);
           assert.deepEqual(JSON.parse(replay.stdout).receipt, localCompaction);
         } else assert.deepEqual(JSON.parse(recovered.stdout).receipt, localCompaction);
-        localRecovery = { exit_after_local_record: interruptedSwap ? undefined : compact.status,
+        if (input.settle_result) assert.deepEqual(JSON.parse(compact.stdout).settlement, JSON.parse(recovered.stdout).settlement);
+        localRecovery = { settlement: JSON.parse(recovered.stdout).settlement, exit_after_local_record: interruptedSwap ? undefined : compact.status,
           exit_after_rename: input.swap_result ? compact.status : undefined,
           exit_before_swap: input.rebuild_result ? compact.status : undefined, exact_replay: true,
           compact_pid: compact.pid, recover_pid: JSON.parse(recovered.stdout).pid };
@@ -119,6 +121,7 @@ try {
       assert.throws(() => results.get(f.record.correction_id), /MEMORY_CANCELLATION_RESULT_INVALID/);
     } finally { reopened.close(); }
     if (!input.compact_result) assert.deepEqual(readFileSync(f.spoolPath), spool);
+    if (input.settle_result) cursor = { active_lane_id: null, accepted_through_sequence: 1 };
     assert.deepEqual(f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get(), cursor);
     storedResult = { result_digest: result.result_digest, exit_after_record: child.status,
       exact_replay: true, result_rows: 1, current_revocation_rejected: true };
