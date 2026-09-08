@@ -64,6 +64,17 @@ sensitive = "mask"
 
 외부 LLM에 보낼 수 없는 소스는 `llm_policy = "deny"` 또는 로컬 모델과 함께 `local-only`로 설정한다.
 
+수집 원본의 owner/project 분류는 선택적인 `[source_access.<source id>]`에 명시한다. 예를 들어 별도로 설정한 `docs` 원본에는 다음을 사용할 수 있다.
+
+```toml
+[source_access.docs]
+owner = "principal:owner"
+projects = ["project:alpha"]
+policy_revision = "policy:1"
+```
+
+프로젝트 목록은 중복 없이 정렬하며 최대 64개다. 빈 목록은 owner 전용 분류를 뜻한다. 신규 처리 원본의 source ID·URI·내용 해시에 분류를 결합해 원장에 저장한다. 기존 분류를 바꾸면 `SOURCE_ACCESS_RECLASSIFICATION_REQUIRED`로 수집을 거부하며, 과거 무분류 원본을 자동 재분류하지 않는다. **현재 이 설정은 분류 기록 기능이며 MCP/API 접근 제어가 아니다.** 접근 claim·record/page 분류 결합과 범위 검사가 연결되기 전까지 기존 owner 프로필의 조회 범위는 그대로다.
+
 의미 검색은 기본적으로 꺼져 있다. `[search] hybrid = true`와 사용 가능한 임베딩 모델을 설정하면 다음 관리형 세대 생성부터 인용 가능한 기억 레코드의 벡터를 함께 봉인한다. 이미 봉인된 세대는 설정 변경만으로 재색인되지 않는다. 모델이 없거나 맞지 않으면 일반 검색을 유지하며, 큰따옴표 검색은 정확 문구 검색으로 처리한다. 모델 품질·대용량 지연 검증과 운영 활성화 판단은 [의미 검색 인수 보고서](SEALED-VECTOR-ACCEPTANCE-2026-09-08.md)를 따른다.
 
 `[search] min_similarity`로 의미 후보의 최소 cosine 점수를 지정할 수 있다. 범위는 -1부터 1이며 미설정 기본값 -1은 기존 후보를 유지한다. 일반 검색 결과에는 적용하지 않는다. 모델과 자료별 평가로 값을 정해야 하며, 높은 유사도가 원문에 답이 있음을 보장하지는 않는다. [실제 100질문 비교·최소 유사도 검증과 한계](SEMANTIC-RELEVANCE-2026-09-08.md).

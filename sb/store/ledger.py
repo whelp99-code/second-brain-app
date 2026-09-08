@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import sqlite3
 from collections.abc import Generator, Sequence
@@ -12,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Final, Self, cast
+
+from sb.source_access import SourceAccess, source_access_digest, source_access_identity
 
 from . import (
     Derivation,
@@ -32,12 +35,19 @@ from . import (
 )
 
 _HEX: Final = frozenset("0123456789abcdef")
-CURRENT_SCHEMA_VERSION: Final = 2
+CURRENT_SCHEMA_VERSION: Final = 3
 _SCHEMA: Final = (
     "CREATE TABLE IF NOT EXISTS source_item ("
     "source_id TEXT NOT NULL, source_uri TEXT NOT NULL, source_version TEXT NOT NULL, "
     "content_hash TEXT NOT NULL, first_seen_run TEXT NOT NULL, last_seen_run TEXT NOT NULL, "
     "PRIMARY KEY (source_id, source_uri, content_hash));"
+    "CREATE TABLE IF NOT EXISTS source_access ("
+    "source_ref_digest TEXT PRIMARY KEY, classification_json TEXT NOT NULL, classification_digest TEXT NOT NULL);"
+    "CREATE TRIGGER IF NOT EXISTS source_access_no_update BEFORE UPDATE ON source_access "
+    "BEGIN SELECT RAISE(ABORT, 'immutable source access'); END;"
+    "CREATE TRIGGER IF NOT EXISTS source_access_no_replace BEFORE INSERT ON source_access "
+    "WHEN EXISTS(SELECT 1 FROM source_access WHERE source_ref_digest=NEW.source_ref_digest) "
+    "BEGIN SELECT RAISE(ABORT, 'immutable source access'); END;"
     "CREATE TABLE IF NOT EXISTS cursor ("
     "source_id TEXT PRIMARY KEY, position TEXT NOT NULL, updated_at TEXT NOT NULL);"
     "CREATE TABLE IF NOT EXISTS unit ("
@@ -102,7 +112,10 @@ def migrate_ledger(path: Path, *, backup: bool = True) -> Path | None:
         folder = path.parent / "migrations"
         folder.mkdir(parents=True, exist_ok=True)
         backup_path = folder / f"ledger-v{version}-{stamp}.db"
-        _ = shutil.copy2(path, backup_path)
+        # The main file can lag committed WAL pages, including schema metadata.
+        with closing(sqlite3.connect(path)) as source, closing(sqlite3.connect(backup_path)) as target:
+            source.backup(target)
+        _ = shutil.copystat(path, backup_path)
     try:
         with closing(sqlite3.connect(str(path))) as conn:
             _ = conn.executescript(_SCHEMA)
@@ -283,6 +296,38 @@ class Ledger:
         for item in items:
             self._tables.source_items[(item.source_id, item.source_uri, item.content_hash)] = item
         return len(items)
+
+    def bind_source_access(self, item: SourceItem, access: SourceAccess) -> None:
+        """Bind trusted ingest configuration to one exact source content version."""
+        identity = source_access_identity(item.source_id, item.source_uri, item.content_hash)
+        encoded = access.encode()
+        digest = source_access_digest(identity, access)
+        with self.transaction():
+            if self._db().execute("SELECT 1 FROM source_item WHERE source_id=? AND source_uri=? AND content_hash=?",
+                (item.source_id, item.source_uri, item.content_hash)).fetchone() is None:
+                raise ValueError("SOURCE_ACCESS_SOURCE_MISSING")
+            prior = cast(tuple[str, str] | None, self._db().execute("SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
+                (identity,)).fetchone())
+            if prior is not None:
+                if prior != (encoded, digest):
+                    raise ValueError("SOURCE_ACCESS_RECLASSIFICATION_REQUIRED")
+                return
+            _ = self._exec("INSERT INTO source_access VALUES (?,?,?)", (identity, encoded, digest))
+
+    def source_access_for(self, item: SourceItem) -> SourceAccess | None:
+        identity = source_access_identity(item.source_id, item.source_uri, item.content_hash)
+        row = cast(tuple[str, str] | None, self._db().execute("SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
+            (identity,)).fetchone())
+        if row is None:
+            return None
+        try:
+            value = cast(dict[str, object], json.loads(row[0]))
+            access = SourceAccess(cast(str, value["owner"]), tuple(cast(list[str], value["projects"])), cast(str, value["policy_revision"]))
+            if access.encode() != row[0] or source_access_digest(identity, access) != row[1]:
+                raise ValueError("SOURCE_ACCESS_CORRUPT")
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ValueError("SOURCE_ACCESS_CORRUPT") from exc
+        return access
 
     def list_source_items(self) -> tuple[SourceItem, ...]:
         items = list(self._tables.source_items.values())

@@ -694,6 +694,15 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         from sb.connectors import discover_adapters
 
         source_config = Config(raw={**config.raw, "vault_root": str(vault.root)}, base_dir=config.base_dir)
+        try:
+            classifications = config.source_access
+            for item in ledger.list_source_items():
+                configured = classifications.get(item.source_id)
+                existing = ledger.source_access_for(item) if configured is not None else None
+                if existing is not None and existing != configured:
+                    return StageReport((), 0, 1, 0, False, failure="SOURCE_ACCESS_RECLASSIFICATION_REQUIRED")
+        except ValueError as exc:
+            return StageReport((), 0, 1, 0, False, failure=str(exc))
         chosen = discover_adapters(source_config)
         adapters = _select_adapters(chosen, source_ids, config)
         cas = ContentAddressedStore(vault.root)
@@ -733,6 +742,10 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                 continue
             with ledger.transaction():
                 _ = ledger.upsert_source_items(prepared.source_items)
+                classification = classifications.get(adapter.source_id)
+                if classification is not None:
+                    for item in prepared.source_items:
+                        ledger.bind_source_access(item, classification)
                 _ = ledger.upsert_units(prepared.units)
                 if prepared.cursor is not None:
                     position, updated_at = prepared.cursor

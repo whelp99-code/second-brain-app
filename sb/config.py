@@ -14,7 +14,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import assert_never
+from typing import assert_never, cast
+
+from sb.source_access import SourceAccess
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 
@@ -385,6 +387,31 @@ class Config:
             return UnifiedDbConfig()
         dsn = _as_str(section.get("dsn"))
         return UnifiedDbConfig(dsn=DEFAULT_UNIFIED_DB_DSN if dsn is None else dsn)
+
+    @property
+    def source_access(self) -> dict[str, SourceAccess]:
+        """Explicit operator classifications, never inferred from connector payloads."""
+        raw = self.raw.get("source_access")
+        if raw is None:
+            return {}
+        entries = _as_mapping(raw)
+        if entries is None:
+            raise ConfigValueError("SOURCE_ACCESS_CONFIG_INVALID")
+        result: dict[str, SourceAccess] = {}
+        for source_id, raw_entry in entries.items():
+            entry = _as_mapping(raw_entry)
+            if not source_id or entry is None or set(entry) != {"owner", "projects", "policy_revision"}:
+                raise ConfigValueError("SOURCE_ACCESS_CONFIG_INVALID")
+            projects = entry.get("projects")
+            owner = _as_str(entry.get("owner"))
+            revision = _as_str(entry.get("policy_revision"))
+            if not isinstance(projects, list) or any(not isinstance(value, str) for value in projects) or owner is None or revision is None:
+                raise ConfigValueError("SOURCE_ACCESS_CONFIG_INVALID")
+            try:
+                result[source_id] = SourceAccess(owner, tuple(cast(str, value) for value in projects), revision)
+            except ValueError as exc:
+                raise ConfigValueError("SOURCE_ACCESS_CONFIG_INVALID") from exc
+        return result
 
     @property
     def source_roots(self) -> list[dict[str, str]]:
