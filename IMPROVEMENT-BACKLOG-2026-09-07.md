@@ -1,6 +1,11 @@
 # Second Brain 수정·개선·고도화 분석
 
-최신 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md). 명시적 schema6·공개키 조회를 실제 Node→Python stdio에서 인수했다. 다음은 DB 의향·외부 취소 접수/전송 경합·로컬 억제 증거/cursor·seq1→V2seq2이며 기존 전체 운영 목표를 유지한다.
+**최신 JARVIS `88fcd89` / SB 제품 `df9412c`: [DB 근거 취소 의향 발급·실제 중단 복구](CANCELLATION-DB-ACCEPTANCE-2026-09-08.md).**
+정정 materialization에서 메타데이터를 보존하고 실제 suppression/attempt/cursor와 현재 키를 검증해 불변 의향을 발급한다.
+취소 저장 직후 exit77→동일 재생·후속 claim 거부, claim 우선→발급 거부 및 Python 계약 일치를 실제 분리 프로세스에서 확인했다.
+최종 관련 20통과, 타입/ESLint/격리 emit 통과. 외부 취소 전송·provider 접수·로컬 증거/cursor·seq1→V2seq2와 전체 운영 목표는 남는다.
+
+이전 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md). 명시적 schema6·공개키 조회를 실제 Node→Python stdio에서 인수했다. 다음은 DB 의향·외부 취소 접수/전송 경합·로컬 억제 증거/cursor·seq1→V2seq2이며 기존 전체 운영 목표를 유지한다.
 
 최신 제품 `6da593e`: [취소 상태 읽기 전용 조회·공개키/철회·실제 프로세스 인수](CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md). 내부 조회 경계와 삭제 chain 누락 거부를 완료했다. 외부 MCP 새 프로필·JARVIS transport/의향/전송/cursor 및 기존 전체 운영 인수 범위는 남는다.
 

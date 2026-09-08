@@ -6,7 +6,12 @@
 
 최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
 
-**최신 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md).**
+**최신 JARVIS `88fcd89` / SB 제품 `df9412c`: [DB 근거 취소 의향 발급·실제 중단 복구](CANCELLATION-DB-ACCEPTANCE-2026-09-08.md).**
+정정 materialization에서 메타데이터를 보존하고 실제 suppression/attempt/cursor와 현재 키를 검증해 불변 의향을 발급한다.
+취소 저장 직후 exit77→동일 재생·후속 claim 거부, claim 우선→발급 거부 및 Python 계약 일치를 실제 분리 프로세스에서 확인했다.
+최종 관련 20통과, 타입/ESLint/격리 emit 통과. 외부 취소 전송·provider 접수·로컬 증거/cursor·seq1→V2seq2와 전체 운영 목표는 남는다.
+
+**이전 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md).**
 새 cancellation-schema6 프로필에서 읽기 전용 조회를 노출하고 구 프로필 bytes/기본 선택을 유지한다.
 JARVIS는 현재 삭제 이력·정확한 의향·서명 결과·키 철회를 검증한다. 개인키 없는 실제 MCP를
 Node transport에서 접수 중/완료 각각 실행·재시작하여 동일 결과, 권한 거부, 원장 불변을 확인했다.

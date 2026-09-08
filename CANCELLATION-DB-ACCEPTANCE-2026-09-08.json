@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-08",
+  "jarvis_product_commit": "88fcd89",
+  "second_brain_product_commit": "df9412c",
+  "database_process_acceptance": {
+    "parent_pid": 46985,
+    "reports": [
+      {
+        "first": "cancellation",
+        "pids": [
+          48166,
+          48190,
+          48220
+        ],
+        "exit_after_commit": 77,
+        "intent_id": "memcancel:intent:v1:789be33208f3bb1ff5766b08bbd285323a6e2601709016154785410947fdb9e6",
+        "canonical_replay": true,
+        "later_claim": "MEMORY_REQUEST_CANCELLED"
+      },
+      {
+        "first": "claim",
+        "pids": [
+          48264,
+          48282
+        ],
+        "later_issuance": "MEMORY_CANCELLATION_UNSENT_UNPROVED",
+        "intents": 0
+      }
+    ],
+    "original_transport_calls": 0,
+    "spool_preserved": true,
+    "intent_file_sha256": "003fa150744095e00e45f5cba4ddfd08f858ea0d598c258ec929888c38c03646",
+    "scope": "actual SQLite authority and separate Node actors; provider submission and cursor settlement not activated"
+  },
+  "python_contract_validation": {
+    "python_pid": 54633,
+    "cases": {
+      "valid": true,
+      "unknown_current": false,
+      "unknown_historical": false,
+      "bad_signature": false
+    },
+    "canonical_bytes": 5752,
+    "intent_id": "memcancel:intent:v1:789be33208f3bb1ff5766b08bbd285323a6e2601709016154785410947fdb9e6",
+    "scope": "verify actual DB-issued metadata intent only; no provider target admission"
+  },
+  "limitations": [
+    "Isolated fixture authority and keys; no operational migration or deployment",
+    "Provider submission, local evidence settlement and sequence continuation remain unverified"
+  ]
+}

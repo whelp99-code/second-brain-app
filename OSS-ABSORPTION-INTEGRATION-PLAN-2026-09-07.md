@@ -7,7 +7,10 @@
 
 현재 읽기용 종합: [최신 인계 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 아래 초반 대조표와 이전 종합은 발견 당시 기록이며 현재 상태는 이 종합과 구현 원장을 우선한다.
 
-최신 제품 후속: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md).
+**최신 JARVIS `88fcd89` / SB 제품 `df9412c`: [DB 근거 취소 의향 발급·실제 중단 복구](CANCELLATION-DB-ACCEPTANCE-2026-09-08.md).**
+정정 materialization에서 메타데이터를 보존하고 실제 suppression/attempt/cursor와 현재 키를 검증해 불변 의향을 발급한다.
+취소 저장 직후 exit77→동일 재생·후속 claim 거부, claim 우선→발급 거부 및 Python 계약 일치를 실제 분리 프로세스에서 확인했다.
+최종 관련 20통과, 타입/ESLint/격리 emit 통과. 외부 취소 전송·provider 접수·로컬 증거/cursor·seq1→V2seq2와 전체 운영 목표는 남는다.
 
 ## 1. 병합한 결정과 범위
 
