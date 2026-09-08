@@ -1,0 +1,27 @@
+{
+  "fixture_authority": true,
+  "child_processes": 4,
+  "provider_calls": 0,
+  "first": {
+    "outcome": "read",
+    "request_id": "memreq:scoped:v4:85bd274c696f0c26f1b7db55627a3c50531b06dbc70e3f136a0a2332ced4e41b",
+    "request_digest": "sha256:85bd274c696f0c26f1b7db55627a3c50531b06dbc70e3f136a0a2332ced4e41b",
+    "source_request_id": "memreq:pos:v3:991c0b50a2e9f112476562017dccdd8368f9cee34df58e16b4292d85afb52df6",
+    "exact_content": true,
+    "content_bytes": 51
+  },
+  "withdrawal_during_final_read": {
+    "outcome": "denied",
+    "code": "SCOPED_OUTBOX_CURRENT_REQUEST_INVALID"
+  },
+  "restarted_policy_denied": {
+    "outcome": "denied",
+    "code": "SCOPED_OUTBOX_CURRENT_REQUEST_INVALID"
+  },
+  "persisted_source_revocation": {
+    "outcome": "denied",
+    "code": "SCOPED_OUTBOX_CURRENT_REQUEST_INVALID"
+  },
+  "outbox_state": "queued",
+  "foreign_key_errors": 0
+}
