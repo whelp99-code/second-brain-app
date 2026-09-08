@@ -553,3 +553,13 @@ provider 삭제 후 rollout 3개 외 thread_history_1.sqlite에도 확인값이 
 수정 전3실패→8파일35통과, 최종 guard 후3파일10통과. 실제5프로세스 인수로4사본 제거,
 무관 파일 보존과 영구지문을 이용한 복원SQLite 재유입 거부를 확인했다. 삭제 자체는 원문이 필요하다.
 제품 native root 연결·전체 직렬화/DB page 분절·운영/DR·scope 등 기존 완료 조건은 유지한다.
+
+## 46. B4/B6 실제 기억 화면의 개인정보 수명과 시작 설정 결함
+
+JARVIS `53136d4`, SB `bc3313b`: [수정8항목·검증·남은 경계](DASHBOARD-MEMORY-LIFETIME-2026-09-08.md).
+검색/상세/충돌의 전체 privacy/session snapshot, suppression과token transaction, 현재token 기반
+detail, 검색만료/epoch, query/draft clear, 이전 action completion 및 정상 검색 메시지 회복을 수정했다.
+Dashboard211 및 최종집중6, backend관련15 및 최종6 통과(중복). 실제Chromium2viewport/HTTP경합409 인수.
+전역 연결배지 끊김·provider는fixture라는 한계를 유지한다. 신규 P1: remote-approval compose가
+cwd 상대정책파일에 의존하며 누락 시 HTTP요청 중 프로세스종료. 시작시 설정검증·고정경로·
+서비스 한번구성으로 후속 수정한다. 기존 native/ACL/capture/검색/운영/DR 완료조건은 남는다.

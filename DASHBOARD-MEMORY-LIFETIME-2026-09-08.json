@@ -1,0 +1,65 @@
+{
+  "root": "/var/tmp/jarvis-view-browser-yDITvd",
+  "origin": "http://127.0.0.1:43863",
+  "viewports": [
+    {
+      "url": "http://127.0.0.1:43863/memory",
+      "title": "JARVIS 현황판",
+      "width": 1440,
+      "errors": [],
+      "global_disconnected_badge": true,
+      "selected_then_privacy_clear": true,
+      "not_blank": true,
+      "no_overlay": true,
+      "no_overflow": true
+    },
+    {
+      "url": "http://127.0.0.1:43863/memory",
+      "title": "JARVIS 현황판",
+      "width": 1024,
+      "errors": [],
+      "global_disconnected_badge": true,
+      "selected_then_privacy_clear": true,
+      "not_blank": true,
+      "no_overlay": true,
+      "no_overflow": true
+    }
+  ],
+  "browser": "Chromium Playwright; Browser plugin not available",
+  "privacy_clear_passed": true,
+  "http_race_status": 409,
+  "native_model_calls": 0,
+  "provider": "deterministic adapter fixture",
+  "query_input_cleared": true,
+  "full_native_integration": false,
+  "global_connection_readiness": "not certified by this memory-flow acceptance",
+  "commits": {
+    "jarvis": "53136d4",
+    "second_brain_tool": "bc3313b"
+  },
+  "tests": {
+    "backend_related": {
+      "files": 5,
+      "passed": 15
+    },
+    "backend_final": {
+      "files": 2,
+      "passed": 6
+    },
+    "dashboard_full": {
+      "files": 34,
+      "passed": 211
+    },
+    "dashboard_final_focus": {
+      "files": 1,
+      "passed": 6
+    },
+    "overlapping_results_not_additive": true
+  },
+  "build_sha256": {
+    "src/dashboard/memory-read-service.js": "cba4534051cafbaa2916845f4c7c1f3051b59643ef497a4fe5ae672103de03d3",
+    "src/dashboard/server.js": "5d98edbf80ee10b95ab461baba5306c0bd1000935184eaa730691bd13eda35fd",
+    "dashboard/assets/index-BiyDD9Qq.css": "7d1243cbbf523b28c3f386dbb0adf935a1f2c412324d3a5bdc744493383b2a82",
+    "dashboard/assets/index-D3vHCW5M.js": "68ba1a77ac0fbb8ad8da4c68804ae46d44343a2d936e7210b51360df90ae356a"
+  }
+}

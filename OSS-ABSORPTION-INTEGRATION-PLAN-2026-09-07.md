@@ -568,3 +568,10 @@ SQLite·백업의 보존/폐기가 필요하다는 실측을 추가했다. 설�
 기존 보존 도구를 보강했으며 새 기억 DB·Proxy·OSS 코드 도입은 없다. 실제5프로세스 격리 검증은
 지문 기반 재시작 검사와 원문을 사용한 사본 삭제를 구분한다. native root 소유권·실제 앱 채택·
 프로젝트 ACL·실패 결과 capture·검색 품질·운영/DR을 남은 구현 우선순위로 유지한다.
+
+## 51. 공통 기억 관리의 실제 화면 수명 보강
+
+[JARVIS 기억 화면의 개인정보 수명](DASHBOARD-MEMORY-LIFETIME-2026-09-08.md): 새 관리 UI나 기억 서버를
+설치하지 않고 기존 dashboard의 검색/상세/충돌·만료·privacy 전환을 보강했다. 합성 provider와
+실제 Chromium 1440/1024·HTTP 409를 검증했다. verified project ACL이나 native 자동 주입의 완료가 아니다.
+실행 cwd의 policy 파일 누락에서 server 종료를 관측해 다음 운영 기초 수정으로 추가했다. 기존 역할·정본 및 전체 목표를 유지한다.

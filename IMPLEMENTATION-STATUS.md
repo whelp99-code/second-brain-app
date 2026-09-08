@@ -4,6 +4,13 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 JARVIS `53136d4` / SB 도구 `bc3313b`: [실제 기억 화면의 개인정보 수명](DASHBOARD-MEMORY-LIFETIME-2026-09-08.md).**
+provider 조회 중 정책/session 변경 차단, 충돌 suppression, 상세/draft/검색어 및 만료 데이터 폐기,
+같은 token 재사용의 이전 action 차단을 구현했다. Dashboard211/최종집중6, backend관련15/최종6
+통과(중복 포함). 실제Chromium1440/1024와HTTP409 본문부재 확인. 상단 전역연결은 끊김으로
+관측되어 전체운영준비는 미완료다. 새로 발견한 policy config 상대경로 부재의 서버 종료는 다음
+수정 대상. native앱채택·scope·capture·검색품질·운영/DR 전체 목표를 유지한다.
+
 **최신 JARVIS `0352642` / SB 도구 `33bffc0`: [JSON 사본 삭제 보강·15개 후속 과제](JSON-RETENTION-ACCEPTANCE-2026-09-08.md).**
 native 보존 조사에서 이어 JARVIS의 raw-only 삭제/재유입 검사를 수정했다. 수정 전3실패,
 8파일35통과·최종 동기 guard 후3파일10통과, 격리 tsc/변경lint 통과. 실제5프로세스로
