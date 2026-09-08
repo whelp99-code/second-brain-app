@@ -26,3 +26,11 @@ SB `397bc87`의 Python 제품/테스트 기준으로 `TMPDIR=/var/tmp uv run pyt
 현재 provider의 mcp_scoped_read는 연결마다 한 세션을 고정하며 JARVIS 파일 정책도 해당 세션을 명시적으로 허용한다. 따라서 임의 로그인 세션에 자동으로 프로젝트 권한을 배정하거나 일반 CSRF를 scoped 인증으로 바꾸지 않는다. 실제 호스트 인증 진입점에서 세션별 정책/전송 수명을 구성하고 이 API를 호출하는 것이 다음 연결 단계다. 게이트웨이와 backend가 별도 프로세스인 HTTP 경로에는 검증된 세션 전달 경계가 추가로 필요하다.
 
 CLI context 반환은 모델이 실제로 수신한 영수증이나 native session 중복 제출의 증거가 아니다. 실제 모델 공급은 기존 submitInSession 경로와 관측된 client/session/epoch를 사용해야 한다. scoped 쓰기→검증 결과→영수증→새 에이전트 재사용, 정책 rollback·원문/로그 삭제·복구·클라이언트별 실제 인수 등 전체 목표를 유지한다. 운영 배포/서비스 재시작/운영 DB 변경은 하지 않았다.
+
+## 후속: 실제 provider 종료 중 인증 철회
+
+2026-09-09 인수 코드 `c0105db`. 제품 JARVIS `e932f79`는 추가 수정하지 않았다. 실제 node execFile로 생성한 MCP 자식의 exit 이벤트에서 시험용 현재 쿠키를 제거하고 CLI 실행 결과를 검사했다. 자식 종료가 실제 관측됐으며 최종 결과는 MEMORY_ACCESS_SCOPE_UNAVAILABLE로 거부됐다. 읽기 응답을 이미 받았더라도 owned transport 정리 후 최종 인증 검사에서 문맥 출력을 차단함을 확인했다. mock close나 sleep을 사용하지 않았다.
+
+정상 CLI records 2/예산 준수, 쿠키 누락 거부, 기존 v1/v2·세대/정책 철회·독립 프로세스 중복 제출 검사를 같은 실행에서 재확인했다. JavaScript 구문과 diff 검사 통과. 전체 Python/JARVIS 테스트를 다시 실행하지 않았으며 위 전체/집중 검사 수치는 앞선 실행 기록이다. 최신 원본 `/var/tmp/page-access-acceptance-k7176aqi/scoped-mcp-result.json`을 연결 JSON에 보존했다.
+
+현재 제품 호출 지점을 다시 검색한 결과 phone 세션 공급자에서 scoped factory로 이어지는 HTTP 구성이 없고, standalone CLI도 scopedMemoryReferenceOptions를 생성하지 않는다. 다음 작업은 이 실제 호스트 연결과 세션별 명시 정책 구성이다. 현재 검증을 실제 로그인 완료나 모델 전달/보존 수명 인수로 확장하지 않는다.
