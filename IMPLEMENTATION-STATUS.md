@@ -6,7 +6,13 @@
 
 최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
 
-**최신 SB `f9daf99` / JARVIS `12d7b2a`: [DB 의향의 실제 MCP 접수·권한 재검사·응답 유실 복구](CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `9e30115` / 검증 JARVIS `12d7b2a`: [취소 CLI 실행·실제 처분·서명 결과·MCP 인수](CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.md).**
+접수된 의향 하나를 기존 writer/처분 체크포인트로 실행하고 현재 취소·서명 권한을 발급 직전까지 재검사한다.
+실제 DB 접수부터 CLI 처분 경계/결과 commit 뒤 exit77→복구·동일 결과→개인키 없는 Node MCP 검증을 확인했다.
+전체1,093통과/2skip 이후 최종 서명 권한 관련67통과, 정적0오류/0경고·lint통과. 이전 키 신뢰/철회에 따른 결과 재생도 검증했다.
+JARVIS 로컬 억제 증거/cursor·seq1→V2seq2·외부 전송 통합 경합 및 기존 전체 운영 목표는 남는다.
+
+**이전 SB `f9daf99` / JARVIS `12d7b2a`: [DB 의향의 실제 MCP 접수·권한 재검사·응답 유실 복구](CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.md).**
 명시적 schema7에서 취소 목적 키를 잠금 내부까지 다시 읽고, JARVIS는 발행 직전 DB 권한을 재검증한다.
 실제 DB→Node→Python 대상 접수, commit 직후 exit77→uncertain/자동 재전송 없음→동일 재생·실행 중 철회 거부를 확인했다.
 전체1,082통과/2skip 이후 최종 오류 정규화 관련26통과, 정적0오류/0경고·lint통과. JARVIS EPIPE 재현·수정 후 최종전송89통과·타입/lint/격리emit통과.

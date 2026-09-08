@@ -1,0 +1,52 @@
+{
+  "reports": [
+    {
+      "phase": "predecessor_disposal",
+      "exit_code": 77,
+      "submission": "/var/tmp/cancellation-submit-acceptance-gqjqz1l7/result.json",
+      "result_digest": "sha256:e88d26fbd01ad0d48919a0c9e07bdfd44a72eedc408740a8d935aec3693843c7",
+      "identical_cli_replay": true,
+      "body_matches": 0,
+      "scan_errors": 0,
+      "result_rows": 1,
+      "mcp": {
+        "node_pid": 292430,
+        "mcp_pids": [
+          292437,
+          292441
+        ],
+        "state": "provider_local_suppressed",
+        "exact_result": true,
+        "replay_equal": true,
+        "missing_state": "not_found",
+        "unauthorized": "TOMBSTONE_FENCE_REQUIRED"
+      }
+    },
+    {
+      "phase": "cancellation_result_committed",
+      "exit_code": 77,
+      "submission": "/var/tmp/cancellation-submit-acceptance-p0km_mko/result.json",
+      "result_digest": "sha256:5ec0bd9ee20f121ce5d18ada385cafa060b24c89f1eb4f309a31b34a946921a6",
+      "identical_cli_replay": true,
+      "body_matches": 0,
+      "scan_errors": 0,
+      "result_rows": 1,
+      "mcp": {
+        "node_pid": 292997,
+        "mcp_pids": [
+          293004,
+          293011
+        ],
+        "state": "provider_local_suppressed",
+        "exact_result": true,
+        "replay_equal": true,
+        "missing_state": "not_found",
+        "unauthorized": "TOMBSTONE_FENCE_REQUIRED"
+      }
+    }
+  ],
+  "scope": "actual JARVIS DB submission, explicit Python CLI execution and Node MCP verification in isolated fixtures; no JARVIS cursor settlement or operational deployment",
+  "second_brain_product_commit": "9e30115",
+  "jarvis_product_commit": "12d7b2a",
+  "date": "2026-09-08"
+}
