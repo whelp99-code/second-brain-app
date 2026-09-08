@@ -1,0 +1,75 @@
+{
+  "fixture_authority": true,
+  "provider_calls": 0,
+  "approval_consumed": false,
+  "cases": [
+    {
+      "case": "valid",
+      "jarvis_accepted": true,
+      "provider_accepted": true
+    },
+    {
+      "case": "wrong_provider",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "writer_lf",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "writer_cr",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "writer_owner",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "scope_changed",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "candidate_changed",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "body_changed",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "authority_label",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "unknown_key",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "expired",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "extended",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    },
+    {
+      "case": "idempotency_changed",
+      "jarvis_accepted": false,
+      "provider_accepted": false
+    }
+  ],
+  "accepted": 1,
+  "rejected": 12,
+  "canonical_bytes_match": true
+}
