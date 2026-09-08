@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 인계 추가 대조:** [수정·개선·고도화 추가 분석](HANDOFF-ADDITIONAL-ANALYSIS-2026-09-09.md). 네 OSS의 선별 흡수 방향을 재확인하고 통합 목록 M1/M9의 오래된 상태를 갱신했다. 후보 범위 제안은 기존 분류/출처에 결합하는 읽기 전용 선행 API이며 승인·scoped 저장 완료가 아니다. 승인된 범위→쓰기→영수증→다른 agent 재사용은 P0로 유지한다.
+
 **2026-09-09 JARVIS `0825e0d` / SB `6831147`:** [scoped 쓰기 계약 결손·지원 기능 API](SCOPED-WRITE-CONTRACT-GAP-2026-09-09.md). 인증 capabilities에 문맥만 지원/쓰기false/준비 미검사 명시, 관련45통과·실제 HTTP 쓰기404·proxy 미전달. 승인된 프로젝트 분류→쓰기 요청→봉인 계보→영수증 확장 없이 scoped 쓰기 개방은 보류한다. 전체 쓰기 완성 목표는 유지한다.
 
 **2026-09-09 SB `b5c192a`:** [서로 다른 agent의 실제 공유·프로젝트 제한](AGENT-POLICY-LOGIN-2026-09-09.md). 두 HTTP gateway agent가 같은 정본 records2를 동일하게 회수, peer만 프로젝트 제한 후 peer0/original2 확인. 실제 Codex/Claude 실행·쓰기/영수증/주입 및 전체 운영 인수는 남는다.
