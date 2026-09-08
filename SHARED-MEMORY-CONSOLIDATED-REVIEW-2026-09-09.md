@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `2c890d4` 범위 검토 단일 사용·등록:** [원자적 outbox 등록·commit 전후 종료 검증](SCOPED-OUTBOX-REGISTRATION-2026-09-09.md). 확대59통과·최종 관련25통과(중복 포함), 타입/lint/격리emit, 최종 독립6프로세스에서 0/0→1/1 또는 1/1 보존·만료 후 등록 응답 재조회. provider 호출0이며 worker/공개 계약/운영 권한 연결은 남는다. [인계 추가 분석과 우선 작업](HANDOFF-ADDITIONAL-ANALYSIS-2026-09-09.md)을 갱신했다.
+
 **2026-09-09 JARVIS `a4ec505` outbox 프로필 분리:** [migration077·legacy worker 경계·실제76→77](OUTBOX-PROFILE-MIGRATION-2026-09-09.md). 확대71통과·타입/lint/격리emit, 실제 queued1/기존 열/FK 보존. scoped 승인 소비·등록·worker 활성화·운영 인수는 남는다.
 
 **2026-09-09 JARVIS `53c67b1` 최종 읽기 뒤 철회 수정:** [회귀1실패→관련23통과·실제 정책 파일 철회](SCOPED-PUBLICATION-COMPOSITION-2026-09-09.md). 타입/lint/격리emit, 독립4프로세스에서 read 직후 정책 철회 시 prepared 반환 거부. 승인 소비/outbox/provider·전체 운영 목표는 유지한다.
@@ -139,7 +141,7 @@ P0는 메인 기억 장소 인수에 필요한 항목, P1은 사용 품질·운�
 | ID | 관점·우선순위 | 현재 부족한 점과 영향 | 구현 지점·개선 방법 | 완료 조건 |
 |---|---|---|---|---|
 | M1 | 연결 개선 P0 | HTTP/CLI→scoped MCP 연결과 두 gateway agent의 공유·제한 검증 완료; 운영 Tailnet/키/서비스 인수는 남음 | 구현된 인증 세션·정책 resolver·issuer·context 구성을 실제 운영 진입점에 적용하고 요청 취소/종료 정리를 검증 | 실제 앱 세션에서 허용 조회 성공·다른 프로젝트 거부, 구형 프로필 호환/거부 명확화 |
-| M2 | 기능 완성 P0 | 일반 owner 저장→완료→별도 client 회수는 검증; 프로젝트 범위 v4는 내부 수락·저장·봉인·proof·독립 회수까지 검증; 실제 권한 검증·승인 소비·공개 MCP/자비스 receipt 연결은 미완료 | 기존 쓰기·status·resolve·export·restore에 동일 범위 계약 적용 | 조회→검증된 작업 결과→저장→영수증→새 세션 회수까지 하나의 ID/계보로 입증 |
+| M2 | 기능 완성 P0 | 일반 owner 저장→완료→별도 client 회수는 검증; 프로젝트 범위 v4는 내부 수락·저장·봉인·proof·독립 회수까지 검증; 범위 검토 단일 사용·outbox 등록 검증 완료; 실제 권한 검증·scoped worker·공개 MCP/자비스 receipt 연결은 미완료 | 기존 쓰기·status·resolve·export·restore에 동일 범위 계약 적용 | 조회→검증된 작업 결과→저장→영수증→새 세션 회수까지 하나의 ID/계보로 입증 |
 | M3 | 정책 개선 P0 | 파일 갱신은 반영하지만 rollback 및 기발급 claim 전역 철회 미완 | 최신 정책 revision·삭제 high-water의 단조성 및 소비 직전 유효성 검증 | 옛 설정/백업 복구·열린 연결·발급 후 철회 시 과거 범위로 읽지 못함 |
 | M4 | 계보 개선 P0 | 원본/페이지 계보와 실제 작업 성공 증거의 자동 연결 부족 | task→검증 결과→candidate→provider record 연결, 실패·철회 상태 전파 | 실패·미확정·대체된 작업은 성공 경험으로 회수되지 않음 |
 | M5 | 세션 수명 개선 P0 | 모델에 전달한 기억의 native session/compaction 보존·삭제 미완 | 기존 managed session·본문 inventory·삭제 관측에 연결 | 세션 재개·요약·원문 로그/WAL/백업에서 삭제 기억 재등장 차단 및 증거 |

@@ -1,0 +1,61 @@
+{
+  "fixture_authority": true,
+  "child_processes": 6,
+  "provider_calls": 0,
+  "scenarios": [
+    {
+      "crash_point": "before-commit",
+      "exit_code": 74,
+      "rows_before": {
+        "outbox": 0,
+        "bindings": 0
+      },
+      "rows_after": {
+        "outbox": 1,
+        "bindings": 1
+      },
+      "registered": {
+        "schema_version": 4,
+        "kind": "registered",
+        "state": "queued",
+        "outbox_id": "memout:scoped:v4:dedf8620786c57756b115e5d6372608c640cfac694291b77b6fda8ca0fae56e4",
+        "request_id": "memreq:scoped:v4:ebf411b6932eac6cfe98d1b689d61cd0c3eb800a5b2496da1c09c9eeb45c5966",
+        "request_digest": "sha256:ebf411b6932eac6cfe98d1b689d61cd0c3eb800a5b2496da1c09c9eeb45c5966",
+        "idempotency_key": "memidem:scoped:v4:1556348db775ac06200e64ab38c32d69646a2b57f854c1db737a6e304cd806eb",
+        "registered_at": "2026-08-28T12:00:00.000Z",
+        "replayed": false
+      },
+      "repeated_acknowledgement": true,
+      "replay_after_lease_recovery": true,
+      "legacy_worker_claims": 0,
+      "foreign_key_errors": 0
+    },
+    {
+      "crash_point": "after-commit",
+      "exit_code": 73,
+      "rows_before": {
+        "outbox": 1,
+        "bindings": 1
+      },
+      "rows_after": {
+        "outbox": 1,
+        "bindings": 1
+      },
+      "registered": {
+        "schema_version": 4,
+        "kind": "registered",
+        "state": "queued",
+        "outbox_id": "memout:scoped:v4:af812b291fd3e67c58c94441e8257263cba9181e52daf3dd22932d856af6084a",
+        "request_id": "memreq:scoped:v4:9e91da9154844359e452aa29972acc439eec9f28409d2661670c08851dc1c6f8",
+        "request_digest": "sha256:9e91da9154844359e452aa29972acc439eec9f28409d2661670c08851dc1c6f8",
+        "idempotency_key": "memidem:scoped:v4:1c65e0168a4b6d3c704bf6ed282ac2fe46e0022fe3c4d57d6130d02c544561dc",
+        "registered_at": "2026-08-28T12:00:00.000Z",
+        "replayed": true
+      },
+      "repeated_acknowledgement": true,
+      "replay_after_lease_recovery": true,
+      "legacy_worker_claims": 0,
+      "foreign_key_errors": 0
+    }
+  ]
+}

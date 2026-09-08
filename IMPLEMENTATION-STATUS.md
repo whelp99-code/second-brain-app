@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `2c890d4` 범위 검토 단일 사용·등록:** [원자적 outbox 등록·commit 전후 종료 검증](SCOPED-OUTBOX-REGISTRATION-2026-09-09.md). 확대59통과·최종 관련25통과(중복 포함), 타입/lint/격리emit, 최종 독립6프로세스에서 0/0→1/1 또는 1/1 보존·만료 후 등록 응답 재조회. provider 호출0이며 worker/공개 계약/운영 권한 연결은 남는다. [인계 추가 분석과 우선 작업](HANDOFF-ADDITIONAL-ANALYSIS-2026-09-09.md)을 갱신했다.
+
 **2026-09-09 JARVIS `a4ec505` outbox 프로필 분리:** [migration077·legacy worker 경계·실제76→77](OUTBOX-PROFILE-MIGRATION-2026-09-09.md). 확대71통과·타입/lint/격리emit, 실제 queued1/기존 열/FK 보존. scoped 승인 소비·등록·worker 활성화·운영 인수는 남는다.
 
 **2026-09-09 JARVIS `53c67b1` 최종 읽기 뒤 철회 수정:** [회귀1실패→관련23통과·실제 정책 파일 철회](SCOPED-PUBLICATION-COMPOSITION-2026-09-09.md). 타입/lint/격리emit, 독립4프로세스에서 read 직후 정책 철회 시 prepared 반환 거부. 승인 소비/outbox/provider·전체 운영 목표는 유지한다.
