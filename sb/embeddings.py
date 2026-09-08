@@ -31,7 +31,7 @@ _WARMUP_SCRIPT: Final = (
 )
 _ENCODE_SCRIPT: Final = (
     "import json,sys\nfrom sentence_transformers import SentenceTransformer\n"
-    "m=SentenceTransformer(sys.argv[1], revision=sys.argv[2])\n"
+    "m=SentenceTransformer(sys.argv[1], revision=sys.argv[2], local_files_only=True)\n"
     "for row in m.encode(json.load(sys.stdin), normalize_embeddings=True):\n"
     " print(','.join(str(float(x)) for x in row))\n"
 )
@@ -64,9 +64,12 @@ class _RemoteEncoder:
 
     def encode(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
         raw = _run_st(_ENCODE_SCRIPT, self.identity, json.dumps(list(texts)))
-        return tuple(
-            tuple(float(part) for part in line.split(",")) for line in raw.splitlines() if line
-        )
+        try:
+            return tuple(
+                tuple(float(part) for part in line.split(",")) for line in raw.splitlines() if line
+            )
+        except ValueError as exc:
+            raise EmbeddingUnavailable("invalid embedding process output") from exc
 
 
 def vectors_path(vault_root: Path) -> Path:
@@ -167,7 +170,7 @@ def resolve_encoder() -> Encoder:
 
 def warmup() -> ModelIdentity:
     identity = _env_identity()
-    revision = _run_st(_WARMUP_SCRIPT, identity, "").strip() or identity.revision
+    revision = _run_st(_WARMUP_SCRIPT, identity, "", timeout=600).strip() or identity.revision
     return ModelIdentity(identity.model_id, revision, VECTOR_DIM)
 
 
@@ -371,14 +374,20 @@ def _vec_cli() -> str | None:
     return found
 
 
-def _run_st(script: str, identity: ModelIdentity, stdin_text: str) -> str:
-    done = subprocess.run(
-        [sys.executable, "-c", script, identity.model_id, identity.revision],
-        input=stdin_text,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _run_st(script: str, identity: ModelIdentity, stdin_text: str, *, timeout: float = 60) -> str:
+    try:
+        done = subprocess.run(
+            [sys.executable, "-c", script, identity.model_id, identity.revision],
+            input=stdin_text,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise EmbeddingUnavailable("embedding subprocess timed out") from exc
+    except OSError as exc:
+        raise EmbeddingUnavailable("embedding subprocess unavailable") from exc
     if done.returncode != 0:
         raise EmbeddingUnavailable(done.stderr.strip() or "sentence-transformers failed")
     return done.stdout
