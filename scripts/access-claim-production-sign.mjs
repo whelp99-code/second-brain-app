@@ -2,6 +2,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 const build = process.argv[2];
 const moduleAt = name => import(pathToFileURL(join(build, name)).href);
 const { memoryDatabase, closeMemoryDatabase } = await moduleAt('tests/fixtures/memory-candidate-store.js');
@@ -121,6 +123,17 @@ try {
         try { await newReader.submitInSession(reread, async () => { callbacks++; }, nativeSession); }
         catch (error) { if (error.code !== 'MEMORY_REFERENCE_ALREADY_SUBMITTED') throw error; durableDuplicateDenied = true; }
         if (!durableDuplicateDenied || callbacks !== 1) throw new Error('durable duplicate accepted');
+        const reopened = spawnSync(process.execPath,
+          [fileURLToPath(new URL('./scoped-delivery-reopen.mjs', import.meta.url)), build], {
+            input: JSON.stringify({ database: db.path, options: productionOptions,
+              fixture_session: sessionSource(), now: body.issued_at, budgets, native_session: nativeSession }),
+            encoding: 'utf8', timeout: 45000, maxBuffer: 1024 * 1024,
+          });
+        if (reopened.error) throw reopened.error;
+        if (reopened.status !== 0) throw new Error(`independent delivery check failed: ${reopened.stderr}`);
+        const processReplay = JSON.parse(reopened.stdout);
+        if (!processReplay.independent_process || !processReplay.duplicate_denied || processReplay.callbacks !== 0)
+          throw new Error('independent delivery evidence missing');
         let duplicateDenied = false;
         try { await reader.submit(reference, async () => { callbacks++; }); }
         catch (error) { if (error.code !== 'MEMORY_REFERENCE_SUBMISSION_INVALID') throw error; duplicateDenied = true; }
@@ -134,7 +147,7 @@ try {
         substituteEmptyGeneration = false;
         if (!generationDenied) throw new Error('empty generation substitution accepted');
         pendingReference = await reader.read('Cited', budgets);
-        referenceCheck = { production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
+        referenceCheck = { independent_process_replay: processReplay, production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
       }
       currentCookie = undefined;
       if (reader) {
