@@ -26,6 +26,8 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
 
+from sb.cancellation_result import CancellationResultError
+from sb.cancellation_status import CancellationStatusError, read_cancellation_status
 from sb.config import Config, load_config
 from sb.contracts import MemoryWriteResultV1
 from sb.delegations import DelegationRejected, verify_read_fence
@@ -109,6 +111,8 @@ _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
 _REMEMBER_PROFILE: Final = "remember-schema5"
+_CANCELLATION_PROFILE: Final = "cancellation-schema6"
+_CANCELLATION_CONTRACT_DIGEST: Final = "8be1ca195f60cb73f05c989d3d5f3e62053020988ccd8bb028cd4d8b442063b4"
 _REMEMBER_CONTRACT_DIGEST: Final = "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
 _TASK32_CONTRACT_DIGEST: Final = "ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0"
 
@@ -256,7 +260,7 @@ def build_server(
     request_root: Path | str | None = None,
     *,
     task30: bool | None = None,
-    contract_schema: Literal[3, 4, 5] | None = None,
+    contract_schema: Literal[3, 4, 5, 6] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
     config: Config | None = None,
 ) -> MCPServer:
@@ -310,6 +314,16 @@ def build_server(
         except ValueError:
             provider_private_key = None
 
+    result_public_keys: dict[str, Ed25519PublicKey] = {}
+    try:
+        result_public_keys = {
+            key_id: Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(encoded + "=="))
+            for key_id, encoded in config.provider_result_public_keys.items()
+            if key_id not in config.revoked_provider_result_key_ids
+        }
+    except ValueError:
+        result_public_keys = {}
+
     external_public_keys: dict[str, Ed25519PublicKey] | None = None
     configured_external_keys = config.external_erasure_public_keys
     if configured_external_keys:
@@ -347,6 +361,9 @@ def build_server(
         elif profile == _REMEMBER_PROFILE:
             task30_enabled = True
             contract_schema_version = 5
+        elif profile == _CANCELLATION_PROFILE:
+            task30_enabled = True
+            contract_schema_version = 6
         else:
             raise ContractProfileError
     generation_store: GenerationStore | None = None
@@ -650,7 +667,8 @@ def build_server(
                     "contract_schema_version": contract_schema_version,
                     "contract_digest": _contract_digest(),
                     "features": ["memory_effect_write_v2", "memory_record_identity_v1"]
-                    + (["memory_remember_v3"] if contract_schema_version == 5 else []),
+                    + (["memory_remember_v3"] if contract_schema_version >= 5 else [])
+                    + (["memory_cancellation_status_v1"] if contract_schema_version == 6 else []),
                 })
             return status
 
@@ -718,9 +736,28 @@ def build_server(
                 ).as_dict()
             return bind_read(result, generation, current)
 
+    def sb_cancellation_status(
+        intent_id: str,
+        intent_digest: str,
+        read_fence: dict[str, JsonValue] | None = None,
+    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+        """Read an exact cancellation result with current status authority and public keys."""
+        try:
+            return dict(read_cancellation_status(
+                requests / "journal.db", intent_id, intent_digest,
+                provider_instance_id=config.provider_instance_id, now=datetime.now(UTC),
+                read_fence=read_fence, reader_keys=public_keys or {},
+                provider_keys=result_public_keys,
+                revoked_provider_key_ids=config.revoked_provider_result_key_ids,
+            ))
+        except (CancellationStatusError, CancellationResultError, DelegationRejected) as exc:
+            raise ToolError(str(exc)) from exc
+
     def _contract_digest() -> str:
         filename = "second-brain-mcp-v3.json.sha256" if contract_schema_version == 5 else "second-brain-mcp-v1.json.sha256"
         expected = _REMEMBER_CONTRACT_DIGEST if contract_schema_version == 5 else _TASK32_CONTRACT_DIGEST
+        if contract_schema_version == 6:
+            filename, expected = "second-brain-mcp-v4.json.sha256", _CANCELLATION_CONTRACT_DIGEST
         sidecar = Path(__file__).resolve().parent.parent / "contracts" / filename
         try:
             value = sidecar.read_text(encoding="ascii").strip()
@@ -959,11 +996,13 @@ def build_server(
     )
     _ = server.tool(name="sb_remember")(sb_remember if task30_enabled else legacy_remember)
     _ = server.tool(name="sb_write_request")(
-        sb_write_remember_request if contract_schema_version == 5 else sb_write_request if task30_enabled else legacy_write_request
+        sb_write_remember_request if contract_schema_version >= 5 else sb_write_request if task30_enabled else legacy_write_request
     )
     if task30_enabled:
         _ = server.tool(name="sb_generation_status")(sb_generation_status)
         _ = server.tool(name="sb_request_status")(sb_request_status)
+        if contract_schema_version == 6:
+            _ = server.tool(name="sb_cancellation_status")(sb_cancellation_status)
         resolver = sb_resolve_memory_record if contract_schema_version >= 4 else sb_resolve_memory_target
         _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server

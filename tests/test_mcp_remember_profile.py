@@ -18,7 +18,7 @@ from tests.task30_clock import FrozenTask30DateTime
 from tests.test_mcp_profile_compatibility import _configured_runtime
 
 
-@pytest.mark.parametrize("profile,accepted", [("task32-schema4", False), ("remember-schema5", True)])
+@pytest.mark.parametrize("profile,accepted", [("task32-schema4", False), ("remember-schema5", True), ("cancellation-schema6", True)])
 def test_only_explicit_new_profile_accepts_multiline_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, accepted: bool,
 ) -> None:

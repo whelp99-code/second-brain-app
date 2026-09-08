@@ -337,6 +337,14 @@ class Config:
         return _as_str(self.raw.get("provider_private_key"))
 
     @property
+    def provider_result_public_keys(self) -> dict[str, str]:
+        return _as_str_mapping(self.raw.get("provider_result_public_keys"))
+
+    @property
+    def revoked_provider_result_key_ids(self) -> frozenset[str]:
+        return frozenset(_as_str_list(self.raw.get("revoked_provider_result_key_ids")) or [])
+
+    @property
     def caps(self) -> dict[str, int]:
         merged = dict(DEFAULT_CAPS)
         section = _as_mapping(self.raw.get("caps"))
