@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `689114c` / SB 인수 `f32f032`:** [HTTP 기억 응답 중 세션 만료 수정](PHONE-MEMORY-HTTP-EXPIRY-2026-09-09.md). 만료 후 200 반환 회귀 재현→관련58통과, 격리 빌드 HTTP 정상200/만료401/재요청401 및 본문 차단 확인. 실제 Tailnet·scoped 인증 전달·전체 운영 인수는 남는다.
+
 **2026-09-09 SB `a3da3b4`:** [인계 재대조·독립 프로세스 제출 검증](HANDOFF-RECONCILIATION-2026-09-09.md). 별도 Node/DB 연결/실제 MCP로 2 records 재조회 후 같은 native session/epoch 중복 제출 거부, 콜백 0회. 기존 철회·변조 검사와 lint 통과. 시험용 identity snapshot이며 실제 HTTP 인증 전달·모델 세션 재개·전체 운영 인수는 미완료다.
 
 **2026-09-09 JARVIS `121d06b` / SB 인수 `57f88c1`:** [영속 제출 세션의 인증 범위 결합](SCOPED-DURABLE-DELIVERY-2026-09-09.md). 다른 인증 세션에서 새 reader/epoch로 native 세션을 재사용하던 회귀 수정, 관련35통과·격리emit/lint 및 실제 MCP→원장 HMAC/새 reader 중복 거부 확인. native 세션 관측·본문 삭제와 인증 진입점 등 전체 운영 목표는 유지한다.

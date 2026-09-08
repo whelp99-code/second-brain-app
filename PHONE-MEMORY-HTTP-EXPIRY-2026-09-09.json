@@ -1,0 +1,9 @@
+{
+  "normal_status": 200,
+  "expired_status": 401,
+  "retry_status": 401,
+  "upstream_reads": 2,
+  "expired_payload_withheld": true,
+  "expired_cookie_cleared": true,
+  "scope": "compiled HTTP gateway; fixture Tailnet headers/upstream/clock; no live Tailnet or scoped MCP composition"
+}
