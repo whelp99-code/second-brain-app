@@ -6,7 +6,14 @@
 
 최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
 
-**최신 인수 `42ceb35` / JARVIS 제품 `ea076ae` / SB 제품 `9e30115`: [취소 후 정상 V2 seq2의 양쪽 검증·실제 provider 실행](CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.md).**
+
+## 2026-09-08 인계 재대조·자비스 후속 command 회귀
+
+인계서의 세컨드브레인 정본·네 OSS 선별 흡수·공통 기억 우선 방향을 최신 구현과 다시 병합했다. [종합 분석](HANDOFF-CURRENT-REVIEW-2026-09-08.md)의 과거 cursor/로컬 처분 미완료 설명을 수정했다.
+JARVIS 테스트 `30cf131`: 취소 settlement 이후 실제 확인·준비·승인·claim·dispatch API를 거쳐 delta1/seq2, 발행1회, cursor2, 원 취소 writer0회를 확인했다. 타입·변경 파일 lint 통과, 직렬 Vitest 1통과/6.34초.
+provider status/accepted 및 대상은 fixture이며 상태 reconciling이다. 실제 provider seq2 인수와 분리된 검사이고 전체 완료가 아니다. 다음은 동일 자비스 DB의 실제 dispatch→provider 실행→완료 증거 연결이다. ACL·계보·native 세션·실제 앱·검색·운영 복구의 잔여 목표는 유지한다.
+
+**이전 실제 provider 인수 `42ceb35` / JARVIS 제품 `ea076ae` / SB 제품 `9e30115`: [취소 후 정상 V2 seq2의 양쪽 검증·실제 provider 실행](CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.md).**
 취소 settlement/cursor1인 provider에 독립 기억을 저장하고 delta1개/sequence2 정정을 양쪽 validator와 실제 executor에서 proved까지 확인했다.
 커밋된 wiki의 정정 반영·이전/취소 내용 부재·재실행 idle을 확인했다. 관련9통과·Ruff/syntax/diff통과.
 JARVIS는 wire validator만 실행했으며 실제 seq2 authority/dispatch/완료는 미인수다. JARVIS cursor1과 전체 운영 목표를 유지한다.
