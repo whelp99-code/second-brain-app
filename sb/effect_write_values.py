@@ -96,7 +96,8 @@ def _target_core(target: ResolvedMemoryTargetModel) -> JsonObject:
     return {key: item for key, item in value.items() if key not in {"target_id", "target_digest"}}
 
 
-def _verify_target(target: ResolvedMemoryTargetModel, provider: str) -> None:
+def verify_resolved_target_metadata(target: ResolvedMemoryTargetModel, provider: str) -> None:
+    """Verify target identities and interval shape; callers enforce use-time freshness."""
     value = model_object(target)
     if target.provider_instance_id != provider:
         reject("EFFECT_TARGET_INVALID")
@@ -397,7 +398,7 @@ def parse_effect_request(
     if not created <= observed < expires or expires > created + timedelta(minutes=15):
         reject("EFFECT_REQUEST_INVALID", request_id)
     for target in request.targets:
-        _verify_target(target, request.provider_instance_id)
+        verify_resolved_target_metadata(target, request.provider_instance_id)
         if parse_instant(target.expires_at) <= observed:
             reject("EFFECT_TARGET_INVALID", request_id)
     target_values = [model_object(target) for target in request.targets]
