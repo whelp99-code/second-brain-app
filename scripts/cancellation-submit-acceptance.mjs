@@ -1,10 +1,24 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync, spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 const input = JSON.parse(readFileSync(0, "utf8"));
 const moduleAt = name => import(pathToFileURL(`${input.build}/${name}.js`));
+if (process.argv.includes("--compact-actor") || process.argv.includes("--recover-actor")) {
+  const { AuthorityDb } = await moduleAt("src/db");
+  const { AuthorityDatabaseRuntime } = await moduleAt("src/authority-database-runtime");
+  const { MemoryManagedSurfaceScanner } = await moduleAt("src/memory-managed-surface-scanner");
+  const { MemoryAuthorityCompactor } = await moduleAt("src/memory-authority-compactor");
+  const db = new AuthorityDb(input.database);
+  const runtime = new AuthorityDatabaseRuntime(db, { registry_root: input.registry_root, watchdog_ms: 5000 });
+  const compactor = new MemoryAuthorityCompactor({ runtime, layout: input.layout,
+    scanner: new MemoryManagedSurfaceScanner({ authority: db, layout: input.layout }), clock: () => new Date() });
+  const receipt = process.argv.includes("--compact-actor") ? await compactor.compactCancellation(input.correction_id)
+    : await compactor.recoverCancellation(input.correction_id);
+  writeFileSync(1, JSON.stringify({ pid: process.pid, receipt }));
+  process.exit(process.argv.includes("--compact-actor") ? 77 : 0);
+}
 if (process.argv.includes("--record-actor")) {
   const { AuthorityDb } = await moduleAt("src/db");
   const { MemoryCorrectionCancellationResultStore } = await moduleAt("src/memory-correction-cancellation-result-store");
@@ -43,7 +57,7 @@ try {
   assert.deepEqual(readFileSync(f.spoolPath), spool);
   const cursor = f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get();
   assert.deepEqual(cursor, { active_lane_id: null, accepted_through_sequence: 0 });
-  let storedResult;
+  let storedResult; let localCompaction; let localRecovery;
   if (input.record_result) {
     const result = JSON.parse(execFileSync(input.python, ["-m", "sb.cli", "apply-cancellation", "--intent-id", accepted.intent_id],
       { cwd: input.sb_root, env: { ...process.env, SB_CONFIG: input.execution_config, TMPDIR: "/var/tmp" }, encoding: "utf8" }));
@@ -57,6 +71,28 @@ try {
     const child = spawnSync(process.execPath, [process.argv[1], "--record-actor"], { encoding: "utf8",
       input: JSON.stringify({ build: input.build, database: f.database.path, correction_id: f.record.correction_id, result }) });
     assert.equal(child.status, 77, child.stderr);
+    if (input.compact_result) {
+      const actorInput = { build: input.build, database: f.database.path, correction_id: f.record.correction_id,
+        registry_root: `${f.root}/registry`, layout: { spool_root: f.runtime.spool_root, state_root: `${f.root}/state`,
+          dist_root: `${f.root}/dist`, backup_root: `${f.root}/backups`, restore_root: `${f.root}/restore` } };
+      f.db.close();
+      try {
+        const compact = spawnSync(process.execPath, [process.argv[1], "--compact-actor"], { encoding: "utf8", input: JSON.stringify(actorInput), timeout: 60000 });
+        assert.equal(compact.status, 77, compact.stderr);
+        localCompaction = JSON.parse(compact.stdout).receipt;
+        const recovered = spawnSync(process.execPath, [process.argv[1], "--recover-actor"], { encoding: "utf8", input: JSON.stringify(actorInput), timeout: 60000 });
+        assert.equal(recovered.status, 0, recovered.stderr);
+        assert.deepEqual(JSON.parse(recovered.stdout).receipt, localCompaction);
+        localRecovery = { exit_after_local_record: compact.status, exact_replay: true,
+          compact_pid: JSON.parse(compact.stdout).pid, recover_pid: JSON.parse(recovered.stdout).pid };
+      } finally { f.db.reopen(); }
+      assert.equal(localCompaction.scope, "jarvis_cancellation_local_compaction");
+      assert.equal(localCompaction.result_digest, result.result_digest);
+      assert.equal(localCompaction.local.observed_surface_count, 20);
+      assert.equal(existsSync(f.spoolPath), false);
+
+      assert.equal(f.db.db.prepare("SELECT count(*) AS n FROM memory_compaction_inputs").get().n, 0);
+    }
     const reopened = new AuthorityDb(f.database.path);
     try {
       const results = new MemoryCorrectionCancellationResultStore(reopened, () => new Date());
@@ -66,12 +102,12 @@ try {
       reopened.db.prepare("UPDATE memory_provider_proof_keys SET state='revoked' WHERE key_id=?").run(result.signing_key_id);
       assert.throws(() => results.get(f.record.correction_id), /MEMORY_CANCELLATION_RESULT_INVALID/);
     } finally { reopened.close(); }
-    assert.deepEqual(readFileSync(f.spoolPath), spool);
+    if (!input.compact_result) assert.deepEqual(readFileSync(f.spoolPath), spool);
     assert.deepEqual(f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get(), cursor);
     storedResult = { result_digest: result.result_digest, exit_after_record: child.status,
       exact_replay: true, result_rows: 1, current_revocation_rejected: true };
   }
-  process.stdout.write(JSON.stringify({ stored_result: storedResult, node_pid: process.pid, mcp_pids: pids, exit_after_provider_commit: exits[0].code, response_loss: lost,
+  process.stdout.write(JSON.stringify({ local_recovery: localRecovery, local_compaction: localCompaction, stored_result: storedResult, node_pid: process.pid, mcp_pids: pids, exit_after_provider_commit: exits[0].code, response_loss: lost,
     no_automatic_write_retry: true, exact_replay_after_restart: true, live_provider_revocation_rejected: true,
-    intent_id: accepted.intent_id, original_transport_calls: f.writer.calls.length, spool_preserved: true, cursor }) + "\n");
+    intent_id: accepted.intent_id, original_transport_calls: f.writer.calls.length, spool_preserved: !input.compact_result, cursor }) + "\n");
 } finally { await transport.close(); await f.close(); }
