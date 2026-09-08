@@ -4,7 +4,17 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 SB `5d9f7d4`: [남는 정상 백업 보존·무결성·실제 복원](RETAINED-BACKUP-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `44ab911` / JARVIS `cabfba2`: [취소 결과의 실제 증거·서명·저장·교차 검증](CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md).**
+별도 provider_local_suppression 결과를 exact intent/target/세대/tombstone과 실제 alias·reingress·
+원본 처분·copy checkpoint·후속 세대 본문 부재에 결합한다. 원문이 있을 때 부재 검사를 저장해
+재시작 시 대조하고, 검사 이후 키 철회도 전환 전에 재검증한다. 결과는 기존 journal의 불변 행으로
+저장하며 응답 유실·후속 세대 이후 동일 결과를 재생한다. 전체1,045통과/2skip(최종 권한 재검사 전),
+이후 관련37통과(중복·신규1포함), 제품정적0오류/0경고·lint통과. JARVIS5파일38통과·타입/lint/격리
+emit통과. 실제 결과 저장 직후 exit77→새프로세스 동일결과 재생, 실제 Node↔Python13입력 판정 일치.
+외부 MCP 취소/결과 조회·자비스 DB 의향 생성 경계/cursor·seq1완료→정상V2seq2는 남는다. 결과를
+전체 native 삭제로 확대하지 않는다. 범위·계보·실제앱·검색·GUI·운영 전체 목표와 자동 route 보류 유지.
+
+**이전 SB `5d9f7d4`: [남는 정상 백업 보존·무결성·실제 복원](RETAINED-BACKUP-ACCEPTANCE-2026-09-08.md).**
 무관한 정상 tar.gz 때문에 정정이 UNMANIFESTED_BACKUP에 멈추는 형식 불일치를 재현·수정했다.
 archive/checksum와 내부 전체 파일 집합·크기·해시를 제한된 스트림으로 검증하며 기존 디렉터리
 형식과 유효한 유니코드/JSON 표현을 유지한다. 잘못된 사본은 pointer 전환 전 거부하고

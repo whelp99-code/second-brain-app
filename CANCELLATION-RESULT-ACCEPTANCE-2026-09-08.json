@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "sb_product_commit": "44ab911c73aabfcfc8a511b5194bd5d9b5d85291",
+  "jarvis_product_commit": "cabfba2c1d49c1c538ca648024ee0ff78790db83",
+  "full_test": {
+    "passed": 1045,
+    "skipped": 2,
+    "seconds": 220.34,
+    "before_final_authority_recheck": true,
+    "log": "/var/tmp/sb-cancellation-result-full-test.log"
+  },
+  "final_focused": {
+    "passed": 37,
+    "seconds": 22.14,
+    "new_tests": 1,
+    "overlaps_full": true,
+    "log": "/var/tmp/sb-cancellation-result-final-focused.log"
+  },
+  "jarvis_tests": {
+    "files": 5,
+    "passed": 38,
+    "seconds": 5.36,
+    "log": "/var/tmp/jarvis-cancellation-result-final-tests.log"
+  },
+  "ruff": "passed",
+  "basedpyright": {
+    "errors": 0,
+    "warnings": 0,
+    "files": [
+      "sb/cancellation_result.py",
+      "sb/cancellation_result_issuer.py",
+      "sb/cancellation_absence.py",
+      "sb/cancellation_journal.py",
+      "sb/correction_cancellation_executor.py"
+    ]
+  },
+  "jarvis_typecheck": "passed",
+  "jarvis_eslint": "passed",
+  "isolated_ts_emit": "/var/tmp/jarvis-cancellation-result-build-fo7qh113",
+  "actual": {
+    "path": "/var/tmp/cancellation-result-acceptance-wuu_1q4i/result.json",
+    "sha256": "e995bc6a42158fa8eaf68838c6cad410fdce46c603759d51bef3de5cd5ba4e8a",
+    "parent_pid": 3918303,
+    "recovery_pid": 3918577,
+    "replay_pid": 3918630,
+    "crash_exit": 77,
+    "result_bytes": 2785,
+    "durable_results": 1,
+    "node_pid": 3918746,
+    "cases": 13,
+    "python_acceptance": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "result_digest": "sha256:39d9dc64234a71081a5c6d4e9cf78d780015ac085e3f0e6a1adba94af303f92c"
+  },
+  "source_sha256": {
+    "sb/cancellation_result.py": "d6804cd36b5549ec4299fe0e81c4b4652bf8298809a3c00adf956813f1973917",
+    "sb/cancellation_result_issuer.py": "8425a489299ee48a4e6b17590e5294e10ee03f3a8c1a53e1c40b71cfb2441e6d",
+    "sb/cancellation_absence.py": "d5e659c9777655413ca48b30aedfea2e735ac2f6eb766a0ab932dae03a037bdb",
+    "sb/cancellation_journal.py": "cc770fde897eba03d1901198e48e4074932882d15c153639c9ca82775bb3d2a8",
+    "sb/correction_cancellation_executor.py": "c36cdad03db434f85041cf585fc9f7294c6821d937da4836a56e7351617bdfbf"
+  },
+  "fixture_sha256": "191a1c06cce8fd02d368d3634868dca2e7c07c68651f82c62e53c05fe8ed74dc",
+  "mcp_cancellation_route": false,
+  "jarvis_cursor_settlement": false,
+  "native_erasure": false,
+  "operational_mutations": 0,
+  "central_memory_goal_complete": false
+}

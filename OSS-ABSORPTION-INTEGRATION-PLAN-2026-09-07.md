@@ -705,3 +705,19 @@ SHA불변·37파일 복원을 최종 소스로 확인했다. 이전 보류 중 �
 해소했다. 임의 압축/Git pack 지원·원본 제거 후 inventory 변경/증거 누락 복구, 최신 삭제/ACL을
 적용한 운영 restore, 취소 최종 결과/서명 영수증/MCP/JARVIS seq1완료→정상V2seq2는 남는다.
 native·범위·계보·실제앱·자동 수집/주입·검색·GUI·운영 전체 목표와 자동 route 확대 보류를 유지한다.
+
+
+## 61. 취소 결과의 증거 결합·불변 저장·자비스 검증
+
+SB `44ab911` / JARVIS `cabfba2`: [계약·실제 중단/교차 검증·남은 P0](CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md).
+기존 의향의 provider_local_suppression 범위를 유지한 별도 서명 결과를 구현했다. 원 요청과
+대상/세대/삭제 원장에 실제 alias8개·reingress·원본 처분·copy checkpoint·새 세대 본문 부재를
+결합한다. 부재 검사는 원본 제거 전에 기록하고 재시작 시 파일 목록을 대조한다. 결과는 기존
+journal에서 불변 저장·동일 바이트 재생한다. 긴 검사 후 키와 tombstone을 다시 확인한다.
+
+전체1,045통과/2skip(최종 권한 재검사 전), 이후관련37통과(중복·신규1포함), 정적0오류/0경고·lint통과.
+JARVIS5파일38통과·타입/lint/격리emit통과. 실제 결과 저장 후 exit77→새프로세스 복구/재생과
+Node↔Python13입력 수락/거부 일치. 일반 정정 proof나 모든 native 삭제 증거로 확대하지 않는다.
+남은 P0는 결과 상태 조회/MCP 계약, 자비스 DB snapshot의 의향 발급과 전송 경합, exact결과+
+로컬suppression 증거의 cursor 완료, 실제seq1→V2seq2 인수다. 키 회전 읽기 정책·증거 누락 복구와
+native·범위·계보·실제앱·수집/주입·검색·GUI·운영 전체 목표를 유지한다. 자동 route/skip은 보류한다.
