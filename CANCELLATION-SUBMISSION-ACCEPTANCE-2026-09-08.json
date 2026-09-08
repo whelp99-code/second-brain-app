@@ -1,0 +1,32 @@
+{
+  "node_pid": 218254,
+  "mcp_pids": [
+    218347,
+    218593,
+    218704
+  ],
+  "exit_after_provider_commit": 77,
+  "response_loss": "SECOND_BRAIN_WRITE_INTERRUPTED",
+  "no_automatic_write_retry": true,
+  "exact_replay_after_restart": true,
+  "live_provider_revocation_rejected": true,
+  "intent_id": "memcancel:intent:v1:2a4bd6f7a4dbe4582eb796a80fda442a23515a2ed99a2d210b243bc77d5e3a7d",
+  "original_transport_calls": 0,
+  "spool_preserved": true,
+  "cursor": {
+    "active_lane_id": null,
+    "accepted_through_sequence": 0
+  },
+  "python_parent_pid": 217418,
+  "accepted_rows": 1,
+  "alias_rows": 8,
+  "result_rows": 0,
+  "generation_unchanged": true,
+  "provider_tombstone_sequence": 1,
+  "private_key_in_mcp_config": false,
+  "clock": "isolated fixed 2026-08-28T12:00:01.000Z",
+  "scope": "actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed",
+  "second_brain_product_commit": "f9daf99",
+  "jarvis_product_commit": "12d7b2a",
+  "contract_digest": "d137a7a7b0e4a577abef04d6ecb2768630e9912cd24b8f270c320cb45d60165d"
+}

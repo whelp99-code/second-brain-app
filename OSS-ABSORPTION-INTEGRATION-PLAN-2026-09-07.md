@@ -7,7 +7,13 @@
 
 현재 읽기용 종합: [최신 인계 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 아래 초반 대조표와 이전 종합은 발견 당시 기록이며 현재 상태는 이 종합과 구현 원장을 우선한다.
 
-**최신 JARVIS `88fcd89` / SB 제품 `df9412c`: [DB 근거 취소 의향 발급·실제 중단 복구](CANCELLATION-DB-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `f9daf99` / JARVIS `12d7b2a`: [DB 의향의 실제 MCP 접수·권한 재검사·응답 유실 복구](CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.md).**
+명시적 schema7에서 취소 목적 키를 잠금 내부까지 다시 읽고, JARVIS는 발행 직전 DB 권한을 재검증한다.
+실제 DB→Node→Python 대상 접수, commit 직후 exit77→uncertain/자동 재전송 없음→동일 재생·실행 중 철회 거부를 확인했다.
+전체1,082통과/2skip 이후 최종 오류 정규화 관련26통과, 정적0오류/0경고·lint통과. JARVIS EPIPE 재현·수정 후 최종전송89통과·타입/lint/격리emit통과.
+접수 후 실제 실행·결과/로컬 증거/cursor·seq1→V2seq2와 외부 전송의 통합 경합, 기존 전체 운영 목표는 남는다.
+
+**이전 JARVIS `88fcd89` / SB 제품 `df9412c`: [DB 근거 취소 의향 발급·실제 중단 복구](CANCELLATION-DB-ACCEPTANCE-2026-09-08.md).**
 정정 materialization에서 메타데이터를 보존하고 실제 suppression/attempt/cursor와 현재 키를 검증해 불변 의향을 발급한다.
 취소 저장 직후 exit77→동일 재생·후속 claim 거부, claim 우선→발급 거부 및 Python 계약 일치를 실제 분리 프로세스에서 확인했다.
 최종 관련 20통과, 타입/ESLint/격리 emit 통과. 외부 취소 전송·provider 접수·로컬 증거/cursor·seq1→V2seq2와 전체 운영 목표는 남는다.
