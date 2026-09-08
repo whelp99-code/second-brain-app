@@ -22,3 +22,7 @@ intent→sealed generation의 연결을 기록하여 포인터 전환 직후 중
 결과는 generation_active이며 provider 전체 물리 삭제나 서명된 최종 영수증이 아니다.
 backup/export/native 처분, 활성 권한 정책의 실제 구성, 외부 상태 조회/결과 계약과 자비스
 cursor settlement는 후속 필수다. 이 중간 결과로 자비스 lane을 자동 건너뛰지 않는다.
+
+구현 대조: 현재 키 검증을 generation writer 안의 활성화 직전에도 반복한다. 완료된 실행은
+기존 activation journal의 parent/manifest/proved와 tombstone prefix를 확인해 재생한다.
+후속 세대가 결과 파일을 정리했어도 다시 실행하지 않으며 과거 활성화 사실을 반환한다.

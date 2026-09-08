@@ -631,3 +631,19 @@ cursor 진행 증거로 사용하지 않는다. 실제 대상/현재 권한·억
 MCP/자비스 연결이 다음 P0다. 자동 수집은 원task→후보→기억의 계보 전까지 보류한다.
 인계 현재판을 다시 대조했고 기존 SB정본/JARVIS실행/dev-wiki원문/네OSS선별흡수 방향과
 native·사용자/프로젝트 범위·실제 앱·검색·운영/복구의 전체 목표를 유지한다.
+
+
+## 52. 취소의 실제 억제 세대와 중단 복구
+
+SB `b3c8b87`: [구현·강제 종료 및 MCP 실제 인수·다음 단계](CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.md).
+기존 ErasureEngine/ReingressGate/GenerationMutationService를 재사용해 원문 없는 취소를
+실제 억제 세대로 처리한다. 대상 generation/blob/span 검증과 활성화 직전 현재 키 재검사,
+sealed generation 연결, 포인터 전환 중단 후 재개와 후속 세대 이후 완료 재생을 구현했다.
+기본968통과/2skip·최종관련28통과(중복), 정적0오류/0경고·lint통과. 실제 worker의 포인터 rename
+직후 exit77→새 worker 복구 및 stdio MCP tombstone_stale→healthy, 원문/취소 본문 검색0 확인.
+
+결과는 generation_active라는 과거 활성화 사실이다. 전체 managed 사본 삭제나 현재 포인터,
+자비스의 최종 완료 증거로 확대하지 않는다. 접수 대상/세대 잠금 결합, backup/export 처분,
+버전 결과·상태 조회·서명 영수증 및 자비스 seq1 완료→정상 V2 seq2의 전체 연결이 다음 P0다.
+내부 경로만 구현했으며 자동 취소 route와 lane 건너뛰기는 보류한다. 인계의 SB정본·JARVIS실행·
+선별OSS흡수와 native/사용자프로젝트범위/원task계보/수집/검색/운영 전체 목표를 유지한다.

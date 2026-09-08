@@ -1,0 +1,197 @@
+{
+  "root": "/var/tmp/cancellation-generation-spdaeck7",
+  "intent_id": "memcancel:intent:v1:78791c72396ba6c12d88995fccf640b6160d406b998f5dfda1c4f28c20cd1298",
+  "parent_pid": 3338180,
+  "crash_exit_code": 77,
+  "recovery": {
+    "pid": 3338354,
+    "result": {
+      "schema_version": 1,
+      "kind": "correction_cancellation_generation",
+      "state": "generation_active",
+      "intent_id": "memcancel:intent:v1:78791c72396ba6c12d88995fccf640b6160d406b998f5dfda1c4f28c20cd1298",
+      "intent_digest": "sha256:78791c72396ba6c12d88995fccf640b6160d406b998f5dfda1c4f28c20cd1298",
+      "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+      "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070"
+    }
+  },
+  "mcp": [
+    {
+      "stage": "before",
+      "pid": 3338229,
+      "status": {
+        "meta": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"schema_version\": 1,\n  \"provider_instance_id\": \"provider:fixture\",\n  \"provider_release_sha\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"generation_id\": \"sbgen:v1:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100\",\n  \"generation_manifest_digest\": \"sha256:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100\",\n  \"vault_head\": \"f7cbdb0db5ad41187a97938e1576caac1b40506d\",\n  \"vault_tree\": \"8ae09a4f24f395046a5779e78ae7b8291976227a\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\",\n  \"pointer_health\": \"tombstone_stale\",\n  \"journal_health\": \"healthy\",\n  \"features\": [\n    \"memory_effect_write_v2\",\n    \"memory_record_identity_v1\",\n    \"memory_remember_v3\"\n  ],\n  \"contract_schema_version\": 5,\n  \"contract_digest\": \"78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e\"\n}",
+            "annotations": null,
+            "meta": null
+          }
+        ],
+        "structured_content": {
+          "schema_version": 1,
+          "provider_instance_id": "provider:fixture",
+          "provider_release_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "generation_id": "sbgen:v1:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100",
+          "generation_manifest_digest": "sha256:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100",
+          "vault_head": "f7cbdb0db5ad41187a97938e1576caac1b40506d",
+          "vault_tree": "8ae09a4f24f395046a5779e78ae7b8291976227a",
+          "tombstone_sequence": 1,
+          "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070",
+          "pointer_health": "tombstone_stale",
+          "journal_health": "healthy",
+          "features": [
+            "memory_effect_write_v2",
+            "memory_record_identity_v1",
+            "memory_remember_v3"
+          ],
+          "contract_schema_version": 5,
+          "contract_digest": "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
+        },
+        "is_error": false,
+        "result_type": "complete"
+      },
+      "search": [
+        {
+          "meta": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Error executing tool sb_search: TOMBSTONE_SET_STALE",
+              "annotations": null,
+              "meta": null
+            }
+          ],
+          "structured_content": null,
+          "is_error": true,
+          "result_type": "complete"
+        },
+        {
+          "meta": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Error executing tool sb_search: TOMBSTONE_SET_STALE",
+              "annotations": null,
+              "meta": null
+            }
+          ],
+          "structured_content": null,
+          "is_error": true,
+          "result_type": "complete"
+        }
+      ]
+    },
+    {
+      "stage": "after",
+      "pid": 3338380,
+      "status": {
+        "meta": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"schema_version\": 1,\n  \"provider_instance_id\": \"provider:fixture\",\n  \"provider_release_sha\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"generation_id\": \"sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"generation_manifest_digest\": \"sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"vault_head\": \"6775568b7aa0d71885d2ab94846f5a0c25b4dce2\",\n  \"vault_tree\": \"718e7f05a406917f451049e8b8595841fbc61b52\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\",\n  \"pointer_health\": \"healthy\",\n  \"journal_health\": \"healthy\",\n  \"features\": [\n    \"memory_effect_write_v2\",\n    \"memory_record_identity_v1\",\n    \"memory_remember_v3\"\n  ],\n  \"contract_schema_version\": 5,\n  \"contract_digest\": \"78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e\"\n}",
+            "annotations": null,
+            "meta": null
+          }
+        ],
+        "structured_content": {
+          "schema_version": 1,
+          "provider_instance_id": "provider:fixture",
+          "provider_release_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+          "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+          "vault_head": "6775568b7aa0d71885d2ab94846f5a0c25b4dce2",
+          "vault_tree": "718e7f05a406917f451049e8b8595841fbc61b52",
+          "tombstone_sequence": 1,
+          "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070",
+          "pointer_health": "healthy",
+          "journal_health": "healthy",
+          "features": [
+            "memory_effect_write_v2",
+            "memory_record_identity_v1",
+            "memory_remember_v3"
+          ],
+          "contract_schema_version": 5,
+          "contract_digest": "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
+        },
+        "is_error": false,
+        "result_type": "complete"
+      },
+      "search": [
+        {
+          "meta": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"results\": [],\n  \"provider_instance_id\": \"provider:fixture\",\n  \"generation_id\": \"sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"generation_manifest_digest\": \"sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"vault_head\": \"6775568b7aa0d71885d2ab94846f5a0c25b4dce2\",\n  \"vault_tree\": \"718e7f05a406917f451049e8b8595841fbc61b52\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\"\n}",
+              "annotations": null,
+              "meta": null
+            }
+          ],
+          "structured_content": {
+            "results": [],
+            "provider_instance_id": "provider:fixture",
+            "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+            "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+            "vault_head": "6775568b7aa0d71885d2ab94846f5a0c25b4dce2",
+            "vault_tree": "718e7f05a406917f451049e8b8595841fbc61b52",
+            "tombstone_sequence": 1,
+            "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070"
+          },
+          "is_error": false,
+          "result_type": "complete"
+        },
+        {
+          "meta": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"results\": [],\n  \"provider_instance_id\": \"provider:fixture\",\n  \"generation_id\": \"sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"generation_manifest_digest\": \"sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"vault_head\": \"6775568b7aa0d71885d2ab94846f5a0c25b4dce2\",\n  \"vault_tree\": \"718e7f05a406917f451049e8b8595841fbc61b52\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\"\n}",
+              "annotations": null,
+              "meta": null
+            }
+          ],
+          "structured_content": {
+            "results": [],
+            "provider_instance_id": "provider:fixture",
+            "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+            "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+            "vault_head": "6775568b7aa0d71885d2ab94846f5a0c25b4dce2",
+            "vault_tree": "718e7f05a406917f451049e8b8595841fbc61b52",
+            "tombstone_sequence": 1,
+            "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070"
+          },
+          "is_error": false,
+          "result_type": "complete"
+        }
+      ]
+    }
+  ],
+  "original_generation_removed": true,
+  "operational_mutations": 0,
+  "signed_completion_receipt": false,
+  "jarvis_cursor_settlement": false,
+  "backup_export_native_erasure": false,
+  "product_commit": "b3c8b87",
+  "full_suite": {
+    "passed": 968,
+    "skipped": 2,
+    "seconds": 132.25,
+    "note": "Before final authority/historical replay refinements and three final regression additions."
+  },
+  "final_focused": {
+    "passed": 28,
+    "seconds": 14.42,
+    "overlaps_full_suite": true
+  },
+  "lint": "passed",
+  "product_typecheck": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "automatic_recovery_complete": false
+}

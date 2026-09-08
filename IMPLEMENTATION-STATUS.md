@@ -4,7 +4,16 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 SB `62d083e`: [취소 원장 접수·자비스 인계 재대조·12개 완성 우선 목록](CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `b3c8b87`: [취소의 실제 억제 세대·중단 복구·MCP 인수](CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.md).**
+접수된 취소로 기존 대상을 제거한 generation을 생성·활성화하며 정정 replacement는 적용하지
+않는다. 기존 erasure/reingress/단일 writer를 재사용하고 실제 대상 검증, 활성화 직전 키 재검사,
+봉인 결과 연결·중단 재개·후속 세대 이후 완료 재생을 구현했다. 기본968통과/2skip,
+최종관련28통과(중복), 제품정적0오류/0경고·lint통과. 실제 worker 강제종료77→새 프로세스 복구와
+stdio MCP tombstone_stale→healthy, 기존/취소 본문 검색0 확인. 내부 generation_active 결과는
+전체 사본 처분·최종 서명 영수증·자비스 cursor 완료가 아니다. 접수 대상 잠금 결합,
+backup/export 처분·결과 계약·MCP/JARVIS 연결과 기존 native/ACL/계보/수집/검색/운영 목표는 남는다.
+
+**이전 SB `62d083e`: [취소 원장 접수·자비스 인계 재대조·12개 완성 우선 목록](CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.md).**
 미전송 정정 취소를 기존 pending flock과 request journal transaction에 연결했다. 원본8별칭의
 영구 재접수 차단, 잠금 후 현재 서명/만료 재검사, orphan 게시 거부, tombstone/target의 원자 기록을
 구현했다. 기본 전체959통과/2skip, 최종관련49통과(중복), 제품정적0오류/0경고·lint통과.
