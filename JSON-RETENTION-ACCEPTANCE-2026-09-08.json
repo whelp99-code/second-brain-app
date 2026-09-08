@@ -1,0 +1,70 @@
+{
+  "status": "passed",
+  "root": "/var/tmp/sb-json-retention-pCgilZ",
+  "build": "/var/tmp/sb-json-retention-build-jvgb0_pd",
+  "memory_digest": "870ebd888ada93649c6865ada5681c0b13a8cc5b779563623fff4632db6c173c",
+  "build_manifest_digest": "b2a6abb23f366acca3a92757f44d04d29271b03e656c23333a3a32e4aff825cb",
+  "processes": [
+    {
+      "pid": 2801862,
+      "identities": 3
+    },
+    {
+      "pid": 2801917,
+      "identities": 3,
+      "status": "rejected",
+      "code": "MEMORY_SURFACE_INVENTORY_INCOMPLETE"
+    },
+    {
+      "pid": 2801965,
+      "identities": 3,
+      "status": "clean",
+      "surfaces": 70
+    },
+    {
+      "pid": 2801991,
+      "identities": 3,
+      "status": "rejected",
+      "code": "MEMORY_SURFACE_INVENTORY_INCOMPLETE"
+    },
+    {
+      "pid": 2802006,
+      "identities": 3,
+      "status": "clean",
+      "surfaces": 70
+    }
+  ],
+  "matched_before": 4,
+  "disposed_files": 4,
+  "restored_copy_rejected": true,
+  "unrelated_preserved": true,
+  "final_surfaces": 70,
+  "operational_data_used": false,
+  "native_model_invoked": false,
+  "entire_fixture_plaintext_disposed": false,
+  "provider_and_guard_observations": "deterministic fixtures; no provider purge receipt claimed",
+  "validation": {
+    "before_regression": {
+      "failed": 3
+    },
+    "regression": {
+      "files": 8,
+      "passed": 35
+    },
+    "after_final_ownership_guard": {
+      "files": 3,
+      "passed": 10
+    },
+    "backend_types": "passed",
+    "changed_eslint": "passed"
+  },
+  "commits": {
+    "jarvis_product": "0352642",
+    "second_brain_acceptance": "33bffc0"
+  },
+  "source_verification": {
+    "manifest_entries": 596,
+    "migration_files": 71,
+    "unchanged_after_acceptance": true
+  }
+}

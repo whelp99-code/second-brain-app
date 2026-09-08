@@ -544,3 +544,12 @@ provider 삭제 후 rollout 3개 외 thread_history_1.sqlite에도 확인값이 
 계약은 이 DB·부속파일·rollout·백업을 함께 포함해야 한다. ephemeral resume도 원문이 남았으므로
 옵션 이름을 비보존 보장으로 사용하지 않는다. native 상태 감사는 권한 예외 1개로 exit 1이며 전체
 정상/삭제 완료로 격상하지 않는다. 실제 앱 연결·범위·compaction·자동 capture·운영/DR은 계속 미완료다.
+
+## 45. B5/C7 JSON 직렬화 사본의 삭제·재유입 누락 수정
+
+[구현·검증·15개 후속 우선 과제](JSON-RETENTION-ACCEPTANCE-2026-09-08.md)에 인계와 기존 목록을 병합했다.
+자비스의 raw-only 검사를 원문/1중/2중 JSON byte 표현으로 확장했다. UTF-8 오탐 방지·임시 버퍼
+소거·100k items/64MiB 누적 상한·비동기 callback 거부를 공통 helper에 적용했다. 기존 schema/wire 유지.
+수정 전3실패→8파일35통과, 최종 guard 후3파일10통과. 실제5프로세스 인수로4사본 제거,
+무관 파일 보존과 영구지문을 이용한 복원SQLite 재유입 거부를 확인했다. 삭제 자체는 원문이 필요하다.
+제품 native root 연결·전체 직렬화/DB page 분절·운영/DR·scope 등 기존 완료 조건은 유지한다.

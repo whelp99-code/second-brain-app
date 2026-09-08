@@ -4,6 +4,14 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 JARVIS `0352642` / SB 도구 `33bffc0`: [JSON 사본 삭제 보강·15개 후속 과제](JSON-RETENTION-ACCEPTANCE-2026-09-08.md).**
+native 보존 조사에서 이어 JARVIS의 raw-only 삭제/재유입 검사를 수정했다. 수정 전3실패,
+8파일35통과·최종 동기 guard 후3파일10통과, 격리 tsc/변경lint 통과. 실제5프로세스로
+4사본 제거·무관 파일 보존·재시작 후 중첩SQLite 재유입 거부·최종70surface 검사를 확인했다.
+스캔은 영구지문만 사용하며 삭제에는 원문을 전달한다. native/운영 삭제 완료가 아니다.
+기존 MCP/schema 유지, 제품 소스 변경은 JARVIS에 있고 SB에는 인수 도구·문서를 추가했다.
+보호된 실제 앱 연결·native 소유권/백업·scope·자동capture·검색 품질·GUI/운영/DR은 미완료다.
+
 **최신 SB 인수 `94ea45a`: [실제 native UUID·원문 보존 표면](NATIVE-SESSION-ACCEPTANCE-2026-09-08.md).**
 자비스 제품 `6e101fc`를 재사용해 실제 Codex bootstrap 5회와 exact UUID resume 5회(총10회)
 모델 인수를 통과했다. 원장 중복·무효화된 native 세션의 callback은 차단됐다. Node20/Python12
