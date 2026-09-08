@@ -28,6 +28,7 @@ from sb.effect_values import (
     format_instant,
     strict_loads,
 )
+from sb.generation_cleanup import discard_staging
 from sb.generation_locks import GenerationWriteLease, generation_writer
 from sb.request_store import RequestStore
 
@@ -591,6 +592,14 @@ class GenerationStore:
 
     def close(self) -> None:
         self.journal.close()
+
+    def discard_abandoned_staging(self) -> tuple[str, ...]:
+        """Dispose only unpublished staging while the caller owns writer/exclusive locks."""
+        def require_unused(root: Path) -> None:
+            if _proc_descriptors(root):
+                raise GenerationError("GENERATION_STAGING_IN_USE")
+
+        return discard_staging(self.staging, require_unused)
 
     @contextmanager
     def writer(self) -> Generator[GenerationWriteLease, None, None]:

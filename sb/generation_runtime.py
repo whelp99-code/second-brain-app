@@ -116,9 +116,11 @@ class GenerationMutationService:
 
     def _maintain_locked(self, now: datetime) -> MaintenanceResult:
         parent, _legacy = self._current_or_legacy()
+        disposed = self.store.discard_abandoned_staging()
         if parent is not None:
             self.store.activate(parent, None, now, lock_held=True)
-        return self.lifecycle.maintain(now)
+        result = self.lifecycle.maintain(now)
+        return MaintenanceResult(result.disposed_export_digests, disposed)
 
     @staticmethod
     def _allowed(relative: Path) -> bool:
@@ -202,8 +204,9 @@ class GenerationMutationService:
 
     def mutate[T](self, mutation: GenerationMutation[T]) -> GenerationMutationResult[T]:
         with self.store.writer() as writer:
-            _ = self.lifecycle.maintain(mutation.now)
             parent, legacy = self._current_or_legacy()
+            _ = self.store.discard_abandoned_staging()
+            _ = self.lifecycle.maintain(mutation.now)
             target = mutation.authority.result_high_water or self.requests.tombstone_high_water()
             if parent is not None and mutation.authority.resume_generation_id == parent.generation_id:
                 return self._resume(mutation, parent, target)
