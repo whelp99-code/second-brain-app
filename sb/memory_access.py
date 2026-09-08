@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from sb.effect_values import JsonObject
 from sb.generation_integrity import load_verified_manifest
 from sb.memory_records import MemoryRecordV1, parse_page_records
 from sb.page_access import PageAccess
@@ -34,15 +35,18 @@ class ClassifiedPage:
     requirements: tuple[SourceAccess, ...]
     source_refs: tuple[str, ...]
     records: tuple[MemoryRecordV1, ...]
+    tombstone_sequence: int
+    tombstone_set_root: str
 
 
-def _verify_generation(root: Path, generation: GenerationIdentityV1) -> None:
+def _verify_generation(root: Path, generation: GenerationIdentityV1) -> JsonObject:
     manifest = load_verified_manifest(root)
     if tuple(manifest[name] for name in (
         "provider_instance_id", "generation_id", "generation_digest", "head", "tree",
     )) != (generation.provider_instance_id, generation.generation_id,
            generation.generation_manifest_digest, generation.vault_head, generation.vault_tree):
         raise MemoryAccessError("MEMORY_GENERATION_CHANGED")
+    return manifest
 
 
 def classified_page(root: Path, page_id: str, generation: GenerationIdentityV1) -> ClassifiedPage:
@@ -53,7 +57,7 @@ def classified_page(root: Path, page_id: str, generation: GenerationIdentityV1) 
     closed. No Ledger writer is opened, migrated or repaired during a read.
     """
     try:
-        _verify_generation(root, generation)
+        manifest = _verify_generation(root, generation)
         rel = git_rel(page_id)
         raw = subprocess.check_output(
             ["git", "-C", str(root), "cat-file", "blob", f"{generation.vault_head}:{rel}"],
@@ -79,9 +83,10 @@ def classified_page(root: Path, page_id: str, generation: GenerationIdentityV1) 
                     raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
                 requirements.append(decode_source_access(source_ref, source[0], source[1]))
         records = parse_page_records(raw, page_id)
-        _verify_generation(root, generation)
+        _ = _verify_generation(root, generation)
         return ClassifiedPage(generation, rel.removesuffix(".md"), checksum,
-                              tuple(requirements), access.source_refs, records)
+                              tuple(requirements), access.source_refs, records,
+                              cast(int, manifest["tombstone_sequence"]), cast(str, manifest["tombstone_set_root"]))
     except MemoryAccessError:
         raise
     except (ValueError, OSError, sqlite3.Error, subprocess.CalledProcessError) as exc:

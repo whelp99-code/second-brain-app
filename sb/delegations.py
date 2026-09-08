@@ -259,3 +259,8 @@ def verify_external_receipt(
         "EXTERNAL_RECEIPT_INVALID",
     )
     return receipt
+
+
+def verify_signed_object(value: JsonObject, key: Ed25519PublicKey | bytes, domain: bytes, code: str) -> None:
+    """Reuse the pinned-key signature verifier for explicitly versioned contracts."""
+    _verify_signature(value, _public_key(key), domain, code)
