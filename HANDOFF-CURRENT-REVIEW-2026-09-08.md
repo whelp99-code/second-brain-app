@@ -1,5 +1,7 @@
 # 자비스 인계 병합 — 현재 판정과 완성 작업 목록
 
+**2026-09-09 JARVIS `e932f79` / SB 인수 `7c3fcae`:** [scoped CLI context 연결·누적 전체 검사](SCOPED-CLI-CONTEXT-2026-09-09.md). 호스트 인증 세션을 명시적으로 받는 기존 CLI execute 경로 추가, 관련27통과·실제 MCP records2/예산/쿠키 철회 거부. SB 전체1,142통과/2skip/216.57초. 독립 CLI 로그인·HTTP 세션 전달과 전체 운영 인수는 남는다.
+
 **2026-09-09 JARVIS `de08adb` / SB 인수 `578bdc1`:** [연결 준비 후 인증·동시성 재검사](PHONE-MEMORY-BOOTSTRAP-2026-09-09.md). 만료 후 추가 조회 회귀 수정, 관련60통과·격리 HTTP 추가 기억 요청0회·동시 상한8개 확인. 실제 scoped 인증 연결과 전체 운영 인수는 남는다.
 
 **2026-09-09 JARVIS `689114c` / SB 인수 `f32f032`:** [HTTP 기억 응답 중 세션 만료 수정](PHONE-MEMORY-HTTP-EXPIRY-2026-09-09.md). 만료 후 200 반환 회귀 재현→관련58통과, 격리 빌드 HTTP 정상200/만료401/재요청401 및 본문 차단 확인. 실제 Tailnet·scoped 인증 전달·전체 운영 인수는 남는다.
