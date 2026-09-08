@@ -36,10 +36,14 @@ def main() -> None:
     _ = parser.add_argument("mode", choices=("init", "serve", "apply", "seed"))
     _ = parser.add_argument("root", type=Path)
     _ = parser.add_argument("--content", help="Synthetic seed content; seed mode only")
+    _ = parser.add_argument("--live-clock", action="store_true", help="Current time for explicit apply acceptance only")
     values: dict[str, object] = vars(parser.parse_args())
     root = values["root"]
     mode = values["mode"]
     content = values["content"]
+    live_clock = values["live_clock"]
+    if live_clock and mode != "apply":
+        raise ValueError("live clock is only supported for explicit apply")
     if content is not None and (mode != "seed" or not isinstance(content, str)):
         raise ValueError("content is only supported for an isolated seed")
     if not isinstance(root, Path) or not isinstance(mode, str):
@@ -96,7 +100,7 @@ def main() -> None:
     if mode in {"apply", "seed"}:
         executor = RequestExecutor(config)
         try:
-            print(json.dumps(asdict(executor.apply_once(now=NOW))))
+            print(json.dumps(asdict(executor.apply_once(now=datetime.now(UTC) if live_clock else NOW))))
         finally:
             executor.close()
         return
