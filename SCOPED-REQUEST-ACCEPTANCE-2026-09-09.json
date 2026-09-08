@@ -1,0 +1,52 @@
+{
+  "fixture_authority": true,
+  "processes": 4,
+  "results": [
+    {
+      "crash": "file",
+      "exit_code": 73,
+      "rows_before_retry": 0,
+      "rows_after_retry": 1,
+      "original_file_preserved": true,
+      "bytes_sha256": "90726c4e84c8b8bd0ad0040fa0ed1ddbc499581bcb1fffef8b464888498ff36d",
+      "acceptance": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "idempotency_key": "memidem:scoped:v4:39d170dad9f6a58395aea309cde8d6abfe442c3d85ee302fb8774e754887d90d",
+        "scope_digest": "sha256:5afd350ebcabbcbf83c7dfbcf98325239a3a6ace92e94d6cb9e7db932409956f",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532.v4.json",
+        "request_file_digest": "sha256:3fb04fc1c65dad30c0b5e81f66b921c3b5398cb9275bf31b3d1e4b3bd3ca2e6f",
+        "replayed": false
+      }
+    },
+    {
+      "crash": "commit",
+      "exit_code": 74,
+      "rows_before_retry": 1,
+      "rows_after_retry": 1,
+      "original_file_preserved": true,
+      "bytes_sha256": "90726c4e84c8b8bd0ad0040fa0ed1ddbc499581bcb1fffef8b464888498ff36d",
+      "acceptance": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "idempotency_key": "memidem:scoped:v4:39d170dad9f6a58395aea309cde8d6abfe442c3d85ee302fb8774e754887d90d",
+        "scope_digest": "sha256:5afd350ebcabbcbf83c7dfbcf98325239a3a6ace92e94d6cb9e7db932409956f",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532.v4.json",
+        "request_file_digest": "sha256:3fb04fc1c65dad30c0b5e81f66b921c3b5398cb9275bf31b3d1e4b3bd3ca2e6f",
+        "replayed": true
+      }
+    }
+  ],
+  "mcp_write_completed": false,
+  "provider_execution_completed": false
+}
