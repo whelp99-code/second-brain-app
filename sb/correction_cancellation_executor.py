@@ -8,6 +8,7 @@ import sqlite3
 from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from datetime import datetime
+from pathlib import Path
 from typing import cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -27,6 +28,11 @@ from sb.generation_runtime_models import (
     GenerationOperation,
 )
 from sb.generations import Generation
+from sb.managed_copy_disposal import (
+    copy_disposal_binding,
+    prepare_copy_disposal,
+    require_copy_disposal,
+)
 
 
 class CancellationExecutionError(RuntimeError):
@@ -50,6 +56,7 @@ def _result(intent: CorrectionCancellationIntentV1, generation_id: str, generati
 
 def apply_correction_cancellation(
     mutations: GenerationMutationService, erasure: ErasureEngine, intent_id: str, *, now: datetime,
+    backup_root: Path,
     historical_delegation_keys: Mapping[str, Ed25519PublicKey],
     current_cancellation_keys: Mapping[str, Ed25519PublicKey],
     barrier: Callable[[str], None] | None = None,
@@ -57,7 +64,8 @@ def apply_correction_cancellation(
     """Resume an already admitted intent; caller key lists retain their separate purposes.
 
     The pending lock serializes admission and cancellation execution. MutationService retains
-    the sole generation writer. Backups/exports/native erasure and signed completion are separate.
+    the sole generation writer. Backup/export disposal precedes activation; native erasure and
+    signed completion remain separate.
     """
     requests, generations = mutations.requests, mutations.store
     with ExitStack() as cleanup:
@@ -88,6 +96,11 @@ def apply_correction_cancellation(
         if verified.intent_id != intent_id:
             raise CancellationExecutionError("CANCELLATION_JOURNAL_CORRUPT")
         intent = CorrectionCancellationIntentV1.model_validate(verified.as_dict())
+        exports = mutations.lifecycle.exports
+        copy_roots = (backup_root, exports.root)
+        def observe(phase: str) -> None:
+            if barrier is not None:
+                barrier(phase)
         high = (intent.tombstone.sequence, intent.tombstone.set_root)
         snapshot = requests.verified_tombstone_snapshot()
         if snapshot.sequence < high[0] or requests.tombstone_root_at(high[0]) != high:
@@ -110,6 +123,8 @@ def apply_correction_cancellation(
             if activation[2] == "proved":
                 # Activation is a durable historical milestone. Later generations may have
                 # disposed its files; do not rebuild or require the original target again.
+                require_copy_disposal(requests.db, intent_id,
+                    copy_disposal_binding(intent.intent_digest, _text(execution, "generation_id"), copy_roots), None)
                 _ = requests.db.execute(
                     """UPDATE correction_cancellation_generations SET state='generation_active'
                     WHERE intent_id=? AND state='sealed'""", (intent_id,),
@@ -121,7 +136,7 @@ def apply_correction_cancellation(
             raise CancellationExecutionError("TOMBSTONE_SET_STALE")
         current = generations.active()
         if current.generation_id != result_id:
-            verify_cancellation_target(current, intent)
+            _ = verify_cancellation_target(current, intent)
         elif execution is None or current.manifest.generation_digest != _text(execution, "generation_digest"):
             raise CancellationExecutionError("CANCELLATION_JOURNAL_CORRUPT")
 
@@ -140,8 +155,24 @@ def apply_correction_cancellation(
                 (intent_id, generation.generation_id, generation.manifest.generation_digest),
             )
 
-        def observed(_generation: Generation) -> None:
-            return None
+        def switching(generation: Generation) -> None:
+            target = intent.target
+            parent = generations.generations / target.generation_id
+            needles = None
+            if parent.is_dir():
+                needles = (verify_cancellation_target(generations.generation(target.generation_id), intent),)
+
+            def authority() -> None:
+                _ = authorize()
+                if requests.tombstone_high_water() != high:
+                    raise CancellationExecutionError("TOMBSTONE_SET_STALE")
+
+            prepare_copy_disposal(requests.db, intent_id,
+                copy_disposal_binding(intent.intent_digest, generation.generation_id, copy_roots),
+                backup_root=backup_root, exports=exports,
+                identities={target.target_id, target.source_identity_full,
+                    target.content_identity_full, target.citation_identity_full},
+                needles=needles, now=now, authority=authority, barrier=observe)
 
         def activated(generation: Generation) -> None:
             # Record activation while the existing generation writer is still held.
@@ -163,7 +194,7 @@ def apply_correction_cancellation(
                 high, resume_generation_id=result_id,
             ),
             apply=lambda root: erasure.suppress_cancellation(root, intent, admitted_at),
-            recover=lambda _generation: (), hooks=GenerationMutationHooks(sealed, observed, activated),
+            recover=lambda _generation: (), hooks=GenerationMutationHooks(sealed, switching, activated),
             barrier=barrier,
         ))
         active = result.generation

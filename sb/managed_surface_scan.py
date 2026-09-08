@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from sb.effect_values import JsonValue, digest
+from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
 from sb.sqlite_values import OPTIONAL_INTEGER_ROW, OPTIONAL_TEXT_ROW, TEXT_ROWS
 
 
@@ -105,11 +106,11 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
                 errors.append("NON_REGULAR_SURFACE")
                 continue
             try:
-                raw = path.read_bytes()
-            except OSError:
-                errors.append("UNREADABLE_SURFACE")
+                inspected = inspect_managed_file(path, needles)
+            except (OSError, ManagedInspectionError) as exc:
+                errors.append(str(exc) if isinstance(exc, ManagedInspectionError) else "UNREADABLE_SURFACE")
                 continue
-            count = sum(raw.count(needle) for needle in needles)
+            count = inspected.matches
             matches += count
             file_count += 1
             if path.suffix == ".db":
@@ -120,8 +121,8 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
                 "surface_id": hashlib.sha256(
                     path.relative_to(root).as_posix().encode("utf-8")
                 ).hexdigest(),
-                "digest": "sha256:" + hashlib.sha256(raw).hexdigest(),
-                "bytes": len(raw),
+                "digest": inspected.digest,
+                "bytes": inspected.byte_count,
                 "matches": count,
             })
         if (root / ".git").is_dir():

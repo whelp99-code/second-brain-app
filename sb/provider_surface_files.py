@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sb.effect_values import JsonInput, digest
+from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
 from sb.provider_observation_models import ProviderSurfaceObservationV1
 from sb.provider_surface_scanner_types import ProviderSurfaceLayout
 from sb.provider_surface_specs import (
@@ -135,17 +136,17 @@ def scan_file_surface(
             if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
                 errors.append("MANAGED_SURFACE_UNSAFE")
                 continue
-            raw = path.read_bytes()
-        except OSError:
-            errors.append("MANAGED_SURFACE_UNREADABLE")
+            inspected = inspect_managed_file(path, needles)
+        except (OSError, ManagedInspectionError) as exc:
+            errors.append(str(exc) if isinstance(exc, ManagedInspectionError) else "MANAGED_SURFACE_UNREADABLE")
             continue
-        count = sum(raw.count(needle) for needle in needles)
+        count = inspected.matches
         file_count += 1
         matches += count
         records.append({
             "locator_digest": locator,
-            "file_digest": "sha256:" + hashlib.sha256(raw).hexdigest(),
-            "byte_count": len(raw),
+            "file_digest": inspected.digest,
+            "byte_count": inspected.byte_count,
             "match_count": count,
         })
         if spec.scanner_kind == "sqlite" and path.name.endswith(".db"):

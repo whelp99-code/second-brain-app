@@ -31,7 +31,6 @@ from sb.erasure import (
     ErasureEngine,
     IngressIdentity,
     ReingressGate,
-    purge_matching_managed_copies,
     scan_managed_surfaces,
 )
 from sb.export_models import MemoryExportManifestV1
@@ -46,6 +45,11 @@ from sb.generation_runtime import (
 )
 from sb.generations import Generation, GenerationError, GenerationStore
 from sb.legacy_requests import LegacyRequestImporterV1
+from sb.managed_copy_disposal import (
+    copy_disposal_binding,
+    prepare_copy_disposal,
+    require_copy_disposal,
+)
 from sb.provider_lifecycle import ProviderLifecycle
 from sb.provider_observations import ProviderObservationInput, create_provider_observations
 from sb.provider_surface_scanner import ProviderSurfaceLayout
@@ -456,6 +460,22 @@ class RequestExecutor:
 
         def switching(generation: Generation) -> None:
             nonlocal lease
+            roots = (self.config.backup_root, self.exports.root)
+
+            def authority() -> None:
+                if self.store.tombstone_high_water() != (
+                    request.tombstone_high_water.sequence, request.tombstone_high_water.set_root,
+                ):
+                    raise RequestExecutionError("TOMBSTONE_SET_STALE")
+
+            prepare_copy_disposal(self.store.db, request.request_id,
+                copy_disposal_binding(request.request_digest, generation.generation_id, roots),
+                backup_root=self.config.backup_root, exports=self.exports,
+                identities={identity for target in request.targets for identity in (
+                    target.target_id, target.source_identity_full,
+                    target.content_identity_full, target.citation_identity_full)},
+                needles=prior_needles if parent is not None and parent.root.exists() else None,
+                now=now, authority=authority, barrier=self.barrier)
             lease = self._advance(lease, "switch_intent", now, generation.generation_id)
 
         def activated(generation: Generation) -> None:
@@ -487,21 +507,9 @@ class RequestExecutor:
         )
         result = mutation.generation
 
-        intersecting_identities = {
-            identity
-            for target in request.targets
-            for identity in (
-                target.target_id,
-                target.source_identity_full,
-                target.content_identity_full,
-                target.citation_identity_full,
-            )
-        }
-        _ = purge_matching_managed_copies((self.config.backup_root,), prior_needles)
-        self.barrier("backup_disposal")
-        _ = self.exports.invalidate(intersecting_identities, now)
-        self.barrier("export_disposal")
-        self.barrier("disposal_parent_fsync")
+        roots = (self.config.backup_root, self.exports.root)
+        require_copy_disposal(self.store.db, request.request_id,
+            copy_disposal_binding(request.request_digest, result.generation_id, roots), roots)
         lease = self._advance(lease, "disposing", now, result.generation_id)
         inventory = scan_managed_surfaces(
             (

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +18,7 @@ from sb.effect_write_models import (
     MemoryEffectWriteRequestV2,
     ResolvedMemoryTargetModel,
 )
+from sb.managed_copy_files import purge_matching_managed_copies
 from sb.managed_surface_scan import (
     SurfaceInventory,
     SurfaceInventoryEntry,
@@ -188,19 +189,6 @@ class ErasureEngine:
                     raise ErasureError("MANAGED_COPY_REMAINS")
         self.reingress.block_targets(plan.targets, plan.high_water, now)
         return tuple(sorted(removed))
-
-
-def purge_matching_managed_copies(roots: Iterable[Path], needles: Sequence[bytes]) -> int:
-    removed = 0
-    for root in roots:
-        for path in sorted(root.rglob("*"), key=lambda item: item.as_posix(), reverse=True):
-            if not path.is_file():
-                continue
-            raw = path.read_bytes()
-            if any(needle in raw for needle in needles):
-                path.unlink()
-                removed += 1
-    return removed
 
 
 def inventory_json(inventory: SurfaceInventory) -> bytes:

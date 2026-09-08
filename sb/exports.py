@@ -45,8 +45,13 @@ class ExportPublisher:
         ):
             raise ExportError("EXPORT_ROOT_UNSAFE")
         root.chmod(0o700)
+        self._root = root
         self._publication = ExportPublicationService(root, provider_release_sha, journal)
         self._retention = ExportRetentionService(root, journal)
+
+    @property
+    def root(self) -> Path:
+        return self._root
 
     def publish(self, publication: ExportPublication) -> MemoryExportManifestV1:
         return self._publication.publish(publication)

@@ -59,6 +59,7 @@ def prepare(root: Path):
 def execute(executor, intent_id, barrier=None, keys=None):
     # Durable acceptance remains executable after the submission TTL has expired.
     return apply_correction_cancellation(executor.mutations, executor.erasure, intent_id,
+        backup_root=executor.config.backup_root,
         now=NOW + timedelta(hours=1), historical_delegation_keys=executor.config.jarvis_public_keys,
         current_cancellation_keys={"jarvis:current": CURRENT.public_key()} if keys is None else keys,
         barrier=barrier)

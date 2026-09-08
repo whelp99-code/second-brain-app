@@ -90,7 +90,7 @@ def accept_correction_cancellation(
             if not accepted_before:
                 intent = CorrectionCancellationIntentV1.model_validate(verified.as_dict())
                 current = generations.active()
-                verify_cancellation_target(current, intent)
+                _ = verify_cancellation_target(current, intent)
                 if (current.manifest.tombstone_sequence, current.manifest.tombstone_set_root) != (
                     intent.tombstone.sequence - 1, intent.tombstone.previous_root,
                 ):

@@ -47,7 +47,7 @@ def _page_bytes(root: Path, relative: str) -> bytes:
         raise CancellationTargetError("EFFECT_TARGET_INVALID") from exc
 
 
-def verify_cancellation_target(generation: Generation, intent: CorrectionCancellationIntentV1) -> None:
+def verify_cancellation_target(generation: Generation, intent: CorrectionCancellationIntentV1) -> bytes:
     target = intent.target
     if (
         generation.manifest.provider_instance_id != intent.provider_instance_id
@@ -68,3 +68,4 @@ def verify_cancellation_target(generation: Generation, intent: CorrectionCancell
         or hashlib.sha256(body[start:end]).hexdigest() != target.content_identity_full
     ):
         raise CancellationTargetError("EFFECT_TARGET_INVALID")
+    return body[start:end]

@@ -21,6 +21,7 @@ from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.effect_values import JsonValue, canonical_bytes, digest, format_instant, strict_loads
 from sb.effect_write_values import model_object
 from sb.export_journal import ExportJournal
+from sb.managed_copy_disposal import initialize_copy_disposals
 from sb.process_identity import observe_process
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
 from sb.request_schema import migrate_remember_v3
@@ -354,6 +355,7 @@ class RequestStore:
         try:
             migrate_remember_v3(self.db)
             initialize_cancellations(self.db)
+            initialize_copy_disposals(self.db)
         except BaseException:
             self.db.close()
             raise
