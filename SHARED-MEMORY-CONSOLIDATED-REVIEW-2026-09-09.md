@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 dispatch 연결:** [현재 원본 권한과 private spool 기반 scoped 준비](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). J3통과·실제 v1 spool/DB 인수, scope review 유효 상태에서도 원본 검증 철회 시 준비 거부. M2 실제 저장/영수증·전 버전 조합 인수는 남는다.
+
 **2026-09-09 후보 본문 결합:** [범위 검토→persisted candidate 본문 준비](SCOPED-WRITE-PAYLOAD-2026-09-09.md). J2통과·실제 API 본문 교체 거부·Python 독립 digest 일치. 준비값은 쓰기 허가가 아니며 M2 저장 요청/소비/영수증 전체 연결은 남는다.
 
 **2026-09-09 JARVIS `0e6923b`:** [scoped 쓰기 식별자의 양쪽 구현·실측 일치](SCOPED-WRITE-IDENTITY-2026-09-09.md). J2/SB9통과·재승인 중복 방지 키 유지·프로젝트 변경 시 분리. 아직 요청 수락이나 쓰기 권한이 아니며 M2의 단일 소비·저장·영수증 연결은 남는다.
