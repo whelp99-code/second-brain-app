@@ -63,6 +63,8 @@ from sb.request_store import (
     RequestStatus,
     RequestStore,
 )
+from sb.scoped_request_execution import load_scoped_execution
+from sb.scoped_write_request import ScopedWriteRequest
 from sb.task30_barriers import (
     BarrierContext,
     BoundBarrierEmitter,
@@ -143,6 +145,7 @@ class RequestExecutor:
         config: ExecutorConfig,
         *,
         barrier_sink: Task30BarrierSink | None = None,
+        scoped_authority: Callable[[ScopedWriteRequest], bool] | None = None,
     ) -> None:
         self.config = config
         self.barrier_sink = barrier_sink or NoopBarrierSink()
@@ -150,7 +153,8 @@ class RequestExecutor:
             self.barrier_sink,
             BarrierContext(),
         ).emit
-        self.store = RequestStore(config.request_root)
+        self.scoped_authority = scoped_authority
+        self.store = RequestStore(config.request_root, scoped_v4=scoped_authority is not None)
         self.generations = GenerationStore(
             config.state_root,
             config.share_root,
@@ -203,7 +207,7 @@ class RequestExecutor:
         status = self.store.get(lease.request_id)
         if status is None:
             raise RequestExecutionError("REQUEST_NOT_FOUND")
-        if status.identity.schema_version not in (1, 2, 3):
+        if status.identity.schema_version not in ((1, 2, 3, 4) if self.scoped_authority is not None else (1, 2, 3)):
             raise RequestExecutionError("REQUEST_SCHEMA_UNSUPPORTED")
         suffix = f"v{status.identity.schema_version}"
         pending = self.config.request_root / "pending" / f"{lease.request_id}.{suffix}.json"
@@ -264,30 +268,43 @@ class RequestExecutor:
         path: Path,
         now: datetime,
     ) -> tuple[RequestLease, Generation, Mapping[str, JsonValue]]:
-        envelope = parse_remember_envelope(path.read_bytes())
-        request = envelope.request
+        status = self.store.get(lease.request_id)
+        if status is None:
+            raise RequestExecutionError("REQUEST_NOT_FOUND")
+        scoped_request = None
+        source_access = None
+        if status.identity.schema_version == 4:
+            request, scoped_request = load_scoped_execution(path, status,
+                provider=self.config.provider_instance_id, now=now)
+            source_access = scoped_request.preparation.source_access
+        else:
+            envelope = parse_remember_envelope(path.read_bytes())
+            request = envelope.request
+            if (envelope.schema_version != status.identity.schema_version
+                    or request.request_id != lease.request_id
+                    or request.request_digest != status.identity.request_digest):
+                raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
+            acceptance = strict_loads(status.result_json, 17_408)
+            file_digest = write_digest("file_v3" if envelope.schema_version == 3 else "file", asdict(envelope))
+            if (not is_json_object(acceptance) or envelope.accepted_at != status.accepted_at
+                    or acceptance.get("accepted_at") != envelope.accepted_at
+                    or acceptance.get("request_file_digest") != file_digest):
+                raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
+
+        def require_scoped_authority() -> None:
+            if scoped_request is not None and lease.phase not in {"activated", "disposing", "proved"} and now >= scoped_request.expires_at:
+                raise RequestExecutionError("SCOPED_WRITE_REQUEST_EXPIRED")
+            if scoped_request is not None and (self.scoped_authority is None
+                    or self.scoped_authority(scoped_request) is not True):
+                raise RequestExecutionError("SCOPED_WRITE_AUTHORITY_INVALID")
+
+        require_scoped_authority()
         if request.operation.value != "remember":
             raise RequestExecutionError("REAPPROVAL_REQUIRED")
         content = request.payload["content"]
         source_identity = hashlib.sha256(str(request.candidate_id).encode()).hexdigest()
         content_identity = hashlib.sha256(content.encode()).hexdigest()
-        self.reingress.check(IngressIdentity(
-            source=source_identity,
-            content=content_identity,
-        ))
-        status = self.store.get(lease.request_id)
-        if status is None:
-            raise RequestExecutionError("REQUEST_NOT_FOUND")
-        if (envelope.schema_version != status.identity.schema_version
-                or request.request_id != lease.request_id
-                or request.request_digest != status.identity.request_digest):
-            raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
-        acceptance = strict_loads(status.result_json, 17_408)
-        file_digest = write_digest("file_v3" if envelope.schema_version == 3 else "file", asdict(envelope))
-        if (not is_json_object(acceptance) or envelope.accepted_at != status.accepted_at
-                or acceptance.get("accepted_at") != envelope.accepted_at
-                or acceptance.get("request_file_digest") != file_digest):
-            raise RequestExecutionError("REQUEST_ENVELOPE_MISMATCH")
+        self.reingress.check(IngressIdentity(source=source_identity, content=content_identity))
         resume_id = status.result_generation_id
         parent = (
             self.generations.generation(status.base_generation_id)
@@ -302,10 +319,11 @@ class RequestExecutor:
         )
 
         def materialize(root: Path) -> None:
+            require_scoped_authority()
             materialize_remember(
                 root, content=content, candidate_id=str(request.candidate_id),
                 created_at=request.created_at, release_sha=self.config.provider_release_sha,
-                sensitivity=request.sensitivity,
+                sensitivity=request.sensitivity, source_access=source_access,
             )
 
         def sealed(generation: Generation) -> None:
@@ -314,6 +332,7 @@ class RequestExecutor:
 
         def switching(generation: Generation) -> None:
             nonlocal lease
+            require_scoped_authority()
             lease = self._advance(lease, "switch_intent", now, generation.generation_id)
 
         def activated(generation: Generation) -> None:
@@ -329,7 +348,7 @@ class RequestExecutor:
         )
         mutation = self.mutations.mutate(
             GenerationMutation(
-                mutation_id=str(request.request_id),
+                mutation_id=lease.request_id,
                 operation=GenerationOperation.REMEMBER,
                 now=parse_instant(request.created_at),
                 authority=GenerationAuthority(
@@ -346,12 +365,16 @@ class RequestExecutor:
         generation = mutation.generation
         artifact: dict[str, JsonValue] = {
             "schema_version": 1,
-            "request_id": str(request.request_id),
+            "request_id": lease.request_id,
             "generation_id": generation.generation_id,
             "head": generation.head,
             "tree": generation.tree,
             "content_digest": "sha256:" + content_identity,
         }
+        if scoped_request is not None:
+            artifact.update(schema_version=4, request_digest=scoped_request.request_digest,
+                scope_digest=scoped_request.preparation.identity.identity_digest,
+                provider_instance_id=self.config.provider_instance_id)
         return lease, generation, artifact
 
     @staticmethod
@@ -706,7 +729,7 @@ class RequestExecutor:
             if status is None:
                 raise RequestExecutionError("REQUEST_NOT_FOUND")
             claimed_at = status.accepted_at
-            if status.identity.schema_version in (1, 3):
+            if status.identity.schema_version in (1, 3) or (status.identity.schema_version == 4 and self.scoped_authority is not None):
                 lease, generation, artifact = self._remember(lease, path, observed)
                 proof_digest = digest("surface", artifact)
                 final_status = self.store.prove(lease, RequestProofSettlement(

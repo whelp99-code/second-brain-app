@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 내부 v4 실행:** [수락→provider proved→독립 재조회](SCOPED-REQUEST-EXECUTION-2026-09-09.md). 실제 프로세스7개·records4/4·다른 프로젝트 거부·재시도/idle. 전체1,208통과/2skip/217.08초·전체Ruff. fixture authority이며 실제 검증기·자비스 승인 소비·MCP/운영 연결은 남는다.
+
 **2026-09-09 v4 내부 수락 조합:** [발행→원장 확정·응답 유실 복구](SCOPED-REQUEST-ACCEPTANCE-2026-09-09.md). 관련45통과·실제 프로세스4개: file crash row0→1, commit crash row1→1/replay. fixture authority 검증이며 실제 권한·승인 소비·MCP·실행·영수증 연결은 남는다.
 
 **2026-09-09 v4 파일 발행:** [기존 publisher 재사용·강제 종료 복구](SCOPED-REQUEST-PUBLICATION-2026-09-09.md). 관련33통과·최종 기존쓰기/신규30통과(중복 포함), 실제 프로세스4개에서 두 crash 지점의 bytes/시각 복구. 수락 원장·승인 소비·실행·영수증 연결은 남는다.
