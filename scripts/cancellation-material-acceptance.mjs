@@ -39,13 +39,19 @@ if (mode === 'capture') {
     const disposed = disposeSensitiveManagedCopies(layout, material);
     assert.equal(disposed, 2); assert.equal(countManagedMatches(layout, material), 0);
     assert.equal(readFileSync(join(layout.state_root, 'unrelated.txt'), 'utf8'), 'preserve unrelated content');
-    meta.disposed_files = disposed; meta.dispose_pid = process.pid;
+    meta.layout = layout; meta.disposed_files = disposed; meta.dispose_pid = process.pid;
     meta.after_disposal_matches = 0;
     writeFileSync(metadataPath, JSON.stringify(meta), { mode: 0o600 });
     material.forEach(b => b.fill(0));
     process.exit(77);
   }
   assert.equal(material.length, 0);
+  const { MemoryManagedSurfaceScanner } = await moduleAt('memory-managed-surface-scanner');
+  const local = new MemoryManagedSurfaceScanner({ authority: db, layout: meta.layout }).scanLocal();
+  assert.equal(local.scope, 'jarvis_managed_local_observation');
+  assert.equal(local.observed_surface_count, 20);
+  assert(local.entries.every(entry => entry.owner === 'jarvis' && entry.match_count === 0 && entry.error_count === 0));
+  meta.local_scan = { scope: local.scope, observed_surface_count: local.observed_surface_count, manifest_digest: local.manifest_digest };
   meta.resume_pid = process.pid; meta.checkpoint_rows = 1; meta.resume_material_count = 0;
   meta.cursor = db.db.prepare('SELECT * FROM memory_effect_dispatch_cursor').all();
   db.close();

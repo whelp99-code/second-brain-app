@@ -748,3 +748,11 @@ native·범위·계보·실제앱·수집/주입·검색·GUI·운영 전체 목
 관련23통과 이후 최종추가 관련15통과(중복), 타입/lint/격리emit통과. provider40 증거가 없는 취소의 전체70 검증·DB교체 완료/cursor·seq1→V2seq2는 미완료다.
 
 네 OSS 전체 도입 대신 기존 저장·계보·정정/삭제 수명주기를 재사용한다. 다음 구현은 실제 취소 로컬 완료 계약과 DB 교체/cursor 연결이다. native·범위·계보·실제 앱·검색·GUI·운영 인수 조건을 유지한다.
+
+
+## 2026-09-08 로컬 관측·DB 교체 인수 후속
+
+**최신 JARVIS `89dbfc8` / SB 제품 `9e30115`: [취소 DB 교체 검증·실제 로컬20 관측](CANCELLATION-LOCAL-OBSERVATION-ACCEPTANCE-2026-09-08.md).**
+기존 scanner를 재사용해 provider 관측 없이 JARVIS20개 관리 영역을 검사하며 금지 본문 해시 집합에 결과를 결합한다.
+실제 분리 프로세스 저장/처분 exit77→새 프로세스 로컬20검사 통과. 기존 전체70 fixture로 취소 DB inode교체·결과/체크포인트 보존도 검증했다.
+최종 관련6통과·타입/lint/격리emit통과. 특정 취소의 불변 로컬 완료 기록·provider 범위 조율·cursor seq1→V2seq2와 전체 운영 목표는 남는다.
