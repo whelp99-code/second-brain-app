@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import shutil
 import sqlite3
 from collections.abc import Generator, Sequence
@@ -15,7 +14,12 @@ from types import TracebackType
 from typing import Final, Self, cast
 
 from sb.page_access import PageAccess
-from sb.source_access import SourceAccess, source_access_digest, source_access_identity
+from sb.source_access import (
+    SourceAccess,
+    decode_source_access,
+    source_access_digest,
+    source_access_identity,
+)
 
 from . import (
     Derivation,
@@ -329,14 +333,7 @@ class Ledger:
             (identity,)).fetchone())
         if row is None:
             return None
-        try:
-            value = cast(dict[str, object], json.loads(row[0]))
-            access = SourceAccess(cast(str, value["owner"]), tuple(cast(list[str], value["projects"])), cast(str, value["policy_revision"]))
-            if access.encode() != row[0] or source_access_digest(identity, access) != row[1]:
-                raise ValueError("SOURCE_ACCESS_CORRUPT")
-        except (ValueError, TypeError, KeyError) as exc:
-            raise ValueError("SOURCE_ACCESS_CORRUPT") from exc
-        return access
+        return decode_source_access(identity, row[0], row[1])
 
     def compiled_page_access(self, sources: Sequence[tuple[str, str]], parent: PageAccess | None = None,
         *, unknown_parent: bool = False) -> PageAccess:

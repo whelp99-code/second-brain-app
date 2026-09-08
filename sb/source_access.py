@@ -49,3 +49,15 @@ def source_access_identity(source_id: str, source_uri: str, content_hash: str) -
 def source_access_digest(identity: str, access: SourceAccess) -> str:
     return "sha256:" + hashlib.sha256(b"second-brain/source-access-classification/v1\0"
         + identity.encode() + b"\0" + access.encode().encode()).hexdigest()
+
+
+def decode_source_access(identity: str, encoded: str, checksum: str) -> SourceAccess:
+    """Validate one stored classification identically for writer and sealed reader."""
+    try:
+        value = cast(dict[str, object], json.loads(encoded))
+        access = SourceAccess(cast(str, value["owner"]), tuple(cast(list[str], value["projects"])), cast(str, value["policy_revision"]))
+        if access.encode() != encoded or source_access_digest(identity, access) != checksum:
+            raise ValueError("SOURCE_ACCESS_CORRUPT")
+        return access
+    except (ValueError, TypeError, KeyError) as exc:
+        raise ValueError("SOURCE_ACCESS_CORRUPT") from exc
