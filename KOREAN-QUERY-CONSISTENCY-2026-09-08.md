@@ -1,5 +1,7 @@
 # 검색어 어순과 MCP 근거 선택 개선
 
+최신 병합 상태: [100회 쓰기 최종 통과](WRITE-CYCLE-ACCEPTANCE-2026-09-08.md) 후 원 작업공간 `1d3d2de`에 반영했다. 아래 병합 대기 표시는 당시의 검증 이력이다.
+
 ## 구현 결과와 병합 상태
 
 기존 trigram 검색을 재사용하면서 공백으로 나눈 모든 검색어가 있는 자료를 어순과 관계없이 찾도록 구현했다. 봉인 검색·비봉인 검색·MCP record 선택이 같은 `sb/search_query.py:LexicalQuery`를 사용한다. 검색 인덱스 schema, generation binding, read fence, record ID/digest, 원문 저장과 MCP 필드는 변경하지 않았다.

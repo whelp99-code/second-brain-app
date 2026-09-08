@@ -1,5 +1,7 @@
 # 벡터 재생성의 기존 DB 보존과 대량 SQL 수정
 
+최신 병합 상태: [100회 쓰기 최종 통과](WRITE-CYCLE-ACCEPTANCE-2026-09-08.md) 후 원 작업공간 `49442bc`에 반영했다. 아래 병합 대기 표시는 당시의 검증 이력이다.
+
 상태: **격리 제품 구현·전체 회귀·실제 CLI 인수 통과, 원 작업공간 병합 대기.**
 제품 커밋 `5d25d3a`.
 작업공간 `/var/tmp/sb-korean-query-work`, 브랜치 `codex/korean-query-consistency-20260908`.

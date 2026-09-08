@@ -4,11 +4,21 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+
+**2026-09-08 최신:** [대규모 100회 쓰기/두 MCP reader/최종 복원](WRITE-CYCLE-ACCEPTANCE-2026-09-08.md)이
+종료·통과했고 제품 소스 고정을 해제했다. 대기 다섯 커밋을 1d3d2de → 0fecf0a → f756872 →
+01f9963 → 49442bc로 병합했으며, 추가 [봉인 파일 무결성](GENERATION-INTEGRITY-2026-09-08.md)은
+db94997로 반영했다. 현재 제품의 전체 회귀 815 passed/2 skipped, 병합 후 통합 26 passed,
+실제 자비스 CLI 5시나리오 통과. 아래의 대기/진행 숫자는 각 기록 작성 시점의 이력이다.
+
+B4~B8 전체 완료는 아니다. capture/run p95 32.99/112.66초의 개선, 실제 질문/모델/GUI,
+자비스 session 전달·compaction·삭제/범위, 봉인 의미 검색, 운영 전환/DR을 계속 진행한다.
+
 B5 준비 경로 구현: 자비스 `3360fe7`의 [출처를 보존한 참고 기억 본문 묶음](MEMORY-REFERENCE-PREPARATION-2026-09-08.md). 기존 adapter 출력에서 여러 줄 원문·record/citation/세대·유효 시점을 유지하고 최종 JSON 전체 byte/선택적 tokenizer 예산을 적용한다. 관련 94 passed, 실제 MCP 3건·record 1개·본문/digest/출처/세대 일치, 독립 리뷰 결함 수정 및 재검토 완료. 기존 추천 authority·frozen MCP는 유지한다. 준비 데이터이며 실제 모델 전달, suppression/범위·세션/compaction receipt와 B5 전체는 남는다.
 
 B5 인계 대조: [공통 문맥 공급 공백과 8개 추가 과제](CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md). 자비스 새 격리 빌드로 snapshot 본문 부재, provider untrusted 제외, 여러 줄 입력 거부, live 관측 의존, 본문을 포함하지 않는 총량 계수를 재현했다. 기존 context/projection 재사용과 실제 전달·중복/compaction·삭제/범위 결합을 C1~C8로 세분화했다. 진단 성공은 B5 완성이 아니며 제품/운영 변경은 없다.
 
-병합 대기: 검색 `d174276` → 준비 사본 복구 `47fa507` → 정확 문구/입력 예산 `9323a6d` (`codex/korean-query-consistency-20260908`, `/var/tmp/sb-korean-query-work`). 결합 제품 전체 764 passed/2 skipped. 원 작업공간의 100회 쓰기 인수가 종료되면 이 커밋들을 병합하고 필요한 통합 검증을 수행한다. 현재 원 작업공간의 제품 소스에는 아직 적용하지 않았다.
+기존 병합 대기는 해소했다. 위 최신 요약과 100회 쓰기 보고서의 커밋 대응표를 따른다.
 
 격리 검색 후속: [정확 문구·입력 오류 인수](SEARCH-PHRASE-ACCEPTANCE-2026-09-08.md). 큰따옴표 문구/경로 문자 보존과 4,096-byte/32-group 예산을 공통 검색에 연결했다. 잘못된 입력은 index refresh 전에 거부하고 CLI/HTTP/MCP에서 구체적인 오류로 반환한다. 별도 합성 문구 7/7 회수·무정답 3/3 빈 결과, 기존 100질문의 60/90 회수 유지. 실제 사용자 질문·의역·B5 문맥 예산과 전체 목표는 남으며, 대규모 쓰기 종료 후 앞선 격리 커밋들과 병합한다.
 

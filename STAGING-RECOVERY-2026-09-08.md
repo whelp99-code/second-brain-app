@@ -1,5 +1,7 @@
 # 중단된 준비 세대의 원본 사본 정리
 
+최신 병합 상태: [100회 쓰기 최종 통과](WRITE-CYCLE-ACCEPTANCE-2026-09-08.md) 후 원 작업공간 `0fecf0a`에 반영했다. 아래 병합 대기 표시는 당시의 검증 이력이다.
+
 ## 문제와 수정
 
 실제 대규모 배치의 의도적 프로세스 종료 후 `/var/tmp/sb-write-cycles-dn1i9yhv/share/vault-generations/.staging/f263fc026c67a02c0cec7300dd41262c8dba2be7dea4c14611028826df00872d`에 raw/원장 사본이 남았다. 다음 다른 ID의 배치가 성공해도 이 경로는 제거되지 않았다. 이 이전 실패 증거는 보존했으며 이번 검증은 새 합성 저장소에서 수행했다.
