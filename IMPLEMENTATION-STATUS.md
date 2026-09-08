@@ -4,7 +4,14 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 JARVIS `0c0508a` / SB 도구 `7e01e2b`: [후보 차단의 승인·remember 전송 집행](CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md).**
+**최신 JARVIS `8a55ea9` / SB 도구 `db19ec5`: [V2 정정 차단·계약 복구 보류·14개 우선 목록](V2-CORRECTION-SUPPRESSION-2026-09-08.md).**
+V2 prepare/materialization/beginDispatch/직접 adapter의 후보 차단을 수정하고 기존 spool 보존 및
+cursor rollback을 검증했다. 최종6파일22통과, 타입/린트/71migration 격리build, 실제3프로세스에서
+재시작 attempt0·정상 입력 후 차단 호출 증가0 확인. 자동 retirement 시제품은 실제 양쪽 validator가
+혼합 delta를 거부하여 철회했다. 차단된 queued tombstone의 후속 정정·삭제 정체는 미해결 P0다.
+기존 native/ACL/계보/자동capture/검색/운영 전체 완료 조건을 유지한다.
+
+**이전 JARVIS `0c0508a` / SB 도구 `7e01e2b`: [후보 차단의 승인·remember 전송 집행](CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md).**
 화면에서 숨긴 후보가 classify 재생·owner 승인·outbox 전송·직접 V1 writer에서 사용되는 결함을
 수정했다. 정정 confirmation도 검사/승인/settlement를 immediate transaction으로 결합했다.
 관련39·최종7·유효 wire 입력 집중6 통과(중복), 타입/린트/격리 build 통과. 실제3프로세스에서

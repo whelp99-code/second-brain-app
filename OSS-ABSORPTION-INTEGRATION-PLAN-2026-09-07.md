@@ -593,3 +593,18 @@ SQLite·백업의 보존/폐기가 필요하다는 실측을 추가했다. 설�
 추가하지 않았다. 실패/미확정 결과를 임의 성공으로 승격하지 않는 기존 signed authority 계약을
 유지하며 실제 task 자동 수집은 원본 차단 계보가 준비될 때까지 보류한다. 실제3프로세스의 HTTP/
 재시작 인수는 합성 transport 조건이며 V2 정정의 별도 쓰기 경계와 원task→SBrecord 계보는 남는다.
+
+
+## 54. V2 정정 차단 집행과 실제 계약에서 확인한 복구 보류
+
+JARVIS `8a55ea9`, SB 도구 `db19ec5`: [이번 수정·검증·14개 후속 우선 목록](V2-CORRECTION-SUPPRESSION-2026-09-08.md).
+후보 차단을 독립 V2 준비/전송/adapter 경로에 적용했다. 기존 spool을 보존하고 cursor claim과
+beginDispatch를 immediate transaction으로 묶었다. 최종6파일22통과·타입/린트/격리build 및 실제
+3프로세스에서 차단 후 추가 전송0·재시작 attempt0을 확인했다. provider는 합성 transport다.
+
+P0 추가: 미전송 차단 lane을 건너뛰고 다음 요청에 이력을 실어 보내는 시제품은 실제 양쪽
+validator가 EFFECT_TOMBSTONE_DELTA_INVALID로 거부했다. 해당 시제품의 합성 테스트 통과는
+통합 성공 증거에서 제외했고 migration072·자동retirement·낮은checkpoint 예외를 철회했다.
+기존 계약을 약화하지 않고 queued/tombstone/spool을 보류한다. 후속 정정·삭제의 자동복구는
+양쪽 버전 계약·원본별 처분 증거를 갖춰 해결해야 한다. 새 OSS 코드/DB/Proxy는 도입하지 않았다.
+전체 native/범위/원task계보/수집/검색/운영 완료 조건을 유지한다.

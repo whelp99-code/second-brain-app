@@ -1,0 +1,71 @@
+{
+  "status": "passed",
+  "root": "/var/tmp/jarvis-v2-suppression-CLxtdH",
+  "build": "/var/tmp/jarvis-v2-suppression-build-ocoj8gvf",
+  "cases": [
+    {
+      "mode": "seed",
+      "pid": 3095704,
+      "state": "queued",
+      "dispatch_attempts": 0,
+      "provider_calls": 0,
+      "interrupted_after_tombstone": true
+    },
+    {
+      "mode": "restart",
+      "pid": 3095763,
+      "state": "queued",
+      "suppressed_dispatch_rejected": true,
+      "correction_attempts": 0,
+      "retained_spool_present": true,
+      "accepted_through_sequence": 0,
+      "automatic_recovery_complete": false
+    },
+    {
+      "mode": "adapter",
+      "pid": 3095824,
+      "valid_request_transport_calls": 1,
+      "post_suppression_additional_calls": 0,
+      "observation_continues": true
+    }
+  ],
+  "build_artifact_digest": "sha256:2e2de32fd70c443452bd42e2b7ee9e33f93e69983474e815128cbd68486783de",
+  "provider": "deterministic transport fixture",
+  "operational_data_used": false,
+  "native_model_calls": 0,
+  "retained_artifacts": "synthetic authority, keys and held spool retained for audit",
+  "full_goal_complete": false,
+  "commits": {
+    "jarvis": "8a55ea9",
+    "second_brain_tool": "db19ec5"
+  },
+  "tests": {
+    "files": 6,
+    "passed": 22,
+    "duration_seconds": 49.73,
+    "typescript": "passed",
+    "changed_eslint": "passed",
+    "isolated_build": "passed"
+  },
+  "held_prototype": {
+    "automatic_retirement_shipped": false,
+    "migration_072_shipped": false,
+    "mixed_delta_integration_passed": false,
+    "reproduced_validators": [
+      {
+        "provider_validator": "actual sb.effect_write_values.parse_effect_request",
+        "code": "EFFECT_TOMBSTONE_DELTA_INVALID",
+        "delta_sequences": [
+          1,
+          2
+        ],
+        "prototype_integration_passed": false
+      },
+      {
+        "validator": "actual JARVIS requireMemoryEffectWriteRequest",
+        "code": "EFFECT_TOMBSTONE_DELTA_INVALID",
+        "prototype_integration_passed": false
+      }
+    ]
+  }
+}

@@ -585,3 +585,18 @@ JARVIS `0c0508a`, SB `7e01e2b`: [수정6항목·실제 인수·다음 V2 경계]
 P0 추가: V2 correction은 별도 preparation/materialization/beginDispatch/dedicatedAuthority를
 사용해 V1 검사를 거치지 않는다. 이 경로와 자체 tombstone/원본 차단 구분을 다음에 보강한다.
 원task→후보→provider record 계보 전까지 자동 collector 보류와 전체 미완료 조건을 유지한다.
+
+
+## 49. V2 정정 차단 집행과 실제 계약에서 확인한 복구 보류
+
+JARVIS `8a55ea9`, SB 도구 `db19ec5`: [이번 수정·검증·14개 후속 우선 목록](V2-CORRECTION-SUPPRESSION-2026-09-08.md).
+후보 차단을 독립 V2 준비/전송/adapter 경로에 적용했다. 기존 spool을 보존하고 cursor claim과
+beginDispatch를 immediate transaction으로 묶었다. 최종6파일22통과·타입/린트/격리build 및 실제
+3프로세스에서 차단 후 추가 전송0·재시작 attempt0을 확인했다. provider는 합성 transport다.
+
+P0 추가: 미전송 차단 lane을 건너뛰고 다음 요청에 이력을 실어 보내는 시제품은 실제 양쪽
+validator가 EFFECT_TOMBSTONE_DELTA_INVALID로 거부했다. 해당 시제품의 합성 테스트 통과는
+통합 성공 증거에서 제외했고 migration072·자동retirement·낮은checkpoint 예외를 철회했다.
+기존 계약을 약화하지 않고 queued/tombstone/spool을 보류한다. 후속 정정·삭제의 자동복구는
+양쪽 버전 계약·원본별 처분 증거를 갖춰 해결해야 한다. 새 OSS 코드/DB/Proxy는 도입하지 않았다.
+전체 native/범위/원task계보/수집/검색/운영 완료 조건을 유지한다.
