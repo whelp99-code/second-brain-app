@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `8ffc993`:** [발행 시각 역행 수정·누적 전체 검사](AUTO-PUBLICATION-CLOCK-2026-09-09.md). 관련19통과·실제 일반 owner 저장 재인수, SB 전체1,153통과/2skip/219.73초(`cc236a3`) 및 전체Ruff. 전체 운영 목표 완료로 확대하지 않는다.
+
 **2026-09-09 실제 저장 인수:** [자동 승인 후보의 일반 owner 저장 전체 연결](AUTO-CANDIDATE-PROVIDER-2026-09-09.md). 실제 CLI→MCP→provider proved→자비스 완료→별도 client records4, 중복/정리 확인. scoped 쓰기 및 M2 전체 운영 조건 완료로 확대하지 않는다.
 
 **2026-09-09 JARVIS `aa825f0`:** [실제 CLI 자동 발행 연결](AUTO-CANDIDATE-PUBLICATION-2026-09-09.md). 이전 auto-approved 후보 발행 결손을 구현, 수동13/최종7통과·실제 v3 CLI→spool→범위 준비 검증. M2 scoped 요청/단일 소비/provider 처리/영수증은 남는다.
@@ -119,7 +121,7 @@ P0는 메인 기억 장소 인수에 필요한 항목, P1은 사용 품질·운�
 
 - 최초 작성 시 실행: JARVIS 집중 17개, SB 집중 19개 통과. 격리된 실제 CLI→issuer→stdio→소비자에서 조회·검색 각 record 2개를 검증하고 새 프로세스 반복 및 변조 거부를 확인했다. 이후 검증은 상단 날짜·커밋별 기록을 따른다. 합성 원본·고정 시각·테스트 세션이다.
 - 이전 기록: [실제 Codex·Claude 상호 회수](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md), [실제 모델 참고 기억 소비](MEMORY-REFERENCE-MODEL-ACCEPTANCE-2026-09-08.md), [정정 완료·독립 재조회](CANCELLATION-FOLLOWUP-SETTLED-ACCEPTANCE-2026-09-09.md). 이번에 이 세 인수를 다시 실행한 것은 아니다.
-- 가장 최근 기록된 전체 SB 검사는 `397bc87` 기준 1,142 passed/2 skipped다. 이후 issuer session 변경을 포함한 현재 전체 통과 수치로 재표기하지 않는다.
+- 가장 최근 전체 SB 검사는 `cc236a3` 기준 1,153 passed/2 skipped(219.73초)다. optional embeddings extra와 JARVIS 전체 검사를 포함하지 않는다.
 - 전송·서명·hash 검증은 기록의 식별과 허용 범위에 대한 증거다. 기억에 적힌 사실이나 작업 성공 자체를 자동 보증하지 않는다.
 
 사용자가 요청한 최종 상태는 **실제 자비스의 검증된 작업 결과가 저장되고, 허용된 다른 에이전트의 새 세션에서 근거와 함께 재사용되며, 정정·철회·삭제·복구 후에도 같은 정책이 유지되는 것**이다. 위 M1~M7과 실제 사용·운영 검증이 남아 있으므로 전체 완성 표시는 유지하지 않는다.

@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `8ffc993` / SB 전체:** [자동 발행의 가변 Date 역행 수정](AUTO-PUBLICATION-CLOCK-2026-09-09.md). 재현1실패→관련19통과·실제 CLI/MCP/provider 저장·records4 재인수. SB `cc236a3` 기준 전체1,153통과/2skip/219.73초·전체Ruff통과. scoped 쓰기·orphan 수명·운영/모델 세션 인수는 남는다.
+
 **2026-09-09 실제 저장 인수:** [자동 CLI 후보→실제 MCP/provider 처리→별도 클라이언트 회수](AUTO-CANDIDATE-PROVIDER-2026-09-09.md). v3 pending→proved, outbox settled/control completed, records4, 중복 replay/재처리idle/추가dispatch0/본문정리0. 관련7통과. 일반 owner 경로이며 scoped 쓰기·운영/모델 세션 인수는 남는다.
 
 **2026-09-09 JARVIS `aa825f0`:** [자동 승인 후보 CLI 발행 구현](AUTO-CANDIDATE-PUBLICATION-2026-09-09.md). 기존 수동 경로13·최종 자동/범위7통과, v1/v3 발행/재실행/실패 복구 및 실제 컴파일 CLI→spool→scoped 준비 인수. auto-approved 발행 결손 수정. scoped 승인 소비·provider 저장·완료 영수증과 orphan 정리 전체 인수는 남는다.
