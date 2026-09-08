@@ -4,7 +4,16 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 SB `b3c8b87`: [취소의 실제 억제 세대·중단 복구·MCP 인수](CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `b34b2a9`: [취소 대상의 원자 접수·백업 잠금 충돌 수정](CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md).**
+취소 접수에 실제 generation/target 고정을 필수로 결합하고 검사 후 현재 키/만료를 재검증한다.
+잘못된 세대·변조/특수 파일은 원장 위치를 바꾸지 않고 거부한다. 기존 백업 생성·검증의
+반대 잠금 순서를 실제2프로세스 검사로 재현하고 pending→generation→DB로 통일했다.
+기본983통과/2skip·마지막백업5통과(중복), 제품정적0오류/0경고·lint통과. 실제 Node 생산자와
+Python6요청 프로세스에서 실제 대상 접수/재생·잘못된 세대의 mutation0, 실제 MCP
+강제종료 복구·healthy/검색0 재확인. backup/export 처분·최종 결과/서명 영수증·MCP/JARVIS
+cursor와 기존 native/ACL/계보/수집/검색/운영 전체 목표는 남는다. 자동 취소 route는 보류한다.
+
+**이전 SB `b3c8b87`: [취소의 실제 억제 세대·중단 복구·MCP 인수](CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.md).**
 접수된 취소로 기존 대상을 제거한 generation을 생성·활성화하며 정정 replacement는 적용하지
 않는다. 기존 erasure/reingress/단일 writer를 재사용하고 실제 대상 검증, 활성화 직전 키 재검사,
 봉인 결과 연결·중단 재개·후속 세대 이후 완료 재생을 구현했다. 기본968통과/2skip,

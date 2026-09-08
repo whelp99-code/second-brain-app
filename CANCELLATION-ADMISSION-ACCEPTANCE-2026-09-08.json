@@ -1,0 +1,288 @@
+{
+  "product_commit": "b34b2a9",
+  "full_suite": {
+    "passed": 983,
+    "skipped": 2,
+    "seconds": 157.23
+  },
+  "final_backup_focus": {
+    "passed": 5,
+    "seconds": 3.72,
+    "overlaps_full_suite": true,
+    "note": "After unused return-value annotations only."
+  },
+  "target_race_focus": {
+    "passed": 10,
+    "seconds": 6.21,
+    "overlaps_full_suite": true
+  },
+  "backup_and_admission_focus": {
+    "passed": 15,
+    "seconds": 9.7,
+    "overlaps_full_suite": true
+  },
+  "pre_fix_backup_lock_reproduction": {
+    "failed": 2,
+    "cause": "generation mutex retained while waiting on pending; actual LOCK_NB raised BlockingIOError"
+  },
+  "lint": "passed",
+  "product_typecheck": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "node_python_admission": {
+    "root": "/var/tmp/cancellation-journal-cross-runtime-9shZaE",
+    "build": "/var/tmp/jarvis-cancellation-intent-build-n_wuztw1",
+    "node_pid": 3373512,
+    "bootstrap_pid": 3373538,
+    "actual_target_binding": true,
+    "intent_digest": "sha256:fde196e70166a814abff3fceb654fb9616b819b20758af89a6656483b30062d9",
+    "results": [
+      {
+        "pid": 3373665,
+        "mode": "cancel",
+        "state": "suppression_pending",
+        "replayed": false,
+        "aliases": 8,
+        "requests": 1,
+        "sequence": 1,
+        "pending_files": 0
+      },
+      {
+        "pid": 3373681,
+        "mode": "original",
+        "state": "MEMORY_REQUEST_CANCELLED",
+        "replayed": false,
+        "aliases": 8,
+        "requests": 1,
+        "sequence": 1,
+        "pending_files": 0
+      },
+      {
+        "pid": 3373720,
+        "mode": "cancel",
+        "state": "suppression_pending",
+        "replayed": true,
+        "aliases": 8,
+        "requests": 1,
+        "sequence": 1,
+        "pending_files": 0
+      },
+      {
+        "pid": 3373748,
+        "mode": "original",
+        "state": "pending",
+        "replayed": false,
+        "aliases": 0,
+        "requests": 2,
+        "sequence": 1,
+        "pending_files": 1
+      },
+      {
+        "pid": 3373766,
+        "mode": "cancel",
+        "state": "MEMORY_CANCELLATION_ALREADY_RECEIVED",
+        "replayed": false,
+        "aliases": 0,
+        "requests": 2,
+        "sequence": 1,
+        "pending_files": 1
+      },
+      {
+        "pid": 3373788,
+        "mode": "wrong-target",
+        "state": "EFFECT_PRIOR_STALE",
+        "replayed": false,
+        "aliases": 0,
+        "requests": 1,
+        "sequence": 0,
+        "pending_files": 0
+      }
+    ],
+    "operational_mutations": 0,
+    "mcp_route_exercised": false,
+    "generation_proof": false,
+    "automatic_recovery": false
+  },
+  "mcp_generation_recovery": {
+    "root": "/var/tmp/cancellation-generation-f2gf7vfk",
+    "intent_id": "memcancel:intent:v1:78791c72396ba6c12d88995fccf640b6160d406b998f5dfda1c4f28c20cd1298",
+    "parent_pid": 3396070,
+    "crash_exit_code": 77,
+    "recovery": {
+      "pid": 3396640,
+      "result": {
+        "schema_version": 1,
+        "kind": "correction_cancellation_generation",
+        "state": "generation_active",
+        "intent_id": "memcancel:intent:v1:78791c72396ba6c12d88995fccf640b6160d406b998f5dfda1c4f28c20cd1298",
+        "intent_digest": "sha256:78791c72396ba6c12d88995fccf640b6160d406b998f5dfda1c4f28c20cd1298",
+        "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+        "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+        "tombstone_sequence": 1,
+        "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070"
+      }
+    },
+    "mcp": [
+      {
+        "stage": "before",
+        "pid": 3396338,
+        "status": {
+          "meta": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"schema_version\": 1,\n  \"provider_instance_id\": \"provider:fixture\",\n  \"provider_release_sha\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"generation_id\": \"sbgen:v1:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100\",\n  \"generation_manifest_digest\": \"sha256:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100\",\n  \"vault_head\": \"f7cbdb0db5ad41187a97938e1576caac1b40506d\",\n  \"vault_tree\": \"8ae09a4f24f395046a5779e78ae7b8291976227a\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\",\n  \"pointer_health\": \"tombstone_stale\",\n  \"journal_health\": \"healthy\",\n  \"features\": [\n    \"memory_effect_write_v2\",\n    \"memory_record_identity_v1\",\n    \"memory_remember_v3\"\n  ],\n  \"contract_schema_version\": 5,\n  \"contract_digest\": \"78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e\"\n}",
+              "annotations": null,
+              "meta": null
+            }
+          ],
+          "structured_content": {
+            "schema_version": 1,
+            "provider_instance_id": "provider:fixture",
+            "provider_release_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "generation_id": "sbgen:v1:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100",
+            "generation_manifest_digest": "sha256:d4bb11cf75d96ebc25e4d4a57c70a304c68c86ace5ab24f04e7d49c50e984100",
+            "vault_head": "f7cbdb0db5ad41187a97938e1576caac1b40506d",
+            "vault_tree": "8ae09a4f24f395046a5779e78ae7b8291976227a",
+            "tombstone_sequence": 1,
+            "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070",
+            "pointer_health": "tombstone_stale",
+            "journal_health": "healthy",
+            "features": [
+              "memory_effect_write_v2",
+              "memory_record_identity_v1",
+              "memory_remember_v3"
+            ],
+            "contract_schema_version": 5,
+            "contract_digest": "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
+          },
+          "is_error": false,
+          "result_type": "complete"
+        },
+        "search": [
+          {
+            "meta": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Error executing tool sb_search: TOMBSTONE_SET_STALE",
+                "annotations": null,
+                "meta": null
+              }
+            ],
+            "structured_content": null,
+            "is_error": true,
+            "result_type": "complete"
+          },
+          {
+            "meta": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "Error executing tool sb_search: TOMBSTONE_SET_STALE",
+                "annotations": null,
+                "meta": null
+              }
+            ],
+            "structured_content": null,
+            "is_error": true,
+            "result_type": "complete"
+          }
+        ]
+      },
+      {
+        "stage": "after",
+        "pid": 3396785,
+        "status": {
+          "meta": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"schema_version\": 1,\n  \"provider_instance_id\": \"provider:fixture\",\n  \"provider_release_sha\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"generation_id\": \"sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"generation_manifest_digest\": \"sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"vault_head\": \"6775568b7aa0d71885d2ab94846f5a0c25b4dce2\",\n  \"vault_tree\": \"718e7f05a406917f451049e8b8595841fbc61b52\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\",\n  \"pointer_health\": \"healthy\",\n  \"journal_health\": \"healthy\",\n  \"features\": [\n    \"memory_effect_write_v2\",\n    \"memory_record_identity_v1\",\n    \"memory_remember_v3\"\n  ],\n  \"contract_schema_version\": 5,\n  \"contract_digest\": \"78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e\"\n}",
+              "annotations": null,
+              "meta": null
+            }
+          ],
+          "structured_content": {
+            "schema_version": 1,
+            "provider_instance_id": "provider:fixture",
+            "provider_release_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+            "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+            "vault_head": "6775568b7aa0d71885d2ab94846f5a0c25b4dce2",
+            "vault_tree": "718e7f05a406917f451049e8b8595841fbc61b52",
+            "tombstone_sequence": 1,
+            "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070",
+            "pointer_health": "healthy",
+            "journal_health": "healthy",
+            "features": [
+              "memory_effect_write_v2",
+              "memory_record_identity_v1",
+              "memory_remember_v3"
+            ],
+            "contract_schema_version": 5,
+            "contract_digest": "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
+          },
+          "is_error": false,
+          "result_type": "complete"
+        },
+        "search": [
+          {
+            "meta": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "{\n  \"results\": [],\n  \"provider_instance_id\": \"provider:fixture\",\n  \"generation_id\": \"sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"generation_manifest_digest\": \"sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"vault_head\": \"6775568b7aa0d71885d2ab94846f5a0c25b4dce2\",\n  \"vault_tree\": \"718e7f05a406917f451049e8b8595841fbc61b52\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\"\n}",
+                "annotations": null,
+                "meta": null
+              }
+            ],
+            "structured_content": {
+              "results": [],
+              "provider_instance_id": "provider:fixture",
+              "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+              "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+              "vault_head": "6775568b7aa0d71885d2ab94846f5a0c25b4dce2",
+              "vault_tree": "718e7f05a406917f451049e8b8595841fbc61b52",
+              "tombstone_sequence": 1,
+              "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070"
+            },
+            "is_error": false,
+            "result_type": "complete"
+          },
+          {
+            "meta": null,
+            "content": [
+              {
+                "type": "text",
+                "text": "{\n  \"results\": [],\n  \"provider_instance_id\": \"provider:fixture\",\n  \"generation_id\": \"sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"generation_manifest_digest\": \"sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7\",\n  \"vault_head\": \"6775568b7aa0d71885d2ab94846f5a0c25b4dce2\",\n  \"vault_tree\": \"718e7f05a406917f451049e8b8595841fbc61b52\",\n  \"tombstone_sequence\": 1,\n  \"tombstone_set_root\": \"sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070\"\n}",
+                "annotations": null,
+                "meta": null
+              }
+            ],
+            "structured_content": {
+              "results": [],
+              "provider_instance_id": "provider:fixture",
+              "generation_id": "sbgen:v1:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+              "generation_manifest_digest": "sha256:95bbf7fdb36d6c2e21cdbe7ea2ed8fa03ebed1c66ce35391673ba21fb20b8af7",
+              "vault_head": "6775568b7aa0d71885d2ab94846f5a0c25b4dce2",
+              "vault_tree": "718e7f05a406917f451049e8b8595841fbc61b52",
+              "tombstone_sequence": 1,
+              "tombstone_set_root": "sha256:2ad5f7f87b1a52cdbab6fa9577086c0349fed387e82159548a3319fbd6a6b070"
+            },
+            "is_error": false,
+            "result_type": "complete"
+          }
+        ]
+      }
+    ],
+    "original_generation_removed": true,
+    "operational_mutations": 0,
+    "signed_completion_receipt": false,
+    "jarvis_cursor_settlement": false,
+    "backup_export_native_erasure": false
+  },
+  "automatic_recovery_complete": false,
+  "operational_mutations": 0
+}

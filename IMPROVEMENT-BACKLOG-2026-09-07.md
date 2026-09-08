@@ -647,3 +647,19 @@ sealed generation 연결, 포인터 전환 중단 후 재개와 후속 세대 �
 버전 결과·상태 조회·서명 영수증 및 자비스 seq1 완료→정상 V2 seq2의 전체 연결이 다음 P0다.
 내부 경로만 구현했으며 자동 취소 route와 lane 건너뛰기는 보류한다. 인계의 SB정본·JARVIS실행·
 선별OSS흡수와 native/사용자프로젝트범위/원task계보/수집/검색/운영 전체 목표를 유지한다.
+
+
+## 53. 취소 대상의 원자 접수와 백업 잠금 충돌 수정
+
+SB `b34b2a9`: [구현·실제 잠금/교차 런타임·MCP 검증](CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md).
+실제 GenerationStore와 같은 provider/request root를 접수의 필수 입력으로 요구한다.
+pending→generation→DB 순서에서 실제 generation/blob/content/span과 직전 tombstone을
+검사하고 마지막 현재 키/시각을 재검증한다. 원본 삭제 후 같은 canonical intent의 접수 재생을
+유지한다. 백업 생성·검증의 generation→pending 역순으로 인한 충돌을 실제 잠금으로 재현해
+같은 순서로 통일했다. 별도 DB/Proxy/OSS 코드는 추가하지 않았다.
+
+기본983통과/2skip·마지막백업5통과(중복), 제품정적0오류/0경고·lint통과. 실제 세대의
+Node 취소 생산→Python6요청 프로세스 인수 및 잘못된 대상의 원장변경0, 실제 MCP 강제종료
+복구·tombstone_stale→healthy/기존·취소 본문 검색0 확인. 남은 P0는 backup/export 등 사본
+처분, 결과·상태 조회·최종 서명 영수증과 자비스 seq1완료→정상V2seq2/cursor 연결이다.
+자동 취소 route/collector 확대 보류와 native·범위·계보·실제앱·검색·운영 전체 완성 조건을 유지한다.
