@@ -6,7 +6,15 @@
 
 최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
 
-**최신 SB `6da593e`: [취소 상태 읽기 전용 조회·공개키 검증·실제 프로세스 인수](CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md).**
+새 cancellation-schema6 프로필에서 읽기 전용 조회를 노출하고 구 프로필 bytes/기본 선택을 유지한다.
+JARVIS는 현재 삭제 이력·정확한 의향·서명 결과·키 철회를 검증한다. 개인키 없는 실제 MCP를
+Node transport에서 접수 중/완료 각각 실행·재시작하여 동일 결과, 권한 거부, 원장 불변을 확인했다.
+전체1,069통과/2skip, 신규2 포함 최종프로필16통과, 제품정적0오류/0경고·lint통과.
+JARVIS관련78·전송71통과(중복), tsc/ESLint/격리emit통과. DB 의향 발급·외부 취소 접수/전송 경합·
+로컬 억제 증거/cursor·seq1→V2seq2와 native·범위·계보·실제앱·검색·GUI·운영 목표는 남는다.
+
+**이전 SB `6da593e`: [취소 상태 읽기 전용 조회·공개키 검증·실제 프로세스 인수](CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md).**
 현재 status fence·같은 원장 snapshot·정확한 intent·삭제 chain·저장 결과를 대조한다.
 개인키 없이 공개키/철회 정책으로 조회하며 재발급·원장 변경을 하지 않는다. 삭제 이력 누락
 손상 사례를 재현·수정했다. 전체1,061통과/2skip(최종 chain 검사 전), 최종관련40통과,

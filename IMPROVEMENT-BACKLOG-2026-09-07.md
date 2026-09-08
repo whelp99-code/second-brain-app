@@ -1,5 +1,7 @@
 # Second Brain 수정·개선·고도화 분석
 
+최신 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·의미 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md). 명시적 schema6·공개키 조회를 실제 Node→Python stdio에서 인수했다. 다음은 DB 의향·외부 취소 접수/전송 경합·로컬 억제 증거/cursor·seq1→V2seq2이며 기존 전체 운영 목표를 유지한다.
+
 최신 제품 `6da593e`: [취소 상태 읽기 전용 조회·공개키/철회·실제 프로세스 인수](CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md). 내부 조회 경계와 삭제 chain 누락 거부를 완료했다. 외부 MCP 새 프로필·JARVIS transport/의향/전송/cursor 및 기존 전체 운영 인수 범위는 남는다.
 
 최초 분석일: 2026-09-07. 인계 재대조: 2026-09-08, Second Brain `ee4fc13`, 자비스 HEAD `e61893e` 및 현재 기억 모듈. 운영 릴리스 `41f0751aca8906d612961e704bc60dd0855fdabd`는 최초 분석 당시 관측값이며 이번에 운영 실행 버전을 재확인한 값은 아니다.

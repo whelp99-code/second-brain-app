@@ -3,7 +3,7 @@
 기준: 2026-09-08, Second Brain 제품 `44ab911`, 문서 `7092ca2`.
 사용자가 전달한 [자비스 인계서](../Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md)의 현재 내용을 기존 구현 원장·통합 계획·실제 클라이언트 인수 기록 및 취소 결과 소스와 대조했다.
 
-후속 제품 `6da593e`: [취소 상태의 읽기 전용 조회·공개키 검증](CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md)을 구현·인수했다. 아래 취소 조회/키 교체 항목의 내부 경계는 진척됐고 외부 MCP·JARVIS 연결은 계속 남는다. 최신 수치는 구현 원장을 따른다.
+후속 SB `df9412c` / JARVIS `1598762`: [취소 상태 MCP·자비스 전송·공개키 검증](CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md)을 구현·실제 stdio 인수했다. 아래 취소 조회/키 교체의 내부 경계와 외부 조회 연결은 진척됐고, DB 의향 생성·외부 취소 실행·cursor 연결은 계속 남는다. 최신 수치는 구현 원장을 따른다.
 
 ## 현재 판정
 

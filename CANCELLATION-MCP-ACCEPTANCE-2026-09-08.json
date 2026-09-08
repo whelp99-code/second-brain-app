@@ -1,0 +1,32 @@
+{
+  "parent_pid": 4121970,
+  "pending": {
+    "node_pid": 4122221,
+    "mcp_pids": [
+      4122245,
+      4122362
+    ],
+    "state": "suppression_pending",
+    "exact_result": false,
+    "replay_equal": true,
+    "missing_state": "not_found",
+    "unauthorized": "TOMBSTONE_FENCE_REQUIRED"
+  },
+  "complete": {
+    "node_pid": 4122542,
+    "mcp_pids": [
+      4122574,
+      4122681
+    ],
+    "state": "provider_local_suppressed",
+    "exact_result": true,
+    "replay_equal": true,
+    "missing_state": "not_found",
+    "unauthorized": "TOMBSTONE_FENCE_REQUIRED"
+  },
+  "private_key_in_mcp_config": false,
+  "journal_rows_unchanged_by_queries": true,
+  "result_digest": "sha256:43cd86f74fe5acb5c9bdb43ebcb52ebcd4855035345f2ffd3d368b016fe2612d",
+  "contract_digest": "8be1ca195f60cb73f05c989d3d5f3e62053020988ccd8bb028cd4d8b442063b4",
+  "scope": "actual JARVIS Node transport and semantic verifier -> Python stdio MCP; no cursor/operational rollout"
+}
