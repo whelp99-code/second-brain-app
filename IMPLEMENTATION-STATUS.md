@@ -1,5 +1,10 @@
 # 중앙 기억 완성 진행 원장
 
+**최신 실제 인수 `6031d73`: [같은 자비스 DB의 후속 발행→실제 MCP→provider proved](CANCELLATION-DISPATCH-MCP-ACCEPTANCE-2026-09-08.md).**
+취소 settlement/cursor1 이후 실제 record 조회·대상 resolve·확인/승인·dispatch·MCP 접수·provider 실행을 연결했다. 발행1회/delta1/seq2/cursor2, 커밋 정정 반영·이전/취소 내용 부재·재실행 idle·MCP 재시작 동일 상태를 확인했다.
+관련 Python11통과/8.96초·Ruff/syntax/diff통과. 권한은 fixture이며 lifecycle observer는 not_proved다. 자비스 최종 reconciling; 실제 proof/전체 관측·compaction/settlement와 운영 전체 목표는 남는다.
+
+
 사용자 확정 목표: 기존 수정·개선·고도화 제안을 완성하고 기능/큰 단위마다 커밋한다. 문제가 될 기능·소스는 근거와 함께 보류하며 개발 완료는 실제 사용 검증으로 판정한다. 기존 범위를 이 원장에 유지하며 테스트 통과만으로 완료로 축소하지 않는다.
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.

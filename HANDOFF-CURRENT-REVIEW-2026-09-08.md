@@ -1,9 +1,14 @@
 # 자비스 인계 병합 — 현재 판정과 완성 작업 목록
 
+**최신 실제 인수 `6031d73`: [같은 자비스 DB의 후속 발행→실제 MCP→provider proved](CANCELLATION-DISPATCH-MCP-ACCEPTANCE-2026-09-08.md).**
+취소 settlement/cursor1 이후 실제 record 조회·대상 resolve·확인/승인·dispatch·MCP 접수·provider 실행을 연결했다. 발행1회/delta1/seq2/cursor2, 커밋 정정 반영·이전/취소 내용 부재·재실행 idle·MCP 재시작 동일 상태를 확인했다.
+관련 Python11통과/8.96초·Ruff/syntax/diff통과. 권한은 fixture이며 lifecycle observer는 not_proved다. 자비스 최종 reconciling; 실제 proof/전체 관측·compaction/settlement와 운영 전체 목표는 남는다.
+
+
 기준: 2026-09-08. 최신 Second Brain 제품 `9e30115`, JARVIS 제품 `ea076ae`.
 사용자가 전달한 [자비스 인계서](../Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md)의 현재 내용을 기존 구현 원장·통합 계획·실제 클라이언트 인수 기록 및 취소 결과 소스와 대조했다.
 
-**최신 인수 `42ceb35` / JARVIS 제품 `ea076ae` / SB 제품 `9e30115`: [취소 후 정상 V2 seq2의 양쪽 검증·실제 provider 실행](CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.md).**
+**이전 provider 단독 인수 `42ceb35` / JARVIS 제품 `ea076ae` / SB 제품 `9e30115`: [취소 후 정상 V2 seq2의 양쪽 검증·실제 provider 실행](CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.md).**
 취소 settlement/cursor1인 provider에 독립 기억을 저장하고 delta1개/sequence2 정정을 양쪽 validator와 실제 executor에서 proved까지 확인했다.
 커밋된 wiki의 정정 반영·이전/취소 내용 부재·재실행 idle을 확인했다. 관련9통과·Ruff/syntax/diff통과.
 JARVIS는 wire validator만 실행했으며 실제 seq2 authority/dispatch/완료는 미인수다. JARVIS cursor1과 전체 운영 목표를 유지한다.
@@ -92,7 +97,7 @@ P0는 공통 기억의 정확한 사용과 완료 판정을 막는 항목, P1은
 | 완료: 취소 상태 조회 | 저장된 최종 결과를 외부 소비자가 조회할 수 없어 응답 유실 이후 흐름이 끊김 | SB에 현재 읽기 권한으로 exact intent ID/digest의 저장 결과 조회. 기존 frozen 계약을 유지하는 명시적 schema6 구현·인수 완료 | 미접수/진행/완료 구분, 잘못된 fence·ID 거부, 재시작 후 동일 결과, 조회 중 재발급 없음 |
 | 완료: 키 교체 후 과거 결과 읽기 | 현재 개인키에 묶인 재생 경로로는 서명키 교체 시 과거 결과 검증이 불편함 | 발급 권한과 과거 공개키 집합 분리·철회 정책 및 개인키 없는 조회 인수 완료 | 개인키 없이 조회, 허용된 과거 키 검증, 알 수 없거나 철회된 키 거부 |
 | P0 부분 완료: 취소 의향 생성·전송 경합 | 내부 취소 접수는 있어도 자비스의 실제 미전송 상태와 외부 전송을 한 경계로 보장해야 함 | JARVIS DB 발급·발행 직전 권한 재검사·schema7 실제 접수·응답 유실 복구 완료. 외부 원 요청 전송과 취소의 통합 경합은 남음 | 전송 우선/취소 우선 경합에서 상반된 완료 없음, 중단 재시도 중복 효과 없음 |
-| P0 수정: 후속 요청 진행 | 취소 접수나 내부 세대 활성화만으로 처리 위치를 넘기면 누락 가능 | provider 결과의 DB 저장·현재 신뢰 검증 완료. spool 본문 수집 누락 수정·체크포인트 인수 완료. 취소 전용 로컬 DB 처분·불변 영수증·실제 중단 복구 완료. 검증된 settlement/cursor1 실제 인수 완료. 정상 V2 seq2의 실제 provider proved·커밋 본문 일치까지 인수. 자비스 authority/dispatch부터 최종 완료까지 연결한 인수는 남음 | 실제 취소 seq1 완료→정상 V2 seq2 처리. 순서 건너뛰기·증거 없는 완료 없음 |
+| P0 수정: 후속 요청 진행 | 취소 접수나 내부 세대 활성화만으로 처리 위치를 넘기면 누락 가능 | provider 결과의 DB 저장·현재 신뢰 검증 완료. spool 본문 수집 누락 수정·체크포인트 인수 완료. 취소 전용 로컬 DB 처분·불변 영수증·실제 중단 복구 완료. 검증된 settlement/cursor1 실제 인수 완료. 정상 V2 seq2의 같은 자비스 DB 승인/dispatch→실제 MCP→provider proved·커밋 본문 일치·cursor2까지 인수. 실제 관측·compaction과 자비스 최종 settlement는 남음 | 실제 취소 seq1 완료→정상 V2 seq2 처리. 순서 건너뛰기·증거 없는 완료 없음 |
 | P0 개선: 사용자·프로젝트 범위 | 공통 연결이 허용되지 않은 기억 공유로 확대될 수 있음 | 검색·직접 원문·target·쓰기·export·restore에 같은 검증된 범위 적용. agent 명칭을 권한으로 사용하지 않음 | 범위 밖 자료가 검색/원문/관계 확장/복원으로 노출되지 않음 |
 | P0 수정: 원작업→기억 계보 | 실패·철회된 원작업의 파생 기억이 유효한 경험으로 남을 수 있음 | 원 task·실행 결과·후보·provider record 식별자를 연결하고 철회 전파 | 실패 결과의 성공 기억 승격 없음, 철회 후 재수집·재색인·복원 재노출 없음 |
 | P0 개선: native 세션 사본 수명 | provider 삭제가 CLI 세션·SQLite WAL·백업 삭제까지 뜻하지 않음 | 관리 대상 파일/세션과 작성자 정지·보존 정책을 명시하고 실제 connector에서 확인 | 관리 대상 사본 처분 증거, compaction·재시작 후 삭제 기억 재공급 없음 |
