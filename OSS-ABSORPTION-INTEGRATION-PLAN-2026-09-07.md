@@ -824,3 +824,7 @@ JARVIS는 wire validator만 실행했으며 실제 seq2 authority/dispatch/완�
 인계서의 세컨드브레인 정본·네 OSS 선별 흡수·공통 기억 우선 방향을 최신 구현과 다시 병합했다. [종합 분석](HANDOFF-CURRENT-REVIEW-2026-09-08.md)의 과거 cursor/로컬 처분 미완료 설명을 수정했다.
 JARVIS 테스트 `30cf131`: 취소 settlement 이후 실제 확인·준비·승인·claim·dispatch API를 거쳐 delta1/seq2, 발행1회, cursor2, 원 취소 writer0회를 확인했다. 타입·변경 파일 lint 통과, 직렬 Vitest 1통과/6.34초.
 provider status/accepted 및 대상은 fixture이며 상태 reconciling이다. 실제 provider seq2 인수와 분리된 검사이고 전체 완료가 아니다. 다음은 동일 자비스 DB의 실제 dispatch→provider 실행→완료 증거 연결이다. ACL·계보·native 세션·실제 앱·검색·운영 복구의 잔여 목표는 유지한다.
+
+**2026-09-09 접수 경합 인수 `686f6e8`: [같은 원 요청과 취소의 두 순서·파일 저장 직후 중단](CANCELLATION-ORIGINAL-ADMISSION-RACE-2026-09-09.md).**
+실제 별도 프로세스에서 원 요청/취소 선행 모두 단일 승자, 새 executor의 결과·커밋 본문을 검증했다. 요청 파일 저장 후 exit77에서도 취소 오승인 없이 원 요청 복구·한 번 실행을 확인했다.
+관련14통과 이후 본문 검사를 추가한 최종3통과/6.75초(중복)·전체Ruff/diff통과. 제품 수정 없음. Node MCP/JARVIS 발행부터의 통합 경합 및 전체 운영 목표는 남는다.

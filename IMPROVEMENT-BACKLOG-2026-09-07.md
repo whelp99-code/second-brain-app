@@ -818,3 +818,7 @@ provider status/accepted 및 대상은 fixture이며 상태 reconciling이다. �
 **최신 실제 인수 `9044f27`: [취소 후 seq2의 실제 proof·관측·compaction·settled·독립 재조회](CANCELLATION-FOLLOWUP-SETTLED-ACCEPTANCE-2026-09-09.md).**
 같은 자비스 DB에서 실제 MCP 발행→provider 서명/40개 영역/10개 guard 검증→로컬 정리→정정 settled·명령 completed를 연결했다. 전체70개 관측, 누락/오류/본문 일치0, 다른 Node 프로세스 동일 완료 재생을 확인했다.
 JARVIS12통과/43.84초·SB11통과/9.77초·Ruff/syntax/diff통과. 합성 기억·테스트 권한의 격리 실제 실행이며, 전송 경합·범위·계보·native/실제 앱·검색·운영 복구 목표는 남는다.
+
+**2026-09-09 접수 경합 인수 `686f6e8`: [같은 원 요청과 취소의 두 순서·파일 저장 직후 중단](CANCELLATION-ORIGINAL-ADMISSION-RACE-2026-09-09.md).**
+실제 별도 프로세스에서 원 요청/취소 선행 모두 단일 승자, 새 executor의 결과·커밋 본문을 검증했다. 요청 파일 저장 후 exit77에서도 취소 오승인 없이 원 요청 복구·한 번 실행을 확인했다.
+관련14통과 이후 본문 검사를 추가한 최종3통과/6.75초(중복)·전체Ruff/diff통과. 제품 수정 없음. Node MCP/JARVIS 발행부터의 통합 경합 및 전체 운영 목표는 남는다.
