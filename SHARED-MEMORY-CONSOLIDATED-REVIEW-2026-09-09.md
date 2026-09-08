@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 JARVIS `a158052` v4 private 자료 저장:** [제한 reader·재발행·독립 프로세스 인수](SCOPED-WRITE-SPOOL-2026-09-09.md). 관련36통과·타입/lint/격리emit, 실제 publish exit73→새 reader/동일 inode 재사용·FIFO 거부. 승인 소비/outbox 연결·orphan/삭제 수명·운영 권한은 남는다.
+
 **2026-09-09 JARVIS `9bc5976` v4 자료 검증:** [생성기 연결·Node/Python codec 대조](SCOPED-CODEC-PARITY-2026-09-09.md). J18/SB29통과·타입/lint/격리emit, 별도 프로세스13건 판정·정상 bytes 일치. 승인 단일 소비·outbox 확정·공개 계약과 실제 운영 권한 연결은 남는다.
 
 **2026-09-09 A1 복구 수정:** [활성화 직후 중단·만료·철회 복구](SCOPED-RESUME-FIX-2026-09-09.md). 수정 전 회귀2실패→관련46통과·전체1,212통과/2skip/221.83초·Ruff/변경 실행기 정적검사 통과. 이전 실패 provider를 새 프로세스로 같은 세대 proved/새 세대0/idle 복구하고 독립 reader 범위 검증. 실제 권한·공개 계약·승인 소비 및 전체 운영 목표는 유지한다.

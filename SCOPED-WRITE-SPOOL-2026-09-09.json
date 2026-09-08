@@ -1,0 +1,16 @@
+{
+  "fixture_material": true,
+  "processes": 3,
+  "publication_exit": 73,
+  "replay": {
+    "created": false,
+    "request_match": true,
+    "body_match": true,
+    "same_inode": true,
+    "file_mode": 384
+  },
+  "fifo": "MEMORY_SPOOL_FILE_INVALID",
+  "provider_calls": 0,
+  "approval_consumed": false,
+  "outbox_enqueued": false
+}
