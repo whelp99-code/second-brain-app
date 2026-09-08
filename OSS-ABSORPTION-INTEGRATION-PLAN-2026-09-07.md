@@ -460,3 +460,16 @@ session 결합, Tencent식 검증된 범위는 각 남은 완료 조건을 계�
 완료로 주장하지 않는다. LightRAG 장점의 실제 흡수 완료에는 봉인 vector 논리/물리 binding,
 공통 MCP의 의미 record/citation 선택, 삭제·정정·복원·실제 한국어 품질 검증이 여전히 필요하다.
 자비스 세션/compaction/삭제·범위와 운영 인수의 기존 완료 조건도 유지한다.
+
+
+## 42. LightRAG 장점 흡수 — 기존 봉인 세대 안의 근거 의미 검색
+
+제품 `cbb910d`: [봉인 의미 검색 인수](SEALED-VECTOR-ACCEPTANCE-2026-09-08.md).
+기존 SQLite에 인용 레코드별 float32 vector를 저장하고 모델·출처·세대 digest를 결합한다.
+새 서버/그래프 DB/Proxy/외부 코드 복사 없이 기존 검색과 MCP schema 4/5의 record 선택을
+개선했다. 두 실제 MCP·CLI 정정/삭제·백업 복원에서 같은 원문/세대와 삭제 후 미노출을 확인했다.
+
+합성 모델의 수명주기 인수와 실제 모델의 검색 품질은 구분한다. 운영 hybrid는 기본 false이고
+한국어 질문·무정답·대용량 지연은 후속 필수 항목이다. Tencent의 범위 관리, code-brain의
+문맥 예산, memory-bank의 세션 중복/compaction은 기존 공통 인터페이스와 자비스 reference를
+재사용하되 미완료 전달/삭제·범위 계약을 건너뛰지 않는다. 개발 정본은 dev-wiki/Git로 유지한다.

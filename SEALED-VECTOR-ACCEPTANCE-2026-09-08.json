@@ -1,0 +1,170 @@
+{
+  "status": "isolated_acceptance_passed_operational_activation_deferred",
+  "product_commit": "cbb910de686f2a4e0b04cbc7000d7dbd6e3fdd99",
+  "source_tree_sha256": "4e83a0fcfa29778001d2f31af4246b19248488dbcbb4cbb3de40a965e0bfd67a",
+  "full": {
+    "passed": 893,
+    "skipped": 2,
+    "seconds": 113.42
+  },
+  "focused": {
+    "passed": 50,
+    "skipped": 1,
+    "seconds": 13.56
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "ruff": "passed",
+  "native": {
+    "state": "passed",
+    "workspace": "/var/tmp/sb-sealed-vector-nmf0lt2a",
+    "source_tree_sha256": "4e83a0fcfa29778001d2f31af4246b19248488dbcbb4cbb3de40a965e0bfd67a",
+    "initial": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "회의는 월요일",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:a372039e9ab31910cc0ec87895aa30de2706d465b706e6b54ba43fa947f8b788",
+          "record_digest": "sha256:a372039e9ab31910cc0ec87895aa30de2706d465b706e6b54ba43fa947f8b788"
+        },
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.016129032258064516,
+          "record_id": "sbrecord:v1:8ad811153205aeea992cb1c9852274412d724d7bb8bfad2c037a88a70a39fe5f",
+          "record_digest": "sha256:8ad811153205aeea992cb1c9852274412d724d7bb8bfad2c037a88a70a39fe5f"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:ea527d0a7845ae8ca4276f3a32441a652f497e4b60963369d4d645650d693685",
+      "generation_manifest_digest": "sha256:ea527d0a7845ae8ca4276f3a32441a652f497e4b60963369d4d645650d693685",
+      "vault_head": "aadb44e9e1550fe396733c979bf6a51b4cb1708c",
+      "vault_tree": "a98f342f52e0a1066350f1837b469fd0a897abd1",
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    },
+    "corrected": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "다음 만남은 수요일",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:8e3f3c813bb4492a9c08cc52d4359c1c5c946757a4c0e49a33231c18fc1dc575",
+          "record_digest": "sha256:8e3f3c813bb4492a9c08cc52d4359c1c5c946757a4c0e49a33231c18fc1dc575"
+        },
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.016129032258064516,
+          "record_id": "sbrecord:v1:be9d8eeb5c30bc0e8dde3f30d73dfe320e14229547ae81bae8e2f8031fe12893",
+          "record_digest": "sha256:be9d8eeb5c30bc0e8dde3f30d73dfe320e14229547ae81bae8e2f8031fe12893"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:94f52c402a4dd0b1042a93866547ade1163aa91b17a6f2bf4f7511a1b599cc79",
+      "generation_manifest_digest": "sha256:94f52c402a4dd0b1042a93866547ade1163aa91b17a6f2bf4f7511a1b599cc79",
+      "vault_head": "ab82d63c86717052a2af1419128d2f9ec409c364",
+      "vault_tree": "0e366c226c3aef4257be532eb4826eaf4f19cd2a",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:d471645042246e4255e45b541e11594f50dc948c9d4450dc885b7dea95965ff0"
+    },
+    "deleted": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:c5f3af2d29b5b966eda984fb2a4042688938a1bc9d7fedfa2a69c50234751fe6",
+          "record_digest": "sha256:c5f3af2d29b5b966eda984fb2a4042688938a1bc9d7fedfa2a69c50234751fe6"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:a1116af1665f4bfca03cb7d0437342740d54e8ce5f24b15c9e9d2c7e8d9b4aad",
+      "generation_manifest_digest": "sha256:a1116af1665f4bfca03cb7d0437342740d54e8ce5f24b15c9e9d2c7e8d9b4aad",
+      "vault_head": "237dacf5d3fa2049fb13c2e26f8624645e3b306f",
+      "vault_tree": "6741f1f5c6361b4f6456a713f566ba1746752c25",
+      "tombstone_sequence": 2,
+      "tombstone_set_root": "sha256:aa087d98bb7ffd2f58e359b894f0c3853404b4833792fda9e4676ea689874571"
+    },
+    "corrected_restore": true,
+    "deleted_restore": true,
+    "commands": [
+      {
+        "label": "correct",
+        "exit": 0,
+        "result": {
+          "code": "PROVIDER_PROVED",
+          "fence": 1,
+          "phase": "proved",
+          "request_id": "memeff:req:v2:a28628b4cda8bbc6cc3c81aaa8c51c453a70714d72bab3d9da8899abc77b82c0",
+          "state": "proved"
+        }
+      },
+      {
+        "label": "forget",
+        "exit": 0,
+        "result": {
+          "code": "PROVIDER_PROVED",
+          "fence": 1,
+          "phase": "proved",
+          "request_id": "memeff:req:v2:57aa836b92b942ccea46968573bf24be517846c7ca1d624106e102905639962b",
+          "state": "proved"
+        }
+      },
+      {
+        "label": "cli-search",
+        "exit": 0,
+        "result": [
+          {
+            "page_id": "wiki/memory-fixture",
+            "section": "결정",
+            "snippet": "비용은 만원",
+            "score": 0.01639344262295082,
+            "kind": "wiki",
+            "index_status": "active",
+            "knowledge_status": "UNKNOWN",
+            "approval_status": "UNKNOWN",
+            "canonical": "",
+            "source_ref": "",
+            "updated_at": "2026-09-08",
+            "role": "REFERENCE",
+            "verification": "UNVERIFIED"
+          }
+        ]
+      }
+    ],
+    "limitations": [
+      "deterministic encoder; not Korean model quality",
+      "two native MCP processes; queries observe stable mutation boundaries",
+      "isolated fixture; no operational activation"
+    ]
+  },
+  "logs": {
+    "full": {
+      "path": "/var/tmp/sb-sealed-vectors-full.log",
+      "sha256": "26e397b57c2e912d147dd86e286589634f3f4b16e50854c25e1ae6ec56af5e3d"
+    },
+    "focused": {
+      "path": "/var/tmp/sb-sealed-vectors-focused-verified.log",
+      "sha256": "02d3d38c2018c42a0ead7e33946c3436c14fe36b45dde192a7f2d19bed11b3eb"
+    },
+    "types": {
+      "path": "/var/tmp/sb-sealed-vectors-types-all-final.log",
+      "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+    },
+    "native": {
+      "path": "/var/tmp/sb-sealed-vectors-native-3.log",
+      "sha256": "cd0b8f209cfb955a9fa797ef692a8c208c8b3c4781f250c2715e51cebb10d4d8"
+    }
+  },
+  "operational_changes": false,
+  "real_embedding_model_quality_verified": false
+}

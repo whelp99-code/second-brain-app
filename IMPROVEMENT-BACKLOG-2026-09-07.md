@@ -428,3 +428,20 @@ replace 후 fsync 실패는 이미 교체됐으나 내구성 미확정인 상태
 경고 후 새 rebuild를 허용한다. 실제 인수에서 잔여 1개/cleanup_complete=false였다.
 확인 가능한 열린 파일·위험한 링크/권한은 거부하며 무조건 glob 삭제하지 않는다.
 봉인 의미 검색·MCP의 의미 record 선택·삭제/복원·실제 질문 품질과 B4~B8는 계속 미완료다.
+
+
+## 37. B8/P1 봉인 의미 검색과 기억 수명 결합
+
+제품 `cbb910d`, [구현·실제 프로세스 인수](SEALED-VECTOR-ACCEPTANCE-2026-09-08.md).
+기존 관리형 vector enabled=0 고정을 해소했다. 명시적 hybrid writer가 cited record 벡터를
+같은 generation에 봉인하며 모델/본문/벡터 digest와 기존 물리 inventory를 연결한다.
+이전 세대의 동일 record만 재사용하고 정정·삭제·모델 장애 시 이전 vector를 새 DB에 남기지 않는다.
+MCP schema 4/5의 의미 후보는 실제 원문 record와 다시 대조하고 RRF로 중복을 제거한다.
+
+전체 893 passed/2 skipped, 집중 50 passed/1 skipped, Ruff/타입 통과.
+두 실제 MCP 프로세스의 같은 기억 회수, CLI 정정/삭제 state=proved, 각 상태의 백업/별도 경로
+복원과 원문 인용 감사가 통과했다. 결정적 encoder이며 실제 한국어 모델 품질 검증은 아니다.
+
+다음 필수 항목은 실제 질문 100–300개와 무정답/낮은 관련성 처리, 모델 배치별 프로세스 비용,
+대규모 cosine 지연 및 운영 가시성이다. 기본 false/운영 활성화 보류를 유지한다.
+자비스 C6–C8와 프로젝트 접근 범위·자동 수집·실제 GUI/운영/DR의 기존 조건도 유지한다.

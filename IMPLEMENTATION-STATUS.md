@@ -4,6 +4,15 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 제품 `cbb910d`: [봉인 의미 검색 구현·인수](SEALED-VECTOR-ACCEPTANCE-2026-09-08.md).**
+명시적 hybrid 설정에서 인용 레코드 벡터를 같은 세대에 봉인하고 CLI/HTTP/MCP 검색에 연결했다.
+모델·레코드/벡터 digest 결합, 변경 레코드만 인코딩, 정정·삭제 시 이전 벡터 제거와 모델 장애의
+lexical fallback을 구현했다. 두 실제 MCP 프로세스/CLI 정정·삭제·각 백업 복원 통과.
+전체 **893 passed/2 skipped**, 집중 **50 passed/1 skipped**, Ruff/타입 오류·경고 0.
+아래 과거 기록의 관리형 enabled=0 고정은 이 변경 이전 상태다. 기본 false는 유지하며 실제 모델
+한국어 품질·낮은 관련성 처리·대량 인코딩/검색 지연·운영 활성화는 미완료다.
+자비스 C6–C8 session 전달/compaction/삭제·범위와 B4–B8 운영/GUI/DR 조건도 유지한다.
+
 
 **2026-09-08 최신:** [대규모 100회 쓰기/두 MCP reader/최종 복원](WRITE-CYCLE-ACCEPTANCE-2026-09-08.md)이
 종료·통과했고 제품 소스 고정을 해제했다. 대기 다섯 커밋을 1d3d2de → 0fecf0a → f756872 →
