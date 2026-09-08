@@ -368,6 +368,11 @@ def build_server(
         if profile is None:
             task30_enabled = False
             contract_schema_version = 3
+        elif profile == "scoped-record-read-v1":
+            if initial_scoped_policy is None:
+                raise ContractProfileError
+            task30_enabled = False
+            contract_schema_version = 4
         elif profile == _TASK30_PROFILE:
             task30_enabled = True
             contract_schema_version = 3

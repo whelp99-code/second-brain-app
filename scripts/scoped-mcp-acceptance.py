@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import runpy
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +31,9 @@ class Clock(datetime):
 m.datetime=Clock
 m.main()
 '''
+launcher = work / "scoped-mcp-launcher"
+launcher.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) + " -c " + shlex.quote(bootstrap) + "\n")
+launcher.chmod(0o700)
 search_bundle = None
 if len(sys.argv) > 1:
     issued = subprocess.run(["node", str(Path(__file__).with_name("access-claim-production-sign.mjs")), sys.argv[1]],
@@ -86,14 +90,17 @@ async def run():
     consumer = None
     if len(sys.argv) > 1:
         checked = await anyio.run_process(["node", str(Path(__file__).with_name("scoped-response-validate.mjs")), sys.argv[1]],
-            input=json.dumps(consumer_inputs).encode())
+            input=json.dumps({"inputs": consumer_inputs, "transport": {"launcher": str(launcher),
+                "config": str(config), "bootstrap": bootstrap,
+                "contract": str(Path(__file__).resolve().parents[1] / "contracts/second-brain-scoped-read-v1.json")}}).encode(), check=False)
+        assert checked.returncode == 0, checked.stderr.decode()
         consumer = json.loads(checked.stdout)
     return {"consumer_validation": consumer, "work": str(work), "tools": ["sb_read_page", "sb_search"], "records": 2,
         "wrong_request_missing_claim_tampering_denied": True, "restart_equal": True,
         "production_issuer": len(sys.argv) > 1,
         "live_revocation_policy_change_invalid_missing_config_denied": True,
         "restored_policy_resumes_same_connection": True,
-        "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, not supervised app transport or full operating ACL"}
+        "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL"}
 report = anyio.run(run)
 output = work / "scoped-mcp-result.json"
 output.write_text(json.dumps(report, indent=2) + "\n")

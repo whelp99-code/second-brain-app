@@ -30,6 +30,7 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
         "jarvis_public_keys": {"key:test": base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()},
         "mcp_scoped_read": {"principal": "principal:owner", "agent": "agent:test", "session": "session:test", "policy_revision": "1"}})
     monkeypatch.setattr("sb.mcp.datetime", FrozenDate)
+    monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v1")
     server = build_server(config=config)
     from sb.effect_write_values import GENESIS_TOMBSTONE_ROOT
     fence = create_read_fence(provider_instance_id=generation.provider_instance_id, purpose="memory_read", operation="read",
@@ -45,6 +46,17 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
     async def run():
         async with Client(server, mode="legacy", cache=None) as client:
             assert [tool.name for tool in (await client.list_tools()).tools] == ["sb_read_page", "sb_search"]
+            import json
+            from pathlib import Path
+            frozen = json.loads(Path("contracts/second-brain-scoped-read-v1.json").read_text())
+            def without_titles(value):
+                if isinstance(value, dict):
+                    return {key: without_titles(item) for key, item in value.items() if key != "title"}
+                if isinstance(value, list):
+                    return [without_titles(item) for item in value]
+                return value
+            for tool in (await client.list_tools()).tools:
+                assert without_titles(tool.input_schema) == frozen["tools"][tool.name]["arguments"]
             args = {"id": name, "read_fence": model_object(fence), "access_claim": claim}
             allowed = await client.call_tool("sb_read_page", args)
             assert not allowed.is_error, allowed
@@ -92,3 +104,13 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             assert expired.is_error
             assert "Alpha fixture" not in str(expired)
     anyio.run(run)
+
+
+def test_explicit_scoped_profile_requires_scope_config(tmp_path, monkeypatch):
+    import pytest
+
+    from sb.mcp import ContractProfileError
+    monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v1")
+    monkeypatch.setattr("sb.mcp.load_config", lambda: Config(raw={"vault_root": str(tmp_path / "vault")}))
+    with pytest.raises(ContractProfileError):
+        build_server()

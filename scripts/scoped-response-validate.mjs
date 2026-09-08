@@ -8,7 +8,18 @@ const base = pathToFileURL(process.argv[2] + '/');
 const { canonicalize } = await import(new URL('src/canonical.js', base));
 const { parseScopedSecondBrainResponse } = await import(new URL('src/second-brain-scoped-read.js', base));
 const hash = (domain, value) => 'sha256:' + createHash('sha256').update(domain + canonicalize(value)).digest('hex');
-const results = data.map(({ response, bundle, request }) => {
+const { createSecondBrainTransport } = await import(new URL('src/second-brain-transport.js', base));
+const transport = createSecondBrainTransport({ contractProfile: 'scoped-record-read-v1',
+  contractPath: data.transport.contract, launcherPath: data.transport.launcher, configPath: data.transport.config });
+const results = [];
+try {
+for (let index = 0; index < data.inputs.length; index++) {
+  const { response: prior, bundle, request } = data.inputs[index];
+  if (index === 2) await transport.restart();
+  const outcome = await transport.call(request.method, { ...request.arguments, ...bundle });
+  if (outcome.kind !== 'data') throw new Error('transport did not return data: ' + JSON.stringify(outcome));
+  const response = outcome.value;
+  if (canonicalize(response) !== canonicalize(prior)) throw new Error('transport response differs');
   const expected = { method: request.method, page_id: request.arguments.id, limit: request.arguments.limit ?? 64,
     request_digest: hash('orca-jarvis/memory-access-request/v1\0', request),
     access_claim_digest: hash('orca-jarvis/memory-access-claim-binding/v1\0', bundle.access_claim),
@@ -26,7 +37,8 @@ const results = data.map(({ response, bundle, request }) => {
     catch (error) { if (error.message !== 'SECOND_BRAIN_SCOPED_RESPONSE_INVALID') throw error; denied++; }
   }
   if (denied !== 3 || parsed.pages.length === 0) throw new Error('acceptance failed');
-  return { method: request.method, pages: parsed.pages.length, substitutions_denied: denied,
-    records: parsed.pages.reduce((sum, page) => sum + ('evidence' in page.parsed ? page.parsed.evidence.length : 0), 0) };
-});
+  results.push({ method: request.method, pages: parsed.pages.length, substitutions_denied: denied,
+    records: parsed.pages.reduce((sum, page) => sum + ('evidence' in page.parsed ? page.parsed.evidence.length : 0), 0) });
+}
+} finally { await transport.close(); }
 process.stdout.write(JSON.stringify(results));
