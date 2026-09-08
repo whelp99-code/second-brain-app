@@ -1,0 +1,74 @@
+{
+  "scoped_status_client": {
+    "profile": "scoped-record-read-v2",
+    "status_before_after_equal": true,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "scoped_client": {
+    "profile": "scoped-record-read-v1",
+    "status_before_after_equal": false,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "consumer_validation": [
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    }
+  ],
+  "work": "/var/tmp/page-access-acceptance-7uazzrwc",
+  "tools": [
+    "sb_read_page",
+    "sb_search"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL",
+  "jarvis_commit": "29c26f1",
+  "sb_commit": "ab0776f",
+  "jarvis_tests": {
+    "passed": 102,
+    "files": 14,
+    "seconds": 11.0
+  },
+  "python_tests": {
+    "passed": 23,
+    "seconds": 4.9
+  },
+  "packaging": {
+    "output": "/var/tmp/scoped-v2-package-7nodmwfz",
+    "verified_contracts": 6
+  },
+  "contract_digest": "a5af30045ba19eb6e79d07f649e3049842741822d75bdb7212d2ec7eabd9cb37"
+}

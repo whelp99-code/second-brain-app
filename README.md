@@ -251,6 +251,8 @@ session = "session:configured-session"
 policy_revision = "policy:1"
 ```
 
+v2는 `SB_MCP_CONTRACT_PROFILE=scoped-record-read-v2`로 명시적으로 선택하며 `sb_generation_status`도 제공한다. 상태 조회에는 `memory_status` 목적의 claim/fence와 파일 정책의 명시적 method 허용이 필요하다. [v2 계약·실제 검증](SCOPED-GENERATION-STATUS-2026-09-09.md)을 따른다.
+
 이 값은 서버가 신뢰하는 연결 문맥이며 사용자 요청에서 복사하면 안 된다. 실제 발급기의 인증된 scope resolver와 맞춰야 한다. 파일 기반 제한 연결은 시작 시 선택한 설정 경로에서 매 조회 전후 정책·키 철회를 다시 읽는다. 누락·손상·조회 중 변경 또는 만료는 거부한다. 세션·provider·저장소 경로 변경에는 새 연결이 필요하다. semantic/hybrid 검색·쓰기·status·export·restore, 운영 권한 공급자와 다중 사용자 인증은 아직 연결되지 않았다. [구현과 실제 stdio 인수](SCOPED-MCP-RECORD-READ-2026-09-09.md)를 따른다.
 
 제한 검색은 query와 limit(1~50)을 서명에 결합하고 전체 페이지 분류 검사를 통과한 lexical record만 반환한다. 권한 밖 원본의 제목·snippet·corpus 점수는 반환하지 않으며, 허용 결과를 고른 뒤 limit을 적용한다. [검색 인수와 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md)을 참고한다.
