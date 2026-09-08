@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 v3 인수:** [한국어 다중 행 v3 spool→scoped 준비](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). 관련4통과·실제 컴파일 코드/DB/spool에서 CRLF 포함 본문 일치·검증 철회 거부. 제품 추가 수정 없음. fixture 발행과 실제 CLI 자동 발행을 구분하며 auto-approved 후보의 발행 연결·scoped 저장/영수증은 남는다.
+
 **2026-09-09 dispatch 연결:** [private spool→scoped 준비·원본 권한 재검사](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). 기존 spool reader/write authority 재사용, J3통과·실제 컴파일 API에서 본문 복구/원본 verification 철회 거부/쓰기0 확인. 범위 승인만으로 원본 권한을 대체하지 않는다. 단일 소비·outbox/provider 쓰기·영수증은 미완료다.
 
 **2026-09-09 후보 본문 결합:** [scoped 쓰기 준비 payload](SCOPED-WRITE-PAYLOAD-2026-09-09.md). 현재 signed review와 후보 제목/본문 digest 일치 검사, 호출자 본문 교체 거부. J2통과·실제 컴파일된 API와 Python의 제목/본문/준비 digest 일치. 요청 codec·승인 소비·outbox/provider 저장·완료 영수증은 미완료다.

@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 v3 인수:** [v3 다중 행 본문·철회 검증](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). 관련4통과·실제 v3 spool 복구. fixture 발행이며 CLI auto-approved 후보의 spool 생성까지 입증한 것은 아니다. M2 자동 발행/요청/승인 소비/완료 영수증은 남는다.
+
 **2026-09-09 dispatch 연결:** [현재 원본 권한과 private spool 기반 scoped 준비](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). J3통과·실제 v1 spool/DB 인수, scope review 유효 상태에서도 원본 검증 철회 시 준비 거부. M2 실제 저장/영수증·전 버전 조합 인수는 남는다.
 
 **2026-09-09 후보 본문 결합:** [범위 검토→persisted candidate 본문 준비](SCOPED-WRITE-PAYLOAD-2026-09-09.md). J2통과·실제 API 본문 교체 거부·Python 독립 digest 일치. 준비값은 쓰기 허가가 아니며 M2 저장 요청/소비/영수증 전체 연결은 남는다.

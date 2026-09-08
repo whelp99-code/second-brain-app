@@ -12,7 +12,11 @@ const { stageMemoryScopeReview, readApprovedMemoryScopeReview } = await load("sr
 const { prepareMemoryScopedWriteFromDispatch } = await load("src/memory-scoped-write-payload.js");
 const { ControlPlane, signCommandApproval } = await load("src/control-plane.js");
 const { localKey } = await load("tests/helpers.js");
-const f = await outboxFixture();
+const version = process.argv[3] ?? "v1";
+assert.ok(["v1", "v3"].includes(version));
+const { scopedV3DispatchFixture } = await load("tests/fixtures/scoped-v3-dispatch.js");
+const v3 = version === "v3" ? await scopedV3DispatchFixture() : undefined;
+const f = v3 ? { ...v3, clock: { now: v3.now } } : await outboxFixture();
 try {
   const authority = f.database.authority; const now = f.clock.now;
   const candidate = readMemoryCandidate(authority.db, f.request.candidate_id);
@@ -26,7 +30,7 @@ try {
     authenticated_session_id: "scope-fixture", key_id: "decision-test", algorithm: "Ed25519",
     issued_at: now.toISOString(), not_before: now.toISOString(), expires_at: command.expires_at,
     nonce: command.request_id, max_uses: 1, status: "issued" }, localKey(authority)), now);
-  const dispatch = { dispatch_spool_digest: control.get(f.commandId).args.dispatch_spool_digest,
+  const dispatch = f.dispatch ?? { dispatch_spool_digest: control.get(f.commandId).args.dispatch_spool_digest,
     roots: { review: join(f.database.root, "candidate-review"), dispatch: join(f.database.root, "candidate-dispatch") } };
   const before = memoryTableCounts(authority);
   const prepared = prepareMemoryScopedWriteFromDispatch(authority, proposal, command.request_id, dispatch, now);
@@ -39,9 +43,10 @@ try {
   assert.throws(() => prepareMemoryScopedWriteFromDispatch(authority, proposal, command.request_id, dispatch, now),
     error => error.code === "MEMORY_SCOPED_SOURCE_AUTHORITY_INVALID");
   assert.deepEqual(memoryTableCounts(authority), afterRevocation);
-  assert.equal(f.writer.calls.length, 0);
+  if (f.writer) assert.equal(f.writer.calls.length, 0);
   process.stdout.write(JSON.stringify({ fixture: true, prior_request_schema: f.request.schema_version,
     private_spool_payload_equal: true, preparation_table_counts_unchanged: true,
     signed_scope_review_still_valid: true, revoked_source_preparation_rejected: true,
-    provider_write_calls: f.writer.calls.length, scoped_write_completed: false }, null, 2) + "\n");
+    provider_write_calls: f.writer?.calls.length ?? null, scoped_write_completed: false,
+    content_utf8_base64: Buffer.from(prepared.payload.content).toString("base64") }, null, 2) + "\n");
 } finally { closeMemoryDatabase(f.database); }
