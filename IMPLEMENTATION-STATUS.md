@@ -4,6 +4,14 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 실제 소비 검증 `8cb5dd5`: [모델 정정·삭제·과거 사본 재전송](REFERENCE-MODEL-LIFECYCLE-2026-09-08.md).**
+자비스 `110227e`의 새 격리 빌드로 실제 CLI/MCP→모델 5개 독립 요청을 실행했다. 정정 후 새 값과
+출처를 회수하고 삭제 후 새 조회/모델은 no_data였다. 그러나 보관된 최초 payload를 다시 보내면
+과거 값이 그대로 회수됐다. 새 조회는 계속 record 0개이며 제품 전달 관련 세 테이블도 0행이다.
+C6/C7 전체 완료가 아니며 [전달·세션·삭제 수명 계약안](REFERENCE-DELIVERY-LIFECYCLE-CONTRACT-2026-09-08.md)으로
+전송 claim/확인/불확실/무효화와 client epoch 처리 조건을 구체화했다. 계약·수명 회귀 18개,
+event 감사 14개·Ruff/타입/syntax 통과. SB 제품/자비스 소스/운영은 이번 단위에서 변경하지 않았다.
+
 **현재 제품 `701e966`: [모델 배치 재사용·실제 수명주기·잔여 우선 목록](EMBEDDING-BATCH-ACCEPTANCE-2026-09-08.md).**
 한 세대 생성 범위에서만 모델 자식을 재사용하고, 종료 확인 후 봉인한다. 부모 종료 후에도
 자식의 writer 잠금이 유지되며 파이프/응답/초기화 timeout을 검증했다. 전체 **931 passed/2 skipped**,
