@@ -1,0 +1,22 @@
+{
+  "fixture": true,
+  "prior_request_schema": 3,
+  "cli_published": true,
+  "expiredUnusedCleanup": null,
+  "writePolicyPreparation": {
+    "explicit_v3_accepted": true,
+    "v2_write_denied": true,
+    "other_project_denied": true,
+    "revoked_agent_denied": true,
+    "read_resolver_write_denied": true,
+    "authority_rows_unchanged": true,
+    "writes_authorized": false
+  },
+  "private_spool_payload_equal": true,
+  "preparation_table_counts_unchanged": true,
+  "signed_scope_review_still_valid": true,
+  "revoked_source_preparation_rejected": true,
+  "provider_write_calls": null,
+  "scoped_write_completed": false,
+  "content_utf8_base64": "7LKrIOqysOyglQ0K65GQIOuyiOynuCDqsrDsoJUK67CY67O1CuuwmOuztSBbXnVzZXJd"
+}

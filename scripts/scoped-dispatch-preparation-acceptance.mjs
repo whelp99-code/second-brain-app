@@ -36,6 +36,37 @@ try {
   const prepared = prepareMemoryScopedWriteFromDispatch(authority, proposal, command.request_id, dispatch, now);
   assert.equal(prepared.payload.content, f.request.payload.content);
   assert.deepEqual(memoryTableCounts(authority), before);
+  let writePolicyPreparation = null;
+  if (process.argv.includes("--write-policy")) {
+    const { writeFileSync } = await import("node:fs");
+    const { createFileMemoryWriteScopeResolver, createFileMemoryAccessScopeResolver } = await load("src/memory-access-policy.js");
+    const { prepareMemoryScopedWriteWithPolicy } = await load("src/memory-scoped-write-policy.js");
+    const path = join(f.database.root, "write-policy.json");
+    const session = { principal_id: "principal:owner", agent_id: "agent:fixture", session_id: "session:fixture",
+      expires_at: new Date(now.getTime() + 30000).toISOString() };
+    const policy = { schema_version: 3, provider_instance_id: "provider:fixture", principal_id: "principal:owner",
+      policy_revision: proposal.scope.policy_revision, valid_from: now.toISOString(), valid_until: session.expires_at,
+      agents: [{ agent_id: session.agent_id, projects: [...proposal.scope.projects], methods: ["sb_search", "sb_write_request"] }] };
+    const save = value => writeFileSync(path, JSON.stringify(value), { mode: 0o600 });
+    const resolve = createFileMemoryWriteScopeResolver(path, "provider:fixture", () => session);
+    const read = createFileMemoryAccessScopeResolver(path, "provider:fixture", () => session);
+    const check = () => prepareMemoryScopedWriteWithPolicy(authority, proposal, command.request_id, dispatch, resolve, now);
+    save(policy);
+    const result = check(); assert.deepEqual(result.preparation, prepared);
+    assert.equal(result.valid_until, session.expires_at);
+    assert.equal(read(now, { method: "sb_write_request", arguments: {} }), undefined);
+    assert.ok(read(now, { method: "sb_search", arguments: {} }));
+    for (const invalid of [{ ...policy, schema_version: 2 },
+      { ...policy, agents: [{ ...policy.agents[0], projects: ["project:other"] }] },
+      { ...policy, agents: [] }]) {
+      save(invalid); assert.throws(check, error => error.code === "MEMORY_SCOPED_WRITE_POLICY_INVALID");
+    }
+    assert.deepEqual(memoryTableCounts(authority), before);
+    writePolicyPreparation = { explicit_v3_accepted: true, v2_write_denied: true,
+      other_project_denied: true, revoked_agent_denied: true, read_resolver_write_denied: true,
+      authority_rows_unchanged: true, writes_authorized: result.writes_authorized };
+  }
+
   authority.db.prepare("INSERT INTO authority_revocations(reference,reason,created_at) VALUES(?,?,?)")
     .run(candidate.source.verification_evidence_id, "withdraw fixture outcome", now.toISOString());
   const afterRevocation = memoryTableCounts(authority);
@@ -69,6 +100,7 @@ try {
     cli_published: f.cli_published === true,
     ...(process.argv.includes("--include-preparation") ? { preparation: prepared } : {}),
     expiredUnusedCleanup,
+    writePolicyPreparation,
     private_spool_payload_equal: true, preparation_table_counts_unchanged: true,
     signed_scope_review_still_valid: true, revoked_source_preparation_rejected: true,
     provider_write_calls: f.writer?.calls.length ?? null, scoped_write_completed: false,
