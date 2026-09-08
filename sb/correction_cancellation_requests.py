@@ -1,4 +1,4 @@
-"""Internal cancellation admission boundary. Not exposed through MCP until recovery is complete."""
+"""Atomic cancellation admission shared by internal and explicit MCP submission."""
 
 from __future__ import annotations
 
@@ -47,6 +47,7 @@ def accept_correction_cancellation(
     clock: Callable[[], datetime], expected_provider: str,
     historical_delegation_keys: Mapping[str, Ed25519PublicKey],
     current_cancellation_keys: Mapping[str, Ed25519PublicKey],
+    authority: Callable[[], tuple[Mapping[str, Ed25519PublicKey], Mapping[str, Ed25519PublicKey]]] | None = None,
 ) -> tuple[dict[str, JsonValue], bool]:
     """Durably accept an authenticated, locally unreceived correction's suppression intent.
 
@@ -59,10 +60,11 @@ def accept_correction_cancellation(
         raise EffectWriteIoError("CANCELLATION_PROVIDER_BINDING_INVALID")
 
     def authenticate(raw: JsonValue, now: datetime) -> ValidatedCancellationIntent:
+        historical, current = authority() if authority is not None else (historical_delegation_keys, current_cancellation_keys)
         return parse_correction_cancellation_intent(
             raw, now=format_instant(now), expected_provider=expected_provider,
-            historical_delegation_keys=historical_delegation_keys,
-            current_cancellation_keys=current_cancellation_keys,
+            historical_delegation_keys=historical,
+            current_cancellation_keys=current,
         )
 
     # Snapshot the caller's mutable object before waiting; authenticate again under all admission locks.

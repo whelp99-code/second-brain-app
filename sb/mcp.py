@@ -9,6 +9,7 @@ import base64
 import itertools
 import json
 import os
+import sqlite3
 import sys
 from collections.abc import Generator, Mapping
 from contextlib import closing, contextmanager
@@ -28,8 +29,10 @@ from pydantic import TypeAdapter
 
 from sb.cancellation_result import CancellationResultError
 from sb.cancellation_status import CancellationStatusError, read_cancellation_status
+from sb.cancellation_submission import CancellationSubmissionError, submit_correction_cancellation
 from sb.config import Config, load_config
 from sb.contracts import MemoryWriteResultV1
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.delegations import DelegationRejected, verify_read_fence
 from sb.effect_values import (
     JsonObject,
@@ -111,6 +114,8 @@ _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
 _REMEMBER_PROFILE: Final = "remember-schema5"
+_CANCELLATION_SUBMIT_PROFILE: Final = "cancellation-submit-schema7"
+_CANCELLATION_SUBMIT_CONTRACT_DIGEST: Final = "d137a7a7b0e4a577abef04d6ecb2768630e9912cd24b8f270c320cb45d60165d"
 _CANCELLATION_PROFILE: Final = "cancellation-schema6"
 _CANCELLATION_CONTRACT_DIGEST: Final = "8be1ca195f60cb73f05c989d3d5f3e62053020988ccd8bb028cd4d8b442063b4"
 _REMEMBER_CONTRACT_DIGEST: Final = "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
@@ -260,7 +265,7 @@ def build_server(
     request_root: Path | str | None = None,
     *,
     task30: bool | None = None,
-    contract_schema: Literal[3, 4, 5, 6] | None = None,
+    contract_schema: Literal[3, 4, 5, 6, 7] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
     config: Config | None = None,
 ) -> MCPServer:
@@ -361,6 +366,9 @@ def build_server(
         elif profile == _REMEMBER_PROFILE:
             task30_enabled = True
             contract_schema_version = 5
+        elif profile == _CANCELLATION_SUBMIT_PROFILE:
+            task30_enabled = True
+            contract_schema_version = 7
         elif profile == _CANCELLATION_PROFILE:
             task30_enabled = True
             contract_schema_version = 6
@@ -668,7 +676,8 @@ def build_server(
                     "contract_digest": _contract_digest(),
                     "features": ["memory_effect_write_v2", "memory_record_identity_v1"]
                     + (["memory_remember_v3"] if contract_schema_version >= 5 else [])
-                    + (["memory_cancellation_status_v1"] if contract_schema_version == 6 else []),
+                    + (["memory_cancellation_status_v1"] if contract_schema_version >= 6 else [])
+                    + (["memory_cancellation_submit_v1"] if contract_schema_version == 7 else []),
                 })
             return status
 
@@ -753,11 +762,29 @@ def build_server(
         except (CancellationStatusError, CancellationResultError, DelegationRejected) as exc:
             raise ToolError(str(exc)) from exc
 
+    def sb_submit_cancellation(
+        intent: CorrectionCancellationIntentV1,
+    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+        """Accept an authenticated unsent correction cancellation as suppression_pending."""
+        try:
+            return dict(submit_correction_cancellation(model_object(intent), config=runtime_config,
+                load_authority=load_config, clock=lambda: datetime.now(UTC)))
+        except (CancellationSubmissionError, ValueError, RuntimeError) as exc:
+            # Only bounded machine codes reach the external caller, never paths or raw JSON.
+            code = str(exc)
+            if not code or len(code) > 96 or any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789" for c in code):
+                code = "CANCELLATION_SUBMISSION_FAILED"
+            raise ToolError(code) from exc
+        except (OSError, sqlite3.Error) as exc:
+            raise ToolError("CANCELLATION_SUBMISSION_FAILED") from exc
+
     def _contract_digest() -> str:
         filename = "second-brain-mcp-v3.json.sha256" if contract_schema_version == 5 else "second-brain-mcp-v1.json.sha256"
         expected = _REMEMBER_CONTRACT_DIGEST if contract_schema_version == 5 else _TASK32_CONTRACT_DIGEST
         if contract_schema_version == 6:
             filename, expected = "second-brain-mcp-v4.json.sha256", _CANCELLATION_CONTRACT_DIGEST
+        if contract_schema_version == 7:
+            filename, expected = "second-brain-mcp-v5.json.sha256", _CANCELLATION_SUBMIT_CONTRACT_DIGEST
         sidecar = Path(__file__).resolve().parent.parent / "contracts" / filename
         try:
             value = sidecar.read_text(encoding="ascii").strip()
@@ -1001,8 +1028,10 @@ def build_server(
     if task30_enabled:
         _ = server.tool(name="sb_generation_status")(sb_generation_status)
         _ = server.tool(name="sb_request_status")(sb_request_status)
-        if contract_schema_version == 6:
+        if contract_schema_version >= 6:
             _ = server.tool(name="sb_cancellation_status")(sb_cancellation_status)
+        if contract_schema_version == 7:
+            _ = server.tool(name="sb_submit_cancellation")(sb_submit_cancellation)
         resolver = sb_resolve_memory_record if contract_schema_version >= 4 else sb_resolve_memory_target
         _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server

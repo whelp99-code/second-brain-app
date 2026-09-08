@@ -317,6 +317,11 @@ class Config:
         return keys
 
     @property
+    def cancellation_public_keys(self) -> dict[str, str]:
+        """Keys authorized specifically to submit cancellation intents."""
+        return _as_str_mapping(self.raw.get("cancellation_public_keys"))
+
+    @property
     def revoked_jarvis_signing_key_ids(self) -> frozenset[str]:
         return frozenset(_as_str_list(self.raw.get("revoked_jarvis_signing_key_ids")) or [])
 
