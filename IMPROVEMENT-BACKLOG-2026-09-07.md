@@ -323,3 +323,14 @@ C6의 모델 수신/session/compaction receipt, C7의 전송 후 삭제·정정 
 B4 자동 수집 보류·B6 운영·B7 full100/질문·B8 품질을 계속 유지한다. provider_status_received_at은
 관측 시각이며 영속한 freshness 보증이 아니다. 운영 migration 070은 미적용, 새 원문 DB와
 자동 주입은 추가하지 않았다. 최종 상세 표의 우선순위·완료 증거를 후속 개발 기준으로 삼는다.
+
+
+## 30. B5/C1 인수 — 실제 모델 요청에서 본문·근거 회수
+
+[실제 모델 인수](MEMORY-REFERENCE-MODEL-ACCEPTANCE-2026-09-08.md)를 추가했다. 자비스 CLI
+출력→native Codex 요청에서 무작위 값과 출처를 정확히 회수했고 도구 없는 빈 기억은 no_data다.
+exit 0을 성공으로 오인하지 않도록 native 이벤트 감사와 14개 실패/정상 검사를 구현했다.
+
+자비스 작업 prompt의 승인 plan/source_files, --no-session-persistence, 추천용 context 저장
+계약을 대조했다. 이를 그대로 C6 session 전달/compaction 기록으로 쓰는 우회는 보류한다.
+C7 전송 수명/삭제, C8 범위와 기존 운영·성능·품질 완료 조건을 유지한다.

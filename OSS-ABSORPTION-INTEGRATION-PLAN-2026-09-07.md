@@ -378,3 +378,14 @@ code-brain의 작은 context pack과 memory-bank의 세션 중복 억제는 자�
 전달 receipt를 대체하지 않는다. memory-bank식 session 중복과 삭제 수명, Tencent식 검증된 공유
 범위, LightRAG식 품질 개선은 각각 기존 C6/C7/C8 및 질문 평가의 완료 조건을 통과해야 한다.
 운영 배포·100회 쓰기 인수·대기 검색/복구 병합과 기존 B4~B8 전체 범위는 유지한다.
+
+
+## 35. 작은 context pack의 실제 모델 소비 확인
+
+[실제 모델 인수](MEMORY-REFERENCE-MODEL-ACCEPTANCE-2026-09-08.md)로 SB→자비스 CLI→제한된
+reference JSON→native Codex 답변을 검증했다. 원문에만 있는 무작위 값과 정확한 출처·세대를
+회수했고 빈 결과 대조를 통과했다. 별도 OSS 서버/Proxy나 모델별 기억 정본은 만들지 않았다.
+
+code-brain식 예산 있는 문맥의 소비 증거를 추가한 것이며 memory-bank식 session 중복/compaction,
+삭제 계보와 Tencent식 검증 범위의 완성을 대체하지 않는다. 기존 작업 실행기의 승인 입력·비영속
+세션을 확인했으므로 제품 자동 주입은 해당 계약을 연결하기 전까지 보류한다.

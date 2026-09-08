@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 from dataclasses import asdict
@@ -14,7 +15,7 @@ from unittest.mock import patch
 import anyio
 
 from sb.generations import GenerationStore
-from sb.mcp_contract import write_fixture_request
+from sb.mcp_contract import canonical_bytes, write_fixture_request
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
 from sb.stable_requests import accept_stable_v1_request
@@ -34,9 +35,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     _ = parser.add_argument("mode", choices=("init", "serve", "apply", "seed"))
     _ = parser.add_argument("root", type=Path)
+    _ = parser.add_argument("--content", help="Synthetic seed content; seed mode only")
     values: dict[str, object] = vars(parser.parse_args())
     root = values["root"]
     mode = values["mode"]
+    content = values["content"]
+    if content is not None and (mode != "seed" or not isinstance(content, str)):
+        raise ValueError("content is only supported for an isolated seed")
     if not isinstance(root, Path) or not isinstance(mode, str):
         raise TypeError("invalid probe arguments")
     marker = root / ".jarvis-memory-probe"
@@ -78,7 +83,16 @@ def main() -> None:
     if not marker.is_file():
         raise ValueError("not an isolated probe directory")
     if mode == "seed":
-        _ = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
+        request = write_fixture_request()
+        if isinstance(content, str):
+            request["payload"] = {"content": content}
+            del request["request_id"]
+            del request["request_digest"]
+            digest = hashlib.sha256(b"orca-jarvis/memory-write-request/v1\0"
+                                    + canonical_bytes(request).rstrip(b"\n")).hexdigest()
+            request["request_id"] = "memreq:pos:v1:" + digest
+            request["request_digest"] = "sha256:" + digest
+        _ = accept_stable_v1_request(config.request_root, request, NOW)
     if mode in {"apply", "seed"}:
         executor = RequestExecutor(config)
         try:

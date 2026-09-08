@@ -274,3 +274,15 @@ Codex CLI 0.153.4와 Claude Code 2.1.261의 실제 로그인/모델/MCP 도구�
 stdout 3,073 bytes, 조회 전후 authority 논리 행 불변. [상세 변경·증거·잔여 목록](MEMORY-REFERENCE-READ-2026-09-08.md).
 모델 session 전달/compaction/후속 삭제 무효화·scope·운영 migration/배포는 미완료다.
 SB 100회 쓰기 인수는 65회 관측 상태이며 제품 소스 고정과 검색/복구 세 커밋 병합 대기를 유지한다.
+
+
+### B5 인수 — 실제 모델의 reference JSON 소비
+
+[모델 소비 인수](MEMORY-REFERENCE-MODEL-ACCEPTANCE-2026-09-08.md): 무작위 합성 기억을 실제
+자비스 CLI로 회수한 뒤 도구 없는 Codex 모델에 전달했다. 답·record/digest/source/세대 정확히
+일치, 빈 기억은 no_data, 완료 시 만료 전·이후 provider 재조회 일치. native 이벤트 감사기 14개,
+관련 Python 회귀 12개와 기존 실제 CLI 5시나리오 통과.
+
+제품 context/projection 세 테이블은 실제 관측 0행이며 session receipt를 구현했다고 주장하지
+않는다. 기존 작업 provider의 비영속 세션·승인 plan 입력 경계를 확인했고 자동 연결은 보류한다.
+C6/C7/C8과 B4~B8의 남은 조건, 100회 쓰기 및 세 커밋 병합 대기는 유지한다.
