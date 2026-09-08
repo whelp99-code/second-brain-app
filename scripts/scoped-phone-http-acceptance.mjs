@@ -9,6 +9,7 @@ const at = name => import(pathToFileURL(join(process.argv[2], name)).href);
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const { request } = await at('node_modules/undici/index.js');
 const { createPhoneGatewayServer, parsePhoneGatewayConfig } = await at('src/phone-gateway.js');
+const { parsePhoneGatewayCli } = await at('src/phone-gateway-main.js');
 const { makePhoneHome, processUid, startFakeAuthority, cookieFromSetCookie,
   FIXTURE_HOST, FIXTURE_LOGIN, FIXTURE_ORIGIN } = await at('tests/fixtures/phone-gateway-harness.js');
 const home = makePhoneHome();
@@ -34,9 +35,21 @@ try {
         return child;
       } } };
   upstream = await startFakeAuthority();
+  const parsed = parsePhoneGatewayCli(['--host', '127.0.0.1', '--port', '4176',
+    '--upstream', 'http://127.0.0.1:4173', '--static-root', staticRoot, '--env-file', home.envFile,
+    '--memory-db', input.database, '--memory-agent', input.agent_id, '--memory-policy', policyPath,
+    '--memory-provider', memory.read_fence_config.provider_instance_id,
+    '--memory-signing-key', memory.read_fence_config.signing_key_id,
+    '--memory-private-key', memory.read_fence_config.private_key_path,
+    '--memory-projection-key', memory.projection_key_path,
+    '--memory-launcher', memory.transport_options.launcherPath, '--memory-provider-config', providerPath,
+    '--memory-contract', memory.transport_options.contractPath]);
+  assert.ok(parsed.memoryContext);
   gateway = createPhoneGatewayServer({ host: '127.0.0.1', port: 0, upstream: upstream.origin, staticRoot, config,
     now: () => now, audit: () => {},
-    memoryContext: { database_path: input.database, agent_id: input.agent_id, memory } });
+    memoryContext: { ...parsed.memoryContext, memory: { ...parsed.memoryContext.memory,
+      transport_options: { ...parsed.memoryContext.memory.transport_options,
+        execFile: memory.transport_options.execFile } } } });
   const base = `http://127.0.0.1:${gateway.address.port}`;
   const identity = { Host: FIXTURE_HOST, 'Tailscale-User-Login': FIXTURE_LOGIN };
   const login = await request(`${base}/api/v1/phone/session`, { headers: identity });
@@ -85,7 +98,7 @@ try {
   assert.ok(expiryExitObserved);
   assert.ok(String(expired.headers['set-cookie']).includes('Max-Age=0'));
   assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/context'));
-  process.stdout.write(JSON.stringify({ records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
+  process.stdout.write(JSON.stringify({ cli_activation_parsed: true, records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
     client_identity_denied: true, csrf_required: true, ungranted_login_session_denied: true,
     policy_withdrawal_denied: true, policy_withdrawal_http_status: revoked.statusCode,
     invalid_query_http_status: invalidQuery.statusCode, direct_scoped_mcp: true,
