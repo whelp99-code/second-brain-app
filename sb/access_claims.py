@@ -56,11 +56,13 @@ def access_request_digest(method: str, arguments: JsonObject) -> str:
 
 @dataclass(frozen=True, slots=True)
 class AccessContext:
-    """Expected values from trusted server/session state, never from the claim itself."""
+    """Expected trusted values. None session explicitly trusts issuer authentication;
+    it must never be populated by copying an unverified claim's session.
+    """
     provider: str
     principal: str
     agent: str
-    session: str
+    session: str | None
     policy_revision: str
     purpose: Literal["memory_read", "memory_status", "memory_resolve"]
     request_digest: str
@@ -82,9 +84,11 @@ def verify_access_claim(value: JsonValue, read_fence: JsonValue,
         if not claim.provider_instance_id or not claim.signing_key_id:
             raise ValueError("empty trust identity")
         scope = SourceAccess(claim.principal_id, tuple(claim.projects), claim.policy_revision)
-        if (claim.provider_instance_id, claim.principal_id, claim.agent_id, claim.session_id,
+        if context.session is not None and claim.session_id != context.session:
+            raise ValueError("session mismatch")
+        if (claim.provider_instance_id, claim.principal_id, claim.agent_id,
             claim.policy_revision, claim.purpose, claim.request_digest) != (
-            context.provider, context.principal, context.agent, context.session,
+            context.provider, context.principal, context.agent,
             context.policy_revision, context.purpose, context.request_digest):
             raise ValueError("context mismatch")
         fence = verify_read_fence(read_fence, keys, context.provider, now,

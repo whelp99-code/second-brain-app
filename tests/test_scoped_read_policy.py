@@ -27,6 +27,17 @@ policy_revision = "policy:1"
     other.write_text(original.replace("policy:1", "policy:other"))
     monkeypatch.setenv("SB_CONFIG", str(other))
     assert current_scoped_policy(config, initial) == initial
+    delegated = original.replace('session = "session:test"', 'session_mode = "issuer_authenticated"')
+    path.write_text(delegated)
+    with pytest.raises(ValueError):
+        current_scoped_policy(config, initial)
+    dynamic = scoped_policy(load_config(path))
+    assert dynamic.identity[2] is None
+    for bad in [delegated + 'session = "session:test"\n', delegated.replace('issuer_authenticated', 'any')]:
+        path.write_text(bad)
+        with pytest.raises(ValueError):
+            scoped_policy(load_config(path))
+    path.write_text(original)
     path.write_text(original.replace("policy:1", "policy:2"))
     assert current_scoped_policy(config, initial).identity[-1] == "policy:2"
     for changed in ['revoked_jarvis_signing_key_ids = ["key:test"]\n' + original,

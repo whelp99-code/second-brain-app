@@ -12,7 +12,7 @@ from sb.source_access import SourceAccess
 
 @dataclass(frozen=True, slots=True)
 class ScopedReadPolicy:
-    identity: tuple[str, str, str, str]
+    identity: tuple[str, str, str | None, str]
     encoded_keys: tuple[tuple[str, str], ...]
     routing: tuple[str, str, str, str, str]
 
@@ -23,11 +23,17 @@ class ScopedReadPolicy:
 
 def scoped_policy(config: Config) -> ScopedReadPolicy:
     raw = config.raw.get("mcp_scoped_read")
-    if not isinstance(raw, dict) or set(raw) != {"principal", "agent", "session", "policy_revision"}:
+    if not isinstance(raw, dict) or set(raw) not in (
+        {"principal", "agent", "session", "policy_revision"},
+        {"principal", "agent", "session_mode", "policy_revision"},
+    ):
         raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
     if any(not isinstance(value, str) or not value for value in raw.values()):
         raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
-    identity = (str(raw["principal"]), str(raw["agent"]), str(raw["session"]), str(raw["policy_revision"]))
+    if "session_mode" in raw and raw["session_mode"] != "issuer_authenticated":
+        raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
+    identity = (str(raw["principal"]), str(raw["agent"]),
+                str(raw["session"]) if "session" in raw else None, str(raw["policy_revision"]))
     _ = SourceAccess(identity[0], (), identity[3])
     keys = tuple(sorted((name, value) for name, value in config.jarvis_public_keys.items()
                         if name not in config.revoked_jarvis_signing_key_ids))

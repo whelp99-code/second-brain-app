@@ -22,8 +22,8 @@ class FrozenDate(datetime):
         return datetime(2026, 9, 9, tzinfo=UTC)
 
 
-@pytest.mark.parametrize("version", [1, 2])
-def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch, version):  # noqa: F811
+@pytest.mark.parametrize("version,issuer_sessions", [(1, False), (2, False), (2, True)])
+def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch, version, issuer_sessions):  # noqa: F811
     root, name, generation = classified
     work = root.parents[2]
     config = Config(raw={"vault_root": str(work / "share" / "vault"), "share_root": str(work / "share"),
@@ -32,6 +32,12 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
         "jarvis_public_keys": {"key:test": base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()},
         "mcp_scoped_read": {"principal": "principal:owner", "agent": "agent:test", "session": "session:test", "policy_revision": "1"}})
     monkeypatch.setattr("sb.mcp.datetime", FrozenDate)
+    if issuer_sessions:
+        del config.raw["mcp_scoped_read"]["session"]
+        config.raw["mcp_scoped_read"]["session_mode"] = "issuer_authenticated"
+        monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v1")
+        with pytest.raises(ValueError, match="MEMORY_SCOPED_CONFIG_INVALID"):
+            build_server(config=config)
     monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", f"scoped-record-read-v{version}")
     server = build_server(config=config)
     from sb.effect_write_values import GENESIS_TOMBSTONE_ROOT
@@ -88,7 +94,10 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             wrong_limit = await client.call_tool("sb_search", {"query": "Cited", "limit": 2,
                 "read_fence": model_object(fence), "access_claim": search_claim})
             assert wrong_limit.is_error
-            for bad in [signed({**claim, "projects": ["project:b"]}), signed({**claim, "session_id": "session:other"})]:
+            other_session = await client.call_tool("sb_read_page", {**args, "access_claim": signed({**claim, "session_id": "session:other"})})
+            assert other_session.is_error is (not issuer_sessions)
+            for bad in [signed({**claim, "projects": ["project:b"]}),
+                        signed({**claim, "agent_id": "agent:other"}), {**claim, "session_id": "session:unsigned"}]:
                 rejected = await client.call_tool("sb_read_page", {**args, "access_claim": bad})
                 assert rejected.is_error
                 assert "Alpha fixture" not in str(rejected)

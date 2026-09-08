@@ -44,6 +44,22 @@ def claim_case():
     return signed(body), model_object(fence), context
 
 
+def test_explicit_issuer_sessions_require_valid_signature_and_keep_other_bindings(claim_case):
+    claim, fence, context = claim_case
+    delegated = replace(context, session=None)
+    for session in ["session:one", "session:two"]:
+        fresh = signed({**claim, "session_id": session})
+        assert verify_access_claim(fresh, fence, {"key:test": KEY.public_key()}, delegated, NOW)
+        with pytest.raises(AccessClaimRejected):
+            verify_access_claim(fresh, fence, {"key:test": KEY.public_key()}, context, NOW)
+    for changed in [{**claim, "session_id": "session:unsigned"},
+                    signed({**claim, "agent_id": "agent:other"}),
+                    signed({**claim, "policy_revision": "policy:old"}),
+                    signed({**claim, "session_id": "*"})]:
+        with pytest.raises(AccessClaimRejected):
+            verify_access_claim(changed, fence, {"key:test": KEY.public_key()}, delegated, NOW)
+
+
 def test_valid_claim_and_request_canonicalization(claim_case):
     value, fence, context = claim_case
     scope = verify_access_claim(value, fence, {"key:test": KEY.public_key()}, context, NOW)

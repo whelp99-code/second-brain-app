@@ -84,6 +84,29 @@ try {
   const otherSession = await call({}, { ...headers, Cookie: `__Host-jarvis-phone=${secondCookie}`, 'X-JARVIS-CSRF': secondCsrf });
   assert.equal(otherSession.statusCode, 403);
   assert.equal((await otherSession.body.json()).error.code, 'PHONE_MEMORY_SCOPE_FORBIDDEN');
+  const fixedProvider = readFileSync(providerPath, 'utf8');
+  const { sessions: sessionGrants, ...policyBase } = policy;
+  const agentPolicy = { ...policyBase, schema_version: 2,
+    agents: sessionGrants.map(row => ({ agent_id: row.agent_id, projects: row.projects, methods: row.methods })) };
+  const agentPolicyBytes = JSON.stringify(agentPolicy);
+  writeFileSync(policyPath, agentPolicyBytes);
+  const issuerProvider = fixedProvider.replace(`session = "${sessionId}"`, 'session_mode = "issuer_authenticated"');
+  assert.notEqual(issuerProvider, fixedProvider);
+  writeFileSync(providerPath, issuerProvider);
+  const secondAllowed = await call({}, { ...headers, Cookie: `__Host-jarvis-phone=${secondCookie}`, 'X-JARVIS-CSRF': secondCsrf });
+  assert.equal(secondAllowed.statusCode, 200); assert.equal((await secondAllowed.body.json()).context.records.length, 2);
+  const thirdLogin = await request(`${base}/api/v1/phone/session`, { headers: identity });
+  assert.equal(thirdLogin.statusCode, 200);
+  const thirdCookie = cookieFromSetCookie(thirdLogin.headers['set-cookie']);
+  const thirdCsrf = (await thirdLogin.body.json()).csrf_token;
+  const thirdHeaders = { ...headers, Cookie: `__Host-jarvis-phone=${thirdCookie}`, 'X-JARVIS-CSRF': thirdCsrf };
+  const thirdAllowed = await call({}, thirdHeaders);
+  assert.equal(thirdAllowed.statusCode, 200); assert.equal((await thirdAllowed.body.json()).context.records.length, 2);
+  assert.equal(readFileSync(policyPath, 'utf8'), agentPolicyBytes);
+  assert.equal(readFileSync(providerPath, 'utf8'), issuerProvider);
+  writeFileSync(policyPath, JSON.stringify({ ...agentPolicy, agents: [] }));
+  const agentRevoked = await call({}, thirdHeaders); assert.equal(agentRevoked.statusCode, 403); await agentRevoked.body.text();
+  writeFileSync(policyPath, JSON.stringify(policy)); writeFileSync(providerPath, fixedProvider);
   const invalidQuery = await call({ query: 'bad\u0000query' });
   assert.equal(invalidQuery.statusCode, 400);
   assert.equal((await invalidQuery.body.json()).error.code, 'PHONE_REQUEST_INVALID');
@@ -98,7 +121,8 @@ try {
   assert.ok(expiryExitObserved);
   assert.ok(String(expired.headers['set-cookie']).includes('Max-Age=0'));
   assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/context'));
-  process.stdout.write(JSON.stringify({ cli_activation_parsed: true, records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
+  process.stdout.write(JSON.stringify({ agent_policy_new_sessions_without_policy_edits: 2,
+    agent_policy_withdrawal_denied: true, cli_activation_parsed: true, records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
     client_identity_denied: true, csrf_required: true, ungranted_login_session_denied: true,
     policy_withdrawal_denied: true, policy_withdrawal_http_status: revoked.statusCode,
     invalid_query_http_status: invalidQuery.statusCode, direct_scoped_mcp: true,

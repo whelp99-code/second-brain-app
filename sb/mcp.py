@@ -1032,6 +1032,8 @@ def build_server(
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
         scoped_v2 = os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v2"
+        if initial_scoped_policy.identity[2] is None and not scoped_v2:
+            raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
         def scoped_request(method: str, arguments: JsonObject, read_fence: dict[str, JsonValue],
             access_claim: dict[str, JsonValue], reader: Callable[[Path, GenerationIdentityV1, SourceAccess], dict[str, object]],

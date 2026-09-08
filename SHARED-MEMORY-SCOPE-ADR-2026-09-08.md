@@ -107,3 +107,9 @@ SB `ec76b14` / JARVIS `8a697d0`: 제한 read/search 응답은 요청 digest와 �
 ## 2026-09-09 HTTP context 연결 결정
 
 기존 phone gateway의 인증된 요청에서만 선택적 `/api/v1/memory/context` POST를 처리한다. 서버 운영자가 기존 DB 경로·agent ID·scoped 정책/키/전송 설정을 명시해야 활성화된다. 같은 gateway 프로세스의 기존 phone 세션 저장소로 요청별 인증 공급자를 만들고 기존 CLI context API를 호출한다. 별도 backend에 임의 신원 헤더를 전달하거나 공통 CSRF를 인증 신원으로 바꾸지 않는다. 기존 proxy 검색/API를 scoped로 표시하지 않으며 새 표면에 동일 본문·예산·동시성 한계를 적용한다. 세션별 정책 배정과 standalone 배포 설정은 자동 생성하지 않는다. 구현·실제 HTTP/MCP 인수 전 운영 완료로 판정하지 않는다.
+
+## 2026-09-09 인증된 새 로그인과 명시적 에이전트 정책
+
+JARVIS 파일 정책 v1의 정확한 session별 grant는 유지한다. 선택적 정책 v2는 operator가 등록한 agent별 projects/methods를 현재 인증된 세션에 적용한다. 인증 공급자가 없는 요청에는 적용하지 않으며, agent 미등록·만료·철회는 거부한다. 실제 발급 claim에는 현재의 정확한 session ID가 계속 포함된다. v1을 자동 변환하지 않는다. provider의 고정 session 검사를 유지한 상태에서는 v2만으로 새 로그인 인수를 완료했다고 표시하지 않는다. provider가 같은 신뢰 경계를 지원하는 명시적 계약과 양쪽 검증이 선행해야 운영 활성화할 수 있다. 새 정책/서명 엔진·자동 project 추론은 추가하지 않는다.
+
+provider 후속 결정: scoped v2에서만 `session_mode = "issuer_authenticated"`를 명시할 수 있다. 기존 `session`과 동시 지정할 수 없다. 이 모드의 session ID는 claim에서 가져와 기대값과 자기 비교하지 않는다. 대신 현재 신뢰 키로 서명된 claim의 유효한 session ID를 JARVIS가 인증한 값으로 수용한다. provider/principal/agent/policy revision/purpose/request/현재 fence/expiry/삭제 high-water 검사는 그대로 유지한다. 일반/기존 scoped v1 및 명시 session 모드는 변경하지 않는다. 정책 파일 모드 변경은 열린 연결을 재사용할 수 없으며 새 연결이 필요하다. 같은 신뢰 발급자의 agent 세션 관리에 의존하는 선택적 모드이지 OS 사용자 격리나 임의 서명자 신뢰가 아니다.
