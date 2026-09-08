@@ -2,6 +2,7 @@
 import json
 import runpy
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -31,23 +32,29 @@ body = {"schema_version": 1, "provider_instance_id": page.generation.provider_in
     "request_digest": request, "read_fence_digest": fence.fence_digest,
     "issued_at": "2026-09-09T00:00:00.000Z", "expires_at": "2026-09-09T00:00:30.000Z",
     "nonce": "nonce:claim", "signing_key_id": "key:test"}
-child = subprocess.run(["node", str(Path(__file__).with_name("access-claim-sign.mjs"))],
-    input=json.dumps(body), capture_output=True, text=True, check=True, timeout=30)
-claim = json.loads(child.stdout)
+if len(sys.argv) > 1:
+    child = subprocess.run(["node", str(Path(__file__).with_name("access-claim-production-sign.mjs")), sys.argv[1]],
+        input=json.dumps({**body, "page_id": page.page_id}), capture_output=True, text=True, check=True, timeout=60)
+    bundle = json.loads(child.stdout)
+    claim, fence_value = bundle["access_claim"], bundle["read_fence"]
+else:
+    child = subprocess.run(["node", str(Path(__file__).with_name("access-claim-sign.mjs"))],
+        input=json.dumps(body), capture_output=True, text=True, check=True, timeout=30)
+    claim, fence_value = json.loads(child.stdout), model_object(fence)
 context = AccessContext(page.generation.provider_instance_id, "principal:owner", "agent:test", "session:test",
     "policy:1", "memory_read", request, page.tombstone_sequence, page.tombstone_set_root)
-require_claimed_page(page, claim, model_object(fence), {"key:test": key.public_key()}, context, now)
+require_claimed_page(page, claim, fence_value, {"key:test": key.public_key()}, context, now)
 try:
-    require_claimed_page(page, {**claim, "projects": ["project:beta"]}, model_object(fence),
+    require_claimed_page(page, {**claim, "projects": ["project:beta"]}, fence_value,
         {"key:test": key.public_key()}, context, now)
 except AccessClaimRejected:
     pass
 else:
     raise AssertionError("unsigned scope change accepted")
 report = {"work": str(work), "provider": page.generation.provider_instance_id, "page": page.page_id,
-    "node_signature_accepted": True, "tampered_scope_rejected": True,
+    "node_signature_accepted": True, "production_issuer": len(sys.argv) > 1, "tampered_scope_rejected": True,
     "records": len(page.records), "source_requirements": len(page.source_refs),
-    "scope": "Node fixture signature and Python claim verification over real isolated CLI data; not JARVIS production issuance or MCP authentication"}
+    "scope": "Node signature and Python verification over isolated CLI data; production_issuer indicates actual issuer code with fixture scope resolver/authority DB, not operational authorization or MCP authentication"}
 output = work / "access-claim-result.json"
 output.write_text(json.dumps(report, indent=2) + "\n")
 print(output)

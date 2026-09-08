@@ -97,3 +97,15 @@ def test_claimed_page_checks_scope_and_generation_high_water(claim_case):
                              claim, fence, keys, context, NOW)
     with pytest.raises(AccessClaimRejected):
         require_claimed_page(page, claim, fence, keys, replace(context, purpose="memory_status"), NOW)
+
+
+def test_existing_long_provider_and_key_path_identity_remain_valid(claim_case):
+    claim, _, context = claim_case
+    provider, key_id = "provider:" + "p" * 128, "jarvis.keys/owner.v1"
+    fence = create_read_fence(provider_instance_id=provider, purpose="memory_read", operation="read",
+        sequence=0, set_root=ROOT, issued_at="2026-09-09T00:00:00.000Z", not_before="2026-09-09T00:00:00.000Z",
+        expires_at="2026-09-09T00:01:00.000Z", nonce="nonce:fence", signing_key_id=key_id, private_key=KEY)
+    value = signed({**claim, "provider_instance_id": provider, "signing_key_id": key_id,
+                    "read_fence_digest": fence.fence_digest})
+    assert verify_access_claim(value, model_object(fence), {key_id: KEY.public_key()},
+        replace(context, provider=provider), NOW).projects == ("project:a",)

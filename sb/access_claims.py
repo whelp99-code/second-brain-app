@@ -74,12 +74,13 @@ def verify_access_claim(value: JsonValue, read_fence: JsonValue,
     """Recheck signature, current read fence, request, session and current policy."""
     try:
         claim = MemoryAccessClaimV1.model_validate(value)
-        for name in (claim.provider_instance_id, claim.principal_id, claim.agent_id,
-                     claim.session_id, claim.policy_revision, claim.nonce, claim.signing_key_id):
+        for name in (claim.principal_id, claim.agent_id, claim.session_id, claim.policy_revision, claim.nonce):
             if _ID.fullmatch(name) is None:
                 raise ValueError("invalid identifier")
         if any(_DIGEST.fullmatch(item) is None for item in (claim.request_digest, claim.read_fence_digest)):
             raise ValueError("invalid digest")
+        if not claim.provider_instance_id or not claim.signing_key_id:
+            raise ValueError("empty trust identity")
         scope = SourceAccess(claim.principal_id, tuple(claim.projects), claim.policy_revision)
         if (claim.provider_instance_id, claim.principal_id, claim.agent_id, claim.session_id,
             claim.policy_revision, claim.purpose, claim.request_digest) != (
