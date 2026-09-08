@@ -6,19 +6,27 @@ import { spawnSync } from "node:child_process";
 
 // Run from the JARVIS repo (fixture policy is relative to cwd) after compiling
 // into an isolated outDir. Never opens an operational DB.
-const [buildArg, mode, databasePath, proposalPath, at] = process.argv.slice(2);
+const [buildArg, mode, databasePath, proposalPath, at, requestId] = process.argv.slice(2);
 const build = resolve(buildArg);
 const load = path => import(pathToFileURL(join(build, path)).href);
 const { proposeMemoryCandidateScope, validateMemoryCandidateScopeProposal } = await load("src/memory-candidate-scope.js");
 const { AuthorityDb } = await load("src/db.js");
-if (mode === "read") {
+const { stageMemoryScopeReview, readApprovedMemoryScopeReview } = await load("src/memory-scope-review.js");
+if (mode === "read" || mode === "review") {
   const authority = new AuthorityDb(databasePath);
   try {
     try {
-      const result = validateMemoryCandidateScopeProposal(authority, JSON.parse(readFileSync(proposalPath, "utf8")), new Date(at));
-      process.stdout.write(JSON.stringify({ accepted: true, proposal_digest: result.proposal_digest, authorization: result.authorization }));
+      const proposal = JSON.parse(readFileSync(proposalPath, "utf8"));
+      if (mode === "review") {
+        const result = readApprovedMemoryScopeReview(authority, proposal, requestId, new Date(at));
+        process.stdout.write(JSON.stringify({ accepted: true, proposal_digest: result.proposal.proposal_digest,
+          writes_authorized: result.writes_authorized }));
+      } else {
+        const result = validateMemoryCandidateScopeProposal(authority, proposal, new Date(at));
+        process.stdout.write(JSON.stringify({ accepted: true, proposal_digest: result.proposal_digest, authorization: result.authorization }));
+      }
     } catch (error) {
-      if (error.code !== "MEMORY_CANDIDATE_SCOPE_INVALID") throw error;
+      if (!["MEMORY_CANDIDATE_SCOPE_INVALID", "MEMORY_SCOPE_REVIEW_INVALID"].includes(error.code)) throw error;
       process.stdout.write(JSON.stringify({ accepted: false, code: error.code }));
     }
   } finally { authority.close(); }
@@ -38,9 +46,9 @@ if (mode === "read") {
       valid_until: new Date(now.getTime() + 60000).toISOString(),
     }, now);
     const path = join(f.root, "proposal.json");
-    const read = value => {
+    const read = (value, action = "read", commandId) => {
       writeFileSync(path, JSON.stringify(value), { mode: 0o600 });
-      const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), build, "read", f.path, path, now.toISOString()],
+      const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), build, action, f.path, path, now.toISOString(), ...(commandId ? [commandId] : [])],
         { encoding: "utf8", timeout: 30000, maxBuffer: 65536 });
       assert.equal(child.error, undefined);
       assert.equal(child.status, 0, child.stderr);
@@ -51,14 +59,39 @@ if (mode === "read") {
     const changed = read({ ...proposal, scope: { ...proposal.scope, projects: ["project:other"] } });
     assert.equal(changed.accepted, false);
     assert.deepEqual(fixture.memoryTableCounts(f.authority), before);
+    const { ControlPlane, signCommandApproval } = await load("src/control-plane.js");
+    const { localKey } = await load("tests/helpers.js");
+    const command = stageMemoryScopeReview(f.authority, proposal, now);
+    const control = new ControlPlane(f.authority);
+    control.decide(signCommandApproval({ schema_version: 1, receipt_id: `receipt:${command.request_id}`, request_id: command.request_id,
+      decision: "approve", command_digest: command.command_digest, signer_principal_id: "principal:owner",
+      authenticated_session_id: "scope-review-fixture", key_id: "decision-test", algorithm: "Ed25519",
+      issued_at: now.toISOString(), not_before: now.toISOString(), expires_at: command.expires_at,
+      nonce: command.request_id, max_uses: 1, status: "issued" }, localKey(f.authority)), now);
+    const approvedCounts = fixture.memoryTableCounts(f.authority);
+    const signedReview = read(proposal, "review", command.request_id);
+    assert.deepEqual(signedReview, { accepted: true, proposal_digest: proposal.proposal_digest, writes_authorized: false });
+    const other = proposeMemoryCandidateScope(f.authority, candidate.candidate_id, {
+      ...proposal.scope, projects: ["project:other"], valid_until: proposal.expires_at }, now);
+    const otherScopeReview = read(other, "review", command.request_id);
+    assert.equal(otherScopeReview.accepted, false);
+    assert.deepEqual(fixture.memoryTableCounts(f.authority), approvedCounts);
+    assert.equal(approvedCounts.memory_outbox, before.memory_outbox);
+    control.cancel({ request_id: command.request_id, actor: "principal:owner", reason: "withdraw fixture scope",
+      revoked_at: now.toISOString() }, now);
+    const cancelledCounts = fixture.memoryTableCounts(f.authority);
+    const withdrawnReview = read(proposal, "review", command.request_id);
+    assert.equal(withdrawnReview.accepted, false);
+    assert.deepEqual(fixture.memoryTableCounts(f.authority), cancelledCounts);
     const projections = new MemoryProjectionAuthority(f.authority); projections.initialize(now);
     projections.quarantineUnresolved({ kind: "dashboard_projection", id: candidate.candidate_id, component_id: candidate.candidate_id }, now);
     const afterQuarantine = fixture.memoryTableCounts(f.authority);
     const quarantined = read(proposal);
     assert.equal(quarantined.accepted, false);
     assert.deepEqual(fixture.memoryTableCounts(f.authority), afterQuarantine);
-    process.stdout.write(JSON.stringify({ schema_version: 1, fixture: true, independent_processes: 3,
+    process.stdout.write(JSON.stringify({ schema_version: 1, fixture: true, independent_processes: 6,
       accepted, changed, quarantined, validation_table_counts_unchanged: true,
+      signedReview, otherScopeReview, withdrawnReview, approval_creates_no_memory_outbox: true,
       scoped_write_completed: false }, null, 2) + "\n");
   } finally { fixture.closeMemoryDatabase(f); }
 }
