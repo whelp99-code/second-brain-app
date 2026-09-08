@@ -1,6 +1,7 @@
 // Real phone cookie -> scoped CLI -> MCP, using isolated operator policy/key fixtures.
 import assert from 'node:assert/strict';
 import { createHash, createHmac } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +14,9 @@ const { makePhoneHome, processUid, startFakeAuthority, cookieFromSetCookie,
 const home = makePhoneHome();
 let gateway;
 let upstream;
+let now = Date.parse(input.now);
+let expireOnExit = false;
+let expiryExitObserved = false;
 try {
   const config = parsePhoneGatewayConfig({ home: home.home, envFile: home.envFile, uid: processUid() });
   const staticRoot = join(home.home, 'static'); mkdirSync(join(staticRoot, 'assets'), { recursive: true });
@@ -21,10 +25,17 @@ try {
   const policyPath = join(home.home, 'policy.json');
   const providerPath = join(home.home, 'provider.toml');
   const memory = { ...input.options, policy_path: policyPath,
-    transport_options: { ...input.options.transport_options, configPath: providerPath } };
+    transport_options: { ...input.options.transport_options, configPath: providerPath,
+      execFile: (file, args, options) => {
+        const child = execFile(file, [...args], options);
+        child.once('exit', () => {
+          if (expireOnExit) { expiryExitObserved = true; now += 16 * 60_000; }
+        });
+        return child;
+      } } };
   upstream = await startFakeAuthority();
   gateway = createPhoneGatewayServer({ host: '127.0.0.1', port: 0, upstream: upstream.origin, staticRoot, config,
-    now: () => Date.parse(input.now), audit: () => {},
+    now: () => now, audit: () => {},
     memoryContext: { database_path: input.database, agent_id: input.agent_id, memory } });
   const base = `http://127.0.0.1:${gateway.address.port}`;
   const identity = { Host: FIXTURE_HOST, 'Tailscale-User-Login': FIXTURE_LOGIN };
@@ -58,14 +69,27 @@ try {
   const secondCookie = cookieFromSetCookie(secondLogin.headers['set-cookie']);
   const secondCsrf = (await secondLogin.body.json()).csrf_token;
   const otherSession = await call({}, { ...headers, Cookie: `__Host-jarvis-phone=${secondCookie}`, 'X-JARVIS-CSRF': secondCsrf });
-  assert.equal(otherSession.statusCode, 502); await otherSession.body.text();
+  assert.equal(otherSession.statusCode, 403);
+  assert.equal((await otherSession.body.json()).error.code, 'PHONE_MEMORY_SCOPE_FORBIDDEN');
+  const invalidQuery = await call({ query: 'bad\u0000query' });
+  assert.equal(invalidQuery.statusCode, 400);
+  assert.equal((await invalidQuery.body.json()).error.code, 'PHONE_REQUEST_INVALID');
   writeFileSync(policyPath, JSON.stringify({ ...policy, sessions: [] }));
-  const revoked = await call(); assert.equal(revoked.statusCode, 502);
+  const revoked = await call(); assert.equal(revoked.statusCode, 403);
   const revokedBody = await revoked.body.text(); assert.ok(!revokedBody.includes('context_digest'));
+  assert.equal(JSON.parse(revokedBody).error.code, 'PHONE_MEMORY_SCOPE_FORBIDDEN');
+  writeFileSync(policyPath, JSON.stringify(policy));
+  expireOnExit = true;
+  const expired = await call(); assert.equal(expired.statusCode, 401);
+  assert.equal((await expired.body.json()).error.code, 'PHONE_SESSION_REQUIRED');
+  assert.ok(expiryExitObserved);
+  assert.ok(String(expired.headers['set-cookie']).includes('Max-Age=0'));
   assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/context'));
   process.stdout.write(JSON.stringify({ records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
     client_identity_denied: true, csrf_required: true, ungranted_login_session_denied: true,
-    policy_withdrawal_denied: true, direct_scoped_mcp: true,
+    policy_withdrawal_denied: true, policy_withdrawal_http_status: revoked.statusCode,
+    invalid_query_http_status: invalidQuery.statusCode, direct_scoped_mcp: true,
+    cleanup_session_expiry_http_status: expired.statusCode, expiry_child_exit_observed: expiryExitObserved,
     scope: 'real HTTP cookie and MCP; fixture Tailnet headers, keys, explicit session grant, source and clock' }));
 } finally {
   gateway?.close();
