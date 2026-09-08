@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 JARVIS `cec7943` / SB 인수 `158bd75`:** [빈 검색의 세대 metadata 유실 수정](SCOPED-EMPTY-GENERATION-2026-09-09.md). 다른 세대의 빈 결과가 empty 문맥으로 수락되는 회귀를 재현하고 실제 응답 세대를 후속 상태와 대조한다. 관련71통과·격리emit/lint·실제 빈 응답 대체 거부 및 기존 제출 인수 통과. 실제 인증 진입점·native 세션·전체 운영 목표는 유지한다.
+
 **2026-09-09 JARVIS `6a9d1d8` / SB 인수 `fa0cc11`:** [scoped v2→기존 reference reader·실제 2 records/4,412 bytes 제출 검사](SCOPED-REFERENCE-DELIVERY-2026-09-09.md). 관련85통과·격리emit/lint통과. 기존 privacy/삭제/예산/중복 제출 검사를 유지하고 준비 후 범위 변경·쿠키 철회를 차단했다. 실제 CLI/HTTP 인증 진입점과 모델/native 세션 수명 및 전체 운영 조건은 남는다.
 
 **2026-09-09 JARVIS `29c26f1` / SB `ab0776f`:** [scoped v2 상태 조회·목적 분리·실제 전후 세대 검사](SCOPED-GENERATION-STATUS-2026-09-09.md). v1 유지, v2 status/read/search 세 도구. 관련JARVIS102·SB23통과·실제 status→조회/검색→status 및 철회 거부, 계약6개 패키징 검증. 기존 context adapter 연결·HTTP 인증 경계 및 전체 잔여 목표는 유지한다.
