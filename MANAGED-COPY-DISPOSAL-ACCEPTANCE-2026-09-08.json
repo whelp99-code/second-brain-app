@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "product_commit": "461f7e3a1c24c89a3e826ecc8d90e58884e3e79b",
+  "baseline_commit": "b34b2a9",
+  "full_test": {
+    "passed": 1005,
+    "skipped": 2,
+    "seconds": 174.72,
+    "ignored": [
+      "tests/test_embeddings.py"
+    ],
+    "log": "/var/tmp/sb-managed-copy-full-test.log"
+  },
+  "subsequent_new_tests": {
+    "passed": 2,
+    "seconds": 4.51,
+    "selection": "tests/test_managed_copy_disposal.py -k new_backup_before_pointer",
+    "included_in_full_run": false
+  },
+  "ruff": "passed",
+  "diff_check": "passed",
+  "basedpyright": {
+    "errors": 0,
+    "warnings": 0,
+    "files": [
+      "sb/managed_file_inspection.py",
+      "sb/managed_copy_files.py",
+      "sb/managed_copy_disposal.py",
+      "sb/erasure.py",
+      "sb/request_executor.py",
+      "sb/correction_cancellation_executor.py",
+      "sb/cancellation_target.py",
+      "sb/correction_cancellation_requests.py",
+      "sb/request_store.py",
+      "sb/exports.py",
+      "sb/managed_surface_scan.py",
+      "sb/provider_surface_files.py"
+    ]
+  },
+  "actual_process_evidence": {
+    "path": "/var/tmp/managed-copy-acceptance-qw9vmk1c/result.json",
+    "sha256": "897e81ac8625ea68015a15bf1e78065cb8d5fa7355d84c9eef427841739f45f7",
+    "parent_pid": 3603902,
+    "cases": [
+      {
+        "operation": "correct",
+        "crash_exit": 77,
+        "recovery_pid": 3604949,
+        "state": "proved",
+        "before": {
+          "pid": 3604398,
+          "pointer_health": "tombstone_stale"
+        },
+        "after": {
+          "pid": 3605295,
+          "pointer_health": "healthy",
+          "search_counts": [
+            0,
+            1
+          ]
+        },
+        "archive_removed": true,
+        "export_removed": true,
+        "original_generation_removed": true,
+        "checkpoint_count": 1,
+        "scan_matches": 0,
+        "scan_errors": 0
+      },
+      {
+        "operation": "cancel",
+        "crash_exit": 77,
+        "recovery_pid": 3606476,
+        "state": "generation_active",
+        "before": {
+          "pid": 3605880,
+          "pointer_health": "tombstone_stale"
+        },
+        "after": {
+          "pid": 3606645,
+          "pointer_health": "healthy",
+          "search_counts": [
+            0,
+            0
+          ]
+        },
+        "archive_removed": true,
+        "export_removed": true,
+        "original_generation_removed": true,
+        "checkpoint_count": 1,
+        "scan_matches": 0,
+        "scan_errors": 0
+      }
+    ]
+  },
+  "source_sha256": {
+    "sb/managed_file_inspection.py": "f908f250365d5ee3a4030613d28d73b0766f52244417f2440a354c6d798bc015",
+    "sb/managed_copy_files.py": "542b970c8b38dbdaa9fe090a014b3268f9f97f2e55512aea29bd9cceccedb3cd",
+    "sb/managed_copy_disposal.py": "706e819be1fbcf75685477012a0a744e35204ecbf6e25ac70651b838258cbcee",
+    "sb/erasure.py": "2b351a1ad685c79669ba59c7bf555f192ce28ecdc12d76148dc7361097960307",
+    "sb/request_executor.py": "3e114ce23fd2934048ed9090a8f980aa2bc34fcccd70c445d6915fb3e76a7e1d",
+    "sb/correction_cancellation_executor.py": "e8d425c2d7126608c0f619635e7bf6190ddaf1d2a6bf31619ec70be0d32bb699",
+    "sb/cancellation_target.py": "368ed5010579d1659dbc94970bcefdeeeed9dfa303c1fcbf7c7d7d13150ab29a",
+    "sb/correction_cancellation_requests.py": "a3d7f3250870ffc41b993dafc0dca495de14f6a6da6cfe337cf06c15c31fe120",
+    "sb/request_store.py": "6bd7e2b90b645a6ff8f84de788f9eaabc1dcf2c0132e32cc41d39ced50949a15",
+    "sb/exports.py": "53626f62c59353e37fcc5a52d6dd0721718727e06533697e94f4717e82d78c98",
+    "sb/managed_surface_scan.py": "aaf760be3f35b12b1b310af44bffd68ad995531601721f05ff7e14428f5cb1e7",
+    "sb/provider_surface_files.py": "53bc735f3d14f575a5a2c38001fb422ab1e55f3dcd68a164e56f5c699221577b"
+  },
+  "first_reproduction": "/var/tmp/compressed-backup-gap-py1yhsoa/result.json",
+  "operational_mutations": 0,
+  "cancellation_signed_completion": false,
+  "jarvis_cursor_settlement": false,
+  "central_memory_goal_complete": false,
+  "holds": [
+    "unsupported ZIP/bzip2/xz/Git pack/sparse/concatenated-gzip and decode limits",
+    "retained unrelated tar.gz lifecycle manifest compatibility",
+    "inventory changed after original disposal; legacy missing checkpoint reconciliation",
+    "cancellation result/status/receipt/MCP/JARVIS cursor integration",
+    "native retention, scope ACL, source lineage, automatic capture/injection, app and operational acceptance"
+  ]
+}

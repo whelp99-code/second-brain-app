@@ -673,3 +673,19 @@ Node 취소 생산→Python6요청 프로세스 인수 및 잘못된 대상의 �
 복구·tombstone_stale→healthy/기존·취소 본문 검색0 확인. 남은 P0는 backup/export 등 사본
 처분, 결과·상태 조회·최종 서명 영수증과 자비스 seq1완료→정상V2seq2/cursor 연결이다.
 자동 취소 route/collector 확대 보류와 native·범위·계보·실제앱·검색·운영 전체 완성 조건을 유지한다.
+
+
+## 59. 압축 사본 검사·세대 전환 전 처분·재시작 체크포인트
+
+SB `461f7e3`: [상세 결함·실제 MCP/프로세스 인수·14개 잔여 우선 목록](MANAGED-COPY-DISPOSAL-ACCEPTANCE-2026-09-08.md).
+자비스 인계 현재판을 다시 대조하고 기존 SB 정본·JARVIS 실행·네 OSS 선별 흡수 방향을 유지했다.
+실제 gzip 원문 누락을 재현하고 tar/Git loose object를 포함한 제한된 해제 검사를 추가했다.
+정정·삭제·취소의 backup/export 처분을 원본 세대 제거 전에 실행한다. 내부 원장에는 원문 없이
+operation/세대/root/내용 목록 digest를 기록하고, 원본이 없을 때 증거 누락·내용 변경은 보류한다.
+
+기본 전체1,005통과/2skip(174.72초), 이후 추가 신규2통과, 정적0오류/0경고·lint통과.
+실제 정정/취소 각 원본 제거 후 exit77→별도 프로세스 복구, stdio MCP stale→healthy와 기존
+본문 검색0 확인. 취소의 결과는 내부 generation_active이며 최종 외부 완료 영수증은 아니다.
+미지원 압축/Git pack·남아 있는 tar.gz manifest·증거 변경 재조정과 최종 취소 결과/상태/서명
+영수증/MCP/JARVIS seq1완료→정상V2seq2 연결이 남는다. native·검증된 범위·계보·수집·실제앱·
+검색·GUI·운영 전체 완성 조건을 유지한다. 별도 DB/Proxy/OSS 설치와 운영 변경은 하지 않았다.

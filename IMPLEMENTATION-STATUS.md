@@ -4,7 +4,17 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 SB `b34b2a9`: [취소 대상의 원자 접수·백업 잠금 충돌 수정](CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `461f7e3`: [압축 백업·내보내기 처분과 실제 중단 복구](MANAGED-COPY-DISPOSAL-ACCEPTANCE-2026-09-08.md).**
+gzip/tar/Git loose object 안의 원문 누락을 재현하고 제한된 스트림 검사를 추가했다.
+정정·삭제·취소의 사본 처분을 세대 전환 전에 실행하고 원문 없는 메타데이터 체크포인트로
+재시작을 검증한다. 증거 누락/내용 변경은 보류하며 전환 전 새 백업은 재검사한다.
+기본 전체1,005통과/2skip, 이후 신규2통과, 변경 제품정적0오류/0경고·lint통과.
+실제 정정/취소 각 exit77→새 프로세스 복구와 MCP stale→healthy·기존 본문 검색0 확인.
+자비스 인계를 재대조하고 14개 잔여 우선 목록을 병합했다. 미지원 사본 형식/남는 tar.gz의
+manifest 인수·증거 재조정, 취소 최종 결과/서명 영수증/MCP/JARVIS cursor 및 native·범위·계보·
+실제 앱·검색·운영 전체 목표는 남는다. 자동 취소 route와 collector 확대는 보류한다.
+
+**이전 SB `b34b2a9`: [취소 대상의 원자 접수·백업 잠금 충돌 수정](CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md).**
 취소 접수에 실제 generation/target 고정을 필수로 결합하고 검사 후 현재 키/만료를 재검증한다.
 잘못된 세대·변조/특수 파일은 원장 위치를 바꾸지 않고 거부한다. 기존 백업 생성·검증의
 반대 잠금 순서를 실제2프로세스 검사로 재현하고 pending→generation→DB로 통일했다.
