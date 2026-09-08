@@ -6,6 +6,7 @@ import fcntl
 import os
 import secrets
 import stat
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -124,18 +125,21 @@ class _PendingPublication:
     name: str
     payload: bytes
     emitter: BoundBarrierEmitter
+    validate_recovery: Callable[[bytes, bytes], None] | None = None
+    max_bytes: int = MAX_ENVELOPE_BYTES
 
 
-def _recover_publication(path: Path, expected: bytes, *, links: int = 1) -> bytes:
+def _recover_publication(path: Path, expected: bytes, *, links: int = 1,
+    validate_recovery: Callable[[bytes, bytes], None] | None = None, max_bytes: int = MAX_ENVELOPE_BYTES) -> bytes:
     """Adopt only an exact earlier request, retaining its original acceptance."""
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
     try:
         before = os.fstat(fd)
-        if not safe_request_file(before, links) or before.st_size > MAX_ENVELOPE_BYTES:
+        if not safe_request_file(before, links) or before.st_size > max_bytes:
             raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
         payload = bytearray()
-        while len(payload) <= MAX_ENVELOPE_BYTES:
-            block = os.read(fd, MAX_ENVELOPE_BYTES + 1 - len(payload))
+        while len(payload) <= max_bytes:
+            block = os.read(fd, max_bytes + 1 - len(payload))
             if not block:
                 break
             payload.extend(block)
@@ -146,8 +150,11 @@ def _recover_publication(path: Path, expected: bytes, *, links: int = 1) -> byte
                 != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
                 or (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
                 != (visible.st_dev, visible.st_ino, visible.st_size, visible.st_mtime_ns, visible.st_ctime_ns)
-                or len(payload) > MAX_ENVELOPE_BYTES):
+                or len(payload) > max_bytes):
             raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
+        if validate_recovery is not None:
+            validate_recovery(bytes(payload), expected)
+            return bytes(payload)
         original = parse_remember_envelope(bytes(payload))
         current = parse_remember_envelope(expected)
         if (original.request != current.request or original.schema_version != current.schema_version
@@ -159,12 +166,22 @@ def _recover_publication(path: Path, expected: bytes, *, links: int = 1) -> byte
 
 
 def _publish(directory: Path, publication: _PendingPublication) -> bytes:
+    def recover(path: Path, expected: bytes, *, links: int = 1) -> bytes:
+        return _recover_publication(path, expected, links=links,
+            validate_recovery=publication.validate_recovery, max_bytes=publication.max_bytes)
+
+    if len(publication.payload) > publication.max_bytes:
+        raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
     name = publication.name
     payload = publication.payload
     directory_fd = os.open(
         directory,
         os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
     )
+    metadata = os.fstat(directory_fd)
+    if metadata.st_uid != os.getuid() or stat.S_IMODE(metadata.st_mode) != 0o700:
+        os.close(directory_fd)
+        raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
     temporary = f".{name}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
     file_fd: int | None = None
     try:
@@ -182,16 +199,16 @@ def _publish(directory: Path, publication: _PendingPublication) -> bytes:
                 if (temp_meta.st_dev, temp_meta.st_ino) != (final_meta.st_dev, final_meta.st_ino):
                     raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
             links = 2 if linked else 1
-            payload = _recover_publication(directory / name, payload, links=links)
+            payload = recover(directory / name, payload, links=links)
             for candidate in owned_temps:
-                if _recover_publication(candidate, payload, links=links) != payload:
+                if recover(candidate, payload, links=links) != payload:
                     raise StableRequestError("WRITE_REQUEST_INBOX_UNSAFE")
                 candidate.unlink()
                 os.fsync(directory_fd)
             return payload
         if owned_temps:
             candidate = owned_temps[0]
-            payload = _recover_publication(candidate, payload)
+            payload = recover(candidate, payload)
             temporary = candidate.name
             file_fd = os.open(
                 temporary,
@@ -230,7 +247,7 @@ def _publish(directory: Path, publication: _PendingPublication) -> bytes:
         publication.emitter.emit("pending_publish_fsync")
         return payload
     except FileExistsError:
-        return _recover_publication(directory / name, payload)
+        return recover(directory / name, payload)
     finally:
         if file_fd is not None:
             os.close(file_fd)
