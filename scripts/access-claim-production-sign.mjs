@@ -81,6 +81,7 @@ try {
       let referenceCheck;
       let pendingReference;
       let reader;
+      let scopedCliOptions;
       let callbacks = 0;
       if (profile === 'scoped-record-read-v2') {
         const { createProductionScopedMemory } = await moduleAt('src/memory-scoped-production.js');
@@ -90,6 +91,14 @@ try {
           read_fence_config: config, projection_key_path: projectionPath, clock: () => new Date(body.issued_at),
           transport_options: { launcherPath: body.transport.launcher, configPath: body.transport.config,
             contractPath: body.transport.contract } };
+        scopedCliOptions = productionOptions;
+        const { execute } = await moduleAt('src/cli-runtime.mjs');
+        const cli = await execute(['memory', 'context', 'Cited', '--db', db.path, '--max_bytes', '32768'], {
+          clock: () => new Date(body.issued_at), scopedMemoryReferenceOptions: productionOptions,
+        });
+        if (cli.command !== 'memory.context' || cli.context.records.length === 0
+          || Buffer.byteLength(JSON.stringify({ version: 1, ...cli }) + '\n') > 32768)
+          throw new Error('scoped CLI context or envelope budget invalid');
         const owned = createProductionScopedMemory(db.authority, productionOptions);
         try {
           const found = await owned.reader.read('Cited', { max_records: 8, max_record_bytes: 4096, max_bytes: 32768 });
@@ -147,9 +156,20 @@ try {
         substituteEmptyGeneration = false;
         if (!generationDenied) throw new Error('empty generation substitution accepted');
         pendingReference = await reader.read('Cited', budgets);
-        referenceCheck = { independent_process_replay: processReplay, production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
+        referenceCheck = { scoped_cli_records: cli.context.records.length, scoped_cli_budget_verified: true, independent_process_replay: processReplay, production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
       }
       currentCookie = undefined;
+      if (scopedCliOptions) {
+        const { execute } = await moduleAt('src/cli-runtime.mjs');
+        let cliDenied = false;
+        try {
+          await execute(['memory', 'context', 'Cited', '--db', db.path], {
+            clock: () => new Date(body.issued_at), scopedMemoryReferenceOptions: scopedCliOptions,
+          });
+        } catch (error) { if (error.code !== 'MEMORY_ACCESS_SCOPE_UNAVAILABLE') throw error; cliDenied = true; }
+        if (!cliDenied) throw new Error('scoped CLI accepted missing authentication');
+        referenceCheck.scoped_cli_missing_cookie_denied = true;
+      }
       if (reader) {
         let denied = false;
         try { await reader.submit(pendingReference, async () => { callbacks++; }); }
