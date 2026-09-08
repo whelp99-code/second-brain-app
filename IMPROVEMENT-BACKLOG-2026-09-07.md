@@ -532,3 +532,15 @@ fresh DB에서 이전 세션 차단 및 대상 HMAC 8개 byte 불검출, native 
 native 모델 실행에 사용한 session ID는 합성 adapter 값이다. 실제 앱의 session/compaction
 관측과 수신 fence는 미완료다. 외부 전송과 DB의 전역 원자성, 범위·자동 capture·근거 충분성,
 운영/DR 전체 완료를 주장하지 않는다. 다음 순서는 실제 앱 adapter와 검증된 범위 연결이다.
+
+
+## 44. B5/C6·C7 실제 native 세션과 추가 원문 보존 표면
+
+SB `94ea45a`: [실제 UUID 인수·native SQLite 잔류](NATIVE-SESSION-ACCEPTANCE-2026-09-08.md).
+실제 UUID 5개, bootstrap 5회 + resume 5회 통과. JARVIS `6e101fc` 원장의 중복·무효화 세션 재개 차단 확인.
+Node 20개/Python 12개 통과. 원장 상태는 callback_completed이며 native 확인 영수증의 제품 저장과 동일하지 않다.
+
+provider 삭제 후 rollout 3개 외 thread_history_1.sqlite에도 확인값이 남았다. 다음 managed surface
+계약은 이 DB·부속파일·rollout·백업을 함께 포함해야 한다. ephemeral resume도 원문이 남았으므로
+옵션 이름을 비보존 보장으로 사용하지 않는다. native 상태 감사는 권한 예외 1개로 exit 1이며 전체
+정상/삭제 완료로 격상하지 않는다. 실제 앱 연결·범위·compaction·자동 capture·운영/DR은 계속 미완료다.

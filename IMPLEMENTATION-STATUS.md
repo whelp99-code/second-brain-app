@@ -4,6 +4,15 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 SB 인수 `94ea45a`: [실제 native UUID·원문 보존 표면](NATIVE-SESSION-ACCEPTANCE-2026-09-08.md).**
+자비스 제품 `6e101fc`를 재사용해 실제 Codex bootstrap 5회와 exact UUID resume 5회(총10회)
+모델 인수를 통과했다. 원장 중복·무효화된 native 세션의 callback은 차단됐다. Node20/Python12
+회귀 통과. 설치 실행체 사본 고정·umask0077·plugins/hooks 자동기능 비활성화를 추가했다.
+삭제 후 rollout 3개 외에 thread_history_1.sqlite에도 원문 확인값이 남음을 실측했다.
+권한 감사는 native 상태의 비공개가 아닌 객체1개 때문에 exit1을 유지하며 nativeHome 폐기
+사실과 구분한다. 운영 native 연결은 이 DB/rollout/백업의 관리형 보존·삭제 계약 전까지 보류.
+실제 앱 채택·compaction·범위·자동수집·운영/DR 전체 목표는 미완료이며 제품/운영 변경은 없다.
+
 **최신 자비스 제품 `6e101fc`, SB 인수 도구 `fd9df47`: [영구 전달 원장·14개 잔여 우선 목록](REFERENCE-DELIVERY-JOURNAL-ACCEPTANCE-2026-09-08.md).**
 필수 session의 submitInSession과 기존 객체 단위 submit을 분리했다. 키 고정·영구 claim·
 불확실 재전송 차단·개인정보 transaction의 전역 세션 무효화·token 제거를 구현했다.

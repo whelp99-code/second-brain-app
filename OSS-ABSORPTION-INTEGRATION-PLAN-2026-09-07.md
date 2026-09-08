@@ -548,3 +548,15 @@ code-brain·memory-bank의 문맥/세션 장점 중 제출 경계만 구현한 �
 에이전트별 DB/OSS 소스 복사는 없다. 합성 adapter session ID를 실제 native session 연동으로
 계산하지 않는다. Tencent식 검증된 사용자/프로젝트 범위와 실제 앱 채택, LightRAG 후보의
 검색 근거 충분성·지연·평가, GUI/운영/DR 조건을 후속 필수 작업으로 유지한다.
+
+
+## 49. memory-bank/code-brain 세션 장점의 실제 native 검증
+
+[실제 UUID 전달과 native 원문 보존](NATIVE-SESSION-ACCEPTANCE-2026-09-08.md)으로 합성 session ID에서
+실제 Codex 세션으로 인수를 확장했다. 기존 SB/JARVIS를 재사용했고 native 모델 10회와 원장 차단을
+검증했다. 새 실행기/기억서버/Proxy를 제품에 도입한 단계는 아니다.
+
+code-brain/memory-bank식 문맥 관리에는 provider 삭제뿐 아니라 native rollout과 thread_history
+SQLite·백업의 보존/폐기가 필요하다는 실측을 추가했다. 설치 CLI의 기본 플러그인 자산 다운로드도
+별도 fixture에서 관측해 명시적으로 비활성화했다. 검증용 실행체 사본과 다운로드 관측은 OSS 소스를
+제품에 채택했다는 뜻이 아니다. native 제품 연결은 관리형 보존 계약까지 보류하고 기존 범위/운영 목표를 유지한다.
