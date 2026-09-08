@@ -874,3 +874,7 @@ provider status/accepted 및 대상은 fixture이며 상태 reconciling이다. �
 
 **2026-09-09 실행 중 정책·키 철회 반영 `867d65b`: [동일 MCP 연결의 설정 변경·조회 중 만료 차단](SCOPED-MCP-POLICY-REFRESH-2026-09-09.md).**
 고정된 설정 경로를 조회 전후 다시 읽고 세션/저장소 변경은 거부한다. 키 철회·손상·설정 삭제·조회 중 만료 시 본문 반환을 차단한다. 최종관련30통과/4.31초·Ruff/diff·정적0오류/0경고. 실제 stdio 동일 연결의 변경 거부·복원·재시작 반복을 인수했다. 운영 resolver·나머지 표면·정책 rollback/복구 및 전체 목표는 남는다.
+
+
+**2026-09-09 제한 검색 `d561f63`: [허용 record 선택 후 limit·실제 서명 검색·새 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md).**
+제한 연결에 sb_search를 추가하고 전체 페이지 범위 검사 후 lexical record를 선택한다. query/limit 서명 결합, 불허 snippet/score 제외. 최종31통과/5.56초·Ruff/diff·정적0오류/0경고, 실제 issuer→stdio 검색2개·limit 변조 거부. 같은 adapter 여러 root가 첫 source만 수집되는 P0 결손을 새로 확인했으며 다음 수정 대상이다. 나머지 운영 목표는 유지한다.
