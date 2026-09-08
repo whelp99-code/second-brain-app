@@ -1,0 +1,403 @@
+{
+  "state": "process_fix_and_native_smoke_verified_full_quality_evaluation_running",
+  "product_commit": "0834e86c86ee6caa932942c8fcca3de2341efb6c",
+  "full_tests": {
+    "passed": 897,
+    "skipped": 2,
+    "seconds": 119.83
+  },
+  "focused_tests": {
+    "passed": 54,
+    "skipped": 1,
+    "seconds": 11.41
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "ruff": "passed",
+  "native_smoke": {
+    "state": "measured",
+    "workspace": "/var/tmp/sb-korean-search-ke_0sj7w",
+    "started_at": "2026-09-08T04:53:06.276619+00:00",
+    "dataset_id": "korean-model-boundary-smoke-v1",
+    "dataset_origin": "synthetic",
+    "provenance": "기존 합성 기준선에서 자연어/의역/무정답 첫 사례 각 1개를 선택한 실제 모델 CLI/MCP 실행 경계 검사. 전체 품질 인수 아님.",
+    "dataset_sha256": "97235c462e96528906295db73e4e8f0aa740e455ed61e8a2a0c3dc38fa68236f",
+    "source_tree_sha256": "8e93f7b6ef2e5e982557b7223f9c7b3332ed4d7ca1b3d44556056e2e9a181b37",
+    "harness_sha256": "5bf2e85b7cda52ce453c6ac0f2a09a35636c7c9fcd4111e0783d46d0c6916659",
+    "metrics_sha256": "f8d37b952bde7bb3eb433fc9bc6d4f14a7bc194b48dc1eff9850799794fada1e",
+    "commit": "6b32416f7aaf84b1698ce676fb277dad43cc8f23",
+    "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+    "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+    "load_average_before": [
+      1.7939453125,
+      1.38818359375,
+      1.8056640625
+    ],
+    "documents": 20,
+    "cases": 3,
+    "limit": 5,
+    "limitations": [
+      "isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
+      "single trusted owner at genesis; no scope, supersession or deletion test",
+      "SDK stdio MCP, not agent app injection; hybrid True",
+      "synthetic data cannot replace the real-user 100–300 question acceptance",
+      "small corpus, one pass; latency is diagnostic, not capacity certification"
+    ],
+    "embedding": {
+      "model_id": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "dim": 1024,
+      "row_count": 20,
+      "rows_digest": "sha256:fbb0d5c9d2e7a8a39f8dc652d6250241009f550e4d8432982536a37baa82fadb"
+    },
+    "vault_before": "9002547be0073f3c539e5b53bebe8267b81b02f335757dfcb5a6f0d221d7c122",
+    "completed_cases": 3,
+    "metrics": {
+      "cli": {
+        "overall": {
+          "positive_cases": 2,
+          "negative_cases": 1,
+          "hit_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "mrr_at_5": 1.0,
+          "negative_empty_rate": 0.0
+        },
+        "by_kind": {
+          "natural_question": {
+            "positive_cases": 1,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          },
+          "no_answer": {
+            "positive_cases": 0,
+            "negative_cases": 1,
+            "hit_at_1": null,
+            "recall_at_5": null,
+            "mrr_at_5": null,
+            "negative_empty_rate": 0.0
+          },
+          "paraphrase": {
+            "positive_cases": 1,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          }
+        }
+      },
+      "mcp": {
+        "overall": {
+          "positive_cases": 2,
+          "negative_cases": 1,
+          "hit_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "mrr_at_5": 1.0,
+          "negative_empty_rate": 0.0
+        },
+        "by_kind": {
+          "natural_question": {
+            "positive_cases": 1,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          },
+          "no_answer": {
+            "positive_cases": 0,
+            "negative_cases": 1,
+            "hit_at_1": null,
+            "recall_at_5": null,
+            "mrr_at_5": null,
+            "negative_empty_rate": 0.0
+          },
+          "paraphrase": {
+            "positive_cases": 1,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          }
+        }
+      }
+    },
+    "latency": {
+      "cli_search": {
+        "count": 3,
+        "p50_ms": 6462.402161676437,
+        "p95_ms": 6489.404716063291,
+        "max_ms": 6489.404716063291
+      },
+      "mcp_search": {
+        "count": 3,
+        "p50_ms": 6200.264151208103,
+        "p95_ms": 6241.31307983771,
+        "max_ms": 6241.31307983771
+      },
+      "mcp_read": {
+        "count": 15,
+        "p50_ms": 34.19802989810705,
+        "p95_ms": 43.28620806336403,
+        "max_ms": 43.28620806336403
+      }
+    },
+    "generation": {
+      "provider_instance_id": "provider:second-brain:linux",
+      "generation_id": "sbgen:v1:a388b36e0925f502d1c90f675c862462da123eb2f04fa6a4cd88cc7b53a4d9f6",
+      "generation_manifest_digest": "sha256:a388b36e0925f502d1c90f675c862462da123eb2f04fa6a4cd88cc7b53a4d9f6",
+      "vault_head": "04d287be557e9c17da71982e772022f79d7167eb",
+      "vault_tree": "a1ce6999fec3819821e1b34dfe8beab6c43458df",
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    },
+    "selected_record_checks": 15,
+    "gold_answer_checks": 2,
+    "sealed_files_unchanged": true,
+    "finished_at": "2026-09-08T04:53:58.006824+00:00",
+    "artifact_sha256": {
+      "dataset.json": "97235c462e96528906295db73e4e8f0aa740e455ed61e8a2a0c3dc38fa68236f",
+      "cli.jsonl": "3fcd62b51bb5515ed073d33628fc44ba0c1a68bbbdd520ceb16c4f0308b0ca6c",
+      "mcp.jsonl": "929c421a2964dae079c5174e3993f45343d1af5051b7bbec9152188131013857",
+      "rankings.jsonl": "28f9cd603d3a0ccdac2dfa5a049cb34de881657992416730e779109624f634ba"
+    }
+  },
+  "lexical_baseline": {
+    "state": "measured",
+    "workspace": "/var/tmp/sb-korean-search-ek7bhffb",
+    "started_at": "2026-09-08T04:49:13.814110+00:00",
+    "dataset_id": "korean-synthetic-regression-v1",
+    "dataset_origin": "synthetic",
+    "provenance": "합성 개발·업무 시나리오. 실제 사용자 질문/개인 기록이 아니며 최종 실사용 품질 인수를 대신하지 않는다.",
+    "dataset_sha256": "8f82e7f1b431766c2a39e018055daa56dcd9430fd67a572c07065f6c1e9d3c55",
+    "source_tree_sha256": "3860d377f4e0ba88296c091f3c26bdfa9fc7b7cff6982fef2382da2572bc91d2",
+    "harness_sha256": "5bf2e85b7cda52ce453c6ac0f2a09a35636c7c9fcd4111e0783d46d0c6916659",
+    "metrics_sha256": "f8d37b952bde7bb3eb433fc9bc6d4f14a7bc194b48dc1eff9850799794fada1e",
+    "commit": "6b32416f7aaf84b1698ce676fb277dad43cc8f23",
+    "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+    "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+    "load_average_before": [
+      0.431640625,
+      0.91259765625,
+      1.80126953125
+    ],
+    "documents": 20,
+    "cases": 100,
+    "limit": 5,
+    "limitations": [
+      "isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
+      "single trusted owner at genesis; no scope, supersession or deletion test",
+      "SDK stdio MCP, not agent app injection; hybrid False",
+      "synthetic data cannot replace the real-user 100–300 question acceptance",
+      "small corpus, one pass; latency is diagnostic, not capacity certification"
+    ],
+    "vault_before": "f59431b004d0245dc023317c805eb7c7a7fddcec9115d521570bb2663e3ee67b",
+    "completed_cases": 100,
+    "metrics": {
+      "cli": {
+        "overall": {
+          "positive_cases": 90,
+          "negative_cases": 10,
+          "hit_at_1": 0.6555555555555556,
+          "recall_at_5": 0.6666666666666666,
+          "mrr_at_5": 0.6611111111111111,
+          "negative_empty_rate": 1.0
+        },
+        "by_kind": {
+          "exact_phrase": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          },
+          "keyword": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 0.95,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 0.975,
+            "negative_empty_rate": null
+          },
+          "natural_question": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 0.0,
+            "recall_at_5": 0.0,
+            "mrr_at_5": 0.0,
+            "negative_empty_rate": null
+          },
+          "no_answer": {
+            "positive_cases": 0,
+            "negative_cases": 10,
+            "hit_at_1": null,
+            "recall_at_5": null,
+            "mrr_at_5": null,
+            "negative_empty_rate": 1.0
+          },
+          "paraphrase": {
+            "positive_cases": 10,
+            "negative_cases": 0,
+            "hit_at_1": 0.0,
+            "recall_at_5": 0.0,
+            "mrr_at_5": 0.0,
+            "negative_empty_rate": null
+          },
+          "reordered_terms": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          }
+        }
+      },
+      "mcp": {
+        "overall": {
+          "positive_cases": 90,
+          "negative_cases": 10,
+          "hit_at_1": 0.6555555555555556,
+          "recall_at_5": 0.6666666666666666,
+          "mrr_at_5": 0.6611111111111111,
+          "negative_empty_rate": 1.0
+        },
+        "by_kind": {
+          "exact_phrase": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          },
+          "keyword": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 0.95,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 0.975,
+            "negative_empty_rate": null
+          },
+          "natural_question": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 0.0,
+            "recall_at_5": 0.0,
+            "mrr_at_5": 0.0,
+            "negative_empty_rate": null
+          },
+          "no_answer": {
+            "positive_cases": 0,
+            "negative_cases": 10,
+            "hit_at_1": null,
+            "recall_at_5": null,
+            "mrr_at_5": null,
+            "negative_empty_rate": 1.0
+          },
+          "paraphrase": {
+            "positive_cases": 10,
+            "negative_cases": 0,
+            "hit_at_1": 0.0,
+            "recall_at_5": 0.0,
+            "mrr_at_5": 0.0,
+            "negative_empty_rate": null
+          },
+          "reordered_terms": {
+            "positive_cases": 20,
+            "negative_cases": 0,
+            "hit_at_1": 1.0,
+            "recall_at_5": 1.0,
+            "mrr_at_5": 1.0,
+            "negative_empty_rate": null
+          }
+        }
+      }
+    },
+    "latency": {
+      "cli_search": {
+        "count": 100,
+        "p50_ms": 228.06988982483745,
+        "p95_ms": 234.73382787778974,
+        "max_ms": 245.0288301333785
+      },
+      "mcp_search": {
+        "count": 100,
+        "p50_ms": 34.37711810693145,
+        "p95_ms": 40.18926061689854,
+        "max_ms": 64.12853812798858
+      },
+      "mcp_read": {
+        "count": 64,
+        "p50_ms": 32.13003929704428,
+        "p95_ms": 35.2180739864707,
+        "max_ms": 37.58078394457698
+      }
+    },
+    "generation": {
+      "provider_instance_id": "provider:second-brain:linux",
+      "generation_id": "sbgen:v1:e219e4e19057187336cbe787e53bb83bb36842eac87a7b8477f25a011f120c57",
+      "generation_manifest_digest": "sha256:e219e4e19057187336cbe787e53bb83bb36842eac87a7b8477f25a011f120c57",
+      "vault_head": "04d287be557e9c17da71982e772022f79d7167eb",
+      "vault_tree": "a1ce6999fec3819821e1b34dfe8beab6c43458df",
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    },
+    "selected_record_checks": 64,
+    "gold_answer_checks": 60,
+    "sealed_files_unchanged": true,
+    "finished_at": "2026-09-08T04:49:43.373750+00:00",
+    "artifact_sha256": {
+      "dataset.json": "8f82e7f1b431766c2a39e018055daa56dcd9430fd67a572c07065f6c1e9d3c55",
+      "cli.jsonl": "c1f985c2fd4fee8d2942b6cb12fd1f44eb80c57a0ef60fb145f0000a1d31b101",
+      "mcp.jsonl": "241636570e0404e148acb0000a39283de53f20653b608f0a294e1d750532f347",
+      "rankings.jsonl": "17d26e4f0afecdd5d39db05310f8898b4de97009debf72ffa0540a652a74697b"
+    }
+  },
+  "full_hybrid_pending": {
+    "source_commit": "6b32416",
+    "source_worktree": "/var/tmp/sb-real-hybrid-source-lf3v04aj",
+    "evidence": "/var/tmp/sb-korean-search-kp_nacfr/evidence.json",
+    "log": "/var/tmp/sb-korean-real-hybrid-full.log",
+    "terminal_session_id": 26716
+  },
+  "logs": {
+    "initial_failures": {
+      "path": "/var/tmp/sb-embedding-process-before.log",
+      "sha256": "ae0189487a6349b418cd6b1126287a7cf202f3e78db97c7a9066c776abc49d09"
+    },
+    "focused": {
+      "path": "/var/tmp/sb-embedding-process-focused.log",
+      "sha256": "12488698d11b36043000b5bf2ad550d6d440de7ddd1a94d7b4e1780d0ca55961"
+    },
+    "full": {
+      "path": "/var/tmp/sb-embedding-process-full.log",
+      "sha256": "6df659b00bf77fcb736cf1a9381baa0f969014551a096f568e05f86d69dd34a5"
+    },
+    "types": {
+      "path": "/var/tmp/sb-embedding-process-types-final.log",
+      "sha256": "56882e01cb80173ef053c4096e4ee43e3123a15f5c0a06715f96988d48fbd91c"
+    },
+    "download_verification": {
+      "path": "/var/tmp/sb-bge-model-verify.log",
+      "sha256": "5705187a644e39a354129ae663c0d0ffdee6db5af0a0d8b59e2dfddbacffbee0"
+    },
+    "missing_model_gate": {
+      "path": "/var/tmp/sb-korean-hybrid-missing-model.log",
+      "sha256": "a5863a147cb9593df3eabad1b3fa46dad5f377b468865a39bf6867a8b7847b20"
+    }
+  },
+  "operational_activation": false,
+  "notes": [
+    "smoke is three synthetic questions, not complete real-user quality acceptance",
+    "do not restart pending evaluation based on elapsed time alone",
+    "the full hybrid evaluation pins code before process-boundary fix; normal encoder algorithm is unchanged"
+  ]
+}

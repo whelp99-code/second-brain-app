@@ -4,6 +4,14 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 제품 `0834e86`: [실제 모델 실행 경계·평가](REAL-EMBEDDING-PROCESS-2026-09-08.md).**
+실제 BGE-M3에서 부분 캐시의 온라인 로딩·무제한 대기·잘못된 출력의 fallback 누락을 확인하고
+offline 인코딩·60초 자식 timeout·오류 정규화를 적용했다. 전체 **897 passed/2 skipped**,
+집중 **54 passed/1 skipped**, Ruff/타입 통과. 실제 CLI/MCP 자연어·의역 각 1건의 정답 1위,
+무정답 1건의 후보 5개 노출과 검색 약 6초를 측정했다. 운영 hybrid 활성화는 계속 보류한다.
+일반 검색의 합성 100질문은 60/90 회수·무정답 10/10 빈 결과로 재확인했다. 실제 모델 100질문은
+고정된 별도 worktree에서 진행 중이며 완료로 계산하지 않는다. 실행/재개 경로는 위 보고서를 따른다.
+
 **최신 제품 `cbb910d`: [봉인 의미 검색 구현·인수](SEALED-VECTOR-ACCEPTANCE-2026-09-08.md).**
 명시적 hybrid 설정에서 인용 레코드 벡터를 같은 세대에 봉인하고 CLI/HTTP/MCP 검색에 연결했다.
 모델·레코드/벡터 digest 결합, 변경 레코드만 인코딩, 정정·삭제 시 이전 벡터 제거와 모델 장애의
