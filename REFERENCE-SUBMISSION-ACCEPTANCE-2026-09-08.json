@@ -1,0 +1,176 @@
+{
+  "state": "guarded_submission_verified_session_receipts_pending",
+  "jarvis_product_commit": "8e233c7802511fff13b9571ed182f1c7b547cf74",
+  "sb_harness_commit": "4e3a8de876480ed1e4bb4007a4bd8cf44e32daf0",
+  "build": {
+    "source": {
+      "head": "8efb2b49060782a5b83fddeb9b4bc2f4831afc9c",
+      "dirty": true,
+      "input_digest": "sha256:6903df8e1339a15071539e81407dc6e9a2c361e607894513bda1de8e01a50ee3",
+      "input_file_count": 1232,
+      "toolchain": {
+        "node": "v24.19.0",
+        "modules": "137",
+        "platform": "linux",
+        "arch": "x64",
+        "typescript": "5.9.3"
+      }
+    },
+    "artifact_digest": "sha256:aca0701b0b8d5710e305a40d66971c5f5fb3d1fc9a15bf140bee0fc8e4c33974"
+  },
+  "tests": {
+    "focused_passed": 70,
+    "focused_files": 3,
+    "seconds": 28.86,
+    "typecheck": "passed",
+    "lint": "passed",
+    "native_event_auditor_passed": 14
+  },
+  "review": {
+    "model": "gpt-5.6-sol",
+    "initial_findings": [
+      "empty-result deadline missing",
+      "malformed object incorrectly classified inside DB transaction"
+    ],
+    "intermediate_failure": "current outcome lacks top-level fresh_until; typecheck and regression caught this before acceptance",
+    "final": "no actionable correctness finding; finite deadline and malformed mutation handling verified",
+    "extra_boundary_test": "current result with all records omitted expires at exactly checked_at+60s"
+  },
+  "native": {
+    "status": "native_model_consumed_reference",
+    "fixture_origin": "synthetic",
+    "root": "/var/tmp/sb-reference-model-89azeB",
+    "build": "/var/tmp/sb-reference-submit-build-verified",
+    "frozen_source": {
+      "sb": "sha256:a0c859369ec3226ceff0099b948decf89aea56f9be3d18253f015ad26c6cb2b9",
+      "jarvis": "sha256:cb5e6de7d6b53078902ec701e659db2db9cd6080072a7b9bd1624e8fd59ee9e1"
+    },
+    "lifecycle": true,
+    "guarded": true,
+    "correction": {
+      "request_id": "memeff:req:v2:aac38e317db24904a36f04f7748ec42ce4a44118915f5c738e4cb82aad0fe57a",
+      "provider_state": "proved",
+      "proof_id": "sbproof:v1:f72e121f8c24427f7b4b117968794a70351bcade5c1e329760f0422e46130c5c",
+      "observation_kind": "correction",
+      "tombstone_sequence": 1
+    },
+    "stale_before_correction_blocked": true,
+    "corrected_model": {
+      "response": {
+        "state": "answered",
+        "answer": "ab08893d0f362d3094bee578cd22db4c",
+        "record_id": "sbrecord:v1:44237825ce9b90ef4ca367a157a1e177c6fed93234cb84f12ab145992019ccb7",
+        "record_digest": "sha256:44237825ce9b90ef4ca367a157a1e177c6fed93234cb84f12ab145992019ccb7",
+        "text_digest": "sha256:90036271347ce0967450d843d584538810483e8a39b97d6eeb94a4d53e9aa518",
+        "source_identity_full": "cf7baa02a46c64215a2fd010fef29935f1b8ee5c86bb4847e10e33a484810488",
+        "generation_id": "sbgen:v1:49b1aa93bb4f0e35c08cd3f1ea734ee2c8ea68a14273914ffcd22962f47f0264"
+      },
+      "thread_id": "01a07fa2-8378-78b0-b347-812ac575cf44",
+      "elapsed_ms": 13945,
+      "prompt_digest": "sha256:1031d504bb03f94abcbbb969091a0acd770b0f65b875663d858d3641928b430b",
+      "response_digest": "sha256:0498841b850a276e439e1bb7e3378ce5174e5604555d21b58402bf56e67594e7",
+      "context_digest": "sha256:893e212030bea7ca3ef384568b0801a4f24d53721947592e15a14b48c60a12e7"
+    },
+    "during_delete_model": {
+      "response": {
+        "state": "answered",
+        "answer": "ab08893d0f362d3094bee578cd22db4c",
+        "record_id": "sbrecord:v1:44237825ce9b90ef4ca367a157a1e177c6fed93234cb84f12ab145992019ccb7",
+        "record_digest": "sha256:44237825ce9b90ef4ca367a157a1e177c6fed93234cb84f12ab145992019ccb7",
+        "text_digest": "sha256:90036271347ce0967450d843d584538810483e8a39b97d6eeb94a4d53e9aa518",
+        "source_identity_full": "cf7baa02a46c64215a2fd010fef29935f1b8ee5c86bb4847e10e33a484810488",
+        "generation_id": "sbgen:v1:49b1aa93bb4f0e35c08cd3f1ea734ee2c8ea68a14273914ffcd22962f47f0264"
+      },
+      "thread_id": "01a07fa2-baa5-74e2-bcc3-2c7f3e17534c",
+      "elapsed_ms": 12827,
+      "prompt_digest": "sha256:83316386163c735390acd9ce7060e0fa2a3f7a903c9e792719c02b244dcf98f9",
+      "response_digest": "sha256:0498841b850a276e439e1bb7e3378ce5174e5604555d21b58402bf56e67594e7",
+      "context_digest": "sha256:0c817994228d574047c8d1e073e3d03c35e2662d95d6a0e22de40d0f04ee58c1"
+    },
+    "deletion": {
+      "request_id": "memeff:req:v2:53b5bfafea000b53b129855a34056728a1050b887d28069d42e74f55a983e1b3",
+      "provider_state": "proved",
+      "proof_id": "sbproof:v1:5317d393c25d8da2568f4c3c4e6af53d707b9dc3199265a55b1767127ce8b888",
+      "observation_kind": "deletion",
+      "tombstone_sequence": 2
+    },
+    "changed_during_callback_result_withheld": true,
+    "deleted_model": {
+      "response": {
+        "state": "no_data",
+        "answer": null,
+        "record_id": null,
+        "record_digest": null,
+        "text_digest": null,
+        "source_identity_full": null,
+        "generation_id": null
+      },
+      "thread_id": "01a07fa2-f4fb-7413-be97-9bd91e0ef512",
+      "elapsed_ms": 10402,
+      "prompt_digest": "sha256:f255317bc5e88df1e7ba30786a6a64adb3980053f7e2b057c77c867ad61f83aa",
+      "response_digest": "sha256:bc4131789a9f2246215ccb5e6c4ed31fb2d930c83ee175f0899590d7b0d817ff",
+      "context_digest": "sha256:b26db89ce205341559767023f8183f28d101c3162524d9a9096211d11dbd05e4"
+    },
+    "already_submitted_replay_blocked": true,
+    "fresh_read_after_retained_probe": 0,
+    "storage": {
+      "personal_context_snapshots": 0,
+      "personal_context_memory_evidence": 0,
+      "memory_projection_dependencies": 0
+    },
+    "database_root": "/var/tmp/jarvis-task27-memory-JyZVQ3",
+    "model": "gpt-5.6-sol",
+    "codex_version": "codex-cli 0.153.4",
+    "negative": {
+      "response": {
+        "state": "no_data",
+        "answer": null,
+        "record_id": null,
+        "record_digest": null,
+        "text_digest": null,
+        "source_identity_full": null,
+        "generation_id": null
+      },
+      "thread_id": "01a07fa2-146f-73a3-a728-38c5aada4049",
+      "elapsed_ms": 8611,
+      "prompt_digest": "sha256:a8c0570679670d31bbf0feff0cdfe01fd834d59a5b3fd413b93a36204e0e1bf8",
+      "response_digest": "sha256:bc4131789a9f2246215ccb5e6c4ed31fb2d930c83ee175f0899590d7b0d817ff",
+      "context_digest": "sha256:ab72667940b5ae07a3ca8006ae8c320ece74ae943da5f8ce7bf209d756e5cc57"
+    },
+    "positive": {
+      "response": {
+        "state": "answered",
+        "answer": "9ad5126eba970eae308134eddb1c1386",
+        "record_id": "sbrecord:v1:9de547450538d64762c55998ff2d77b3d4cd28c6929088f9b5656cbb4bda5df5",
+        "record_digest": "sha256:9de547450538d64762c55998ff2d77b3d4cd28c6929088f9b5656cbb4bda5df5",
+        "text_digest": "sha256:7d9b529b2d38f126713e71a145818dff62fa5520d4ca5a2395751a542c5af738",
+        "source_identity_full": "5bdc4b126a8920a25888f4ebf83933201c31d2a717e020c999745568cf1a5521",
+        "generation_id": "sbgen:v1:37d2307e028c8bb4782973821cc98b9473eae349b1dc31f3dcd139eb3ed4a1cc"
+      },
+      "thread_id": "01a07fa2-36c7-7fa3-a4c4-69df7d2bd367",
+      "elapsed_ms": 16511,
+      "prompt_digest": "sha256:16e2dc4441a8b7e2f87bf44872c2382ca13751c15869f2c3353850029512154b",
+      "response_digest": "sha256:cb465ebc56675db54bd9761b24fa105eb1b60d4f715c9c225ac99c6763939b90",
+      "context_digest": "sha256:88d60117d53dfbdf4e03ae0dfcf8e39c02b4c5335f0ce85a50bf3cddd6f72e17"
+    },
+    "provider_rechecked_after_model": true,
+    "confirmation_level": "native_turn_completed_and_exact_answer_with_provenance",
+    "automatic_injection_enabled": false,
+    "session_compaction_acceptance": false,
+    "post_delivery_invalidation_acceptance": false,
+    "production_receipt_persisted": false
+  },
+  "absent_native_artifacts": [
+    "stale-after-correction.model.jsonl",
+    "stale-after-correction.prompt.json",
+    "retained-before-correction.model.jsonl",
+    "retained-before-correction.prompt.json"
+  ],
+  "limitations": [
+    "reader-local issued object only; no cross-process or session-wide claim",
+    "callback result rechecked; not a persistent native delivery receipt",
+    "status is a snapshot; no atomic global provider/consumer lock",
+    "already submitted bytes cannot be retracted; automatic injection/compaction remain pending",
+    "existing CLI JSON output may still be used outside the guarded API"
+  ]
+}

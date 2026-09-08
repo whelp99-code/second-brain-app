@@ -4,7 +4,15 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 실제 소비 검증 `8cb5dd5`: [모델 정정·삭제·과거 사본 재전송](REFERENCE-MODEL-LIFECYCLE-2026-09-08.md).**
+**최신 자비스 제품 `8e233c7`, SB 도구 `4e3a8de`: [참고 문맥의 보호된 제출](REFERENCE-SUBMISSION-ACCEPTANCE-2026-09-08.md).**
+기존 reader가 발급한 문맥을 객체당 한 번 제출하고 전송 직전/완료 뒤 provider·privacy·만료를
+재검사한다. 실제 모델 인수에서 준비 후 정정과 이미 제출한 객체의 재전송은 추가 모델 호출 없이
+차단됐고, 모델 callback 중 삭제는 결과 반환을 막았다. 최신 값/삭제 후 no_data 정상 제출 유지.
+관련 70 passed, event 감사 14 passed, tsc/lint 통과 및 별도 모델 독립 검토 완료.
+영구 session/epoch claim·native receipt·compaction·삭제된 세션 후속 처리·실제 앱 채택은
+미완료다. 객체 단위 WeakMap을 영구 전달 원장으로 계산하지 않는다. 운영 변경은 수행하지 않았다.
+
+**이전 실제 소비 검증 `8cb5dd5`: [모델 정정·삭제·과거 사본 재전송](REFERENCE-MODEL-LIFECYCLE-2026-09-08.md).**
 자비스 `110227e`의 새 격리 빌드로 실제 CLI/MCP→모델 5개 독립 요청을 실행했다. 정정 후 새 값과
 출처를 회수하고 삭제 후 새 조회/모델은 no_data였다. 그러나 보관된 최초 payload를 다시 보내면
 과거 값이 그대로 회수됐다. 새 조회는 계속 record 0개이며 제품 전달 관련 세 테이블도 0행이다.

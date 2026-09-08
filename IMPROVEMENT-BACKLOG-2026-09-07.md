@@ -506,3 +506,16 @@ compaction·삭제 수명이다. C8 범위 분류와 자동 수집의 원본 차
 새 세션과 복구의 완료 조건을 명시했다. 전역 자동 주입은 이 연결 전까지 보류한다.
 회귀 18개·event 감사 14개·Ruff/타입/syntax 통과. 실제 운영·GUI·접근 범위·사용자 질문과
 전체 runtime DR의 기존 완료 조건은 유지한다.
+
+
+## 42. B5/C7 문맥 제출 전후 재검사 구현
+
+자비스 `8e233c7`, SB 도구 `4e3a8de`: [보호된 제출 인수](REFERENCE-SUBMISSION-ACCEPTANCE-2026-09-08.md).
+reader 발급 객체의 정확한 본문과 generation/privacy를 내부에 결합하고 객체당 한 번 submit한다.
+전송 직전·callback 완료 뒤 상태/만료를 검사한다. 빈 결과도 최대 60초이며 변조/복사/다른 reader,
+동시 호출·불확실 실패 후 같은 객체 재시도를 거부한다. 별도 원문 DB나 MCP wire 변경은 없다.
+
+관련 70개/event 감사 14개/tsc/lint·독립 검토 통과. 실제 모델에서 준비 후 정정은 미전송,
+callback 중 삭제는 결과 반환 거부, 이미 제출한 사본은 미전송을 확인했다. 최신 값/삭제 no_data는
+유지했다. 기존 CLI JSON을 밖에서 직접 전송하는 경로는 guard 적용 밖이다. C6 영구 claim·receipt,
+실제 session/compaction/삭제 계보와 앱 연결, 범위·사용자 질문·운영/DR의 미완료 조건을 유지한다.

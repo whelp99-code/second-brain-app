@@ -4,6 +4,9 @@
 근거: [실제 모델의 정정·삭제 및 과거 사본 재전송](REFERENCE-MODEL-LIFECYCLE-2026-09-08.md).
 기존 [인계 계획](OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md)의 범위를 구체화한다.
 
+후속 구현: [보호된 제출 인수](REFERENCE-SUBMISSION-ACCEPTANCE-2026-09-08.md), 자비스 `8e233c7`.
+제출 전후 재검사·객체당 한 번 시도는 구현됐으며, 아래 영구/session/epoch 상태 모델은 계속 후속이다.
+
 ## 1. 책임과 완료의 의미
 
 세컨드브레인은 현재 세대·record·출처·삭제 high-water의 정본을 유지한다. 자비스는 기존
