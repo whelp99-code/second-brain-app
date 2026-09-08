@@ -19,8 +19,9 @@ from tests.task30_effect_factory import effect_request
 from tests.test_correction_cancellation import HISTORICAL
 from tests.test_request_executor import _config
 
-if len(sys.argv) != 2:
-    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD')
+if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != '--record-result'):
+    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result]')
+record_result = len(sys.argv) == 3
 work = Path(tempfile.mkdtemp(prefix='cancellation-submit-acceptance-', dir='/var/tmp'))
 c = _config(work)
 seed = write_fixture_request()
@@ -73,7 +74,13 @@ module.submit_correction_cancellation = crash_after_commit
 module.main()
 ''')
     launcher.chmod(0o700)
-    payload = {'build': str(Path(sys.argv[1]).resolve()), 'launcher': str(launcher), 'config': str(config),
+    execution_config = work / 'execution-config.toml'
+    if record_result:
+        private = base64.urlsafe_b64encode(HISTORICAL.private_bytes_raw()).decode().rstrip('=')
+        execution_config.write_text('provider_signing_key_id = "provider:key"\nprovider_private_key = "'+private+'"\n'+config.read_text())
+        execution_config.chmod(0o600)
+    payload = {'record_result': record_result, 'execution_config': str(execution_config),
+        'python': sys.executable, 'sb_root': str(ROOT), 'build': str(Path(sys.argv[1]).resolve()), 'launcher': str(launcher), 'config': str(config),
         'contract': str(ROOT / 'contracts/second-brain-mcp-v5.json'),
         'resolved': {'target': original['targets'][0], 'scope': original['scope']}}
     run = subprocess.run(['node', str(ROOT / 'scripts/cancellation-submit-acceptance.mjs')],
@@ -82,15 +89,15 @@ module.main()
         print(run.stderr, file=sys.stderr)
         raise SystemExit(run.returncode)
     observed = json.loads(run.stdout)
-    assert executor.generations.active().generation_id == generation.generation_id
+    assert (executor.generations.active().generation_id == generation.generation_id) is (not record_result)
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellations').fetchone()[0] == 1
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellation_aliases').fetchone()[0] == 8
-    assert executor.store.db.execute('SELECT count(*) FROM correction_cancellation_results').fetchone()[0] == 0
+    assert executor.store.db.execute('SELECT count(*) FROM correction_cancellation_results').fetchone()[0] == int(record_result)
     assert executor.store.tombstone_high_water()[0] == 1
     report = {**observed, 'python_parent_pid': os.getpid(), 'accepted_rows': 1, 'alias_rows': 8,
-        'result_rows': 0, 'generation_unchanged': True, 'provider_tombstone_sequence': 1,
+        'result_rows': int(record_result), 'generation_unchanged': not record_result, 'provider_tombstone_sequence': 1,
         'private_key_in_mcp_config': False, 'clock': 'isolated fixed 2026-08-28T12:00:01.000Z',
-        'scope': 'actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed'}
+        'scope': ('actual provider execution and JARVIS durable result reception; cursor not advanced' if record_result else 'actual JARVIS SQLite issuer and Node transport to actual Python provider target admission; execution/cursor settlement not performed')}
     (work / 'result.json').write_text(json.dumps(report, indent=2)+'\n')
     print(work / 'result.json')
     print(json.dumps(report))

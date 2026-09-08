@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 const input = JSON.parse(readFileSync(0, "utf8"));
 const moduleAt = name => import(pathToFileURL(`${input.build}/${name}.js`));
+if (process.argv.includes("--record-actor")) {
+  const { AuthorityDb } = await moduleAt("src/db");
+  const { MemoryCorrectionCancellationResultStore } = await moduleAt("src/memory-correction-cancellation-result-store");
+  const db = new AuthorityDb(input.database);
+  new MemoryCorrectionCancellationResultStore(db, () => new Date()).record(input.correction_id, input.result);
+  process.exit(77);
+}
 const { cancellationDatabaseFixture } = await moduleAt("tests/fixtures/memory-cancellation-db");
 const { MemoryCorrectionCancellationIssuer } = await moduleAt("src/memory-correction-cancellation-issuer");
 const { submitDatabaseCorrectionCancellation } = await moduleAt("src/memory-correction-cancellation-submit");
@@ -36,7 +43,35 @@ try {
   assert.deepEqual(readFileSync(f.spoolPath), spool);
   const cursor = f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get();
   assert.deepEqual(cursor, { active_lane_id: null, accepted_through_sequence: 0 });
-  process.stdout.write(JSON.stringify({ node_pid: process.pid, mcp_pids: pids, exit_after_provider_commit: exits[0].code, response_loss: lost,
+  let storedResult;
+  if (input.record_result) {
+    const result = JSON.parse(execFileSync(input.python, ["-m", "sb.cli", "apply-cancellation", "--intent-id", accepted.intent_id],
+      { cwd: input.sb_root, env: { ...process.env, SB_CONFIG: input.execution_config, TMPDIR: "/var/tmp" }, encoding: "utf8" }));
+    const { createPublicKey } = await import("node:crypto");
+    const { registerMemoryProviderProofKey } = await moduleAt("src/memory-effect-delegation");
+    const { AuthorityDb } = await moduleAt("src/db");
+    const { MemoryCorrectionCancellationResultStore } = await moduleAt("src/memory-correction-cancellation-result-store");
+    registerMemoryProviderProofKey(f.db, { key_id: result.signing_key_id, provider_instance_id: result.provider_instance_id,
+      provider_release_sha: result.provider_release_sha, public_key_pem: createPublicKey(f.runtime.private_key).export({ type: "spki", format: "pem" }).toString(),
+      valid_from: accepted.accepted_at, valid_until: "2027-09-01T00:00:00.000Z" }, new Date());
+    const child = spawnSync(process.execPath, [process.argv[1], "--record-actor"], { encoding: "utf8",
+      input: JSON.stringify({ build: input.build, database: f.database.path, correction_id: f.record.correction_id, result }) });
+    assert.equal(child.status, 77, child.stderr);
+    const reopened = new AuthorityDb(f.database.path);
+    try {
+      const results = new MemoryCorrectionCancellationResultStore(reopened, () => new Date());
+      assert.deepEqual(results.get(f.record.correction_id), result);
+      assert.deepEqual(results.record(f.record.correction_id, result), result);
+      assert.equal(reopened.db.prepare("SELECT count(*) AS n FROM memory_correction_cancellation_results").get().n, 1);
+      reopened.db.prepare("UPDATE memory_provider_proof_keys SET state='revoked' WHERE key_id=?").run(result.signing_key_id);
+      assert.throws(() => results.get(f.record.correction_id), /MEMORY_CANCELLATION_RESULT_INVALID/);
+    } finally { reopened.close(); }
+    assert.deepEqual(readFileSync(f.spoolPath), spool);
+    assert.deepEqual(f.db.db.prepare("SELECT active_lane_id,accepted_through_sequence FROM memory_effect_dispatch_cursor").get(), cursor);
+    storedResult = { result_digest: result.result_digest, exit_after_record: child.status,
+      exact_replay: true, result_rows: 1, current_revocation_rejected: true };
+  }
+  process.stdout.write(JSON.stringify({ stored_result: storedResult, node_pid: process.pid, mcp_pids: pids, exit_after_provider_commit: exits[0].code, response_loss: lost,
     no_automatic_write_retry: true, exact_replay_after_restart: true, live_provider_revocation_rejected: true,
     intent_id: accepted.intent_id, original_transport_calls: f.writer.calls.length, spool_preserved: true, cursor }) + "\n");
 } finally { await transport.close(); await f.close(); }
