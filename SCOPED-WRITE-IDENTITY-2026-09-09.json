@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "independent_processes": 7,
+  "accepted": {
+    "accepted": true,
+    "proposal_digest": "sha256:fa95210616af3cf60423e50ec5ecb3f8abe6930668d2a7b714906eae713cc080",
+    "authorization": "not_granted"
+  },
+  "changed": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "quarantined": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "validation_table_counts_unchanged": true,
+  "signedReview": {
+    "accepted": true,
+    "proposal_digest": "sha256:fa95210616af3cf60423e50ec5ecb3f8abe6930668d2a7b714906eae713cc080",
+    "writes_authorized": false
+  },
+  "otherScopeReview": {
+    "accepted": false,
+    "code": "MEMORY_SCOPE_REVIEW_INVALID"
+  },
+  "withdrawnReview": {
+    "accepted": false,
+    "code": "MEMORY_SCOPE_REVIEW_INVALID"
+  },
+  "approval_creates_no_memory_outbox": true,
+  "executorRefusal": {
+    "accepted": false,
+    "code": "CONTROL_ACTION_REVIEW_ONLY"
+  },
+  "execution_attempt_preserves_approval": true,
+  "scopedWriteIdentity": {
+    "identity": {
+      "schema_version": 1,
+      "operation": "remember",
+      "candidate_id": "memcand:pos:v1:dbeda743b4c45369dd7afaeb9aeabbe2970bfb00783a82911c27d35ebdc1b32c",
+      "candidate_digest": "sha256:5a9bcc4dc5599612ef3833380426655fd5b62711e8b331e3edc4e95dcf028826",
+      "classification_digest": "sha256:aa2ac376cb7a0f366583f5e30830d13d643c197a64b87f7ba9c82487946fabaa",
+      "source_digest": "sha256:8c1b8e71dd21a73ab56f197c1c9929de055375d5be5b8aa7e48883bda54303fd",
+      "owner": "principal:owner",
+      "projects": [
+        "project:shared-memory"
+      ],
+      "policy_revision": "policy:fixture"
+    },
+    "identity_digest": "sha256:f65318ceb4fca90beb85e46a3e33e2c3e85155030297384336655cc206072aa7",
+    "proposal_digest": "sha256:fa95210616af3cf60423e50ec5ecb3f8abe6930668d2a7b714906eae713cc080",
+    "idempotency_key": "memidem:scoped:v1:f65318ceb4fca90beb85e46a3e33e2c3e85155030297384336655cc206072aa7",
+    "control_request_id": "memory-scope-review:fa95210616af3cf60423e50ec5ecb3f8abe6930668d2a7b714906eae713cc080",
+    "control_receipt_id": "receipt:memory-scope-review:fa95210616af3cf60423e50ec5ecb3f8abe6930668d2a7b714906eae713cc080",
+    "command_digest": "sha256:083f2c4befa91db50aba0c8570908210b6f9c07122af4912fb31af80e32bdc15",
+    "expires_at": "2026-08-28T12:01:00.000Z",
+    "writes_authorized": false
+  },
+  "scoped_write_completed": false
+}

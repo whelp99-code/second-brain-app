@@ -75,6 +75,8 @@ if (mode === "read" || mode === "review" || mode === "execute") {
       issued_at: now.toISOString(), not_before: now.toISOString(), expires_at: command.expires_at,
       nonce: command.request_id, max_uses: 1, status: "issued" }, localKey(f.authority)), now);
     const approvedCounts = fixture.memoryTableCounts(f.authority);
+    const { prepareMemoryScopedWriteIdentity } = await load("src/memory-scoped-write-identity.js");
+    const scopedWriteIdentity = prepareMemoryScopedWriteIdentity(f.authority, proposal, command.request_id, now);
     const executorRefusal = read(proposal, "execute", command.request_id);
     assert.deepEqual(executorRefusal, { accepted: false, code: "CONTROL_ACTION_REVIEW_ONLY" });
     assert.deepEqual(fixture.memoryTableCounts(f.authority), approvedCounts);
@@ -102,6 +104,7 @@ if (mode === "read" || mode === "review" || mode === "execute") {
       accepted, changed, quarantined, validation_table_counts_unchanged: true,
       signedReview, otherScopeReview, withdrawnReview, approval_creates_no_memory_outbox: true,
       executorRefusal, execution_attempt_preserves_approval: true,
+      scopedWriteIdentity,
       scoped_write_completed: false }, null, 2) + "\n");
   } finally { fixture.closeMemoryDatabase(f); }
 }
