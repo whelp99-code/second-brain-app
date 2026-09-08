@@ -1,5 +1,9 @@
 # 자비스 인계 병합 — 현재 판정과 완성 작업 목록
 
+**2026-09-09 JARVIS issuer `c5ad24b` / SB `3b2a08d`: [현재 키·범위 검사 발급과 실제 상호 검증](ACCESS-CLAIM-ISSUER-2026-09-09.md).**
+매 요청 범위를 다시 조회하고 현재 DB 키 검사·fence·요청 digest와 만료를 결합한다. 기존 긴 provider/key ID 호환을 수정했다. JARVIS17통과/13.10초·SB31통과/6.02초·타입/lint/격리emit통과. 실제 issuer→Python→봉인 페이지를 인수했으나 scope resolver는 fixture다. 운영 resolver·scoped MCP 및 전체 운영 목표는 남는다.
+
+
 **2026-09-09 범위 claim 검증 `d220902`: [계약·실제 Node 서명/Python 검증·잔여 issuer 경계](ACCESS-CLAIM-VERIFICATION-2026-09-09.md).**
 별도 서명 claim을 현재 읽기 fence·provider/principal·agent/session·정책·실제 요청·유효 시간에 결합한다. 페이지 provider/삭제 high-water도 대조한다. 최종 관련43통과/7.33초·Ruff/diff·정적0오류/0경고. 실제 Node 테스트 서명과 봉인 CLI 페이지 범위 판정을 인수했다. 운영 JARVIS 발급·scoped MCP·다중 사용자·전체 표면과 기존 운영 목표는 남는다.
 
