@@ -310,3 +310,16 @@ B5는 자비스에 이미 있는 문맥 snapshot/근거/삭제 projection을 재
 자비스 `3360fe7`의 [참고 기억 묶음](MEMORY-REFERENCE-PREPARATION-2026-09-08.md)은 C1~C5의 준비 단계를 구현한다. 추천용 live/confirmed 계약을 유지하고 별도 reference-only 프로필에서 provider untrusted 원문·digest·세대를 보존한다. 최종 JSON 예산·전체 항목 생략·상충 출처와 세대 거부를 검사했다. 관련 94 passed, 실제 MCP 인수 및 독립 리뷰/수정/재검토 완료.
 
 실제 tokenizer/model 전달·전송 receipt·로컬 suppression와 범위·세션 중복/compaction·삭제 계보 연결은 여전히 필요하다. 라이브러리 export를 전역 자동 주입 완료로 취급하지 않는다. 제품의 원문 DB·승인 엔진·frozen MCP는 추가/변경하지 않았다.
+
+
+## 29. G3/B5 구현 — 실제 CLI 조회와 정책 변경 감지
+
+자비스 `63bdd02`의 [참고 기억 조회](MEMORY-REFERENCE-READ-2026-09-08.md)는 준비 JSON을 명시적
+CLI에 연결하고 기존 로컬 차단·signed read/status·세대·만료 검사와 최종 stdout 예산을 결합한다.
+같은 개수 REPLACE, 중복 cleanup/오류 덮어쓰기, DB/키 close 오류를 재현·수정했다.
+최종 77개 관련 회귀와 실제 CLI/MCP 5시나리오, 독립 재검토 통과.
+
+C6의 모델 수신/session/compaction receipt, C7의 전송 후 삭제·정정 수명, C8의 검증된 범위와
+B4 자동 수집 보류·B6 운영·B7 full100/질문·B8 품질을 계속 유지한다. provider_status_received_at은
+관측 시각이며 영속한 freshness 보증이 아니다. 운영 migration 070은 미적용, 새 원문 DB와
+자동 주입은 추가하지 않았다. 최종 상세 표의 우선순위·완료 증거를 후속 개발 기준으로 삼는다.

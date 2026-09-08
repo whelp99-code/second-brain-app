@@ -261,3 +261,16 @@ R8/I6의 mtime 기반 백업 정상 오판, 오래된 실행·정체 요청·최
 Codex CLI 0.153.4와 Claude Code 2.1.261의 실제 로그인/모델/MCP 도구로 A 기록→Claude 회수 및 B 기록→새 Codex 회수를 검증했다. 각각 모르는 무작위 답을 원문과 함께 회수했고 search/page 세대와 record ID/digest를 대조했다. source_item 2개, CAS 원문 일치, 성공 MCP 6건. 관련 회귀 22 passed/7.14초. [실행·권한 설정·감사·한계](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md).
 
 검증 서버 compile은 결정적 fixture이며 실제 LLM 요약 품질을 의미하지 않는다. 일반 stdio에 없는 sb_run을 안내하던 README를 수정했다. scope를 일반 검색 필터로 대체하는 방식은 보류하고 [권한/분류 계약 경계](SHARED-MEMORY-SCOPE-ADR-2026-09-08.md)를 기록했다. 실제 GUI·다른 client·삭제 후 일반 agent fence 연결·자동 수집/주입, B4~B8 운영 및 전체 인수는 유지한다.
+
+
+### B5 진행 — 정책·세대에 결합한 실제 CLI 참고 기억 조회
+
+자비스 `63bdd02`: `memory context`를 기존 adapter와 본문 준비 모듈에 연결했다. 웹 suppression을
+공통화하고 migration 070의 revision으로 같은 개수 REPLACE를 감지한다. 전후 provider 세대와
+최종 로컬 정책·key/본문 만료를 확인하고 전체 stdout까지 예산에 포함한다. 내부 오류와 cleanup
+실패를 정규화했다. 관련 77 passed/7 files, 격리 build·타입·lint·독립 최종 리뷰 통과.
+
+실제 Node CLI→SB MCP의 조회/빈 결과/불가능 예산/공개 권한 키/철회 키 5건 통과, 조회 1 record,
+stdout 3,073 bytes, 조회 전후 authority 논리 행 불변. [상세 변경·증거·잔여 목록](MEMORY-REFERENCE-READ-2026-09-08.md).
+모델 session 전달/compaction/후속 삭제 무효화·scope·운영 migration/배포는 미완료다.
+SB 100회 쓰기 인수는 65회 관측 상태이며 제품 소스 고정과 검색/복구 세 커밋 병합 대기를 유지한다.

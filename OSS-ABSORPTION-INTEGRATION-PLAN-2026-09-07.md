@@ -366,3 +366,15 @@ code-brain의 작은 context pack과 memory-bank의 세션 중복 억제는 자�
 자비스 `3360fe7`의 [reference-only 본문 묶음](MEMORY-REFERENCE-PREPARATION-2026-09-08.md)은 code-brain의 작은 문맥·예산 개념을 기존 read adapter와 연결한다. source/citation/record/세대와 원문을 보존하며 Tencent식 별도 기억 서버나 memory-bank 전용 수집 훅을 설치하지 않았다. 동일 ID의 출처 불일치는 독립 리뷰로 발견해 수정했다.
 
 관련 회귀와 실제 SB MCP→adapter→JSON 준비는 검증했다. 실제 모델 전달과 session/compaction receipt, 삭제/정책/프로젝트 범위 연결은 후속 구현이며 전체 목표의 완료 조건을 유지한다. 외부 코드를 복사하거나 신규 OSS 의존성을 추가하지 않았다.
+
+
+## 34. 공통 기억의 명시적 조회·차단 정책 연결
+
+자비스 `63bdd02`의 [CLI 참고 기억 경로](MEMORY-REFERENCE-READ-2026-09-08.md)는 작은 context pack을
+기존 owner 읽기·차단·세대 수명과 연결한다. source/record/digest를 보존하고 출력 전체 예산을
+계수한다. 동시 정책 교체와 만료, 오류 정리를 보강했으며 실제 CLI/MCP와 77개 회귀를 검증했다.
+
+별도 공통 기억 서버·원문 저장소·Proxy나 OSS 코드를 추가하지 않았다. 명시 CLI 조회는 실제 모델
+전달 receipt를 대체하지 않는다. memory-bank식 session 중복과 삭제 수명, Tencent식 검증된 공유
+범위, LightRAG식 품질 개선은 각각 기존 C6/C7/C8 및 질문 평가의 완료 조건을 통과해야 한다.
+운영 배포·100회 쓰기 인수·대기 검색/복구 병합과 기존 B4~B8 전체 범위는 유지한다.
