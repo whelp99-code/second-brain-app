@@ -1,0 +1,11 @@
+{
+  "work": "/var/tmp/page-access-acceptance-xi41zhe4",
+  "first_content_digest": "sha256:3fcf3708f78a9c7588c6c10ae587ef30e86b57fb71f4f82cc6cb0a9eceee31bf",
+  "updated_content_digest": "sha256:11b43025553da7a081d6f95e42e812a5811107aaa51a85d262c7876d5004a0a6",
+  "first_source_count": 1,
+  "updated_source_count": 2,
+  "parent_requirements_retained": true,
+  "repeat_preserved": true,
+  "committed_bytes_bound": true,
+  "scope": "actual isolated CLI ingest/compile/sealed generations with fake LLM; no scoped MCP enforcement"
+}
