@@ -17,6 +17,7 @@ from typing import cast
 from sb.cli_requests import apply_requests_once
 from sb.config import load_config
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
+from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
 from sb.inbox import RememberRejected
 from sb.metrics import record_command
@@ -34,7 +35,7 @@ from sb.ops import (
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
 from sb.runtime_access import mutate_root, read_config
 from sb.search import SearchIndex
-from sb.search_errors import SearchQueryError
+from sb.search_errors import GenerationIndexError, SearchQueryError
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import Vault, VaultLintError, init_vault
 
@@ -550,7 +551,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except (OperationError, VaultLintError, GovernanceError, SearchQueryError) as exc:
+    except (OperationError, VaultLintError, GovernanceError, SearchQueryError,
+            GenerationError, GenerationIndexError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
