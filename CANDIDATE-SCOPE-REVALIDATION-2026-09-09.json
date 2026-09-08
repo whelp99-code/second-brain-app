@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "independent_processes": 3,
+  "accepted": {
+    "accepted": true,
+    "proposal_digest": "sha256:39e1e8d86a142c49c502941fc2975e72f3328ef8856ed3e8db0eea30314546df",
+    "authorization": "not_granted"
+  },
+  "changed": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "quarantined": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "validation_table_counts_unchanged": true,
+  "scoped_write_completed": false
+}
