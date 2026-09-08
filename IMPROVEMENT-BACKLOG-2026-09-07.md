@@ -1,5 +1,9 @@
 # Second Brain 수정·개선·고도화 분석
 
+**2026-09-09 선택 누락 성공 오표시 수정 `5c8fcb2`: [없는 source ID·혼합 선택의 사전 실패](INGEST-SELECTION-VALIDATION-2026-09-09.md).**
+수정 전 두 실패로 재현하고 전체 명시적 선택을 scan 전에 확인한다. 누락 ID가 있으면 SOURCE_NOT_FOUND로 실패하며 정상 원본만 부분 수집하지 않는다. 최종68통과/8.34초·Ruff/diff·정적0오류/기존경고1. 실제 CLI 원본/분류/커서 보존 확인. connector별 ID 지원과 전체 운영 목표는 남는다.
+
+
 **2026-09-09 다중 원본 수집 수정 `db685e9`: [동일 adapter의 원본3 수집·커서 독립성·중복 ID 거부](MULTI-SOURCE-INGEST-FIX-2026-09-09.md).**
 pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수집되던 markdown 배치 결손을 수정했다. 실제 CLI source3/classification3, 재실행 동일, B만 갱신·A/C cursor 유지, 중복 ID 거부를 인수했다. 최종 전체1,138통과/2skip/201.63초·Ruff/diff통과·정적0오류/기존경고1. 다른 factory의 임의 ID 지원과 기존 전체 운영 목표는 남는다.
 
