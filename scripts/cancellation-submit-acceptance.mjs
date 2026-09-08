@@ -14,6 +14,10 @@ if (process.argv.includes("--compact-actor") || process.argv.includes("--recover
   const runtime = new AuthorityDatabaseRuntime(db, { registry_root: input.registry_root, watchdog_ms: 5000 });
   const compactor = new MemoryAuthorityCompactor({ runtime, layout: input.layout,
     scanner: new MemoryManagedSurfaceScanner({ authority: db, layout: input.layout }), clock: () => new Date() });
+  if (input.rebuild_result && process.argv.includes("--compact-actor")) {
+    // Actual process termination after material disposal, before entering physical swap.
+    compactor.swap = async () => process.exit(77);
+  }
   const receipt = process.argv.includes("--compact-actor") ? await compactor.compactCancellation(input.correction_id)
     : await compactor.recoverCancellation(input.correction_id);
   writeFileSync(1, JSON.stringify({ pid: process.pid, receipt }));
@@ -72,19 +76,25 @@ try {
       input: JSON.stringify({ build: input.build, database: f.database.path, correction_id: f.record.correction_id, result }) });
     assert.equal(child.status, 77, child.stderr);
     if (input.compact_result) {
-      const actorInput = { build: input.build, database: f.database.path, correction_id: f.record.correction_id,
+      const actorInput = { rebuild_result: input.rebuild_result, build: input.build, database: f.database.path, correction_id: f.record.correction_id,
         registry_root: `${f.root}/registry`, layout: { spool_root: f.runtime.spool_root, state_root: `${f.root}/state`,
           dist_root: `${f.root}/dist`, backup_root: `${f.root}/backups`, restore_root: `${f.root}/restore` } };
       f.db.close();
       try {
         const compact = spawnSync(process.execPath, [process.argv[1], "--compact-actor"], { encoding: "utf8", input: JSON.stringify(actorInput), timeout: 60000 });
         assert.equal(compact.status, 77, compact.stderr);
-        localCompaction = JSON.parse(compact.stdout).receipt;
+        if (!input.rebuild_result) localCompaction = JSON.parse(compact.stdout).receipt;
         const recovered = spawnSync(process.execPath, [process.argv[1], "--recover-actor"], { encoding: "utf8", input: JSON.stringify(actorInput), timeout: 60000 });
         assert.equal(recovered.status, 0, recovered.stderr);
-        assert.deepEqual(JSON.parse(recovered.stdout).receipt, localCompaction);
-        localRecovery = { exit_after_local_record: compact.status, exact_replay: true,
-          compact_pid: JSON.parse(compact.stdout).pid, recover_pid: JSON.parse(recovered.stdout).pid };
+        if (input.rebuild_result) {
+          localCompaction = JSON.parse(recovered.stdout).receipt;
+          const replay = spawnSync(process.execPath, [process.argv[1], "--recover-actor"], { encoding: "utf8", input: JSON.stringify(actorInput), timeout: 60000 });
+          assert.equal(replay.status, 0, replay.stderr);
+          assert.deepEqual(JSON.parse(replay.stdout).receipt, localCompaction);
+        } else assert.deepEqual(JSON.parse(recovered.stdout).receipt, localCompaction);
+        localRecovery = { exit_after_local_record: input.rebuild_result ? undefined : compact.status,
+          exit_before_swap: input.rebuild_result ? compact.status : undefined, exact_replay: true,
+          compact_pid: compact.pid, recover_pid: JSON.parse(recovered.stdout).pid };
       } finally { f.db.reopen(); }
       assert.equal(localCompaction.scope, "jarvis_cancellation_local_compaction");
       assert.equal(localCompaction.result_digest, result.result_digest);
