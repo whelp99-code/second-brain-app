@@ -103,3 +103,7 @@ SB `ec76b14` / JARVIS `8a697d0`: 제한 read/search 응답은 요청 digest와 �
 ## 2026-09-09 기존 전송기의 별도 scoped 계약
 
 **2026-09-09 JARVIS `ff0aecc` / SB `687ecf6`:** [고정 scoped 계약→기존 supervised transport→실제 MCP→소비자·재시작 검증](SCOPED-SUPERVISED-TRANSPORT-2026-09-09.md). 전송 관련91통과·SB6통과, 격리 패키징 계약5개 확인. M1 전송 연결은 검증했으며 실제 인증 세션/제품 context 연결·M2~M14와 전체 운영 목표는 남는다. 일반 adapter의 프로필 일괄 전환은 보류한다.
+
+## 2026-09-09 HTTP context 연결 결정
+
+기존 phone gateway의 인증된 요청에서만 선택적 `/api/v1/memory/context` POST를 처리한다. 서버 운영자가 기존 DB 경로·agent ID·scoped 정책/키/전송 설정을 명시해야 활성화된다. 같은 gateway 프로세스의 기존 phone 세션 저장소로 요청별 인증 공급자를 만들고 기존 CLI context API를 호출한다. 별도 backend에 임의 신원 헤더를 전달하거나 공통 CSRF를 인증 신원으로 바꾸지 않는다. 기존 proxy 검색/API를 scoped로 표시하지 않으며 새 표면에 동일 본문·예산·동시성 한계를 적용한다. 세션별 정책 배정과 standalone 배포 설정은 자동 생성하지 않는다. 구현·실제 HTTP/MCP 인수 전 운영 완료로 판정하지 않는다.

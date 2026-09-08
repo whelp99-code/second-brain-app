@@ -92,6 +92,14 @@ try {
           transport_options: { launcherPath: body.transport.launcher, configPath: body.transport.config,
             contractPath: body.transport.contract } };
         scopedCliOptions = productionOptions;
+        const httpRun = spawnSync(process.execPath,
+          [fileURLToPath(new URL('./scoped-phone-http-acceptance.mjs', import.meta.url)), build], {
+            input: JSON.stringify({ database: db.path, agent_id: body.agent_id, now: body.issued_at, options: productionOptions }),
+            encoding: 'utf8', timeout: 45000, maxBuffer: 1024 * 1024,
+          });
+        if (httpRun.error) throw httpRun.error;
+        if (httpRun.status !== 0) throw new Error(`scoped HTTP acceptance failed: ${httpRun.stderr}`);
+        const httpContext = JSON.parse(httpRun.stdout);
         const { execute } = await moduleAt('src/cli-runtime.mjs');
         const cli = await execute(['memory', 'context', 'Cited', '--db', db.path, '--max_bytes', '32768'], {
           clock: () => new Date(body.issued_at), scopedMemoryReferenceOptions: productionOptions,
@@ -174,7 +182,7 @@ try {
         substituteEmptyGeneration = false;
         if (!generationDenied) throw new Error('empty generation substitution accepted');
         pendingReference = await reader.read('Cited', budgets);
-        referenceCheck = { scoped_cli_cleanup_withdrawal_denied: cleanupDenied, scoped_cli_cleanup_child_exit_observed: cleanupExited, scoped_cli_records: cli.context.records.length, scoped_cli_budget_verified: true, independent_process_replay: processReplay, production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
+        referenceCheck = { http_context: httpContext, scoped_cli_cleanup_withdrawal_denied: cleanupDenied, scoped_cli_cleanup_child_exit_observed: cleanupExited, scoped_cli_records: cli.context.records.length, scoped_cli_budget_verified: true, independent_process_replay: processReplay, production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
       }
       currentCookie = undefined;
       if (scopedCliOptions) {
