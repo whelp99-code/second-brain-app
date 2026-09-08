@@ -1,0 +1,245 @@
+{
+  "state": "generation_batch_reuse_verified_operation_pending",
+  "product_commit": "701e96688e900ab8579119b824f004f067ffba4b",
+  "product_source_sha256": "7ae444f13db2a907c0703b58d8207a93be266018828af74623b540fb1fc94a5a",
+  "tests": {
+    "full": {
+      "passed": 931,
+      "skipped": 2,
+      "seconds": 127.03
+    },
+    "focused_optional": {
+      "passed": 58,
+      "skipped": 1,
+      "seconds": 7.28
+    },
+    "ruff": "passed",
+    "type_errors": 0,
+    "type_warnings": 0
+  },
+  "comparison": {
+    "baseline": {
+      "state": "measured",
+      "mode": "baseline",
+      "commit": "0f9db824cf9a0abfdf624664f2948acaea96adf1",
+      "source_tree_sha256": "7ae444f13db2a907c0703b58d8207a93be266018828af74623b540fb1fc94a5a",
+      "model_id": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "dim": 1024,
+      "inputs": 129,
+      "inputs_sha256": "95bd061c566ad8b2e4bd5335b4b9c190b3749087bb0c1e382982e3efe46f5597",
+      "float32_sha256": "ba9b552a1950d853fa3f111e6570eccc442d3836ba37eaae1c2a32807a0b5454",
+      "seconds": 28.754784043878317,
+      "batches": [
+        {
+          "offset": 0,
+          "count": 64,
+          "seconds": 13.143632697872818,
+          "float32_sha256": "633ae478ac598bc687d20db6d4d0679d6b8667bb796c9bc2c001ed60565f83a5"
+        },
+        {
+          "offset": 64,
+          "count": 64,
+          "seconds": 9.484188880305737,
+          "float32_sha256": "07ce813518072f4f1f67e408666c6683609274d6ee31c1b749aeda7af4bddca9"
+        },
+        {
+          "offset": 128,
+          "count": 1,
+          "seconds": 6.126640938222408,
+          "float32_sha256": "af39cdb2ddd798d6568152997fb16697461a7c832fb033111fbbaf7811ca225b"
+        }
+      ],
+      "max_child_rss_kib": 2537800,
+      "limitations": [
+        "synthetic 129-input batch comparison; not user quality or capacity acceptance",
+        "single sequential measurement per mode; not operational p95",
+        "query processes are unchanged; no claim of faster independent searches"
+      ]
+    },
+    "session": {
+      "state": "measured",
+      "mode": "session",
+      "commit": "0f9db824cf9a0abfdf624664f2948acaea96adf1",
+      "source_tree_sha256": "7ae444f13db2a907c0703b58d8207a93be266018828af74623b540fb1fc94a5a",
+      "model_id": "BAAI/bge-m3",
+      "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "dim": 1024,
+      "inputs": 129,
+      "inputs_sha256": "95bd061c566ad8b2e4bd5335b4b9c190b3749087bb0c1e382982e3efe46f5597",
+      "float32_sha256": "ba9b552a1950d853fa3f111e6570eccc442d3836ba37eaae1c2a32807a0b5454",
+      "seconds": 16.811576284002513,
+      "batches": [
+        {
+          "offset": 0,
+          "count": 64,
+          "seconds": 12.315853042062372,
+          "float32_sha256": "633ae478ac598bc687d20db6d4d0679d6b8667bb796c9bc2c001ed60565f83a5"
+        },
+        {
+          "offset": 64,
+          "count": 64,
+          "seconds": 3.454565337859094,
+          "float32_sha256": "07ce813518072f4f1f67e408666c6683609274d6ee31c1b749aeda7af4bddca9"
+        },
+        {
+          "offset": 128,
+          "count": 1,
+          "seconds": 0.1234891302883625,
+          "float32_sha256": "af39cdb2ddd798d6568152997fb16697461a7c832fb033111fbbaf7811ca225b"
+        }
+      ],
+      "max_child_rss_kib": 2557764,
+      "limitations": [
+        "synthetic 129-input batch comparison; not user quality or capacity acceptance",
+        "single sequential measurement per mode; not operational p95",
+        "query processes are unchanged; no claim of faster independent searches"
+      ]
+    },
+    "float32_exact": true,
+    "seconds_reduction_percent": 41.53468077399255
+  },
+  "native_lifecycle": {
+    "state": "passed",
+    "workspace": "/var/tmp/sb-sealed-vector-l7yeiiwd",
+    "source_tree_sha256": "41216463f7d971a43543d912ce44a5e90dbb134ea48951d93f6a92ff91892783",
+    "initial": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "회의는 월요일",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:a372039e9ab31910cc0ec87895aa30de2706d465b706e6b54ba43fa947f8b788",
+          "record_digest": "sha256:a372039e9ab31910cc0ec87895aa30de2706d465b706e6b54ba43fa947f8b788"
+        },
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.016129032258064516,
+          "record_id": "sbrecord:v1:8ad811153205aeea992cb1c9852274412d724d7bb8bfad2c037a88a70a39fe5f",
+          "record_digest": "sha256:8ad811153205aeea992cb1c9852274412d724d7bb8bfad2c037a88a70a39fe5f"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:59e946cc8074d00022762af6e4fabfa6a775d661c982675e2c65830d4483ac0d",
+      "generation_manifest_digest": "sha256:59e946cc8074d00022762af6e4fabfa6a775d661c982675e2c65830d4483ac0d",
+      "vault_head": "aadb44e9e1550fe396733c979bf6a51b4cb1708c",
+      "vault_tree": "a98f342f52e0a1066350f1837b469fd0a897abd1",
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    },
+    "corrected": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "다음 만남은 수요일",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:4044fbd2070b73908fb60748612a00fe117b378f70c73ca2ddf77576c7cfbc63",
+          "record_digest": "sha256:4044fbd2070b73908fb60748612a00fe117b378f70c73ca2ddf77576c7cfbc63"
+        },
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.016129032258064516,
+          "record_id": "sbrecord:v1:be9d8eeb5c30bc0e8dde3f30d73dfe320e14229547ae81bae8e2f8031fe12893",
+          "record_digest": "sha256:be9d8eeb5c30bc0e8dde3f30d73dfe320e14229547ae81bae8e2f8031fe12893"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:259ba9a1eae86e53f619c4d8b50f9a1acee04b544a5bffd228852fa67c68950a",
+      "generation_manifest_digest": "sha256:259ba9a1eae86e53f619c4d8b50f9a1acee04b544a5bffd228852fa67c68950a",
+      "vault_head": "eb8b0817f7de2a29da27eb15d289af6f0d95ecbb",
+      "vault_tree": "be0c7a07f5d70671dd001605d57be767bff93a75",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:d0d2f337515b3474bc3d2e44fbddbe01e2a345ec9ff60cd52955e1dd8e2dc79e"
+    },
+    "deleted": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:c5f3af2d29b5b966eda984fb2a4042688938a1bc9d7fedfa2a69c50234751fe6",
+          "record_digest": "sha256:c5f3af2d29b5b966eda984fb2a4042688938a1bc9d7fedfa2a69c50234751fe6"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:2376f8cac114c5a4b6a057c2b9dcbb53a8ba85c01bb085dc2601994271445d2a",
+      "generation_manifest_digest": "sha256:2376f8cac114c5a4b6a057c2b9dcbb53a8ba85c01bb085dc2601994271445d2a",
+      "vault_head": "237dacf5d3fa2049fb13c2e26f8624645e3b306f",
+      "vault_tree": "6741f1f5c6361b4f6456a713f566ba1746752c25",
+      "tombstone_sequence": 2,
+      "tombstone_set_root": "sha256:5e06a7bbcd21fb1b0ccae0ebcc36a39ad7dcf7e7431009b1d5e8689cd355f297"
+    },
+    "corrected_restore": true,
+    "deleted_restore": true,
+    "commands": [
+      {
+        "label": "correct",
+        "exit": 0,
+        "result": {
+          "code": "PROVIDER_PROVED",
+          "fence": 1,
+          "phase": "proved",
+          "request_id": "memeff:req:v2:3e0232af3fc7ea6f9550ab5f72e0aff8dd4e85d23dba9839d362ccbe372d13a4",
+          "state": "proved"
+        }
+      },
+      {
+        "label": "forget",
+        "exit": 0,
+        "result": {
+          "code": "PROVIDER_PROVED",
+          "fence": 1,
+          "phase": "proved",
+          "request_id": "memeff:req:v2:5906d4351b6462e783f65d088418602fde06faf691f5ea7bcf8307b581f53b27",
+          "state": "proved"
+        }
+      },
+      {
+        "label": "cli-search",
+        "exit": 0,
+        "result": [
+          {
+            "page_id": "wiki/memory-fixture",
+            "section": "결정",
+            "snippet": "비용은 만원",
+            "score": 0.01639344262295082,
+            "kind": "wiki",
+            "index_status": "active",
+            "knowledge_status": "UNKNOWN",
+            "approval_status": "UNKNOWN",
+            "canonical": "",
+            "source_ref": "",
+            "updated_at": "2026-09-08",
+            "role": "REFERENCE",
+            "verification": "UNVERIFIED"
+          }
+        ]
+      }
+    ],
+    "real_model": true,
+    "limitations": [
+      "real model lifecycle fixture; not full Korean quality",
+      "two native MCP processes; queries observe stable mutation boundaries",
+      "isolated fixture; no operational activation"
+    ]
+  },
+  "source_correspondence": "Full suite and native lifecycle preceded one blank line added by Ruff between imports and class. Reconstructing that single whitespace difference reproduces the lifecycle source hash. Focused tests, lint/types and both native batch measurements use committed product source.",
+  "held": [
+    "persistent model across independent requests",
+    "direct Transformers replacement inference",
+    "operational hybrid activation and global relevance threshold"
+  ],
+  "remaining": [
+    "independent search latency",
+    "answer sufficiency and real-user questions",
+    "JARVIS session delivery/compaction/deletion/scope",
+    "operational rollout and DR acceptance"
+  ]
+}
