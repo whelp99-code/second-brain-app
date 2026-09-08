@@ -55,11 +55,15 @@ try {
     const transport = createSecondBrainTransport({ contractProfile: profile,
       launcherPath: body.transport.launcher, configPath: body.transport.config, contractPath: body.transport.contract });
     let withdrawAfterResponse = false;
+    let substituteEmptyGeneration = false;
     const client = createMemoryScopedClient({ issue, profile,
       status_issue: createProductionMemoryAccessClaim(db.authority, config, resolve, "memory_status"), now: () => new Date(body.issued_at),
       transport: { call: async (...args) => {
         const outcome = await transport.call(...args);
         if (withdrawAfterResponse) writeFileSync(policyPath, JSON.stringify({ ...policy, sessions: [] }));
+        if (substituteEmptyGeneration && outcome.kind === 'data' && Array.isArray(outcome.value.results)
+          && outcome.value.results.length === 0) return { kind: 'data', value: { ...outcome.value,
+            generation_id: 'sbgen:v1:' + '0'.repeat(64) } };
         return outcome;
       }, restart: () => transport.restart(), close: () => transport.close(), diagnostics: () => transport.diagnostics() },
       budgets: { max_hits: 50, max_excerpt_bytes: 8192, max_total_bytes: 1000000, max_page_bytes: 100000 },
@@ -91,8 +95,16 @@ try {
         try { await reader.submit(reference, async () => { callbacks++; }); }
         catch (error) { if (error.code !== 'MEMORY_REFERENCE_SUBMISSION_INVALID') throw error; duplicateDenied = true; }
         if (!duplicateDenied || callbacks !== 1) throw new Error('duplicate reference submission');
+        const empty = await reader.read('unmatchedscopeacceptance', budgets);
+        if (empty.payload.state !== 'empty') throw new Error('empty query fixture mismatch');
+        substituteEmptyGeneration = true;
+        let generationDenied = false;
+        try { await reader.read('unmatchedscopeacceptance', budgets); }
+        catch (error) { if (error.code !== 'MEMORY_REFERENCE_GENERATION_CHANGED') throw error; generationDenied = true; }
+        substituteEmptyGeneration = false;
+        if (!generationDenied) throw new Error('empty generation substitution accepted');
         pendingReference = await reader.read('Cited', budgets);
-        referenceCheck = { records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied };
+        referenceCheck = { records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
       }
       currentCookie = undefined;
       if (reader) {
