@@ -4,7 +4,15 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 JARVIS `8a55ea9` / SB 도구 `db19ec5`: [V2 정정 차단·계약 복구 보류·14개 우선 목록](V2-CORRECTION-SUPPRESSION-2026-09-08.md).**
+**최신 JARVIS `0ea62c8` / SB `e7efd62`: [본문 없는 정정 취소 의향 계약·교차 런타임 검증](CORRECTION-CANCELLATION-INTENT-2026-09-08.md).**
+P0 복구의 선행 계약을 양 언어로 구현했다. 기존 서명/대상/삭제 이력과 현재 취소 서명을 결합하며
+의향을 미수신·삭제 완료 증거로 사용하지 않는다. 기존 테스트 접수기도 실제 V2 validator를 거치게
+수정했다. SB 기본947통과/2skip·최종집중30, JARVIS41통과, Python정적0오류/0경고·lint/build통과.
+실제 Node↔Python 16입력 판정·5,775바이트 서명이 일치했다. MCP/DB/전송에는 아직 연결하지
+않았으며 provider 수신경합·alias차단·실제 suppression generation·결과증거가 다음 구현이다.
+자동복구와 native/ACL/계보/수집/검색/운영 전체 목표는 미완료다.
+
+**이전 JARVIS `8a55ea9` / SB 도구 `db19ec5`: [V2 정정 차단·계약 복구 보류·14개 우선 목록](V2-CORRECTION-SUPPRESSION-2026-09-08.md).**
 V2 prepare/materialization/beginDispatch/직접 adapter의 후보 차단을 수정하고 기존 spool 보존 및
 cursor rollback을 검증했다. 최종6파일22통과, 타입/린트/71migration 격리build, 실제3프로세스에서
 재시작 attempt0·정상 입력 후 차단 호출 증가0 확인. 자동 retirement 시제품은 실제 양쪽 validator가

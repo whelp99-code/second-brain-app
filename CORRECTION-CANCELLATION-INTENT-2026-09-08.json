@@ -1,0 +1,127 @@
+{
+  "status": "passed",
+  "root": "/var/tmp/cancellation-intent-cross-runtime-2fhAuc",
+  "build": "/var/tmp/jarvis-cancellation-intent-build-n_wuztw1",
+  "node_pid": 3190337,
+  "python_pid": 3190347,
+  "cases": [
+    {
+      "name": "valid",
+      "node_accepted": true,
+      "python_accepted": true
+    },
+    {
+      "name": "plaintext",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "target",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "scope",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "chain",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "attempt",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "cursor",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "boolean",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "bool-fence",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "float",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "ttl",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "future",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "signature",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "purge",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "historical-key",
+      "node_accepted": false,
+      "python_accepted": false
+    },
+    {
+      "name": "current-key",
+      "node_accepted": false,
+      "python_accepted": false
+    }
+  ],
+  "build_artifact_digest": "sha256:b2f63b1c1dc0ca50ab3361b1bb4a50ac846d60859915afc0444efd2daea91482",
+  "bidirectional_identical": true,
+  "intent_digest": "sha256:a6122345c346b2de07439e01433b26f0093b987bce42046c75131b2a6519ccf6",
+  "canonical_bytes": 5775,
+  "plaintext_present": false,
+  "provider_mutations": 0,
+  "operational_data_used": false,
+  "automatic_recovery_complete": false,
+  "commits": {
+    "jarvis": "0ea62c8",
+    "second_brain": "e7efd62"
+  },
+  "checks": {
+    "sb_base_suite": {
+      "passed": 947,
+      "skipped": 2,
+      "excluded": "tests/test_embeddings.py",
+      "seconds": 122.45
+    },
+    "sb_final_focus": {
+      "passed": 30,
+      "seconds": 0.62
+    },
+    "jarvis_related": {
+      "files": 5,
+      "passed": 41,
+      "seconds": 43.85
+    },
+    "python_static": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "lint": "passed",
+    "isolated_backend_build": "passed",
+    "test_counts_overlap": true
+  },
+  "scope": "signed intent library only; no provider execution or automatic recovery",
+  "full_goal_complete": false
+}

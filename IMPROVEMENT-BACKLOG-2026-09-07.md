@@ -600,3 +600,18 @@ validator가 EFFECT_TOMBSTONE_DELTA_INVALID로 거부했다. 해당 시제품의
 기존 계약을 약화하지 않고 queued/tombstone/spool을 보류한다. 후속 정정·삭제의 자동복구는
 양쪽 버전 계약·원본별 처분 증거를 갖춰 해결해야 한다. 새 OSS 코드/DB/Proxy는 도입하지 않았다.
 전체 native/범위/원task계보/수집/검색/운영 완료 조건을 유지한다.
+
+
+## 50. P0 자동 복구 선행: 본문 없는 정정 취소 의향
+
+JARVIS `0ea62c8`, SB `e7efd62`: [구현·교차 런타임 검증·다음 6단계](CORRECTION-CANCELLATION-INTENT-2026-09-08.md).
+기존 V2를 완화하지 않고 별도 signed intent library를 양쪽에 추가했다. 원본 content 없이
+historical delegation/target/scope/tombstone과 현재 서명을 결합한다. 의향은 미수신/삭제 증거가
+아니므로 아직 MCP나 전송/DB 상태 변경에 연결하지 않았다. 기존 AcceptedWriter fixture가 실제
+V2 검증을 생략하던 문제도 수정하고 새로 서명된 혼합 delta 거부 회귀를 추가했다.
+
+SB 기본947통과/2skip·최종집중30, JARVIS5파일41통과, 정적검사·lint·격리build통과.
+실제 Node/Python16입력의 판정과5,775바이트 서명 일치. provider mutation0/운영사용없음.
+취소seq1을 독립 적용·세대 전환한 뒤 V2seq2만 전송하는 방향으로 수신경합/alias영구차단/
+실제억제세대/결과증거/cursor를 이어 구현한다. 자동복구 완료로 처리하지 않는다.
+인계의 SB정본·JARVIS실행·선별OSS흡수와 기존 native/범위/계보/수집/검색/운영 목표를 유지한다.
