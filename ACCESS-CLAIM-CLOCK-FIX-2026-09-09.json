@@ -1,0 +1,11 @@
+{
+  "work": "/var/tmp/page-access-acceptance-rynyerwr",
+  "provider": "provider:second-brain:linux",
+  "page": "wiki/docs-notes-5e8b1af6",
+  "node_signature_accepted": true,
+  "production_issuer": true,
+  "tampered_scope_rejected": true,
+  "records": 2,
+  "source_requirements": 2,
+  "scope": "Node signature and Python verification over isolated CLI data; production_issuer indicates actual issuer code with fixture scope resolver/authority DB, not operational authorization or MCP authentication"
+}

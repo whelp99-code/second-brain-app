@@ -1,5 +1,9 @@
 # Second Brain 수정·개선·고도화 분석
 
+**2026-09-09 JARVIS `90bf269`: [범위 공급자의 시각 변경으로 만료 범위를 발급하는 결함 수정](ACCESS-CLAIM-CLOCK-FIX-2026-09-09.md).**
+수정 전 회귀1실패/2통과로 재현하고 발급 시각 고정·공급자 Date 분리·변경 거부를 적용했다. 최종18통과/15.38초·lint/격리emit통과. 실제 issuer→Python→봉인 페이지 재인수 성공. 운영 resolver·scoped MCP 및 전체 잔여 목표는 유지한다.
+
+
 **2026-09-09 JARVIS issuer `c5ad24b` / SB `3b2a08d`: [현재 키·범위 검사 발급과 실제 상호 검증](ACCESS-CLAIM-ISSUER-2026-09-09.md).**
 매 요청 범위를 다시 조회하고 현재 DB 키 검사·fence·요청 digest와 만료를 결합한다. 기존 긴 provider/key ID 호환을 수정했다. JARVIS17통과/13.10초·SB31통과/6.02초·타입/lint/격리emit통과. 실제 issuer→Python→봉인 페이지를 인수했으나 scope resolver는 fixture다. 운영 resolver·scoped MCP 및 전체 운영 목표는 남는다.
 
