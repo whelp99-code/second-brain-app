@@ -1,0 +1,77 @@
+{
+  "jarvis_commit": "eafe913",
+  "before": {
+    "issued_at": 1000000,
+    "checked_at": 999999,
+    "authentication": "ok"
+  },
+  "after": {
+    "issued_at": 1000000,
+    "checked_at": 999999,
+    "authentication": "invalid",
+    "after_clock_restored": "invalid"
+  },
+  "new_tests_before": {
+    "failed": 7,
+    "passed": 6
+  },
+  "jarvis_regression": {
+    "passed": 57,
+    "files": 5,
+    "seconds": 1.14
+  },
+  "sb_full": {
+    "passed": 1141,
+    "skipped": 2,
+    "seconds": 214.33,
+    "sb_head": "0b969d7",
+    "jarvis_head_at_full_run": "7ae0684"
+  },
+  "actual_mcp": {
+    "scoped_client": {
+      "page_groups": 1,
+      "search_groups": 1,
+      "policy_withdrawn_after_actual_response_denied": true,
+      "phone_session_store_authenticated": true,
+      "missing_cookie_denied": true
+    },
+    "consumer_validation": [
+      {
+        "method": "sb_read_page",
+        "pages": 1,
+        "substitutions_denied": 3,
+        "records": 2
+      },
+      {
+        "method": "sb_search",
+        "pages": 1,
+        "substitutions_denied": 3,
+        "records": 2
+      },
+      {
+        "method": "sb_read_page",
+        "pages": 1,
+        "substitutions_denied": 3,
+        "records": 2
+      },
+      {
+        "method": "sb_search",
+        "pages": 1,
+        "substitutions_denied": 3,
+        "records": 2
+      }
+    ],
+    "work": "/var/tmp/page-access-acceptance-3vomzejh",
+    "tools": [
+      "sb_read_page",
+      "sb_search"
+    ],
+    "records": 2,
+    "wrong_request_missing_claim_tampering_denied": true,
+    "restart_equal": true,
+    "production_issuer": true,
+    "live_revocation_policy_change_invalid_missing_config_denied": true,
+    "restored_policy_resumes_same_connection": true,
+    "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL"
+  }
+}
