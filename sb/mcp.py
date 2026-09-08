@@ -27,6 +27,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
 
+from sb.access_claims import AccessContext, access_request_digest, verify_access_claim
 from sb.cancellation_result import CancellationResultError
 from sb.cancellation_status import CancellationStatusError, read_cancellation_status
 from sb.cancellation_submission import CancellationSubmissionError, submit_correction_cancellation
@@ -61,6 +62,7 @@ from sb.mcp_write_models import (
     MemoryWriteRequestModel,
     MemoryWriteResultModel,
 )
+from sb.memory_access import MemoryAccessError, classified_page, require_scope
 from sb.memory_records import (
     MemoryRecordError,
     find_record,
@@ -78,6 +80,7 @@ from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.search_errors import SearchQueryError
 from sb.search_filters import SearchFilters
 from sb.search_query import LexicalQuery
+from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
@@ -297,6 +300,15 @@ def build_server(
             "provider_release_sha": config.provider_release_sha,
         }
     )
+    scoped = config.raw.get("mcp_scoped_read")
+    scoped_identity: tuple[str, str, str, str] | None = None
+    if scoped is not None:
+        if not isinstance(scoped, dict) or set(scoped) != {"principal", "agent", "session", "policy_revision"}:
+            raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
+        if any(not isinstance(value, str) or not value for value in scoped.values()):
+            raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
+        scoped_identity = (str(scoped["principal"]), str(scoped["agent"]), str(scoped["session"]), str(scoped["policy_revision"]))
+        _ = SourceAccess(scoped_identity[0], (), scoped_identity[3])
     server = MCPServer("second-brain")
     public_keys: dict[str, Ed25519PublicKey] | None = None
     configured_keys = config.jarvis_public_keys
@@ -1010,6 +1022,33 @@ def build_server(
     def sb_run() -> RunOutcomeDict:
         """Immediately process explicit capture using the single writer pipeline."""
         return _run_outcome(run_all(runtime_config, runtime_config.configured_source_ids))
+
+    if scoped_identity is not None:
+        if generation_store is None or not public_keys:
+            raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
+        identity = scoped_identity
+
+        def scoped_read_page(id: str, read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue]) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+            """Read classified records under an exact signed request and pinned session scope."""
+            try:
+                with pin_generation() as (current_root, generation):
+                    current = high_water()
+                    context = AccessContext(config.provider_instance_id, *identity,
+                        "memory_read", access_request_digest("sb_read_page", {"id": id}), *current)
+                    scope = verify_access_claim(access_claim, read_fence, public_keys or {}, context, datetime.now(UTC))
+                    require_active_high_water(generation, current)
+                    page = classified_page(current_root, id, generation)
+                    if (page.tombstone_sequence, page.tombstone_set_root) != current:
+                        raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
+                    require_scope(page, scope)
+                    return {"profile": "scoped-record-read-v1", "page_id": page.page_id,
+                        "content_digest": page.content_digest, "records": [record.as_dict() for record in page.records],
+                        **generation_read_binding(generation, current).as_dict()}
+            except (ValueError, PathEscapeError) as exc:
+                raise ToolError("MEMORY_SCOPED_READ_DENIED") from exc
+
+        _ = server.tool(name="sb_read_page")(scoped_read_page)
+        return server
 
     if desktop:
         _ = server.tool(name="sb_run")(sb_run)

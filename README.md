@@ -238,3 +238,17 @@ swift test
 - 맥 폴더 동기화는 서버 방향 단방향이며 삭제를 전파하지 않음
 - 자동 conflict 해결과 무승인 원본 삭제 금지
 - Push는 명시적 요청 없이 수행하지 않음
+
+## 범위 제한 record 조회 연결
+
+관리형 vault와 JARVIS 공개키가 설정된 서버에 아래 명시적 설정을 추가하면 `scoped-record-read-v1` 연결로 동작한다. 이 연결은 서명된 `read_fence`와 `access_claim`을 요구하는 `sb_read_page` 하나만 제공하며, 응답은 분류 검증된 records와 세대 정보다. 기존 전체 기능 클라이언트의 대체 프로필은 아니다.
+
+```toml
+[mcp_scoped_read]
+principal = "principal:owner"
+agent = "agent:jarvis"
+session = "session:configured-session"
+policy_revision = "policy:1"
+```
+
+이 값은 서버가 신뢰하는 연결 문맥이며 사용자 요청에서 복사하면 안 된다. 실제 발급기의 인증된 scope resolver와 맞춰야 한다. 현재 서버 설정/공개키는 시작 시 읽으므로 정책·세션·키 철회 설정 변경에는 서버 재구성이 필요하다. 자동 정책 갱신, 전체 검색·쓰기·status·export·restore, 다중 사용자 인증은 아직 연결되지 않았다. [구현과 실제 stdio 인수](SCOPED-MCP-RECORD-READ-2026-09-09.md)를 따른다.
