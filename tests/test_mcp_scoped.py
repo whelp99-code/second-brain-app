@@ -4,6 +4,7 @@ import base64
 from datetime import UTC, datetime
 
 import anyio
+import pytest
 from mcp.client import Client
 
 from sb.access_claims import access_claim_binding, access_request_digest
@@ -21,7 +22,8 @@ class FrozenDate(datetime):
         return datetime(2026, 9, 9, tzinfo=UTC)
 
 
-def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch):  # noqa: F811
+@pytest.mark.parametrize("version", [1, 2])
+def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch, version):  # noqa: F811
     root, name, generation = classified
     work = root.parents[2]
     config = Config(raw={"vault_root": str(work / "share" / "vault"), "share_root": str(work / "share"),
@@ -30,7 +32,7 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
         "jarvis_public_keys": {"key:test": base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()},
         "mcp_scoped_read": {"principal": "principal:owner", "agent": "agent:test", "session": "session:test", "policy_revision": "1"}})
     monkeypatch.setattr("sb.mcp.datetime", FrozenDate)
-    monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v1")
+    monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", f"scoped-record-read-v{version}")
     server = build_server(config=config)
     from sb.effect_write_values import GENESIS_TOMBSTONE_ROOT
     fence = create_read_fence(provider_instance_id=generation.provider_instance_id, purpose="memory_read", operation="read",
@@ -45,10 +47,10 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
 
     async def run():
         async with Client(server, mode="legacy", cache=None) as client:
-            assert [tool.name for tool in (await client.list_tools()).tools] == ["sb_read_page", "sb_search"]
+            assert [tool.name for tool in (await client.list_tools()).tools] == (["sb_generation_status"] if version == 2 else []) + ["sb_read_page", "sb_search"]
             import json
             from pathlib import Path
-            frozen = json.loads(Path("contracts/second-brain-scoped-read-v1.json").read_text())
+            frozen = json.loads(Path(f"contracts/second-brain-scoped-read-v{version}.json").read_text())
             def without_titles(value):
                 if isinstance(value, dict):
                     return {key: without_titles(item) for key, item in value.items() if key != "title"}
@@ -60,8 +62,22 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             args = {"id": name, "read_fence": model_object(fence), "access_claim": claim}
             allowed = await client.call_tool("sb_read_page", args)
             assert not allowed.is_error, allowed
-            assert allowed.structured_content["profile"] == "scoped-record-read-v1"
+            assert allowed.structured_content["profile"] == f"scoped-record-read-v{version}"
             assert allowed.structured_content["records"]
+            if version == 2:
+                status_fence = create_read_fence(provider_instance_id=generation.provider_instance_id,
+                    purpose="memory_status", operation="status", sequence=0, set_root=GENESIS_TOMBSTONE_ROOT,
+                    issued_at="2026-09-09T00:00:00.000Z", not_before="2026-09-09T00:00:00.000Z",
+                    expires_at="2026-09-09T00:01:00.000Z", nonce="nonce:status", signing_key_id="key:test", private_key=KEY)
+                status_claim = signed({**claim, "purpose": "memory_status", "read_fence_digest": status_fence.fence_digest,
+                    "request_digest": access_request_digest("sb_generation_status", {})})
+                status = await client.call_tool("sb_generation_status", {"read_fence": model_object(status_fence), "access_claim": status_claim})
+                assert not status.is_error, status
+                assert status.structured_content["pointer_health"] == "healthy"
+                assert "records" not in status.structured_content
+                wrong_purpose = await client.call_tool("sb_generation_status", {"read_fence": model_object(fence), "access_claim": claim})
+                assert wrong_purpose.is_error
+
             assert allowed.structured_content["request_digest"] == claim["request_digest"]
             assert allowed.structured_content["access_claim_digest"] == access_claim_binding(claim)
             search_claim = signed({**claim, "request_digest": access_request_digest("sb_search", {"query": "Cited", "limit": 1})})

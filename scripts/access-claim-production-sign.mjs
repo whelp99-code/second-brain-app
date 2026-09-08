@@ -9,6 +9,7 @@ const { memoryReadFenceFixture } = await moduleAt('tests/fixtures/memory-read-fe
 const { createProductionMemoryAccessClaim } = await moduleAt('src/memory-access-claim-production.js');
 const { createFileMemoryAccessScopeResolver } = await moduleAt('src/memory-access-policy.js');
 const body = JSON.parse(readFileSync(0, 'utf8'));
+const profile = body.transport?.profile ?? "scoped-record-read-v1";
 const db = await memoryDatabase();
 try {
   const { config } = memoryReadFenceFixture(db, '2026-09-10T00:00:00.000Z', {
@@ -44,17 +45,18 @@ try {
     principal_id: body.principal_id, policy_revision: body.policy_revision,
     valid_from: body.issued_at, valid_until: body.expires_at,
     sessions: [{ agent_id: body.agent_id, session_id: body.session_id, projects: body.projects,
-      methods: ['sb_read_page', 'sb_search'] }] };
+      methods: [...(profile === 'scoped-record-read-v2' ? ['sb_generation_status'] : []), 'sb_read_page', 'sb_search'] }] };
   writeFileSync(policyPath, JSON.stringify(policy), { mode: 0o600 });
   const resolve = createFileMemoryAccessScopeResolver(policyPath, config.provider_instance_id, sessionSource);
   const issue = createProductionMemoryAccessClaim(db.authority, config, resolve);
   if (body.transport) {
     const { createMemoryScopedClient } = await moduleAt('src/memory-scoped-client.js');
     const { createSecondBrainTransport } = await moduleAt('src/second-brain-transport.js');
-    const transport = createSecondBrainTransport({ contractProfile: 'scoped-record-read-v1',
+    const transport = createSecondBrainTransport({ contractProfile: profile,
       launcherPath: body.transport.launcher, configPath: body.transport.config, contractPath: body.transport.contract });
     let withdrawAfterResponse = false;
-    const client = createMemoryScopedClient({ issue, now: () => new Date(body.issued_at),
+    const client = createMemoryScopedClient({ issue, profile,
+      status_issue: createProductionMemoryAccessClaim(db.authority, config, resolve, "memory_status"), now: () => new Date(body.issued_at),
       transport: { call: async (...args) => {
         const outcome = await transport.call(...args);
         if (withdrawAfterResponse) writeFileSync(policyPath, JSON.stringify({ ...policy, sessions: [] }));
@@ -63,8 +65,12 @@ try {
       budgets: { max_hits: 50, max_excerpt_bytes: 8192, max_total_bytes: 1000000, max_page_bytes: 100000 },
       max_age_ms: 86400000, expiry_ms: 172800000 });
     try {
+      const before = profile === "scoped-record-read-v2" ? await client.status() : undefined;
       const page = await client.readPage(body.page_id);
       const search = await client.search('Cited', 2);
+      const after = profile === "scoped-record-read-v2" ? await client.status() : undefined;
+      if (before && JSON.stringify(before.generation) !== JSON.stringify(after.generation)) throw new Error('status changed');
+      if (before && JSON.stringify(before.generation) !== JSON.stringify(search.generation)) throw new Error('read generation differs');
       currentCookie = undefined;
       let missingCookieDenied = false;
       try { await client.search('Cited', 2); }
@@ -76,7 +82,7 @@ try {
       try { await client.search('Cited', 2); }
       catch (error) { if (error.code !== 'MEMORY_ACCESS_SCOPE_UNAVAILABLE') throw error; denied = true; }
       if (!denied || page.pages.length !== 1 || search.pages.length !== 1) throw new Error('scoped client acceptance failed');
-      process.stdout.write(JSON.stringify({ page_groups: page.pages.length, search_groups: search.pages.length,
+      process.stdout.write(JSON.stringify({ profile, status_before_after_equal: before !== undefined, page_groups: page.pages.length, search_groups: search.pages.length,
         policy_withdrawn_after_actual_response_denied: denied,
         phone_session_store_authenticated: true, missing_cookie_denied: missingCookieDenied }));
     } finally { await transport.close(); }

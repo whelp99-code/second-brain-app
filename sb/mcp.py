@@ -368,7 +368,7 @@ def build_server(
         if profile is None:
             task30_enabled = False
             contract_schema_version = 3
-        elif profile == "scoped-record-read-v1":
+        elif profile in {"scoped-record-read-v1", "scoped-record-read-v2"}:
             if initial_scoped_policy is None:
                 raise ContractProfileError
             task30_enabled = False
@@ -1031,6 +1031,8 @@ def build_server(
         if generation_store is None or not public_keys:
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
+        scoped_v2 = os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v2"
+
         def scoped_request(method: str, arguments: JsonObject, read_fence: dict[str, JsonValue],
             access_claim: dict[str, JsonValue], reader: Callable[[Path, GenerationIdentityV1, SourceAccess], dict[str, object]],
         ) -> dict[str, object]:
@@ -1039,7 +1041,7 @@ def build_server(
                     current = high_water()
                     policy = current_scoped_policy(config, initial_scoped_policy)
                     context = AccessContext(config.provider_instance_id, *policy.identity,
-                        "memory_read", access_request_digest(method, arguments), *current)
+                        "memory_status" if method == "sb_generation_status" else "memory_read", access_request_digest(method, arguments), *current)
                     scope = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
                     require_active_high_water(generation, current)
                     payload = reader(current_root, generation, scope)
@@ -1047,7 +1049,7 @@ def build_server(
                         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
                     require_active_high_water(generation, current)
                     _ = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
-                    return {"profile": "scoped-record-read-v1", "request_digest": context.request_digest,
+                    return {"profile": "scoped-record-read-v2" if scoped_v2 else "scoped-record-read-v1", "request_digest": context.request_digest,
                         "access_claim_digest": access_claim_binding(access_claim), **payload,
                         **generation_read_binding(generation, current).as_dict()}
             except (ValueError, OSError, PathEscapeError) as exc:
@@ -1069,6 +1071,13 @@ def build_server(
             return scoped_request("sb_search", {"query": query, "limit": limit}, read_fence, access_claim,
                 lambda root, generation, scope: {"results": search_scoped_records(root, generation, scope, query, limit)})
 
+        def scoped_generation_status(read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue]) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+            """Return authorized active generation health without page content."""
+            return scoped_request("sb_generation_status", {}, read_fence, access_claim,
+                lambda root, generation, scope: {"schema_version": 1, "pointer_health": "healthy", "journal_health": "healthy"})
+
+        if scoped_v2:
+            _ = server.tool(name="sb_generation_status")(scoped_generation_status)
         _ = server.tool(name="sb_read_page")(scoped_read_page)
         _ = server.tool(name="sb_search")(scoped_search)
         return server
