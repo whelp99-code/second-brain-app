@@ -1,0 +1,10 @@
+{
+  "work": "/var/tmp/multi-source-ingest-l9gdn69_",
+  "initial_sources": 3,
+  "initial_classifications": 3,
+  "repeat_equal": true,
+  "targeted_update_source_versions": 4,
+  "other_cursors_unchanged": true,
+  "duplicate_id_denied": true,
+  "scope": "actual isolated CLI sealed ingest; no operational sources or new connector types"
+}

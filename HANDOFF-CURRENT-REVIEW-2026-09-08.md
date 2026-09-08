@@ -1,5 +1,9 @@
 # 자비스 인계 병합 — 현재 판정과 완성 작업 목록
 
+**2026-09-09 다중 원본 수집 수정 `db685e9`: [동일 adapter의 원본3 수집·커서 독립성·중복 ID 거부](MULTI-SOURCE-INGEST-FIX-2026-09-09.md).**
+pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수집되던 markdown 배치 결손을 수정했다. 실제 CLI source3/classification3, 재실행 동일, B만 갱신·A/C cursor 유지, 중복 ID 거부를 인수했다. 최종 전체1,138통과/2skip/201.63초·Ruff/diff통과·정적0오류/기존경고1. 다른 factory의 임의 ID 지원과 기존 전체 운영 목표는 남는다.
+
+
 **2026-09-09 제한 검색 `d561f63`: [허용 record 선택 후 limit·실제 서명 검색·새 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md).**
 제한 연결에 sb_search를 추가하고 전체 페이지 범위 검사 후 lexical record를 선택한다. query/limit 서명 결합, 불허 snippet/score 제외. 최종31통과/5.56초·Ruff/diff·정적0오류/0경고, 실제 issuer→stdio 검색2개·limit 변조 거부. 같은 adapter 여러 root가 첫 source만 수집되는 P0 결손을 새로 확인했으며 다음 수정 대상이다. 나머지 운영 목표는 유지한다.
 
