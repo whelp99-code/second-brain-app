@@ -1,0 +1,180 @@
+{
+  "before": {
+    "state": "passed",
+    "source_fixture": "/var/tmp/sb-write-cycles-ynvxjoyu",
+    "workspace": "/var/tmp/sb-write-profile-uazbt7kq",
+    "source_tree_sha256": "05fd287b6c94cc913f3ebc1e03f69546c565b0a03f16c34170fc30dccd5ddec1",
+    "commands": [
+      {
+        "command": "remember",
+        "seconds": 33.51860786322504,
+        "exit": 0
+      },
+      {
+        "command": "run",
+        "seconds": 120.06359593616799,
+        "exit": 0
+      }
+    ],
+    "counts": {
+      "source_item": 5101,
+      "unit": 100101
+    },
+    "limitations": [
+      "deterministic LLM fixture",
+      "cProfile overhead included",
+      "no concurrent reader load; compare matched profiles only"
+    ]
+  },
+  "after": {
+    "state": "passed",
+    "source_fixture": "/var/tmp/sb-write-cycles-ynvxjoyu",
+    "workspace": "/var/tmp/sb-write-profile-zkqjgivw",
+    "source_tree_sha256": "40ba38a260cf329cb7ba950f25bbca7db0d278b0a0189f41b8d05ed28196052f",
+    "commands": [
+      {
+        "command": "remember",
+        "seconds": 12.23961881082505,
+        "exit": 0
+      },
+      {
+        "command": "run",
+        "seconds": 96.83010478038341,
+        "exit": 0
+      }
+    ],
+    "counts": {
+      "source_item": 5101,
+      "unit": 100101
+    },
+    "limitations": [
+      "deterministic LLM fixture",
+      "cProfile overhead included",
+      "no concurrent reader load; compare matched profiles only"
+    ]
+  },
+  "detail": {
+    "before": {
+      "remember": {
+        "<built-in method posix.fsync>": {
+          "calls": 32811,
+          "self_seconds": 14.965764167000001,
+          "cumulative_seconds": 14.965764167000001
+        },
+        "relative_to": {
+          "calls": 71861,
+          "self_seconds": 0.350775987,
+          "cumulative_seconds": 6.781643172000001
+        },
+        "_fsync_tree": {
+          "calls": 1,
+          "self_seconds": 0.013197708,
+          "cumulative_seconds": 0.24372907500000002
+        },
+        "_content_rows": {
+          "calls": 1,
+          "self_seconds": 0.060101661,
+          "cumulative_seconds": 5.12043449
+        },
+        "_copy_allowed": {
+          "calls": 1,
+          "self_seconds": 0.19671982500000001,
+          "cumulative_seconds": 18.672881985
+        }
+      },
+      "run": {
+        "<built-in method posix.fsync>": {
+          "calls": 32814,
+          "self_seconds": 13.143166947000001,
+          "cumulative_seconds": 13.143166947000001
+        },
+        "relative_to": {
+          "calls": 72873,
+          "self_seconds": 0.35435683100000004,
+          "cumulative_seconds": 7.1310835390000005
+        },
+        "_fsync_tree": {
+          "calls": 1,
+          "self_seconds": 0.014974183,
+          "cumulative_seconds": 0.30099506200000004
+        },
+        "_content_rows": {
+          "calls": 1,
+          "self_seconds": 0.05952409400000001,
+          "cumulative_seconds": 5.395609220000001
+        },
+        "_copy_allowed": {
+          "calls": 1,
+          "self_seconds": 0.18579351200000002,
+          "cumulative_seconds": 16.762215879
+        }
+      }
+    },
+    "after": {
+      "remember": {
+        "<built-in method posix.fsync>": {
+          "calls": 16608,
+          "self_seconds": 0.09326751800000001,
+          "cumulative_seconds": 0.09326751800000001
+        },
+        "relative_to": {
+          "calls": 11102,
+          "self_seconds": 0.046250636000000005,
+          "cumulative_seconds": 1.02361232
+        },
+        "_fsync_tree": {
+          "calls": 1,
+          "self_seconds": 0.014702024000000001,
+          "cumulative_seconds": 0.30994948
+        },
+        "_content_rows": {
+          "calls": 1,
+          "self_seconds": 0.054880137,
+          "cumulative_seconds": 0.915053289
+        },
+        "surface_files": {
+          "calls": 2,
+          "self_seconds": 0.043890214000000004,
+          "cumulative_seconds": 0.6301727730000001
+        },
+        "_copy_allowed": {
+          "calls": 1,
+          "self_seconds": 0.09312584700000001,
+          "cumulative_seconds": 1.501615594
+        }
+      },
+      "run": {
+        "<built-in method posix.fsync>": {
+          "calls": 16611,
+          "self_seconds": 0.029648217,
+          "cumulative_seconds": 0.029648217
+        },
+        "relative_to": {
+          "calls": 12111,
+          "self_seconds": 0.0511618,
+          "cumulative_seconds": 1.1519102140000002
+        },
+        "_fsync_tree": {
+          "calls": 1,
+          "self_seconds": 0.016180288,
+          "cumulative_seconds": 0.30835444700000003
+        },
+        "_content_rows": {
+          "calls": 1,
+          "self_seconds": 0.053281004,
+          "cumulative_seconds": 0.94516096
+        },
+        "surface_files": {
+          "calls": 2,
+          "self_seconds": 0.045997198,
+          "cumulative_seconds": 0.6948753040000001
+        },
+        "_copy_allowed": {
+          "calls": 1,
+          "self_seconds": 0.094753397,
+          "cumulative_seconds": 1.5466099160000002
+        }
+      }
+    }
+  }
+}

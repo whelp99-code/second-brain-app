@@ -376,3 +376,19 @@ CLI 5건 및 새 3회 쓰기/두 MCP/복원 인수가 통과했다.
 다음 필수 개발은 봉인 vector 논리/물리 binding 및 reader pin·삭제/복원, 쓰기 비용 프로파일링,
 자비스 C6~C8 전달 수명/범위 계약이다. 실제 질문·GUI/운영 인수 조건도 남는다. stored inventory
 검사를 별도 서명 권한이나 모든 원문/SQL 행의 논리 감사로 확대 해석하지 않는다.
+
+
+## 34. B7/P1 쓰기 지연 — 실제 프로파일과 세대 복사 최적화
+
+[프로파일·수정·검증](GENERATION-WRITE-PERFORMANCE-2026-09-08.md), 제품 `fe21016`: 제외되는
+.git/.sb 내부 순회를 생략하고 상대 경로를 재사용하며, 복사 중 조기 fsync를 최종 봉인 전수
+동기화에 모았다. 포함 파일 검증과 단일 writer·pin·fsync 실패 시 이전 세대 보존을 유지했다.
+동일 고정 입력의 generation manifest는 기준 코드와 같았다.
+
+대용량의 분리 단일 프로파일에서 remember 33.52→12.24초, run 120.06→96.83초. 전체
+821 passed/2 skipped와 실제 3회 쓰기/두 MCP/복원 통과. 새 100회 부하의 p95로 주장하지 않는다.
+
+남은 큰 비용은 원본 전체 재정규화, 두 차례 전체 unit 보호 처리, conflict/briefing의 corpus
+스캔이다. 정책 결과가 같은 빠른 보호 경로와 실제 전송 대상의 중복 처리를 먼저 검증한다.
+정규화 cache는 parser/source/version·삭제 수명 계약 전까지, capture를 별도 inbox/queue로
+옮기는 변경은 generation 응답 계약을 보존하기 전까지 보류한다. 기존 전체 미완료 범위는 유지한다.
