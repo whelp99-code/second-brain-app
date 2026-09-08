@@ -11,7 +11,7 @@ import json
 import os
 import sqlite3
 import sys
-from collections.abc import Generator, Mapping
+from collections.abc import Callable, Generator, Mapping
 from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -77,10 +77,12 @@ from sb.public_page import public_frontmatter
 from sb.remember_contracts import MemoryWriteResultV3
 from sb.request_store import RequestStore
 from sb.scoped_read_policy import current_scoped_policy, scoped_policy
+from sb.scoped_search import search_scoped_records
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
 from sb.search_errors import SearchQueryError
 from sb.search_filters import SearchFilters
 from sb.search_query import LexicalQuery
+from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
@@ -1019,31 +1021,45 @@ def build_server(
         if generation_store is None or not public_keys:
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
-        def scoped_read_page(id: str, read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue]) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-            """Read classified records under an exact signed request and pinned session scope."""
+        def scoped_request(method: str, arguments: JsonObject, read_fence: dict[str, JsonValue],
+            access_claim: dict[str, JsonValue], reader: Callable[[Path, GenerationIdentityV1, SourceAccess], dict[str, object]],
+        ) -> dict[str, object]:
             try:
                 with pin_generation() as (current_root, generation):
                     current = high_water()
                     policy = current_scoped_policy(config, initial_scoped_policy)
                     context = AccessContext(config.provider_instance_id, *policy.identity,
-                        "memory_read", access_request_digest("sb_read_page", {"id": id}), *current)
+                        "memory_read", access_request_digest(method, arguments), *current)
                     scope = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
                     require_active_high_water(generation, current)
-                    page = classified_page(current_root, id, generation)
-                    if (page.tombstone_sequence, page.tombstone_set_root) != current:
-                        raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
-                    require_scope(page, scope)
+                    payload = reader(current_root, generation, scope)
                     if current_scoped_policy(config, initial_scoped_policy) != policy or high_water() != current:
                         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
                     require_active_high_water(generation, current)
                     _ = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
-                    return {"profile": "scoped-record-read-v1", "page_id": page.page_id,
-                        "content_digest": page.content_digest, "records": [record.as_dict() for record in page.records],
+                    return {"profile": "scoped-record-read-v1", **payload,
                         **generation_read_binding(generation, current).as_dict()}
             except (ValueError, OSError, PathEscapeError) as exc:
                 raise ToolError("MEMORY_SCOPED_READ_DENIED") from exc
 
+        def scoped_read_page(id: str, read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue]) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+            """Read classified records under an exact signed request and pinned session scope."""
+            def read(current_root: Path, generation: GenerationIdentityV1, scope: SourceAccess) -> dict[str, object]:
+                page = classified_page(current_root, id, generation)
+                require_scope(page, scope)
+                if (page.tombstone_sequence, page.tombstone_set_root) != high_water():
+                    raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
+                return {"page_id": page.page_id, "content_digest": page.content_digest,
+                        "records": [record.as_dict() for record in page.records]}
+            return scoped_request("sb_read_page", {"id": id}, read_fence, access_claim, read)
+
+        def scoped_search(query: str, read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue], limit: int = 10) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+            """Search only classified records in the signed project scope; limit 1 to 50."""
+            return scoped_request("sb_search", {"query": query, "limit": limit}, read_fence, access_claim,
+                lambda root, generation, scope: {"results": search_scoped_records(root, generation, scope, query, limit)})
+
         _ = server.tool(name="sb_read_page")(scoped_read_page)
+        _ = server.tool(name="sb_search")(scoped_search)
         return server
 
     if desktop:

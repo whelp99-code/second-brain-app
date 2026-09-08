@@ -17,6 +17,6 @@ try {
     principal_id: body.principal_id, agent_id: body.agent_id, session_id: body.session_id,
     projects: body.projects, policy_revision: body.policy_revision, valid_until: body.expires_at,
   }));
-  const result = issue({ method: 'sb_read_page', arguments: { id: body.page_id } }, new Date(body.issued_at));
+  const result = issue(body.request ?? { method: 'sb_read_page', arguments: { id: body.page_id } }, new Date(body.issued_at));
   process.stdout.write(JSON.stringify(result));
 } finally { closeMemoryDatabase(db); }

@@ -241,7 +241,7 @@ swift test
 
 ## 범위 제한 record 조회 연결
 
-관리형 vault와 JARVIS 공개키가 설정된 서버에 아래 명시적 설정을 추가하면 `scoped-record-read-v1` 연결로 동작한다. 이 연결은 서명된 `read_fence`와 `access_claim`을 요구하는 `sb_read_page` 하나만 제공하며, 응답은 분류 검증된 records와 세대 정보다. 기존 전체 기능 클라이언트의 대체 프로필은 아니다.
+관리형 vault와 JARVIS 공개키가 설정된 서버에 아래 명시적 설정을 추가하면 `scoped-record-read-v1` 연결로 동작한다. 이 연결은 서명된 `read_fence`와 `access_claim`을 요구하는 `sb_read_page`와 `sb_search`를 제공하며, 응답은 분류 검증된 records와 세대 정보다. 기존 전체 기능 클라이언트의 대체 프로필은 아니다.
 
 ```toml
 [mcp_scoped_read]
@@ -251,4 +251,6 @@ session = "session:configured-session"
 policy_revision = "policy:1"
 ```
 
-이 값은 서버가 신뢰하는 연결 문맥이며 사용자 요청에서 복사하면 안 된다. 실제 발급기의 인증된 scope resolver와 맞춰야 한다. 파일 기반 제한 연결은 시작 시 선택한 설정 경로에서 매 조회 전후 정책·키 철회를 다시 읽는다. 누락·손상·조회 중 변경 또는 만료는 거부한다. 세션·provider·저장소 경로 변경에는 새 연결이 필요하다. 전체 검색·쓰기·status·export·restore, 운영 권한 공급자와 다중 사용자 인증은 아직 연결되지 않았다. [구현과 실제 stdio 인수](SCOPED-MCP-RECORD-READ-2026-09-09.md)를 따른다.
+이 값은 서버가 신뢰하는 연결 문맥이며 사용자 요청에서 복사하면 안 된다. 실제 발급기의 인증된 scope resolver와 맞춰야 한다. 파일 기반 제한 연결은 시작 시 선택한 설정 경로에서 매 조회 전후 정책·키 철회를 다시 읽는다. 누락·손상·조회 중 변경 또는 만료는 거부한다. 세션·provider·저장소 경로 변경에는 새 연결이 필요하다. semantic/hybrid 검색·쓰기·status·export·restore, 운영 권한 공급자와 다중 사용자 인증은 아직 연결되지 않았다. [구현과 실제 stdio 인수](SCOPED-MCP-RECORD-READ-2026-09-09.md)를 따른다.
+
+제한 검색은 query와 limit(1~50)을 서명에 결합하고 전체 페이지 분류 검사를 통과한 lexical record만 반환한다. 권한 밖 원본의 제목·snippet·corpus 점수는 반환하지 않으며, 허용 결과를 고른 뒤 limit을 적용한다. [검색 인수와 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md)을 참고한다.

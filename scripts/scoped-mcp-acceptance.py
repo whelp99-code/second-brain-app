@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import runpy
+import subprocess
 import sys
 from pathlib import Path
 
@@ -29,6 +30,12 @@ class Clock(datetime):
 m.datetime=Clock
 m.main()
 '''
+search_bundle = None
+if len(sys.argv) > 1:
+    issued = subprocess.run(["node", str(Path(__file__).with_name("access-claim-production-sign.mjs")), sys.argv[1]],
+        input=json.dumps({**setup["body"], "request": {"method": "sb_search", "arguments": {"query": "Cited", "limit": 2}}}),
+        capture_output=True, text=True, check=True, timeout=60)
+    search_bundle = json.loads(issued.stdout)
 async def run():
     outputs = []
     for _ in range(2):
@@ -36,12 +43,18 @@ async def run():
             cwd=str(Path(__file__).resolve().parents[1]), env={**os.environ, "SB_CONFIG": str(config), "TMPDIR": "/var/tmp"})
         async with Client(params, mode="legacy", cache=None, read_timeout_seconds=60) as client:
             names = [tool.name for tool in (await client.list_tools()).tools]
-            assert names == ["sb_read_page"], names
+            assert names == ["sb_read_page", "sb_search"], names
             args = {"id": page.page_id, "read_fence": setup["fence_value"], "access_claim": setup["claim"]}
             result = await client.call_tool("sb_read_page", args)
             assert not result.is_error, result
             assert result.structured_content["profile"] == "scoped-record-read-v1"
             assert len(result.structured_content["records"]) == 2
+            if len(sys.argv) > 1:
+                found = await client.call_tool("sb_search", {"query": "Cited", "limit": 2, **search_bundle})
+                assert not found.is_error, found
+                assert len(found.structured_content["results"]) == 2
+                wrong = await client.call_tool("sb_search", {"query": "Cited", "limit": 1, **search_bundle})
+                assert wrong.is_error
             for invalid in [{**args, "id": "wiki/other"}, {"id": page.page_id},
                 {**args, "access_claim": {**setup["claim"], "projects": ["project:other"]}}]:
                 denied = await client.call_tool("sb_read_page", invalid)
@@ -64,7 +77,7 @@ async def run():
             assert restored.structured_content == result.structured_content
             outputs.append(result.structured_content)
     assert outputs[0] == outputs[1]
-    return {"work": str(work), "tools": ["sb_read_page"], "records": 2,
+    return {"work": str(work), "tools": ["sb_read_page", "sb_search"], "records": 2,
         "wrong_request_missing_claim_tampering_denied": True, "restart_equal": True,
         "production_issuer": len(sys.argv) > 1,
         "live_revocation_policy_change_invalid_missing_config_denied": True,

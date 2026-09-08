@@ -44,12 +44,20 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
 
     async def run():
         async with Client(server, mode="legacy", cache=None) as client:
-            assert [tool.name for tool in (await client.list_tools()).tools] == ["sb_read_page"]
+            assert [tool.name for tool in (await client.list_tools()).tools] == ["sb_read_page", "sb_search"]
             args = {"id": name, "read_fence": model_object(fence), "access_claim": claim}
             allowed = await client.call_tool("sb_read_page", args)
             assert not allowed.is_error, allowed
             assert allowed.structured_content["profile"] == "scoped-record-read-v1"
             assert allowed.structured_content["records"]
+            search_claim = signed({**claim, "request_digest": access_request_digest("sb_search", {"query": "Cited", "limit": 1})})
+            searched = await client.call_tool("sb_search", {"query": "Cited", "limit": 1,
+                "read_fence": model_object(fence), "access_claim": search_claim})
+            assert not searched.is_error, searched
+            assert len(searched.structured_content["results"]) == 1
+            wrong_limit = await client.call_tool("sb_search", {"query": "Cited", "limit": 2,
+                "read_fence": model_object(fence), "access_claim": search_claim})
+            assert wrong_limit.is_error
             for bad in [signed({**claim, "projects": ["project:b"]}), signed({**claim, "session_id": "session:other"})]:
                 rejected = await client.call_tool("sb_read_page", {**args, "access_claim": bad})
                 assert rejected.is_error
