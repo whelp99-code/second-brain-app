@@ -71,7 +71,37 @@ try {
       const after = profile === "scoped-record-read-v2" ? await client.status() : undefined;
       if (before && JSON.stringify(before.generation) !== JSON.stringify(after.generation)) throw new Error('status changed');
       if (before && JSON.stringify(before.generation) !== JSON.stringify(search.generation)) throw new Error('read generation differs');
+      let referenceCheck;
+      let pendingReference;
+      let reader;
+      let callbacks = 0;
+      if (profile === 'scoped-record-read-v2') {
+        const { createScopedMemoryReference } = await moduleAt('src/memory-scoped-reference.js');
+        const { createMemoryMembership } = await moduleAt('src/memory-membership.js');
+        reader = createScopedMemoryReference(db.authority, { client, membership: createMemoryMembership(Buffer.alloc(32, 7)),
+          clock: () => new Date(body.issued_at), search_limit: 2 });
+        const budgets = { max_records: 8, max_record_bytes: 4096, max_bytes: 32768 };
+        const reference = await reader.read('Cited', budgets);
+        if (reference.payload.records.length === 0) throw new Error('reference did not contain actual records');
+        await reader.submit(reference, async serialized => {
+          callbacks++;
+          if (serialized !== reference.serialized || Buffer.byteLength(serialized) !== reference.bytes) throw new Error('payload mismatch');
+        });
+        let duplicateDenied = false;
+        try { await reader.submit(reference, async () => { callbacks++; }); }
+        catch (error) { if (error.code !== 'MEMORY_REFERENCE_SUBMISSION_INVALID') throw error; duplicateDenied = true; }
+        if (!duplicateDenied || callbacks !== 1) throw new Error('duplicate reference submission');
+        pendingReference = await reader.read('Cited', budgets);
+        referenceCheck = { records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied };
+      }
       currentCookie = undefined;
+      if (reader) {
+        let denied = false;
+        try { await reader.submit(pendingReference, async () => { callbacks++; }); }
+        catch (error) { if (error.code !== 'MEMORY_ACCESS_SCOPE_UNAVAILABLE') throw error; denied = true; }
+        if (!denied || callbacks !== 1) throw new Error('unauthenticated reference delivery');
+        referenceCheck.cookie_removed_before_submit_denied = true;
+      }
       let missingCookieDenied = false;
       try { await client.search('Cited', 2); }
       catch (error) { if (error.code !== 'MEMORY_ACCESS_SCOPE_UNAVAILABLE') throw error; missingCookieDenied = true; }
@@ -82,7 +112,7 @@ try {
       try { await client.search('Cited', 2); }
       catch (error) { if (error.code !== 'MEMORY_ACCESS_SCOPE_UNAVAILABLE') throw error; denied = true; }
       if (!denied || page.pages.length !== 1 || search.pages.length !== 1) throw new Error('scoped client acceptance failed');
-      process.stdout.write(JSON.stringify({ profile, status_before_after_equal: before !== undefined, page_groups: page.pages.length, search_groups: search.pages.length,
+      process.stdout.write(JSON.stringify({ reference_delivery: referenceCheck, profile, status_before_after_equal: before !== undefined, page_groups: page.pages.length, search_groups: search.pages.length,
         policy_withdrawn_after_actual_response_denied: denied,
         phone_session_store_authenticated: true, missing_cookie_denied: missingCookieDenied }));
     } finally { await transport.close(); }
