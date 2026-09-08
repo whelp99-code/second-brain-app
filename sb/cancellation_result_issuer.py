@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from sb.cancellation_absence import require_cancellation_absence
 from sb.cancellation_result import sign_cancellation_result, verify_cancellation_result
@@ -43,6 +44,8 @@ class CancellationResultIssuer:
     signing_key_id: str
     signing_key: Ed25519PrivateKey
     now: datetime
+    provider_keys: Mapping[str, Ed25519PublicKey] | None = None
+    authority: Callable[[], None] | None = None
 
     def _aliases(self, intent: CorrectionCancellationIntentV1) -> str:
         old = intent.original_delegation
@@ -79,6 +82,8 @@ class CancellationResultIssuer:
 
     def complete(self, intent: CorrectionCancellationIntentV1, generation_id: str, generation_digest: str) -> JsonObject:
         """Caller holds pending and generation writer locks, including on first-issuance replay."""
+        if self.authority is not None:
+            self.authority()
         saved = cast(sqlite3.Row | None, self.requests.db.execute(
             'SELECT result_json FROM correction_cancellation_results WHERE intent_id=?', (intent.intent_id,)).fetchone())
         if saved is not None:
@@ -86,9 +91,11 @@ class CancellationResultIssuer:
             if not isinstance(value,dict):
                 raise CancellationEvidenceError('CANCELLATION_RESULT_CORRUPT')
             result = verify_cancellation_result(value,intent,now=self.now,
-                provider_keys={self.signing_key_id:self.signing_key.public_key()})
+                provider_keys=self.provider_keys if self.provider_keys is not None else {self.signing_key_id:self.signing_key.public_key()})
             if (result.result_generation_id,result.result_generation_manifest_digest) != (generation_id,generation_digest):
                 raise CancellationEvidenceError('CANCELLATION_RESULT_CORRUPT')
+            if self.authority is not None:
+                self.authority()
             return model_object(result)
         active = self.generations.active()
         high = (intent.tombstone.sequence,intent.tombstone.set_root)
@@ -125,10 +132,14 @@ class CancellationResultIssuer:
             'aliases_digest':self._aliases(intent),'alias_count':8,'reingress_digest':self._reingress(intent),
             'generation_absence_digest':require_cancellation_absence(self.requests.db,intent.intent_id,generation_id,generation_digest,active.root),
             'accepted_at':_text(admitted, 0),'completed_at':format_instant(self.now)}
+        if self.authority is not None:
+            self.authority()
         result = sign_cancellation_result(body,self.signing_key)
         wire = model_object(result)
         _ = verify_cancellation_result(wire,intent,now=self.now,
             provider_keys={self.signing_key_id:self.signing_key.public_key()})
+        if self.authority is not None:
+            self.authority()
         _ = self.requests.db.execute('INSERT INTO correction_cancellation_results VALUES(?,?,?)',
             (intent.intent_id,result.result_digest,canonical_bytes(wire).decode()))
         return wire

@@ -1,4 +1,4 @@
-"""Internal admitted cancellation -> suppressed generation. No external completion receipt."""
+"""Admitted cancellation execution under the existing generation writer."""
 
 from __future__ import annotations
 
@@ -60,6 +60,7 @@ def apply_correction_cancellation(
     backup_root: Path,
     historical_delegation_keys: Mapping[str, Ed25519PublicKey],
     current_cancellation_keys: Mapping[str, Ed25519PublicKey],
+    authority: Callable[[], tuple[Mapping[str, Ed25519PublicKey], Mapping[str, Ed25519PublicKey]]] | None = None,
     barrier: Callable[[str], None] | None = None,
     complete: Callable[[CorrectionCancellationIntentV1, str, str], JsonObject] | None = None,
 ) -> JsonObject:
@@ -87,11 +88,12 @@ def apply_correction_cancellation(
         encoded = _text(row, "intent_json")
 
         def authorize():
+            historical, current = authority() if authority is not None else (historical_delegation_keys, current_cancellation_keys)
             return parse_correction_cancellation_intent(
                 strict_loads(encoded, 16_384), now=stamp,
                 expected_provider=generations.provider_instance_id,
-                historical_delegation_keys=historical_delegation_keys,
-                current_cancellation_keys=current_cancellation_keys,
+                historical_delegation_keys=historical,
+                current_cancellation_keys=current,
             )
 
         verified = authorize()
@@ -133,6 +135,7 @@ def apply_correction_cancellation(
                 )
                 if complete is not None:
                     with generations.exclusive():
+                        _ = authorize()
                         return complete(intent, _text(execution, "generation_id"), _text(execution, "generation_digest"))
                 return _result(intent, _text(execution, "generation_id"), _text(execution, "generation_digest"))
             if _text(execution, "state") == "generation_active":
@@ -167,7 +170,7 @@ def apply_correction_cancellation(
             if parent.is_dir():
                 needles = (verify_cancellation_target(generations.generation(target.generation_id), intent),)
 
-            def authority() -> None:
+            def check_authority() -> None:
                 _ = authorize()
                 if requests.tombstone_high_water() != high:
                     raise CancellationExecutionError("TOMBSTONE_SET_STALE")
@@ -177,10 +180,10 @@ def apply_correction_cancellation(
                 backup_root=backup_root, exports=exports,
                 identities={target.target_id, target.source_identity_full,
                     target.content_identity_full, target.citation_identity_full},
-                needles=needles, now=now, authority=authority, barrier=observe)
+                needles=needles, now=now, authority=check_authority, barrier=observe)
             _ = record_cancellation_absence(requests.db, intent_id, generation.generation_id,
                 generation.manifest.generation_digest, generation.root, needles)
-            authority()
+            check_authority()
 
         settlement: JsonObject | None = None
 
@@ -197,6 +200,7 @@ def apply_correction_cancellation(
             )
 
             if complete is not None:
+                _ = authorize()
                 settlement = complete(intent, generation.generation_id, generation.manifest.generation_digest)
 
         # Permanent block precedes mutation; interrupted attempts remain fail-closed.

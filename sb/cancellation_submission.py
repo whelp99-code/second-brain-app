@@ -23,29 +23,7 @@ def submit_correction_cancellation(value: JsonValue, *, config: Config,
     load_authority: Callable[[], Config], clock: Callable[[], datetime]) -> JsonObject:
     """No generation mutation, result signing, or automatic cursor completion."""
     def authority() -> tuple[Mapping[str, Ed25519PublicKey], Mapping[str, Ed25519PublicKey]]:
-        try:
-            current = load_authority()
-            if (current.provider_instance_id != config.provider_instance_id
-                or current.provider_release_sha != config.provider_release_sha
-                or tuple(Path(path).absolute() for path in (current.vault_root, current.request_root, current.state_root, current.share_root, current.export_root))
-                    != tuple(Path(path).absolute() for path in (config.vault_root, config.request_root, config.state_root, config.share_root, config.export_root))):
-                raise CancellationSubmissionError("CANCELLATION_AUTHORITY_BINDING_CHANGED")
-            for name in ("jarvis_public_keys", "cancellation_public_keys"):
-                keys = current.raw.get(name)
-                if not isinstance(keys, Mapping) or not keys or any(
-                    not isinstance(encoded, str) for encoded in keys.values()):
-                    raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE")
-            revoked = current.raw.get("revoked_jarvis_signing_key_ids", [])
-            if not isinstance(revoked, list) or any(not isinstance(key, str) for key in revoked):
-                raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE")
-            historical = {key: Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True))
-                for key, encoded in current.jarvis_public_keys.items()}
-            active = {key: Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True))
-                for key, encoded in current.cancellation_public_keys.items()
-                if key not in current.revoked_jarvis_signing_key_ids}
-            return historical, active
-        except (OSError, ValueError) as exc:
-            raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE") from exc
+        return cancellation_authority(config, load_authority)
 
     # Authenticate before opening writable journals; repeat under all admission locks.
     historical, current = authority()
@@ -60,3 +38,29 @@ def submit_correction_cancellation(value: JsonValue, *, config: Config,
         return accepted
     finally:
         mutations.close()
+
+
+def cancellation_authority(config: Config, load_authority: Callable[[], Config]) -> tuple[Mapping[str, Ed25519PublicKey], Mapping[str, Ed25519PublicKey]]:
+    try:
+        current = load_authority()
+        if (current.provider_instance_id != config.provider_instance_id
+            or current.provider_release_sha != config.provider_release_sha
+            or tuple(Path(path).absolute() for path in (current.vault_root, current.request_root, current.state_root, current.share_root, current.export_root, current.backup_root))
+                != tuple(Path(path).absolute() for path in (config.vault_root, config.request_root, config.state_root, config.share_root, config.export_root, config.backup_root))):
+            raise CancellationSubmissionError("CANCELLATION_AUTHORITY_BINDING_CHANGED")
+        for name in ("jarvis_public_keys", "cancellation_public_keys"):
+            keys = current.raw.get(name)
+            if not isinstance(keys, Mapping) or not keys or any(
+                not isinstance(encoded, str) for encoded in keys.values()):
+                raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE")
+        revoked = current.raw.get("revoked_jarvis_signing_key_ids", [])
+        if not isinstance(revoked, list) or any(not isinstance(key, str) for key in revoked):
+            raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE")
+        historical = {key: Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True))
+            for key, encoded in current.jarvis_public_keys.items()}
+        active = {key: Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True))
+            for key, encoded in current.cancellation_public_keys.items()
+            if key not in current.revoked_jarvis_signing_key_ids}
+        return historical, active
+    except (OSError, ValueError) as exc:
+        raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE") from exc

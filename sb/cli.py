@@ -14,6 +14,7 @@ from pathlib import Path
 from time import monotonic
 from typing import cast
 
+from sb.cli_cancellation import apply_cancellation
 from sb.cli_requests import apply_requests_once
 from sb.config import ConfigValueError, load_config
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
@@ -63,6 +64,7 @@ class Command(StrEnum):
     RETENTION = "retention"
     GC = "gc"
     METRICS = "metrics"
+    APPLY_CANCELLATION = "apply-cancellation"
     APPLY_REQUESTS = "apply-requests"
     MAINTAIN = "maintain"
 
@@ -110,6 +112,8 @@ def _parser() -> argparse.ArgumentParser:
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
+    cancellation = sub.add_parser(Command.APPLY_CANCELLATION.value)
+    _ = cancellation.add_argument("--intent-id", required=True)
     apply_requests = sub.add_parser(Command.APPLY_REQUESTS.value)
     _ = apply_requests.add_argument("--once", action="store_true")
     _ = apply_requests.add_argument("--test-control-socket")
@@ -508,6 +512,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.RETENTION: retention,
         Command.GC: gc,
         Command.METRICS: metrics,
+        Command.APPLY_CANCELLATION: lambda: apply_cancellation(config, _opt_str(ns, "intent_id") or ""),
         Command.APPLY_REQUESTS: apply_requests,
         Command.MAINTAIN: maintain,
     }
