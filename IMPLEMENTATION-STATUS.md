@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `121d06b` / SB 인수 `57f88c1`:** [영속 제출 세션의 인증 범위 결합](SCOPED-DURABLE-DELIVERY-2026-09-09.md). 다른 인증 세션에서 새 reader/epoch로 native 세션을 재사용하던 회귀 수정, 관련35통과·격리emit/lint 및 실제 MCP→원장 HMAC/새 reader 중복 거부 확인. native 세션 관측·본문 삭제와 인증 진입점 등 전체 운영 목표는 유지한다.
+
 **2026-09-09 JARVIS `ded750c` / SB 인수 `5b07d53`:** [정책·인증 세션·기존 키·v2 전송·문맥 공급기 제품 구성](SCOPED-PRODUCTION-COMPOSITION-2026-09-09.md). 집중6통과·격리emit/lint 및 직접 소유/주입 전송기 실제 인수 통과. 키/정책 자동 생성 없이 필수 인증 문맥을 검사한다. CLI/HTTP 인증 전달·native 세션 및 전체 운영 목표는 유지한다.
 
 **2026-09-09 JARVIS `cec7943` / SB 인수 `158bd75`:** [빈 검색의 세대 metadata 유실 수정](SCOPED-EMPTY-GENERATION-2026-09-09.md). 다른 세대의 빈 결과가 empty 문맥으로 수락되는 회귀를 재현하고 실제 응답 세대를 후속 상태와 대조한다. 관련71통과·격리emit/lint·실제 빈 응답 대체 거부 및 기존 제출 인수 통과. 실제 인증 진입점·native 세션·전체 운영 목표는 유지한다.

@@ -1,0 +1,78 @@
+{
+  "scoped_status_client": {
+    "reference_delivery": {
+      "production_factory_owned_and_shared": true,
+      "durable_scope_binding_verified": true,
+      "durable_duplicate_denied": true,
+      "records": 2,
+      "bytes": 4412,
+      "duplicate_denied": true,
+      "empty_generation_substitution_denied": true,
+      "cookie_removed_before_submit_denied": true
+    },
+    "profile": "scoped-record-read-v2",
+    "status_before_after_equal": true,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "scoped_client": {
+    "profile": "scoped-record-read-v1",
+    "status_before_after_equal": false,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "consumer_validation": [
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    }
+  ],
+  "work": "/var/tmp/page-access-acceptance-8kaockvk",
+  "tools": [
+    "sb_read_page",
+    "sb_search"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL",
+  "jarvis_commit": "121d06b",
+  "acceptance_commit": "57f88c1",
+  "regression": {
+    "passed": 35,
+    "files": 3,
+    "seconds": 24.26
+  },
+  "before_failed": 1,
+  "typescript_isolated_emit": "passed",
+  "eslint": "passed"
+}
