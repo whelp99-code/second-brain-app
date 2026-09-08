@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "fixture": true,
+  "independent_processes": 7,
+  "accepted": {
+    "accepted": true,
+    "proposal_digest": "sha256:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+    "authorization": "not_granted"
+  },
+  "changed": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "quarantined": {
+    "accepted": false,
+    "code": "MEMORY_CANDIDATE_SCOPE_INVALID"
+  },
+  "validation_table_counts_unchanged": true,
+  "signedReview": {
+    "accepted": true,
+    "proposal_digest": "sha256:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+    "writes_authorized": false
+  },
+  "otherScopeReview": {
+    "accepted": false,
+    "code": "MEMORY_SCOPE_REVIEW_INVALID"
+  },
+  "withdrawnReview": {
+    "accepted": false,
+    "code": "MEMORY_SCOPE_REVIEW_INVALID"
+  },
+  "approval_creates_no_memory_outbox": true,
+  "executorRefusal": {
+    "accepted": false,
+    "code": "CONTROL_ACTION_REVIEW_ONLY"
+  },
+  "execution_attempt_preserves_approval": true,
+  "scopedWriteIdentity": {
+    "identity": {
+      "schema_version": 1,
+      "operation": "remember",
+      "candidate_id": "memcand:pos:v1:dbeda743b4c45369dd7afaeb9aeabbe2970bfb00783a82911c27d35ebdc1b32c",
+      "candidate_digest": "sha256:5a9bcc4dc5599612ef3833380426655fd5b62711e8b331e3edc4e95dcf028826",
+      "classification_digest": "sha256:2eee17b562f08b940aefb4139bc4c0d868ffeef2869d80280cbb14ec2a899d1c",
+      "source_digest": "sha256:32a7d8b0d74c56ae9a15b21624e0ec859c113c2f0bf4b54e73422f5bc42b0f47",
+      "owner": "principal:owner",
+      "projects": [
+        "project:shared-memory"
+      ],
+      "policy_revision": "policy:fixture"
+    },
+    "identity_digest": "sha256:353713308e58d5b52d5f7d70b0877c36ee51c77f4f91a1b39d97d392a6080bd2",
+    "proposal_digest": "sha256:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+    "idempotency_key": "memidem:scoped:v1:353713308e58d5b52d5f7d70b0877c36ee51c77f4f91a1b39d97d392a6080bd2",
+    "control_request_id": "memory-scope-review:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+    "control_receipt_id": "receipt:memory-scope-review:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+    "command_digest": "sha256:964ce6178603661cc289083ade943c6c8b5b62edd6601588124e7bdc70207584",
+    "expires_at": "2026-08-28T12:01:00.000Z",
+    "writes_authorized": false
+  },
+  "scopedWritePreparation": {
+    "schema_version": 1,
+    "profile": "scoped-remember-preparation-v1",
+    "binding": {
+      "identity": {
+        "schema_version": 1,
+        "operation": "remember",
+        "candidate_id": "memcand:pos:v1:dbeda743b4c45369dd7afaeb9aeabbe2970bfb00783a82911c27d35ebdc1b32c",
+        "candidate_digest": "sha256:5a9bcc4dc5599612ef3833380426655fd5b62711e8b331e3edc4e95dcf028826",
+        "classification_digest": "sha256:2eee17b562f08b940aefb4139bc4c0d868ffeef2869d80280cbb14ec2a899d1c",
+        "source_digest": "sha256:32a7d8b0d74c56ae9a15b21624e0ec859c113c2f0bf4b54e73422f5bc42b0f47",
+        "owner": "principal:owner",
+        "projects": [
+          "project:shared-memory"
+        ],
+        "policy_revision": "policy:fixture"
+      },
+      "identity_digest": "sha256:353713308e58d5b52d5f7d70b0877c36ee51c77f4f91a1b39d97d392a6080bd2",
+      "proposal_digest": "sha256:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+      "idempotency_key": "memidem:scoped:v1:353713308e58d5b52d5f7d70b0877c36ee51c77f4f91a1b39d97d392a6080bd2",
+      "control_request_id": "memory-scope-review:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+      "control_receipt_id": "receipt:memory-scope-review:d1fb5808e766c81b54b083eebe35f7975c8c61b15b93a8bc8cc9ebf48d24d691",
+      "command_digest": "sha256:964ce6178603661cc289083ade943c6c8b5b62edd6601588124e7bdc70207584",
+      "expires_at": "2026-08-28T12:01:00.000Z",
+      "writes_authorized": false
+    },
+    "payload": {
+      "subject": "Task 27 verification",
+      "content": "Task 27 passed independent technical verification.",
+      "subject_digest": "sha256:8db1697049f734b95744d2a566eb286ea9d32576002662bd385740763d605ceb",
+      "content_digest": "sha256:b6eb474a976d98c9fdd4987eb9e02a7351bb9f9c15b927f9091f654a7cd6b077",
+      "purpose": "personal_memory",
+      "sensitivity": "personal",
+      "retention_days": 3650
+    },
+    "writes_authorized": false,
+    "preparation_digest": "sha256:aca959f8bbfc646525202f564b986fe63d1c2f10bd7d2d63e766bcf3d90d8aaf"
+  },
+  "replacement_payload_rejected": true,
+  "scoped_write_completed": false
+}

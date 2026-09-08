@@ -77,6 +77,12 @@ if (mode === "read" || mode === "review" || mode === "execute") {
     const approvedCounts = fixture.memoryTableCounts(f.authority);
     const { prepareMemoryScopedWriteIdentity } = await load("src/memory-scoped-write-identity.js");
     const scopedWriteIdentity = prepareMemoryScopedWriteIdentity(f.authority, proposal, command.request_id, now);
+    const { prepareMemoryScopedWritePayload } = await load("src/memory-scoped-write-payload.js");
+    const scopedWritePreparation = prepareMemoryScopedWritePayload(f.authority, proposal, command.request_id,
+      input.subject, input.statement, now);
+    assert.equal(scopedWritePreparation.payload.content, input.statement);
+    assert.throws(() => prepareMemoryScopedWritePayload(f.authority, proposal, command.request_id,
+      input.subject, "Unverified replacement outcome", now), error => error.code === "MEMORY_SCOPED_PAYLOAD_INVALID");
     const executorRefusal = read(proposal, "execute", command.request_id);
     assert.deepEqual(executorRefusal, { accepted: false, code: "CONTROL_ACTION_REVIEW_ONLY" });
     assert.deepEqual(fixture.memoryTableCounts(f.authority), approvedCounts);
@@ -105,6 +111,7 @@ if (mode === "read" || mode === "review" || mode === "execute") {
       signedReview, otherScopeReview, withdrawnReview, approval_creates_no_memory_outbox: true,
       executorRefusal, execution_attempt_preserves_approval: true,
       scopedWriteIdentity,
+      scopedWritePreparation, replacement_payload_rejected: true,
       scoped_write_completed: false }, null, 2) + "\n");
   } finally { fixture.closeMemoryDatabase(f); }
 }

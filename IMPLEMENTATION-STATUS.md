@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 후보 본문 결합:** [scoped 쓰기 준비 payload](SCOPED-WRITE-PAYLOAD-2026-09-09.md). 현재 signed review와 후보 제목/본문 digest 일치 검사, 호출자 본문 교체 거부. J2통과·실제 컴파일된 API와 Python의 제목/본문/준비 digest 일치. 요청 codec·승인 소비·outbox/provider 저장·완료 영수증은 미완료다.
+
 **2026-09-09 JARVIS `0e6923b`:** [범위가 결합된 쓰기 식별자](SCOPED-WRITE-IDENTITY-2026-09-09.md). 기존 v1/v3 유지, signed review→scoped identity/key 및 Python 독립 codec. J2/SB9통과·실제 서명 검토에서 양쪽 digest/key 일치, 동일 범위 재승인 key 불변. 요청 codec·승인 소비·outbox/provider 저장·영수증은 미완료다.
 
 **2026-09-09 JARVIS `5c8931b`:** [범위 검토의 일반 실행·소비 차단](SCOPED-WRITE-REVIEW-DESIGN-2026-09-09.md). 일반 큐 반환 회귀 재현→관련13통과·타입/lint·격리 실행기 거부 및 승인 보존 확인(독립 프로세스7개). outbox 원자적 삽입 지점을 확인했으며 범위 검토를 기존 confirmation 소비 종류로 위장하는 방식은 보류한다. scoped 쓰기 전체는 미완료다.
