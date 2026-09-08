@@ -57,11 +57,19 @@ def _assignment_repl(match: re.Match[str]) -> str:
 
 
 def _redact(text: str) -> str:
-    redacted = _PEM.sub("[REDACTED:pem]", text)
-    redacted = _AWS.sub("[REDACTED:aws]", redacted)
-    redacted = _GITHUB.sub("[REDACTED:github]", redacted)
-    redacted = _OPENAI.sub("[REDACTED:openai]", redacted)
-    return _ASSIGN.sub(_assignment_repl, redacted)
+    # Necessary literal gates only; preserve regexes and replacement order.
+    redacted = text
+    if "-----BEGIN " in redacted:
+        redacted = _PEM.sub("[REDACTED:pem]", redacted)
+    if "AKIA" in redacted:
+        redacted = _AWS.sub("[REDACTED:aws]", redacted)
+    if "gh" in redacted:
+        redacted = _GITHUB.sub("[REDACTED:github]", redacted)
+    if "sk-" in redacted:
+        redacted = _OPENAI.sub("[REDACTED:openai]", redacted)
+    if "=" in redacted or ":" in redacted:
+        redacted = _ASSIGN.sub(_assignment_repl, redacted)
+    return redacted
 
 
 def _splitter() -> _TextSplitter:

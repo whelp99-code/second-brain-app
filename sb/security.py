@@ -42,13 +42,20 @@ class SecurityPolicyError(RuntimeError):
 
 def mask_sensitive(text: str) -> str:
     """Mask common secrets and personal identifiers in an LLM-bound copy."""
-    protected = _PRIVATE_KEY.sub("[REDACTED_PRIVATE_KEY]", text)
+    # Each literal is required by its regex. Check the current intermediate
+    # string so overlapping replacements retain the original policy order.
+    protected = text
+    if "-----BEGIN " in protected:
+        protected = _PRIVATE_KEY.sub("[REDACTED_PRIVATE_KEY]", protected)
     protected = _BEARER.sub("Bearer [REDACTED_TOKEN]", protected)
-    protected = _SECRET_ASSIGN.sub(
-        lambda match: f"{match.group(1)}=[REDACTED_SECRET]",
-        protected,
-    )
-    return _EMAIL.sub("[REDACTED_EMAIL]", protected)
+    if ":" in protected or "=" in protected:
+        protected = _SECRET_ASSIGN.sub(
+            lambda match: f"{match.group(1)}=[REDACTED_SECRET]",
+            protected,
+        )
+    if "@" in protected:
+        protected = _EMAIL.sub("[REDACTED_EMAIL]", protected)
+    return protected
 
 
 def llm_is_external(config: Config) -> bool:
