@@ -12,6 +12,7 @@ from pytest import LogCaptureFixture, MonkeyPatch
 
 from sb.contracts import PageSpec, SourceCite
 from sb.search import SearchHit, SearchIndex
+from sb.search_filters import SearchFilters
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 from tests.knowledge import commit_page, register_page, stamp_knowledge
@@ -192,9 +193,11 @@ def test_search_uses_hybrid_module_when_flag_enabled(
         limit: int,
         *,
         vault_root: Path | None = None,
+        filters: SearchFilters | None = None,
     ) -> tuple[SearchHit, ...]:
         del lexical_results, query, limit
         assert vault_root == index.vault_root
+        assert filters == SearchFilters()
         return (sentinel,)
 
     stub.__dict__["hybrid_search"] = _hybrid
