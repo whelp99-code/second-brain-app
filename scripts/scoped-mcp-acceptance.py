@@ -88,6 +88,7 @@ async def run():
             outputs.append(result.structured_content)
     assert outputs[0] == outputs[1]
     consumer = None
+    scoped_client = None
     if len(sys.argv) > 1:
         checked = await anyio.run_process(["node", str(Path(__file__).with_name("scoped-response-validate.mjs")), sys.argv[1]],
             input=json.dumps({"inputs": consumer_inputs, "transport": {"launcher": str(launcher),
@@ -95,7 +96,12 @@ async def run():
                 "contract": str(Path(__file__).resolve().parents[1] / "contracts/second-brain-scoped-read-v1.json")}}).encode(), check=False)
         assert checked.returncode == 0, checked.stderr.decode()
         consumer = json.loads(checked.stdout)
-    return {"consumer_validation": consumer, "work": str(work), "tools": ["sb_read_page", "sb_search"], "records": 2,
+        client_check = await anyio.run_process(["node", str(Path(__file__).with_name("access-claim-production-sign.mjs")), sys.argv[1]],
+            input=json.dumps({**setup["body"], "page_id": page.page_id, "transport": {"launcher": str(launcher), "config": str(config),
+                "contract": str(Path(__file__).resolve().parents[1] / "contracts/second-brain-scoped-read-v1.json")}}).encode(), check=False)
+        assert client_check.returncode == 0, client_check.stderr.decode()
+        scoped_client = json.loads(client_check.stdout)
+    return {"scoped_client": scoped_client, "consumer_validation": consumer, "work": str(work), "tools": ["sb_read_page", "sb_search"], "records": 2,
         "wrong_request_missing_claim_tampering_denied": True, "restart_equal": True,
         "production_issuer": len(sys.argv) > 1,
         "live_revocation_policy_change_invalid_missing_config_denied": True,
