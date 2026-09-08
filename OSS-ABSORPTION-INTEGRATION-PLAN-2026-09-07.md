@@ -359,3 +359,10 @@ LightRAG의 평가·근거 연결 개념을 기존 검색에 적용할 구체적
 [공통 문맥 공급 분석](CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md)으로 네 OSS의 장점을 기존 코드에 다시 대응했다. 자비스 context snapshot은 근거 메타데이터이며 실제 본문 전달 receipt가 아니다. provider의 untrusted, 여러 줄 원문, live 관측 조건과 총량 계산을 격리 실행으로 확인하고 C1~C8의 코드 경계·우선순위·완료 기준을 추가했다.
 
 code-brain의 작은 context pack과 memory-bank의 세션 중복 억제는 자비스 기존 context/projection 및 실제 agent 전송 경계에 연결한다. Tencent의 공유 범위는 검증된 원본 분류와 함께 확장하며, LightRAG의 검색 개선은 기존 질문 평가를 통과한 기능만 채택한다. 별도 기억 서버·Proxy·원문 DB와 전역 훅은 도입하지 않았다. 이번 산출물은 재현 도구와 구현 세부 계획이며 공통 문맥 공급·운영 인수 완료를 의미하지 않는다.
+
+
+## 33. 선택적 문맥의 본문 준비 구현
+
+자비스 `3360fe7`의 [reference-only 본문 묶음](MEMORY-REFERENCE-PREPARATION-2026-09-08.md)은 code-brain의 작은 문맥·예산 개념을 기존 read adapter와 연결한다. source/citation/record/세대와 원문을 보존하며 Tencent식 별도 기억 서버나 memory-bank 전용 수집 훅을 설치하지 않았다. 동일 ID의 출처 불일치는 독립 리뷰로 발견해 수정했다.
+
+관련 회귀와 실제 SB MCP→adapter→JSON 준비는 검증했다. 실제 모델 전달과 session/compaction receipt, 삭제/정책/프로젝트 범위 연결은 후속 구현이며 전체 목표의 완료 조건을 유지한다. 외부 코드를 복사하거나 신규 OSS 의존성을 추가하지 않았다.

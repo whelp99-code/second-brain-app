@@ -4,6 +4,8 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+B5 준비 경로 구현: 자비스 `3360fe7`의 [출처를 보존한 참고 기억 본문 묶음](MEMORY-REFERENCE-PREPARATION-2026-09-08.md). 기존 adapter 출력에서 여러 줄 원문·record/citation/세대·유효 시점을 유지하고 최종 JSON 전체 byte/선택적 tokenizer 예산을 적용한다. 관련 94 passed, 실제 MCP 3건·record 1개·본문/digest/출처/세대 일치, 독립 리뷰 결함 수정 및 재검토 완료. 기존 추천 authority·frozen MCP는 유지한다. 준비 데이터이며 실제 모델 전달, suppression/범위·세션/compaction receipt와 B5 전체는 남는다.
+
 B5 인계 대조: [공통 문맥 공급 공백과 8개 추가 과제](CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md). 자비스 새 격리 빌드로 snapshot 본문 부재, provider untrusted 제외, 여러 줄 입력 거부, live 관측 의존, 본문을 포함하지 않는 총량 계수를 재현했다. 기존 context/projection 재사용과 실제 전달·중복/compaction·삭제/범위 결합을 C1~C8로 세분화했다. 진단 성공은 B5 완성이 아니며 제품/운영 변경은 없다.
 
 병합 대기: 검색 `d174276` → 준비 사본 복구 `47fa507` → 정확 문구/입력 예산 `9323a6d` (`codex/korean-query-consistency-20260908`, `/var/tmp/sb-korean-query-work`). 결합 제품 전체 764 passed/2 skipped. 원 작업공간의 100회 쓰기 인수가 종료되면 이 커밋들을 병합하고 필요한 통합 검증을 수행한다. 현재 원 작업공간의 제품 소스에는 아직 적용하지 않았다.

@@ -303,3 +303,10 @@ B5는 자비스에 이미 있는 문맥 snapshot/근거/삭제 projection을 재
 [상세 분석과 C1~C8](CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md)에 인계서와 자비스 기존 assembler/adapter/context store/projection을 병합했다. 새 격리 빌드에서 confirmed snapshot의 본문 부재, provider untrusted 제외, LF/CRLF/CR/tab 거부, 기억만 있을 때 live 관측 부족, 본문 길이가 총량에 반영되지 않음을 재현했다.
 
 우선순위는 공급 목적·신뢰 계약 → 원문 보존/최종 payload 예산 → 실제 전달 receipt·session/compaction → 삭제/정책/프로젝트 범위 결합이다. 기존 추천 조건을 완화하거나 trust를 올리고 별도 원문 DB를 만드는 우회는 보류한다. 진단 도구 exit 0은 결손 재현이며 B5 구현 또는 실사용 인수 통과가 아니다. 기존 100회 쓰기와 병합 대기 세 커밋, B4~B8 전체 완료 조건을 유지한다.
+
+
+## 28. G3/B5 구현 — 원문과 출처를 보존하는 문맥 준비
+
+자비스 `3360fe7`의 [참고 기억 묶음](MEMORY-REFERENCE-PREPARATION-2026-09-08.md)은 C1~C5의 준비 단계를 구현한다. 추천용 live/confirmed 계약을 유지하고 별도 reference-only 프로필에서 provider untrusted 원문·digest·세대를 보존한다. 최종 JSON 예산·전체 항목 생략·상충 출처와 세대 거부를 검사했다. 관련 94 passed, 실제 MCP 인수 및 독립 리뷰/수정/재검토 완료.
+
+실제 tokenizer/model 전달·전송 receipt·로컬 suppression와 범위·세션 중복/compaction·삭제 계보 연결은 여전히 필요하다. 라이브러리 export를 전역 자동 주입 완료로 취급하지 않는다. 제품의 원문 DB·승인 엔진·frozen MCP는 추가/변경하지 않았다.
