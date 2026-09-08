@@ -123,6 +123,17 @@ def _request(
         return int(exc.code), body
 
 
+@pytest.mark.parametrize("query", ['"미완성', "가" * 1366])
+def test_search_query_errors_are_http_400(tmp_path: Path, query: str) -> None:
+    config, root = _ready(tmp_path)
+    with _running(config) as base:
+        code, payload = _request(base + "/api/search?" + urllib.parse.urlencode({"q": query}))
+    assert code == 400
+    assert isinstance(payload, dict)
+    assert "SEARCH_QUERY_" in str(cast(dict[str, object], payload).get("error"))
+    assert not (root / ".sb/search.db").exists()
+
+
 def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     with _running(config) as base:

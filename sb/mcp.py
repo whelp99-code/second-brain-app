@@ -69,6 +69,8 @@ from sb.public_page import public_frontmatter
 from sb.remember_contracts import MemoryWriteResultV3
 from sb.request_store import RequestStore
 from sb.search import SearchHitDict, SearchIndex, committed_text, git_run
+from sb.search_errors import SearchQueryError
+from sb.search_query import LexicalQuery
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
@@ -477,15 +479,19 @@ def build_server(
             **generation_read_binding(generation, current).as_dict(),
         })
 
+    def query_plan(query: str) -> LexicalQuery:
+        try:
+            return LexicalQuery.parse(query)
+        except SearchQueryError as exc:
+            raise ToolError(str(exc)) from exc
+
     def sb_search(
         query: str,
         limit: int = 10,
         read_fence: dict[str, JsonValue] | None = None,
     ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
         """Search the pinned compiled wiki, daily briefs, and conflict pages."""
-        from sb.search_query import LexicalQuery
-
-        parsed = LexicalQuery.parse(query)
+        parsed = query_plan(query)
         with pin_generation() as (current_root, generation):
             current = high_water()
             require_read_fence(read_fence, "memory_read", "read", current)
@@ -864,6 +870,7 @@ def build_server(
         Returns ranked sections with a snippet and the `page_id` to pass to
         `sb_read_page`.
         """
+        _ = query_plan(query)
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
             hits = SearchIndex(vault_root=current_root).search(query, limit, scope="reference")
@@ -922,6 +929,7 @@ def build_server(
 
     def desktop_search(query: str, limit: int = 10, scope: Literal["active", "candidate", "reference"] = "reference") -> dict[str, list[SearchHitDict]]:
         """Search cited knowledge, distinguishing verified and reference results."""
+        _ = query_plan(query)
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
             return {"results": [hit.as_dict() for hit in SearchIndex(current_root).search(query, limit, scope=scope)]}

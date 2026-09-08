@@ -34,6 +34,7 @@ from sb.ops import (
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
 from sb.runtime_access import mutate_root, read_config
 from sb.search import SearchIndex
+from sb.search_errors import SearchQueryError
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import Vault, VaultLintError, init_vault
 
@@ -549,7 +550,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except (OperationError, VaultLintError, GovernanceError) as exc:
+    except (OperationError, VaultLintError, GovernanceError, SearchQueryError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
