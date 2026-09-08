@@ -10,13 +10,13 @@ import sqlite3
 import subprocess
 from collections.abc import Generator, Sequence
 from contextlib import closing, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import islice
 from pathlib import Path
 from typing import Final, Protocol, TypedDict, cast, runtime_checkable
 
-from sb.config import APP_ROOT, default_knowledge_registry_path
+from sb.config import APP_ROOT, default_knowledge_registry_path, validate_search_min_similarity
 from sb.knowledge_registry import (
     ACTIVE,
     APPROVED,
@@ -221,6 +221,10 @@ class SearchIndex:
     vault_root: Path
     hybrid: bool | None = None
     registry_path: Path | None = None
+    min_similarity: float = -1.0
+
+    def __post_init__(self) -> None:
+        _ = validate_search_min_similarity(self.min_similarity)
 
     def search(
         self,
@@ -264,7 +268,8 @@ class SearchIndex:
         if not _wants_hybrid(self.hybrid):
             return hits
         return _hybrid_or_lexical(hits, query, limit, root,
-                                  SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope))
+                                  SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope,
+                                                self.min_similarity))
 
     def iter_lexical_hits(
         self, query: str, *, kinds: Sequence[str] | None = None,
@@ -333,6 +338,7 @@ class SearchIndex:
         _ = LexicalQuery.parse(query)
         if limit <= 0 or not query.strip() or '"' in query or not _wants_hybrid(self.hybrid):
             return ()
+        filters = replace(filters, min_similarity=max(filters.min_similarity, self.min_similarity))
         root = self.vault_root.resolve()
         if not (root / "generation.json").is_file():
             return ()

@@ -500,7 +500,8 @@ def build_server(
             require_active_high_water(generation, current)
             if limit <= 0 or not query.strip():
                 return bind_read({"results": []}, generation, current)
-            index = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid)
+            index = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid,
+                                min_similarity=config.search_min_similarity)
             results: list[ToolResult] = []
             seen_records: set[str] = set()
             seen_pages: set[str] = set()
@@ -879,7 +880,8 @@ def build_server(
         _ = query_plan(query)
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            hits = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid).search(query, limit, scope="reference")
+            hits = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid,
+                               min_similarity=config.search_min_similarity).search(query, limit, scope="reference")
             return {"results": [hit.as_dict() for hit in hits]}
 
     def legacy_read_page(id: str) -> dict[str, dict[str, str] | str]:
@@ -938,7 +940,8 @@ def build_server(
         _ = query_plan(query)
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            return {"results": [hit.as_dict() for hit in SearchIndex(current_root, hybrid=config.search_hybrid).search(query, limit, scope=scope)]}
+            return {"results": [hit.as_dict() for hit in SearchIndex(current_root, hybrid=config.search_hybrid,
+                min_similarity=config.search_min_similarity).search(query, limit, scope=scope)]}
 
     def sb_run() -> RunOutcomeDict:
         """Immediately process explicit capture using the single writer pipeline."""

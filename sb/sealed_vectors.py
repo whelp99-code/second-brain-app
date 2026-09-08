@@ -63,6 +63,8 @@ def query_sealed_cosine(root: Path, query: str, limit: int, *, filters: SearchFi
         predicate, parameters = filters.predicate("d.")
         pieces = predicate.split("?")
         predicate = "".join(piece + _text(value) for piece, value in zip(pieces, parameters, strict=False)) + pieces[-1]
+        if filters.min_similarity > -1:
+            predicate += " AND vec_distance_cosine(d.embedding,X'" + blob.hex() + "') <= " + repr(1.0 - filters.min_similarity)
         sql = (
             "PRAGMA query_only=ON;BEGIN;"
             + "SELECT json_array(generation_id,manifest_digest) FROM generation_meta;"

@@ -15,7 +15,7 @@ from time import monotonic
 from typing import cast
 
 from sb.cli_requests import apply_requests_once
-from sb.config import load_config
+from sb.config import ConfigValueError, load_config
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
@@ -259,7 +259,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             else None
         )
         explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
-        hits = SearchIndex(vault_root=Path(config.vault_root), registry_path=explicit, hybrid=config.search_hybrid).search(
+        hits = SearchIndex(vault_root=Path(config.vault_root), registry_path=explicit, hybrid=config.search_hybrid,
+                           min_similarity=config.search_min_similarity).search(
             query,
             _opt_int(ns, "limit") or 10,
             kinds=kinds,
@@ -551,7 +552,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except (OperationError, VaultLintError, GovernanceError, SearchQueryError,
+    except (OperationError, VaultLintError, GovernanceError, SearchQueryError, ConfigValueError,
             GenerationError, GenerationIndexError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

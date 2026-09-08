@@ -34,22 +34,25 @@ def query_filtered_cosine(root: Path, query: str, limit: int, *, encoder: Encode
     predicate, parameters = filters.predicate("d.")
     parts = predicate.split("?")
     predicate = "".join(part + _quote(value) for part, value in zip(parts, parameters, strict=False)) + parts[-1]
+    similarity = ("WHERE vec_distance_cosine(v.embedding," + vector + ") <= "
+                  + repr(1.0 - filters.min_similarity) + " ") if filters.min_similarity > -1 else ""
     # Both databases are read-only. A single read transaction pins each SQLite
     # snapshot; exact text equality rejects stale or removed vector chunks.
     # Filtering occurs before distance ordering and LIMIT, not after a top-k cut.
     sql = (
         f"ATTACH DATABASE {_quote(index.resolve().as_uri() + '?mode=ro')} AS knowledge;"
-        "PRAGMA query_only=ON;BEGIN;"
-        "SELECT json_array(embedding_model_id,revision,dim) FROM embedding_meta;"
-        "WITH eligible AS MATERIALIZED (SELECT c.id,d.page_id,d.section,d.text,d.kind,d.status,"
-        "d.knowledge_status,d.approval_status,d.canonical,d.source_ref,d.updated "
-        "FROM chunks c JOIN knowledge.docs d ON c.page_id=d.page_id AND c.section=d.section "
-        f"AND c.text=d.text WHERE {predicate}), ranked AS MATERIALIZED ("
-        f"SELECT e.*,vec_distance_cosine(v.embedding,{vector}) AS distance "
-        "FROM eligible e JOIN vec_chunks v ON v.rowid=e.id "
-        f"ORDER BY distance,e.page_id,e.section LIMIT {int(limit)}) "
-        "SELECT json_array(page_id,section,text,distance,kind,status,knowledge_status,approval_status,"
-        "canonical,source_ref,updated) FROM ranked ORDER BY distance,page_id,section;COMMIT;"
+        + "PRAGMA query_only=ON;BEGIN;"
+        + "SELECT json_array(embedding_model_id,revision,dim) FROM embedding_meta;"
+        + "WITH eligible AS MATERIALIZED (SELECT c.id,d.page_id,d.section,d.text,d.kind,d.status,"
+        + "d.knowledge_status,d.approval_status,d.canonical,d.source_ref,d.updated "
+        + "FROM chunks c JOIN knowledge.docs d ON c.page_id=d.page_id AND c.section=d.section "
+        + f"AND c.text=d.text WHERE {predicate}), ranked AS MATERIALIZED ("
+        + f"SELECT e.*,vec_distance_cosine(v.embedding,{vector}) AS distance "
+        + "FROM eligible e JOIN vec_chunks v ON v.rowid=e.id "
+        + similarity
+        + f"ORDER BY distance,e.page_id,e.section LIMIT {int(limit)}) "
+        + "SELECT json_array(page_id,section,text,distance,kind,status,knowledge_status,approval_status,"
+        + "canonical,source_ref,updated) FROM ranked ORDER BY distance,page_id,section;COMMIT;"
     )
     raw = emb.run_vec_sql(emb.vectors_path(root), sql, read_only=True)
     try:

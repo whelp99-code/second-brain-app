@@ -7,6 +7,7 @@ beyond stdlib `tomllib` (py3.11+).
 
 from __future__ import annotations
 
+import math
 import os
 import tomllib
 from collections.abc import Mapping
@@ -41,6 +42,17 @@ DEFAULT_ARGV_TEMPLATE: list[str] = ["claude", "-p", "{prompt}"]
 type TomlValue = (
     str | int | float | bool | date | datetime | time | list[TomlValue] | Mapping[str, TomlValue]
 )
+
+
+class ConfigValueError(ValueError):
+    """A configured value cannot be used without changing its intended meaning."""
+
+
+def validate_search_min_similarity(value: object) -> float:
+    if (not isinstance(value, (int, float)) or isinstance(value, bool)
+        or not -1 <= value <= 1 or not math.isfinite(value)):
+        raise ConfigValueError("[search].min_similarity must be a finite number between -1 and 1")
+    return float(value)
 
 
 def _empty_raw() -> dict[str, TomlValue]:
@@ -431,6 +443,11 @@ class Config:
     def search_hybrid(self) -> bool:
         section = _as_mapping(self.raw.get("search"))
         return section is not None and section.get("hybrid") is True
+
+    @property
+    def search_min_similarity(self) -> float:
+        section = _as_mapping(self.raw.get("search"))
+        return validate_search_min_similarity(-1.0 if section is None else section.get("min_similarity", -1.0))
 
 
 def load_config(path: str | Path | None = None) -> Config:

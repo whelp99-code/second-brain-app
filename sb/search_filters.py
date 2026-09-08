@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sb.config import validate_search_min_similarity
 from sb.knowledge_registry import ACTIVE, APPROVED, CANDIDATE
 
 
@@ -13,6 +14,10 @@ class SearchFilters:
     updated_from: str | None = None
     updated_to: str | None = None
     scope: str | None = None
+    min_similarity: float = -1.0
+
+    def __post_init__(self) -> None:
+        _ = validate_search_min_similarity(self.min_similarity)
 
     def predicate(self, prefix: str = "") -> tuple[str, tuple[str, ...]]:
         if prefix not in {"", "d."}:

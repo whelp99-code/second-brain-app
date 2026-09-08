@@ -35,7 +35,7 @@ from korean_search_evaluation import (  # pyright: ignore[reportImplicitRelative
 from mcp import StdioServerParameters
 from mcp.client import Client
 
-from sb.config import load_config
+from sb.config import load_config, validate_search_min_similarity
 from sb.contracts import PageSpec, SourceCite
 from sb.generation_runtime import GenerationMutationService
 from sb.generation_runtime_models import (
@@ -70,8 +70,9 @@ def latency(values: list[float]) -> dict[str, float | int]:
 
 @final
 class Evaluation:
-    def __init__(self, path: Path, *, hybrid: bool = False) -> None:
+    def __init__(self, path: Path, *, hybrid: bool = False, min_similarity: float = -1.0) -> None:
         self.hybrid = hybrid
+        self.min_similarity = validate_search_min_similarity(min_similarity)
         self.dataset_bytes = path.read_bytes()
         self.dataset = load_dataset(cast(object, json.loads(self.dataset_bytes)))
         self.base = Path(mkdtemp(prefix="sb-korean-search-"))
@@ -97,6 +98,7 @@ class Evaluation:
             "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repository, text=True).strip(),
             "python": sys.version, "platform": platform.platform(), "load_average_before": os.getloadavg(),
             "documents": len(self.dataset.documents), "cases": len(self.dataset.cases), "limit": 5,
+            "min_similarity": self.min_similarity,
             "limitations": ["isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
                             "single trusted owner at genesis; no scope, supersession or deletion test",
                             "SDK stdio MCP, not agent app injection; hybrid " + str(hybrid),
@@ -117,7 +119,8 @@ class Evaluation:
                "backup_root": str(self.base / "backups"), "export_root": str(self.base / "exports"),
                "knowledge_registry": self.environment["SB_KNOWLEDGE_REGISTRY"]}
         _ = self.config_file.write_text("\n".join(f"{key} = {json.dumps(value)}" for key, value in raw.items())
-                                        + "\n[search]\nhybrid = " + str(self.hybrid).lower() + "\n")
+                                        + "\n[search]\nhybrid = " + str(self.hybrid).lower()
+                                        + "\nmin_similarity = " + repr(self.min_similarity) + "\n")
         vault = init_vault(self.vault)
         cas = ContentAddressedStore(self.vault)
         registry = KnowledgeRegistry(Path(raw["knowledge_registry"]))
@@ -255,8 +258,11 @@ def main() -> None:
     _ = parser.add_argument("--dataset", type=Path,
                             default=Path(__file__).resolve().parent.parent / "tests/fixtures/korean_search_v1.json")
     _ = parser.add_argument("--hybrid", action="store_true", help="require real enabled generation vectors")
+    _ = parser.add_argument("--min-similarity", type=float, default=-1.0,
+                            help="explicit cosine floor for semantic candidates; default unchanged")
     args = parser.parse_args()
-    evaluation = Evaluation(cast(Path, args.dataset), hybrid=cast(bool, args.hybrid))
+    evaluation = Evaluation(cast(Path, args.dataset), hybrid=cast(bool, args.hybrid),
+                            min_similarity=cast(float, args.min_similarity))
     anyio.run(evaluation.run)
 
 
