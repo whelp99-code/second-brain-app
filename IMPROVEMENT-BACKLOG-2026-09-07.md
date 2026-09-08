@@ -519,3 +519,16 @@ reader 발급 객체의 정확한 본문과 generation/privacy를 내부에 결�
 callback 중 삭제는 결과 반환 거부, 이미 제출한 사본은 미전송을 확인했다. 최신 값/삭제 no_data는
 유지했다. 기존 CLI JSON을 밖에서 직접 전송하는 경로는 guard 적용 밖이다. C6 영구 claim·receipt,
 실제 session/compaction/삭제 계보와 앱 연결, 범위·사용자 질문·운영/DR의 미완료 조건을 유지한다.
+
+
+## 43. B5/C6·C7 영구 전달 원장과 실제 재시작 검증
+
+자비스 `6e101fc`, SB 도구 `fd9df47`: [구현·인수·잔여 14항목](REFERENCE-DELIVERY-JOURNAL-ACCEPTANCE-2026-09-08.md).
+객체 단위 submit을 유지하며 필수 session의 submitInSession을 추가했다. 기존 AuthorityDb에서
+키 고정·한 시도 claim·중복/불확실 차단·정책/삭제 transaction의 세션 무효화와 token 제거를
+구현했다. 6파일 90개, 추가 upgrade/clock 집중 14개 통과. 실제 프로세스 강제 종료와 재시작,
+fresh DB에서 이전 세션 차단 및 대상 HMAC 8개 byte 불검출, native 모델 5회 원장 상태 확인.
+
+native 모델 실행에 사용한 session ID는 합성 adapter 값이다. 실제 앱의 session/compaction
+관측과 수신 fence는 미완료다. 외부 전송과 DB의 전역 원자성, 범위·자동 capture·근거 충분성,
+운영/DR 전체 완료를 주장하지 않는다. 다음 순서는 실제 앱 adapter와 검증된 범위 연결이다.

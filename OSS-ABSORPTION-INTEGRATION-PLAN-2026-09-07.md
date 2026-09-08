@@ -535,3 +535,16 @@ SB 작업공간의 인수 도구를 확장했고 자비스 제품·새 DB·외�
 code-brain·memory-bank의 문맥/세션 장점 중 제출 경계만 구현한 단계다. 객체 단위 한 번 시도는
 여러 프로세스와 세션 전체의 중복 억제가 아니며 영구 receipt·실제 compaction·삭제 계보가
 필요하다. 기존 context/projection을 확장하는 후속과 Tencent식 범위 분류·운영 인수는 유지한다.
+
+
+## 48. 인계 최종 방향 재대조와 세션 영구 이력
+
+인계 문서 현재판을 다시 읽고 네 OSS 후보를 기존 구현과 대조했다.
+[영구 전달 원장·수정/개선/고도화 14항목](REFERENCE-DELIVERY-JOURNAL-ACCEPTANCE-2026-09-08.md)에
+분류와 완료 증거를 통합했다. memory-bank식 세션 중복 관리와 code-brain식 문맥 공급은 기존
+자비스 reader/AuthorityDb에서 보강했다. SB 정본·MCP wire 계약·dev-wiki 개발 정본 경계는 유지한다.
+
+실제 Node 프로세스 6개와 native 모델 5회에서 영구 이력을 검증했으며 별도 기억 서버/Proxy/
+에이전트별 DB/OSS 소스 복사는 없다. 합성 adapter session ID를 실제 native session 연동으로
+계산하지 않는다. Tencent식 검증된 사용자/프로젝트 범위와 실제 앱 채택, LightRAG 후보의
+검색 근거 충분성·지연·평가, GUI/운영/DR 조건을 후속 필수 작업으로 유지한다.

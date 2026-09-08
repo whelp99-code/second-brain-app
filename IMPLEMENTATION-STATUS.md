@@ -4,6 +4,15 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
+**최신 자비스 제품 `6e101fc`, SB 인수 도구 `fd9df47`: [영구 전달 원장·14개 잔여 우선 목록](REFERENCE-DELIVERY-JOURNAL-ACCEPTANCE-2026-09-08.md).**
+필수 session의 submitInSession과 기존 객체 단위 submit을 분리했다. 키 고정·영구 claim·
+불확실 재전송 차단·개인정보 transaction의 전역 세션 무효화·token 제거를 구현했다.
+관련 6파일 90 passed, 추가 upgrade/clock 포함 집중 14 passed, event 감사 14 passed,
+tsc/lint 및 독립 검토 완료. 실제 6개 Node 프로세스 종료/재시작/fresh-copy와 native 모델
+5회 원장을 검증했다. 세션 ID는 합성 adapter fixture이며 실제 앱 세션/compaction 인수는
+남는다. DB→외부 callback 원자성·프로젝트 ACL·자동 수집·검색 근거 충분성·GUI/운영/DR
+완료 조건을 유지한다. 운영 migration/배포/push는 수행하지 않았다.
+
 **최신 자비스 제품 `8e233c7`, SB 도구 `4e3a8de`: [참고 문맥의 보호된 제출](REFERENCE-SUBMISSION-ACCEPTANCE-2026-09-08.md).**
 기존 reader가 발급한 문맥을 객체당 한 번 제출하고 전송 직전/완료 뒤 provider·privacy·만료를
 재검사한다. 실제 모델 인수에서 준비 후 정정과 이미 제출한 객체의 재전송은 추가 모델 호출 없이
