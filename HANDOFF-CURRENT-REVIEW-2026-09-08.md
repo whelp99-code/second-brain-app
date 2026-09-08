@@ -1,5 +1,9 @@
 # 자비스 인계 병합 — 현재 판정과 완성 작업 목록
 
+**2026-09-09 범위 제한 MCP record 연결 `31d9ab1`: [실제 stdio·재시작·우회 도구 차단](SCOPED-MCP-RECORD-READ-2026-09-09.md).**
+명시적 서버 문맥과 claim을 대조하는 `scoped-record-read-v1`에 `sb_read_page`만 등록한다. 실제 JARVIS issuer→별도 MCP→record2 회수와 잘못된 요청/claim 누락/변조 거부·새 프로세스 동일 응답을 확인했다. 최종 전체1,136통과/2skip/208.36초·Ruff/diff·정적0오류/0경고. 운영 resolver·정책 자동 갱신·전체 표면 및 기존 운영 목표는 남는다.
+
+
 **2026-09-09 JARVIS `90bf269`: [범위 공급자의 시각 변경으로 만료 범위를 발급하는 결함 수정](ACCESS-CLAIM-CLOCK-FIX-2026-09-09.md).**
 수정 전 회귀1실패/2통과로 재현하고 발급 시각 고정·공급자 Date 분리·변경 거부를 적용했다. 최종18통과/15.38초·lint/격리emit통과. 실제 issuer→Python→봉인 페이지 재인수 성공. 운영 resolver·scoped MCP 및 전체 잔여 목표는 유지한다.
 

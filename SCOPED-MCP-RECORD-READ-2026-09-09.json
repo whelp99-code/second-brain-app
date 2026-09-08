@@ -1,0 +1,11 @@
+{
+  "work": "/var/tmp/page-access-acceptance-padlzyh0",
+  "tools": [
+    "sb_read_page"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read only, not full operating ACL"
+}

@@ -79,3 +79,7 @@
 
 **2026-09-09 JARVIS issuer `c5ad24b` / SB `3b2a08d`: [현재 키·범위 검사 발급과 실제 상호 검증](ACCESS-CLAIM-ISSUER-2026-09-09.md).**
 매 요청 범위를 다시 조회하고 현재 DB 키 검사·fence·요청 digest와 만료를 결합한다. 기존 긴 provider/key ID 호환을 수정했다. JARVIS17통과/13.10초·SB31통과/6.02초·타입/lint/격리emit통과. 실제 issuer→Python→봉인 페이지를 인수했으나 scope resolver는 fixture다. 운영 resolver·scoped MCP 및 전체 운영 목표는 남는다.
+
+## 2026-09-09 제한된 MCP record 조회 연결
+
+명시적인 서버 설정 `mcp_scoped_read`가 있는 연결에는 `scoped-record-read-v1` 프로필을 적용한다. 첫 단계는 `sb_read_page`의 분류 검증된 records 조회만 노출한다. 기존 unscoped 도구·쓰기·status·검색은 이 연결에 등록하지 않는다. 이는 전체 기능의 대체가 아니라 전체 표면 구현 전 지원 능력을 제한한 단계다. 서버 설정의 principal/agent/session/policy revision을 claim과 별도로 대조하며 관리형 봉인 세대와 공개키 설정을 요구한다. 원문 권한을 검증하기 전에 본문이나 존재 여부를 반환하지 않는다. 운영 resolver·세션 인증·전체 표면 인수 전 운영 완료로 판정하지 않는다.
