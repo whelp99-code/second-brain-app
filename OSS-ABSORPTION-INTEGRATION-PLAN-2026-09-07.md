@@ -400,3 +400,15 @@ committed search DB를 연결한다. cosine 전용 후보의 출처/지식 상�
 운영 hybrid는 아직 보류한다. 봉인 세대·삭제/복원·모델 identity 수명과 실제 한국어 품질/성능의
 완료 조건을 적용한 뒤 활성화 여부를 결정한다. 기존 자비스 승인·참고 기억·session 전달 경계와
 정본 역할을 유지한다.
+
+
+## 37. LightRAG 흡수 선행 — 기존 벡터 재생성의 실패 보존
+
+[벡터 재생성 수정](VECTOR-REBUILD-ATOMICITY-2026-09-08.md)은 기존 sqlite-vec 경로를 보완했다.
+새 OSS 코드·의존성 없이 모델 실패가 이전 검색 DB를 없애는 결함과 대량 SQL 인자 한계를 수정했다.
+동시 reader·CLI·강제 종료·전체 회귀로 검증했고, 제품 `5d25d3a`를 기존 네 커밋 뒤에 병합한다.
+
+봉인 generation의 vector는 현재 enabled=0/rows=0 계약이다. manifest와 같은 reader pin,
+모델 identity, 삭제/정정/복원 수명이 연결되기 전에는 hybrid를 운영 활성화하지 않는다.
+대규모 임베딩 메모리와 실제 질문 품질, 강제 종료 임시 DB 회수는 별도 완료 조건으로 유지한다.
+자비스와 SB의 기존 정본·승인·session 전달 경계를 유지하며 별도 기억 서버는 추가하지 않았다.

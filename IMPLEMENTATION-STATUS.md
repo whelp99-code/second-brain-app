@@ -298,3 +298,19 @@ C6/C7/C8과 B4~B8의 남은 조건, 100회 쓰기 및 세 커밋 병합 대기�
 동시 읽기 불변, 정정 전 vector 제외 확인. [상세 결과·제한](HYBRID-FILTERS-2026-09-08.md).
 봉인 세대/삭제 수명·실제 품질·대용량 성능이 남아 운영 hybrid 활성화는 보류한다. full100 완료 후
 기존 세 커밋에 ef3466e를 이어 병합한다. B4~B8 전체 목표와 자비스 자동 전달 보류는 유지한다.
+
+
+### B8/R10 진행 — 벡터 재생성의 기존 DB 보존
+
+격리 `5d25d3a`: encode 실패 시 기존 DB 삭제, 48 sections에서 SQL argv 초과, 짧은 encoder
+결과의 IndexError, 봉인 root 직접 변경을 재현·수정했다. private 임시 DB·단일 writer·검증 후
+원자적 교체·fsync와 ASCII hex SQL stream을 적용하고 같은 Git commit의 본문을 수집한다.
+
+집중 83 passed/1 skipped, 전체 797 passed/2 skipped, 131 vectors 실제 CLI 재생성과 기존
+필터 CLI 5건 통과. 강제 종료 후 기존 검색/다음 rebuild, 열린 reader의 이전 snapshot 보존을
+확인했다. [상세 결함·검증·보류](VECTOR-REBUILD-ATOMICITY-2026-09-08.md).
+
+강제 종료 임시 DB 자동 회수·대규모 모델 메모리·봉인 세대/삭제 수명·실제 질문 품질은 남는다.
+관리형 vector는 현재 enabled=0이며 운영 hybrid 활성화는 보류한다. full100은 93회 관측,
+최종 성공 전 제품 소스 고정은 유지한다. 병합 대기는 기존 네 커밋 다음 5d25d3a, 총 다섯이다.
+B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완료 판정을 유지한다.

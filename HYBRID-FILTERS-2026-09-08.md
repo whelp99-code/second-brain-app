@@ -100,3 +100,7 @@ PYTHONPATH=$PWD TMPDIR=/var/tmp /home/jm/orca/projects/second-brain-app/.venv/bi
 `387d6c7f5b9c1b9db98c31d53c224181757d4eddba5aaf8cfba0641176cb53c4`로 고정한다.
 이번 관측은 기존 full write 실행의 80/100회 진행이며 최종 성공 판정이 아니다.
 B4 실제 업무 수집·앱/범위, B5 전달 수명, B6 운영/DR, B7 최종 쓰기/질문 및 B8 잔여 전체를 유지한다.
+
+
+후속: [벡터 재생성 보존](VECTOR-REBUILD-ATOMICITY-2026-09-08.md), 격리 `5d25d3a`가 기존
+DB 선삭제와 대량 SQL 실패를 수정했다. 위 네 커밋 다음에 병합하며 운영 세대 통합 보류는 유지한다.
