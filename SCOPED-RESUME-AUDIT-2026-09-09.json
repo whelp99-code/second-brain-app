@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "product_commit": "1f478d3",
+  "environment": "isolated synthetic fixture; authority callback True; no production service",
+  "crash_barrier": "pointer_parent_fsync",
+  "child_exit_code": 73,
+  "phase_before_first_resume": "switch_intent",
+  "active_matches_request": true,
+  "first_resume": {
+    "state": "reconciling",
+    "code": "SCOPED_WRITE_REQUEST_EXPIRED",
+    "proof_present": false
+  },
+  "second_resume": {
+    "state": "reconciling",
+    "code": "SCOPED_WRITE_REQUEST_EXPIRED",
+    "phase": "switch_intent",
+    "proof_present": false
+  },
+  "desired_result": "Recover exactly the already applied generation without authorizing a new write; not implemented in this audit",
+  "focused_tests": {
+    "passed": 42,
+    "seconds": 7.59
+  }
+}

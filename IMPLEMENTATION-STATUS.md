@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 인계 최신 재대조:** [OSS 대조·현재 구현·우선 작업 A1~A10](HANDOFF-ADDITIONAL-ANALYSIS-2026-09-09.md). M2 내부 v4 구현 상태와 전체 검사 기록 갱신. 새 P0: 활성 포인터 저장 직후 종료→만료 후 재개 두 번 모두 reconciling/proof 없음 재현(미수정). 관련42통과/7.59초는 이 중단 결함을 포괄하지 않는다.
+
 **2026-09-09 내부 v4 실행:** [수락→provider proved→독립 재조회](SCOPED-REQUEST-EXECUTION-2026-09-09.md). 실제 프로세스7개·records4/4·다른 프로젝트 거부·재시도/idle. 전체1,208통과/2skip/217.08초·전체Ruff. fixture authority이며 실제 검증기·자비스 승인 소비·MCP/운영 연결은 남는다.
 
 **2026-09-09 v4 내부 수락 조합:** [발행→원장 확정·응답 유실 복구](SCOPED-REQUEST-ACCEPTANCE-2026-09-09.md). 관련45통과·실제 프로세스4개: file crash row0→1, commit crash row1→1/replay. fixture authority 검증이며 실제 권한·승인 소비·MCP·실행·영수증 연결은 남는다.

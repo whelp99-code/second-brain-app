@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 인계 최신 재대조:** [OSS 대조·현재 구현·우선 작업 A1~A10](HANDOFF-ADDITIONAL-ANALYSIS-2026-09-09.md). M2 내부 v4 구현 상태와 전체 검사 기록 갱신. 새 P0: 활성 포인터 저장 직후 종료→만료 후 재개 두 번 모두 reconciling/proof 없음 재현(미수정). 관련42통과/7.59초는 이 중단 결함을 포괄하지 않는다.
+
 **2026-09-09 JARVIS `d020bc4` / SB `e95fa8f`:** [에이전트 정책·새 로그인 기억 사용](AGENT-POLICY-LOGIN-2026-09-09.md). 선택적 정책v2/issuer session 모드, J8·SB23통과 및 실제 서로 다른 로그인2개에서 정책 파일 수정 없이 records2 회수·agent 철회403. 기존 고정 session/v1 유지. 운영·쓰기/영수증/재사용 전체 인수는 남는다.
 
 **2026-09-09 JARVIS `939a0d9` / SB 인수 `33f2a07`:** [인증 phone HTTP→scoped context 연결](SCOPED-PHONE-HTTP-CONTEXT-2026-09-09.md). 명시적 server 구성의 새 POST 경로, 관련46통과·실제 HTTP 쿠키→MCP records2/4,649bytes 및 신원 삽입/새 세션 무단 재사용/정책 철회 거부. standalone 설정·세션 정책 배정·운영 Tailnet 및 전체 인수는 남는다.
