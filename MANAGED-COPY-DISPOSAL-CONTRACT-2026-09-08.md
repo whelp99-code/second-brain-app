@@ -17,3 +17,11 @@ DB·키·승인 절차를 추가하지 않는다. SB 정본/JARVIS 실행 및 OS
 
 검증: 실제 provider tar.gz 생성, 정정·삭제·취소의 export와 백업 제거, pointer 이후 중단 복구,
 증거 누락/사본 변경 거부, 압축 오류·예산·내부 Git 내용, 전체 기존 회귀. 운영 데이터는 사용하지 않는다.
+
+## 후속: 남는 정상 archive의 manifest 검증
+
+삭제 대상이 없는 canonical backup도 정정 후 남길 수 있어야 한다. 기존 디렉터리 manifest
+형식에 더해 create_backup의 archive+checksum 형식을 검증한다. 내부 manifest의 경로·크기·
+해시와 실제 전체 regular member 집합을 대조하며 해제 파일을 디스크에 만들지 않는다.
+checksum 단독 또는 문법만 맞는 manifest를 복원 가능성의 증거로 인정하지 않는다.
+이 검증은 파일 집합 무결성이며 최신 tombstone/권한을 적용하는 restore 권한 검사를 대체하지 않는다.

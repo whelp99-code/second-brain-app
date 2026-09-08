@@ -82,7 +82,7 @@ class _Reader:
         return b"".join(parts)
 
 
-class _TarInfo(tarfile.TarInfo):
+class ManagedTarInfo(tarfile.TarInfo):
     @classmethod
     @override
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
@@ -156,7 +156,7 @@ def _tar_scan(source: _Source, needles: Sequence[bytes], budget: _Budget, depth:
             yield block
 
     tar_source = _Reader(guarded())
-    with tarfile.open(fileobj=cast(IO[bytes], cast(object, tar_source)), mode="r|", tarinfo=_TarInfo) as archive:
+    with tarfile.open(fileobj=cast(IO[bytes], cast(object, tar_source)), mode="r|", tarinfo=ManagedTarInfo) as archive:
         for member in archive:
             budget.members += 1
             if budget.members > MAX_MEMBERS or not 0 <= member.size <= MAX_FILE_BYTES:

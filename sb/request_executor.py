@@ -45,6 +45,7 @@ from sb.generation_runtime import (
 )
 from sb.generations import Generation, GenerationError, GenerationStore
 from sb.legacy_requests import LegacyRequestImporterV1
+from sb.managed_backup_manifest import validate_managed_backups
 from sb.managed_copy_disposal import (
     copy_disposal_binding,
     prepare_copy_disposal,
@@ -539,15 +540,7 @@ class RequestExecutor:
         }
         if generation_names != {result.generation_id}:
             raise RequestExecutionError("GENERATION_SPLIT_BRAIN")
-        for backup in self.config.backup_root.iterdir():
-            if backup.is_symlink() or not backup.is_dir() or not (backup / "manifest.json").is_file():
-                raise RequestExecutionError("UNMANIFESTED_BACKUP")
-            try:
-                manifest = strict_loads((backup / "manifest.json").read_bytes(), 262_144)
-            except (OSError, ValueError) as exc:
-                raise RequestExecutionError("UNMANIFESTED_BACKUP") from exc
-            if not is_json_object(manifest) or manifest.get("schema_version") != 1:
-                raise RequestExecutionError("UNMANIFESTED_BACKUP")
+        validate_managed_backups(self.config.backup_root)
 
     def _proof(self, context: ProviderProofContext) -> RequestProofSettlement:
         request = context.request

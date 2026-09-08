@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from sb.effect_values import JsonValue, digest, format_instant
+from sb.managed_backup_manifest import validate_managed_backups
 from sb.managed_copy_files import purge_matching_managed_copies
 from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
 
@@ -80,6 +81,7 @@ def prepare_copy_disposal(
     barrier("backup_disposal")
     _ = exports.invalidate(identities, now)
     barrier("export_disposal")
+    validate_managed_backups(backup_root)
     inventory = copy_inventory(roots, needles)
     authority()
     _ = db.execute("""INSERT INTO managed_copy_disposals VALUES(?,?,?,?)
