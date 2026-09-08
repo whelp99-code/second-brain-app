@@ -67,3 +67,11 @@
 
 **2026-09-09 봉인 record 분류·내부 범위 판정 `62da782`: [구현·실제 CLI·남은 인증 경계](MEMORY-ACCESS-READER-2026-09-09.md).**
 같은 세대 원장·커밋 본문·전체 원본 분류를 결합해 record를 읽고, 이미 인증된 scope의 owner/project/revision을 대조한다. 최종 관련32통과/8.42초·Ruff/diff·정적0오류/0경고. 실제 CLI 산출물의 요구 원본2/record2 및 네 범위 거부·읽기 불변을 인수했다. 내부 함수이며 caller 인증·scoped MCP·모든 표면 적용과 전체 운영 목표는 남는다.
+
+## 2026-09-09 범위 claim 검증 계약
+
+기존 읽기 fence v1을 범위로 재해석하지 않는다. 별도 `orca-jarvis/memory-access-claim/v1` 서명 domain의 claim을 추가하며 provider·principal·agent/session·project 집합·policy revision·정확한 요청 digest·fence digest·유효 시간을 결합한다. 검증은 기존 Ed25519 검증과 현재 공개키 집합을 재사용한다. 현재 fence v1의 principal:owner 제한을 그대로 대조하므로 첫 계약은 같은 소유자의 여러 에이전트/프로젝트 범위다. 다중 사용자 확대는 fence 계약도 함께 버전 변경하기 전까지 보류한다. 이 계약만으로 MCP를 공개하지 않으며 issuer는 검증된 작업/사용자 문맥에서만 발급해야 한다.
+
+
+**2026-09-09 범위 claim 검증 `d220902`: [계약·실제 Node 서명/Python 검증·잔여 issuer 경계](ACCESS-CLAIM-VERIFICATION-2026-09-09.md).**
+별도 서명 claim을 현재 읽기 fence·provider/principal·agent/session·정책·실제 요청·유효 시간에 결합한다. 페이지 provider/삭제 high-water도 대조한다. 최종 관련43통과/7.33초·Ruff/diff·정적0오류/0경고. 실제 Node 테스트 서명과 봉인 CLI 페이지 범위 판정을 인수했다. 운영 JARVIS 발급·scoped MCP·다중 사용자·전체 표면과 기존 운영 목표는 남는다.

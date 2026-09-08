@@ -1,0 +1,10 @@
+{
+  "work": "/var/tmp/page-access-acceptance-r3phrz2h",
+  "provider": "provider:second-brain:linux",
+  "page": "wiki/docs-notes-5e8b1af6",
+  "node_signature_accepted": true,
+  "tampered_scope_rejected": true,
+  "records": 2,
+  "source_requirements": 2,
+  "scope": "Node fixture signature and Python claim verification over real isolated CLI data; not JARVIS production issuance or MCP authentication"
+}
