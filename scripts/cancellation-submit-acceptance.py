@@ -19,8 +19,8 @@ from tests.task30_effect_factory import effect_request
 from tests.test_correction_cancellation import HISTORICAL
 from tests.test_request_executor import _config
 
-if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in ('--record-result', '--compact-result', '--rebuild-result', '--swap-result', '--settle-result', '--dispatch-result')):
-    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result|--compact-result|--rebuild-result|--swap-result|--settle-result|--dispatch-result]')
+if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] not in ('--record-result', '--compact-result', '--rebuild-result', '--swap-result', '--settle-result', '--dispatch-result', '--race-request', '--race-cancellation')):
+    raise SystemExit('usage: python scripts/cancellation-submit-acceptance.py ISOLATED_JARVIS_BUILD [--record-result|--compact-result|--rebuild-result|--swap-result|--settle-result|--dispatch-result|--race-request|--race-cancellation]')
 record_result = len(sys.argv) == 3
 compact_result = record_result and sys.argv[2] in ("--compact-result", "--rebuild-result", "--swap-result", "--settle-result", "--dispatch-result")
 rebuild_result = record_result and sys.argv[2] == "--rebuild-result"
@@ -64,7 +64,7 @@ sys.path.insert(0, {str(ROOT)!r})
 import sb.mcp as module
 class Clock:
     @classmethod
-    def now(cls, tz=None): return datetime(2026,8,28,12,0,1,tzinfo=UTC)
+    def now(cls, tz=None): return datetime(2026,8,28,12,0,{2 if record_result and sys.argv[2].startswith("--race-") else 1},tzinfo=UTC)
 module.datetime = Clock
 submit = module.submit_correction_cancellation
 def crash_after_commit(*args, **kwargs):
@@ -83,16 +83,43 @@ module.main()
         private = base64.urlsafe_b64encode(HISTORICAL.private_bytes_raw()).decode().rstrip('=')
         execution_config.write_text('provider_signing_key_id = "provider:key"\nprovider_private_key = "'+private+'"\n'+config.read_text())
         execution_config.chmod(0o600)
-    payload = {'dispatch_result': record_result and sys.argv[2] == '--dispatch-result', 'work': str(work), 'settle_result': settle_result, 'swap_result': swap_result, 'rebuild_result': rebuild_result, 'compact_result': compact_result, 'record_result': record_result, 'execution_config': str(execution_config),
+    payload = {'race_first': sys.argv[2].removeprefix('--race-') if record_result and sys.argv[2].startswith('--race-') else None, 'dispatch_result': record_result and sys.argv[2] == '--dispatch-result', 'work': str(work), 'settle_result': settle_result, 'swap_result': swap_result, 'rebuild_result': rebuild_result, 'compact_result': compact_result, 'record_result': record_result, 'execution_config': str(execution_config),
         'python': sys.executable, 'sb_root': str(ROOT), 'build': str(Path(sys.argv[1]).resolve()), 'launcher': str(launcher), 'config': str(config),
         'contract': str(ROOT / 'contracts/second-brain-mcp-v5.json'),
         'resolved': {'target': original['targets'][0], 'scope': original['scope']}}
-    run = subprocess.run(['node', str(ROOT / 'scripts/cancellation-submit-acceptance.mjs')],
+    run = subprocess.run(['node', str(ROOT / ('scripts/cancellation-dispatch-race.mjs' if payload['race_first'] else 'scripts/cancellation-submit-acceptance.mjs'))],
         input=json.dumps(payload), text=True, capture_output=True, timeout=120, cwd=ROOT.parent / "Orca-JARVIS")
     if run.returncode:
         print(run.stderr, file=sys.stderr)
         raise SystemExit(run.returncode)
     observed = json.loads(run.stdout)
+    if payload['race_first']:
+        cancel_first = payload['race_first'] == 'cancellation'
+        assert executor.store.db.execute('SELECT count(*) FROM correction_cancellations').fetchone()[0] == int(cancel_first)
+        assert executor.store.tombstone_high_water()[0] == 1
+        if cancel_first:
+            result = subprocess.run([sys.executable, '-m', 'sb.cli', 'apply-cancellation', '--intent-id', observed['intent_id']],
+                env={**os.environ, 'SB_CONFIG':str(execution_config), 'TMPDIR':'/var/tmp'}, capture_output=True,text=True,timeout=60)
+            assert result.returncode == 0, result.stderr
+            assert executor.store.get(observed['request_id']) is None
+            execution = 'cancellation_applied'
+        else:
+            applied = executor.apply_once(now=datetime(2026,8,28,12,0,3,tzinfo=UTC))
+            assert applied.state == 'proved', applied
+            assert applied.request_id == observed['request_id']
+            execution = applied.state
+        assert executor.apply_once(now=datetime(2026,8,28,12,0,4,tzinfo=UTC)).state == 'idle'
+        active = executor.generations.active()
+        files = subprocess.check_output(['git','-C',str(active.root),'ls-tree','-r','--name-only','HEAD','wiki'],text=True).splitlines()
+        committed = '\n'.join(subprocess.check_output(['git','-C',str(active.root),'show',f'HEAD:{name}'],text=True) for name in files)
+        assert 'ExampleAlpha 예시기록' not in committed
+        assert ('Corrected fixture memory.' in committed) == (not cancel_first)
+        report = {**observed, 'provider_execution':execution, 'repeat_executor':'idle',
+            'old_record_absent':True,'replacement_present':not cancel_first,
+            'scope':'actual JARVIS saga/issuer and Node MCP; ordered async boundaries, isolated fixture authority'}
+        (work/'race-result.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(work/'race-result.json'); print(json.dumps(report))
+        raise SystemExit(0)
     assert (executor.generations.active().generation_id == generation.generation_id) is (not record_result)
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellations').fetchone()[0] == 1
     assert executor.store.db.execute('SELECT count(*) FROM correction_cancellation_aliases').fetchone()[0] == 8
