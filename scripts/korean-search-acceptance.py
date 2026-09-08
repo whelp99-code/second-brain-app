@@ -12,9 +12,11 @@ import json
 import math
 import os
 import platform
+import sqlite3
 import subprocess
 import sys
 import time
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import mkdtemp
@@ -68,7 +70,8 @@ def latency(values: list[float]) -> dict[str, float | int]:
 
 @final
 class Evaluation:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, hybrid: bool = False) -> None:
+        self.hybrid = hybrid
         self.dataset_bytes = path.read_bytes()
         self.dataset = load_dataset(cast(object, json.loads(self.dataset_bytes)))
         self.base = Path(mkdtemp(prefix="sb-korean-search-"))
@@ -96,7 +99,7 @@ class Evaluation:
             "documents": len(self.dataset.documents), "cases": len(self.dataset.cases), "limit": 5,
             "limitations": ["isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
                             "single trusted owner at genesis; no scope, supersession or deletion test",
-                            "SDK stdio MCP, not agent app injection; hybrid disabled",
+                            "SDK stdio MCP, not agent app injection; hybrid " + str(hybrid),
                             "synthetic data cannot replace the real-user 100–300 question acceptance",
                             "small corpus, one pass; latency is diagnostic, not capacity certification"]}
         _ = (self.base / "dataset.json").write_bytes(self.dataset_bytes)
@@ -114,7 +117,7 @@ class Evaluation:
                "backup_root": str(self.base / "backups"), "export_root": str(self.base / "exports"),
                "knowledge_registry": self.environment["SB_KNOWLEDGE_REGISTRY"]}
         _ = self.config_file.write_text("\n".join(f"{key} = {json.dumps(value)}" for key, value in raw.items())
-                                        + "\n[search]\nhybrid = false\n")
+                                        + "\n[search]\nhybrid = " + str(self.hybrid).lower() + "\n")
         vault = init_vault(self.vault)
         cas = ContentAddressedStore(self.vault)
         registry = KnowledgeRegistry(Path(raw["knowledge_registry"]))
@@ -135,6 +138,14 @@ class Evaluation:
                 datetime.now(UTC), GenerationAuthority(None, None), lambda _root: None))
         finally:
             service.close()
+        if self.hybrid:
+            with closing(sqlite3.connect((self.vault.resolve() / ".sb/vectors.db").as_uri() + "?mode=ro", uri=True)) as conn:
+                enabled, count = cast(tuple[int, int], conn.execute(
+                    "SELECT enabled,row_count FROM generation_meta").fetchone())
+                if enabled != 1 or count != len(self.documents):
+                    raise ValueError("real hybrid evaluation requires enabled cited vectors for every document")
+                self.evidence["embedding"] = dict(zip(("model_id", "revision", "dim", "row_count", "rows_digest"),
+                    cast(tuple[object, ...], conn.execute("SELECT * FROM vector_info").fetchone()), strict=True))
         self.evidence["vault_before"] = tree_hash(self.vault.resolve(), "*")
 
     async def call(self, client: Client, case: Case, method: str,
@@ -165,6 +176,8 @@ class Evaluation:
                     "exit_code": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
         if result.returncode:
             raise ValueError("CLI search failed; see native evidence")
+        if self.hybrid and "using lexical results" in result.stderr:
+            raise ValueError("hybrid encoder failed during CLI measurement; see native evidence")
         rows = array(cast(object, json.loads(result.stdout)))
         self.timings["cli_search"].append(elapsed)
         return [string(object_value(row).get("page_id")) for row in rows]
@@ -241,8 +254,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     _ = parser.add_argument("--dataset", type=Path,
                             default=Path(__file__).resolve().parent.parent / "tests/fixtures/korean_search_v1.json")
+    _ = parser.add_argument("--hybrid", action="store_true", help="require real enabled generation vectors")
     args = parser.parse_args()
-    evaluation = Evaluation(cast(Path, args.dataset))
+    evaluation = Evaluation(cast(Path, args.dataset), hybrid=cast(bool, args.hybrid))
     anyio.run(evaluation.run)
 
 
