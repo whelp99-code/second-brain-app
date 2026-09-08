@@ -12,6 +12,8 @@ import {pausedCompile} from './jarvis-compile-fixture.mjs';
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jarvis = resolve(process.argv[2] ?? join(sb, '../Orca-JARVIS'));
 const ownerConfirmed = process.argv.includes('--owner-confirmed');
+const autoCandidate = process.argv.includes('--auto-candidate');
+if (autoCandidate && ownerConfirmed) throw new Error('choose auto-candidate or owner-confirmed');
 const approvalRollback = process.argv.includes('--approval-rollback');
 const runtimeCli = process.argv.includes('--runtime-cli');
 const afterDelete = process.argv.includes('--after-delete');
@@ -22,25 +24,29 @@ const dashboardProgress = process.argv.includes('--dashboard-progress');
 if (dashboardProgress && !runtimeCli) throw new Error('--dashboard-progress requires --runtime-cli');
 if (duringCompile && !runtimeCli) throw new Error('--during-compile requires --runtime-cli');
 if (afterDelete && !runtimeCli) throw new Error('--after-delete requires --runtime-cli');
-if (runtimeCli && !ownerConfirmed) throw new Error('--runtime-cli requires --owner-confirmed');
+if (runtimeCli && !ownerConfirmed && !autoCandidate) throw new Error('--runtime-cli requires a candidate publication path');
 if (approvalRollback && !ownerConfirmed) throw new Error('--approval-rollback requires --owner-confirmed');
 const plainTextV3 = process.argv.includes('--plain-text-v3');
-if (plainTextV3 && !ownerConfirmed) throw new Error('--plain-text-v3 requires --owner-confirmed');
+if (plainTextV3 && !ownerConfirmed && !autoCandidate) throw new Error('--plain-text-v3 requires a candidate publication path');
+if (autoCandidate && !plainTextV3) throw new Error('--auto-candidate requires --plain-text-v3');
 const transportProfile = plainTextV3 ? 'remember-schema5' : 'task32-schema4';
 const profileEnv = process.argv.includes('--profile-env');
 if (profileEnv && !plainTextV3) throw new Error('--profile-env requires --plain-text-v3');
 if (profileEnv) process.env.JARVIS_SECOND_BRAIN_CONTRACT_PROFILE = transportProfile;
-const transportSelection = profileEnv ? {} : {contractProfile:transportProfile};
+const transportSelection = { ...(profileEnv ? {} : {contractProfile:transportProfile}),
+  contractPath:join(jarvis,'contracts',plainTextV3 ? 'second-brain-mcp-v3.json' : 'second-brain-mcp-v1.json') };
 const recordSet = process.argv.includes('--record-set');
 const recordLimit = process.argv.includes('--record-limit');
 const recordBudget = process.argv.includes('--record-budget');
 const sensitive = process.argv.includes('--sensitive');
 const python = process.env.SB_TEST_PYTHON ?? join(sb, '.venv/bin/python');
-const load = path => import(pathToFileURL(join(jarvis, 'dist', path)).href);
+const build = process.env.JARVIS_ACCEPTANCE_BUILD ? resolve(process.env.JARVIS_ACCEPTANCE_BUILD) : join(jarvis, 'dist');
+const load = path => import(pathToFileURL(join(build, path)).href);
 const {outboxFixture, OUTBOX_NOW} = await load('tests/fixtures/memory-outbox-fixture.js');
 const {closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.js');
 const {localKey} = await load('tests/helpers.js');
-const {execute} = await load('src/cli-runtime.mjs');
+const {execute} = await load('src/cli.js');
+const {scopedV3DispatchFixture} = await load('tests/fixtures/scoped-v3-dispatch.js');
 const {MemoryOutboxRecordReader} = await load('src/memory-outbox-record.js');
 const {createProductionMemoryReadFence} = await load('src/memory-read-fence-production.js');
 const {ControlPlane, signCommandApproval, MemoryOutboxService, createSecondBrainReadAdapter,
@@ -65,7 +71,7 @@ try {
   const launcher = join(root, 'mcp');
   writeFileSync(launcher, `#!/bin/sh\ncd ${quote(sb)}\nexec ${quote(python)} -m tests.fixtures.jarvis_memory_provider serve ${quote(root)}\n`, {mode:0o700});
   process.chdir(jarvis);
-  fixture = ownerConfirmed ? await ownerMemoryFixture(load,OUTBOX_NOW, {
+  fixture = autoCandidate ? await scopedV3DispatchFixture(OUTBOX_NOW) : ownerConfirmed ? await ownerMemoryFixture(load,OUTBOX_NOW, {
     ...(recordSet ? {statement:'공통 기억 첫째\u2028  반복 기억  \u0085\u0085반복 기억\u2029사용자 [^deadbeef] 기록'} : {}),
     ...(recordLimit ? {statement:Array(64).fill('a'.repeat(60)).join('\u2028')} : {}),
     ...(sensitive ? {sensitivity:'sensitive'} : {}),
@@ -90,11 +96,11 @@ try {
   const content = fixture.request.payload.content;
   const expectation = memoryRememberArtifact(fixture.request);
   const expected = expectation.artifact;
-  const prepared = ownerConfirmed ? prepareMemoryRememberDispatch(fixture.database.authority,
+  const prepared = ownerConfirmed || autoCandidate ? prepareMemoryRememberDispatch(fixture.database.authority,
     fixture.request.candidate_id,OUTBOX_NOW,{candidate_review_spool_root:join(fixture.database.root,'candidate-review'),
       candidate_dispatch_spool_root:join(fixture.database.root,'candidate-dispatch')}) : undefined;
   const control = new ControlPlane(fixture.database.authority);
-  const previous = ownerConfirmed
+  const previous = ownerConfirmed || autoCandidate
     ? {args_json:JSON.stringify(prepared.args),target_json:JSON.stringify(prepared.target)}
     : fixture.database.authority.db.prepare('SELECT args_json,target_json FROM control_command_requests WHERE request_id=?').get(fixture.commandId);
   const action = {schema_version:1,action:'memory.outbox.dispatch',action_level:3,
@@ -172,10 +178,10 @@ try {
       dashboardStored = row.stored;
     } finally { dashboard.close(); }
   }
-  const result = {input_mode:ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
+  const result = {input_mode:autoCandidate ? 'auto_approved_cli' : ownerConfirmed ? 'owner_confirmed_inference' : 'verified_fixture',
     request_schema:fixture.request.schema_version,plain_text_v3:plainTextV3,
     contract_selection:profileEnv ? 'environment' : 'explicit_option',
-    candidate_intake:candidateIntake,dashboard_stored:dashboardStored,
+    candidate_intake:candidateIntake || autoCandidate,project_scoped_write:false,dashboard_stored:dashboardStored,
     runtime_cli:runtimeCli,control_state:control.get(staged.request_id)?.state,after_delete:deleted?.result ?? null,
     during_compile:duringCompile,compile_read_ms:compileReadMs,compile_completed:compiled?.event ?? null,
     approval_rollback_recovered:approvalRollback,

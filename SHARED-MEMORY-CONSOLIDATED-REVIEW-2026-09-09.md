@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 실제 저장 인수:** [자동 승인 후보의 일반 owner 저장 전체 연결](AUTO-CANDIDATE-PROVIDER-2026-09-09.md). 실제 CLI→MCP→provider proved→자비스 완료→별도 client records4, 중복/정리 확인. scoped 쓰기 및 M2 전체 운영 조건 완료로 확대하지 않는다.
+
 **2026-09-09 JARVIS `aa825f0`:** [실제 CLI 자동 발행 연결](AUTO-CANDIDATE-PUBLICATION-2026-09-09.md). 이전 auto-approved 후보 발행 결손을 구현, 수동13/최종7통과·실제 v3 CLI→spool→범위 준비 검증. M2 scoped 요청/단일 소비/provider 처리/영수증은 남는다.
 
 **2026-09-09 v3 인수:** [v3 다중 행 본문·철회 검증](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). 관련4통과·실제 v3 spool 복구. fixture 발행이며 CLI auto-approved 후보의 spool 생성까지 입증한 것은 아니다. M2 자동 발행/요청/승인 소비/완료 영수증은 남는다.
