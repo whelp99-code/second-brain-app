@@ -58,4 +58,27 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             assert rejected.is_error
             missing = await client.call_tool("sb_read_page", {"id": name})
             assert missing.is_error
+            import sb.mcp as module
+            original_reader = module.classified_page
+            def revoke_during_read(*args):
+                result = original_reader(*args)
+                config.raw["revoked_jarvis_signing_key_ids"] = ["key:test"]
+                return result
+            monkeypatch.setattr(module, "classified_page", revoke_during_read)
+            changed = await client.call_tool("sb_read_page", args)
+            assert changed.is_error
+            assert "Alpha fixture" not in str(changed)
+            config.raw.pop("revoked_jarvis_signing_key_ids")
+            class ExpiredDate(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return datetime(2026, 9, 9, 0, 2, tzinfo=UTC)
+            def expire_during_read(*args):
+                result = original_reader(*args)
+                monkeypatch.setattr(module, "datetime", ExpiredDate)
+                return result
+            monkeypatch.setattr(module, "classified_page", expire_during_read)
+            expired = await client.call_tool("sb_read_page", args)
+            assert expired.is_error
+            assert "Alpha fixture" not in str(expired)
     anyio.run(run)

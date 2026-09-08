@@ -242,6 +242,7 @@ class Config:
 
     raw: Mapping[str, TomlValue] = field(default_factory=_empty_raw, repr=False)
     base_dir: Path = field(default_factory=Path.cwd, repr=False)
+    source_path: Path | None = field(default=None, repr=False)
 
     def _path(self, value: str | None, default: Path) -> str:
         raw = str(default) if value is None else value
@@ -497,4 +498,4 @@ def load_config(path: str | Path | None = None) -> Config:
     """
     resolved = Path(path).expanduser() if path is not None else _config_search_path()
     resolved = resolved.resolve(strict=False)
-    return Config(raw=_load_toml(resolved), base_dir=resolved.parent)
+    return Config(raw=_load_toml(resolved), base_dir=resolved.parent, source_path=resolved)

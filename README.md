@@ -251,4 +251,4 @@ session = "session:configured-session"
 policy_revision = "policy:1"
 ```
 
-이 값은 서버가 신뢰하는 연결 문맥이며 사용자 요청에서 복사하면 안 된다. 실제 발급기의 인증된 scope resolver와 맞춰야 한다. 현재 서버 설정/공개키는 시작 시 읽으므로 정책·세션·키 철회 설정 변경에는 서버 재구성이 필요하다. 자동 정책 갱신, 전체 검색·쓰기·status·export·restore, 다중 사용자 인증은 아직 연결되지 않았다. [구현과 실제 stdio 인수](SCOPED-MCP-RECORD-READ-2026-09-09.md)를 따른다.
+이 값은 서버가 신뢰하는 연결 문맥이며 사용자 요청에서 복사하면 안 된다. 실제 발급기의 인증된 scope resolver와 맞춰야 한다. 파일 기반 제한 연결은 시작 시 선택한 설정 경로에서 매 조회 전후 정책·키 철회를 다시 읽는다. 누락·손상·조회 중 변경 또는 만료는 거부한다. 세션·provider·저장소 경로 변경에는 새 연결이 필요하다. 전체 검색·쓰기·status·export·restore, 운영 권한 공급자와 다중 사용자 인증은 아직 연결되지 않았다. [구현과 실제 stdio 인수](SCOPED-MCP-RECORD-READ-2026-09-09.md)를 따른다.

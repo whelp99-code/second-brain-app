@@ -47,11 +47,28 @@ async def run():
                 denied = await client.call_tool("sb_read_page", invalid)
                 assert denied.is_error, denied
                 assert "Alpha fixture" not in str(denied)
+            original = config.read_text()
+            for replacement in ['revoked_jarvis_signing_key_ids = ["key:test"]\n' + original,
+                original.replace('policy_revision = "policy:1"', 'policy_revision = "policy:changed"'),
+                "not valid toml [", None]:
+                if replacement is None:
+                    config.unlink()
+                else:
+                    config.write_text(replacement)
+                denied = await client.call_tool("sb_read_page", args)
+                assert denied.is_error, denied
+                assert "Alpha fixture" not in str(denied)
+            config.write_text(original)
+            restored = await client.call_tool("sb_read_page", args)
+            assert not restored.is_error
+            assert restored.structured_content == result.structured_content
             outputs.append(result.structured_content)
     assert outputs[0] == outputs[1]
     return {"work": str(work), "tools": ["sb_read_page"], "records": 2,
         "wrong_request_missing_claim_tampering_denied": True, "restart_equal": True,
         "production_issuer": len(sys.argv) > 1,
+        "live_revocation_policy_change_invalid_missing_config_denied": True,
+        "restored_policy_resumes_same_connection": True,
         "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read only, not full operating ACL"}
 report = anyio.run(run)
 output = work / "scoped-mcp-result.json"
