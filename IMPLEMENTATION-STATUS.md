@@ -4,7 +4,16 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 JARVIS `0ea62c8` / SB `e7efd62`: [본문 없는 정정 취소 의향 계약·교차 런타임 검증](CORRECTION-CANCELLATION-INTENT-2026-09-08.md).**
+**최신 SB `62d083e`: [취소 원장 접수·자비스 인계 재대조·12개 완성 우선 목록](CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.md).**
+미전송 정정 취소를 기존 pending flock과 request journal transaction에 연결했다. 원본8별칭의
+영구 재접수 차단, 잠금 후 현재 서명/만료 재검사, orphan 게시 거부, tombstone/target의 원자 기록을
+구현했다. 기본 전체959통과/2skip, 최종관련49통과(중복), 제품정적0오류/0경고·lint통과.
+실제 Node producer→Python5프로세스에서 취소 우선/원본 우선/재시작/재생을 확인했다.
+결과는 suppression_pending이며 실제 억제 세대·MCP 취소 라우트·처분 증거·자비스 cursor 연결은
+아직 없다. 원장 접수를 자동복구 완료로 처리하지 않는다. 인계 방향과 native/ACL/계보/수집/
+검색/운영 전체 완료 조건을 유지한다.
+
+**이전 JARVIS `0ea62c8` / SB `e7efd62`: [본문 없는 정정 취소 의향 계약·교차 런타임 검증](CORRECTION-CANCELLATION-INTENT-2026-09-08.md).**
 P0 복구의 선행 계약을 양 언어로 구현했다. 기존 서명/대상/삭제 이력과 현재 취소 서명을 결합하며
 의향을 미수신·삭제 완료 증거로 사용하지 않는다. 기존 테스트 접수기도 실제 V2 validator를 거치게
 수정했다. SB 기본947통과/2skip·최종집중30, JARVIS41통과, Python정적0오류/0경고·lint/build통과.

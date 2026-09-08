@@ -1,0 +1,80 @@
+{
+  "root": "/var/tmp/cancellation-journal-cross-runtime-wuqY62",
+  "build": "/var/tmp/jarvis-cancellation-intent-build-n_wuztw1",
+  "node_pid": 3254273,
+  "intent_digest": "sha256:ddf1154f34edbf945014496b1ef3f421a90a7bc051053c188663313636fc04f3",
+  "results": [
+    {
+      "pid": 3254287,
+      "mode": "cancel",
+      "state": "suppression_pending",
+      "replayed": false,
+      "aliases": 8,
+      "requests": 0,
+      "sequence": 1,
+      "pending_files": 0
+    },
+    {
+      "pid": 3254322,
+      "mode": "original",
+      "state": "MEMORY_REQUEST_CANCELLED",
+      "replayed": false,
+      "aliases": 8,
+      "requests": 0,
+      "sequence": 1,
+      "pending_files": 0
+    },
+    {
+      "pid": 3254335,
+      "mode": "cancel",
+      "state": "suppression_pending",
+      "replayed": true,
+      "aliases": 8,
+      "requests": 0,
+      "sequence": 1,
+      "pending_files": 0
+    },
+    {
+      "pid": 3254359,
+      "mode": "original",
+      "state": "pending",
+      "replayed": false,
+      "aliases": 0,
+      "requests": 1,
+      "sequence": 1,
+      "pending_files": 1
+    },
+    {
+      "pid": 3254384,
+      "mode": "cancel",
+      "state": "MEMORY_CANCELLATION_ALREADY_RECEIVED",
+      "replayed": false,
+      "aliases": 0,
+      "requests": 1,
+      "sequence": 1,
+      "pending_files": 1
+    }
+  ],
+  "operational_mutations": 0,
+  "mcp_route_exercised": false,
+  "generation_proof": false,
+  "automatic_recovery": false,
+  "product_commit": "62d083e",
+  "full_suite": {
+    "passed": 959,
+    "skipped": 2,
+    "seconds": 134.06,
+    "note": "Before final three regression additions; final focused suite covers all final code and new cases."
+  },
+  "final_focused": {
+    "passed": 49,
+    "seconds": 2.84,
+    "overlaps_full_suite": true
+  },
+  "lint": "passed",
+  "product_typecheck": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "independent_review": "No reproducible blocker identified; runtime activation prerequisites remain."
+}

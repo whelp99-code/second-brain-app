@@ -615,3 +615,19 @@ SB 기본947통과/2skip·최종집중30, JARVIS5파일41통과, 정적검사·l
 취소seq1을 독립 적용·세대 전환한 뒤 V2seq2만 전송하는 방향으로 수신경합/alias영구차단/
 실제억제세대/결과증거/cursor를 이어 구현한다. 자동복구 완료로 처리하지 않는다.
 인계의 SB정본·JARVIS실행·선별OSS흡수와 기존 native/범위/계보/수집/검색/운영 목표를 유지한다.
+
+
+## 51. 취소 원장 원자 접수와 인계 재대조
+
+SB `62d083e`: [구현·실제 프로세스 인수·12개 후속 우선 목록](CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.md).
+본문 없는 취소 의향을 기존 pending flock과 journal.db에 연결했다. 원본과 취소 접수를 직렬화하고
+8개 전역 별칭·SQL INSERT 방어로 재시작 후 재접수를 막는다. 현재 키/시각을 잠금 후 재검증하며
+원본 게시 흔적은 취소하지 않는다. marker·tombstone·target을 한 transaction으로 저장하고
+중간 중단 시 모두 롤백한다. 기본959통과/2skip·최종관련49통과(중복), 제품정적0오류/0경고·lint,
+독립검토 및 실제 Node→Python5프로세스의 우선순위/재생/재시작 인수를 통과했다.
+
+현재 결과는 suppression_pending이다. replica 위치를 healthy generation/삭제 완료나 자비스
+cursor 진행 증거로 사용하지 않는다. 실제 대상/현재 권한·억제 generation·처분 결과 계약과
+MCP/자비스 연결이 다음 P0다. 자동 수집은 원task→후보→기억의 계보 전까지 보류한다.
+인계 현재판을 다시 대조했고 기존 SB정본/JARVIS실행/dev-wiki원문/네OSS선별흡수 방향과
+native·사용자/프로젝트 범위·실제 앱·검색·운영/복구의 전체 목표를 유지한다.
