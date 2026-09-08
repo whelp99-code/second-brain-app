@@ -23,6 +23,18 @@ CREATE TABLE IF NOT EXISTS correction_cancellation_aliases(
   alias_kind TEXT NOT NULL,
   intent_id TEXT NOT NULL REFERENCES correction_cancellations(intent_id)
 );
+CREATE TABLE IF NOT EXISTS correction_cancellation_generations(
+  intent_id TEXT PRIMARY KEY REFERENCES correction_cancellations(intent_id),
+  generation_id TEXT NOT NULL,
+  generation_digest TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('sealed','generation_active'))
+);
+CREATE TRIGGER IF NOT EXISTS cancellation_active_generation_immutable
+BEFORE UPDATE ON correction_cancellation_generations WHEN OLD.state='generation_active'
+BEGIN SELECT RAISE(ABORT,'immutable active cancellation generation'); END;
+CREATE TRIGGER IF NOT EXISTS cancellation_generation_no_delete
+BEFORE DELETE ON correction_cancellation_generations
+BEGIN SELECT RAISE(ABORT,'immutable cancellation generation'); END;
 CREATE TRIGGER IF NOT EXISTS correction_cancellation_no_update
 BEFORE UPDATE ON correction_cancellations
 BEGIN SELECT RAISE(ABORT,'immutable correction cancellation'); END;

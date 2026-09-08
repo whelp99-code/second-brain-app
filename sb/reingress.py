@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import final
 
 from sb.effect_values import format_instant
-from sb.effect_write_models import MemoryEffectWriteRequestV2
+from sb.effect_write_models import MemoryEffectWriteRequestV2, ResolvedMemoryTargetModel
 from sb.sqlite_values import OPTIONAL_INTEGER_ROW
 
 
@@ -74,29 +75,35 @@ class ReingressGate:
     def block_request(self, request: MemoryEffectWriteRequestV2, now: datetime) -> None:
         if request.operation not in {"correct", "forget"}:
             return
+        self.block_targets(request.targets, (request.tombstone_high_water.sequence,
+            request.tombstone_high_water.set_root), now)
+
+    def block_targets(
+        self, targets: Sequence[ResolvedMemoryTargetModel], high_water: tuple[int, str], now: datetime,
+    ) -> None:
         rows: list[tuple[str, str, int, str, str]] = []
-        for target in request.targets:
+        for target in targets:
             rows.extend(
                 (
                     (
                         "source", target.source_identity_full,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root, format_instant(now),
+                        high_water[0],
+                        high_water[1], format_instant(now),
                     ),
                     (
                         "content", target.content_identity_full,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root, format_instant(now),
+                        high_water[0],
+                        high_water[1], format_instant(now),
                     ),
                     (
                         "citation", target.citation_identity_full,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root, format_instant(now),
+                        high_water[0],
+                        high_water[1], format_instant(now),
                     ),
                     (
                         "subject", target.subject_digest,
-                        request.tombstone_high_water.sequence,
-                        request.tombstone_high_water.set_root, format_instant(now),
+                        high_water[0],
+                        high_water[1], format_instant(now),
                     ),
                 )
             )

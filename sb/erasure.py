@@ -5,14 +5,19 @@ from __future__ import annotations
 import hashlib
 import os
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import final
 
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.correction_rendering import correction_marker, render_correction
 from sb.effect_values import canonical_bytes, format_instant
-from sb.effect_write_models import CorrectionPayloadModelV2, MemoryEffectWriteRequestV2
+from sb.effect_write_models import (
+    CorrectionPayloadModelV2,
+    MemoryEffectWriteRequestV2,
+    ResolvedMemoryTargetModel,
+)
 from sb.managed_surface_scan import (
     SurfaceInventory,
     SurfaceInventoryEntry,
@@ -41,6 +46,16 @@ __all__ = (
     "scan_managed_surfaces",
     "scan_provider_surfaces",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _ErasurePlan:
+    targets: Sequence[ResolvedMemoryTargetModel]
+    operation: str
+    request_id: str
+    request_digest: str
+    high_water: tuple[int, str]
+    replacement: str | None
 
 
 @final
@@ -81,10 +96,27 @@ class ErasureEngine:
     def apply(self, root: Path, request: MemoryEffectWriteRequestV2, now: datetime) -> tuple[str, ...]:
         if request.operation == "export":
             return ()
+        replacement = None
+        if request.operation == "correct":
+            if not isinstance(request.payload, CorrectionPayloadModelV2):
+                raise ErasureError("EFFECT_OPERATION_CONFUSION")
+            replacement = request.payload.content
+        return self._apply(root, _ErasurePlan(request.targets, request.operation, request.request_id,
+            request.request_digest, (request.tombstone_high_water.sequence,
+                request.tombstone_high_water.set_root), replacement), now)
+
+    def suppress_cancellation(
+        self, root: Path, intent: CorrectionCancellationIntentV1, now: datetime,
+    ) -> tuple[str, ...]:
+        """Internal admitted-intent path; never reconstruct or apply the original correction body."""
+        return self._apply(root, _ErasurePlan((intent.target,), "suppression", intent.intent_id,
+            intent.intent_digest, (intent.tombstone.sequence, intent.tombstone.set_root), None), now)
+
+    def _apply(self, root: Path, plan: _ErasurePlan, now: datetime) -> tuple[str, ...]:
         removed: list[str] = []
         erased_hashes: set[str] = set()
         prior_records: list[bytes] = []
-        for index, target in enumerate(request.targets):
+        for index, target in enumerate(plan.targets):
             page = self._page(root, target.page_id)
             try:
                 body = page.read_bytes()
@@ -100,12 +132,9 @@ class ErasureEngine:
             if hashlib.sha256(prior).hexdigest() != target.content_identity_full:
                 raise ErasureError("EFFECT_TARGET_INVALID")
             prior_records.append(prior)
-            if request.operation == "correct" and index == 0:
-                payload = request.payload
-                if not isinstance(payload, CorrectionPayloadModelV2):
-                    raise ErasureError("EFFECT_OPERATION_CONFUSION")
+            if plan.replacement is not None and index == 0:
                 sid = correction_marker(body[end:])
-                replacement = render_correction(payload.content, sid)
+                replacement = render_correction(plan.replacement, sid)
                 successor = body[:start] + replacement.encode("utf-8") + body[end:]
                 if sid is not None:
                     try:
@@ -117,7 +146,7 @@ class ErasureEngine:
             else:
                 successor = body[:start] + body[end:]
             self._write_private(page, successor)
-        targets = {self._page(root, target.page_id) for target in request.targets}
+        targets = {self._page(root, target.page_id) for target in plan.targets}
         for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
             if not path.is_file() or ".git" in path.relative_to(root).parts or path in targets:
                 continue
@@ -132,17 +161,17 @@ class ErasureEngine:
                 path.unlink()
                 removed.append(hashlib.sha256(relative.encode("utf-8")).hexdigest())
         Vault(root).rebind_erased_sources(
-            str(request.request_id), frozenset(erased_hashes), ContentAddressedStore(root).put,
+            plan.request_id, frozenset(erased_hashes), ContentAddressedStore(root).put,
         )
         marker_root = root / ".sb" / "memory-effects"
-        for target in request.targets:
+        for target in plan.targets:
             marker = {
                 "schema_version": 1,
-                "operation": request.operation,
+                "operation": plan.operation,
                 "target_digest": target.target_digest,
-                "request_digest": request.request_digest,
-                "tombstone_sequence": request.tombstone_high_water.sequence,
-                "tombstone_set_root": request.tombstone_high_water.set_root,
+                "request_digest": plan.request_digest,
+                "tombstone_sequence": plan.high_water[0],
+                "tombstone_set_root": plan.high_water[1],
                 "effective_at": format_instant(now),
             }
             self._write_private(
@@ -157,7 +186,7 @@ class ErasureEngine:
                     and prior in path.read_bytes()
                 ):
                     raise ErasureError("MANAGED_COPY_REMAINS")
-        self.reingress.block_request(request, now)
+        self.reingress.block_targets(plan.targets, plan.high_water, now)
         return tuple(sorted(removed))
 
 
