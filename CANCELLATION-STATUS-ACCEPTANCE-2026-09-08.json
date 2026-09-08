@@ -1,0 +1,16 @@
+{
+  "parent_pid": 4069817,
+  "reader_pids": [
+    4070200,
+    4070216,
+    4070225,
+    4070233
+  ],
+  "private_keys_in_reader_input": false,
+  "identical_replay": true,
+  "journal_rows_unchanged": true,
+  "result_digest": "sha256:eddd3a9fe500b3448a17061eb2ba78237b57e33cfdf8d8907a6fe782d6d5f133",
+  "revoked": "MEMORY_CANCELLATION_RESULT_INVALID",
+  "unauthorized": "TOMBSTONE_FENCE_REQUIRED",
+  "scope": "real Python process, actual durable provider journal; no MCP/JARVIS cursor/operational deployment"
+}

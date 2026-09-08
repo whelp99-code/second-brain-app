@@ -6,7 +6,15 @@
 
 최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
 
-**최신 SB `44ab911` / JARVIS `cabfba2`: [취소 결과의 실제 증거·서명·저장·교차 검증](CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `6da593e`: [취소 상태 읽기 전용 조회·공개키 검증·실제 프로세스 인수](CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md).**
+현재 status fence·같은 원장 snapshot·정확한 intent·삭제 chain·저장 결과를 대조한다.
+개인키 없이 공개키/철회 정책으로 조회하며 재발급·원장 변경을 하지 않는다. 삭제 이력 누락
+손상 사례를 재현·수정했다. 전체1,061통과/2skip(최종 chain 검사 전), 최종관련40통과,
+제품정적0오류/0경고·lint통과. 실제4개 reader 프로세스의 동일 결과·철회/권한 거부·원장불변 확인.
+현재는 내부 읽기 경계이며 MCP 새 프로필·JARVIS transport/DB/cursor/seq1→seq2 연결은 남는다.
+native·범위·계보·실제앱·검색·GUI·운영 전체 목표 및 자동 route/skip 보류를 유지한다.
+
+**이전 SB `44ab911` / JARVIS `cabfba2`: [취소 결과의 실제 증거·서명·저장·교차 검증](CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md).**
 별도 provider_local_suppression 결과를 exact intent/target/세대/tombstone과 실제 alias·reingress·
 원본 처분·copy checkpoint·후속 세대 본문 부재에 결합한다. 원문이 있을 때 부재 검사를 저장해
 재시작 시 대조하고, 검사 이후 키 철회도 전환 전에 재검증한다. 결과는 기존 journal의 불변 행으로
