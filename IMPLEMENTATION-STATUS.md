@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `53c67b1` 최종 읽기 뒤 철회 수정:** [회귀1실패→관련23통과·실제 정책 파일 철회](SCOPED-PUBLICATION-COMPOSITION-2026-09-09.md). 타입/lint/격리emit, 독립4프로세스에서 read 직후 정책 철회 시 prepared 반환 거부. 승인 소비/outbox/provider·전체 운영 목표는 유지한다.
+
 **2026-09-09 JARVIS `862913e` 준비→발행 조합:** [현재 권한 재검사·별도 프로세스 재시도](SCOPED-PUBLICATION-COMPOSITION-2026-09-09.md). 관련20통과·타입/lint/격리emit, 실제 CLI/서명 검토/private 정책의 독립3프로세스 인수. prepared/권한false이며 승인 소비/outbox·운영 연결은 남는다.
 
 **2026-09-09 JARVIS `65f1e15` 발행 중단 복구:** [실제 hardlink 직후 종료·새 프로세스 재시도](SCOPED-SPOOL-CRASH-RECOVERY-2026-09-09.md). 관련19통과·타입/lint/격리emit, 전후6프로세스에서 link2 거부→동일 bytes/inode/link1 복구. live/불명 link 거부 유지. 단독 임시 파일·삭제 수명·승인 소비/outbox/운영 연결은 남는다.

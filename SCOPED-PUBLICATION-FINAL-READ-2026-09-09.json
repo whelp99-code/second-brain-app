@@ -1,0 +1,17 @@
+{
+  "processes": 4,
+  "cli_fixture": true,
+  "crash_exit": 73,
+  "replay": {
+    "created": false,
+    "request_id": "memreq:scoped:v4:4c06d909ba16154d0b9ee1511e53047cba79e5037b40419a152a1e195819b598",
+    "kind": "prepared",
+    "writes_authorized": false
+  },
+  "same_bytes_and_inode": true,
+  "policy_revocation_rejected": true,
+  "final_read_policy_revocation_rejected": true,
+  "database_counts_unchanged": true,
+  "provider_calls": 0,
+  "outbox_enqueued": false
+}

@@ -18,6 +18,16 @@ if (mode) {
   const db = new AuthorityDb(state.databasePath);
   try {
     try {
+      if (mode === 'revoke-during-read') {
+        const { MemoryScopedWriteSpool } = await load('src/memory-scoped-write-spool.js');
+        const original = MemoryScopedWriteSpool.prototype.read;
+        MemoryScopedWriteSpool.prototype.read = function (...args) {
+          const result = original.apply(this, args);
+          const policy = JSON.parse(readFileSync(state.policyPath, 'utf8'));
+          writeFileSync(state.policyPath, JSON.stringify({ ...policy, agents: [] }), { mode: 0o600 });
+          return result;
+        };
+      }
       const value = publishMemoryScopedWriteRequest(options(db, state));
       if (mode === 'crash') process.exit(73);
       process.stdout.write(JSON.stringify(value));
@@ -63,13 +73,14 @@ if (mode) {
     const replay = child('replay'); assert.equal(replay.status, 0, replay.stderr);
     const value = JSON.parse(replay.stdout); assert.equal(value.created, false); assert.equal(value.request_id, request.request_id);
     assert.equal(value.writes_authorized, false); assert.equal(value.kind, 'prepared');
-    writeFileSync(policyPath, JSON.stringify({ ...policy, agents: [] }), { mode: 0o600 });
+    const during = child('revoke-during-read'); assert.equal(during.status, 0, during.stderr);
+    assert.equal(JSON.parse(during.stdout).error, 'MEMORY_SCOPED_WRITE_POLICY_INVALID');
     const revoked = child('revoked'); assert.equal(revoked.status, 0, revoked.stderr);
     assert.equal(JSON.parse(revoked.stdout).error, 'MEMORY_SCOPED_WRITE_POLICY_INVALID');
     assert.deepEqual(readFileSync(target), bytes); assert.equal(statSync(target).ino, inode);
     assert.deepEqual(memoryTableCounts(f.database.authority), before);
-    console.log(JSON.stringify({ processes: 3, cli_fixture: true, crash_exit: 73, replay: { created: value.created,
+    console.log(JSON.stringify({ processes: 4, cli_fixture: true, crash_exit: 73, replay: { created: value.created,
       request_id: value.request_id, kind: value.kind, writes_authorized: false }, same_bytes_and_inode: true,
-      policy_revocation_rejected: true, database_counts_unchanged: true, provider_calls: 0, outbox_enqueued: false }, null, 2));
+      policy_revocation_rejected: true, final_read_policy_revocation_rejected: true, database_counts_unchanged: true, provider_calls: 0, outbox_enqueued: false }, null, 2));
   } finally { closeMemoryDatabase(f.database); }
 }
