@@ -203,3 +203,34 @@ def test_mcp_unordered_terms_require_one_record_and_limit_after_selection(
     for field in ("generation_id", "generation_manifest_digest", "vault_head", "vault_tree",
                   "tombstone_sequence", "tombstone_set_root", "provider_instance_id"):
         assert search[field] == read[field]
+
+
+@pytest.mark.parametrize("sealed", [False, True])
+def test_quoted_phrase_excludes_scattered_candidates_on_both_search_surfaces(tmp_path: Path, sealed: bool) -> None:
+    root = _query_corpus(tmp_path, {
+        "wiki/a": "노을 알림은 세 번 실패하면 확인한다. [^aaaaaaaa]",
+        "wiki/b": "노을 연결 실패는 세 번까지 재시도한다. [^aaaaaaaa]",
+        "wiki/c": "모래 알림은 세 번 실패하면 확인한다. [^aaaaaaaa]",
+    }, sealed)
+    index = SearchIndex(root, registry_path=tmp_path / "registry.sqlite")
+    _ = index.search("없는검색", scope="reference")
+    before = _hashes(root)
+    assert {hit.page_id for hit in index.search("노을 세 번 실패", scope="reference")} == {"wiki/a", "wiki/b"}
+    query = '노을 "세 번 실패"'
+    assert [hit.page_id for hit in index.search(query, scope="reference")] == ["wiki/a"]
+    server = build_server(root, task30=True, contract_schema=5)
+    rows = payload(call(server, "sb_search", {"query": query}))["results"]
+    assert isinstance(rows, list) and len(rows) == 1
+    assert isinstance(rows[0], dict) and rows[0]["page_id"] == "wiki/a"
+    assert _hashes(root) == before
+
+
+@pytest.mark.parametrize("query", ['"미완성', " ".join(f"단어{i}" for i in range(33))])
+@pytest.mark.parametrize("task30", [False, True])
+def test_mcp_invalid_query_is_tool_error_not_empty_success(tmp_path: Path, query: str, task30: bool) -> None:
+    root = _query_corpus(tmp_path, {"wiki/a": "자료다. [^aaaaaaaa]"}, True)
+    before = _hashes(root)
+    result = call(build_server(root, task30=task30, contract_schema=5 if task30 else None), "sb_search", {"query": query})
+    assert result.is_error
+    assert "SEARCH_QUERY_" in str(result.content)
+    assert _hashes(root) == before

@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "dataset_id": "korean-quoted-regression-v1",
+  "dataset_origin": "synthetic",
+  "provenance": "고정 합성 문구/인용문/경로 회귀 10개. 실제 사용자 질문 인수를 대신하지 않는다.",
+  "documents": [
+    {
+      "page_id": "wiki/ko-eval-aurora",
+      "title": "오로라 배포",
+      "body": "오로라 배포는 매주 목요일 22시에 진행한다. 되돌릴 릴리스 태그는 v2.4.1이다. 오류율이 5분 동안 5%를 넘으면 이전 태그로 되돌린다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/ko-eval-noeul",
+      "title": "노을 알림",
+      "body": "노을의 조용한 시간은 밤 10시부터 다음 날 오전 7시까지다. 실패 알림은 조용한 시간에도 전달한다. 알림 전달이 세 번 실패하면 담당자에게 확인을 요청한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/ko-eval-noise-noeul",
+      "title": "참고 알림",
+      "body": "참고 알림은 밤 11시부터 오전 8시까지 멈춘다. 전달이 한 번 실패하면 기록을 남긴다.",
+      "role": "distractor"
+    },
+    {
+      "page_id": "wiki/ko-eval-morae",
+      "title": "모래 API",
+      "body": "모래 API 요청 제한 시간은 8초다. 일시적 연결 실패는 최대 세 번 재시도한다. 같은 작업을 다시 보낼 때는 동일한 멱등성 키를 사용한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/ko-eval-bada",
+      "title": "바다 개발 문서",
+      "body": "바다 프로젝트의 개발 결정 원문은 Git의 docs/decisions에 보관한다. 규칙 변경은 구현 전에 결정 문서로 남긴다. 자동 요약은 원문의 위치와 커밋을 함께 표시한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/quoted-values",
+      "title": "문자 보존",
+      "body": "그는 \"확인 완료\"라고 말했다. 보관 경로는 C:\\notes\\memory.md이다.",
+      "role": "gold"
+    }
+  ],
+  "cases": [
+    {
+      "id": "phrase-01",
+      "kind": "quoted_phrase",
+      "query": "\"세 번 실패\"",
+      "expected_page_ids": [
+        "wiki/ko-eval-noeul"
+      ],
+      "answer_span": "세 번 실패"
+    },
+    {
+      "id": "phrase-02",
+      "kind": "quoted_phrase",
+      "query": "노을 \"세 번 실패\"",
+      "expected_page_ids": [
+        "wiki/ko-eval-noeul"
+      ],
+      "answer_span": "세 번 실패"
+    },
+    {
+      "id": "phrase-03",
+      "kind": "quoted_phrase",
+      "query": "오로라 \"매주 목요일\"",
+      "expected_page_ids": [
+        "wiki/ko-eval-aurora"
+      ],
+      "answer_span": "매주 목요일"
+    },
+    {
+      "id": "phrase-04",
+      "kind": "quoted_phrase",
+      "query": "\"v2.4.1\" 오로라",
+      "expected_page_ids": [
+        "wiki/ko-eval-aurora"
+      ],
+      "answer_span": "v2.4.1"
+    },
+    {
+      "id": "phrase-05",
+      "kind": "quoted_phrase",
+      "query": "\"원문의 위치와 커밋\"",
+      "expected_page_ids": [
+        "wiki/ko-eval-bada"
+      ],
+      "answer_span": "원문의 위치와 커밋"
+    },
+    {
+      "id": "phrase-06",
+      "kind": "quoted_phrase",
+      "query": "\"그는 \\\"확인 완료\\\"라고 말했다\"",
+      "expected_page_ids": [
+        "wiki/quoted-values"
+      ],
+      "answer_span": "그는 \"확인 완료\"라고 말했다"
+    },
+    {
+      "id": "phrase-07",
+      "kind": "quoted_phrase",
+      "query": "C:\\notes\\memory.md \"보관 경로\"",
+      "expected_page_ids": [
+        "wiki/quoted-values"
+      ],
+      "answer_span": "C:\\notes\\memory.md"
+    },
+    {
+      "id": "phrase-08",
+      "kind": "no_answer",
+      "query": "\"배포 오로라\"",
+      "expected_page_ids": [],
+      "answer_span": null
+    },
+    {
+      "id": "phrase-09",
+      "kind": "no_answer",
+      "query": "미등록 \"세 번 실패\"",
+      "expected_page_ids": [],
+      "answer_span": null
+    },
+    {
+      "id": "phrase-10",
+      "kind": "no_answer",
+      "query": "\"백업 보관 기간은 200일\"",
+      "expected_page_ids": [],
+      "answer_span": null
+    }
+  ]
+}

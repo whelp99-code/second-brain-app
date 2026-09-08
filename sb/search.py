@@ -209,6 +209,7 @@ class SearchIndex:
         scope: str | None = None,
     ) -> tuple[SearchHit, ...]:
         """Refresh from Git HEAD only when needed, then BM25-search `query`."""
+        _ = LexicalQuery.parse(query)
         root = self.vault_root.resolve()
         if (root / "generation.json").is_file():
             with closing(self.iter_lexical_hits(
@@ -242,6 +243,7 @@ class SearchIndex:
 
         The caller owns the generation pin and closes this iterator on early exit.
         """
+        _ = LexicalQuery.parse(query)
         root = self.vault_root.resolve()
         if not (root / "generation.json").is_file():
             registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
