@@ -6,7 +6,13 @@
 
 최신 인계 분석: [현재 동작 판정·OSS 대조·14개 잔여 작업과 완료 조건](HANDOFF-CURRENT-REVIEW-2026-09-08.md). 기존 제품 완료 기록을 유지하며 자비스·공통 기억의 운영 미완료 범위를 구분한다.
 
-**최신 SB `9e30115` / 검증 JARVIS `12d7b2a`: [취소 CLI 실행·실제 처분·서명 결과·MCP 인수](CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.md).**
+**최신 JARVIS `9d8c0ed` / SB 제품 `9e30115`: [취소 결과의 자비스 불변 저장·현재 신뢰·실제 중단 복구](CANCELLATION-RESULT-STORAGE-ACCEPTANCE-2026-09-08.md).**
+실제 provider 서명 결과를 원 의향/요청/삭제 이력과 등록 키에 결합하고 현재 철회를 재검사한다.
+실제 CLI 결과→별도 Node DB 저장 직후 exit77→다른 프로세스 동일 재생·1행·철회 거부를 확인했다. JARVIS최종57통과·타입/lint/격리emit통과.
+로컬 진단은 차단projection2개·수집본문0개·spool대체본문존재였다. 기존 전체70표면 계약도 취소 결과와 달라 그대로 적용할 수 없다.
+검증된 spool 처분 재료·실제 로컬 검사/DB 교체→결과/cursor·seq1→V2seq2와 기존 전체 운영 목표를 유지한다. 자동skip보류.
+
+**이전 SB `9e30115` / 검증 JARVIS `12d7b2a`: [취소 CLI 실행·실제 처분·서명 결과·MCP 인수](CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.md).**
 접수된 의향 하나를 기존 writer/처분 체크포인트로 실행하고 현재 취소·서명 권한을 발급 직전까지 재검사한다.
 실제 DB 접수부터 CLI 처분 경계/결과 commit 뒤 exit77→복구·동일 결과→개인키 없는 Node MCP 검증을 확인했다.
 전체1,093통과/2skip 이후 최종 서명 권한 관련67통과, 정적0오류/0경고·lint통과. 이전 키 신뢰/철회에 따른 결과 재생도 검증했다.

@@ -1,0 +1,46 @@
+{
+  "stored_result": {
+    "result_digest": "sha256:ebafceea339e3e7bcb7462a67b06c1f134ec756c86243e342901aa12233e16bf",
+    "exit_after_record": 77,
+    "exact_replay": true,
+    "result_rows": 1,
+    "current_revocation_rejected": true
+  },
+  "node_pid": 329364,
+  "mcp_pids": [
+    329436,
+    329457,
+    329472
+  ],
+  "exit_after_provider_commit": 77,
+  "response_loss": "SECOND_BRAIN_WRITE_INTERRUPTED",
+  "no_automatic_write_retry": true,
+  "exact_replay_after_restart": true,
+  "live_provider_revocation_rejected": true,
+  "intent_id": "memcancel:intent:v1:9f935a460d209f81754f31f6cf6d1d5e8acc357b70afb1966ed69262b785a3cf",
+  "original_transport_calls": 0,
+  "spool_preserved": true,
+  "cursor": {
+    "active_lane_id": null,
+    "accepted_through_sequence": 0
+  },
+  "python_parent_pid": 329312,
+  "accepted_rows": 1,
+  "alias_rows": 8,
+  "result_rows": 1,
+  "generation_unchanged": false,
+  "provider_tombstone_sequence": 1,
+  "private_key_in_mcp_config": false,
+  "clock": "isolated fixed 2026-08-28T12:00:01.000Z",
+  "scope": "actual provider execution and JARVIS durable result reception; cursor not advanced",
+  "jarvis_product_commit": "9d8c0ed",
+  "second_brain_product_commit": "9e30115",
+  "acceptance_script_commit": "bfca89e",
+  "local_material_probe": {
+    "blocked_projection_count": 2,
+    "material_count": 0,
+    "replacement_material_found": false,
+    "replacement_in_spool": true,
+    "scope": "isolated cancellationDatabaseFixture; existing collector probe only, no physical compaction"
+  }
+}
