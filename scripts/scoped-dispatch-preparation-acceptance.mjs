@@ -45,6 +45,7 @@ try {
   assert.deepEqual(memoryTableCounts(authority), afterRevocation);
   if (f.writer) assert.equal(f.writer.calls.length, 0);
   process.stdout.write(JSON.stringify({ fixture: true, prior_request_schema: f.request.schema_version,
+    cli_published: f.cli_published === true,
     private_spool_payload_equal: true, preparation_table_counts_unchanged: true,
     signed_scope_review_still_valid: true, revoked_source_preparation_rejected: true,
     provider_write_calls: f.writer?.calls.length ?? null, scoped_write_completed: false,

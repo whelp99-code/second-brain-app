@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 JARVIS `aa825f0`:** [자동 승인 후보 CLI 발행 구현](AUTO-CANDIDATE-PUBLICATION-2026-09-09.md). 기존 수동 경로13·최종 자동/범위7통과, v1/v3 발행/재실행/실패 복구 및 실제 컴파일 CLI→spool→scoped 준비 인수. auto-approved 발행 결손 수정. scoped 승인 소비·provider 저장·완료 영수증과 orphan 정리 전체 인수는 남는다.
+
 **2026-09-09 v3 인수:** [한국어 다중 행 v3 spool→scoped 준비](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). 관련4통과·실제 컴파일 코드/DB/spool에서 CRLF 포함 본문 일치·검증 철회 거부. 제품 추가 수정 없음. fixture 발행과 실제 CLI 자동 발행을 구분하며 auto-approved 후보의 발행 연결·scoped 저장/영수증은 남는다.
 
 **2026-09-09 dispatch 연결:** [private spool→scoped 준비·원본 권한 재검사](SCOPED-DISPATCH-PREPARATION-2026-09-09.md). 기존 spool reader/write authority 재사용, J3통과·실제 컴파일 API에서 본문 복구/원본 verification 철회 거부/쓰기0 확인. 범위 승인만으로 원본 권한을 대체하지 않는다. 단일 소비·outbox/provider 쓰기·영수증은 미완료다.
