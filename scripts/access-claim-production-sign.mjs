@@ -99,10 +99,28 @@ try {
         const budgets = { max_records: 8, max_record_bytes: 4096, max_bytes: 32768 };
         const reference = await reader.read('Cited', budgets);
         if (reference.payload.records.length === 0) throw new Error('reference did not contain actual records');
-        await reader.submit(reference, async serialized => {
+        const nativeSession = { client_id: "client:acceptance", session_id: "native:acceptance", epoch_id: "epoch:1" };
+        await reader.submitInSession(reference, async serialized => {
           callbacks++;
           if (serialized !== reference.serialized || Buffer.byteLength(serialized) !== reference.bytes) throw new Error('payload mismatch');
-        });
+        }, nativeSession);
+        const { canonicalize } = await moduleAt('src/canonical.js');
+        const { createMemoryMembership } = await moduleAt('src/memory-membership.js');
+        const { memoryReadPrivacyState } = await moduleAt('src/memory-read-privacy.js');
+        const membership = createMemoryMembership(Buffer.alloc(32, 7));
+        const binding = canonicalize({ generation: before.generation,
+          privacy: canonicalize(memoryReadPrivacyState(db.authority)), authorization: shared.client.authorizationIdentity() });
+        const expectedBinding = membership('record', 'reference-delivery/binding/v1\0' + canonicalize(binding));
+        const journal = db.authority.db.prepare('SELECT binding_key,state FROM personal_context_reference_sessions').get();
+        if (journal.binding_key !== expectedBinding || journal.state !== 'active') throw new Error('scope missing from durable binding');
+        const dump = JSON.stringify(db.authority.db.prepare('SELECT * FROM personal_context_reference_attempts').all());
+        if (dump.includes(reference.serialized) || dump.includes(body.session_id)) throw new Error('raw delivery metadata leaked');
+        const newReader = createProductionScopedMemory(db.authority, { ...productionOptions, transport: monitoredTransport }).reader;
+        const reread = await newReader.read('Cited', budgets);
+        let durableDuplicateDenied = false;
+        try { await newReader.submitInSession(reread, async () => { callbacks++; }, nativeSession); }
+        catch (error) { if (error.code !== 'MEMORY_REFERENCE_ALREADY_SUBMITTED') throw error; durableDuplicateDenied = true; }
+        if (!durableDuplicateDenied || callbacks !== 1) throw new Error('durable duplicate accepted');
         let duplicateDenied = false;
         try { await reader.submit(reference, async () => { callbacks++; }); }
         catch (error) { if (error.code !== 'MEMORY_REFERENCE_SUBMISSION_INVALID') throw error; duplicateDenied = true; }
@@ -116,7 +134,7 @@ try {
         substituteEmptyGeneration = false;
         if (!generationDenied) throw new Error('empty generation substitution accepted');
         pendingReference = await reader.read('Cited', budgets);
-        referenceCheck = { production_factory_owned_and_shared: true, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
+        referenceCheck = { production_factory_owned_and_shared: true, durable_scope_binding_verified: true, durable_duplicate_denied: durableDuplicateDenied, records: reference.payload.records.length, bytes: reference.bytes, duplicate_denied: duplicateDenied, empty_generation_substitution_denied: generationDenied };
       }
       currentCookie = undefined;
       if (reader) {
