@@ -14,6 +14,7 @@ const { makePhoneHome, processUid, startFakeAuthority, cookieFromSetCookie,
   FIXTURE_HOST, FIXTURE_LOGIN, FIXTURE_ORIGIN } = await at('tests/fixtures/phone-gateway-harness.js');
 const home = makePhoneHome();
 let gateway;
+let peer;
 let upstream;
 let now = Date.parse(input.now);
 let expireOnExit = false;
@@ -104,6 +105,37 @@ try {
   assert.equal(thirdAllowed.statusCode, 200); assert.equal((await thirdAllowed.body.json()).context.records.length, 2);
   assert.equal(readFileSync(policyPath, 'utf8'), agentPolicyBytes);
   assert.equal(readFileSync(providerPath, 'utf8'), issuerProvider);
+  // A separate configured agent and cookie store use the same canonical provider/DB.
+  const peerAgent = 'agent:shared-memory-peer';
+  const peerProviderPath = join(home.home, 'peer-provider.toml');
+  const peerProvider = issuerProvider.replace(`agent = "${input.agent_id}"`, `agent = "${peerAgent}"`);
+  assert.notEqual(peerProvider, issuerProvider);
+  writeFileSync(peerProviderPath, peerProvider, { mode: 0o600 });
+  const peerGrant = { ...agentPolicy.agents[0], agent_id: peerAgent };
+  writeFileSync(policyPath, JSON.stringify({ ...agentPolicy, agents: [...agentPolicy.agents, peerGrant] }));
+  peer = createPhoneGatewayServer({ host: '127.0.0.1', port: 0, upstream: upstream.origin, staticRoot, config,
+    now: () => now, audit: () => {}, memoryContext: { ...parsed.memoryContext, agent_id: peerAgent,
+      memory: { ...parsed.memoryContext.memory, transport_options: { ...parsed.memoryContext.memory.transport_options,
+        configPath: peerProviderPath } } } });
+  const peerBase = `http://127.0.0.1:${peer.address.port}`;
+  const peerLogin = await request(`${peerBase}/api/v1/phone/session`, { headers: identity });
+  assert.equal(peerLogin.statusCode, 200);
+  const peerCookie = cookieFromSetCookie(peerLogin.headers['set-cookie']);
+  const peerCsrf = (await peerLogin.body.json()).csrf_token;
+  const peerHeaders = { ...headers, Cookie: `__Host-jarvis-phone=${peerCookie}`, 'X-JARVIS-CSRF': peerCsrf };
+  const peerCall = () => request(`${peerBase}/api/v1/memory/context`, { method: 'POST', headers: peerHeaders,
+    body: JSON.stringify({ schema_version: 1, query: 'Cited', limit: 8, max_bytes: 32768 }) });
+  const shared = await peerCall(); assert.equal(shared.statusCode, 200);
+  const sharedContext = (await shared.body.json()).context;
+  assert.deepEqual(sharedContext.records, result.context.records);
+  writeFileSync(policyPath, JSON.stringify({ ...agentPolicy, agents: [...agentPolicy.agents,
+    { ...peerGrant, projects: ['project:isolated-peer'] }] }));
+  const isolated = await peerCall(); assert.equal(isolated.statusCode, 200);
+  const isolatedContext = (await isolated.body.json()).context;
+  assert.equal(isolatedContext.state, 'empty'); assert.deepEqual(isolatedContext.records, []);
+  const firstStillAllowed = await call(); assert.equal(firstStillAllowed.statusCode, 200);
+  assert.equal((await firstStillAllowed.body.json()).context.records.length, 2);
+  peer.close(); peer = undefined;
   writeFileSync(policyPath, JSON.stringify({ ...agentPolicy, agents: [] }));
   const agentRevoked = await call({}, thirdHeaders); assert.equal(agentRevoked.statusCode, 403); await agentRevoked.body.text();
   writeFileSync(policyPath, JSON.stringify(policy)); writeFileSync(providerPath, fixedProvider);
@@ -122,6 +154,8 @@ try {
   assert.ok(String(expired.headers['set-cookie']).includes('Max-Age=0'));
   assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/context'));
   process.stdout.write(JSON.stringify({ agent_policy_new_sessions_without_policy_edits: 2,
+    independent_agent_shared_records_equal: true, restricted_peer_records: isolatedContext.records.length,
+    original_agent_records_after_peer_restriction: 2,
     agent_policy_withdrawal_denied: true, cli_activation_parsed: true, records: 2, bytes: Buffer.byteLength(text), cookie_required: true,
     client_identity_denied: true, csrf_required: true, ungranted_login_session_denied: true,
     policy_withdrawal_denied: true, policy_withdrawal_http_status: revoked.statusCode,
@@ -129,6 +163,7 @@ try {
     cleanup_session_expiry_http_status: expired.statusCode, expiry_child_exit_observed: expiryExitObserved,
     scope: 'real HTTP cookie and MCP; fixture Tailnet headers, keys, explicit session grant, source and clock' }));
 } finally {
+  peer?.close();
   gateway?.close();
   try { await upstream?.close(); } finally { rmSync(home.home, { recursive: true, force: true }); }
 }
