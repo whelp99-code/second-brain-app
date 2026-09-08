@@ -563,3 +563,13 @@ Dashboard211 및 최종집중6, backend관련15 및 최종6 통과(중복). 실�
 전역 연결배지 끊김·provider는fixture라는 한계를 유지한다. 신규 P1: remote-approval compose가
 cwd 상대정책파일에 의존하며 누락 시 HTTP요청 중 프로세스종료. 시작시 설정검증·고정경로·
 서비스 한번구성으로 후속 수정한다. 기존 native/ACL/capture/검색/운영/DR 완료조건은 남는다.
+
+
+## 47. B4/B6 정책의 고정 경로·시작 검증과 배포 자산
+
+JARVIS `4d8bdf0`, SB `aa7e76f`: [이번 수정5항목·잔여11우선과제](DASHBOARD-POLICY-STARTUP-2026-09-08.md).
+46절에서 발견한 cwd 정책 누락에 따른 요청 중 서버 종료를 수정했다. 정책을 module-relative
+자산으로 함께 게시하고 시작 시 한번 구성한다. 명시적 정책 오류는 listen 전 거부하며 CLI DB를
+정리한다. 수정 전3실패→관련14/build10통과, 타입·린트·독립 검토·정규 격리 build 통과.
+실제6프로세스에서 다른 cwd 정상 HTTP/CLI 및 잘못된 정책 거부를 확인했다. 기존 signer의
+원격 승인 미준비와 native/ACL/자동capture/검색/운영/DR 미완료 조건은 유지한다.

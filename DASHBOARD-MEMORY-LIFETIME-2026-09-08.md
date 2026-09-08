@@ -72,3 +72,8 @@ JARVIS task provider는 승인된 execution-plan digest와 source snapshot으로
 최종 선택 후 개인정보 제거 화면:
 
 ![1024 화면의 개인정보 제거 후 상태](/var/tmp/jarvis-view-browser-yDITvd/cleared-1024.png)
+
+
+후속 갱신: 위의 상대 정책 경로·요청 중 종료 문제는 JARVIS `4d8bdf0`에서 수정했다.
+[시작 정책 수정과 실제 실행 증거](DASHBOARD-POLICY-STARTUP-2026-09-08.md)를 현재 상태로 참조한다.
+기존 브라우저 결과와 전역 연결 배지 관측은 당시 기록으로 유지한다.

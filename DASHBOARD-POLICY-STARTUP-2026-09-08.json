@@ -1,0 +1,71 @@
+{
+  "root": "/var/tmp/jarvis-policy-acceptance-YA3b5x",
+  "build": "/var/tmp/jarvis-policy-build-1qaj70f8",
+  "status": "passed",
+  "cases": [
+    {
+      "mode": "default",
+      "pid": 2916446,
+      "health": 200,
+      "memory_status": 200,
+      "policy_reread_after_start": false,
+      "cwd": "/var/tmp/jarvis-policy-acceptance-YA3b5x/unrelated-cwd"
+    },
+    {
+      "mode": "pinned",
+      "pid": 2916629,
+      "health": 200,
+      "memory_status": 200,
+      "policy_reread_after_start": false,
+      "cwd": "/var/tmp/jarvis-policy-acceptance-YA3b5x/unrelated-cwd"
+    },
+    {
+      "mode": "missing",
+      "pid": 2916711,
+      "rejected_before_listen": true
+    },
+    {
+      "mode": "invalid",
+      "pid": 2916954,
+      "rejected_before_listen": true
+    },
+    {
+      "mode": "cli-default",
+      "pid": 2917015,
+      "health": 200,
+      "exit_code": 0,
+      "cwd": "/var/tmp/jarvis-policy-acceptance-YA3b5x/unrelated-cwd"
+    },
+    {
+      "mode": "cli-missing",
+      "exit_code": 2,
+      "no_origin_printed": true,
+      "error_code": "REMOTE_APPROVAL_POLICY_UNAVAILABLE"
+    }
+  ],
+  "packaged_policy": {
+    "path": "src/personal-os-policy.json",
+    "bytes": 4397,
+    "mode": 436,
+    "sha256": "sha256:df781b7201e489686cce96c82c6182979a22b1d18ede828253d484300201cdae"
+  },
+  "artifact_digest": "sha256:43e8368b6174c2b4f2e07f9fcd1922b2e4910b78d93d2e125a889ad7b480e81d",
+  "operational_data_used": false,
+  "remote_approval_activated": false,
+  "native_model_calls": 0,
+  "commits": {
+    "jarvis": "4d8bdf0",
+    "second_brain_tool": "aa7e76f"
+  },
+  "checks": {
+    "before_failed": 3,
+    "related_tests": 14,
+    "related_files": 4,
+    "build_publication_tests": 10,
+    "typescript": "passed",
+    "changed_eslint": "passed",
+    "independent_review": "no blocker; metadata snapshot limitations documented"
+  },
+  "build_input_digest": "sha256:df5151e1e8108bbd091fb2e8447d9daa4d247c4fcd0c25ca37ed53d9245858b1",
+  "full_goal_complete": false
+}

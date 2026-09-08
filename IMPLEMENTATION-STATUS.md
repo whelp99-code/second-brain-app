@@ -4,7 +4,13 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 JARVIS `53136d4` / SB 도구 `bc3313b`: [실제 기억 화면의 개인정보 수명](DASHBOARD-MEMORY-LIFETIME-2026-09-08.md).**
+**최신 JARVIS `4d8bdf0` / SB 도구 `aa7e76f`: [정책 시작 오류 수정·후속 우선 목록](DASHBOARD-POLICY-STARTUP-2026-09-08.md).**
+실행 cwd 정책 의존·HTTP 요청마다 서비스 조립·배포 정책 자산 누락을 수정했다. 시작 시 정책을
+고정하며 잘못된 정책은 listen 전 거부하고 CLI DB를 닫는다. 관련14개/build10개·타입·린트·
+독립 검토, 정규 격리 build 및 실제6프로세스 HTTP/CLI 인수 통과. 이전 화면 보고서의 다음 수정
+대상은 이 단위에서 해결했다. native 원문 관리·실제 앱 연결·ACL·capture·검색·운영/DR은 미완료다.
+
+**이전 JARVIS `53136d4` / SB 도구 `bc3313b`: [실제 기억 화면의 개인정보 수명](DASHBOARD-MEMORY-LIFETIME-2026-09-08.md).**
 provider 조회 중 정책/session 변경 차단, 충돌 suppression, 상세/draft/검색어 및 만료 데이터 폐기,
 같은 token 재사용의 이전 action 차단을 구현했다. Dashboard211/최종집중6, backend관련15/최종6
 통과(중복 포함). 실제Chromium1440/1024와HTTP409 본문부재 확인. 상단 전역연결은 끊김으로
