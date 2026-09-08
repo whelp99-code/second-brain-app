@@ -1,0 +1,305 @@
+{
+  "baseline": {
+    "state": "passed",
+    "source_fixture": "/var/tmp/sb-write-cycles-ynvxjoyu",
+    "workspace": "/var/tmp/sb-write-profile-zkqjgivw",
+    "source_tree_sha256": "40ba38a260cf329cb7ba950f25bbca7db0d278b0a0189f41b8d05ed28196052f",
+    "commands": [
+      {
+        "command": "remember",
+        "seconds": 12.23961881082505,
+        "exit": 0
+      },
+      {
+        "command": "run",
+        "seconds": 96.83010478038341,
+        "exit": 0
+      }
+    ],
+    "counts": {
+      "source_item": 5101,
+      "unit": 100101
+    },
+    "limitations": [
+      "deterministic LLM fixture",
+      "cProfile overhead included",
+      "no concurrent reader load; compare matched profiles only"
+    ]
+  },
+  "after": {
+    "state": "passed",
+    "source_fixture": "/var/tmp/sb-write-cycles-ynvxjoyu",
+    "workspace": "/var/tmp/sb-write-profile-xtqmv091",
+    "source_tree_sha256": "53aec50887980f2ffb8839b22b0fb705c498c69ad53858a4a2886f58ad905c2c",
+    "commands": [
+      {
+        "command": "remember",
+        "seconds": 12.518112926743925,
+        "exit": 0
+      },
+      {
+        "command": "run",
+        "seconds": 74.07043725484982,
+        "exit": 0
+      }
+    ],
+    "counts": {
+      "source_item": 5101,
+      "unit": 100101
+    },
+    "limitations": [
+      "deterministic LLM fixture",
+      "cProfile overhead included",
+      "no concurrent reader load; compare matched profiles only"
+    ]
+  },
+  "run_functions": {
+    "baseline": [
+      {
+        "file": "~",
+        "function": "<method 'sub' of 're.Pattern' objects>",
+        "calls": 831521,
+        "self_seconds": 27.437215625,
+        "cumulative_seconds": 27.437324726
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/reingress.py",
+        "function": "check",
+        "calls": 2,
+        "self_seconds": 1.6964000000000002e-05,
+        "cumulative_seconds": 9.5339e-05
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/pipeline.py",
+        "function": "_load_units",
+        "calls": 1,
+        "self_seconds": 0.014294996,
+        "cumulative_seconds": 24.953787991000002
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/compile.py",
+        "function": "compile_pending",
+        "calls": 1,
+        "self_seconds": 0.006772053,
+        "cumulative_seconds": 15.417228882000002
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/normalize.py",
+        "function": "normalize",
+        "calls": 5102,
+        "self_seconds": 0.177324234,
+        "cumulative_seconds": 24.107304242
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/conflict.py",
+        "function": "check",
+        "calls": 1,
+        "self_seconds": 0.07766795500000001,
+        "cumulative_seconds": 24.412382201
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/security.py",
+        "function": "protect_units",
+        "calls": 2,
+        "self_seconds": 0.042401232000000004,
+        "cumulative_seconds": 25.973164720000003
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/normalize.py",
+        "function": "_redact",
+        "calls": 5102,
+        "self_seconds": 0.007292529000000001,
+        "cumulative_seconds": 4.653694393
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/security.py",
+        "function": "mask_sensitive",
+        "calls": 201202,
+        "self_seconds": 0.146359038,
+        "cumulative_seconds": 22.932206275000002
+      }
+    ],
+    "after": [
+      {
+        "file": "~",
+        "function": "<method 'sub' of 're.Pattern' objects>",
+        "calls": 203405,
+        "self_seconds": 2.515209671,
+        "cumulative_seconds": 2.51531903
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/reingress.py",
+        "function": "check",
+        "calls": 2,
+        "self_seconds": 2.9408e-05,
+        "cumulative_seconds": 0.0022525
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/pipeline.py",
+        "function": "_load_units",
+        "calls": 1,
+        "self_seconds": 0.015359667,
+        "cumulative_seconds": 20.774823449000003
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/compile.py",
+        "function": "compile_pending",
+        "calls": 1,
+        "self_seconds": 0.006408531,
+        "cumulative_seconds": 5.284305165
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/normalize.py",
+        "function": "normalize",
+        "calls": 5102,
+        "self_seconds": 0.176010308,
+        "cumulative_seconds": 19.797969675
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/conflict.py",
+        "function": "check",
+        "calls": 1,
+        "self_seconds": 0.07693952100000001,
+        "cumulative_seconds": 14.209901963
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/normalize.py",
+        "function": "_redact",
+        "calls": 5102,
+        "self_seconds": 0.27358682700000003,
+        "cumulative_seconds": 0.27358682700000003
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/security.py",
+        "function": "protect_units",
+        "calls": 2,
+        "self_seconds": 0.038988617,
+        "cumulative_seconds": 5.568189665
+      },
+      {
+        "file": "/home/jm/orca/projects/second-brain-app/sb/security.py",
+        "function": "mask_sensitive",
+        "calls": 201202,
+        "self_seconds": 0.165003895,
+        "cumulative_seconds": 2.67678129
+      }
+    ]
+  },
+  "limitations": [
+    "Single synthetic cProfile run per version, not p95 or production SLO.",
+    "Own full regression and native readers run only after profiling. Unrelated JARVIS vitest activity was observed on shared host during after profile."
+  ],
+  "native_acceptance": {
+    "artifact": "/var/tmp/sb-write-cycles-3nnhf2to/evidence.json",
+    "evidence": {
+      "state": "passed",
+      "full": false,
+      "workspace": "/var/tmp/sb-write-cycles-3nnhf2to",
+      "started_at": "2026-09-08T03:37:53.730236+00:00",
+      "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+      "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+      "cpu_count": 8,
+      "load_average_before": [
+        2.2783203125,
+        1.49267578125,
+        1.60791015625
+      ],
+      "disk_available_before": 827936026624,
+      "target_cycles": 3,
+      "completed_cycles": 3,
+      "commit": "0856355cc0c6ccb60c37144865a0b4572dfb4183",
+      "source_tree_sha256": "53aec50887980f2ffb8839b22b0fb705c498c69ad53858a4a2886f58ad905c2c",
+      "harness_sha256": "35e725aabc5b491ed67d939493d1ecfff037676649d2f3c9d913f645a97e3948",
+      "fixture_sha256": "751a33a99f94f19b385c46c66232740e6564d08cb20c349310f95cd7c266bb4a",
+      "limitations": [
+        "synthetic precompiled baseline and deterministic LLM subprocess",
+        "real CLI capture/run and two MCP SDK reader processes; not agent apps",
+        "single owner, no deletes or policy changes in this load scenario",
+        "not Korean relevance, real model throughput or operational deployment"
+      ],
+      "baseline": {
+        "source_item": 5,
+        "unit": 100,
+        "run": 1,
+        "pages": 10,
+        "conflicts": 70,
+        "active_bytes": 410178,
+        "disk_free": 827924111360
+      },
+      "growth": [
+        {
+          "cycle": 3,
+          "active_bytes": 479272,
+          "workspace_bytes": 3202030
+        }
+      ],
+      "concurrent_reads_per_run": [
+        784,
+        198,
+        224
+      ],
+      "sb_search": {
+        "count": 706,
+        "p50_ms": 30.850918032228947,
+        "p95_ms": 53.07393614202738,
+        "max_ms": 482.9016337171197
+      },
+      "sb_read_page": {
+        "count": 706,
+        "p50_ms": 29.784020967781544,
+        "p95_ms": 49.84478885307908,
+        "max_ms": 484.2556160874665
+      },
+      "run_latency": {
+        "count": 3,
+        "p50_ms": 4017.7370561286807,
+        "p95_ms": 13094.70172598958,
+        "max_ms": 13094.70172598958
+      },
+      "capture_latency": {
+        "count": 3,
+        "p50_ms": 1251.2057381682098,
+        "p95_ms": 1552.1205901168287,
+        "max_ms": 1552.1205901168287
+      },
+      "final": {
+        "source_item": 8,
+        "unit": 103,
+        "run": 12,
+        "same_cas_audit": true,
+        "restored_recalls": 3,
+        "unchanged_replay": true,
+        "backup_bytes": 100090,
+        "backup_checksum": "fdb4ce9d9f8c74353bc96520243945decb18d66018cc0436a859fe90c5c1a3e0",
+        "retention": {
+          "raw_blobs": 8,
+          "raw_bytes": 122081,
+          "protected_blobs": 8,
+          "orphan_blobs": [],
+          "orphan_count": 0,
+          "invalid_blobs": [],
+          "invalid_count": 0
+        }
+      }
+    }
+  },
+  "product_commit": "b6d9875",
+  "validation": {
+    "focused": {
+      "passed": 72,
+      "log": "/var/tmp/sb-redaction-focused.log"
+    },
+    "full": {
+      "passed": 860,
+      "skipped": 2,
+      "seconds": 201.04,
+      "log": "/var/tmp/sb-redaction-full.log",
+      "excluded": "tests/test_embeddings.py"
+    },
+    "ruff": "passed",
+    "changed_file_types": {
+      "errors": 0,
+      "warnings": 0
+    }
+  }
+}
