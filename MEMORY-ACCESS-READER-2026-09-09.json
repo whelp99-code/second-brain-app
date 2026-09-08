@@ -1,0 +1,17 @@
+{
+  "work": "/var/tmp/page-access-acceptance-egea9oz_",
+  "generation_id": "sbgen:v1:f97091579bc329c7891e23a7f6c04246dc70f2e77a07c193f9fe8d9f624a5039",
+  "page_id": "wiki/docs-notes-5e8b1af6",
+  "content_digest": "sha256:11b43025553da7a081d6f95e42e812a5811107aaa51a85d262c7876d5004a0a6",
+  "source_requirements": 2,
+  "records": 2,
+  "denied": [
+    "other_owner",
+    "other_project",
+    "other_policy",
+    "empty_projects"
+  ],
+  "ledger_unchanged": true,
+  "repeat_equal": true,
+  "scope": "actual isolated CLI with fake LLM and internal scope evaluator; caller authentication and scoped MCP are not implemented"
+}
