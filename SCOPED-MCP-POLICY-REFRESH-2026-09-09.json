@@ -1,0 +1,13 @@
+{
+  "work": "/var/tmp/page-access-acceptance-015mp1o4",
+  "tools": [
+    "sb_read_page"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read only, not full operating ACL"
+}
