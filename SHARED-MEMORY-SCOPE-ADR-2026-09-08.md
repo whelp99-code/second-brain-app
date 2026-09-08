@@ -95,3 +95,7 @@
 
 **2026-09-09 JARVIS 파일 정책 `623ef50` / 인수 `79ede52`: [현재 정책·인증 세션 대조 공급자와 실제 MCP 연결](MEMORY-ACCESS-FILE-POLICY-2026-09-09.md).**
 소유자 전용 정책 파일을 매 발급 다시 읽고 session/project/method/provider/만료를 대조한다. 누락·손상·철회·불안전 파일은 캐시 없이 거부한다. 관련21통과/13.97초·lint/타입/격리emit통과, 실제 파일 공급자→issuer→stdio 조회/검색 인수. 실제 앱 인증 세션 연결·기발급 claim의 전역 철회 및 전체 운영 목표는 남는다.
+
+## 2026-09-09 제한 응답의 소비자 결합
+
+SB `ec76b14` / JARVIS `8a697d0`: 제한 read/search 응답은 요청 digest와 사용한 claim의 canonical domain digest를 포함한다. 소비자는 별도로 보존한 기대값·claim 만료·fence·record 검증과 예산을 적용한다. 운영 전 제한 프로필의 내부 검증 단계이며 기존 frozen 계약을 완화하지 않는다. 실제 supervised transport 프로필 동결·인증 세션·전 표면 적용은 남는다. [구현과 실제 검증](SCOPED-RESPONSE-CONSUMER-2026-09-09.md).

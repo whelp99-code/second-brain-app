@@ -1,0 +1,58 @@
+{
+  "consumer_validation": [
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    }
+  ],
+  "work": "/var/tmp/page-access-acceptance-c8_18704",
+  "tools": [
+    "sb_read_page",
+    "sb_search"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, not supervised app transport or full operating ACL",
+  "sb_commit": "ec76b14",
+  "jarvis_commit": "8a697d0",
+  "focused_python": {
+    "passed": 19,
+    "seconds": 3.28
+  },
+  "focused_jarvis": {
+    "passed": 17,
+    "seconds": 1.02
+  },
+  "ruff": "passed",
+  "basedpyright": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "typescript_emit": "passed, isolated outDir",
+  "eslint": "passed",
+  "operational_deployment": false
+}

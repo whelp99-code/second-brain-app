@@ -1,5 +1,8 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 최신 통합 분석:** [수정 완료 8항목·잔여 14항목·OSS 대조·완료 조건](SHARED-MEMORY-CONSOLIDATED-REVIEW-2026-09-09.md).
+**SB `ec76b14` / JARVIS `8a697d0`:** [제한 응답의 요청·claim·record 소비자 검증](SCOPED-RESPONSE-CONSUMER-2026-09-09.md). JARVIS17·SB19 집중 통과, 실제 별도 MCP 조회/검색→Node 소비자·변조 거부·재시작 반복 확인. 실제 인증 세션과 supervised transport, scoped 쓰기 및 전체 운영 인수는 남는다. 아래 과거 항목은 당시 기록이며 현재 판단은 최신 통합 분석을 우선한다.
+
 **2026-09-09 SB 제품 `62b1609`: [설정 기반 원본 분류 저장·WAL 백업 수정·실제 CLI 인수](SOURCE-ACCESS-CLASSIFICATION-2026-09-09.md).**
 source ID/URI/내용 해시에 owner/projects/policy revision을 결합하고 같은 수집 transaction에 보존한다. 재수집은 같은 분류를 재사용하고 재분류는 거부한다. 과거 무분류 원본은 자동 project 분류하지 않는다.
 원장v3 마이그레이션의 main 파일 복사에서 WAL 누락을 재현·수정했다. 최종전체1,104통과/2skip/205.82초·Ruff/diff통과·정적0오류/기존경고1. 실제 봉인 CLI 최초/재수집0·재분류1 및 분류 보존을 인수했다.

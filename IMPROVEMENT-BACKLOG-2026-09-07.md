@@ -1,5 +1,8 @@
 # Second Brain 수정·개선·고도화 분석
 
+**2026-09-09 최신 통합 분석:** [수정 완료 8항목·잔여 14항목·OSS 대조·완료 조건](SHARED-MEMORY-CONSOLIDATED-REVIEW-2026-09-09.md).
+**SB `ec76b14` / JARVIS `8a697d0`:** [제한 응답의 요청·claim·record 소비자 검증](SCOPED-RESPONSE-CONSUMER-2026-09-09.md). JARVIS17·SB19 집중 통과, 실제 별도 MCP 조회/검색→Node 소비자·변조 거부·재시작 반복 확인. 실제 인증 세션과 supervised transport, scoped 쓰기 및 전체 운영 인수는 남는다. 아래 과거 항목은 당시 기록이며 현재 판단은 최신 통합 분석을 우선한다.
+
 **2026-09-09 JARVIS 파일 정책 `623ef50` / 인수 `79ede52`: [현재 정책·인증 세션 대조 공급자와 실제 MCP 연결](MEMORY-ACCESS-FILE-POLICY-2026-09-09.md).**
 소유자 전용 정책 파일을 매 발급 다시 읽고 session/project/method/provider/만료를 대조한다. 누락·손상·철회·불안전 파일은 캐시 없이 거부한다. 관련21통과/13.97초·lint/타입/격리emit통과, 실제 파일 공급자→issuer→stdio 조회/검색 인수. 실제 앱 인증 세션 연결·기발급 claim의 전역 철회 및 전체 운영 목표는 남는다.
 
