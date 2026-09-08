@@ -27,12 +27,15 @@ def effect_request(
     lane_char: str,
     *,
     correction_content: str = "corrected runtime record",
+    page_id: str | None = None,
+    source_identity_full: str = "6" * 64,
 ) -> JsonObject:
     lane = {"correct": "correction", "forget": "deletion", "export": "export"}[operation]
     prefix = {"correct": "memcorr:req:v1:", "forget": "memdel:req:v1:", "export": "memexp:req:v1:"}[operation]
     lane_id = prefix + lane_char * 64
-    page = next(generation.root.joinpath("wiki").glob("memory-*.md"))
-    page_id = page.relative_to(generation.root).with_suffix("").as_posix()
+    if page_id is None:
+        page = next(generation.root.joinpath("wiki").glob("memory-*.md"))
+        page_id = page.relative_to(generation.root).with_suffix("").as_posix()
     resolved_target = resolve_memory_target(
         generation.root,
         GenerationIdentityV1(
@@ -42,7 +45,7 @@ def effect_request(
             generation.head,
             generation.tree,
         ),
-        MemoryTargetSelectorV1(page_id, record, "6" * 64),
+        MemoryTargetSelectorV1(page_id, record, source_identity_full),
         owner_digest_key=b"owner-key",
         subject_digest_key=b"subject-key",
         now=now,
