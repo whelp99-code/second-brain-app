@@ -1,0 +1,74 @@
+{
+  "scoped_status_client": {
+    "reference_delivery": {
+      "records": 2,
+      "bytes": 4412,
+      "duplicate_denied": true,
+      "cookie_removed_before_submit_denied": true
+    },
+    "profile": "scoped-record-read-v2",
+    "status_before_after_equal": true,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "scoped_client": {
+    "profile": "scoped-record-read-v1",
+    "status_before_after_equal": false,
+    "page_groups": 1,
+    "search_groups": 1,
+    "policy_withdrawn_after_actual_response_denied": true,
+    "phone_session_store_authenticated": true,
+    "missing_cookie_denied": true
+  },
+  "consumer_validation": [
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_read_page",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    },
+    {
+      "method": "sb_search",
+      "pages": 1,
+      "substitutions_denied": 3,
+      "records": 2
+    }
+  ],
+  "work": "/var/tmp/page-access-acceptance-zq89noh0",
+  "tools": [
+    "sb_read_page",
+    "sb_search"
+  ],
+  "records": 2,
+  "wrong_request_missing_claim_tampering_denied": true,
+  "restart_equal": true,
+  "production_issuer": true,
+  "live_revocation_policy_change_invalid_missing_config_denied": true,
+  "restored_policy_resumes_same_connection": true,
+  "scope": "actual stdio and JARVIS issuer with fixture authority/scope/clock; record read/search and consumer validator, supervised stdio transport; not authenticated app sessions or full operating ACL",
+  "jarvis_commit": "6a9d1d8",
+  "acceptance_commit": "fa0cc11",
+  "regression": {
+    "passed": 85,
+    "files": 5,
+    "seconds": 38.02
+  },
+  "typescript_isolated_emit": "passed",
+  "eslint": "passed",
+  "native_model_delivery_verified": false
+}
