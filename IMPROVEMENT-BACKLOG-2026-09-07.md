@@ -679,3 +679,19 @@ operation/세대/root/내용 목록 digest를 기록하고, 원본이 없을 때
 미지원 압축/Git pack·남아 있는 tar.gz manifest·증거 변경 재조정과 최종 취소 결과/상태/서명
 영수증/MCP/JARVIS seq1완료→정상V2seq2 연결이 남는다. native·검증된 범위·계보·수집·실제앱·
 검색·GUI·운영 전체 완성 조건을 유지한다. 별도 DB/Proxy/OSS 설치와 운영 변경은 하지 않았다.
+
+
+## 55. 남는 정상 백업 보존과 manifest 무결성 인수
+
+SB `5d9f7d4`: [상세 결함·형식 검증·실제 복원·한계](RETAINED-BACKUP-ACCEPTANCE-2026-09-08.md).
+삭제 대상과 무관한 정상 tar.gz 때문에 정정이 UNMANIFESTED_BACKUP에 멈추던 기존 형식
+불일치를 수정했다. checksum와 내부 member 전체 집합/크기/해시를 검증하고 기존 manifest
+디렉터리와 유효한 유니코드·JSON 표현을 보존한다. 잘못된 manifest는 전환 전에 거부하고
+오류의 경로 노출을 방지한다. 별도 DB/Proxy/OSS 설치나 운영 변경 없이 기존 provider를 보강했다.
+
+전체1,024통과/2skip(마지막 오류 정규화 전), 이후 관련45통과(중복·신규4포함), 정적0오류/0경고·
+lint통과. 실제 정정/취소 각각 exit77 복구·MCP stale→healthy와 이전 본문 검색0, 무관한 백업
+SHA불변·37파일 복원을 최종 소스로 확인했다. 이전 보류 중 남는 정상 tar.gz 형식 불일치는
+해소했다. 임의 압축/Git pack 지원·원본 제거 후 inventory 변경/증거 누락 복구, 최신 삭제/ACL을
+적용한 운영 restore, 취소 최종 결과/서명 영수증/MCP/JARVIS seq1완료→정상V2seq2는 남는다.
+native·범위·계보·실제앱·자동 수집/주입·검색·GUI·운영 전체 목표와 자동 route 확대 보류를 유지한다.

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "product_commit": "5d9f7d4dfb2aae921bc48e12736dff0e1d93d80c",
+  "full_test": {
+    "passed": 1024,
+    "skipped": 2,
+    "seconds": 189.42,
+    "before_final_error_normalization": true,
+    "log": "/var/tmp/sb-retained-backup-final-test.log"
+  },
+  "final_focused": {
+    "passed": 45,
+    "seconds": 25.6,
+    "new_tests_after_full": 4,
+    "overlaps_full": true,
+    "log": "/var/tmp/sb-retained-backup-focused-test.log"
+  },
+  "ruff": "passed",
+  "diff_check": "passed",
+  "basedpyright": {
+    "errors": 0,
+    "warnings": 0,
+    "files": [
+      "sb/managed_backup_manifest.py",
+      "sb/managed_file_inspection.py",
+      "sb/managed_copy_disposal.py",
+      "sb/request_executor.py"
+    ]
+  },
+  "source_sha256": {
+    "sb/managed_backup_manifest.py": "8916b54e9985f3bcfebd6a37a5436417d47e10568520f04e8b0aea9dfc06d637",
+    "sb/managed_file_inspection.py": "ed4f8a7653fe5cdb4e1041e20061c33d5f8b35dc1c1343ea17fbe696d7589cc0",
+    "sb/managed_copy_disposal.py": "67b7a4ba38bdb8a3dd1d189035c23d0481d3d488907befb5fdd065b4613f1d55",
+    "sb/request_executor.py": "df3dc20ed53e9c89c2f8d8790d89254ad0d90f15506f482961bab647be4b8ce2"
+  },
+  "process_evidence": {
+    "path": "/var/tmp/retained-backup-acceptance-53c2k881/result.json",
+    "sha256": "aaa5bd1e416eda8c9842ae6076b0b21068464e25e5ae2f3d1eb1dd41707d6a05",
+    "parent_pid": 3756660,
+    "cases": [
+      {
+        "operation": "correct",
+        "crash_exit": 77,
+        "recovery_pid": 3757299,
+        "state": "proved",
+        "before_mcp_pid": 3756900,
+        "after_mcp_pid": 3758258,
+        "before_health": "tombstone_stale",
+        "after_health": "healthy",
+        "search_counts": [
+          0,
+          1
+        ],
+        "retained_sha256": "2b5ab6679ba1a29bddd6e9962f03cf1456b7f037d802c0cc942f3bc1c50aa979",
+        "restored_files": 37,
+        "retained_backup_unchanged": true,
+        "archive_removed": true,
+        "export_removed": true,
+        "original_generation_removed": true,
+        "checkpoint_count": 1,
+        "scan_matches": 0,
+        "scan_errors": 0
+      },
+      {
+        "operation": "cancel",
+        "crash_exit": 77,
+        "recovery_pid": 3760522,
+        "state": "generation_active",
+        "before_mcp_pid": 3759706,
+        "after_mcp_pid": 3760804,
+        "before_health": "tombstone_stale",
+        "after_health": "healthy",
+        "search_counts": [
+          0,
+          0
+        ],
+        "retained_sha256": "cec216da0c46f4dd69d5c95bc4bed4330aea8a6a444d50d575d42e88bd7805e1",
+        "restored_files": 37,
+        "retained_backup_unchanged": true,
+        "archive_removed": true,
+        "export_removed": true,
+        "original_generation_removed": true,
+        "checkpoint_count": 1,
+        "scan_matches": 0,
+        "scan_errors": 0
+      }
+    ]
+  },
+  "operational_mutations": 0,
+  "cancellation_signed_completion": false,
+  "jarvis_cursor_settlement": false,
+  "central_memory_goal_complete": false
+}

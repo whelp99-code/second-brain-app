@@ -4,7 +4,17 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-**최신 SB `461f7e3`: [압축 백업·내보내기 처분과 실제 중단 복구](MANAGED-COPY-DISPOSAL-ACCEPTANCE-2026-09-08.md).**
+**최신 SB `5d9f7d4`: [남는 정상 백업 보존·무결성·실제 복원](RETAINED-BACKUP-ACCEPTANCE-2026-09-08.md).**
+무관한 정상 tar.gz 때문에 정정이 UNMANIFESTED_BACKUP에 멈추는 형식 불일치를 재현·수정했다.
+archive/checksum와 내부 전체 파일 집합·크기·해시를 제한된 스트림으로 검증하며 기존 디렉터리
+형식과 유효한 유니코드/JSON 표현을 유지한다. 잘못된 사본은 pointer 전환 전 거부하고
+오류 응답에 로컬 경로가 포함되지 않게 한다. 전체1,024통과/2skip(마지막 오류 정규화 전),
+정규화 후 관련45통과(중복·신규4포함), 정적0오류/0경고·lint통과. 실제 정정/취소 강제종료77→
+복구·MCP stale→healthy/기존 검색0, 무관한 백업 SHA불변·각37파일 복원을 재확인했다.
+취소 최종 결과/상태/서명 영수증/MCP/JARVIS cursor, 미지원 형식·증거 재조정 및 native·범위·
+계보·실제 앱·검색·GUI·운영 전체 목표는 유지한다. 운영 변경·push는 하지 않았다.
+
+**이전 SB `461f7e3`: [압축 백업·내보내기 처분과 실제 중단 복구](MANAGED-COPY-DISPOSAL-ACCEPTANCE-2026-09-08.md).**
 gzip/tar/Git loose object 안의 원문 누락을 재현하고 제한된 스트림 검사를 추가했다.
 정정·삭제·취소의 사본 처분을 세대 전환 전에 실행하고 원문 없는 메타데이터 체크포인트로
 재시작을 검증한다. 증거 누락/내용 변경은 보류하며 전환 전 새 백업은 재검사한다.
