@@ -31,6 +31,7 @@ from sb.effect_values import (
 from sb.generation_cleanup import discard_staging
 from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
+from sb.generation_walk import surface_files
 from sb.request_store import RequestStore
 
 
@@ -137,14 +138,9 @@ def _private_directory(path: Path) -> None:
     path.chmod(0o700)
 
 
-def _regular_files(root: Path, *, include_derived: bool) -> tuple[Path, ...]:
-    files: list[Path] = []
-    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
-        relative = path.relative_to(root)
-        if relative.parts[0] == ".git" or relative.name == "generation.json":
-            continue
-        if not include_derived and relative.parts[0] == ".sb":
-            continue
+def _regular_files(root: Path, *, include_derived: bool) -> tuple[tuple[Path, Path], ...]:
+    files: list[tuple[Path, Path]] = []
+    for path, relative in surface_files(root, include_derived=include_derived):
         metadata = path.stat(follow_symlinks=False)
         if stat.S_ISDIR(metadata.st_mode):
             continue
@@ -154,15 +150,15 @@ def _regular_files(root: Path, *, include_derived: bool) -> tuple[Path, ...]:
             or metadata.st_uid != os.getuid()
         ):
             raise GenerationError("GENERATION_SURFACE_UNSAFE")
-        files.append(path)
+        files.append((path, relative))
     return tuple(files)
 
 
 def _content_rows(root: Path) -> tuple[list[dict[str, JsonValue]], int]:
     rows: list[dict[str, JsonValue]] = []
     byte_count = 0
-    for path in _regular_files(root, include_derived=False):
-        relative = path.relative_to(root).as_posix()
+    for path, relative_path in _regular_files(root, include_derived=False):
+        relative = relative_path.as_posix()
         raw = path.read_bytes()
         byte_count += len(raw)
         rows.append(
@@ -691,10 +687,7 @@ class GenerationStore:
         allowed: Callable[[Path], bool],
     ) -> None:
         source_device = source.stat().st_dev
-        for path in sorted(source.rglob("*"), key=lambda item: item.as_posix()):
-            relative = path.relative_to(source)
-            if relative.parts[0] in {".git", ".sb"} or relative.name == "generation.json":
-                continue
+        for path, relative in surface_files(source):
             metadata = path.stat(follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
                 continue
@@ -729,7 +722,8 @@ class GenerationStore:
                         if count <= 0:
                             raise GenerationError("GENERATION_WRITE_FAILED")
                         offset += count
-                os.fsync(target_fd)
+                # The complete staged tree is fsynced after all mutations and
+                # derived stores, before any sealed manifest is published.
             finally:
                 os.close(source_fd)
                 if target_fd is not None:
