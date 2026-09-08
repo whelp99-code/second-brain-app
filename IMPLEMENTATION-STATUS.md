@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 요청 기억 분류·봉인:** [scoped remember materialization](SCOPED-REMEMBER-MATERIALIZATION-2026-09-09.md). 내부 staging의 원본/페이지 불변 분류 결합, 독립 reader 3개에서 records4/4·불허 프로젝트 거부. 전체1,169통과/2skip/220.91초·전체Ruff. 공개 쓰기 요청/승인 소비/영수증 연결은 남는다.
+
 **2026-09-09 scoped 준비값 검증:** [provider 측 codec·SourceAccess 연결](SCOPED-WRITE-PREPARATION-CODEC-2026-09-09.md). 관련23통과·실제 JARVIS CLI 생성값의 독립 Python 검증/본문51bytes·범위 일치. 실제 쓰기 수락·단일 소비·봉인 계보·완료 영수증은 남는다.
 
 **2026-09-09 미사용 자동 후보 정리:** [원문 만료 정리·인계 추가 대조](AUTO-EXPIRY-CLEANUP-2026-09-09.md). 관련21통과·격리 CLI v3 원문1→0/분류·원장 불변/provider 호출0. 처리 중 자료 보존. scoped 쓰기·native 세션 삭제·전체 운영 인수는 남는다.

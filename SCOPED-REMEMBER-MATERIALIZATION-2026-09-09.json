@@ -1,0 +1,25 @@
+{
+  "fixture": true,
+  "independent_read_processes": 3,
+  "read_results": [
+    {
+      "records": 4,
+      "source_refs": [
+        "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4"
+      ],
+      "page_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6"
+    },
+    {
+      "records": 4,
+      "source_refs": [
+        "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4"
+      ],
+      "page_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6"
+    },
+    {
+      "denied": "MEMORY_ACCESS_DENIED"
+    }
+  ],
+  "source_bytes": 51,
+  "mcp_write_completed": false
+}
