@@ -1,0 +1,14 @@
+{
+  "source_evidence": "/var/tmp/source-access-acceptance-9ucri_a4/result.json",
+  "work": "/var/tmp/source-access-acceptance-9ucri_a4",
+  "first_exit": 0,
+  "repeat_exit": 0,
+  "reclassification_exit": 1,
+  "source_count": 1,
+  "classification_count": 1,
+  "source_ref_digest": "sha256:3323cc05a9dc058d85d2c467ff9cf13a55bb8e89c611b1908210e4cb41213c4f",
+  "classification_digest": "sha256:c47fa1f104174076df263f106ca076f210b8e3ed2948e8953d575e5b6a8dc176",
+  "classification_preserved_through_sealed_generations": true,
+  "frontmatter_not_used_as_authority": true,
+  "scope": "trusted source classification persistence only; no scoped MCP access grant or enforcement"
+}
