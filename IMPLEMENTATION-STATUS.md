@@ -4,7 +4,9 @@
 
 정본 계획: `IMPROVEMENT-BACKLOG-2026-09-07.md`, `OSS-ABSORPTION-INTEGRATION-PLAN-2026-09-07.md`.
 
-병합 대기: 검색 구현 커밋 `d174276` (`codex/korean-query-consistency-20260908`, `/var/tmp/sb-korean-query-work`). 전체 722 passed/2 skipped. 원 작업공간의 100회 쓰기 인수가 종료되면 이 커밋을 병합하고 필요한 통합 검증을 수행한다. 현재 원 작업공간의 제품 소스에는 아직 적용하지 않았다.
+병합 대기: 검색 `d174276` → 준비 사본 복구 `47fa507` (`codex/korean-query-consistency-20260908`, `/var/tmp/sb-korean-query-work`). 결합 제품의 전체 733 passed/2 skipped. 원 작업공간의 100회 쓰기 인수가 종료되면 순서대로 병합하고 필요한 통합 검증을 수행한다. 현재 원 작업공간의 제품 소스에는 아직 적용하지 않았다.
+
+격리 복구 후속: [중단된 준비 세대 정리](STAGING-RECOVERY-2026-09-08.md). 다른 request ID의 재실행 뒤에도 남던 `.staging` raw 사본을 기존 writer/exclusive 잠금 아래에서 정리한다. 전체 트리 검증·descriptor 상대 삭제·열린 파일/진행 writer 보호·실패 재시도를 연결했다. 실제 CLI 종료→유지보수→기존/새 기억 MCP 회수·CAS byte 일치, pending inbox 보존, 전체 733 passed/2 skipped. 검색 수정과 같은 격리 worktree이며 100회 쓰기 종료 후 원 작업공간 병합이 필요하다. 운영 cleanup·전체 삭제/DR·B5 구현 완료는 아니다.
 
 격리 개발 후속: [검색어 어순과 MCP 근거 선택 개선](KOREAN-QUERY-CONSISTENCY-2026-09-08.md). 봉인/비봉인/record가 공통 AND 질의를 사용하고 연속 문구를 우선한다. 같은 합성 자료의 Recall@5 40/90→60/90, 어순 변경 0/20→20/20, 정확 문구 20/20 유지. 실제 CLI/MCP와 분리 record·필터·frozen 계약 관련 60개를 검증했다. 100회 쓰기의 소스 고정을 위해 별도 worktree에서 개발하며 원 작업공간 병합은 해당 인수 종료 뒤 수행한다. 자연어/의역 30개·실제 사용자 질문·B4~B8 전체는 남는다.
 
