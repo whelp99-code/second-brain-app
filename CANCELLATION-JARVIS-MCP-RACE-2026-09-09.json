@@ -1,0 +1,56 @@
+{
+  "request": {
+    "source_evidence": "/var/tmp/cancellation-submit-acceptance-eh4dmaff/race-result.json",
+    "node_pid": 763553,
+    "mcp_pids": [
+      763731
+    ],
+    "transport_methods": {
+      "sb_generation_status": 1,
+      "sb_write_request": 1
+    },
+    "race_first": "request",
+    "request_id": "memeff:req:v2:711e66716678489b1d535c70be51b00f97587399a27ac79f1f4c3b80d72c1767",
+    "original_write_calls": 1,
+    "cancellation_intents": 0,
+    "cancellation_denial": "MEMORY_CANCELLATION_UNSENT_UNPROVED",
+    "response_loss_recovered": false,
+    "jarvis_state": "reconciling",
+    "cursor": {
+      "active_lane_id": null,
+      "accepted_through_sequence": 1
+    },
+    "provider_execution": "proved",
+    "repeat_executor": "idle",
+    "old_record_absent": true,
+    "replacement_present": true,
+    "scope": "actual JARVIS saga/issuer and Node MCP; ordered async boundaries, isolated fixture authority"
+  },
+  "cancellation": {
+    "source_evidence": "/var/tmp/cancellation-submit-acceptance-i2ga1k2x/race-result.json",
+    "node_pid": 763523,
+    "mcp_pids": [
+      763729,
+      763749
+    ],
+    "transport_methods": {
+      "sb_submit_cancellation": 2
+    },
+    "race_first": "cancellation",
+    "request_id": "memeff:req:v2:e4e3a2ab8e07e073c002647e0dc3802af53d931e7a746324849fd49fb9f77e7e",
+    "intent_id": "memcancel:intent:v1:a570da6cf443a57a29b8cbfb7cbe0ccb2e05a721425f25d8c51c1439cd64b600",
+    "original_write_calls": 0,
+    "cancellation_intents": 1,
+    "response_loss_recovered": true,
+    "jarvis_state": "queued",
+    "cursor": {
+      "active_lane_id": null,
+      "accepted_through_sequence": 0
+    },
+    "provider_execution": "cancellation_applied",
+    "repeat_executor": "idle",
+    "old_record_absent": true,
+    "replacement_present": false,
+    "scope": "actual JARVIS saga/issuer and Node MCP; ordered async boundaries, isolated fixture authority"
+  }
+}
