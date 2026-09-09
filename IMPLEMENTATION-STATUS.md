@@ -1,3 +1,5 @@
+[검색·MCP 공통 YAML 해석](SHARED-YAML-METADATA-2026-09-09.md) —제목불일치3회귀수정, 관련51개·추가제목9개(중복)통과.
+
 [커밋된 제목 YAML 복원](MCP-YAML-TITLE-ROUNDTRIP-2026-09-09.md) — 따옴표/여러줄3회귀 수정, MCP/web28개통과; sources문자열계약유지.
 
 [실제 웹 서버 검색·본문 인수](REAL-WEB-SEARCH-READ-2026-09-09.md) —mock없는 브라우저버튼→검색1개/본문출처/빈결과초기화, console/pageerror0.

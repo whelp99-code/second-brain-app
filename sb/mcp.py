@@ -26,7 +26,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
-from yaml import BaseLoader, MappingNode, ScalarNode, YAMLError
 
 from sb.access_claims import (
     AccessContext,
@@ -78,6 +77,7 @@ from sb.memory_records import (
 from sb.memory_search import merge_semantic_records
 from sb.page_access_projection import page_access_projection
 from sb.page_ids import git_rel
+from sb.page_metadata import scalar_frontmatter as _frontmatter
 from sb.pipeline import RunOutcome, run_all
 from sb.provider_lifecycle import ProviderLifecycle
 from sb.public_page import public_frontmatter
@@ -1166,25 +1166,6 @@ def _split_md(text: str) -> tuple[str, str]:
     if end < 0:
         return "", text
     return rest[:end], rest[end + 4 :].lstrip("\n")
-
-
-def _frontmatter(block: str) -> dict[str, str]:
-    # Decode YAML scalar quoting/folding without constructing typed objects.
-    # The public contract remains scalar strings; nested source lists stay empty.
-    loader = BaseLoader(block)
-    try:
-        node = cast(object, loader.get_single_node())
-    except YAMLError:
-        return {}
-    finally:
-        loader.dispose()
-    if not isinstance(node, MappingNode):
-        return {}
-    return {
-        cast(str, key.value): cast(str, value.value) if isinstance(value, ScalarNode) else ""
-        for key, value in cast(list[tuple[object, object]], node.value)
-        if isinstance(key, ScalarNode)
-    }
 
 
 def _conflict_page(stem: str) -> str:
