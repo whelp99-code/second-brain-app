@@ -196,6 +196,42 @@ def test_restore_nonempty_destination_requires_force_and_preserves_previous(tmp_
     assert (destination / "wiki" / "계약-일정.md").is_file()
 
 
+def test_restore_publish_failure_preserves_empty_destination(tmp_path: Path, monkeypatch) -> None:
+    root, _config = _seed_vault(tmp_path)
+    archive = tmp_path / "backup.tar.gz"
+    create_backup(root, archive)
+    destination = tmp_path / "existing"
+    destination.mkdir(mode=0o700)
+    original_stat = destination.stat()
+    import os
+    original_replace = os.replace
+
+    def fail_publish(source, target):
+        if Path(source).name.startswith(".existing.restore-"):
+            raise OSError("injected publish failure")
+        return original_replace(source, target)
+
+    monkeypatch.setattr("sb.ops.os.replace", fail_publish)
+    with pytest.raises(OSError, match="injected publish failure"):
+        restore_backup(archive, destination)
+    assert destination.is_dir()
+    assert destination.stat().st_ino == original_stat.st_ino
+    assert destination.stat().st_mode == original_stat.st_mode
+    assert not list(destination.iterdir())
+    assert not list(tmp_path.glob(".existing.restore-*"))
+
+
+def test_restore_atomically_replaces_empty_destination(tmp_path: Path) -> None:
+    root, _config = _seed_vault(tmp_path)
+    archive = tmp_path / "backup.tar.gz"
+    create_backup(root, archive)
+    destination = tmp_path / "existing"
+    destination.mkdir()
+    result = restore_backup(archive, destination)
+    assert result.previous is None
+    assert (destination / "wiki" / "계약-일정.md").is_file()
+
+
 def test_restore_publish_failure_recovers_previous_destination(tmp_path: Path, monkeypatch) -> None:
     root, _config = _seed_vault(tmp_path)
     archive = tmp_path / "backup.tar.gz"

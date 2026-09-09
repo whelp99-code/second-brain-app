@@ -378,9 +378,9 @@ def _restore_backup_locked(archive: Path, destination_path: Path, *, force: bool
                 stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
                 previous = parent / f"{destination_path.name}.pre-restore-{stamp}"
                 os.replace(destination_path, previous)
-            else:
-                destination_path.rmdir()
         try:
+            # Replacing an empty directory is atomic on supported POSIX hosts.
+            # Keep it in place until publication succeeds so failure preserves it.
             os.replace(temporary, destination_path)
         except OSError:
             if previous is not None:
