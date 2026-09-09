@@ -9,6 +9,7 @@ from pathlib import Path
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
 from sb.scoped_request_acceptance import accept_scoped_request
+from sb.scoped_provider_decision import validate_scoped_provider_decision
 from tests.task30_process_harness import executor_config
 
 node, script, build, state_path, mode, root = sys.argv[1:]
@@ -36,15 +37,9 @@ def authority(request):
     response = child('verify', json.loads(request.canonical))
     if response.returncode != 0:
         return False
-    decision = json.loads(response.stdout)
-    return (decision['kind'] == 'current_scoped_dispatch'
-        and decision['outbox_id'] == state['outbox']
-        and decision['dispatch_fence'] == state['fence']
-        and decision['provider_instance_id'] == request.provider_instance_id
-        and decision['request_id'] == request.request_id
-        and decision['request_digest'] == request.request_digest
-        and decision['scope_digest'] == request.preparation.identity.identity_digest
-        and datetime.fromisoformat(decision['checked_at']) <= now < datetime.fromisoformat(decision['valid_until']))
+    decision = validate_scoped_provider_decision(json.loads(response.stdout), request, started=now, now=now)
+    return decision.outbox_id == state['outbox'] and decision.dispatch_fence == state['fence']
+
 
 try:
     accepted = accept_scoped_request(config.request_root, raw, expected_provider=config.provider_instance_id,

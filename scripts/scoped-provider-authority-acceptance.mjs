@@ -17,11 +17,11 @@ if (statePath) {
       const { recordMemoryScopedOutboxAcceptance } = await load('src/memory-scoped-outbox-result.js');
       console.log(JSON.stringify(recordMemoryScopedOutboxAcceptance(authority, s.outbox, s.fence, s.request, value, new Date(s.at))));
     } else {
-      const { createFileMemoryWriteScopeResolver } = await load('src/memory-access-policy.js');
-      const { verifyMemoryScopedProviderWrite } = await load('src/memory-scoped-provider-authority.js');
-      const resolveWriteScope = createFileMemoryWriteScopeResolver(s.policyPath, s.provider, () => s.session);
-      console.log(JSON.stringify(verifyMemoryScopedProviderWrite({ authority, roots: s.roots, spoolRoot: s.spoolRoot,
-        providerInstanceId: s.provider, clock: () => new Date(s.at), resolveWriteScope }, value)));
+      const { createProductionScopedProviderVerifier } = await load('src/memory-scoped-provider-production.js');
+      const verify = createProductionScopedProviderVerifier(authority, { policy_path: s.policyPath,
+        provider_instance_id: s.provider, spool_root: s.spoolRoot, roots: s.roots,
+        authenticated_session: () => s.session, clock: () => new Date(s.at) });
+      console.log(JSON.stringify(verify(value)));
     }
   } catch (error) { console.log(JSON.stringify({ denied: error.code ?? error.message })); process.exitCode = 1; }
   finally { authority.close(); }

@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 서버 인증 세션·현재 정책 검증 조합:** [구현·실제 프로세스·공개 연동 잔여 과제](SCOPED-PROVIDER-PRODUCTION-2026-09-09.md). JARVIS 서버 소유 세션과 현재 파일 정책을 기존 dispatch 검증기에 연결하고 SB에서 요청·범위·fence·시각에 결합된 판정을 엄격히 검사한다. SB 전체1,275통과/2skip, 최종 관련25통과·Ruff·새 모듈 정적검사, J 관련11통과·emit/lint. 실제 내부 프로세스 정상 저장과 수락 중/실행 전 철회 차단을 확인했다. 인증 세션은 fixture이며 공개 scoped 쓰기 transport와 실제 A 저장→B 새 세션 회수 등 M1–M14 운영 인수는 남는다.
+
 **2026-09-09 scoped 원장 inventory·삭제 재구성 수정:** [목록 누락/후보 단독 FK 오류 재현·실제 fresh DB](SCOPED-LEDGER-COMPACTION-2026-09-09.md). scoped3개 원장을 기존 surface에 포함하고 종속 삭제/후보 copy filter를 보완했다. 관련13통과·emit/lint, 실제 MCP 완료 원장의 새 DB 대상0/원본1·FK0·trigger/control 보존. 원문·spool·백업 전체 삭제/복원 및 운영 인수는 남는다.
 
 **2026-09-09 scoped 저장·원작업 원자적 완료 연결:** [현재 권한/lease·영수증·실제 commit 후 종료 복구](SCOPED-ATOMIC-SETTLEMENT-2026-09-09.md). outbox/candidate settled와 control completed를 한 트랜잭션에 연결했다. 관련62통과·최종5재검사(중복)·emit/lint·패키징. 실제 MCP 완료 후 exit73/독립 replay에서 provider 호출0, settlement1/attempt1/FK0. 공개 쓰기·실제 에이전트 운영·보존/삭제/복원 및 전체 인수는 남는다.
