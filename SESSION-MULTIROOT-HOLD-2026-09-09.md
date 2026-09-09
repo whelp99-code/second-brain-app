@@ -19,3 +19,9 @@ Claude/Codex/OMO/GJC 커넥터는 하나의 adapter instance가 여러 root를 �
 [명시적 source ID별 실제 CLI 검증](SESSION-SOURCE-ISOLATION-2026-09-09.md)에서 4개 형식 모두 3회 프로세스 재실행으로 독립 수집과 커서 보존을 확인했다. 신규 설정은 폴더마다 서로 다른 id를 사용한다. 기존 출처 ID를 임의로 바꾸는 마이그레이션은 이 검증 범위가 아니다.
 
 안정적인 root별 출처 식별자와 커서 namespace, root 이동/삭제/재등록 규칙, 기존 기억·cursor의 출처 대조 및 삭제/중복 방지 migration을 함께 구현해야 한다. legacy cursor에는 원래 root가 없으므로 추측 기반 자동 변환을 금지한다. 이미 합쳐진 데이터의 출처 복구는 별도 대조가 필요하다. 또한 단일 root를 다른 폴더로 교체하는 경우의 기존 ID 충돌은 이번 복수 root 차단만으로 해결되지 않는다.
+
+## 보류 상태 전달 보강
+
+추가 실제 CLI 검사에서 ambiguous-session-roots가 일반 skip으로 처리되어 exit 0을 반환하는 문제를 재현했다(수정 전 4개 실패). 파이프라인은 이제 이 사유를 dedup 전에 검사하고 SOURCE_ROOTS_AMBIGUOUS 실패로 올린다. skip SourceItem을 새로 기록하거나 cursor를 갱신하지 않으며, 이전 버전이 저장한 skip이 있어도 보류가 숨겨지지 않도록 검사 순서를 정했다.
+
+명시적 ID 정상 수집 4개와 모호한 구성의 2회 연속 CLI 실패 4개 통합 검사 통과(8 passed, 15.78s). 선택·수집 예산·복수 root 커서 보존·walking skeleton 23개 통과(4.59s). 총 31개 관련 검사이며 전체 suite 결과는 아니다. Ruff 통과. 운영 배포는 하지 않았다.

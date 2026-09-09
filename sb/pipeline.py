@@ -627,6 +627,14 @@ def _prepare_adapter_ingest(
     errors = attempted = written = 0
     capped = adapter_failed = False
     for ref, data, meta in items:
+        # A source configuration hold is not a deduplicated/quarantined item.
+        # Recheck it on every run, even if older versions recorded a skip row.
+        if meta.get("skip_reason") == "ambiguous-session-roots":
+            errors += 1
+            attempted += 1
+            adapter_failed = True
+            failure = "SOURCE_ROOTS_AMBIGUOUS"
+            break
         version_key = (ref.source_id, ref.source_uri, ref.source_version)
         if version_key in seen or version_key in accepted:
             continue

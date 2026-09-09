@@ -40,7 +40,9 @@ def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
 
     def snapshot():
         tables = load_ledger_tables(vault / ".sb" / "ledger.db")
-        return tuple(tables.source_items.values()), {name: value[0] for name, value in tables.cursors.items()}
+        return tuple(tables.source_items.values()), {
+            name: value[0] for name, value in tables.cursors.items()
+        }
 
     ingest()
     first, cursors = snapshot()
@@ -60,3 +62,31 @@ def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
     assert len(items) == 3
     assert after["agent-1"] == cursors["agent-1"]
     assert after["agent-0"] != cursors["agent-0"]
+
+
+@pytest.mark.parametrize("kind", list(FACTORIES))
+def test_ambiguous_roots_fail_cli_on_every_restart(tmp_path, kind):
+    roots = [tmp_path / "a", tmp_path / "b"]
+    for root in roots:
+        root.mkdir()
+        (root / "session.jsonl").write_bytes(record(kind, "same-id"))
+    vault = tmp_path / "vault"
+    config = tmp_path / "config.toml"
+    config.write_text(
+        f'vault_root = "{vault}"\nshare_root = "{tmp_path}"\nstate_root = "{tmp_path / "state"}"\n'
+        + "".join(f'[[sources]]\nadapter = "{kind}-sessions"\nroot = "{root}"\n' for root in roots)
+    )
+    for _ in range(2):
+        done = subprocess.run(
+            [sys.executable, "-m", "sb.cli", "ingest"],
+            env={**os.environ, "SB_CONFIG": str(config)},
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert done.returncode != 0
+        assert "SOURCE_ROOTS_AMBIGUOUS" in done.stdout + done.stderr
+        tables = load_ledger_tables(vault / ".sb" / "ledger.db")
+        assert not tables.source_items
+        assert not tables.cursors
