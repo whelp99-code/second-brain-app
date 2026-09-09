@@ -1186,3 +1186,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 정정 상태 저장 실패 인수:** [reconciling→새 executor 재처리→후속 export/forget](CORRECTION-KNOWLEDGE-RECOVERY-2026-09-10.md). 실제 lifecycle 6통과/27.13초·Ruff/diff. tombstone high water 불변, 정정 문장 단일 저장, 기존 승인 여부별 검색 상태를 확인했다. OS 강제 종료·취소 경쟁·복원·운영 전체 목표는 남는다.
+
+
+**2026-09-10 상태/복구 최신 전체 통과:** [f323e16 전체1630통과/2skip·350.80초](EFFECT-FULL-PASS-2026-09-10.md). Ruff 전체 및 상태/검색/세대/요청 네 모듈 타입0오류/0경고. 실행 중 소스 불변. 이전 schema fixture 실패 이후 최신 기준선이며 OS 강제 종료·복원/scoped 접근·실제 업무·설치/운영 및 M1–M14는 남는다.
