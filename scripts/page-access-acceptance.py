@@ -14,7 +14,8 @@ source = work / "source"
 source.mkdir()
 (source / "notes.md").write_text("---\nowner: principal:other\nproject: project:beta\n---\nAlpha fixture memory\n")
 config = work / "config.toml"
-base = f'''vault_root = "{work / 'share' / 'vault'}"
+base = f'''knowledge_registry = "{work / 'registry.sqlite'}"
+vault_root = "{work / 'share' / 'vault'}"
 share_root = "{work / 'share'}"
 state_root = "{work / 'state'}"
 request_root = "{work / 'requests'}"

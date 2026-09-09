@@ -1231,3 +1231,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 복원 MCP 별도 프로세스 재시작:** [새 stdio 서버2개 응답 동일·다른 프로젝트 거부](RESTORE-STDIO-RESTART-2026-09-10.md). 정상/저장오류 재시도 네 경로 포함6통과/22.21초·서버8실행·Ruff/diff. fixture 키/시각이며 실제 JARVIS 발급/native 업무·운영/DR 및 전체 목표는 남는다.
+
+
+**2026-09-10 fake 충돌 형식·실제 JARVIS 읽기 재검증:** [CLI 실패 재현→JSON/cites 일치 수정→실제 issuer/stdio/HTTPS 통과](FAKE-CONFLICT-AND-JARVIS-READ-2026-09-10.md). 회귀28통과·Ruff/diff, 독립클라이언트2개 각2records·제한peer0·철회거부. 격리 J195b1a7 빌드 사용, 모델0호출. 복원 고수위/JARVIS 권한·실업무·운영/DR 및 전체 목표는 남는다.

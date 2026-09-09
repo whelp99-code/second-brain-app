@@ -92,7 +92,10 @@ class _CitedFake:
     def generate(
         self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120
     ) -> str:
-        del system, json_mode, timeout
+        del system, timeout
+        if json_mode:
+            return json.dumps({"relation": "unrelated", "confidence": 0.0,
+                               "rationale": "fake mode: no semantic judgment", "cites": []})
         found: list[str] = _SID.findall(prompt)
         if not found:
             found = re.findall(r"\[\^([0-9a-f]{8})\]", prompt)
