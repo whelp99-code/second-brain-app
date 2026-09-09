@@ -9,7 +9,7 @@ from pathlib import Path
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
 from sb.scoped_request_acceptance import accept_scoped_request
-from sb.scoped_provider_decision import validate_scoped_provider_decision
+from sb.scoped_provider_decision import create_scoped_provider_authority
 from tests.task30_process_harness import executor_config
 
 node, script, build, state_path, mode, root = sys.argv[1:]
@@ -29,16 +29,19 @@ def child(operation, value):
     return subprocess.run([node, script, build, state_path, operation], input=json.dumps(value),
         text=True, capture_output=True, timeout=20, check=False)
 
-def authority(request):
+def verify(payload):
     global calls
     calls += 1
     if mode == 'revoke_during_accept' and calls == 2:
         revoke()
-    response = child('verify', json.loads(request.canonical))
+    response = child('verify', json.loads(payload))
     if response.returncode != 0:
         return False
-    decision = validate_scoped_provider_decision(json.loads(response.stdout), request, started=now, now=now)
-    return decision.outbox_id == state['outbox'] and decision.dispatch_fence == state['fence']
+    decision = json.loads(response.stdout)
+    assert decision['outbox_id'] == state['outbox'] and decision['dispatch_fence'] == state['fence']
+    return decision
+
+authority = create_scoped_provider_authority(verify, clock=lambda: now)
 
 
 try:

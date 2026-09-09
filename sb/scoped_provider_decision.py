@@ -1,5 +1,6 @@
 """Validate a request-bound decision from a trusted JARVIS verifier channel."""
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import cast
@@ -24,8 +25,10 @@ def validate_scoped_provider_decision(value: object, request: ScopedWriteRequest
     """The trusted channel authenticates the sender; hashes do not do so.
 
     Call with the clock sampled immediately before and after that channel call.
-    A cached/pre-call decision, backward clock, expiry, extra fields, or another
-    request must not authorize admission/execution. Reinvoke the verifier for
+    A decision from an earlier millisecond, backward clock, expiry, extra fields,
+    or another request cannot authorize admission/execution. The trusted channel
+    must correlate each response to a fresh call: timestamps cannot distinguish
+    replay within the same millisecond. Reinvoke the verifier for
     every authority check; the returned decision is not a reusable grant.
     """
     try:
@@ -48,9 +51,34 @@ def validate_scoped_provider_decision(value: object, request: ScopedWriteRequest
         if not isinstance(checked_raw, str) or not isinstance(until_raw, str):
             raise TypeError
         checked, until = parse_instant(checked_raw), parse_instant(until_raw)
+        earliest = started.replace(microsecond=(started.microsecond // 1000) * 1000)
         if (started.tzinfo is None or now.tzinfo is None or now < started
-            or not started <= checked <= now < until <= request.expires_at):
+            or not earliest <= checked <= now < until <= request.expires_at):
             raise ValueError
         return ScopedProviderDecision(outbox, fence, checked, until)
     except (KeyError, TypeError, ValueError, AttributeError) as exc:
         raise ValueError("SCOPED_PROVIDER_DECISION_INVALID") from exc
+
+
+def create_scoped_provider_authority(
+    verify: Callable[[bytes], object], *, clock: Callable[[], datetime],
+) -> Callable[[ScopedWriteRequest], bool]:
+    """Adapt a server-configured, authenticated, request-correlated verifier.
+
+    Send immutable canonical request bytes and sample the real clock around every
+    call, including repeated admission and execution checks. No cached decision
+    or incoming request field may supply the verifier or its authenticated session.
+    The channel owns authentication, correlation, deadlines and response size limits.
+    Transport exceptions propagate; invalid decisions deny. This is not a transport.
+    """
+    def authorize(request: ScopedWriteRequest) -> bool:
+        started = clock()
+        response = verify(request.canonical)
+        finished = clock()
+        try:
+            _ = validate_scoped_provider_decision(response, request, started=started, now=finished)
+        except ValueError:
+            return False
+        return True
+
+    return authorize
