@@ -1,0 +1,230 @@
+{
+  "full_suite": {
+    "passed": 1418,
+    "skipped": 2,
+    "seconds": 260.91
+  },
+  "upgrade": {
+    "previous_manifest": {
+      "schema": 1,
+      "release_id": "9f65b0b0b349297a4187e89f98079c8f62ba0eb7",
+      "wheel_sha256": "961c9e38c50d7b3e50647b7329c2c27f87d26477ac3071e00397dff0539f2031",
+      "source_commit": "289e3261758e653e988c107bed5814ebd196c46c",
+      "source_tree": "1e5c48520541e5f64560167304a59f2d61788f04",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "candidate_manifest": {
+      "schema": 1,
+      "release_id": "91ad288b09aef84d6de42a14bfb8d0a76bbfc3b4",
+      "wheel_sha256": "713b464120391b8e5e97e48901d8342497ba86c720bd644db22ba08055eae0b1",
+      "source_commit": "11511a488467f5a5e6daf129ed10ce4936256926",
+      "source_tree": "2f3de83766012025c61e20c151e4af4e664214e7",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "before": {
+      "pages": [
+        {
+          "page": "docs-a-same-392932ea",
+          "projects": [
+            "project:a"
+          ],
+          "source_refs": [
+            "sha256:13f9dd12f577dea11c6db50f3bcf316dbe57c85fa8125b289ac9ea6c9a94aaa7"
+          ]
+        }
+      ],
+      "source_items": 2,
+      "cursors": {
+        "docs-a": "7:same.md87:1788943802254454081:53:c1ae0edcdfa4a2075c07e17a580339f183470ab501aa6944afb301e6e5c2dd84",
+        "docs-b": "7:same.md87:1788943802254510081:53:c1ae0edcdfa4a2075c07e17a580339f183470ab501aa6944afb301e6e5c2dd84"
+      },
+      "derivations": 1,
+      "head": "0a09f48bd3f9de9fd7d989224e52123c0cbe86cb"
+    },
+    "after": {
+      "pages": [
+        {
+          "page": "docs-a-same-392932ea",
+          "projects": [
+            "project:a"
+          ],
+          "source_refs": [
+            "sha256:13f9dd12f577dea11c6db50f3bcf316dbe57c85fa8125b289ac9ea6c9a94aaa7"
+          ]
+        },
+        {
+          "page": "docs-b-same-71768c0e",
+          "projects": [
+            "project:b"
+          ],
+          "source_refs": [
+            "sha256:e0f40b48091fccee5bf8bbf6fe3f8f6e99b5c0984d14b4c11e2f5488afe8cb81"
+          ]
+        }
+      ],
+      "source_items": 2,
+      "cursors": {
+        "docs-a": "7:same.md87:1788943802254454081:53:c1ae0edcdfa4a2075c07e17a580339f183470ab501aa6944afb301e6e5c2dd84",
+        "docs-b": "7:same.md87:1788943802254510081:53:c1ae0edcdfa4a2075c07e17a580339f183470ab501aa6944afb301e6e5c2dd84"
+      },
+      "derivations": 3,
+      "head": "4f788f94482c824c33791c1fa8033fc8a6aa216f"
+    },
+    "replay_unchanged": true,
+    "cross_project_denied": true,
+    "production_activated": false
+  },
+  "shared_memory": {
+    "harness_commit": "11511a488467f5a5e6daf129ed10ce4936256926",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "91ad288b09aef84d6de42a14bfb8d0a76bbfc3b4",
+      "wheel_sha256": "713b464120391b8e5e97e48901d8342497ba86c720bd644db22ba08055eae0b1",
+      "source_commit": "11511a488467f5a5e6daf129ed10ce4936256926",
+      "source_tree": "2f3de83766012025c61e20c151e4af4e664214e7",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-pagekey-candidate-od_6kd7e/releases/91ad288b09aef84d6de42a14bfb8d0a76bbfc3b4/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-pagekey-candidate-od_6kd7e/releases/91ad288b09aef84d6de42a14bfb8d0a76bbfc3b4/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-pagekey-candidate-od_6kd7e/releases/91ad288b09aef84d6de42a14bfb8d0a76bbfc3b4/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-pagekey-candidate-od_6kd7e/releases/91ad288b09aef84d6de42a14bfb8d0a76bbfc3b4/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-locked-candidate-j9w0jrk8/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:c248062e161f2b5cc5538a7f2bdfd366812562fa164646fe6c5117a8300a4121",
+            "request_digest": "sha256:c248062e161f2b5cc5538a7f2bdfd366812562fa164646fe6c5117a8300a4121",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:c248062e161f2b5cc5538a7f2bdfd366812562fa164646fe6c5117a8300a4121",
+            "request_digest": "sha256:c248062e161f2b5cc5538a7f2bdfd366812562fa164646fe6c5117a8300a4121",
+            "idempotency_key": "memidem:scoped:v4:b9b331629e93de26adbb229e65b9b7b7ce5ec973783ee1aca22b6e02247854aa",
+            "scope_digest": "sha256:6e0ef9329ff7fd15ac3bc581d819661b2299eea0ad04728ec4f84fa438df6b6a",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:c248062e161f2b5cc5538a7f2bdfd366812562fa164646fe6c5117a8300a4121.v4.json",
+            "request_file_digest": "sha256:3b393a6ad7960ee68d970f407411ccc728a4be1efe473b429025a6efc5bbf815",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:3bb518853790a3410a7daa4b23d7f111b2b84607895ce09b454de15d245c55c0",
+            "request_digest": "sha256:3bb518853790a3410a7daa4b23d7f111b2b84607895ce09b454de15d245c55c0",
+            "idempotency_key": "memidem:scoped:v4:5364ff8762ac9cb64d769fafff1bb76bada0b424d45012cdf5c206144c9041cf",
+            "scope_digest": "sha256:c7dae5b4bc48521d0270740f3d6717a7835434deceadc989fd0aa09480dab542",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:3bb518853790a3410a7daa4b23d7f111b2b84607895ce09b454de15d245c55c0.v4.json",
+            "request_file_digest": "sha256:1e31f3370004a1a415e95fa2f93e1045b9f353de9a81c95e48fac58558243d3a",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:79612f5aa695afea0517e0124bd2a9fc2f638200c79a721bd81dbf96004e062e",
+            "request_digest": "sha256:79612f5aa695afea0517e0124bd2a9fc2f638200c79a721bd81dbf96004e062e",
+            "idempotency_key": "memidem:scoped:v4:fd9754c11f9e84e0ef117a08fd84c6c65eb8a43915f0e6b10185b9ad7dfe520b",
+            "scope_digest": "sha256:184514b026dbbff54b28f7de7ffd677fa479e513b753b29ba20350d7b4652b2a",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:79612f5aa695afea0517e0124bd2a9fc2f638200c79a721bd81dbf96004e062e.v4.json",
+            "request_file_digest": "sha256:04be82a99bb0507de65992fe0bf141e4db2b9d83b9b20259db4bcb5969e0aa0d",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "production_activated": false
+  }
+}
