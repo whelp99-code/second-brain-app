@@ -311,7 +311,7 @@ def _select_adapters(
         if len(matches) > 1:
             raise ValueError("SOURCE_ID_AMBIGUOUS")
         if not matches:
-            continue
+            raise ValueError("SOURCE_NOT_FOUND: " + source_id)
         key, adapter = matches[0]
         if key not in expanded:
             candidates = [(name, item) for name, item in candidates if name != key]

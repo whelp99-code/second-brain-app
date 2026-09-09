@@ -28,3 +28,11 @@ def test_legacy_defaults_and_explicit_request_remain_available(tmp_path):
     assert _select_adapters(chosen, None, legacy) == list(chosen.values())
     explicit_empty = Config(raw={'vault_root': str(tmp_path), 'sources': []})
     assert _select_adapters(chosen, ['sessions-codex'], explicit_empty) == list(chosen.values())
+
+
+def test_unknown_configured_source_is_rejected_before_scan(monkeypatch, tmp_path):
+    import pytest
+    monkeypatch.setattr('sb.connectors.discover_adapters', lambda config: {})
+    config = Config(raw={'vault_root': str(tmp_path), 'sources': [{'id': 'typo-source', 'adapter': 'missing-adapter'}]})
+    with pytest.raises(ValueError, match='SOURCE_NOT_FOUND: typo-source'):
+        _select_adapters({}, None, config)

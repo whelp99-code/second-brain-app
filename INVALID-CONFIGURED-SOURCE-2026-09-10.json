@@ -1,0 +1,8 @@
+{
+  "workspace": "/var/tmp/sb-invalid-source-xn8f46p1",
+  "status": "failed",
+  "exit_code": 1,
+  "failure": "SOURCE_NOT_FOUND: typo-source",
+  "source_items": 0,
+  "inbox_preserved": true
+}

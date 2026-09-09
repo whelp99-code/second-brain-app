@@ -1,3 +1,5 @@
+[설정 원본 누락 사전 실패](INVALID-CONFIGURED-SOURCE-2026-09-10.md) — 조용한 생략 재현·SOURCE_NOT_FOUND, 관련68통과·실제 혼합 설정 source0/inbox보존. 관리형 staging→외부 registry 자동승인 우회 보류·세대 결합 설계 필요. 전체 M1–M14 유지.
+
 [암묵적 배치의 설정 원본 제한](CONFIGURED-BATCH-SOURCES-2026-09-10.md) — inbox 설정에도 기본 세션 선택되는2회귀 수정, 관련67통과·같은 관리형 저장소 batch ok/오류0·HTTP 검색1. 미닫힌 검증 SQLite로 인한 reader대기 해결·보호 유지. 일반 검색 UNVERIFIED 상태 후속 대조·M1–M14 유지.
 
 [전체 배치 상태 영속화](PERSISTED-BATCH-STATUS-2026-09-10.md) — 기존 잠금·원장에 시작/종료·단계 계보·오류 합계, 웹 분리 표시. 관련102통과·실제 관리형 ingest실패→compile성공 후 새 프로세스/HTTP batch실패 보존. 원본 변경 감지 원인·강제 종료 인수·전체 M1–M14 유지.
