@@ -132,3 +132,5 @@ P0는 운영 완성의 선행 조건, P1은 안정적 사용의 인수 항목, P
 최신 누적 회귀: 제품 `6f330591`에서 전체 **1,551 passed, 2 skipped / 321.62초**, Ruff와 diff 검사 통과. 선택적 embeddings 테스트는 제외했다. [검증 범위·로그](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md).
 
 [각주 중복 후속 수정](NATIVE-FOOTNOTE-DEDUP-2026-09-09.md): 모델 span 정의와 vault 자동 정의 중복 제거, 코드 예시·상이한 span 보존. 관련47통과 및 실제 Claude 생성/기본 MCP2회 각주1개 인수. 다른 span의 통합과 운영 과거 자료 일괄 재작성은 하지 않았다.
+
+[최신 설치 후보·연동·재현](LATEST-INSTALLED-PAIR-2026-09-09.md) — fa79861 설치파일176개 Git일치, J195b1a 실제 연동4경로 통과, 같은 최종 경로2회 빌드18,458항목 동일. 정본 manifest/운영 전환·전체 M1–M14 유지.
