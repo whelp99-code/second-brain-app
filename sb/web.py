@@ -236,6 +236,7 @@ def _decode_upload(data: dict[str, object]) -> bytes:
 
 def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
+        close_connection: bool
         server_version: str = "SecondBrain/1"
 
         @override
@@ -244,13 +245,16 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
 
         def _json(self, status: HTTPStatus, payload: object) -> None:
             body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Content-Type-Options", "nosniff")
-            self.end_headers()
-            _ = self.wfile.write(body)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                _ = self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
 
         def _authorized(self) -> bool:
             if context.token is None or not self.path.startswith("/api/"):
@@ -286,6 +290,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         self._get(pinned)
             except (ValueError, PageNotFoundError, PathEscapeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
             except (OSError, GitCommandError, RuntimeError) as exc:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
 
@@ -423,6 +429,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 VaultLintError,
             ) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
             except (OSError, GitCommandError, RuntimeError) as exc:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
 
