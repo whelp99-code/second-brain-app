@@ -391,11 +391,14 @@ def status_snapshot(config: Config) -> dict[str, object]:
     derivations: dict[str, int] = {status.value: 0 for status in DerivStatus}
     runs: dict[str, int] = {}
     failed: list[dict[str, object]] = []
+    failed_by_stage: dict[str, int] = {}
     last_run: dict[str, object] | None = None
     if db.is_file():
         tables = load_ledger_tables(db)
         for row in tables.derivations.values():
             derivations[row.status] = derivations.get(row.status, 0) + 1
+            if row.status == DerivStatus.FAILED.value:
+                failed_by_stage[row.stage] = failed_by_stage.get(row.stage, 0) + 1
             if row.status == DerivStatus.FAILED.value and len(failed) < 20:
                 failed.append(
                     {
@@ -403,6 +406,8 @@ def status_snapshot(config: Config) -> dict[str, object]:
                         "stage": row.stage,
                         "attempts": row.attempts,
                         "error": _safe_detail(row.error),
+                        "retry_hold_reason": "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
+                        if row.stage == "brief" else None,
                     }
                 )
         ordered = sorted(tables.runs.values(), key=lambda row: (row.started_at, row.run_id))
@@ -432,6 +437,8 @@ def status_snapshot(config: Config) -> dict[str, object]:
         "run_counts": runs,
         "derivation_counts": derivations,
         "failed_derivations": failed,
+        "failed_by_stage": failed_by_stage,
+        "failed_details_omitted": sum(failed_by_stage.values()) - len(failed),
         "pages": page_counts,
         "raw": {"files": len(raw_files), "bytes": sum(path.stat().st_size for path in raw_files)},
     }

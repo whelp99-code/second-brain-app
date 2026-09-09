@@ -31,6 +31,29 @@ from tests.knowledge import stamp_knowledge
 TERM = "웹콘솔계약검색"
 
 
+def test_status_exposes_held_brief_failures_without_changing_rows(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    with Ledger(root) as ledger:
+        for index in range(23):
+            key = f"brief-failure-{index:02}"
+            ledger.ensure_derivation(key, "brief", "past-run")
+            ledger.mark_running(key, "past-run")
+            ledger.mark_failed(key, "password=secret-value unresolved citation")
+    with _running(config) as base:
+        status, payload = _request(f"{base}/api/status")
+        assert status == 200
+        failures = payload["failures"]
+        assert failures["total"] == 23
+        assert failures["by_stage"] == {"brief": 23}
+        assert failures["omitted"] == 3
+        assert len(failures["items"]) == 20
+        assert all(item["retry_hold_reason"] == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
+                   for item in failures["items"])
+        assert "secret-value" not in json.dumps(payload)
+    with Ledger(root) as ledger:
+        assert len(list(ledger.list_derivations(status="failed", stage="brief"))) == 23
+
+
 class _NoPreviousHash:
     def last_compiled_hash(self, page_id: str) -> str | None:
         del page_id

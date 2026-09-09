@@ -63,6 +63,12 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <div class="row"><input id="token" type="password" placeholder="SB_WEB_TOKEN 사용 시 입력"><button class="secondary" onclick="saveToken()">저장</button></div>
 </section>
 <section>
+<h2>처리 실패</h2>
+<p id="failureSummary" role="status">상태 확인 중</p>
+<pre id="failureDetails"></pre>
+<p class="muted">브리핑 재시도가 보류된 경우 원래 날짜와 입력을 복구해야 합니다. 현재 처리를 다시 실행해도 과거 실패의 복구를 보장하지 않습니다.</p>
+</section>
+<section>
 <h2>기억 추가</h2>
 <label for="title">제목</label><input id="title" placeholder="예: 계약 일정">
 <label for="content">내용</label><textarea id="content" placeholder="기억할 내용을 입력하세요"></textarea>
@@ -110,7 +116,7 @@ function authHeaders(){const token=localStorage.getItem('sb_token')||'';return {
 async function api(path,options={}){const response=await fetch(path,{...options,headers:{...authHeaders(),...(options.headers||{})}});const payload=await response.json();if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 function show(id,value){byId(id).textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
 function saveToken(){localStorage.setItem('sb_token',byId('token').value);show('rememberResult','토큰을 이 브라우저에 저장했습니다.')}
-async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status}catch(error){byId('status').textContent=error.message}}
+async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status;const failures=data.failures;byId('failureSummary').textContent=failures.total?'미해결 실패 '+failures.total+'건 (단계별: '+Object.entries(failures.by_stage).map(([stage,count])=>stage+' '+count+'건').join(', ')+')':'원장에 기록된 미해결 실패 없음';byId('failureDetails').textContent=failures.items.map(item=>item.stage+' · '+item.key+' · 시도 '+item.attempts+'회\\n'+(item.error||'오류 상세 없음')+(item.retry_hold_reason?'\\n재시도 보류: 원래 브리핑 입력을 복구해야 합니다.':'')).join('\\n\\n')+(failures.omitted?'\\n추가 '+failures.omitted+'건은 상세 목록에서 생략됐습니다.':'')}catch(error){byId('status').textContent=error.message;byId('failureSummary').textContent='실패 상태를 확인하지 못했습니다.';byId('failureDetails').textContent=''}}
 async function remember(){try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify({title:byId('title').value,content:byId('content').value})});show('rememberResult',data);byId('content').value=''}catch(error){show('rememberResult',error.message)}}
 async function runPipeline(){try{show('rememberResult',await api('/api/run',{method:'POST',body:'{}'}));await loadStatus()}catch(error){show('rememberResult',error.message)}}
 function readBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',',2)[1]||'');reader.onerror=()=>reject(reader.error||new Error('파일 읽기 실패'));reader.readAsDataURL(file)})}
@@ -290,6 +296,12 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     {
                         "status": read_status(context.config),
                         "last_run_status": last_run_status,
+                        "failures": {
+                            "total": sum(cast(dict[str, int], snapshot["failed_by_stage"]).values()),
+                            "by_stage": snapshot["failed_by_stage"],
+                            "items": snapshot["failed_derivations"],
+                            "omitted": snapshot["failed_details_omitted"],
+                        },
                     },
                 )
                 return
