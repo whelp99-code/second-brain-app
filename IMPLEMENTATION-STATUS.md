@@ -1,3 +1,5 @@
+> 2026-09-09 최신 설치본 첫 실행 인수: [SB5fcc28c/JARVISe6984ad·바이트코드 사전 생성](CURRENT-COLD-INSTALLED-PAIR-2026-09-09.md). 새 후보 MCP4프로파일·연동4경로, 전체32,150항목 및 Node 전후 변경0. 중간548캐시 변경 거부 원인 해결, 관련16개 통과. 운영 봉인/실사용 전체 인수는 남음.
+
 > 2026-09-09 원본 진단 경로 수정: [수집 설정과 sources의 공통 경로 해석](SOURCE-DIAGNOSTIC-PATHS-2026-09-09.md). 상대/환경변수2회귀 실패→관련23개 통과, 실제 별도 CLI doctor/sources 경로·존재 일치, Ruff/정적 통과. 운영 및 에이전트 인수는 남음.
 
 > 2026-09-09 CLI 설정 경로 수정: [read_config의 base_dir/source_path 보존](CLI-CONFIG-PATH-PRESERVATION-2026-09-09.md). 수정 전2회귀 실패→관련55개 통과, 별도 실제 CLI 원본 폴더 진단 pass, Ruff/정적0오류0경고. 운영·개별 진단 표면 전체 인수는 남음.

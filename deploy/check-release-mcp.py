@@ -20,7 +20,7 @@ async def main():
     'jarvis_public_keys = { "jarvis:fixture" = "'+base64.urlsafe_b64encode(bytes(range(32))).rstrip(b'=').decode()+'" }'])+'\n'+
     (f'[scoped_provider_verifier]\ncredentials_path = "{credentials}"\n' if profile=='scoped-request-write-v1' else '[mcp_scoped_read]\nprincipal = "principal:owner"\nagent = "agent:fixture"\nsession = "session:fixture"\npolicy_revision = "policy:1"\n'))
    config.chmod(0o600)
-   params=StdioServerParameters(command=str(release/'bin/second-brain-mcp'),args=[],cwd=str(root),env={**os.environ,'SB_CONFIG':str(config),'SB_MCP_CONTRACT_PROFILE':profile,'TMPDIR':'/var/tmp'})
+   params=StdioServerParameters(command=str(release/'bin/second-brain-mcp'),args=[],cwd=str(root),env={**os.environ,'SB_CONFIG':str(config),'SB_MCP_CONTRACT_PROFILE':profile,'TMPDIR':'/var/tmp','PYTHONDONTWRITEBYTECODE':'1'})
    async with Client(params,mode='legacy',cache=None,read_timeout_seconds=15) as client:
     names=[tool.name for tool in (await client.list_tools()).tools]
     expected={'scoped-record-read-v2':['sb_read_page','sb_search','sb_generation_status'],'scoped-record-read-v5':['sb_read_page','sb_search','sb_generation_status','sb_request_status'],'scoped-request-status-v1':['sb_request_status'],'scoped-request-write-v1':['sb_write_request']}[profile]

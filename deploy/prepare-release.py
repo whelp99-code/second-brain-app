@@ -55,8 +55,8 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     release.mkdir(parents=True, mode=0o700)
     run('uv', 'venv', '--python', '3.12', str(release / '.venv'))
     python = release / '.venv/bin/python'
-    run('uv', 'pip', 'install', '--python', str(python), '-r', str(requirements))
-    run('uv', 'pip', 'install', '--python', str(python), '--no-deps', str(wheel))
+    run('uv', 'pip', 'install', '--python', str(python), '--compile-bytecode', '-r', str(requirements))
+    run('uv', 'pip', 'install', '--python', str(python), '--no-deps', '--compile-bytecode', str(wheel))
     (release / 'requirements.txt').write_bytes(requirements.read_bytes())
     (release / wheel.name).write_bytes(wheel.read_bytes())
     bin_dir = release / 'bin'
