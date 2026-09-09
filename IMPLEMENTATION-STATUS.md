@@ -1,3 +1,5 @@
+> 2026-09-09 품질 기준선: [답변 불가 CLI/MCP 실제 측정](ABSTENTION-CLI-MCP-BASELINE-2026-09-09.md). 합성4문항 positive recall@5=1이나 negative_empty_rate=0, 양쪽 동일. 작은 반례 데이터셋 추가, 측정 완료와 품질 합격 구분.
+
 > 2026-09-09 검색 품질 반례: [실제 모델 20쌍 측정](SEMANTIC-ABSTENTION-COUNTEREXAMPLE-2026-09-09.md). 정답 일정 0.613보다 무관한 주소/날짜 0.651이 높음. 기본 임계값 일괄 상향 보류, 재현 스크립트 및 동일 재실행 증거 추가.
 
 > 2026-09-09 실제 모델 재검증: [기존 별도 캐시를 사용한 smoke·정정/삭제/복원](CURRENT-REAL-EMBEDDING-2026-09-09.md) 통과. 기본 캐시는 없지만 명시적 HF_HOME에서 offline 실행 가능. 일정 삭제 후 비용 후보 반환은 근거 부족 품질 과제로 유지, 운영 미변경.

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "dataset_id": "korean-abstention-counterexamples-v1",
+  "dataset_origin": "synthetic",
+  "provenance": "Hand-authored counterexamples from the 2026-09-09 actual BGE-M3 cosine probe; not user questions. Address value is absent; deployment date cannot answer address query.",
+  "documents": [
+    {
+      "page_id": "wiki/meeting",
+      "title": "회의 기록",
+      "body": "회의는 월요일",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/cost",
+      "title": "비용 기록",
+      "body": "비용은 만원",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/deploy",
+      "title": "배포 기록",
+      "body": "배포는 금요일",
+      "role": "gold"
+    }
+  ],
+  "cases": [
+    {
+      "id": "meeting-short",
+      "kind": "natural_question",
+      "query": "일정",
+      "expected_page_ids": [
+        "wiki/meeting",
+        "wiki/deploy"
+      ],
+      "answer_span": "요일"
+    },
+    {
+      "id": "meeting-question",
+      "kind": "natural_question",
+      "query": "회의 일정이 언제야?",
+      "expected_page_ids": [
+        "wiki/meeting"
+      ],
+      "answer_span": "회의는 월요일"
+    },
+    {
+      "id": "cost-question",
+      "kind": "natural_question",
+      "query": "비용은 얼마야?",
+      "expected_page_ids": [
+        "wiki/cost"
+      ],
+      "answer_span": "비용은 만원"
+    },
+    {
+      "id": "missing-address",
+      "kind": "no_answer",
+      "query": "배포 서버 주소는?",
+      "expected_page_ids": [],
+      "answer_span": null
+    }
+  ]
+}
