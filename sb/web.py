@@ -54,7 +54,7 @@ input,textarea{box-sizing:border-box;width:100%}textarea{min-height:100px;resize
 button.secondary{background:#fff;color:#24292f}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row button{flex:0 0 auto}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f8fa;border-radius:8px;padding:12px;min-height:40px}.muted{color:#66707b}
 label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-.dropzone{border:2px dashed #8c959f;border-radius:12px;padding:28px;text-align:center;background:#f6f8fa;cursor:pointer}.dropzone.active{border-color:#0969da;background:#ddf4ff}
+.dropzone{overflow-wrap:anywhere;border:2px dashed #8c959f;border-radius:12px;padding:28px;text-align:center;background:#f6f8fa;cursor:pointer}.dropzone.active{border-color:#0969da;background:#ddf4ff}
 </style>
 </head>
 <body>

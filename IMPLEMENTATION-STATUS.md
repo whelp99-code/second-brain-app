@@ -1324,3 +1324,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 scoped 표시값 중복 읽기 제거:** [후보 metadata 생략·명시필터/접근 검사 유지·1,000페이지4.33→2.17초](SCOPED-CANDIDATE-PROJECTION-2026-09-10.md). 최종관련60통과/21.97초·Ruff/변경 타입0오류0경고. 최신 설치 paired 재인수를 다음 단계로 지정, 운영/실사용 및 전체 목표 유지.
 
 **2026-09-10 검색 개선 설치 paired 인수:** [SB a2861f3 offline설치·실제TLS/MCP/CLI 저장→완료→새로그인 회수](INSTALLED-SEARCH-PAIR-2026-09-10.md). 정상/철회/만료4경로·독립2reader각2records·settlement1/attempt1/FK0·전체설치물/Node불변exit0. fixture신원/업무·native0회, 운영/실사용 및 전체 목표 유지.
+
+**2026-09-10 운영 콘솔 모바일 넘침 수정:** sb/web.py 업로드 안내 줄바꿈. 실제 Playwright1440/390px 실패상세/검색/원문/기억추가대기 통과·콘솔0·overflow true→false, Ruff/diff. 증거 /var/tmp/sb-console-qa-_o_xz8nm/QA.md 및 browser-result.json/스크린샷. 임시 fixture 설정 수정과 /tmp Chromium 실패는 분리 기록. 운영 두holder/유효lease1/관측불가18 유지, 즉시 페이지종료 BrokenPipe 로그 후속 및 전체 목표 유지.
