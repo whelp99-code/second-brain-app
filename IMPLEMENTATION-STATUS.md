@@ -1,3 +1,5 @@
+[미해결 실패 자격증명 마스킹](FAILED-DETAIL-CREDENTIALS-2026-09-09.md) — token/AWS/GitHub/sk- 4누락 재현·공통 처리, 연락처 보존 및 관련73개 통과.
+
 [공통 자격증명 마스킹](SHARED-CREDENTIAL-REDACTION-2026-09-09.md) — stdlib 모듈 분리·기존 동등성 및 관련94개 통과, 독립 import/연락처 보존 확인.
 
 [누적 전체 검사·새 설치 연동](POST-CONFLICT-REGRESSION-2026-09-09.md) — 40c7baa 전체1541통과/2실패/2skip, 잘못된 테스트 모델2개 수정 후 관련22통과. 새 후보 실제 연동4경로·내용 일치; 타입0오류7경고.

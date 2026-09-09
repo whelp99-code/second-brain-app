@@ -371,3 +371,17 @@ def test_retry_refuses_brief_without_replay_inputs_and_preserves_other_rows(tmp_
         retry_failed(root, stage=stage)
     with Ledger(root) as ledger:
         assert ledger.list_derivations() == before
+
+
+@pytest.mark.parametrize('secret', ['token=plain-value', 'AKIA0123456789ABCDEF',
+                                    'ghp_' + 'A' * 36, 'sk-' + 'a' * 24])
+def test_failed_details_apply_shared_credential_rules(tmp_path: Path, secret: str):
+    root, config = _seed_vault(tmp_path)
+    with Ledger(root) as ledger:
+        ledger.ensure_derivation('credential-failure', 'compile', 'test-run')
+        ledger.mark_running('credential-failure', 'test-run')
+        ledger.mark_failed('credential-failure', secret + ' owner@example.com 010-1234-5678')
+    result = json.dumps(status_snapshot(config), ensure_ascii=False)
+    assert secret not in result
+    assert 'owner@example.com' in result
+    assert '010-1234-5678' in result

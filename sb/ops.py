@@ -166,7 +166,7 @@ def _package_version() -> str:
 def _safe_detail(value: str | None, *, limit: int = 240) -> str:
     if not value:
         return ""
-    redacted = _SENSITIVE_DETAIL.sub("[REDACTED]", value)
+    redacted = redact_credentials(_SENSITIVE_DETAIL.sub("[REDACTED]", value))
     return redacted if len(redacted) <= limit else redacted[: limit - 1] + "…"
 
 
@@ -445,7 +445,7 @@ def status_snapshot(config: Config) -> dict[str, object]:
                 ):
                     recent_stages.append({
                         "run_id": row[0], "stage": row[1], "status": row[2],
-                        "errors": row[3], "error": _safe_detail(redact_credentials(row[4] or "")),
+                        "errors": row[3], "error": _safe_detail(row[4]),
                     })
         tables = load_ledger_tables(db)
         for row in tables.derivations.values():
