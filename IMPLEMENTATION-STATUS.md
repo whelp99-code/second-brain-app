@@ -1,3 +1,5 @@
+> 2026-09-09 실제 native 답변 검사: [Claude 1회 근거 부족 응답](NATIVE-ABSTENTION-2026-09-09.md). IP 값 추정 없이 insufficient_evidence/null, 4경로 통과. 설명의 omission=0 완전성 추론은 미흡으로 기록, 전체 품질 합격 아님.
+
 > 2026-09-09 실행물 인수: [JARVIS 근거 안내 별도 빌드](GUIDANCE-INSTALLED-ACCEPTANCE-2026-09-09.md). 실제 stdio 도구 목록 전달·새 빌드 연동4경로 통과. native 답변 준수·운영 배포는 별도 미완료.
 
 > 2026-09-09 소비자 개선: [JARVIS 61b8a42 기억 도구 근거 안내](MEMORY-CONSUMER-EVIDENCE-GUIDANCE-2026-09-09.md). 후보/순위와 답변 가능성 구분·없는 사실 추정 금지·미정/충돌 보존 명시. 통합 15개 및 ESLint 통과. 실제 native 답변 품질·운영 반영은 미검증.
