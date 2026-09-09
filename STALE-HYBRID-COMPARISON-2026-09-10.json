@@ -1,0 +1,149 @@
+{
+  "state": "measured",
+  "workspace": "/var/tmp/sb-korean-search-e4qcukpi",
+  "started_at": "2026-09-09T18:48:20.175943+00:00",
+  "dataset_id": "korean-stale-decision-probe-v1",
+  "dataset_origin": "synthetic",
+  "provenance": "합성 최신/폐기 결정 동시 검색 노출 검사. 메타데이터 삭제·권한 검증이나 실사용 질의 평가를 대신하지 않는다.",
+  "dataset_sha256": "1cadd4bfe956caede0f1261ed0fec7e3c0645232c30805469a101030d23059d3",
+  "source_tree_sha256": "c3cbe7ce23e12714f9bd119fe8fd0271655585c1c501bf5a4905d9ccbad652ce",
+  "harness_sha256": "c751748461e90d607f1649c5e1322139571bbe73f35b763add74c617ca4e2bbb",
+  "metrics_sha256": "ee44b54bc42b808334c214f9e8787d757eb2ac3807e3bd39e9439053172f9c4f",
+  "commit": "d709723e4fbbe7cc620eca3b730a796b6ebe986e",
+  "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "load_average_before": [
+    1.5703125,
+    1.9794921875,
+    2.36376953125
+  ],
+  "documents": 2,
+  "cases": 3,
+  "limit": 5,
+  "min_similarity": -1.0,
+  "limitations": [
+    "isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
+    "single trusted owner at genesis; no scope, supersession or deletion test",
+    "SDK stdio MCP, not agent app injection; hybrid True",
+    "synthetic data cannot replace the real-user 100–300 question acceptance",
+    "small corpus, one pass; latency is diagnostic, not capacity certification"
+  ],
+  "embedding": {
+    "model_id": "BAAI/bge-m3",
+    "revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "dim": 1024,
+    "row_count": 2,
+    "rows_digest": "sha256:e4c4a9cffcfc9fc03b52385037753a1aef555b5b20c95e8133170d823ccc3faa"
+  },
+  "vault_before": "a630aa2a15540a0f59e45d6927f4ec397c3c039582317e5b24e9d9443d7ce5c3",
+  "completed_cases": 3,
+  "metrics": {
+    "cli": {
+      "overall": {
+        "forbidden_labeled_cases": 3,
+        "forbidden_exposure_at_5": 1.0,
+        "positive_cases": 2,
+        "negative_cases": 1,
+        "hit_at_1": 1.0,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "negative_empty_rate": 0.0
+      },
+      "by_kind": {
+        "no_answer": {
+          "forbidden_labeled_cases": 1,
+          "forbidden_exposure_at_5": 1.0,
+          "positive_cases": 0,
+          "negative_cases": 1,
+          "hit_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_5": null,
+          "negative_empty_rate": 0.0
+        },
+        "stale_decision": {
+          "forbidden_labeled_cases": 2,
+          "forbidden_exposure_at_5": 1.0,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "mrr_at_5": 1.0,
+          "negative_empty_rate": null
+        }
+      }
+    },
+    "mcp": {
+      "overall": {
+        "forbidden_labeled_cases": 3,
+        "forbidden_exposure_at_5": 1.0,
+        "positive_cases": 2,
+        "negative_cases": 1,
+        "hit_at_1": 1.0,
+        "recall_at_5": 1.0,
+        "mrr_at_5": 1.0,
+        "negative_empty_rate": 0.0
+      },
+      "by_kind": {
+        "no_answer": {
+          "forbidden_labeled_cases": 1,
+          "forbidden_exposure_at_5": 1.0,
+          "positive_cases": 0,
+          "negative_cases": 1,
+          "hit_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_5": null,
+          "negative_empty_rate": 0.0
+        },
+        "stale_decision": {
+          "forbidden_labeled_cases": 2,
+          "forbidden_exposure_at_5": 1.0,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "mrr_at_5": 1.0,
+          "negative_empty_rate": null
+        }
+      }
+    }
+  },
+  "latency": {
+    "cli_search": {
+      "count": 3,
+      "p50_ms": 6421.409116126597,
+      "p95_ms": 6465.554322581738,
+      "max_ms": 6465.554322581738
+    },
+    "mcp_search": {
+      "count": 3,
+      "p50_ms": 6198.5421613790095,
+      "p95_ms": 6303.667837288231,
+      "max_ms": 6303.667837288231
+    },
+    "mcp_read": {
+      "count": 6,
+      "p50_ms": 34.413051791489124,
+      "p95_ms": 39.494268130511045,
+      "max_ms": 39.494268130511045
+    }
+  },
+  "generation": {
+    "provider_instance_id": "provider:second-brain:linux",
+    "generation_id": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+    "generation_manifest_digest": "sha256:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+    "vault_head": "1ec26e634ea1ef270740f310dc7f958d442a0a0d",
+    "vault_tree": "fec3a0977fca2aa42d7609980c332eb2d5b37c9e",
+    "tombstone_sequence": 0,
+    "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+  },
+  "selected_record_checks": 6,
+  "gold_answer_checks": 2,
+  "sealed_files_unchanged": true,
+  "finished_at": "2026-09-09T18:49:05.604089+00:00",
+  "artifact_sha256": {
+    "dataset.json": "1cadd4bfe956caede0f1261ed0fec7e3c0645232c30805469a101030d23059d3",
+    "cli.jsonl": "7b76ef66095a1ed7b07f7fb7889b872de8da105801e2fcc433747b9e83da6373",
+    "mcp.jsonl": "8c54c85b41009ca6a116f6d7a86ec52d6c2f01e0f515311167f08650385d005d",
+    "rankings.jsonl": "e1a4b7e7b861dbae83955c1eaef6d64928d60dc544458ea7d53ed980344d7d6c"
+  }
+}
