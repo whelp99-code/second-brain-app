@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 게이트웨이 CLI 복구 설정 공급:** [13개 명시적 옵션·startup 전달·실제 HTTP/MCP 재인수](SCOPED-GATEWAY-CLI-CONFIG-2026-09-09.md). 일부 설정은 시작 거절, 기존 context 유지. 관련55통과·emit/lint, parser 조립 설정으로 실제 3상태/철회/종료복구 attempt1/FK0. 운영 경로·키·서비스 인수·쓰기 verifier CLI 설정·실제 A→B 등 M1–M14는 남는다.
+
 **2026-09-09 실제 로그인 HTTP→scoped 복구:** [쿠키/CSRF·현재 세션·실제 3상태/종료 복구](SCOPED-RECONCILE-HTTP-2026-09-09.md). 명시적 서버 설정에서 새 POST가 실제 session store→CLI/production/MCP에 연결된다. 관련48통과·emit/lint. 실제 인증/본문/정책/만료 차단, pending/failed deferred와 proved control completed·exit73 replay·attempt1/FK0. gateway CLI 설정 공급·운영 Tailnet/서비스·실제 A→B 및 전체 M1–M14 인수는 남는다.
 
 **2026-09-09 호스트 인증 기반 scoped 복구 CLI:** [production 구성·명령 진입점·실제 3상태/종료 복구](SCOPED-RECONCILE-CLI-2026-09-09.md). memory reconcile-scoped ID --once가 기존 세션 callback/파일 정책/키/명시적 전송으로 상태별 실행한다. 관련22통과·emit/lint, 실제 execute→MCP pending/failed deferred 및 proved control completed·exit73 replay·attempt1/FK0. 독립 CLI 로그인·실제 gateway 세션 공급/운영 설정·A→B 및 전체 M1–M14 인수는 남는다.

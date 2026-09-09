@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 export async function reconcileThroughHttp(build, options, outboxId, at) {
   const load = p => import(pathToFileURL(join(build, p)).href);
   const { request } = await import(pathToFileURL(join(build, 'node_modules/undici/index.js')).href);
+  const { parsePhoneGatewayCli } = await load('src/phone-gateway-main.js');
   const { createPhoneGatewayServer, parsePhoneGatewayConfig } = await load('src/phone-gateway.js');
   const { FIXTURE_HOST, FIXTURE_LOGIN, FIXTURE_ORIGIN, cookieFromSetCookie, makePhoneHome,
     processUid, startFakeAuthority } = await load('tests/fixtures/phone-gateway-harness.js');
@@ -18,10 +19,24 @@ export async function reconcileThroughHttp(build, options, outboxId, at) {
   writeFileSync(join(staticRoot, 'manifest.json'), JSON.stringify({ 'index.html': { file: 'assets/app.js' } }));
   writeFileSync(join(staticRoot, 'assets/app.js'), '1');
   const config = parsePhoneGatewayConfig({ home: home.home, envFile: home.envFile, uid: processUid() });
+  const memory = options.memory;
+  const fields = { 'reconcile-db': options.database_path, 'reconcile-agent': options.agent_id,
+    'reconcile-policy': memory.policy_path, 'reconcile-provider': memory.read_fence_config.provider_instance_id,
+    'reconcile-signing-key': memory.read_fence_config.signing_key_id, 'reconcile-private-key': memory.read_fence_config.private_key_path,
+    'reconcile-spool': memory.spool_root,
+    'reconcile-dispatch-spool': memory.roots.candidate_dispatch_spool_root ?? join(home.home, 'unused-dispatch'),
+    'reconcile-review-spool': memory.roots.candidate_review_spool_root ?? join(home.home, 'unused-review'),
+    'reconcile-launcher': memory.journal_transport_options.launcherPath,
+    'reconcile-provider-config': memory.journal_transport_options.configPath,
+    'reconcile-journal-contract': memory.journal_transport_options.contractPath,
+    'reconcile-read-contract': memory.completion_transport_options.contractPath };
+  const parsed = parsePhoneGatewayCli(['--host', '127.0.0.1', '--port', '4176', '--upstream', 'http://127.0.0.1:4173',
+    '--static-root', staticRoot, '--env-file', home.envFile, ...Object.entries(fields).flatMap(([key, value]) => [`--${key}`, value])]);
+  assert.equal(parsed.memoryReconcile.database_path, options.database_path);
   let clock = at.getTime();
   const logs = [];
   const gateway = createPhoneGatewayServer({ host: '127.0.0.1', port: 0, upstream: upstream.origin,
-    staticRoot, config, now: () => clock, audit: line => logs.push(line), memoryReconcile: options });
+    staticRoot, config, now: () => clock, audit: line => logs.push(line), memoryReconcile: parsed.memoryReconcile });
   try {
     const origin = `http://127.0.0.1:${gateway.address.port}`;
     const login = await request(`${origin}/api/v1/phone/session`, { headers: { Host: FIXTURE_HOST, 'Tailscale-User-Login': FIXTURE_LOGIN } });
