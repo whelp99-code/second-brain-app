@@ -1,3 +1,5 @@
+[관리형 지식 상태 결합 구현 경계](MANAGED-KNOWLEDGE-BINDING-DESIGN-2026-09-10.md) — .sb 임의 registry의 복사/해시 제외 확인, 기존 운영 원장+명시적 세대 digest 결합 방향 선택. 기존 관련46통과. 신규 상태 저장/검색 연결은 아직 미구현·M1–M14 유지.
+
 [배치 진행량·중단 계보 보존](BATCH-PROGRESS-RECOVERY-2026-09-10.md) — 단계 완료마다 기록, interrupted 시 기존 detail 유지·외곽 예외에도 계보. 관련40/후속10통과(중복), 실제 partial ingest 뒤 SIGKILL 후 오류1/단계ID 보존. 운영·M1–M14 유지.
 
 [배치 설명·단계 오류 필드 분리](BATCH-DETAIL-FIELD-2026-09-10.md) — batch 계보 JSON의 error 오표시 재현·detail 이동, 관련46통과·실제 HTTP 과거 ingest 오류 보존 확인. 운영·M1–M14 유지.
