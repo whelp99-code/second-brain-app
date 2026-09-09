@@ -93,3 +93,17 @@ def test_default_budget_still_rejects_oversized_scan(tmp_path: Path) -> None:
     snapshot = TombstoneSnapshot(1, 'unused', 'unused', (), (target,))
     with pytest.raises(RestoreInventoryError, match='RESTORE_SCAN_BUDGET_EXCEEDED'):
         ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+
+
+def test_removing_line_cannot_create_new_blocked_sequence(tmp_path: Path) -> None:
+    page = tmp_path / 'wiki' / 'memory.md'
+    page.parent.mkdir()
+    payload = b'header\nalpha\nremove me\nbeta\ntail\n'
+    page.write_bytes(payload)
+    targets = tuple(BlockedTargetIdentity(index, 'unused', 'unused', hashlib.sha256(content).hexdigest(),
+        'unused', 'unused', 'unused', 'unused', 0, len(content))
+        for index, content in enumerate([b'remove me', b'alpha\nbeta'], 1))
+    snapshot = TombstoneSnapshot(2, 'unused', 'unused', (), targets)
+    with pytest.raises(RestoreInventoryError, match='RESTORE_SANITATION_FAILED'):
+        ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+    assert page.read_bytes() == payload

@@ -204,6 +204,10 @@ class ManagedRestoreInventory:
             if require_clean and spans:
                 raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
             sanitized = _sanitize_markdown(relative, payload, snapshot.targets, spans)
+            # Removing a line can join formerly separated bytes into another
+            # blocked record. Reject before materializing any candidate.
+            if sanitized != payload and budget.spans(sanitized, snapshot.targets):
+                raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
             if _is_whole_blocked(sanitized, snapshot.targets):
                 raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
             files.append(SanitizedRestoreFile(relative, sanitized))
