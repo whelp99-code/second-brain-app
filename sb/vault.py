@@ -490,7 +490,10 @@ def _render_definitions(body: str, sources: Sequence[SourceCite]) -> str:
             continue
         canonical = definitions[match[1]]
         value = line.lstrip(" ")
-        if value == canonical or re.fullmatch(re.escape(canonical) + r" span=[0-9]+-[0-9]+", value):
+        origin = canonical.split(": ", 1)[1]
+        native = f"[^{match[1]}]: sid={match[1]} origin={origin}"
+        if (value == canonical or re.fullmatch(re.escape(canonical) + r" span=[0-9]+-[0-9]+", value)
+                or re.fullmatch(re.escape(native) + r" span=[0-9]+-[0-9]+", value)):
             owned.setdefault(match[1], []).append(index)
     removed: set[int] = set()
     for sid, indices in owned.items():

@@ -1,0 +1,72 @@
+{
+  "before": {
+    "workspace": "/var/tmp/sb-bound-native-99n3tcsa",
+    "managed_active_symlink": true,
+    "first": {
+      "page_id": "wiki/inbox-2026-09-09t161317525124-관리형실제기억검증-4d9fc292",
+      "body": "# 관리형 실제 기억 검증\n\n검증용 회의는 금요일 오후 세 시입니다.[^ac209e18]\n\n[^ac209e18]: sid=ac209e18 origin=inbox:2026-09-09T161317525124-관리형실제기억검증.md span=0-33\n\n[^ac209e18]: inbox:2026-09-09T161317525124-관리형실제기억검증.md\n",
+      "results": 1
+    },
+    "second": {
+      "page_id": "wiki/inbox-2026-09-09t161317525124-관리형실제기억검증-4d9fc292",
+      "body": "# 관리형 실제 기억 검증\n\n검증용 회의는 금요일 오후 세 시입니다.[^ac209e18]\n\n[^ac209e18]: sid=ac209e18 origin=inbox:2026-09-09T161317525124-관리형실제기억검증.md span=0-33\n\n[^ac209e18]: inbox:2026-09-09T161317525124-관리형실제기억검증.md\n",
+      "results": 1
+    },
+    "default_entrypoint": "python -m sb.mcp",
+    "real_claude": true,
+    "bound_active_hits": [
+      {
+        "page_id": "wiki/inbox-2026-09-09t161317525124-관리형실제기억검증-4d9fc292",
+        "section": "관리형 실제 기억 검증",
+        "snippet": "...7525124-관리형실제기억검증.md span=...",
+        "score": 1.5714285714285712e-06,
+        "kind": "wiki",
+        "index_status": "active",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "source_ref": "",
+        "updated_at": "2026-09-09",
+        "role": "CANONICAL",
+        "verification": "VERIFIED"
+      }
+    ],
+    "explicit_registry_exists": false,
+    "unused_registry_exists": false
+  },
+  "after": {
+    "workspace": "/var/tmp/sb-bound-native-ig4kx5cd",
+    "managed_active_symlink": true,
+    "first": {
+      "page_id": "wiki/inbox-2026-09-09t161445663194-관리형실제기억검증-35c8bb6d",
+      "body": "# 관리형 실제 기억 검증\n\n검증용 회의는 금요일 오후 세 시입니다.[^ac209e18]\n\n[^ac209e18]: sid=ac209e18 origin=inbox:2026-09-09T161445663194-관리형실제기억검증.md span=0-33\n",
+      "results": 1
+    },
+    "second": {
+      "page_id": "wiki/inbox-2026-09-09t161445663194-관리형실제기억검증-35c8bb6d",
+      "body": "# 관리형 실제 기억 검증\n\n검증용 회의는 금요일 오후 세 시입니다.[^ac209e18]\n\n[^ac209e18]: sid=ac209e18 origin=inbox:2026-09-09T161445663194-관리형실제기억검증.md span=0-33\n",
+      "results": 1
+    },
+    "default_entrypoint": "python -m sb.mcp",
+    "real_claude": true,
+    "bound_active_hits": [
+      {
+        "page_id": "wiki/inbox-2026-09-09t161445663194-관리형실제기억검증-35c8bb6d",
+        "section": "관리형 실제 기억 검증",
+        "snippet": "...5663194-관리형실제기억검증.md span=...",
+        "score": 1.375e-06,
+        "kind": "wiki",
+        "index_status": "active",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "source_ref": "",
+        "updated_at": "2026-09-09",
+        "role": "CANONICAL",
+        "verification": "VERIFIED"
+      }
+    ],
+    "explicit_registry_exists": false,
+    "unused_registry_exists": false
+  }
+}

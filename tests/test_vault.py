@@ -320,21 +320,23 @@ def test_write_pages_restores_page_log_index_when_commit_fails(
 
 @pytest.mark.parametrize('fence', ['```', '~~~~'])
 @pytest.mark.parametrize('span_first', [True, False])
-def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fence: str, span_first: bool) -> None:
+@pytest.mark.parametrize('native_format', [False, True])
+def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fence: str, span_first: bool, native_format: bool) -> None:
     from sb.vault import read_page_spec
 
     origin = 'me-wiki:identity/profile.md'
     definition = f'[^{CAS_SID}]: {origin}'
-    definitions = [definition + ' span=0-12', definition]
+    annotated = (f'[^{CAS_SID}]: sid={CAS_SID} origin={origin}' if native_format else definition) + ' span=0-12'
+    definitions = [annotated, definition]
     if not span_first:
         definitions.reverse()
     body = f'A fact.[^{CAS_SID}]\n\n{fence}\n{definition}\n{fence}\n\n' + '\n\n'.join(definitions)
     vault = _ready(tmp_path)
     vault.write_pages([_cited_page(body_md=body)], 'first', MemoryLedger())
     text = (tmp_path / 'wiki/identity-profile.md').read_text()
-    assert text.count(definition) == 2  # code example and one real definition
+    assert text.count(definition) == (1 if native_format else 2)  # code example remains
     assert f'{fence}\n{definition}\n{fence}' in text
-    assert f'{definition} span=0-12' in text
+    assert annotated in text
     page = read_page_spec(tmp_path, 'identity-profile')
     assert page is not None
     assert page.sources[0].spans == ['0-12']
