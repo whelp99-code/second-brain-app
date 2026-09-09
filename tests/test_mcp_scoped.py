@@ -22,7 +22,7 @@ class FrozenDate(datetime):
         return datetime(2026, 9, 9, tzinfo=UTC)
 
 
-@pytest.mark.parametrize("version,issuer_sessions", [(1, False), (2, False), (2, True)])
+@pytest.mark.parametrize("version,issuer_sessions", [(1, False), (2, False), (2, True), (3, False), (3, True)])
 def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch, version, issuer_sessions):  # noqa: F811
     root, name, generation = classified
     work = root.parents[2]
@@ -53,7 +53,7 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
 
     async def run():
         async with Client(server, mode="legacy", cache=None) as client:
-            assert [tool.name for tool in (await client.list_tools()).tools] == (["sb_generation_status"] if version == 2 else []) + ["sb_read_page", "sb_search"]
+            assert [tool.name for tool in (await client.list_tools()).tools] == (["sb_generation_status"] if version >= 2 else []) + ["sb_read_page", "sb_search"]
             import json
             from pathlib import Path
             frozen = json.loads(Path(f"contracts/second-brain-scoped-read-v{version}.json").read_text())
@@ -70,7 +70,14 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             assert not allowed.is_error, allowed
             assert allowed.structured_content["profile"] == f"scoped-record-read-v{version}"
             assert allowed.structured_content["records"]
-            if version == 2:
+            if version == 3:
+                from sb.memory_access import classified_page
+                from sb.page_access_projection import page_access_projection
+                assert allowed.structured_content["page_access"] == page_access_projection(classified_page(root, name, generation))
+                assert allowed.structured_content["page_access"]["complete"] is True
+            else:
+                assert "page_access" not in allowed.structured_content
+            if version >= 2:
                 status_fence = create_read_fence(provider_instance_id=generation.provider_instance_id,
                     purpose="memory_status", operation="status", sequence=0, set_root=GENESIS_TOMBSTONE_ROOT,
                     issued_at="2026-09-09T00:00:00.000Z", not_before="2026-09-09T00:00:00.000Z",

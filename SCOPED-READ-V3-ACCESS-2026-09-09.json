@@ -1,0 +1,97 @@
+{
+  "v3": {
+    "fixture": true,
+    "profile": "scoped-record-read-v3",
+    "production_composition": true,
+    "internal_write_authority_fixture": true,
+    "supervised_stdio": true,
+    "read_after_restart": true,
+    "broader_authenticated_scope_allowed": true,
+    "provider_policy_change_rejected": true,
+    "issuer_policy_withdrawal_rejected": true,
+    "observation": {
+      "kind": "remembered_artifact_observed",
+      "access": {
+        "schema_version": 1,
+        "complete": true,
+        "sources": [
+          {
+            "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+            "classification_digest": "sha256:c6227da82601c6ef0c00dcd5f9bcde3e59a26b7996bdf4c40186a9f00b2d07c1",
+            "classification": {
+              "schema_version": 1,
+              "owner": "principal:owner",
+              "projects": [
+                "project:shared-memory"
+              ],
+              "policy_revision": "policy:fixture"
+            }
+          }
+        ]
+      },
+      "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+      "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+        "generation_manifest_digest": "sha256:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "record_ids": [
+        "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+        "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+        "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+        "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+      ]
+    },
+    "automatic_settlement": false
+  },
+  "v2_compatibility": {
+    "fixture": true,
+    "profile": "scoped-record-read-v2",
+    "production_composition": false,
+    "internal_write_authority_fixture": true,
+    "supervised_stdio": true,
+    "read_after_restart": true,
+    "broader_authenticated_scope_allowed": true,
+    "provider_policy_change_rejected": true,
+    "issuer_policy_withdrawal_rejected": true,
+    "observation": {
+      "kind": "remembered_content_observed",
+      "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+      "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+      "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+        "generation_manifest_digest": "sha256:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "record_ids": [
+        "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+        "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+        "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+        "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+      ]
+    },
+    "automatic_settlement": false
+  },
+  "isolated_packaging": {
+    "profiles": [
+      1,
+      2,
+      3
+    ],
+    "v3_sha256": "c3d4b1d883d8966fcc39b5f26e999159cb60977c248683d5719da27fd5500ad8"
+  },
+  "python_node_access_fixture_match": true
+}

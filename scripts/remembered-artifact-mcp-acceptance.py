@@ -15,6 +15,9 @@ from sb.request_executor import RequestExecutor
 from sb.scoped_request_acceptance import accept_scoped_request
 from tests.task30_process_harness import executor_config
 
+profile = sys.argv[2] if len(sys.argv) > 2 else 'scoped-record-read-v2'
+if profile not in {'scoped-record-read-v2', 'scoped-record-read-v3'}:
+    raise ValueError('unsupported fixture profile')
 root = Path(tempfile.mkdtemp(prefix='remembered-artifact-mcp-'))
 app = Path(__file__).resolve().parents[1]
 config = executor_config(root)
@@ -44,10 +47,10 @@ try:
     launcher.chmod(0o700)
     result = subprocess.run(['node', str(app / 'scripts/remembered-artifact-mcp-consumer.mjs'), sys.argv[1]],
         input=json.dumps({'request': raw, 'accepted': dataclasses.asdict(accepted), 'config': str(config_path),
-            'launcher': str(launcher), 'contract': str(app / 'contracts/second-brain-scoped-read-v2.json')}),
+            'launcher': str(launcher), 'profile': profile, 'contract': str(app / f'contracts/second-brain-scoped-read-v{profile[-1]}.json')}),
         text=True, capture_output=True, timeout=60, check=False)
     if result.returncode != 0:
-        raise RuntimeError(result.stderr + (root / 'server.err').read_text())
+        raise RuntimeError(result.stderr + ((root / 'server.err').read_text() if (root / 'server.err').exists() else ''))
     print(result.stdout.strip())
 finally:
     if executor is not None:

@@ -75,6 +75,7 @@ from sb.memory_records import (
     target_for_record,
 )
 from sb.memory_search import merge_semantic_records
+from sb.page_access_projection import page_access_projection
 from sb.page_ids import git_rel
 from sb.pipeline import RunOutcome, run_all
 from sb.provider_lifecycle import ProviderLifecycle
@@ -368,7 +369,7 @@ def build_server(
         if profile is None:
             task30_enabled = False
             contract_schema_version = 3
-        elif profile in {"scoped-record-read-v1", "scoped-record-read-v2"}:
+        elif profile in {"scoped-record-read-v1", "scoped-record-read-v2", "scoped-record-read-v3"}:
             if initial_scoped_policy is None:
                 raise ContractProfileError
             task30_enabled = False
@@ -1031,7 +1032,8 @@ def build_server(
         if generation_store is None or not public_keys:
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
-        scoped_v2 = os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v2"
+        scoped_v3 = os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v3"
+        scoped_v2 = scoped_v3 or os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v2"
         if initial_scoped_policy.identity[2] is None and not scoped_v2:
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
@@ -1051,7 +1053,7 @@ def build_server(
                         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
                     require_active_high_water(generation, current)
                     _ = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
-                    return {"profile": "scoped-record-read-v2" if scoped_v2 else "scoped-record-read-v1", "request_digest": context.request_digest,
+                    return {"profile": "scoped-record-read-v3" if scoped_v3 else "scoped-record-read-v2" if scoped_v2 else "scoped-record-read-v1", "request_digest": context.request_digest,
                         "access_claim_digest": access_claim_binding(access_claim), **payload,
                         **generation_read_binding(generation, current).as_dict()}
             except (ValueError, OSError, PathEscapeError) as exc:
@@ -1065,7 +1067,8 @@ def build_server(
                 if (page.tombstone_sequence, page.tombstone_set_root) != high_water():
                     raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
                 return {"page_id": page.page_id, "content_digest": page.content_digest,
-                        "records": [record.as_dict() for record in page.records]}
+                        "records": [record.as_dict() for record in page.records],
+                        **({"page_access": page_access_projection(page)} if scoped_v3 else {})}
             return scoped_request("sb_read_page", {"id": id}, read_fence, access_claim, read)
 
         def scoped_search(query: str, read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue], limit: int = 10) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
