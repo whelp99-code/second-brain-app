@@ -1,0 +1,202 @@
+{
+  "provider_manifest": {
+    "schema": 1,
+    "release_id": "95637d2efe27899689c2a90b3eeef5edc10022aa",
+    "wheel_sha256": "00fb38baa8029d91188fdba12a138ecb959b580f2cb8ba1c0b6064be328753e7",
+    "source_commit": "e6866b0108709d6e5c3b952b4b0092c4731752f9",
+    "source_tree": "3733f2d3a3d0cd30da4badbe597cb8e792515b96",
+    "source_materialization": "git-archive",
+    "working_tree_modified": true,
+    "contract_profile": "task32-schema4",
+    "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+  },
+  "installed_module_parity": [
+    "sb/reingress.py",
+    "sb/ops.py",
+    "sb/compile.py"
+  ],
+  "installed_integration": {
+    "harness_commit": "e6866b0108709d6e5c3b952b4b0092c4731752f9",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "95637d2efe27899689c2a90b3eeef5edc10022aa",
+      "wheel_sha256": "00fb38baa8029d91188fdba12a138ecb959b580f2cb8ba1c0b6064be328753e7",
+      "source_commit": "e6866b0108709d6e5c3b952b4b0092c4731752f9",
+      "source_tree": "3733f2d3a3d0cd30da4badbe597cb8e792515b96",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-reingress-candidate-od1trd1c/releases/95637d2efe27899689c2a90b3eeef5edc10022aa/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-reingress-candidate-od1trd1c/releases/95637d2efe27899689c2a90b3eeef5edc10022aa/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-reingress-candidate-od1trd1c/releases/95637d2efe27899689c2a90b3eeef5edc10022aa/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-reingress-candidate-od1trd1c/releases/95637d2efe27899689c2a90b3eeef5edc10022aa/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-locked-candidate-j9w0jrk8/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:4d4d2f9a35a47d5c11e6c0a6114ca841820c87db88cc227c4c3f627d2207edb4",
+            "request_digest": "sha256:4d4d2f9a35a47d5c11e6c0a6114ca841820c87db88cc227c4c3f627d2207edb4",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "omo_engine_calls": 0,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:4d4d2f9a35a47d5c11e6c0a6114ca841820c87db88cc227c4c3f627d2207edb4",
+            "request_digest": "sha256:4d4d2f9a35a47d5c11e6c0a6114ca841820c87db88cc227c4c3f627d2207edb4",
+            "idempotency_key": "memidem:scoped:v4:1870cf67868881ed9400883a48b0c880f0e0e197027d8c5d1304cbe3e3cac733",
+            "scope_digest": "sha256:23d310366167cb947fbfdba6d5550ad3986a991e70dd0f7a2b2000ac86cce491",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:4d4d2f9a35a47d5c11e6c0a6114ca841820c87db88cc227c4c3f627d2207edb4.v4.json",
+            "request_file_digest": "sha256:1e6535fad5869b260c522f3d9b6446ac98ef8da32583211613e6baf0f6b1f525",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:3dc79c1d401e2a8641284621678577cc788e7a148cd5afff4810710d9c9ed29b",
+            "request_digest": "sha256:3dc79c1d401e2a8641284621678577cc788e7a148cd5afff4810710d9c9ed29b",
+            "idempotency_key": "memidem:scoped:v4:086c69c784bd53345af80cd48ebebcb602be394d4bc7832864eab980f7081666",
+            "scope_digest": "sha256:4051ded9b5a8f6ccc8d21ee12327e338b98dac1e3bda4ca979e18cec7d4c0344",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:3dc79c1d401e2a8641284621678577cc788e7a148cd5afff4810710d9c9ed29b.v4.json",
+            "request_file_digest": "sha256:e3685ca6893a0a28d19dd032cf119a305487a7dd7e73af0ce02df7003a99a3ec",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:8774d15992533d8919ef4b5f7966fa2c99436edd4bfa921dd3d0db379387be75",
+            "request_digest": "sha256:8774d15992533d8919ef4b5f7966fa2c99436edd4bfa921dd3d0db379387be75",
+            "idempotency_key": "memidem:scoped:v4:8979727a68924adf9018dae58c2d9745642f7efb39f3bff593782a444ba86868",
+            "scope_digest": "sha256:84abecd7321f8fbb18bbc006a576332d35992a048fd5cae050a1894e53038a1e",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:8774d15992533d8919ef4b5f7966fa2c99436edd4bfa921dd3d0db379387be75.v4.json",
+            "request_file_digest": "sha256:8217468b2a38c0df80f5cc1a1fab757f64261372b38ec59a1087358dd5108520",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "production_activated": false
+  },
+  "installed_mcp": [
+    {
+      "profile": "scoped-record-read-v2",
+      "tools": [
+        "sb_generation_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-record-read-v5",
+      "tools": [
+        "sb_generation_status",
+        "sb_request_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-request-status-v1",
+      "tools": [
+        "sb_request_status"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-request-write-v1",
+      "tools": [
+        "sb_write_request"
+      ],
+      "installed_release": true
+    }
+  ],
+  "development_integration_passed": true
+}
