@@ -50,6 +50,11 @@ def inventory(path, prior=None):
     return result
 
 
+def migration_identity(root):
+    return {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(root.glob("*.sql"))}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-db", required=True, type=Path)
@@ -58,11 +63,24 @@ def main():
     parser.add_argument("--previous-build", type=Path, help="Readiness-only check using the prior installed build")
     parser.add_argument("--previous-migrations", type=Path)
     args = parser.parse_args()
+    if args.previous_migrations is not None and args.previous_build is None:
+        parser.error("--previous-migrations requires --previous-build")
     source = args.source_db.resolve(strict=True)
     build = args.jarvis_build.resolve(strict=True)
     migrations = args.migrations.resolve(strict=True)
     if not source.is_file() or not (build / "src/db.js").is_file():
         raise ValueError("source database and isolated build required")
+    packaged_migrations = migration_identity(build / "migrations")
+    if not packaged_migrations or migration_identity(migrations) != packaged_migrations:
+        raise ValueError("REHEARSAL_MIGRATIONS_DIFFER_FROM_BUILD")
+    candidate_identity = {
+        "build": str(build),
+        "migration_sha256": packaged_migrations,
+        "runtime_files_sha256": {
+            name: hashlib.sha256((build / "src" / name).read_bytes()).hexdigest()
+            for name in ("db.js", "migration-store.js")
+        },
+    }
     with tempfile.TemporaryDirectory(prefix="authority-upgrade-rehearsal-") as directory:
         target = Path(directory) / "authority.sqlite"
         # The destination cannot alias the operational source: it is newly allocated
@@ -150,7 +168,21 @@ try {
         observed_counts = {name: before[name]["rows"] for name in
                            ("memory_candidates", "memory_outbox", "control_command_requests", "memory_correction_requests")
                            if name in before}
+        hold_reasons = []
+        if not journal_preserved:
+            hold_reasons.append("ORIGINAL_MIGRATION_HISTORY_CHANGED")
+        if changed:
+            hold_reasons.append("ORIGINAL_BUSINESS_ROWS_CHANGED")
+        if previous_check is not None and previous_check["accepted_upgraded_database"]:
+            hold_reasons.append("PREVIOUS_BINARY_ACCEPTS_UPGRADED_DATABASE")
+        if initial_fk or upgrade["foreign_key_errors"]:
+            hold_reasons.append("FOREIGN_KEY_ERRORS")
+        if upgrade["integrity"] != ["ok"]:
+            hold_reasons.append("INTEGRITY_CHECK_FAILED")
+        if upgrade["replay_changes"]:
+            hold_reasons.append("MIGRATION_REPLAY_CHANGED_DATABASE")
         report = {"source_open_mode": "read_only", "operational_activation": False,
+                  "candidate_identity": candidate_identity, "hold_reasons": hold_reasons,
                   "previous_readiness_check": previous_check, "observed_original_counts": observed_counts,
                   "original_migration_entries_preserved": journal_preserved,
                   "migration_count_before": len(old_vector), "migration_count_after": len(upgrade["vector"]),
@@ -160,9 +192,7 @@ try {
                                                     if name != "schema_migrations"),
                   "initial_foreign_key_errors": initial_fk, "upgrade": upgrade}
         print(json.dumps(report, indent=2))
-        return int(not journal_preserved or bool(changed) or (previous_check is not None
-                   and previous_check["accepted_upgraded_database"]) or initial_fk != 0 or upgrade["foreign_key_errors"] != 0
-                   or upgrade["integrity"] != ["ok"] or upgrade["replay_changes"] != 0)
+        return int(bool(hold_reasons))
 
 
 if __name__ == "__main__":
