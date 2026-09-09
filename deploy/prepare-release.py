@@ -56,7 +56,12 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     staged_runtime = temp / 'python-runtime'
     bundle_runtime(runtime_source, staged_runtime)
     runtime_sha256 = runtime_digest(staged_runtime)
-    release_id = release_identity(wheel.read_bytes(), requirements.read_bytes(), runtime_sha256)
+    preparation_files = {
+        name: hashlib.sha256((repo / 'deploy' / name).read_bytes()).hexdigest()
+        for name in ('prepare-release.py', 'bundle_python_runtime.py', 'check-release-contents.py')
+    }
+    recipe_sha256 = hashlib.sha256(json.dumps(preparation_files, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    release_id = release_identity(wheel.read_bytes(), requirements.read_bytes(), runtime_sha256, recipe_sha256)
     release = app / 'releases' / release_id
     if release.exists():
         raise SystemExit(f'Release already exists; inspect it before reuse: {release}')
@@ -102,7 +107,9 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
         path.write_text(base + command)
         path.chmod(0o700)
     manifest = {'schema': 1, 'release_id': release_id, 'wheel_sha256': wheel_hash,
-                'release_id_scheme': 'sb-release-inputs-v2',
+                'release_id_scheme': 'sb-release-inputs-v3',
+                'preparation_recipe_sha256': recipe_sha256,
+                'preparation_files_sha256': preparation_files,
                 'python_runtime_input_sha256': runtime_sha256,
                 'source_commit': source_commit, 'source_tree': source_tree, 'source_materialization': 'git-archive',
                 'working_tree_modified': working_tree_modified,

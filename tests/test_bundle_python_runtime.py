@@ -18,11 +18,12 @@ def test_release_identity_binds_runtime_bytes_and_not_staging_path(tmp_path):
     bundle(source, target)
     first = api["runtime_digest"](source)
     assert api["runtime_digest"](target) == first
-    identity = api["release_identity"](b"wheel", b"locked requirements", first)
+    identity = api["release_identity"](b"wheel", b"locked requirements", first, "recipe-one")
     (target / "python").write_bytes(b"runtime two")
     second = api["runtime_digest"](target)
     assert second != first
-    assert api["release_identity"](b"wheel", b"locked requirements", second) != identity
+    assert api["release_identity"](b"wheel", b"locked requirements", second, "recipe-one") != identity
+    assert api["release_identity"](b"wheel", b"locked requirements", first, "recipe-two") != identity
 
 
 @pytest.mark.parametrize("external", [False, True])
