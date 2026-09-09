@@ -56,6 +56,8 @@ try {
   assert.equal(db.prepare('SELECT count(*) AS n FROM memory_scoped_completion_observations').get().n, 1);
   assert.equal(observed.durable_observation.replayed, true);
   const proofInput = { database: f.database.path, spoolRoot: f.options.spoolRoot,
+    authority_roots: { candidate_dispatch_spool_root: f.options.dispatch.roots.dispatch,
+      candidate_review_spool_root: f.options.dispatch.roots.review },
     observation_id: observed.durable_observation.observation_id, at: new Date(late.getTime() + 60000).toISOString() };
   const proofPath = join(f.database.root, 'proof-reader.json');
   const proofRun = provider => {
@@ -69,6 +71,8 @@ try {
   assert.equal(reconstructed.kind, 'completion_evidence_consistent');
   assert.equal(reconstructed.evidence_digest, observed.durable_observation.evidence_digest);
   assert.equal(reconstructed.historical_authority_expired, true);
+  assert.equal(reconstructed.settlement_authority.kind, 'spent_authority_currently_unrevoked');
+  assert.equal(reconstructed.current_revocation_rejected, true);
   const wrongProvider = proofRun('provider:other');
   assert.equal(wrongProvider.status, 1);
   assert.equal(JSON.parse(wrongProvider.stdout).rejected, 'SCOPED_COMPLETION_EVIDENCE_INVALID');

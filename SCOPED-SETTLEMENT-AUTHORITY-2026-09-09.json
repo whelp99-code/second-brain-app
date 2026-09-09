@@ -1,0 +1,283 @@
+{
+  "reconstructed": {
+    "settlement_authority": {
+      "kind": "spent_authority_currently_unrevoked",
+      "outbox_id": "memout:scoped:v4:c493e61b6188bbede7a209da1bbdc622f1d1f96f9249b5a0d3db2005b00a1707",
+      "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+      "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+      "control_request_id": "memory-dispatch:247ce8e50bb503eba4ed0f9ce1dafbb88945385c35f5d7585dfb2e11d1b14b1f",
+      "control_receipt_id": "receipt:memory-dispatch:247ce8e50bb503eba4ed0f9ce1dafbb88945385c35f5d7585dfb2e11d1b14b1f",
+      "control_fence": 1,
+      "dispatch_fence": 1,
+      "dispatched_at": "2026-08-28T12:00:00.000Z",
+      "checked_at": "2026-08-31T03:31:00.000Z"
+    },
+    "current_revocation_rejected": true,
+    "kind": "completion_evidence_consistent",
+    "observation_id": "memobs:scoped:v1:591cb90502a55038b9f76b9ae725152231197c3490d89523a4c50a98b8997762",
+    "evidence_digest": "sha256:591cb90502a55038b9f76b9ae725152231197c3490d89523a4c50a98b8997762",
+    "observed_at": "2026-08-31T03:30:00.000Z",
+    "authorized_until": "2026-08-31T03:31:00.000Z",
+    "historical_authority_expired": true,
+    "record_count": 4
+  },
+  "independent_proof_readers": 2,
+  "wrong_provider_rejected": true,
+  "durable_observations": 1,
+  "reconciliation_lease": {
+    "outbox_id": "memout:scoped:v4:c493e61b6188bbede7a209da1bbdc622f1d1f96f9249b5a0d3db2005b00a1707",
+    "worker": "worker:reconcile",
+    "fence": 2,
+    "dispatch_fence": 1,
+    "lease_expires_at": "2026-08-31T03:30:10.000Z"
+  },
+  "lease_preserved_across_acceptance_recovery": true,
+  "observed": {
+    "durable_observation": {
+      "kind": "completion_observation_recorded",
+      "observation_id": "memobs:scoped:v1:591cb90502a55038b9f76b9ae725152231197c3490d89523a4c50a98b8997762",
+      "outbox_id": "memout:scoped:v4:c493e61b6188bbede7a209da1bbdc622f1d1f96f9249b5a0d3db2005b00a1707",
+      "evidence_digest": "sha256:591cb90502a55038b9f76b9ae725152231197c3490d89523a4c50a98b8997762",
+      "replayed": true
+    },
+    "cancellation_checks": [
+      {
+        "after_responses": 0,
+        "calls": 0,
+        "rejected": true
+      },
+      {
+        "after_responses": 1,
+        "calls": 1,
+        "rejected": true
+      },
+      {
+        "after_responses": 2,
+        "calls": 2,
+        "rejected": true
+      },
+      {
+        "after_responses": 3,
+        "calls": 3,
+        "rejected": true
+      }
+    ],
+    "combined_completion": {
+      "kind": "remembered_completion_observed",
+      "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+      "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+      "status": {
+        "schema_version": 4,
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+        "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+        "scope_digest": "sha256:e5ef4609a3a3b135f6b8a1ef447e1f59238000a75ba34d2f51f1978956b17155",
+        "state": "proved",
+        "phase": "proved",
+        "updated_at": "2026-08-28T12:00:00.000Z",
+        "proof": {
+          "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "provider_instance_id": "provider:fixture",
+          "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "schema_version": 4,
+          "scope_digest": "sha256:e5ef4609a3a3b135f6b8a1ef447e1f59238000a75ba34d2f51f1978956b17155",
+          "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+        },
+        "receipt": {
+          "schema_version": 4,
+          "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "envelope_digest": null,
+          "state": "proved",
+          "code": "PROVIDER_PROVED",
+          "proof_digest": "sha256:ccc7cc356cb9bb9100c87a2089c63db40d8e223b7371e2403321e78168ef7477",
+          "status_digest": "sha256:c926dbbb208dc99ba5690f30c7aca2403ecd413c41562f306e8a50f890e73a2c",
+          "updated_at": "2026-08-28T12:00:00.000Z"
+        },
+        "acceptance": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "idempotency_key": "memidem:scoped:v4:13a68d4e1f8e7b9c5f7fa0064bdd2261677102a3e73938478a56c99aba93860e",
+          "scope_digest": "sha256:e5ef4609a3a3b135f6b8a1ef447e1f59238000a75ba34d2f51f1978956b17155",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd.v4.json",
+          "request_file_digest": "sha256:278e1c9e017a387463ff0ca370bf496084723d2d48a0a142fcefa4e6b1a7cc6a",
+          "replayed": true
+        }
+      },
+      "artifact": {
+        "kind": "remembered_artifact_observed",
+        "access": {
+          "schema_version": 1,
+          "complete": true,
+          "sources": [
+            {
+              "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+              "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+              "classification": {
+                "schema_version": 1,
+                "owner": "principal:owner",
+                "projects": [
+                  "project:a"
+                ],
+                "policy_revision": "policy:1"
+              }
+            }
+          ]
+        },
+        "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+        "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "checked_at": "2026-08-31T03:30:00.000Z",
+      "valid_until": "2026-08-31T03:31:00.000Z"
+    },
+    "recovered_without_local_acceptance": true,
+    "completion": {
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "status": {
+        "schema_version": 4,
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+        "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+        "scope_digest": "sha256:e5ef4609a3a3b135f6b8a1ef447e1f59238000a75ba34d2f51f1978956b17155",
+        "state": "proved",
+        "phase": "proved",
+        "updated_at": "2026-08-28T12:00:00.000Z",
+        "proof": {
+          "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "provider_instance_id": "provider:fixture",
+          "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "schema_version": 4,
+          "scope_digest": "sha256:e5ef4609a3a3b135f6b8a1ef447e1f59238000a75ba34d2f51f1978956b17155",
+          "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+        },
+        "receipt": {
+          "schema_version": 4,
+          "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "envelope_digest": null,
+          "state": "proved",
+          "code": "PROVIDER_PROVED",
+          "proof_digest": "sha256:ccc7cc356cb9bb9100c87a2089c63db40d8e223b7371e2403321e78168ef7477",
+          "status_digest": "sha256:c926dbbb208dc99ba5690f30c7aca2403ecd413c41562f306e8a50f890e73a2c",
+          "updated_at": "2026-08-28T12:00:00.000Z"
+        },
+        "acceptance": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+          "idempotency_key": "memidem:scoped:v4:13a68d4e1f8e7b9c5f7fa0064bdd2261677102a3e73938478a56c99aba93860e",
+          "scope_digest": "sha256:e5ef4609a3a3b135f6b8a1ef447e1f59238000a75ba34d2f51f1978956b17155",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd.v4.json",
+          "request_file_digest": "sha256:278e1c9e017a387463ff0ca370bf496084723d2d48a0a142fcefa4e6b1a7cc6a",
+          "replayed": true
+        }
+      }
+    },
+    "request_status_after_restart": true,
+    "fixture": true,
+    "profile": "scoped-record-read-v5",
+    "production_composition": true,
+    "internal_write_authority_fixture": true,
+    "supervised_stdio": true,
+    "read_after_restart": true,
+    "broader_authenticated_scope_allowed": true,
+    "provider_policy_change_rejected": true,
+    "issuer_policy_withdrawal_rejected": true,
+    "observation": {
+      "kind": "remembered_artifact_observed",
+      "access": {
+        "schema_version": 1,
+        "complete": true,
+        "sources": [
+          {
+            "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+            "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+            "classification": {
+              "schema_version": 1,
+              "owner": "principal:owner",
+              "projects": [
+                "project:a"
+              ],
+              "policy_revision": "policy:1"
+            }
+          }
+        ]
+      },
+      "request_id": "memreq:scoped:v4:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+      "request_digest": "sha256:919a5dc50491b3a4670848fcd97ed622853232c5362a8d8a71a6ea1358ca4dbd",
+      "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+      "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "record_ids": [
+        "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+        "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+        "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+        "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+      ]
+    },
+    "automatic_settlement": false
+  },
+  "acceptance_recorded": {
+    "kind": "acceptance_recorded",
+    "outbox_id": "memout:scoped:v4:c493e61b6188bbede7a209da1bbdc622f1d1f96f9249b5a0d3db2005b00a1707",
+    "attempt_id": "memattempt:pos:v2:178635b76033ce68f65d846fa64257af38aeca7475c7743dbd64acbc94d35fd8",
+    "acceptance_receipt_digest": "sha256:d7f71dbfd934b9d9e13f5d4147b4e0b5e438ff05cd29c26d51277cd1ee8e7d6b",
+    "replayed": true
+  },
+  "attempt_count": 1,
+  "acceptance_events": 1,
+  "record_commit_exit": 73,
+  "record_processes": 3,
+  "replay_idempotent": true,
+  "redispatch": false,
+  "jarvis_state": "reconciling",
+  "foreign_key_errors": 0
+}

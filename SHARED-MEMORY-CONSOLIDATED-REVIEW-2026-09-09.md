@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 원래 전송 권한·현재 철회 대조:** [만료와 철회 분리·uncertain 복구·실제 프로세스](SCOPED-SETTLEMENT-AUTHORITY-2026-09-09.md). 원래 승인/서명·source·범위 검토를 당시 시점에서 대조하며 현재 철회/suppression은 거절한다. 관련48통과·emit/lint, 실제 만료 후 uncertain 검증/현재 철회 거절. 새 쓰기 권한 발행이나 자동 최종 완료는 하지 않는다.
+
 **2026-09-09 재시작 후 scoped 관찰 증거 재구성:** [원래 수락/event/proof/범위 대조·독립 reader](SCOPED-DURABLE-PROOF-READER-2026-09-09.md). 만료된 읽기 권한을 재사용하지 않고 과거 관찰의 일관성을 검사한다. 신규12+관련46=58통과·격리 emit/lint, 실제 만료 후 별도 프로세스 복원/다른 provider 거절. 최종 settlement/control 및 운영 인수는 남는다.
 
 **2026-09-09 scoped 완료 관찰 영구 기록:** [원래 attempt 결합·권한/lease rollback·실제 MCP](SCOPED-DURABLE-OBSERVATION-2026-09-09.md). migration079와 현재 읽기 검사 callback을 연결해 수락+관찰을 원자적으로 기록한다. 총55개 통과·격리 emit/lint·migration 패키징, 실제 관찰1/attempt1/수락event1/replay. 자동 최종 완료 및 운영 인수는 미완료다.
