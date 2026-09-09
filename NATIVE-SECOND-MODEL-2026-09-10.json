@@ -1,0 +1,133 @@
+{
+  "initial": {
+    "source": "/var/tmp/sb-korean-search-e4qcukpi",
+    "results": [
+      {
+        "case_id": "current",
+        "model": {
+          "requested": "sonnet",
+          "initialized": "claude-sonnet-5",
+          "responses": [
+            "claude-sonnet-5"
+          ],
+          "client_version": "2.1.261"
+        },
+        "tool_calls": 1,
+        "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+        "passed": false,
+        "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ '은하 백업 보관 기간은 21일이다.'\n- '21일'\n"
+      },
+      {
+        "case_id": "current-natural",
+        "model": {
+          "requested": "sonnet",
+          "initialized": "claude-sonnet-5",
+          "responses": [
+            "claude-sonnet-5"
+          ],
+          "client_version": "2.1.261"
+        },
+        "tool_calls": 1,
+        "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+        "passed": false,
+        "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ '은하 백업 보관 기간은 21일이다.'\n- '21일'\n"
+      },
+      {
+        "case_id": "absent",
+        "model": {
+          "requested": "sonnet",
+          "initialized": "claude-sonnet-5",
+          "responses": [
+            "claude-sonnet-5"
+          ],
+          "client_version": "2.1.261"
+        },
+        "tool_calls": 1,
+        "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+        "passed": true,
+        "answer": {
+          "status": "insufficient_evidence",
+          "value": null,
+          "explanation": "검색 결과에 달빛 프로젝트 담당자나 전화번호에 관한 내용이 없고, 무관한 은하 백업 보관 기간 관련 항목만 반환되었습니다.",
+          "raw_response": "{\"status\": \"insufficient_evidence\", \"value\": null, \"explanation\": \"검색 결과에 달빛 프로젝트 담당자나 전화번호에 관한 내용이 없고, 무관한 은하 백업 보관 기간 관련 항목만 반환되었습니다.\"}"
+        }
+      }
+    ],
+    "scope": "native Claude calls real provider MCP; synthetic data; no JARVIS authenticated session delivery"
+  },
+  "final": {
+    "source": "/var/tmp/sb-korean-search-e4qcukpi",
+    "results": [
+      {
+        "case_id": "current",
+        "model": {
+          "requested": "sonnet",
+          "initialized": "claude-sonnet-5",
+          "responses": [
+            "claude-sonnet-5"
+          ],
+          "client_version": "2.1.261"
+        },
+        "tool_calls": 1,
+        "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+        "passed": true,
+        "answer": {
+          "status": "supported",
+          "value": "21일",
+          "explanation": "현재 결정(wiki/current-backup)에 '현재 은하 백업 보관 기간은 21일이다'라고 명시되어 있으며, 7일은 폐기된 과거 결정임.",
+          "raw_response": "{\"status\": \"supported\", \"value\": \"21일\", \"explanation\": \"현재 결정(wiki/current-backup)에 '현재 은하 백업 보관 기간은 21일이다'라고 명시되어 있으며, 7일은 폐기된 과거 결정임.\"}"
+        }
+      },
+      {
+        "case_id": "current-natural",
+        "model": {
+          "requested": "sonnet",
+          "initialized": "claude-sonnet-5",
+          "responses": [
+            "claude-sonnet-5"
+          ],
+          "client_version": "2.1.261"
+        },
+        "tool_calls": 1,
+        "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+        "passed": true,
+        "answer": {
+          "status": "supported",
+          "value": "21일",
+          "explanation": "current-backup 페이지에 '현재 은하 백업 보관 기간은 21일이다'라고 명시되어 있으며, 7일 결정은 폐기되었다고 명시됨.",
+          "raw_response": "{\"status\": \"supported\", \"value\": \"21일\", \"explanation\": \"current-backup 페이지에 '현재 은하 백업 보관 기간은 21일이다'라고 명시되어 있으며, 7일 결정은 폐기되었다고 명시됨.\"}"
+        }
+      },
+      {
+        "case_id": "absent",
+        "model": {
+          "requested": "sonnet",
+          "initialized": "claude-sonnet-5",
+          "responses": [
+            "claude-sonnet-5"
+          ],
+          "client_version": "2.1.261"
+        },
+        "tool_calls": 1,
+        "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+        "passed": true,
+        "answer": {
+          "status": "insufficient_evidence",
+          "value": null,
+          "explanation": "검색 결과에 '달빛 프로젝트' 또는 담당자 전화번호와 관련된 내용이 없고, 무관한 은하 백업 보관 기간 기록만 반환됨.",
+          "raw_response": "{\"status\": \"insufficient_evidence\", \"value\": null, \"explanation\": \"검색 결과에 '달빛 프로젝트' 또는 담당자 전화번호와 관련된 내용이 없고, 무관한 은하 백업 보관 기간 기록만 반환됨.\"}"
+        }
+      }
+    ],
+    "scope": "native Claude calls real provider MCP; synthetic data; no JARVIS authenticated session delivery"
+  },
+  "roots": {
+    "initial": "/var/tmp/sb-native-search-answer-IhOJXk",
+    "final": "/var/tmp/sb-native-search-answer-929WZ7"
+  },
+  "previous_opus_observed": {
+    "model": "claude-opus-5[1m]",
+    "client_version": "2.1.261",
+    "event_file": "/var/tmp/sb-native-search-answer-wJnPAf/current.txt"
+  }
+}
