@@ -1225,3 +1225,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 복원 세대 서명 MCP 조회:** [격리 활성화→v5 요청→범위/만료/철회 거부](RESTORE-SCOPED-MCP-2026-09-10.md). 기존v1–v5 포함13통과/17.12초·Ruff/diff. 실제 provider MCP Client 경로이며 동일 프로세스·fixture 키/시간이다. JARVIS 실제 발급/transport/native 업무 인수와 DR·운영 전체 목표는 남는다.
+
+
+**2026-09-10 복원 저장 오류 재시도:** [세 실제 저장 직후 오류→기존 세대/삭제 이력 유지→같은 요청 복원/MCP 성공](RESTORE-WRITE-FAILURE-2026-09-10.md). 실제 integration6통과/15.68초·Ruff/diff. 제품 결함 발견 없음. 예외 경로 검증이며 복원 SIGKILL·DR·실제 JARVIS/native 업무 및 전체 목표는 남는다.

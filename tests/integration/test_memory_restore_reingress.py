@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from sb.knowledge_registry import KnowledgeRegistry
 from sb.search import SearchIndex
 from tests.task30_restore_factory import OLD, restore_fixture
@@ -88,7 +90,8 @@ def test_archived_knowledge_ledger_cannot_authorize_restored_content(tmp_path: P
         fixture.executor.close()
 
 
-def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.parametrize("failure", [None, "bind_knowledge", "bind_source_classification", "bind_page_access"])
+def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: Path, monkeypatch, failure) -> None:
     import hashlib
 
     import pytest
@@ -115,6 +118,27 @@ def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: 
     monkeypatch.setattr('sb.request_executor.materialize_remember', seed)
     fixture = restore_fixture(tmp_path, full_source=True)
     try:
+        if failure is not None:
+            original = getattr(Ledger, failure)
+            writes = []
+            active = fixture.executor.generations.active()
+            before = hashlib.sha256((active.root / '.sb/ledger.db').read_bytes()).hexdigest()
+            high_water = fixture.executor.store.tombstone_high_water()
+
+            def fail_after_write(self, *args):
+                original(self, *args)
+                writes.append(failure)
+                raise ValueError("RESTORE_INJECTED_WRITE_FAILURE")
+
+            with monkeypatch.context() as patch:
+                patch.setattr(Ledger, failure, fail_after_write)
+                with pytest.raises(ValueError, match="RESTORE_INJECTED_WRITE_FAILURE"):
+                    fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
+            assert writes == [failure]
+            assert fixture.executor.generations.active().generation_id == active.generation_id
+            assert hashlib.sha256((active.root / '.sb/ledger.db').read_bytes()).hexdigest() == before
+            assert fixture.executor.store.tombstone_high_water() == high_water
+            assert not list(fixture.executor.generations.staging.iterdir())
         generation, proof = fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
         index = SearchIndex(generation.root, registry_path=tmp_path / 'absent.sqlite')
         assert index.search(OLD, scope='reference') == ()
