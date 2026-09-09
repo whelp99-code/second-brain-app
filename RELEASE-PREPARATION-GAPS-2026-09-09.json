@@ -1,0 +1,75 @@
+{
+  "jarvis_commit": "a7a98e9",
+  "dependency_reuse": {
+    "workspace_direct_runtime_dependencies": 7,
+    "workspace_check": "passed",
+    "operational_check": "RELEASE_DEPENDENCY_LOCK_MISMATCH",
+    "operational_sdk_present": false,
+    "tests_passed": 9,
+    "publisher_boundary_cases": 4,
+    "operational_changes": false
+  },
+  "provider_candidate": {
+    "release": "/var/tmp/sb-memory-release-pinned-daghgem0/releases/dc591781612a0e9acbc751aa2c6cc7b7b7b15093",
+    "manifest": {
+      "schema": 1,
+      "release_id": "dc591781612a0e9acbc751aa2c6cc7b7b7b15093",
+      "wheel_sha256": "4b2da0bd145488f048c421fb457a8ef5d71f7f54fdc68823da50d613868efaa9",
+      "source_commit": "b025e05888f5886460ab0457fb894a0ffd872d07",
+      "source_tree": "8c7a068bdf7d92dd92fc637c4edc2feae8b8cee0",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "package_files": 175,
+    "untracked_package_files": [],
+    "changed_package_files": [],
+    "installed_modules": 7,
+    "cli_help": true,
+    "activated": false
+  },
+  "installed_mcp_handshakes": [
+    {
+      "profile": "scoped-record-read-v2",
+      "tools": [
+        "sb_generation_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-record-read-v5",
+      "tools": [
+        "sb_generation_status",
+        "sb_request_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-request-status-v1",
+      "tools": [
+        "sb_request_status"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-request-write-v1",
+      "tools": [
+        "sb_write_request"
+      ],
+      "installed_release": true
+    }
+  ],
+  "rejected_candidate": {
+    "untracked_backup_files": 2,
+    "removed": true,
+    "original_files_preserved": true
+  },
+  "production_ready": false,
+  "operational_changes": false,
+  "full_goal_complete": false
+}

@@ -103,3 +103,6 @@ P0는 운영 완성의 선행 조건, P1은 안정적 사용의 인수 항목, P
 
 
 [OMO/GJC 후속](EXPORT-CONTENT-CHECKPOINT-2026-09-09.md): 네 수집기가 공통 내용 체크포인트를 사용하며 OMO/GJC 동일크기 교체·prefix 수정·읽는 중 변경과 GJC 헤더 교체를 검사한다. 전체1,388/2skip·독립11프로세스 인수. 과거 offset만 있는 이력, 다중 root, 실제 앱별 자동 수집/주입 및 운영·M1–M14는 남는다.
+
+
+[운영 전환 준비 후속](RELEASE-PREPARATION-GAPS-2026-09-09.md): 기존 운영 node_modules에는 SDK가 없어 현재 lock과 재사용 불가함을 확인했다. 자비스 publisher 사전/사후 검사와 SB git archive 기반 빌드를 수정했다. 새 SB 설치 후보의175파일·CLI·MCP4프로필을 확인했으나 실제 activation/DB·설정·M1–M14는 유지한다.

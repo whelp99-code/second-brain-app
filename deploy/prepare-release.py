@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Build a locked, content-addressed release without activating it.
+"""Build committed HEAD as a locked release without activating it.
+
+Uncommitted and untracked files are excluded; commit intended changes first.
 
 Usage: python deploy/prepare-release.py [app-root]
 Activation is an atomic replacement of app-root/current after validation.
@@ -12,6 +14,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import tarfile
 
 repo = Path(__file__).resolve().parent.parent
 app = Path(sys.argv[1]).expanduser().absolute() if len(sys.argv) > 1 else Path.home() / '.local/state/second-brain/app'
@@ -20,12 +23,28 @@ os.umask(0o077)
 def run(*args):
     return subprocess.run(args, cwd=repo, check=True, text=True, capture_output=True).stdout
 
+source_commit = run("git", "rev-parse", "HEAD").strip()
+source_tree = run("git", "rev-parse", source_commit + "^{tree}").strip()
+working_tree_modified = bool(run("git", "status", "--porcelain"))
+
 with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as temporary:
     temp = Path(temporary)
-    run('uv', 'build', '--wheel', '--out-dir', str(temp))
+    # Build only the pinned commit. Untracked backups and local changes never
+    # enter the artifact, even when the shared worktree intentionally stays dirty.
+    source = temp / 'source'
+    source.mkdir()
+    archive = temp / 'source.tar'
+    with archive.open('wb') as output:
+        subprocess.run(['git', 'archive', '--format=tar', source_commit], cwd=repo, stdout=output, check=True)
+    with tarfile.open(archive) as packed:
+        packed.extractall(source, filter='data')
+    build_env = {**os.environ, 'SOURCE_DATE_EPOCH': run('git', 'show', '-s', '--format=%ct', source_commit).strip()}
+    def build_run(*args):
+        return subprocess.run(args, cwd=source, env=build_env, check=True, text=True, capture_output=True).stdout
+    build_run('uv', 'build', '--wheel', '--out-dir', str(temp))
     wheel = next(temp.glob('*.whl'))
     requirements = temp / 'requirements.txt'
-    run('uv', 'export', '--frozen', '--no-dev', '--no-emit-project', '--no-header', '--format', 'requirements-txt', '--output-file', str(requirements))
+    build_run('uv', 'export', '--frozen', '--no-dev', '--no-emit-project', '--no-header', '--format', 'requirements-txt', '--output-file', str(requirements))
     wheel_hash = hashlib.sha256(wheel.read_bytes()).hexdigest()
     release_id = hashlib.sha256(wheel.read_bytes() + requirements.read_bytes()).hexdigest()[:40]
     release = app / 'releases' / release_id
@@ -51,8 +70,8 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
         path.write_text(base + command)
         path.chmod(0o700)
     manifest = {'schema': 1, 'release_id': release_id, 'wheel_sha256': wheel_hash,
-                'source_commit': run('git', 'rev-parse', 'HEAD').strip(),
-                'working_tree_modified': bool(run('git', 'status', '--porcelain')),
+                'source_commit': source_commit, 'source_tree': source_tree, 'source_materialization': 'git-archive',
+                'working_tree_modified': working_tree_modified,
                 'contract_profile': 'task32-schema4',
                 'requirements_sha256': hashlib.sha256(requirements.read_bytes()).hexdigest()}
     (release / 'release-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')

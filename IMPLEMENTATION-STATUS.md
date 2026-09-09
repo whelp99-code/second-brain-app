@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 운영 전환 준비 결함2개:** [Ja7a98e9 의존성 재사용 차단·SB 고정 커밋 wheel](RELEASE-PREPARATION-GAPS-2026-09-09.md). 운영 SDK 부재/lock 불일치 거부, 관련9검사·격리 publisher4경계. wheel의 미추적 bak2개 혼입을 재현해 git archive 빌드로 수정; 후보175파일 commit일치·7모듈/CLI·설치 MCP4프로필 handshake. 실제 운영 전환/DB·세션 설정 및 M1–M14는 남는다.
+
 **2026-09-09 OMO/GJC 내용 체크포인트:** [교체·헤더 재검증·네 수집기 공통 함수](EXPORT-CONTENT-CHECKPOINT-2026-09-09.md). 회귀11실패→관련50/전체1,388통과·2skip/250.16초·정적0오류0경고, 독립11프로세스 교체/append/헤더/FIFO 인수. legacy 소급 복구·다중 root·운영 및 전체 M1–M14 유지.
 
 **2026-09-09 세션 내용 결합 커서:** [동일크기 교체·수정 후 append 유실6재현·FIFO 회귀 수정](SESSION-CONTENT-CHECKPOINT-2026-09-09.md). Codex/Claude prefix 해시·읽는 중 변경 시 커서 보존/skip. 관련34/전체1,377통과·2skip/238.71초·Ruff/정적0오류0경고·독립8재개+2FIFO프로세스. legacy offset 소급 판별/OMO·GJC/운영 및 전체 M1–M14는 남는다.
