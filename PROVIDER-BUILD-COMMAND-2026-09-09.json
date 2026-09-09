@@ -1,0 +1,1 @@
+{"argv":["python","deploy/prepare-release.py","--offline","/var/tmp/sb-manifest-evidence-o0ue1et6/app"],"cwd":"/home/jm/orca/projects/second-brain-app","environment":{"UV_CACHE_DIR":"/var/tmp/sb-manifest-evidence-o0ue1et6/cache"}}

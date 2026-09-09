@@ -1,0 +1,12 @@
+{
+  "entries": 18456,
+  "first_entries_sha256": "94bd7de7ce4eea3c1842a3081380b1364e1b73c05e46738a2d4486d47e46b4b6",
+  "fixed_path": "/var/tmp/sb-manifest-evidence-o0ue1et6/app/releases/ef56676c6f20ed5ee0fccf3f67563c512bd34756",
+  "offline_cache_sha256": "2fb2a56e3be2f06fe4d1b5ee23a64878d48abb9fbff9c6ec142bfcaf7ea9cc72",
+  "production_activated": false,
+  "schema": 1,
+  "scope": "two builds at same final path and local tool environment, each using a fresh copy of the same cache snapshot",
+  "second_entries_sha256": "94bd7de7ce4eea3c1842a3081380b1364e1b73c05e46738a2d4486d47e46b4b6",
+  "source_archive_sha256": "02661bae4c4d4d57c20f71548a8030e0b5802aaae9148459d4518cc3ba86a332",
+  "source_commit": "d7373ab542e6ed26720817cf8760e2f21e579fde"
+}
