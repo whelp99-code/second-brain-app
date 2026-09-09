@@ -65,3 +65,31 @@ def test_content_scan_refuses_exhausted_budget(tmp_path: Path, monkeypatch) -> N
         with pytest.raises(RestoreInventoryError, match="RESTORE_SCAN_BUDGET_EXCEEDED"):
             ManagedRestoreInventory().sanitize(tmp_path, snapshot)
     assert page.read_bytes() == b"unrelated text"
+
+
+def test_default_budget_restores_megabyte_page_without_deleted_line(tmp_path: Path) -> None:
+    prefix = b"a" * (512 * 1024) + b"\n"
+    secret = b"deleted-record-identity"
+    suffix = b"b" * (512 * 1024) + b"\n"
+    payload = prefix + secret + b"\n" + suffix
+    page = tmp_path / "wiki" / "large.md"
+    page.parent.mkdir()
+    page.write_bytes(payload)
+    target = BlockedTargetIdentity(1, "unused", "unused", hashlib.sha256(secret).hexdigest(),
+        "unused", "unused", "unused", "unused", 0, len(secret))
+    snapshot = TombstoneSnapshot(1, "unused", "unused", (), (target,))
+    result = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+    assert result.files[0].payload == prefix + suffix
+    page.write_bytes(result.files[0].payload)
+    assert ManagedRestoreInventory().sanitize(tmp_path, snapshot, require_clean=True).blocked_matches == 0
+
+
+def test_default_budget_still_rejects_oversized_scan(tmp_path: Path) -> None:
+    page = tmp_path / 'wiki' / 'oversized.md'
+    page.parent.mkdir()
+    page.write_bytes(b'x' * (8 * 1024 * 1024))
+    target = BlockedTargetIdentity(1, 'unused', 'unused', hashlib.sha256(b'secret').hexdigest(),
+        'unused', 'unused', 'unused', 'unused', 0, 6)
+    snapshot = TombstoneSnapshot(1, 'unused', 'unused', (), (target,))
+    with pytest.raises(RestoreInventoryError, match='RESTORE_SCAN_BUDGET_EXCEEDED'):
+        ManagedRestoreInventory().sanitize(tmp_path, snapshot)

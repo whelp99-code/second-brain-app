@@ -90,8 +90,10 @@ def _page_id(relative: Path) -> str | None:
 
 @dataclass(slots=True)
 class _ScanBudget:
-    windows: int = 1_000_000
-    hashed_bytes: int = 64 * 1024 * 1024
+    # Measured 4MiB / 256-byte targets complete below two seconds on the
+    # reference host. These are aggregate per-inventory work limits, not RAM.
+    windows: int = 8_000_000
+    hashed_bytes: int = 1024 * 1024 * 1024
 
     def spans(self, payload: bytes, targets: tuple[BlockedTargetIdentity, ...]) -> list[tuple[int, int]]:
         by_length: dict[int, set[str]] = {}

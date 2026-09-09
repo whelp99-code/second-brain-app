@@ -1,0 +1,38 @@
+[
+  {
+    "bytes": 1048576,
+    "span": 16,
+    "state": "scanned",
+    "seconds": 0.3407
+  },
+  {
+    "bytes": 1048576,
+    "span": 64,
+    "state": "scanned",
+    "seconds": 0.3632
+  },
+  {
+    "bytes": 1048576,
+    "span": 256,
+    "state": "scanned",
+    "seconds": 0.4712
+  },
+  {
+    "bytes": 4194304,
+    "span": 16,
+    "state": "scanned",
+    "seconds": 1.3828
+  },
+  {
+    "bytes": 4194304,
+    "span": 64,
+    "state": "scanned",
+    "seconds": 1.4204
+  },
+  {
+    "bytes": 4194304,
+    "span": 256,
+    "state": "scanned",
+    "seconds": 1.8712
+  }
+]
