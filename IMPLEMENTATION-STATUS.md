@@ -1312,3 +1312,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 관리형 runtime 백업 삭제:** [실제tar에 원문/제어원장 확인→forget proved→대상제거/무관백업bytes동일](MANAGED-RUNTIME-BACKUP-DISPOSAL-2026-09-10.md). 관련23통과/7.57초·Ruff/diff. 일반파일 fixture는 UNMANIFESTED_BACKUP으로 거부, 규칙유지. 합성provider 검사이며 운영/native 전체 수명·전체 목표 유지.
 
 **2026-09-10 유지 백업 복원 조회:** [선택적삭제 후 실제tar restore→무관기억1/삭제기억0](RETAINED-BACKUP-READBACK-2026-09-10.md). 관련23통과/7.46초·Ruff/diff. 합성provider/reference조회이며 운영활성화·DR/native 수명과 전체 목표 유지.
+
+**2026-09-10 M11 scoped 검색 비용 실측:** [100페이지1.85초→300페이지12.4초·허용1/제한0](SCOPED-SEARCH-SCALE-2026-09-10.md). 실제봉인/분류검색·peak RSS/build포함, profile에서199후보/398세대검증 확인. 요청단위 검증공유가 다음 개선이며 전역cache/검사생략 없음. 운영/실사용·전체 목표 유지.

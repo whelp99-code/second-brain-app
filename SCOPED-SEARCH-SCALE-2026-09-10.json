@@ -1,0 +1,40 @@
+[
+  {
+    "root": "/var/tmp/sb-scoped-scale-c8_hhcnx",
+    "pages": 100,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 1.85960759408772,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 1.844192935153842,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 49800,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  },
+  {
+    "root": "/var/tmp/sb-scoped-scale-33j9atep",
+    "pages": 300,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 12.397102672141045,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 12.486739550251514,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 51068,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  }
+]
