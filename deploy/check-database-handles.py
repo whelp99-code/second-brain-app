@@ -26,7 +26,8 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
     observed_uid = os.getuid() if uid is None else uid
     if observed_uid < 0:
         raise ValueError("observed UID must be nonnegative")
-    database = database.resolve(strict=True)
+    requested_database = database.absolute()
+    database = requested_database.resolve(strict=True)
     paths = [database, *(Path(str(database) + suffix) for suffix in ('-wal', '-shm', '-journal'))]
     identities = file_identities(paths)
     matches, mapped, unreadable = [], [], []
@@ -91,12 +92,16 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
             except PermissionError:
                 detail[name] = 'permission-denied'
         diagnostics.append(detail)
-    return {'database': str(database), 'uid': observed_uid, 'observer_uid': os.getuid(), 'scanned_processes': scanned,
+    try:
+        target_path_changed = requested_database.resolve(strict=True) != database
+    except (OSError, RuntimeError):
+        target_path_changed = True
+    return {'database': str(database), 'requested_database': str(requested_database), 'uid': observed_uid, 'observer_uid': os.getuid(), 'scanned_processes': scanned,
             'open_handles': sorted(matches, key=lambda row: (row['pid'], row['fd'])),
             'mapped_files': sorted(mapped, key=lambda row: (row['pid'], row['file'])),
             'unreadable_pids': sorted(set(unreadable)),
             'unreadable_processes': diagnostics,
-            'target_identity_changed': file_identities(paths) != identities,
+            'target_identity_changed': target_path_changed or file_identities(paths) != identities,
             'scope': 'selected-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
             'drain_authorized': False}
 

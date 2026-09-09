@@ -142,3 +142,26 @@ def test_negative_uid_is_rejected_before_observation(tmp_path: Path) -> None:
     assert result.returncode == 2
     assert '--uid must be nonnegative' in result.stderr
     assert not result.stdout
+
+
+def test_symlink_retarget_during_scan_is_incomplete(tmp_path: Path, monkeypatch) -> None:
+    import runpy
+
+    inspect = runpy.run_path(str(SCRIPT))['inspect']
+    old, new = tmp_path / 'old.sqlite', tmp_path / 'new.sqlite'
+    old.write_bytes(b'old generation')
+    new.write_bytes(b'new generation')
+    named = tmp_path / 'current.sqlite'
+    named.symlink_to(old)
+    original = Path.iterdir
+
+    def entries(path):
+        if path == Path('/proc'):
+            named.unlink()
+            named.symlink_to(new)
+        return original(path)
+
+    monkeypatch.setattr(Path, 'iterdir', entries)
+    report = inspect(named)
+    assert report['target_identity_changed'] is True
+    assert report['drain_authorized'] is False
