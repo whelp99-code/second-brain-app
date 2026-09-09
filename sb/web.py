@@ -72,7 +72,7 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <h2>기억 추가</h2>
 <label for="title">제목</label><input id="title" placeholder="예: 계약 일정">
 <label for="content">내용</label><textarea id="content" placeholder="기억할 내용을 입력하세요"></textarea>
-<p><button onclick="remember()">기억하기</button> <button class="secondary" onclick="runPipeline()">지금 처리</button></p>
+<p><button id="rememberButton" onclick="remember()">기억하기</button> <button class="secondary" onclick="runPipeline()">지금 처리</button></p>
 <pre id="rememberResult" class="muted"></pre>
 </section>
 <section>
@@ -117,7 +117,8 @@ async function api(path,options={}){const response=await fetch(path,{...options,
 function show(id,value){byId(id).textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
 function saveToken(){localStorage.setItem('sb_token',byId('token').value);show('rememberResult','토큰을 이 브라우저에 저장했습니다.')}
 async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status;const failures=data.failures;byId('failureSummary').textContent=failures.total?'미해결 실패 '+failures.total+'건 (단계별: '+Object.entries(failures.by_stage).map(([stage,count])=>stage+' '+count+'건').join(', ')+')':'원장에 기록된 미해결 실패 없음';byId('failureDetails').textContent=failures.items.map(item=>item.stage+' · '+item.key+' · 시도 '+item.attempts+'회\\n'+(item.error||'오류 상세 없음')+(item.retry_hold_reason?'\\n재시도 보류: 원래 브리핑 입력을 복구해야 합니다.':'')).join('\\n\\n')+(failures.omitted?'\\n추가 '+failures.omitted+'건은 상세 목록에서 생략됐습니다.':'')}catch(error){byId('status').textContent=error.message;byId('failureSummary').textContent='실패 상태를 확인하지 못했습니다.';byId('failureDetails').textContent=''}}
-async function remember(){const draft={title:byId('title').value,content:byId('content').value};try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify(draft)});show('rememberResult',data);if(byId('title').value===draft.title&&byId('content').value===draft.content)byId('content').value=''}catch(error){show('rememberResult',error.message)}}
+let remembering=false;
+async function remember(){if(remembering)return;remembering=true;byId('rememberButton').disabled=true;const draft={title:byId('title').value,content:byId('content').value};show('rememberResult','저장 중…');try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify(draft)});show('rememberResult',{message:'받은 편지함에 저장했습니다. 처리 대기 상태이며, 지금 처리 후 검색 결과를 확인하세요.',...data});if(byId('title').value===draft.title&&byId('content').value===draft.content)byId('content').value=''}catch(error){show('rememberResult',error.message)}finally{remembering=false;byId('rememberButton').disabled=false}}
 async function runPipeline(){try{show('rememberResult',await api('/api/run',{method:'POST',body:'{}'}));await loadStatus()}catch(error){show('rememberResult',error.message)}}
 function readBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',',2)[1]||'');reader.onerror=()=>reject(reader.error||new Error('파일 읽기 실패'));reader.readAsDataURL(file)})}
 async function uploadFiles(files){const results=[];for(const file of files){try{const payload={filename:file.name,relative_path:file.webkitRelativePath||file.name,device_id:'mac-web',content_base64:await readBase64(file)};results.push(await api('/api/uploads',{method:'POST',body:JSON.stringify(payload)}))}catch(error){results.push({filename:file.name,error:error.message})}}show('uploadResult',results)}
