@@ -1298,3 +1298,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 native 실제 MCP 검색 답변:** [새3호출·각 sb_search1회/실제 result·21일/21일/보류](NATIVE-LIVE-SEARCH-2026-09-10.md). generation/results 기준일치·completion success·validator6통과·구문/diff. 단일 trusted fixture이며 JARVIS 인증/scoped 실제업무·다중모델/전체 목표 유지.
 
 **2026-09-10 두 번째 native 모델 조회:** [실제sonnet5 init/응답·동일MCP3질의·정확값/보류](NATIVE-SECOND-MODEL-2026-09-10.md). 첫 필드형식2실패→지침명확화 후3통과/exit0, 모델식별 기록. 기존Opus와 prompt차이/단일client제품을 구분하며 JARVIS scoped 실제업무·전체 목표 유지.
+
+**2026-09-10 최신 설치물 paired 연동:** [SB eea2c23 설치+J195b1a7·TLS/MCP 쓰기→완료→새로그인 재조회](INSTALLED-PAIR-CURRENT-2026-09-10.md). 정상/철회/만료4경로·settlement1/attempt1/FK0·독립reader2개 각2records·전체설치물/Node불변exit0. 합성identity/clock·모델0회, 운영 전환/실업무·전체 목표 유지.
