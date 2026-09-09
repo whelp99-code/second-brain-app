@@ -77,11 +77,18 @@ class GenerationRestoreSanitizer:
         try:
             with tarfile.open(archive, mode="r:*") as bundle:
                 members = bundle.getmembers()
+                paths: dict[Path, bool] = {}
                 for member in members:
                     path = Path(member.name)
                     if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk():
                         raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
                     if not (member.isdir() or member.isfile()):
+                        raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+                    if path in paths or (path == Path(".") and not member.isdir()):
+                        raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+                    paths[path] = member.isdir()
+                for path in paths:
+                    if any(parent in paths and not paths[parent] for parent in path.parents):
                         raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
                 bundle.extractall(destination, filter="data")
         except (OSError, tarfile.TarError) as exc:

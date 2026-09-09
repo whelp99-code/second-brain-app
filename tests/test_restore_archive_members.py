@@ -1,0 +1,55 @@
+"""Ambiguous archive paths must fail before extraction writes any files."""
+from __future__ import annotations
+
+import io
+import tarfile
+from pathlib import Path
+
+import pytest
+
+from sb.restore import GenerationRestoreSanitizer, RestoreError
+
+
+@pytest.mark.parametrize('second_name', ['wiki/page.md', './wiki/page.md', 'wiki//page.md'])
+def test_restore_rejects_duplicate_normalized_member(tmp_path: Path, second_name: str) -> None:
+    archive = tmp_path / 'duplicate.tar'
+    with tarfile.open(archive, 'w') as bundle:
+        for name, content in [('wiki/page.md', b'original'), (second_name, b'replacement')]:
+            member = tarfile.TarInfo(name)
+            member.size = len(content)
+            bundle.addfile(member, io.BytesIO(content))
+    destination = tmp_path / 'extracted'
+    destination.mkdir()
+    with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
+        GenerationRestoreSanitizer._extract(archive, destination)
+    assert list(destination.iterdir()) == []
+
+
+@pytest.mark.parametrize('names', [('wiki', 'wiki/page.md'), ('wiki/page.md', 'wiki')])
+def test_restore_rejects_file_as_parent_before_writing(tmp_path: Path, names: tuple[str, str]) -> None:
+    archive = tmp_path / 'conflict.tar'
+    with tarfile.open(archive, 'w') as bundle:
+        for name in names:
+            member = tarfile.TarInfo(name)
+            member.size = 1
+            bundle.addfile(member, io.BytesIO(b'x'))
+    destination = tmp_path / 'extracted'
+    destination.mkdir()
+    with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
+        GenerationRestoreSanitizer._extract(archive, destination)
+    assert list(destination.iterdir()) == []
+
+
+def test_restore_extracts_unambiguous_archive(tmp_path: Path) -> None:
+    archive = tmp_path / 'valid.tar'
+    with tarfile.open(archive, 'w') as bundle:
+        directory = tarfile.TarInfo('./wiki')
+        directory.type = tarfile.DIRTYPE
+        bundle.addfile(directory)
+        member = tarfile.TarInfo('wiki/page.md')
+        member.size = 4
+        bundle.addfile(member, io.BytesIO(b'kept'))
+    destination = tmp_path / 'extracted'
+    destination.mkdir()
+    GenerationRestoreSanitizer._extract(archive, destination)
+    assert (destination / 'wiki/page.md').read_bytes() == b'kept'

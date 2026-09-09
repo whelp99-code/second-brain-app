@@ -1,3 +1,5 @@
+[복원 tar 경로 모호성 거부](RESTORE-ARCHIVE-PATH-VALIDATION-2026-09-09.md) — 중복/별칭 경로 및 파일·상위경로 충돌을 추출 전 거부, 정상 tar 포함16개 통과.
+
 [실측 기반 복원 검사 예산 조정](RESTORE-SCAN-BUDGET-TUNING-2026-09-09.md) —1MiB 실제 파일 복원/정상 기억 보존,4MiB 탐지1.38~1.87초,8MiB초과 거부 유지. 대규모 전체 인수는 미완료.
 
 [복원 수정 후 전체 회귀](POST-RESTORE-FULL-REGRESSION-2026-09-09.md) — 1cfeafb에서1491통과/2skip(282.63초), Ruff 통과. [대규모 복원 제한 실측](RESTORE-SCAN-CAPACITY-2026-09-09.md)은 별도 보류.
