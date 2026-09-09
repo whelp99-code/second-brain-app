@@ -1,3 +1,5 @@
+> 2026-09-09 OMO native 모델 검증: [Cursor CLI OAuth 재로그인 요구](OMO-NATIVE-MODEL-HOLD-2026-09-09.md)로 보류. 새 선택적 검증 helper 추가, 실제 모델 기억 도구 호출 성공 미검증. 기본 통합 4경로 회귀 통과. 인증 상태 변경 전 재시도하지 않음.
+
 > 2026-09-09 OMO 후속: [실제 CLI 기억 도구 등록](OMO-CLI-MEMORY-STARTUP-2026-09-09.md) 확인. jarvis_memory connected/1도구, 추가 _ast_grep 비활성화. 모델 요청 0회·사용자 설정 미변경. 자동 선택/수집/주입은 미완료.
 
 > 2026-09-09 클라이언트 대조: [설치 OMO MCP 엔진](OMO-MCP-ENGINE-ACCEPTANCE-2026-09-09.md)으로 JARVIS 공통 기억 1회/2기록 조회 및 통합 4경로 통과. 모델 선택·자동 수집/주입은 미검증, GJC는 원격 wrapper로 별도 인수 필요.

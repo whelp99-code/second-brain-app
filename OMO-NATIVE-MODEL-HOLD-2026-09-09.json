@@ -1,0 +1,11 @@
+{
+  "status": "held",
+  "provider": "cursor-cli-oauth",
+  "model_requested": "composer-2.5",
+  "reason": "All Cursor CLI OAuth accounts are blocked until re-login.",
+  "native_memory_call_verified": false,
+  "account_expiry_check": "passed but insufficient to prove provider authentication",
+  "default_integration_modes": 4,
+  "default_integration_exit": 0,
+  "production_activation": false
+}

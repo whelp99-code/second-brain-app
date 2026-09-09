@@ -1,5 +1,6 @@
 // Client-facing TLS forwarder is a test identity mapper, not a production proxy.
 import assert from 'node:assert/strict';
+import { acceptOmoNativeMemory } from './omo-native-memory-acceptance.mjs';
 import { createServer } from 'node:https';
 import { request } from 'node:http';
 import { execFile, spawnSync } from 'node:child_process';
@@ -124,9 +125,10 @@ export async function acceptPhoneMemoryClient({ build, root, port, identity, ori
       codexVersion = (await promisify(execFile)('codex', ['--version'])).stdout.trim();
       }
     }
-    assert.equal(calls, 2 + nativeCalls + codexCalls + omoEngineCalls);
+    const omoNative = nativeMode === 'omo-cursor' ? await acceptOmoNativeMemory({root,entry,credentials,query,expected}) : undefined;
+    assert.equal(calls, 2 + nativeCalls + codexCalls + omoEngineCalls + (omoNative?.calls ?? 0));
     return { independent_stdio_clients: 2, records_each: expected.length, https_calls: calls,
-      omo_engine_calls: omoEngineCalls, omo_engine_module: omoEngine,
+      omo_native: omoNative, omo_engine_calls: omoEngineCalls, omo_engine_module: omoEngine,
       native_mode: nativeMode ?? 'off', native_claude_calls: nativeCalls, native_version: nativeVersion, native_codex_calls: codexCalls, codex_version: codexVersion,
       scope: 'actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only' };
   } finally { tls.closeAllConnections(); await new Promise(resolve => tls.close(resolve)); }
