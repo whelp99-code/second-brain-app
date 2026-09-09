@@ -1,0 +1,113 @@
+{
+  "database": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
+  "uid": 1000,
+  "scanned_processes": 382,
+  "open_handles": [
+    {
+      "pid": 1553366,
+      "fd": 21,
+      "file": "jarvis.sqlite"
+    },
+    {
+      "pid": 1553366,
+      "fd": 22,
+      "file": "jarvis.sqlite-wal"
+    },
+    {
+      "pid": 1553366,
+      "fd": 23,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 1625716,
+      "fd": 21,
+      "file": "jarvis.sqlite"
+    },
+    {
+      "pid": 1625716,
+      "fd": 22,
+      "file": "jarvis.sqlite-wal"
+    },
+    {
+      "pid": 1625716,
+      "fd": 23,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 2123274,
+      "fd": 21,
+      "file": "jarvis.sqlite"
+    },
+    {
+      "pid": 2123274,
+      "fd": 22,
+      "file": "jarvis.sqlite-wal"
+    },
+    {
+      "pid": 2123274,
+      "fd": 23,
+      "file": "jarvis.sqlite-shm"
+    }
+  ],
+  "mapped_files": [
+    {
+      "pid": 1553366,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 1625716,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 2123274,
+      "file": "jarvis.sqlite-shm"
+    }
+  ],
+  "unreadable_pids": [
+    1422,
+    1477,
+    7401,
+    114125,
+    123343,
+    123344,
+    123345,
+    123348,
+    124121,
+    719131,
+    1040584,
+    1160262,
+    1160311,
+    1160383,
+    1160418,
+    1160508,
+    1160604,
+    1160778,
+    1160863,
+    1161011,
+    1161189,
+    1161268,
+    1161440,
+    1161586,
+    1220791,
+    1331853,
+    1332072,
+    1332133,
+    1332307,
+    1332420,
+    1332467,
+    1332629,
+    1332642,
+    1332768,
+    1332867,
+    1398129,
+    1457025,
+    1496211,
+    1533918,
+    1537182,
+    1553350,
+    2713372,
+    3771272
+  ],
+  "scope": "same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion",
+  "drain_authorized": false
+}

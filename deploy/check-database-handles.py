@@ -21,7 +21,7 @@ def inspect(database: Path) -> dict[str, object]:
             identities[(metadata.st_dev, metadata.st_ino)] = path.name
         except FileNotFoundError:
             continue
-    matches, unreadable = [], []
+    matches, mapped, unreadable = [], [], []
     scanned = 0
     for process in Path('/proc').iterdir():
         if not process.name.isdigit():
@@ -47,10 +47,27 @@ def inspect(database: Path) -> dict[str, object]:
             target = identities.get((metadata.st_dev, metadata.st_ino))
             if target is not None:
                 matches.append({'pid': int(process.name), 'fd': int(descriptor.name), 'file': target})
+        try:
+            process_maps = (process / 'maps').read_text()
+        except FileNotFoundError:
+            continue
+        except PermissionError:
+            unreadable.append(int(process.name))
+            continue
+        mapped_names = set()
+        for line in process_maps.splitlines():
+            fields = line.split(maxsplit=5)
+            major, minor = fields[3].split(':')
+            identity = (os.makedev(int(major, 16), int(minor, 16)), int(fields[4]))
+            target = identities.get(identity)
+            if target is not None:
+                mapped_names.add(target)
+        mapped.extend({'pid': int(process.name), 'file': name} for name in sorted(mapped_names))
     return {'database': str(database), 'uid': os.getuid(), 'scanned_processes': scanned,
             'open_handles': sorted(matches, key=lambda row: (row['pid'], row['fd'])),
+            'mapped_files': sorted(mapped, key=lambda row: (row['pid'], row['file'])),
             'unreadable_pids': sorted(set(unreadable)),
-            'scope': 'same-UID /proc fd snapshot of current file inodes; no future-open exclusion',
+            'scope': 'same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
             'drain_authorized': False}
 
 
@@ -60,7 +77,8 @@ def main() -> None:
     args = parser.parse_args()
     result = inspect(args.database)
     print(json.dumps(result, indent=2))
-    raise SystemExit(2 if result['unreadable_pids'] else 1 if result['open_handles'] else 0)
+    raise SystemExit(2 if result['unreadable_pids'] else 1
+                     if result['open_handles'] or result['mapped_files'] else 0)
 
 
 if __name__ == '__main__':

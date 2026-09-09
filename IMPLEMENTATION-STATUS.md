@@ -1,3 +1,5 @@
+> 2026-09-09 전환 관측 보강: [DB 메모리 매핑 검사](DATABASE-MAPPING-AUDIT-2026-09-09.md). fd 닫힌 실제 mmap 누락 재현·수정, 2개 테스트 및 운영 읽기 전용 조사 완료. 일시 관측이며 전환 허가 아님.
+
 > 2026-09-09 자비스 운영 준비 수정: [portfolio 입력60초 제한](PORTFOLIO-INPUT-DEADLINE-2026-09-09.md). 관련9개·emit/lint 및 실제 CLI 60,211ms timeout/exit2/DB 재개 통과. 열린 운영 구버전 프로세스는 미변경.
 
 > 2026-09-09 운영 DB 보유 원인: [SSH portfolio ingest](SSH-PORTFOLIO-DB-HOLDER-2026-09-09.md) 확인. 구 릴리스 CLI·sshd 부모·stdin pipe, 현/구 readPortfolioStdin에 대기 시간 제한 없음. 입력 대기/자원 종료 개선 대상으로 확정, 프로세스 중지 미실행.
