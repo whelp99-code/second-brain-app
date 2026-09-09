@@ -88,13 +88,41 @@ def _page_id(relative: Path) -> str | None:
     return relative.with_suffix("").as_posix()
 
 
+@dataclass(slots=True)
+class _ScanBudget:
+    windows: int = 1_000_000
+    hashed_bytes: int = 64 * 1024 * 1024
+
+    def spans(self, payload: bytes, targets: tuple[BlockedTargetIdentity, ...]) -> list[tuple[int, int]]:
+        by_length: dict[int, set[str]] = {}
+        for target in targets:
+            size = target.citation_span_end - target.citation_span_start
+            if size <= 0:
+                raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
+            by_length.setdefault(size, set()).add(target.content_identity_digest)
+        found: list[tuple[int, int]] = []
+        for size, hashes in by_length.items():
+            count = max(0, len(payload) - size + 1)
+            self.windows -= count
+            self.hashed_bytes -= count * size
+            if self.windows < 0 or self.hashed_bytes < 0:
+                raise RestoreInventoryError("RESTORE_SCAN_BUDGET_EXCEEDED")
+            for start in range(count):
+                if hashlib.sha256(payload[start:start + size]).hexdigest() in hashes:
+                    found.append((start, start + size))
+        return found
+
+
 def _sanitize_markdown(
     relative: Path,
     payload: bytes,
     targets: tuple[BlockedTargetIdentity, ...],
+    content_spans: list[tuple[int, int]],
 ) -> bytes:
     page_id = _page_id(relative)
     if page_id is None:
+        if content_spans:
+            raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
         return payload
     page_digest = "sha256:" + hashlib.sha256(page_id.encode("utf-8")).hexdigest()
     matches = [target for target in targets if target.page_id_digest == page_digest]
@@ -116,6 +144,10 @@ def _sanitize_markdown(
         next_newline = payload.find(b"\n", end - 1)
         line_end = len(payload) if next_newline < 0 else next_newline + 1
         intervals.append((line_start, line_end))
+    for start, end in content_spans:
+        line_start = payload.rfind(b"\n", 0, start) + 1
+        next_newline = payload.find(b"\n", end - 1)
+        intervals.append((line_start, len(payload) if next_newline < 0 else next_newline + 1))
     # All offsets refer to the original bytes. Merge overlapping line removals
     # before editing so repeated tombstones cannot consume surviving memory.
     merged: list[tuple[int, int]] = []
@@ -139,7 +171,10 @@ def _is_whole_blocked(payload: bytes, targets: tuple[BlockedTargetIdentity, ...]
 class ManagedRestoreInventory:
     """Classify every archive file through one immutable registry."""
 
-    def sanitize(self, extracted: Path, snapshot: TombstoneSnapshot) -> RestoreInventoryResult:
+    def sanitize(
+        self, extracted: Path, snapshot: TombstoneSnapshot, *, require_clean: bool = False,
+    ) -> RestoreInventoryResult:
+        budget = _ScanBudget()
         counts: dict[SurfaceClass, int] = {surface: 0 for surface in RESTORE_SURFACE_CLASSES}
         files: list[SanitizedRestoreFile] = []
         seen: list[dict[str, JsonInput]] = []
@@ -160,8 +195,13 @@ class ManagedRestoreInventory:
             if surface in {"derived_sqlite", "git", "generation_manifest"}:
                 continue
             if _is_whole_blocked(payload, snapshot.targets):
+                if require_clean:
+                    raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
                 continue
-            sanitized = _sanitize_markdown(relative, payload, snapshot.targets)
+            spans = budget.spans(payload, snapshot.targets)
+            if require_clean and spans:
+                raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
+            sanitized = _sanitize_markdown(relative, payload, snapshot.targets, spans)
             if _is_whole_blocked(sanitized, snapshot.targets):
                 raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
             files.append(SanitizedRestoreFile(relative, sanitized))

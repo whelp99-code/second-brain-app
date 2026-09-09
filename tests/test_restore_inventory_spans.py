@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from sb.restore_inventory import ManagedRestoreInventory
+from sb.restore_inventory import ManagedRestoreInventory, RestoreInventoryError
 from sb.tombstone_snapshot import BlockedTargetIdentity, TombstoneSnapshot
 
 
@@ -41,6 +41,27 @@ def test_tombstone_spans_preserve_unrelated_memory(
             citation_span_start=start, citation_span_end=start + len(content),
         ))
     snapshot = TombstoneSnapshot(2, 'unused', 'unused', (), tuple(targets))
+    with pytest.raises(RestoreInventoryError, match="RESTORE_SANITATION_FAILED"):
+        ManagedRestoreInventory().sanitize(tmp_path, snapshot, require_clean=True)
     result = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
     assert len(result.files) == 1
     assert result.files[0].payload == expected.encode()
+
+
+def test_content_scan_refuses_exhausted_budget(tmp_path: Path, monkeypatch) -> None:
+    from functools import partial
+
+    import sb.restore_inventory as inventory
+
+    page = tmp_path / "wiki" / "page.md"
+    page.parent.mkdir()
+    page.write_bytes(b"unrelated text")
+    target = BlockedTargetIdentity(1, "unused", "unused", hashlib.sha256(b"secret").hexdigest(),
+        "unused", "unused", "unused", "unused", 0, 6)
+    snapshot = TombstoneSnapshot(1, "unused", "unused", (), (target,))
+    original = inventory._ScanBudget
+    for windows, hashed_bytes in [(0, 1000), (1000, 0)]:
+        monkeypatch.setattr(inventory, "_ScanBudget", partial(original, windows, hashed_bytes))
+        with pytest.raises(RestoreInventoryError, match="RESTORE_SCAN_BUDGET_EXCEEDED"):
+            ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+    assert page.read_bytes() == b"unrelated text"

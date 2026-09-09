@@ -1,3 +1,5 @@
+[위치 변경·복제된 삭제 대상 복원 수정](RESTORE-RELOCATED-CONTENT-FIX-2026-09-09.md) — 서명 복원3사례, bounded 내용 검사 및 최종 잔존 거부 구현; 관련19개/후속31개(중복8) 통과.
+
 [운영 인수 보류: 위치가 바뀐 삭제 대상 잔존](RESTORE-SHIFTED-CONTENT-HOLD-2026-09-09.md) — inventory 실제 파일 재현에서 대상 잔존인데 blocked_matches=0. 기존 복원 통과 결과를 전체 삭제 보장으로 확대하지 않음.
 
 [복원 인용 끝 개행 경계 수정](RESTORE-TOMBSTONE-SPAN-PRESERVATION-2026-09-09.md) — LF/CRLF/여러 줄 인용의 다음 정상 줄 보존, 관련15개 통과.

@@ -169,7 +169,9 @@ class GenerationRestoreSanitizer:
                     apply=lambda root: ManagedRestoreInventory.materialize(root, inventory),
                 )
             )
-            final_inventory = ManagedRestoreInventory().sanitize(result.generation.root, snapshot)
+            final_inventory = ManagedRestoreInventory().sanitize(
+                result.generation.root, snapshot, require_clean=True
+            )
             if final_inventory.blocked_matches != 0 or final_inventory.scan_errors != 0:
                 raise RestoreError("RESTORE_SANITATION_FAILED")
             shutil.rmtree(staging)
