@@ -1021,3 +1021,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 상태 공개 직후 SIGKILL 인수:** [포인터 전환 후 동일 세대·효과 재실행 없음·정리 완료](EFFECT-PUBLISHED-SIGKILL-2026-09-10.md). 실제 종료 세 경계 총3통과/7.44초·Ruff/diff. 이미 공개된 삭제 효과를 다시 호출하면 실패하는 감시를 두고 proved 복구를 확인했다. 다른 장애/취소·복원/scoped 접근·실제 업무/운영 전체 목표는 남는다.
+
+
+**2026-09-10 효과 접근 분류 결손 수정:** [정확한 prior 요구사항 전체 유지·제한 조회 복구](EFFECT-ACCESS-REBIND-2026-09-10.md). 실제 부분 삭제에서 UNCLASSIFIED 재현 후 수정. 새 본문 동일scope 조회·다른 owner/project/policy 거부, incomplete 승격 없음, access 저장 실패 reconciling→재처리. 최종부분삭제12통과/25.20초·관련16통과/37.79초·Ruff/diff·타입통과. JARVIS 세션 전체 인수·복원·운영 전체 목표는 남는다.

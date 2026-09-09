@@ -16,6 +16,7 @@ from typing import Literal, Protocol, final
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from sb.disposition import sign_disposition_proof
+from sb.effect_access import EffectAccessRebindError, apply_with_prior_access
 from sb.effect_knowledge import EffectKnowledgeRebindError, apply_with_prior_knowledge
 from sb.effect_values import (
     JsonValue,
@@ -492,7 +493,9 @@ class RequestExecutor:
         def mutate(root: Path) -> None:
             def apply() -> None:
                 _ = self.erasure.apply(root, request, now)
-            apply_with_prior_knowledge(root, apply)
+            def with_knowledge() -> None:
+                apply_with_prior_knowledge(root, apply)
+            apply_with_prior_access(root, with_knowledge)
 
         def sealed(generation: Generation) -> None:
             nonlocal lease
@@ -794,7 +797,7 @@ class RequestExecutor:
                 )
             if status is not None and status.identity.operation == "export":
                 activated = activated or (self.config.export_root / lease.request_id).is_dir()
-            if not activated and not isinstance(exc, EffectKnowledgeRebindError):
+            if not activated and not isinstance(exc, (EffectKnowledgeRebindError, EffectAccessRebindError)):
                 final_status = self.store.terminal(
                     lease.request_id,
                     "failed",
