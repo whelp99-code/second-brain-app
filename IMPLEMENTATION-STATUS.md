@@ -1,3 +1,5 @@
+[최신 소스 전체 회귀·설치본 인수](LATEST-SOURCE-INSTALLED-ACCEPTANCE-2026-09-09.md) — d12c183 전체 1532통과/2skip, 새 오프라인 후보·실제 자비스 연동4경로·설치 패키지76개 통과, 후보 내용 보존. 운영·실업무 인수는 남음.
+
 [검색 백업 삭제 수명·인계 우선순위 보완](SEARCH-BACKUP-LIFECYCLE-2026-09-09.md) — 실제 SQLite 및 백업 두 개 삭제·무관 기억 보존, 관련 47개 및 Ruff 통과. 운영·실업무·전체 수명 인수는 남음.
 
 [기존 검색 색인 자동 갱신](SEARCH-PROJECTION-UPGRADE-2026-09-09.md) —색인v3으로YAML해석변경반영, 원문HEAD불변·관련33개통과.

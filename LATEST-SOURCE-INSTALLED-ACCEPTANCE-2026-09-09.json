@@ -1,0 +1,182 @@
+{
+  "harness_commit": "d12c1837fb0f34e1087f5c4c273caa9246d2472c",
+  "provider_manifest": {
+    "schema": 1,
+    "release_id": "184abd3c13e3a12eb09c1c0b171d30389e34018b",
+    "wheel_sha256": "c36d906151f254eadf5bbe49ae4402aac845fdc1c0fa0fb10fa8ad290bb59d38",
+    "release_id_scheme": "sb-release-inputs-v3",
+    "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+    "preparation_files_sha256": {
+      "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+      "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+      "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+    },
+    "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+    "source_commit": "d12c1837fb0f34e1087f5c4c273caa9246d2472c",
+    "source_tree": "32f064620b20757791e53941759f16022a07ddc1",
+    "source_materialization": "git-archive",
+    "working_tree_modified": true,
+    "contract_profile": "task32-schema4",
+    "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+  },
+  "provider_imports": [
+    "/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/mcp.py",
+    "/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/cli.py",
+    "/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+    "/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+  ],
+  "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+  "acceptance": {
+    "gateway_configuration": "CLI parser and independently owned existing authority connection",
+    "admission_surface": "mcp",
+    "execution_surface": "cli",
+    "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+    "identity_forwarder": "fixture",
+    "clock": "fixture",
+    "public_mcp_write": true,
+    "results": [
+      {
+        "mode": "valid",
+        "readback": {
+          "request_id": "memreq:scoped:v4:60a95ceb1dd93d2c7325d0df141fca2531631598522ee712a83f99edbf26d454",
+          "request_digest": "sha256:60a95ceb1dd93d2c7325d0df141fca2531631598522ee712a83f99edbf26d454",
+          "writer_agent": "agent:fixture",
+          "reader_agent": "agent:reader",
+          "fresh_login": true,
+          "provider_proved": true,
+          "jarvis_settled": true,
+          "control_completed": true,
+          "settlement_replay": true,
+          "settlements": 1,
+          "attempts": 1,
+          "same_generation": true,
+          "record_ids": [
+            "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+            "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+          ],
+          "source_refs": [
+            "Second Brain",
+            "Second Brain"
+          ],
+          "context_records": 2,
+          "clients": {
+            "independent_stdio_clients": 2,
+            "records_each": 2,
+            "https_calls": 2,
+            "omo_engine_calls": 0,
+            "native_mode": "off",
+            "native_claude_calls": 0,
+            "native_codex_calls": 0,
+            "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+          },
+          "reader_revocation": 403,
+          "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+        },
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:60a95ceb1dd93d2c7325d0df141fca2531631598522ee712a83f99edbf26d454",
+          "request_digest": "sha256:60a95ceb1dd93d2c7325d0df141fca2531631598522ee712a83f99edbf26d454",
+          "idempotency_key": "memidem:scoped:v4:78dfa8ae128987aff1d2bb2abc90789be6736431331b8d70d984bffad92d5b05",
+          "scope_digest": "sha256:644f893fc10c52553d83a4a188f0829c028945febe5c46b5259c6d3dc0d8358d",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:60a95ceb1dd93d2c7325d0df141fca2531631598522ee712a83f99edbf26d454.v4.json",
+          "request_file_digest": "sha256:812cabdf8d09f8535d8cf8f33c05cf89f6422810d7616fb8b2225882820ecaeb",
+          "replayed": false
+        },
+        "provider_state": "proved",
+        "active_generation": true,
+        "authority_https_calls": 5,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_during_accept",
+        "admission": "denied",
+        "accepted_row": false,
+        "authority_https_calls": 2,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:9bf6512f176c120fe2df2cf7b9226c1b9ce2d8ca1596be1e585636dacedcb680",
+          "request_digest": "sha256:9bf6512f176c120fe2df2cf7b9226c1b9ce2d8ca1596be1e585636dacedcb680",
+          "idempotency_key": "memidem:scoped:v4:d2c4a34b2f36b9618d8e501074fecfe9934d6c6e03cf6bd5439543b54748e222",
+          "scope_digest": "sha256:c783b02712a198b7044214089cdb18f12776d2f61b597f9a007cea80a4a5c422",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:9bf6512f176c120fe2df2cf7b9226c1b9ce2d8ca1596be1e585636dacedcb680.v4.json",
+          "request_file_digest": "sha256:e19daf1879380c574febec063362730998781017f0dfcdf49f27152dc4465044",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "expire_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:c122c087a9768f2a918e9b783103a6e629ae46ba50b67928be3d7d8677070fad",
+          "request_digest": "sha256:c122c087a9768f2a918e9b783103a6e629ae46ba50b67928be3d7d8677070fad",
+          "idempotency_key": "memidem:scoped:v4:6803381bd02d02f55cb4fd81b798bab9c5f389ff60c656effda4c9a06c3ec2a8",
+          "scope_digest": "sha256:00e924f12258bcd5398f8799488fc796500f8d90177d77eb138692c744e99212",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:c122c087a9768f2a918e9b783103a6e629ae46ba50b67928be3d7d8677070fad.v4.json",
+          "request_file_digest": "sha256:8ccf498b7a2b5c48eb0c33ce011a76f474e853f503eb299afdaa23362dfc29e4",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      }
+    ]
+  },
+  "production_activated": false,
+  "candidate_contents": {
+    "provider": {
+      "inventory_sha256": "4f952c8230e3d9f82857556ecaa5e7d8e18de59ca2edd97eea511a9b9b42dd6d",
+      "entries": 18456
+    },
+    "jarvis": {
+      "inventory_sha256": "8b3ebc1901256636f33c6218adee47d6e294355afd64b569af343ea7676b8d10",
+      "entries": 19588
+    },
+    "node_executable": {
+      "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+      "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "size": 125989464,
+      "mode": 493
+    }
+  },
+  "post_installed_tests": {
+    "installed_tests": 76,
+    "provider_inventory_unchanged_after_installed_tests": true,
+    "provider_inventory_sha256": "4f952c8230e3d9f82857556ecaa5e7d8e18de59ca2edd97eea511a9b9b42dd6d",
+    "entries": 18456
+  },
+  "installed_test_results": {
+    "installed-lifecycle-tests.txt": "['/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/restore.py', '/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/search.py', '/var/tmp/sb-latest-regression-pair-1x4ibfku/app/releases/184abd3c13e3a12eb09c1c0b171d30389e34018b/.venv/lib/python3.12/site-packages/sb/page_metadata.py']\n..........................................................               [100%]\n58 passed in 26.17s\n",
+    "installed-archive-tests.txt": "..................                                                       [100%]\n18 passed in 0.39s\n"
+  }
+}
