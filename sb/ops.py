@@ -376,7 +376,10 @@ def _restore_backup_locked(archive: Path, destination_path: Path, *, force: bool
                 raise OperationError("restore destination is not empty; use --force")
             if any(destination_path.iterdir()):
                 stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-                previous = parent / f"{destination_path.name}.pre-restore-{stamp}"
+                # Reserve a fresh sibling even when multiple restores share a second.
+                previous = Path(mkdtemp(
+                    prefix=f"{destination_path.name}.pre-restore-{stamp}-", dir=parent
+                ))
                 os.replace(destination_path, previous)
         try:
             # Replacing an empty directory is atomic on supported POSIX hosts.

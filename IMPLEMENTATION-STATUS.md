@@ -1,3 +1,5 @@
+[반복 복원 보관 경로 충돌 수정](RESTORE-EMPTY-DESTINATION-2026-09-09.md) — 같은 초의 연속 복원과 각각의 이전 기억 보존 검증, 관련 70개 테스트 통과.
+
 [빈 복원 대상 실패 보존 검증](RESTORE-EMPTY-DESTINATION-2026-09-09.md) — 배치 실패 시 기존 디렉터리 보존, 관련 69개 테스트 통과.
 
 > 2026-09-09 provider 정본 manifest: [실제 Git/캐시/두 준비 receipt 연결·독립 항목 검증](PROVIDER-CANONICAL-MANIFEST-2026-09-09.md). 두 manifest 바이트일치·payload18,455항목·sidecar/digest·실제 설치연동4경로 통과. 영구봉인/JARVIS 동등검증·운영/에이전트 인수는 남음.

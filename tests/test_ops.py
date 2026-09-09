@@ -196,6 +196,31 @@ def test_restore_nonempty_destination_requires_force_and_preserves_previous(tmp_
     assert (destination / "wiki" / "계약-일정.md").is_file()
 
 
+def test_restore_same_timestamp_preserves_each_previous_vault(tmp_path: Path, monkeypatch) -> None:
+    from datetime import UTC, datetime
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 9, 9, tzinfo=UTC)
+
+    monkeypatch.setattr("sb.ops.datetime", FixedDatetime)
+    root, _config = _seed_vault(tmp_path)
+    archive = tmp_path / "backup.tar.gz"
+    create_backup(root, archive)
+    destination = tmp_path / "existing"
+    destination.mkdir()
+    (destination / "original.txt").write_text("first memory")
+    first = restore_backup(archive, destination, force=True)
+    (destination / "second.txt").write_text("second memory")
+    second = restore_backup(archive, destination, force=True)
+    assert first.previous is not None and second.previous is not None
+    assert first.previous != second.previous
+    assert (first.previous / "original.txt").read_text() == "first memory"
+    assert (second.previous / "second.txt").read_text() == "second memory"
+    assert (destination / "wiki" / "계약-일정.md").is_file()
+
+
 def test_restore_publish_failure_preserves_empty_destination(tmp_path: Path, monkeypatch) -> None:
     root, _config = _seed_vault(tmp_path)
     archive = tmp_path / "backup.tar.gz"
