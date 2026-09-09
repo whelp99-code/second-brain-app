@@ -1294,3 +1294,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 실제 hybrid 품질 비교:** [동일3질의·실제BGE-M3·CLI/MCP](STALE-HYBRID-COMPARISON-2026-09-10.md). recall0.5→1이나 stale노출0.5→1·무근거빈결과1→0. hybrid 기본 활성화 보류, 최종 추적없는 실행exit0. 초기벡터실패 원인미확정·실제gold/소비자근거 검증과 전체 목표 유지.
 
 **2026-09-10 실제 native 검색 답변 진단:** [MCP 응답 hash검증·Claude 새3호출·21일/21일/근거부족](NATIVE-SEARCH-ANSWER-2026-09-10.md). 실제 모델3값 통과·검사기6통과·구문/diff. 저장응답 재생/명시지침/단일모델이며 live JARVIS 세션·전체 의미검증·운영 및 전체 목표 유지.
+
+**2026-09-10 native 실제 MCP 검색 답변:** [새3호출·각 sb_search1회/실제 result·21일/21일/보류](NATIVE-LIVE-SEARCH-2026-09-10.md). generation/results 기준일치·completion success·validator6통과·구문/diff. 단일 trusted fixture이며 JARVIS 인증/scoped 실제업무·다중모델/전체 목표 유지.

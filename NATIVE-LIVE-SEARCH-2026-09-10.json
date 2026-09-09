@@ -1,0 +1,48 @@
+{
+  "source": "/var/tmp/sb-korean-search-e4qcukpi",
+  "results": [
+    {
+      "case_id": "current",
+      "tool_calls": 1,
+      "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+      "passed": true,
+      "answer": {
+        "status": "supported",
+        "value": "21일",
+        "explanation": "wiki/current-backup의 현재 결정에 따르면 은하 백업 보관 기간은 21일이며, wiki/old-backup의 7일은 폐기된 과거 결정이다.",
+        "raw_response": "```json\n{\n  \"status\": \"supported\",\n  \"value\": \"21일\",\n  \"explanation\": \"wiki/current-backup의 현재 결정에 따르면 은하 백업 보관 기간은 21일이며, wiki/old-backup의 7일은 폐기된 과거 결정이다.\"\n}\n```"
+      }
+    },
+    {
+      "case_id": "current-natural",
+      "tool_calls": 1,
+      "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+      "passed": true,
+      "answer": {
+        "status": "supported",
+        "value": "21일",
+        "explanation": "wiki/current-backup의 현재 결정에 따르면 은하 백업 보관 기간은 21일이며, 7일은 폐기된 과거 결정(wiki/old-backup)이다.",
+        "raw_response": "```json\n{\n  \"status\": \"supported\",\n  \"value\": \"21일\",\n  \"explanation\": \"wiki/current-backup의 현재 결정에 따르면 은하 백업 보관 기간은 21일이며, 7일은 폐기된 과거 결정(wiki/old-backup)이다.\"\n}\n```"
+      }
+    },
+    {
+      "case_id": "absent",
+      "tool_calls": 1,
+      "generation": "sbgen:v1:7c843167b9ba284db6958fffec4473e56c6f88976484f6ebb720b8872584f473",
+      "passed": true,
+      "answer": {
+        "status": "insufficient_evidence",
+        "value": null,
+        "explanation": "검색된 후보 문서 두 건은 모두 '은하' 백업 보관 기간(현재 21일, 폐기된 7일)에 관한 내용으로, 달빛 프로젝트 담당자나 전화번호에 대한 정보가 전혀 없습니다.",
+        "raw_response": "```json\n{\n  \"status\": \"insufficient_evidence\",\n  \"value\": null,\n  \"explanation\": \"검색된 후보 문서 두 건은 모두 '은하' 백업 보관 기간(현재 21일, 폐기된 7일)에 관한 내용으로, 달빛 프로젝트 담당자나 전화번호에 대한 정보가 전혀 없습니다.\"\n}\n```"
+      }
+    }
+  ],
+  "scope": "native Claude calls real provider MCP; synthetic data; no JARVIS authenticated session delivery",
+  "raw_event_sha256": {
+    "current.txt": "a1fbdb7e5922bdc94eb19fe210a30b29619d4e87e78589e36d101aa2839ff168",
+    "current-natural.txt": "cca7bd8c12b70cc1e5a3444cf4b18e442d64404e0f617ac6c217d5b9fe73e13b",
+    "absent.txt": "e1b86d9898c9c5c73c5febe6973f52bfedc5ae05c550f1463121aac337591e8e"
+  },
+  "raw_event_root": "/var/tmp/sb-native-search-answer-wJnPAf"
+}
