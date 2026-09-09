@@ -1278,3 +1278,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 실제 runtime archive 자비스 복원:** [copytree 대체→runtime tar/해제→삭제·동시scoped조회·재삭제/재복원](JARVIS-RUNTIME-BACKUP-2026-09-10.md). 최종exit0·제어journal존재/복원제외·최종highwater2/결과0·Ruff/diff. stale외부사본 fixture이며 managedbackup 처분/운영DR 전체 인수는 남는다.
 
 **2026-09-10 실제 복원 SIGKILL:** [독립 프로세스 종료/재시도 2통과 및 P0 원문 잔류 발견](RESTORE-SIGKILL-2026-09-10.md). 활성/삭제 이력·후보 정제 유지, 그러나 해제 작업공간에 각각 24파일/삭제내용 3파일 잔류. 운영 복원 완료 보류, 안전한 중단 작업공간 회수가 다음 수정이다. 전체 목표 미완료.
+
+**2026-09-10 복원 중단 사본 회수 수정:** [작업공간 잠금·SIGKILL 다음 진입 정리·동시 진입/링크 보호](RESTORE-WORKSPACE-RECOVERY-2026-09-10.md). 최종 관련17통과·Ruff/타입0오류0경고·실제 JARVIS archive 경로exit0. 다음 진입 전 잔류/구형 이름 처분·혼합 구버전 writer·운영 maintenance 인수는 남는다. 전체 목표 유지.

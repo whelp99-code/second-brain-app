@@ -39,5 +39,6 @@ def test_restore_sigkill_preserves_active_and_allows_fresh_process_retry(tmp_pat
         assert all(OLD.encode() not in path.read_bytes()
                    for path in candidate.rglob('*') if path.is_file())
         assert not list(restarted.generations.staging.iterdir())
+        assert not list((tmp_path / "restore").iterdir())
     finally:
         restarted.close()

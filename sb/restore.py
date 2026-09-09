@@ -10,7 +10,6 @@ import tarfile
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from tempfile import mkdtemp
 from typing import BinaryIO, Final, final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -37,6 +36,7 @@ from sb.restore_models import (
     manifest_preimage,
 )
 from sb.restore_source import read_restore_knowledge
+from sb.restore_workspace import restore_workspace
 from sb.store.ledger import Ledger
 
 _MAX_RESTORE_MEMBERS: Final = 100_000
@@ -113,6 +113,8 @@ class GenerationRestoreSanitizer:
         self.provider_instance_id = provider_instance_id
         self.jarvis_public_keys = jarvis_public_keys
         workspace.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if workspace.is_symlink():
+            raise RestoreError("RESTORE_WORKSPACE_UNSAFE")
         workspace.chmod(0o700)
 
     @staticmethod
@@ -234,8 +236,7 @@ class GenerationRestoreSanitizer:
         ):
             raise RestoreError("TOMBSTONE_SET_STALE")
         request_key = hashlib.sha256(request.request_id.encode("utf-8")).hexdigest()
-        staging = Path(mkdtemp(prefix=f"restore-{request_key}-", dir=self.workspace))
-        try:
+        with restore_workspace(self.workspace, request_key) as staging:
             self._extract(request.archive, staging)
             self._verify_manifest(staging, request.archive_manifest)
             states = (read_restore_knowledge(staging, request.archive_manifest, mutations.store)
@@ -300,6 +301,3 @@ class GenerationRestoreSanitizer:
             return result.generation, RestoreProofV1.model_validate(
                 {**body, "proof_digest": proof_digest}
             )
-        except (OSError, RuntimeError, ValueError):
-            shutil.rmtree(staging, ignore_errors=True)
-            raise
