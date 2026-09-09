@@ -6,6 +6,7 @@ import {mkdtempSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {referenceEffectFixture} from './reference_effect_fixture.mjs';
+import {checkRestoredScope} from './restore-scoped-client.mjs';
 const build = resolve(process.argv[2]);
 const sb = fileURLToPath(new URL('..', import.meta.url));
 const load = name => import(pathToFileURL(join(build,name)).href);
@@ -52,9 +53,10 @@ try {
   const keep = await read('KeepBeta');
   assert.equal(keep.payload.records.length,1);
   assert(keep.payload.records[0].text.includes('KeepBeta'));
-  const result = {root,backup,deleted,restored,jarvis_owned_high_water:1,
+  const scoped = await checkRestoredScope({load,database,config,root,launcher,pageId:restored.surviving_page_id});
+  const result = {root,backup,deleted,restored,scoped,jarvis_owned_high_water:1,
     deleted_records:0,surviving_records:1,model_calls:0,
-    scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; not scoped-project or operational/native acceptance'};
+    scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result));
 } finally {

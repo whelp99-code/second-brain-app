@@ -14,6 +14,7 @@ from sb.restore_models import (
     RestoreRequest,
     build_restore_archive_manifest,
 )
+from sb.source_access import SourceAccess
 from tests.task30_process_harness import executor_config
 
 root = Path(sys.argv[2]).resolve()
@@ -30,7 +31,8 @@ try:
         def seed(destination):
             materialize_remember(destination, content='KeepBeta synthetic surviving memory',
                 candidate_id='memcand:pos:v1:' + 'c' * 64, created_at=now.isoformat(),
-                release_sha=config.provider_release_sha)
+                release_sha=config.provider_release_sha,
+                source_access=SourceAccess("principal:owner", ("project:a",), "policy:1"))
         generation = executor.generations.build(request_id='fixture:restore-keep', parent=parent,
             tombstone_sequence=parent.manifest.tombstone_sequence,
             tombstone_set_root=parent.manifest.tombstone_set_root, created_at=now,
@@ -53,7 +55,10 @@ try:
         sanitizer = GenerationRestoreSanitizer(root / 'restore-work', config.provider_instance_id, config.jarvis_public_keys)
         generation, proof = sanitizer.sanitize(request, executor.mutations)
         executor.generations.activate(generation, executor.generations.active(), now)
-        print(json.dumps({'generation_id': generation.generation_id,
+        pages = [path.relative_to(generation.root).with_suffix('').as_posix()
+                 for path in (generation.root / 'wiki').glob('*.md') if 'KeepBeta' in path.read_text()]
+        assert len(pages) == 1
+        print(json.dumps({'generation_id': generation.generation_id, 'surviving_page_id': pages[0],
             'tombstone_sequence': generation.manifest.tombstone_sequence,
             'tombstone_set_root': generation.manifest.tombstone_set_root,
             'blocked_matches': proof.blocked_matches, 'scan_errors': proof.scan_errors}))

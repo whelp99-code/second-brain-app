@@ -1075,3 +1075,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 실제 JARVIS 삭제 이력→복원 조회:** [자비스 chain1·실제 effect proof·production fence→sanitizer→reference reader](JARVIS-RESTORE-ACCEPTANCE-2026-09-10.md). 최종실행exit0·삭제0/유지1·blocked/scan0, provider high water 복사 없음. 실제 stdio/시계지만 synthetic authority/source이며 scoped 프로젝트·실업무/운영 전체 목표는 남는다.
+
+
+**2026-09-10 실제 자비스 scoped 복원 조회:** [자비스 chain1 유지·v3 issuer/client→허용1/다른프로젝트0·정책철회거부](JARVIS-SCOPED-RESTORE-2026-09-10.md). 최종실행exit0·Ruff/Node구문/diff. 실제 stdio/제품 발급소비지만 synthetic session/policy/source다. 운영 인증/native 업무·DR 및 전체 목표는 남는다.
