@@ -1,0 +1,12 @@
+{
+  "source_commit": "cf2be5a3bc48a87859f83c2135aade27c65478eb",
+  "command": "uv run pytest -q --ignore=tests/test_embeddings.py",
+  "exit_code": 0,
+  "passed": 1435,
+  "skipped": 2,
+  "seconds": 263.15,
+  "output_sha256": "693b61b711e4dafeb82991a3defff5ac4c8e24354c61625939f28421b6582fe6",
+  "ruff": "passed: uv run ruff check sb tests",
+  "operational_changes": false,
+  "full_goal_complete": false
+}
