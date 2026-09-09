@@ -1,0 +1,226 @@
+{
+  "integration": {
+    "harness_commit": "0ff54e23b6ccf0c37303ef596d5398c13c760bbb",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "9c2c034796f47f6bcd4834fffdf18a67f9094a14",
+      "wheel_sha256": "6011b7e2db69909b52352716acc5caa3458893f109fc9117f8ba7193e2247893",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "0ff54e23b6ccf0c37303ef596d5398c13c760bbb",
+      "source_tree": "63eed9b59a412247212f4dabbbabe6c8dc27b09b",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-current-complete-pair-x8zt5yl7/app/releases/9c2c034796f47f6bcd4834fffdf18a67f9094a14/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-current-complete-pair-x8zt5yl7/app/releases/9c2c034796f47f6bcd4834fffdf18a67f9094a14/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-current-complete-pair-x8zt5yl7/app/releases/9c2c034796f47f6bcd4834fffdf18a67f9094a14/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-current-complete-pair-x8zt5yl7/app/releases/9c2c034796f47f6bcd4834fffdf18a67f9094a14/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:1c22fc3befbaf55fe89c0169f5d335a2e0f89cf0f0d887264a4d432d8629643e",
+            "request_digest": "sha256:1c22fc3befbaf55fe89c0169f5d335a2e0f89cf0f0d887264a4d432d8629643e",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "omo_engine_calls": 0,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:1c22fc3befbaf55fe89c0169f5d335a2e0f89cf0f0d887264a4d432d8629643e",
+            "request_digest": "sha256:1c22fc3befbaf55fe89c0169f5d335a2e0f89cf0f0d887264a4d432d8629643e",
+            "idempotency_key": "memidem:scoped:v4:32353deb6c97a8f53e553bc3d8c3bc4f53b3082e7c0d4d0a12a9a46adaf85555",
+            "scope_digest": "sha256:5bb00ef0ea9b4b1813522f83dce35ae0e04b5c1dd9c248ed2a0b8d0ba7c7a61e",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:1c22fc3befbaf55fe89c0169f5d335a2e0f89cf0f0d887264a4d432d8629643e.v4.json",
+            "request_file_digest": "sha256:718e75a3d816a15328260234594b0af747ca2158f27dc1ed73229928594e9c40",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:3d45f9a61b46f71de61af9ba8d8b70cfd60b63462e7c6190897cf4489dc5d8ba",
+            "request_digest": "sha256:3d45f9a61b46f71de61af9ba8d8b70cfd60b63462e7c6190897cf4489dc5d8ba",
+            "idempotency_key": "memidem:scoped:v4:5682f8a85cae34ad79d4ac318169e1692fe7179caae9cbfcf1ed9a9cd3d9d5c8",
+            "scope_digest": "sha256:5af7cddabb90916387cd390e4ce5ef3dd129aabb9c5fccd178e11c0a1913796d",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:3d45f9a61b46f71de61af9ba8d8b70cfd60b63462e7c6190897cf4489dc5d8ba.v4.json",
+            "request_file_digest": "sha256:3c951e5dad81b62a5e6355eadb239681e8503974e1bb5d65bf9abeda54ffa1a5",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:cb3fe0396b84168bdb454b4e69a446a5b6297fcb5c9ea4d4f6a9af534421d077",
+            "request_digest": "sha256:cb3fe0396b84168bdb454b4e69a446a5b6297fcb5c9ea4d4f6a9af534421d077",
+            "idempotency_key": "memidem:scoped:v4:671ad1c07520a9907af6d51b4e2093dda204703608b983e7e7f9ab548585bf59",
+            "scope_digest": "sha256:656c9bcb83323aac116cc773ce16672e6e91a74717ba2486640680e9ffa993d6",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:cb3fe0396b84168bdb454b4e69a446a5b6297fcb5c9ea4d4f6a9af534421d077.v4.json",
+            "request_file_digest": "sha256:83bec415b7415c6fa028a8474ea8eb80177e6fff1af03754ee45a015d70573f4",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "production_activated": false,
+    "candidate_contents": {
+      "provider": {
+        "inventory_sha256": "9b80a5089368c9db8f5d27115415c5b2b7c5629e303016434d973bd7d8bb987d",
+        "entries": 18456
+      },
+      "jarvis": {
+        "inventory_sha256": "8b3ebc1901256636f33c6218adee47d6e294355afd64b569af343ea7676b8d10",
+        "entries": 19588
+      },
+      "node_executable": {
+        "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+        "size": 125989464,
+        "mode": 493
+      }
+    }
+  },
+  "installed_cli_restore": {
+    "workspace": "/var/tmp/installed-restore-current-uitdphta",
+    "provider_release": "/var/tmp/sb-current-complete-pair-x8zt5yl7/app/releases/9c2c034796f47f6bcd4834fffdf18a67f9094a14",
+    "backup": {
+      "archive": "/var/tmp/installed-restore-current-uitdphta/backup.tar.gz",
+      "checksum": "630efe53b6156abdd4fac4aee6b44ed859093eb618c0df0f59c44873bb29f247",
+      "verification": {
+        "schema_version": 1,
+        "validation": "isolated-vault-restore-v1",
+        "archive_name": "backup.tar.gz",
+        "origin": "vault:/var/tmp/installed-restore-current-uitdphta/vault-한글",
+        "generation": null,
+        "archive_sha256": "630efe53b6156abdd4fac4aee6b44ed859093eb618c0df0f59c44873bb29f247",
+        "archive_identity": {
+          "device": 64770,
+          "inode": 49589435,
+          "size": 17725,
+          "mtime_ns": 1788956359703192011,
+          "ctime_ns": 1788956359703192011
+        },
+        "backup_created_at": "2026-09-09T12:19:19.693733+00:00",
+        "verified_at": "2026-09-09T12:19:19.713688+00:00",
+        "files": 37,
+        "bytes": 126960
+      },
+      "files": 37,
+      "bytes": 126960
+    },
+    "restores": [
+      {
+        "destination": "/var/tmp/installed-restore-current-uitdphta/restored",
+        "files": 37,
+        "bytes": 126960,
+        "previous": null
+      },
+      {
+        "destination": "/var/tmp/installed-restore-current-uitdphta/restored",
+        "files": 37,
+        "bytes": 126960,
+        "previous": "/var/tmp/installed-restore-current-uitdphta/restored.pre-restore-20260909T121920Z-mzlow9mh"
+      },
+      {
+        "destination": "/var/tmp/installed-restore-current-uitdphta/restored",
+        "files": 37,
+        "bytes": 126960,
+        "previous": "/var/tmp/installed-restore-current-uitdphta/restored.pre-restore-20260909T121920Z-tk87znoy"
+      }
+    ],
+    "previous_memories_preserved": true,
+    "source_fixture_only": true,
+    "cli_runs": 4
+  }
+}

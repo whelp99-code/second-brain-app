@@ -1,3 +1,5 @@
+[최근 복원 수정 포함 설치본 인수](CURRENT-PAIR-RESTORE-ACCEPTANCE-2026-09-09.md) — SB0ff54e2/JARVIS195b1a7 연동4경로 및 실제 설치 CLI 백업1회·복원3회 통과.
+
 [최신 자비스 설치 후보 연동](LATEST-JARVIS-INSTALLED-PAIR-2026-09-09.md) — JARVIS195b1a7 신규 빌드, 실제 TLS/MCP 4경로 통과, 후보 전후 일치.
 
 [반복 복원 보관 경로 충돌 수정](RESTORE-EMPTY-DESTINATION-2026-09-09.md) — 같은 초의 연속 복원과 각각의 이전 기억 보존 검증, 관련 70개 테스트 통과.
