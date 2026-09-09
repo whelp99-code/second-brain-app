@@ -27,19 +27,27 @@ def inspect(database: Path) -> dict[str, object]:
     paths = [database, *(Path(str(database) + suffix) for suffix in ('-wal', '-shm', '-journal'))]
     identities = file_identities(paths)
     matches, mapped, unreadable = [], [], []
+    denied: dict[int, set[str]] = {}
+
+    def mark_denied(pid: int, resource: str) -> None:
+        unreadable.append(pid)
+        denied.setdefault(pid, set()).add(resource)
+
     scanned = 0
     for process in Path('/proc').iterdir():
         if not process.name.isdigit():
             continue
+        resource = 'process_metadata'
         try:
             if process.stat().st_uid != os.getuid():
                 continue
+            resource = 'fd_directory'
             descriptors = tuple((process / 'fd').iterdir())
             scanned += 1
         except FileNotFoundError:
             continue
         except PermissionError:
-            unreadable.append(int(process.name))
+            mark_denied(int(process.name), resource)
             continue
         for descriptor in descriptors:
             try:
@@ -47,7 +55,7 @@ def inspect(database: Path) -> dict[str, object]:
             except FileNotFoundError:
                 continue
             except PermissionError:
-                unreadable.append(int(process.name))
+                mark_denied(int(process.name), 'fd_target')
                 break
             target = identities.get((metadata.st_dev, metadata.st_ino))
             if target is not None:
@@ -57,7 +65,7 @@ def inspect(database: Path) -> dict[str, object]:
         except FileNotFoundError:
             continue
         except PermissionError:
-            unreadable.append(int(process.name))
+            mark_denied(int(process.name), 'maps')
             continue
         mapped_names = set()
         for line in process_maps.splitlines():
@@ -71,7 +79,7 @@ def inspect(database: Path) -> dict[str, object]:
     diagnostics = []
     for pid in sorted(set(unreadable)):
         process = Path('/proc') / str(pid)
-        detail = {'pid': pid}
+        detail = {'pid': pid, 'denied_resources': sorted(denied[pid])}
         for name in ('comm', 'cgroup'):
             try:
                 detail[name] = (process / name).read_text().strip()

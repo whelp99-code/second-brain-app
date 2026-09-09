@@ -89,3 +89,30 @@ def test_file_identity_change_during_scan_is_incomplete(tmp_path: Path, monkeypa
     result = inspect(database)
     assert result['target_identity_changed'] is True
     assert not result['drain_authorized']
+
+
+@pytest.mark.parametrize('resource', ['fd_directory', 'fd_target', 'maps'])
+def test_permission_failure_identifies_unreadable_resource(tmp_path: Path, monkeypatch, resource: str) -> None:
+    import runpy
+
+    inspect = runpy.run_path(str(SCRIPT))['inspect']
+    database = tmp_path / 'fixture.sqlite'
+    database.write_bytes(b'fixture')
+    process = Path('/proc') / str(os.getpid())
+    method = {'fd_directory': 'iterdir', 'fd_target': 'stat', 'maps': 'read_text'}[resource]
+    original = getattr(Path, method)
+
+    def deny(path, *args, **kwargs):
+        blocked = ((resource == 'fd_directory' and path == process / 'fd')
+            or (resource == 'fd_target' and path.parent == process / 'fd')
+            or (resource == 'maps' and path == process / 'maps'))
+        if blocked:
+            raise PermissionError('injected permission failure')
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, method, deny)
+    report = inspect(database)
+    detail = next(row for row in report['unreadable_processes'] if row['pid'] == os.getpid())
+    assert resource in detail['denied_resources']
+    assert os.getpid() in report['unreadable_pids']
+    assert report['drain_authorized'] is False

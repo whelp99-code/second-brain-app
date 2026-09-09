@@ -1,3 +1,5 @@
+[운영 DB 접근 거부 단계 진단](DATABASE-DENIAL-STAGES-2026-09-09.md) —17PID 중16 FD목록/1 FD대상·maps, 관련8개 통과; exit2 유지.
+
 [운영 작성자 재관측](CURRENT-OPERATIONAL-WRITERS-2026-09-09.md) — 이전 SSH PID없음, 현재2서비스/6핸들/2매핑·접근불가17·DB58migrations. exit2로 운영 전환 보류 유지.
 
 [삭제 줄 제거 후 새 차단 내용 검사](RESTORE-JOINED-CONTENT-2026-09-09.md) — 후보 생성 전 정리 결과 재검사, 실제 반례 및 관련23개 통과.
