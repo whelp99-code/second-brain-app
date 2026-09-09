@@ -204,7 +204,7 @@ def test_source_cap_bounds_zero_unit_and_quarantined_versions(
     def discover(_config: Config) -> dict[str, EmptySources]:
         return {"empty": EmptySources()}
 
-    config = Config(raw={**config.raw, "sources": [{"id": "empty", "adapter": "test-empty"}]})
+    config = Config(raw={**config.raw, "sources": [{"id": "empty", "adapter": "empty"}]})
     monkeypatch.setattr("sb.connectors.discover_adapters", discover)
     for expected, status in ((2, "capped"), (4, "capped"), (5, "ok")):
         assert run_ingest(config, None).status == status

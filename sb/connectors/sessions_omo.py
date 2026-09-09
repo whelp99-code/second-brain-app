@@ -41,6 +41,8 @@ class _ConnectorConfig(Protocol):
 class OmoSessionsAdapter:
     """Walks OMO JSONL roots. `_next_cursor` mutates across `scan()` calls."""
 
+    accepted_adapters: Final = _ADAPTERS
+
     def __init__(self, roots: tuple[Path, ...], source_id: str) -> None:
         self.source_id: str = source_id
         self._roots: tuple[Path, ...] = roots

@@ -1,0 +1,13 @@
+{
+  "workspace": "/var/tmp/sb-adapter-validation-s0dbfwag",
+  "bad": {
+    "exit_code": 1,
+    "failure": "SOURCE_NOT_FOUND: inbox",
+    "input_preserved_before_valid_run": true
+  },
+  "valid_alias": {
+    "adapter": "documents",
+    "exit_code": 0,
+    "written": 1
+  }
+}

@@ -306,8 +306,10 @@ def _select_adapters(
             raise ValueError("SOURCE_ID_DUPLICATE")
         seen_ids.add(source_id)
         isolated = Config(raw={**config.raw, "sources": [row]}, base_dir=config.base_dir)
+        declared = row.get("adapter") or row.get("type") or ""
         matches = [(key, adapter) for key, adapter in discover_adapters(isolated).items()
-                   if adapter.source_id == source_id]
+                   if adapter.source_id == source_id and
+                   (not declared or declared in getattr(adapter, "accepted_adapters", (key,)))]
         if len(matches) > 1:
             raise ValueError("SOURCE_ID_AMBIGUOUS")
         if not matches:

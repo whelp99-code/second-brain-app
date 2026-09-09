@@ -43,6 +43,8 @@ class MarkdownVaultAdapter:
     report the per-file `mtime_ns:size:sha256` resume token.
     """
 
+    accepted_adapters: Final = _MARKDOWN_ADAPTERS
+
     def __init__(self, root: Path, source_id: str = DEFAULT_SOURCE_ID) -> None:
         self._root: Path = root
         self.source_id: str = source_id

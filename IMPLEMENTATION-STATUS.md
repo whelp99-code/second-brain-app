@@ -1,3 +1,5 @@
+[adapter 이름·원본 ID 동시 검증](ADAPTER-NAME-VALIDATION-2026-09-10.md) — 기본ID 오타 우회 재현·기존 별칭 집합 공개 재사용, 관련144통과/1skip·타입0오류1기존경고. 실제 잘못된 설정 원본보존→documents별칭 수집1. 운영·전체 M1–M14 유지.
+
 [배치 누적 전체 통과](BATCH-FULL-PASS-2026-09-10.md) — bc73959 전체1567통과/2skip/305.35초·Ruff/diff통과, 최근 모듈 타입0오류14경고. [기본 ID/잘못된 adapter 충돌](DEFAULT-SOURCE-ID-COLLISION-2026-09-10.md) 미수정 재현·다음 우선순위. 운영·전체 M1–M14 유지.
 
 [배치 누적 전체 회귀](BATCH-FULL-REGRESSION-2026-09-10.md) — 7674b63 전체1563통과/4실패/2skip, 설정 대역3·웹 기대1 수정 후 관련24통과·Ruff. 전체 재실행 전. [일반 승인 표시와 본문 검증 경계](REGISTRY-CONTENT-BINDING-AUDIT-2026-09-10.md) 격리 재현·관리형 연결 설계 및 M1–M14 유지.

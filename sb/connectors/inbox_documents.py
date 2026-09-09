@@ -49,6 +49,8 @@ class _ConnectorConfig(Protocol):
 class InboxDocumentsAdapter:
     """Scans `<vault>/inbox/`. `_next_cursor` mutates across `scan()` calls."""
 
+    accepted_adapters: Final = _ADAPTERS
+
     def __init__(self, root: Path, source_id: str) -> None:
         self.source_id: str = source_id
         self._root: Path = root
