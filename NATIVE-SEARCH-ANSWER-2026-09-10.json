@@ -1,0 +1,36 @@
+{
+  "source": "/var/tmp/sb-korean-search-e4qcukpi",
+  "results": [
+    {
+      "case_id": "current",
+      "passed": true,
+      "answer": {
+        "status": "supported",
+        "value": "21일",
+        "explanation": "wiki/current-backup에 현재 은하 백업 보관 기간이 21일이라고 명시되어 있으며, 7일은 폐기된 과거 결정(wiki/old-backup)이므로 현재 결정을 사용함.",
+        "raw_response": "{\"status\": \"supported\", \"value\": \"21일\", \"explanation\": \"wiki/current-backup에 현재 은하 백업 보관 기간이 21일이라고 명시되어 있으며, 7일은 폐기된 과거 결정(wiki/old-backup)이므로 현재 결정을 사용함.\"}"
+      }
+    },
+    {
+      "case_id": "current-natural",
+      "passed": true,
+      "answer": {
+        "status": "supported",
+        "value": "21일",
+        "explanation": "wiki/current-backup에 현재 보관 기간이 21일이며 과거 7일 결정은 폐기되었다고 명시되어 있어, 상위 후보인 wiki/old-backup의 7일은 무효화된 결정으로 배제함.",
+        "raw_response": "```json\n{\"status\": \"supported\", \"value\": \"21일\", \"explanation\": \"wiki/current-backup에 현재 보관 기간이 21일이며 과거 7일 결정은 폐기되었다고 명시되어 있어, 상위 후보인 wiki/old-backup의 7일은 무효화된 결정으로 배제함.\"}\n```"
+      }
+    },
+    {
+      "case_id": "absent",
+      "passed": true,
+      "answer": {
+        "status": "insufficient_evidence",
+        "value": null,
+        "explanation": "검색된 후보 문서는 은하 백업 보관 기간(현재 21일, 폐기된 과거 7일)에 관한 내용만 포함하며, 달빛 프로젝트나 담당자 전화번호에 대한 정보는 전혀 없습니다.",
+        "raw_response": "{\"status\":\"insufficient_evidence\",\"value\":null,\"explanation\":\"검색된 후보 문서는 은하 백업 보관 기간(현재 21일, 폐기된 과거 7일)에 관한 내용만 포함하며, 달빛 프로젝트나 담당자 전화번호에 대한 정보는 전혀 없습니다.\"}"
+      }
+    }
+  ],
+  "scope": "captured synthetic MCP responses; native Claude; no live JARVIS session delivery"
+}
