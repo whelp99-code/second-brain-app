@@ -22,7 +22,7 @@ from sb.inbox import RememberRejected, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
 from sb.ops import status_snapshot
-from sb.pipeline import read_status, run_all
+from sb.pipeline import run_all
 from sb.redaction import redact_credentials
 from sb.runtime_access import mutate_root, read_root
 from sb.search import SearchIndex, committed_paths, committed_text
@@ -314,14 +314,16 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 snapshot = status_snapshot(pinned_config)
                 last_run = snapshot.get("last_run")
                 last_run_status: str | None = None
+                summary = "원장에 기록된 실행 없음"
                 if isinstance(last_run, dict):
                     candidate = cast(dict[str, object], last_run).get("status")
                     if isinstance(candidate, str):
                         last_run_status = candidate
+                        summary = f"최근 단계 실행 {last_run.get('run_id')}: {candidate}"
                 self._json(
                     HTTPStatus.OK,
                     {
-                        "status": read_status(pinned_config),
+                        "status": summary,
                         "last_run_status": last_run_status,
                         "recent_stages": snapshot["recent_stages"],
                         "failures": {

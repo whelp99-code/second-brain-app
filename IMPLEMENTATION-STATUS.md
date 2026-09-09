@@ -1,3 +1,5 @@
+[웹 원장 상태 요약 일치](WEB-STATUS-LEDGER-SUMMARY-2026-09-09.md) — no runs/상세 실행 불일치 재현·같은 snapshot 기반 요약, 관련38통과·동일 임시 저장소 실제 HTTP 전후 확인. 전체 배치 영속 요약 및 M1–M14 유지.
+
 [실행 이력 시간대 정렬 수정](RUN-TIMEZONE-ORDER-2026-09-09.md) — 혼합 offset 최신 실행 오판 재현·UTC 공통 정렬, 관련54통과 및 실제 HTTP 순서 확인. 별도 no runs 요약 불일치 후속 대조·전체 M1–M14 유지.
 
 [설치 후보 검증 자료 고정](CANDIDATE-HARNESS-PINNING-2026-09-09.md) — HEAD 대신 후보 commit/tree 대조·동일 버전 자료 사용, 관련17통과·실제 설치 연동4경로 통과. 운영 및 M1–M14 유지.

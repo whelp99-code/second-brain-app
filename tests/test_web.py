@@ -429,3 +429,17 @@ def test_request_body_budget_is_enforced(tmp_path: Path) -> None:
         connection.close()
     assert status == 400
     assert payload == {"error": "request body too large"}
+
+
+def test_status_summary_uses_same_ledger_run_as_details(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    with Ledger(root) as ledger:
+        ledger.record_run(Run('latest-failed', '2099-01-01T00:00:00Z', None, None, 'failed'))
+    (root / 'log.md').write_text('old successful run\n')
+    with _running(config) as base:
+        status, payload = _request(base + '/api/status')
+    assert status == 200
+    assert payload['last_run_status'] == 'failed'
+    assert 'latest-failed' in payload['status']
+    assert 'failed' in payload['status']
+    assert 'old successful run' not in payload['status']

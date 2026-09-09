@@ -1,0 +1,56 @@
+{
+  "workspace": "/var/tmp/sb-status-timezone-bozdyhl2",
+  "before": {
+    "status": "no runs",
+    "last_run_status": "ok",
+    "recent_stages": [
+      {
+        "run_id": "newer",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "older",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      }
+    ],
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  },
+  "after": {
+    "status": "최근 단계 실행 newer: ok",
+    "last_run_status": "ok",
+    "recent_stages": [
+      {
+        "run_id": "newer",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "older",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      }
+    ],
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  },
+  "http_status": 200
+}
