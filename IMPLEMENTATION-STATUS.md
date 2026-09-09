@@ -1328,3 +1328,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 운영 콘솔 모바일 넘침 수정:** sb/web.py 업로드 안내 줄바꿈. 실제 Playwright1440/390px 실패상세/검색/원문/기억추가대기 통과·콘솔0·overflow true→false, Ruff/diff. 증거 /var/tmp/sb-console-qa-_o_xz8nm/QA.md 및 browser-result.json/스크린샷. 임시 fixture 설정 수정과 /tmp Chromium 실패는 분리 기록. 운영 두holder/유효lease1/관측불가18 유지, 즉시 페이지종료 BrokenPipe 로그 후속 및 전체 목표 유지.
 
 **2026-09-10 웹 연결 종료 중복 응답 수정:** [BrokenPipe/reset 별도 종료·실제TCP reset후health200](WEB-DISCONNECT-2026-09-10.md). 관련22통과/10.95초·Ruff/diff·타입0오류/기존snapshot경고5. 다른I/O오류 유지, 운영/실사용 및 전체 목표 유지.
+
+**2026-09-10 콘솔 운영 준비 상태 연결:** 기존 /ready의503 degraded/사유를 최근단계ok와 별도로 표시. 실제Playwright1440/390px 준비미완료·검색/원문/기억추가대기 통과, 예상503외콘솔0·가로넘침0. 웹22통과/10.78초·Ruff/diff. 증거 /var/tmp/sb-console-qa-3ctc5y_o/QA.md/browser-result.json/스크린샷. 실제ready복구/운영 및 전체 목표 유지.

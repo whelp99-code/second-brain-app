@@ -64,6 +64,12 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <div class="row"><input id="token" type="password" placeholder="SB_WEB_TOKEN 사용 시 입력"><button class="secondary" onclick="saveToken()">저장</button></div>
 </section>
 <section>
+<h2>운영 준비 상태</h2>
+<p id="readinessSummary" role="status">상태 확인 중</p>
+<pre id="readinessDetails"></pre>
+<p class="muted">백업·원장·처리 상태의 점검 결과입니다. 최근 실행 결과와 함께 확인하세요.</p>
+</section>
+<section>
 <h2>처리 실패</h2>
 <p id="failureSummary" role="status">상태 확인 중</p>
 <pre id="failureDetails"></pre>
@@ -125,7 +131,8 @@ function authHeaders(){const token=localStorage.getItem('sb_token')||'';return {
 async function api(path,options={}){const response=await fetch(path,{...options,headers:{...authHeaders(),...(options.headers||{})}});const payload=await response.json();if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 function show(id,value){byId(id).textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
 function saveToken(){localStorage.setItem('sb_token',byId('token').value);show('rememberResult','토큰을 이 브라우저에 저장했습니다.')}
-async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status;show('stageHistory',data.recent_stages||[]);const failures=data.failures;byId('failureSummary').textContent=failures.total?'미해결 실패 '+failures.total+'건 (단계별: '+Object.entries(failures.by_stage).map(([stage,count])=>stage+' '+count+'건').join(', ')+')':'원장에 기록된 미해결 실패 없음';byId('failureDetails').textContent=failures.items.map(item=>item.stage+' · '+item.key+' · 시도 '+item.attempts+'회\\n'+(item.error||'오류 상세 없음')+(item.retry_hold_reason?'\\n재시도 보류: 원래 브리핑 입력을 복구해야 합니다.':'')).join('\\n\\n')+(failures.omitted?'\\n추가 '+failures.omitted+'건은 상세 목록에서 생략됐습니다.':'')}catch(error){byId('status').textContent=error.message;byId('failureSummary').textContent='실패 상태를 확인하지 못했습니다.';byId('failureDetails').textContent='';show('stageHistory','단계 이력을 확인하지 못했습니다.')}}
+async function loadReadiness(){try{const response=await fetch('/ready',{headers:authHeaders()});const data=await response.json();if(![200,503].includes(response.status)||!['ready','degraded'].includes(data.status))throw new Error('준비 상태 응답을 확인하지 못했습니다.');show('readinessSummary',data.status==='ready'?'운영 준비 점검 통과':'운영 준비 미완료 — 아래 항목을 확인하세요.');show('readinessDetails',data.reasons||[])}catch(error){show('readinessSummary','운영 준비 상태를 확인하지 못했습니다.');show('readinessDetails',error.message)}}
+async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status;show('stageHistory',data.recent_stages||[]);const failures=data.failures;byId('failureSummary').textContent=failures.total?'미해결 실패 '+failures.total+'건 (단계별: '+Object.entries(failures.by_stage).map(([stage,count])=>stage+' '+count+'건').join(', ')+')':'원장에 기록된 미해결 실패 없음';byId('failureDetails').textContent=failures.items.map(item=>item.stage+' · '+item.key+' · 시도 '+item.attempts+'회\\n'+(item.error||'오류 상세 없음')+(item.retry_hold_reason?'\\n재시도 보류: 원래 브리핑 입력을 복구해야 합니다.':'')).join('\\n\\n')+(failures.omitted?'\\n추가 '+failures.omitted+'건은 상세 목록에서 생략됐습니다.':'')}catch(error){byId('status').textContent=error.message;byId('failureSummary').textContent='실패 상태를 확인하지 못했습니다.';byId('failureDetails').textContent='';show('stageHistory','단계 이력을 확인하지 못했습니다.')}finally{await loadReadiness()}}
 let remembering=false;
 async function remember(){if(remembering)return;remembering=true;byId('rememberButton').disabled=true;const draft={title:byId('title').value,content:byId('content').value};show('rememberResult','저장 중…');try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify(draft)});show('rememberResult',{message:'받은 편지함에 저장했습니다. 처리 대기 상태이며, 지금 처리 후 검색 결과를 확인하세요.',...data});if(byId('title').value===draft.title&&byId('content').value===draft.content)byId('content').value=''}catch(error){show('rememberResult',error.message)}finally{remembering=false;byId('rememberButton').disabled=false}}
 let runningPipeline=false;
