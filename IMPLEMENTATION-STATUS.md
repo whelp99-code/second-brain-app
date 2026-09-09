@@ -1,3 +1,5 @@
+[복원 삭제 구간 중복에 따른 정상 기억 훼손 수정](RESTORE-TOMBSTONE-SPAN-PRESERVATION-2026-09-09.md) — 수정 전 재현, 실제 파일 네 경우 및 관련12개 통과.
+
 [최근 복원 수정 포함 설치본 인수](CURRENT-PAIR-RESTORE-ACCEPTANCE-2026-09-09.md) — SB0ff54e2/JARVIS195b1a7 연동4경로 및 실제 설치 CLI 백업1회·복원3회 통과.
 
 [최신 자비스 설치 후보 연동](LATEST-JARVIS-INSTALLED-PAIR-2026-09-09.md) — JARVIS195b1a7 신규 빌드, 실제 TLS/MCP 4경로 통과, 후보 전후 일치.

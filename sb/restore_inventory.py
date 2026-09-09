@@ -98,8 +98,8 @@ def _sanitize_markdown(
         return payload
     page_digest = "sha256:" + hashlib.sha256(page_id.encode("utf-8")).hexdigest()
     matches = [target for target in targets if target.page_id_digest == page_digest]
-    result = payload
-    for target in sorted(matches, key=lambda item: item.citation_span_start, reverse=True):
+    intervals: list[tuple[int, int]] = []
+    for target in matches:
         start = target.citation_span_start
         end = target.citation_span_end
         exact_source = "sha256:" + hashlib.sha256(payload).hexdigest() == target.page_content_digest
@@ -114,7 +114,18 @@ def _sanitize_markdown(
         line_start = payload.rfind(b"\n", 0, start) + 1
         next_newline = payload.find(b"\n", end)
         line_end = len(payload) if next_newline < 0 else next_newline + 1
-        result = result[:line_start] + result[line_end:]
+        intervals.append((line_start, line_end))
+    # All offsets refer to the original bytes. Merge overlapping line removals
+    # before editing so repeated tombstones cannot consume surviving memory.
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(intervals):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    result = payload
+    for start, end in reversed(merged):
+        result = result[:start] + result[end:]
     return result
 
 
