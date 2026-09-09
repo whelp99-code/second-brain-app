@@ -1,0 +1,814 @@
+{
+  "runtime_packages": 161,
+  "all_versions_match_lock": true,
+  "npm_ls_exit": 0,
+  "dependency_occurrences": 300,
+  "packages": [
+    {
+      "path": "node_modules/@modelcontextprotocol/sdk",
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.30.0"
+    },
+    {
+      "path": "node_modules/@simplewebauthn/server",
+      "name": "@simplewebauthn/server",
+      "version": "13.3.3"
+    },
+    {
+      "path": "node_modules/better-sqlite3",
+      "name": "better-sqlite3",
+      "version": "12.11.1"
+    },
+    {
+      "path": "node_modules/react-dom",
+      "name": "react-dom",
+      "version": "19.2.8"
+    },
+    {
+      "path": "node_modules/react-router-dom",
+      "name": "react-router-dom",
+      "version": "7.18.2"
+    },
+    {
+      "path": "node_modules/react",
+      "name": "react",
+      "version": "19.2.8"
+    },
+    {
+      "path": "node_modules/zod",
+      "name": "zod",
+      "version": "4.1.5"
+    },
+    {
+      "path": "node_modules/@hono/node-server",
+      "name": "@hono/node-server",
+      "version": "2.1.1"
+    },
+    {
+      "path": "node_modules/ajv-formats",
+      "name": "ajv-formats",
+      "version": "3.0.1"
+    },
+    {
+      "path": "node_modules/@modelcontextprotocol/sdk/node_modules/ajv",
+      "name": "ajv",
+      "version": "8.20.0"
+    },
+    {
+      "path": "node_modules/content-type",
+      "name": "content-type",
+      "version": "1.0.5"
+    },
+    {
+      "path": "node_modules/cors",
+      "name": "cors",
+      "version": "2.8.6"
+    },
+    {
+      "path": "node_modules/cross-spawn",
+      "name": "cross-spawn",
+      "version": "7.0.6"
+    },
+    {
+      "path": "node_modules/eventsource-parser",
+      "name": "eventsource-parser",
+      "version": "3.1.1"
+    },
+    {
+      "path": "node_modules/eventsource",
+      "name": "eventsource",
+      "version": "3.0.7"
+    },
+    {
+      "path": "node_modules/express-rate-limit",
+      "name": "express-rate-limit",
+      "version": "8.7.0"
+    },
+    {
+      "path": "node_modules/express",
+      "name": "express",
+      "version": "5.2.1"
+    },
+    {
+      "path": "node_modules/hono",
+      "name": "hono",
+      "version": "4.13.7"
+    },
+    {
+      "path": "node_modules/jose",
+      "name": "jose",
+      "version": "6.2.12"
+    },
+    {
+      "path": "node_modules/json-schema-typed",
+      "name": "json-schema-typed",
+      "version": "8.0.2"
+    },
+    {
+      "path": "node_modules/pkce-challenge",
+      "name": "pkce-challenge",
+      "version": "5.0.1"
+    },
+    {
+      "path": "node_modules/raw-body",
+      "name": "raw-body",
+      "version": "3.0.2"
+    },
+    {
+      "path": "node_modules/zod-to-json-schema",
+      "name": "zod-to-json-schema",
+      "version": "3.25.2"
+    },
+    {
+      "path": "node_modules/@hexagon/base64",
+      "name": "@hexagon/base64",
+      "version": "1.1.28"
+    },
+    {
+      "path": "node_modules/@levischuck/tiny-cbor",
+      "name": "@levischuck/tiny-cbor",
+      "version": "0.2.11"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-android",
+      "name": "@peculiar/asn1-android",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-ecc",
+      "name": "@peculiar/asn1-ecc",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-rsa",
+      "name": "@peculiar/asn1-rsa",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-schema",
+      "name": "@peculiar/asn1-schema",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-x509",
+      "name": "@peculiar/asn1-x509",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/x509",
+      "name": "@peculiar/x509",
+      "version": "1.14.3"
+    },
+    {
+      "path": "node_modules/bindings",
+      "name": "bindings",
+      "version": "1.5.0"
+    },
+    {
+      "path": "node_modules/prebuild-install",
+      "name": "prebuild-install",
+      "version": "7.1.3"
+    },
+    {
+      "path": "node_modules/scheduler",
+      "name": "scheduler",
+      "version": "0.27.0"
+    },
+    {
+      "path": "node_modules/react-router",
+      "name": "react-router",
+      "version": "7.18.2"
+    },
+    {
+      "path": "node_modules/ajv-formats/node_modules/ajv",
+      "name": "ajv",
+      "version": "8.20.0"
+    },
+    {
+      "path": "node_modules/fast-deep-equal",
+      "name": "fast-deep-equal",
+      "version": "3.1.3"
+    },
+    {
+      "path": "node_modules/fast-uri",
+      "name": "fast-uri",
+      "version": "3.1.7"
+    },
+    {
+      "path": "node_modules/@modelcontextprotocol/sdk/node_modules/json-schema-traverse",
+      "name": "json-schema-traverse",
+      "version": "1.0.0"
+    },
+    {
+      "path": "node_modules/require-from-string",
+      "name": "require-from-string",
+      "version": "2.0.2"
+    },
+    {
+      "path": "node_modules/object-assign",
+      "name": "object-assign",
+      "version": "4.1.1"
+    },
+    {
+      "path": "node_modules/vary",
+      "name": "vary",
+      "version": "1.1.2"
+    },
+    {
+      "path": "node_modules/path-key",
+      "name": "path-key",
+      "version": "3.1.1"
+    },
+    {
+      "path": "node_modules/shebang-command",
+      "name": "shebang-command",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/which",
+      "name": "which",
+      "version": "2.0.2"
+    },
+    {
+      "path": "node_modules/debug",
+      "name": "debug",
+      "version": "4.4.3"
+    },
+    {
+      "path": "node_modules/ip-address",
+      "name": "ip-address",
+      "version": "10.7.0"
+    },
+    {
+      "path": "node_modules/accepts",
+      "name": "accepts",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/body-parser",
+      "name": "body-parser",
+      "version": "2.3.0"
+    },
+    {
+      "path": "node_modules/content-disposition",
+      "name": "content-disposition",
+      "version": "1.1.0"
+    },
+    {
+      "path": "node_modules/cookie-signature",
+      "name": "cookie-signature",
+      "version": "1.2.2"
+    },
+    {
+      "path": "node_modules/express/node_modules/cookie",
+      "name": "cookie",
+      "version": "0.7.2"
+    },
+    {
+      "path": "node_modules/depd",
+      "name": "depd",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/encodeurl",
+      "name": "encodeurl",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/escape-html",
+      "name": "escape-html",
+      "version": "1.0.3"
+    },
+    {
+      "path": "node_modules/etag",
+      "name": "etag",
+      "version": "1.8.1"
+    },
+    {
+      "path": "node_modules/finalhandler",
+      "name": "finalhandler",
+      "version": "2.1.1"
+    },
+    {
+      "path": "node_modules/fresh",
+      "name": "fresh",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/http-errors",
+      "name": "http-errors",
+      "version": "2.0.1"
+    },
+    {
+      "path": "node_modules/merge-descriptors",
+      "name": "merge-descriptors",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/mime-types",
+      "name": "mime-types",
+      "version": "3.0.2"
+    },
+    {
+      "path": "node_modules/on-finished",
+      "name": "on-finished",
+      "version": "2.4.1"
+    },
+    {
+      "path": "node_modules/once",
+      "name": "once",
+      "version": "1.4.0"
+    },
+    {
+      "path": "node_modules/parseurl",
+      "name": "parseurl",
+      "version": "1.3.3"
+    },
+    {
+      "path": "node_modules/proxy-addr",
+      "name": "proxy-addr",
+      "version": "2.0.7"
+    },
+    {
+      "path": "node_modules/qs",
+      "name": "qs",
+      "version": "6.16.0"
+    },
+    {
+      "path": "node_modules/range-parser",
+      "name": "range-parser",
+      "version": "1.3.0"
+    },
+    {
+      "path": "node_modules/router",
+      "name": "router",
+      "version": "2.2.0"
+    },
+    {
+      "path": "node_modules/send",
+      "name": "send",
+      "version": "1.2.1"
+    },
+    {
+      "path": "node_modules/serve-static",
+      "name": "serve-static",
+      "version": "2.2.1"
+    },
+    {
+      "path": "node_modules/statuses",
+      "name": "statuses",
+      "version": "2.0.2"
+    },
+    {
+      "path": "node_modules/type-is",
+      "name": "type-is",
+      "version": "2.1.0"
+    },
+    {
+      "path": "node_modules/bytes",
+      "name": "bytes",
+      "version": "3.1.2"
+    },
+    {
+      "path": "node_modules/iconv-lite",
+      "name": "iconv-lite",
+      "version": "0.7.3"
+    },
+    {
+      "path": "node_modules/unpipe",
+      "name": "unpipe",
+      "version": "1.0.0"
+    },
+    {
+      "path": "node_modules/asn1js",
+      "name": "asn1js",
+      "version": "3.0.10"
+    },
+    {
+      "path": "node_modules/tslib",
+      "name": "tslib",
+      "version": "2.8.1"
+    },
+    {
+      "path": "node_modules/@peculiar/utils",
+      "name": "@peculiar/utils",
+      "version": "2.0.3"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-cms",
+      "name": "@peculiar/asn1-cms",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-csr",
+      "name": "@peculiar/asn1-csr",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-pkcs9",
+      "name": "@peculiar/asn1-pkcs9",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/pvtsutils",
+      "name": "pvtsutils",
+      "version": "1.3.6"
+    },
+    {
+      "path": "node_modules/reflect-metadata",
+      "name": "reflect-metadata",
+      "version": "0.2.2"
+    },
+    {
+      "path": "node_modules/tsyringe",
+      "name": "tsyringe",
+      "version": "4.10.0"
+    },
+    {
+      "path": "node_modules/file-uri-to-path",
+      "name": "file-uri-to-path",
+      "version": "1.0.0"
+    },
+    {
+      "path": "node_modules/detect-libc",
+      "name": "detect-libc",
+      "version": "2.1.2"
+    },
+    {
+      "path": "node_modules/expand-template",
+      "name": "expand-template",
+      "version": "2.0.3"
+    },
+    {
+      "path": "node_modules/github-from-package",
+      "name": "github-from-package",
+      "version": "0.0.0"
+    },
+    {
+      "path": "node_modules/minimist",
+      "name": "minimist",
+      "version": "1.2.8"
+    },
+    {
+      "path": "node_modules/mkdirp-classic",
+      "name": "mkdirp-classic",
+      "version": "0.5.3"
+    },
+    {
+      "path": "node_modules/napi-build-utils",
+      "name": "napi-build-utils",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/node-abi",
+      "name": "node-abi",
+      "version": "3.94.0"
+    },
+    {
+      "path": "node_modules/pump",
+      "name": "pump",
+      "version": "3.0.4"
+    },
+    {
+      "path": "node_modules/rc",
+      "name": "rc",
+      "version": "1.2.8"
+    },
+    {
+      "path": "node_modules/simple-get",
+      "name": "simple-get",
+      "version": "4.0.1"
+    },
+    {
+      "path": "node_modules/tar-fs",
+      "name": "tar-fs",
+      "version": "2.1.5"
+    },
+    {
+      "path": "node_modules/tunnel-agent",
+      "name": "tunnel-agent",
+      "version": "0.6.0"
+    },
+    {
+      "path": "node_modules/cookie",
+      "name": "cookie",
+      "version": "1.1.1"
+    },
+    {
+      "path": "node_modules/set-cookie-parser",
+      "name": "set-cookie-parser",
+      "version": "2.7.2"
+    },
+    {
+      "path": "node_modules/ajv-formats/node_modules/json-schema-traverse",
+      "name": "json-schema-traverse",
+      "version": "1.0.0"
+    },
+    {
+      "path": "node_modules/shebang-regex",
+      "name": "shebang-regex",
+      "version": "3.0.0"
+    },
+    {
+      "path": "node_modules/isexe",
+      "name": "isexe",
+      "version": "2.0.0"
+    },
+    {
+      "path": "node_modules/ms",
+      "name": "ms",
+      "version": "2.1.3"
+    },
+    {
+      "path": "node_modules/negotiator",
+      "name": "negotiator",
+      "version": "1.1.0"
+    },
+    {
+      "path": "node_modules/body-parser/node_modules/content-type",
+      "name": "content-type",
+      "version": "2.1.0"
+    },
+    {
+      "path": "node_modules/inherits",
+      "name": "inherits",
+      "version": "2.0.4"
+    },
+    {
+      "path": "node_modules/setprototypeof",
+      "name": "setprototypeof",
+      "version": "1.2.0"
+    },
+    {
+      "path": "node_modules/toidentifier",
+      "name": "toidentifier",
+      "version": "1.0.1"
+    },
+    {
+      "path": "node_modules/mime-db",
+      "name": "mime-db",
+      "version": "1.54.0"
+    },
+    {
+      "path": "node_modules/ee-first",
+      "name": "ee-first",
+      "version": "1.1.1"
+    },
+    {
+      "path": "node_modules/wrappy",
+      "name": "wrappy",
+      "version": "1.0.2"
+    },
+    {
+      "path": "node_modules/forwarded",
+      "name": "forwarded",
+      "version": "0.2.0"
+    },
+    {
+      "path": "node_modules/ipaddr.js",
+      "name": "ipaddr.js",
+      "version": "1.9.1"
+    },
+    {
+      "path": "node_modules/es-define-property",
+      "name": "es-define-property",
+      "version": "1.0.1"
+    },
+    {
+      "path": "node_modules/side-channel",
+      "name": "side-channel",
+      "version": "1.1.1"
+    },
+    {
+      "path": "node_modules/is-promise",
+      "name": "is-promise",
+      "version": "4.0.0"
+    },
+    {
+      "path": "node_modules/path-to-regexp",
+      "name": "path-to-regexp",
+      "version": "8.4.2"
+    },
+    {
+      "path": "node_modules/type-is/node_modules/content-type",
+      "name": "content-type",
+      "version": "2.1.0"
+    },
+    {
+      "path": "node_modules/media-typer",
+      "name": "media-typer",
+      "version": "1.1.1"
+    },
+    {
+      "path": "node_modules/safer-buffer",
+      "name": "safer-buffer",
+      "version": "2.1.2"
+    },
+    {
+      "path": "node_modules/pvutils",
+      "name": "pvutils",
+      "version": "1.2.0"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-x509-attr",
+      "name": "@peculiar/asn1-x509-attr",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-pfx",
+      "name": "@peculiar/asn1-pfx",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/@peculiar/asn1-pkcs8",
+      "name": "@peculiar/asn1-pkcs8",
+      "version": "2.9.4"
+    },
+    {
+      "path": "node_modules/tsyringe/node_modules/tslib",
+      "name": "tslib",
+      "version": "1.14.1"
+    },
+    {
+      "path": "node_modules/semver",
+      "name": "semver",
+      "version": "7.8.5"
+    },
+    {
+      "path": "node_modules/end-of-stream",
+      "name": "end-of-stream",
+      "version": "1.4.5"
+    },
+    {
+      "path": "node_modules/deep-extend",
+      "name": "deep-extend",
+      "version": "0.6.0"
+    },
+    {
+      "path": "node_modules/ini",
+      "name": "ini",
+      "version": "1.3.8"
+    },
+    {
+      "path": "node_modules/rc/node_modules/strip-json-comments",
+      "name": "strip-json-comments",
+      "version": "2.0.1"
+    },
+    {
+      "path": "node_modules/decompress-response",
+      "name": "decompress-response",
+      "version": "6.0.0"
+    },
+    {
+      "path": "node_modules/simple-concat",
+      "name": "simple-concat",
+      "version": "1.0.1"
+    },
+    {
+      "path": "node_modules/chownr",
+      "name": "chownr",
+      "version": "1.1.4"
+    },
+    {
+      "path": "node_modules/tar-stream",
+      "name": "tar-stream",
+      "version": "2.2.0"
+    },
+    {
+      "path": "node_modules/safe-buffer",
+      "name": "safe-buffer",
+      "version": "5.2.1"
+    },
+    {
+      "path": "node_modules/negotiator/node_modules/content-type",
+      "name": "content-type",
+      "version": "2.1.0"
+    },
+    {
+      "path": "node_modules/es-errors",
+      "name": "es-errors",
+      "version": "1.3.0"
+    },
+    {
+      "path": "node_modules/object-inspect",
+      "name": "object-inspect",
+      "version": "1.13.4"
+    },
+    {
+      "path": "node_modules/side-channel-list",
+      "name": "side-channel-list",
+      "version": "1.0.1"
+    },
+    {
+      "path": "node_modules/side-channel-map",
+      "name": "side-channel-map",
+      "version": "1.0.1"
+    },
+    {
+      "path": "node_modules/side-channel-weakmap",
+      "name": "side-channel-weakmap",
+      "version": "1.0.2"
+    },
+    {
+      "path": "node_modules/mimic-response",
+      "name": "mimic-response",
+      "version": "3.1.0"
+    },
+    {
+      "path": "node_modules/bl",
+      "name": "bl",
+      "version": "4.1.0"
+    },
+    {
+      "path": "node_modules/fs-constants",
+      "name": "fs-constants",
+      "version": "1.0.0"
+    },
+    {
+      "path": "node_modules/readable-stream",
+      "name": "readable-stream",
+      "version": "3.6.2"
+    },
+    {
+      "path": "node_modules/call-bound",
+      "name": "call-bound",
+      "version": "1.0.4"
+    },
+    {
+      "path": "node_modules/get-intrinsic",
+      "name": "get-intrinsic",
+      "version": "1.3.0"
+    },
+    {
+      "path": "node_modules/buffer",
+      "name": "buffer",
+      "version": "5.7.1"
+    },
+    {
+      "path": "node_modules/string_decoder",
+      "name": "string_decoder",
+      "version": "1.3.0"
+    },
+    {
+      "path": "node_modules/util-deprecate",
+      "name": "util-deprecate",
+      "version": "1.0.2"
+    },
+    {
+      "path": "node_modules/call-bind-apply-helpers",
+      "name": "call-bind-apply-helpers",
+      "version": "1.0.2"
+    },
+    {
+      "path": "node_modules/es-object-atoms",
+      "name": "es-object-atoms",
+      "version": "1.1.2"
+    },
+    {
+      "path": "node_modules/function-bind",
+      "name": "function-bind",
+      "version": "1.1.2"
+    },
+    {
+      "path": "node_modules/get-proto",
+      "name": "get-proto",
+      "version": "1.0.1"
+    },
+    {
+      "path": "node_modules/gopd",
+      "name": "gopd",
+      "version": "1.2.0"
+    },
+    {
+      "path": "node_modules/has-symbols",
+      "name": "has-symbols",
+      "version": "1.1.0"
+    },
+    {
+      "path": "node_modules/hasown",
+      "name": "hasown",
+      "version": "2.0.4"
+    },
+    {
+      "path": "node_modules/math-intrinsics",
+      "name": "math-intrinsics",
+      "version": "1.1.0"
+    },
+    {
+      "path": "node_modules/base64-js",
+      "name": "base64-js",
+      "version": "1.5.1"
+    },
+    {
+      "path": "node_modules/ieee754",
+      "name": "ieee754",
+      "version": "1.2.1"
+    },
+    {
+      "path": "node_modules/dunder-proto",
+      "name": "dunder-proto",
+      "version": "1.0.1"
+    }
+  ],
+  "scope": "installed runtime closure on this platform; no vulnerability or registry integrity attestation"
+}
