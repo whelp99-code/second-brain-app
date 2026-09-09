@@ -2,7 +2,7 @@
 
 ## 결함과 영향
 
-Claude/Codex/OMO/GJC 커넥터는 하나의 adapter instance가 여러 root를 받지만, 커서 키는 root를 제외한 상대 경로다. SourceRef URI도 상대 경로와 메시지 ID만 사용한다. 같은 `session.jsonl` 및 메시지 ID를 갖는 서로 다른 에이전트 폴더는 커서를 덮어쓰거나 출처가 합쳐질 수 있다. 설정 factory는 같은 adapter의 여러 설정을 모으면서 마지막 source_id를 사용하는 문제도 있다. registry는 adapter당 한 번 create하므로 서로 다른 설정 id를 주는 것만으로 해결되지 않는다.
+Claude/Codex/OMO/GJC 커넥터는 하나의 adapter instance가 여러 root를 받지만, 커서 키는 root를 제외한 상대 경로다. SourceRef URI도 상대 경로와 메시지 ID만 사용한다. 같은 `session.jsonl` 및 메시지 ID를 갖는 서로 다른 에이전트 폴더는 커서를 덮어쓰거나 출처가 합쳐질 수 있다. 설정 factory를 직접 호출하면 같은 adapter의 여러 설정을 모으면서 마지막 source_id를 사용한다. **정정:** 실제 파이프라인의 `_select_adapters`는 명시적 source ID마다 설정을 분리해 다시 생성한다. 따라서 서로 다른 source ID를 지정한 정식 CLI 수집 경로는 이 충돌을 피한다. 아래 보류는 한 adapter instance에 복수 root가 남는 경우에 해당한다.
 
 ## 적용한 임시 차단
 
@@ -14,6 +14,8 @@ Claude/Codex/OMO/GJC 커넥터는 하나의 adapter instance가 여러 root를 �
 
 수정 전 새 회귀 검사 4개가 모두 실패했다. 두 경로의 상대 URI가 같은 현상과 기존 오프셋의 잘못된 적용을 확인했다. 수정 후 초기/기존 커서 보존 8개를 포함한 세션 교체·native Claude 검사 33개 통과. 기존 세션 커넥터·export resume·partial record·walking skeleton 통합 27개 통과: 총 60개. 첫 focused 명령은 존재하지 않는 테스트 파일명을 사용해 수집 전에 실패했고, 실제 파일을 찾아 다시 실행했다. 전체 pytest를 재실행한 결과로 표시하지 않는다. Ruff 통과(기존 GJC noqa 형식 경고 2개 유지).
 
-## 남은 완성 조건
+## 지원되는 구성과 남은 완성 조건
+
+[명시적 source ID별 실제 CLI 검증](SESSION-SOURCE-ISOLATION-2026-09-09.md)에서 4개 형식 모두 3회 프로세스 재실행으로 독립 수집과 커서 보존을 확인했다. 신규 설정은 폴더마다 서로 다른 id를 사용한다. 기존 출처 ID를 임의로 바꾸는 마이그레이션은 이 검증 범위가 아니다.
 
 안정적인 root별 출처 식별자와 커서 namespace, root 이동/삭제/재등록 규칙, 기존 기억·cursor의 출처 대조 및 삭제/중복 방지 migration을 함께 구현해야 한다. legacy cursor에는 원래 root가 없으므로 추측 기반 자동 변환을 금지한다. 이미 합쳐진 데이터의 출처 복구는 별도 대조가 필요하다. 또한 단일 root를 다른 폴더로 교체하는 경우의 기존 ID 충돌은 이번 복수 root 차단만으로 해결되지 않는다.

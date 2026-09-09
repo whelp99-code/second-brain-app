@@ -1,3 +1,5 @@
+> 2026-09-09 정정 및 검증: [명시적 source ID별 세션 분리](SESSION-SOURCE-ISOLATION-2026-09-09.md)는 기존 파이프라인에서 지원됨. 네 형식 × 실제 CLI 3회(12프로세스)로 독립 원장/커서 및 무중복 재개 확인. 복수 root 보류는 ID별 분리가 없는 adapter instance에 한정.
+
 > 2026-09-09 제품 수정: [복수 세션 루트 충돌](SESSION-MULTIROOT-HOLD-2026-09-09.md)을 확인해 Claude/Codex/OMO/GJC 복수 root 수집을 명시적으로 보류하고 커서를 보존. 관련 60개 검사 통과. root별 identity/migration 구현은 미완료.
 
 > 2026-09-09 추가: [전환 서비스 경계 조사](TRANSITION-UNIT-AUDIT-2026-09-09.md): 실제 systemd 재시작/trigger 의존성 확인, 18개 단위의 읽기 전용 drain 검사와 7개 테스트 추가. 현재 활성 상태이므로 전환 gate는 보류이며 운영 중지는 실행하지 않음.
