@@ -11,6 +11,7 @@ from typing import Final, Protocol
 type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 
 from sb.connectors.base import ItemMeta, SourceAdapter
+from sb.connectors.claude_native import extract_native
 from sb.contracts import SourceRef
 
 ADAPTER_ID: Final = "claude-sessions"
@@ -189,6 +190,8 @@ def _claude_extract(obj: dict[str, JVal]) -> list[tuple[str, str]] | str:
     if not isinstance(rec, str) or rec in _DENIED:
         return []
     match rec:
+        case "user" | "assistant":
+            return extract_native(obj)
         case "export_meta":
             version = obj.get("export_version")
             return "unsupported-version" if version != EXPORT_VERSION else []

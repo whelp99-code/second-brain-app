@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 Claude 원본 수집 누락 수정:** [native user/assistant·출처/도구 오류·실제 CLI](CLAUDE-NATIVE-COLLECTION-2026-09-09.md). 회귀4실패→관련24/전체1,362통과·2skip/246.29초·Ruff/정적검사. 실제 표본96블록 및 새 Claude 세션2블록 회수·재조회0. 과거 cursor/운영 미변경, 실제 A→B와 전체 M1–M14 유지.
+
 **2026-09-09 세션 부분 기록 유실 수정:** [Codex/Claude cursor 보존·독립6프로세스](SESSION-PARTIAL-RECORDS-2026-09-09.md). 회귀2실패→관련20/전체1,358통과·2skip/257.79초, Ruff·정적검사 통과. 실제 Claude native user/assistant 형식 누락도 구조 표본으로 확인했으며 다음 수정 대상이다. 운영 변경 없음·전체 M1–M14 유지.
 
 **2026-09-09 verifier DB 버전 경계:** [시작/요청마다 migration 검사·실제 TLS/MCP](PROVIDER-MIGRATION-BOUNDARY-2026-09-09.md). J867c274, async 시작·오류 연결 정리·실행 중 unknown 거절. 관련67통과·emit/lint, 실제4상태 attempt1/FK0. 운영 전환과 실제 A→B 등 M1–M14 미완료.

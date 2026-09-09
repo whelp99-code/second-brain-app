@@ -1,0 +1,42 @@
+{
+  "bounded_actual_native_audit": {
+    "actual_native_files_sampled": 3,
+    "max_lines_per_file": 100,
+    "collected_visible_blocks": 96,
+    "block_types": {
+      "text": 13,
+      "tool_use": 42,
+      "tool_result": 41
+    },
+    "skip_counts": {},
+    "repeat_scan_rows": 0,
+    "operational_cursor_changed": false,
+    "temporary_raw_samples_removed": true
+  },
+  "new_live_client_session": {
+    "client_version": "2.1.261",
+    "actual_cli_exit": 0,
+    "new_native_session": true,
+    "user_marker_collected": true,
+    "assistant_marker_collected": true,
+    "session_lineage_matched": true,
+    "collected_blocks": 2,
+    "repeat_scan_rows": 0,
+    "seconds": 3.55,
+    "native_fixture_log": "/home/jm/.claude/projects/-var-tmp-claude-native-live-zkp1izxv/e3ed55e1-ab00-4618-98a8-75cdfd697c2c.jsonl",
+    "limitations": [
+      "synthetic echo, not shared-memory recall",
+      "only this generated session JSONL removed; other native retention surfaces not audited",
+      "no vault ingestion or operational cursor change"
+    ],
+    "native_fixture_log_removed": true
+  },
+  "tests": {
+    "initial_regression_failures": 4,
+    "focused_passed": 24,
+    "full_passed": 1362,
+    "full_skipped": 2,
+    "full_seconds": 246.29,
+    "embeddings_extra_excluded": true
+  }
+}
