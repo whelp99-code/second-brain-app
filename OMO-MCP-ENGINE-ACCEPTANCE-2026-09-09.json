@@ -1,0 +1,135 @@
+{
+  "omo_version": "5.0.0-0.beta.46",
+  "engine_package_version": "2026.9.7",
+  "engine_module_sha256": "34850ea2ea75669b6853fa231d02c43a9f6a85d2a0768d9abc90bcb66ae23518",
+  "acceptance": {
+    "gateway_configuration": "CLI parser and independently owned existing authority connection",
+    "admission_surface": "mcp",
+    "execution_surface": "cli",
+    "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+    "identity_forwarder": "fixture",
+    "clock": "fixture",
+    "public_mcp_write": true,
+    "results": [
+      {
+        "mode": "valid",
+        "readback": {
+          "request_id": "memreq:scoped:v4:ac9e14b9b9931fbe6789f649a9900f2d70eb4cc3049830c7d4c6afbbd59f9623",
+          "request_digest": "sha256:ac9e14b9b9931fbe6789f649a9900f2d70eb4cc3049830c7d4c6afbbd59f9623",
+          "writer_agent": "agent:fixture",
+          "reader_agent": "agent:reader",
+          "fresh_login": true,
+          "provider_proved": true,
+          "jarvis_settled": true,
+          "control_completed": true,
+          "settlement_replay": true,
+          "settlements": 1,
+          "attempts": 1,
+          "same_generation": true,
+          "record_ids": [
+            "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+            "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+          ],
+          "source_refs": [
+            "Second Brain",
+            "Second Brain"
+          ],
+          "context_records": 2,
+          "clients": {
+            "independent_stdio_clients": 2,
+            "records_each": 2,
+            "https_calls": 3,
+            "omo_engine_calls": 1,
+            "omo_engine_module": "/home/jm/.nvm/versions/node/v24.19.0/lib/node_modules/omo-ai/node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/mcp/connection.js",
+            "native_mode": "off",
+            "native_claude_calls": 0,
+            "native_codex_calls": 0,
+            "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+          },
+          "reader_revocation": 403,
+          "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+        },
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:ac9e14b9b9931fbe6789f649a9900f2d70eb4cc3049830c7d4c6afbbd59f9623",
+          "request_digest": "sha256:ac9e14b9b9931fbe6789f649a9900f2d70eb4cc3049830c7d4c6afbbd59f9623",
+          "idempotency_key": "memidem:scoped:v4:55154e9d18b77c5ef3ea303e9e65f5d4917eb5ab9c5bbd719c68adfaedfc8f98",
+          "scope_digest": "sha256:a29d0a65ef74e035df412ecabd8994a9822d99f1420deace559d52fecefa88a6",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:ac9e14b9b9931fbe6789f649a9900f2d70eb4cc3049830c7d4c6afbbd59f9623.v4.json",
+          "request_file_digest": "sha256:b83f57f082e4e34782faad9aaaa121907fb46f3aecaa67235a6a641a6d20acae",
+          "replayed": false
+        },
+        "provider_state": "proved",
+        "active_generation": true,
+        "authority_https_calls": 5,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_during_accept",
+        "admission": "denied",
+        "accepted_row": false,
+        "authority_https_calls": 2,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:6d4e4cab6867ec6151b4d2154f382477481d12f4d0a7548b19cece83947b2ed7",
+          "request_digest": "sha256:6d4e4cab6867ec6151b4d2154f382477481d12f4d0a7548b19cece83947b2ed7",
+          "idempotency_key": "memidem:scoped:v4:e15c052ec8f278867ad2a2c4b463a60fd8ddbcafa237d6accbd473fbf74ed70e",
+          "scope_digest": "sha256:0ca8fd8cd4bec5a8eb5da596dc71e5e87df47ea1ce4a63adcb7d7235ded3c319",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:6d4e4cab6867ec6151b4d2154f382477481d12f4d0a7548b19cece83947b2ed7.v4.json",
+          "request_file_digest": "sha256:652098b09a0b56fc0019282b83e5c97b96f4333f54b4b4816d12090bd31aa1ee",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "expire_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:0475695930a9d2d02136ae4847a81140b28c60960276a72a84e4af226c92f2f9",
+          "request_digest": "sha256:0475695930a9d2d02136ae4847a81140b28c60960276a72a84e4af226c92f2f9",
+          "idempotency_key": "memidem:scoped:v4:36d19885ce23b6b015ef2a3aabbd9851b5db1a809bdf3b6ae70167a510b2da1e",
+          "scope_digest": "sha256:d497d4ce167ed6cdc35166c5b21a674f36993ba4568f382390894c5ce2aedc0a",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:0475695930a9d2d02136ae4847a81140b28c60960276a72a84e4af226c92f2f9.v4.json",
+          "request_file_digest": "sha256:9e6cb091fa553f84a807a4d9c1d4b5ac29081f3185a44c5c5fa87f310d6bd1fe",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      }
+    ]
+  },
+  "native_model_invoked": false,
+  "gjc_transport": "SSH remote wrapper; not invoked",
+  "production_changed": false
+}

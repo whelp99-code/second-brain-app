@@ -5,7 +5,7 @@ import { request } from 'node:http';
 import { execFile, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 export async function acceptPhoneMemoryClient({ build, root, port, identity, origin, cookie, csrf, expected, query = 'Cited' }) {
   const load = name => import(pathToFileURL(join(build, name)).href);
@@ -44,6 +44,27 @@ export async function acceptPhoneMemoryClient({ build, root, port, identity, ori
         const value = JSON.parse(result.content[0].text);
         assert.deepEqual(value.context.records, expected);
       } finally { await client.close(); await transport.close(); }
+    }
+    let omoEngineCalls = 0;
+    const omoEngine = process.env.SB_OMO_MCP_ENGINE;
+    if (omoEngine !== undefined) {
+      assert(isAbsolute(omoEngine), 'OMO engine module must be an absolute installed path');
+      const { ServerConnection } = await import(pathToFileURL(omoEngine).href);
+      const quiet = () => {};
+      const connection = new ServerConnection({ serverName: 'jarvis_memory',
+        config: { type: 'stdio', enabled: true, command: process.execPath, args: [entry, credentials], cwd: root,
+          connectTimeoutMs: 15000, requestTimeoutMs: 20000 },
+        logger: { filePath: '', debug: quiet, info: quiet, warn: quiet, error: quiet,
+          stderr: quiet, log: quiet, getRingBuffer: () => [] } });
+      try {
+        const client = await connection.connect();
+        assert.equal(connection.state, 'connected');
+        assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['jarvis_memory_context']);
+        const result = await client.callTool({ name: 'jarvis_memory_context', arguments: { query, max_bytes: 32768 } });
+        assert.notEqual(result.isError, true);
+        assert.deepEqual(JSON.parse(result.content[0].text).context.records, expected);
+        omoEngineCalls++;
+      } finally { await connection.dispose(); }
     }
     let nativeCalls = 0, nativeVersion, codexCalls = 0, codexVersion;
     if (native) {
@@ -103,8 +124,9 @@ export async function acceptPhoneMemoryClient({ build, root, port, identity, ori
       codexVersion = (await promisify(execFile)('codex', ['--version'])).stdout.trim();
       }
     }
-    assert.equal(calls, 2 + nativeCalls + codexCalls);
+    assert.equal(calls, 2 + nativeCalls + codexCalls + omoEngineCalls);
     return { independent_stdio_clients: 2, records_each: expected.length, https_calls: calls,
+      omo_engine_calls: omoEngineCalls, omo_engine_module: omoEngine,
       native_mode: nativeMode ?? 'off', native_claude_calls: nativeCalls, native_version: nativeVersion, native_codex_calls: codexCalls, codex_version: codexVersion,
       scope: 'actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only' };
   } finally { tls.closeAllConnections(); await new Promise(resolve => tls.close(resolve)); }
