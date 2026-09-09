@@ -1,3 +1,5 @@
+[컴파일 완료 후 충돌 재시도](CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md) — 기존 페이지 비교 입력 유지, 실제 같은 vault 실패1→0·재제출 없음, 동일 키 done/attempts+1 포함 관련71개 통과.
+
 [충돌 실패 배치 반영](CONFLICT-FAILURE-BATCH-2026-09-09.md) — 실제 HTTP 실험 ok/errors0→partial/errors1, 실패 원장 보존·관련70개 및 충돌13개(중복) 통과. 마지막 단계 상태와 전체 배치 구분은 남음.
 
 [웹 단계 예외 상세·원인 정정](WEB-STAGE-FAILURE-DETAIL-2026-09-09.md) — 실행 ID별 compile 정책 거부 확인, RunOutcome→HTTP 상세·자격증명 마스킹. 관련68개 및 후속18개(중복), Ruff 통과.
