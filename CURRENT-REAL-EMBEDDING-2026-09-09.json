@@ -1,0 +1,139 @@
+{
+  "smoke": {
+    "passed": 1,
+    "seconds": 33.55
+  },
+  "cache": "/var/tmp/sb-bge-evaluation-hf",
+  "offline": true,
+  "lifecycle": {
+    "state": "passed",
+    "workspace": "/var/tmp/sb-sealed-vector-o33h1o_x",
+    "source_tree_sha256": "40a98a31d5831a6eb633a6e2775b5f305aeb3c3454081714d3290ce1affb7c53",
+    "initial": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "회의는 월요일",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:f8da2fda6717b8e622064c894953525f768ae14e1eaf7e4dbbe61a9a88419b76",
+          "record_digest": "sha256:f8da2fda6717b8e622064c894953525f768ae14e1eaf7e4dbbe61a9a88419b76"
+        },
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.016129032258064516,
+          "record_id": "sbrecord:v1:141f43d56c6c0357d8da2e1c6de5cfff488fb0fc28f1d741f59dbc2d15b9bc85",
+          "record_digest": "sha256:141f43d56c6c0357d8da2e1c6de5cfff488fb0fc28f1d741f59dbc2d15b9bc85"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:0cb18bd7faff482c200bf9f5a43bd81bc200d21e6477d5816a7c2fb257a5ac58",
+      "generation_manifest_digest": "sha256:0cb18bd7faff482c200bf9f5a43bd81bc200d21e6477d5816a7c2fb257a5ac58",
+      "vault_head": "98a9411cb0d69f49d7b809661236bc521e2a0cd2",
+      "vault_tree": "dfad181aa25b05c0cb272398ea3e671ccff74c46",
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    },
+    "corrected": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "다음 만남은 수요일",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:5ef6716fec1a98866073a234a68490128a1dfee5d66104b94b5a1d08ea2e814e",
+          "record_digest": "sha256:5ef6716fec1a98866073a234a68490128a1dfee5d66104b94b5a1d08ea2e814e"
+        },
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.016129032258064516,
+          "record_id": "sbrecord:v1:31a20877d7a660376dd17771f731b3beaa082c9a5f9169811e41c3e374987b62",
+          "record_digest": "sha256:31a20877d7a660376dd17771f731b3beaa082c9a5f9169811e41c3e374987b62"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:bd3ca41fd66a185fe64753d9065410ceeb2e8f3638457046205f9e6ca6d06fac",
+      "generation_manifest_digest": "sha256:bd3ca41fd66a185fe64753d9065410ceeb2e8f3638457046205f9e6ca6d06fac",
+      "vault_head": "4d145bc4357ba8b7758fa15a3ec777a78621b073",
+      "vault_tree": "cd981ec3faa912ed29af3b02cda8882f66465ce2",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:f638a757c478c14e1780d1f0bf85f0fa697a0d3458ddd1e8685e9a71353292d6"
+    },
+    "deleted": {
+      "results": [
+        {
+          "page_id": "wiki/memory-fixture",
+          "section": "결정",
+          "snippet": "비용은 만원",
+          "score": 0.01639344262295082,
+          "record_id": "sbrecord:v1:a4be02b0f8da61d8e87dfd03d0f9f831c3bf2b7351c68c849404f5609e4b0787",
+          "record_digest": "sha256:a4be02b0f8da61d8e87dfd03d0f9f831c3bf2b7351c68c849404f5609e4b0787"
+        }
+      ],
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:e5ad377b17aa18442f6c5f39e9f91cf99ef4d8a29bb58c2f2cdc109ec464612b",
+      "generation_manifest_digest": "sha256:e5ad377b17aa18442f6c5f39e9f91cf99ef4d8a29bb58c2f2cdc109ec464612b",
+      "vault_head": "f37842bfd390f010adabde108e0a2b36b3f28f8c",
+      "vault_tree": "a623ad67c1e85594bd764a822bfb3fc4f0a7e3d9",
+      "tombstone_sequence": 2,
+      "tombstone_set_root": "sha256:613bb6cae8c692c75e5ab79481b9111c586fb7ca14dee248e3e7367bea51b2fd"
+    },
+    "corrected_restore": true,
+    "deleted_restore": true,
+    "commands": [
+      {
+        "label": "correct",
+        "exit": 0,
+        "result": {
+          "code": "PROVIDER_PROVED",
+          "fence": 1,
+          "phase": "proved",
+          "request_id": "memeff:req:v2:1a5d730ff2cd13742c0fa94e79d2b2942cbc4f68b8ae0e3812a6988befccaffa",
+          "state": "proved"
+        }
+      },
+      {
+        "label": "forget",
+        "exit": 0,
+        "result": {
+          "code": "PROVIDER_PROVED",
+          "fence": 1,
+          "phase": "proved",
+          "request_id": "memeff:req:v2:9b7d7636d16d0d54f474a6a72166c8000dbfb2c924568b392033636fdf030aaa",
+          "state": "proved"
+        }
+      },
+      {
+        "label": "cli-search",
+        "exit": 0,
+        "result": [
+          {
+            "page_id": "wiki/memory-fixture",
+            "section": "결정",
+            "snippet": "비용은 만원",
+            "score": 0.01639344262295082,
+            "kind": "wiki",
+            "index_status": "active",
+            "knowledge_status": "UNKNOWN",
+            "approval_status": "UNKNOWN",
+            "canonical": "",
+            "source_ref": "",
+            "updated_at": "2026-09-09",
+            "role": "REFERENCE",
+            "verification": "UNVERIFIED"
+          }
+        ]
+      }
+    ],
+    "real_model": true,
+    "limitations": [
+      "real model lifecycle fixture; not full Korean quality",
+      "two native MCP processes; queries observe stable mutation boundaries",
+      "isolated fixture; no operational activation"
+    ]
+  }
+}

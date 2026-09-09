@@ -1,3 +1,5 @@
+> 2026-09-09 실제 모델 재검증: [기존 별도 캐시를 사용한 smoke·정정/삭제/복원](CURRENT-REAL-EMBEDDING-2026-09-09.md) 통과. 기본 캐시는 없지만 명시적 HF_HOME에서 offline 실행 가능. 일정 삭제 후 비용 후보 반환은 근거 부족 품질 과제로 유지, 운영 미변경.
+
 > 2026-09-09 선택 검사 보완: [임베딩 모듈 30개 통과](OPTIONAL-EMBEDDINGS-VERIFICATION-2026-09-09.md), 실제 모델 1개 skip. 현재 기본 캐시 모델 부재·resolve_encoder unavailable 확인. 다운로드/운영 변경 없음, 실제 모델 품질 인수와 구분.
 
 > 2026-09-09 전체 회귀 갱신: [cf2be5a 검증](CURRENT-FULL-REGRESSION-2026-09-09.md). 1,435 passed/2 skipped, 263.15초, Ruff 통과. embeddings 파일 제외. 최근 삭제·inbox·동시성 변경 포함, 운영·실제 모델 최종 인수는 미완료.
