@@ -15,17 +15,21 @@ from sb.generation_runtime_models import (
     GenerationMutation,
     GenerationOperation,
 )
+from sb.memory_access import MemoryAccessError, classified_page, require_scope
 from sb.pipeline import audit_citations
 from sb.remember_page import materialize_remember
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.search import SearchIndex
+from sb.source_access import SourceAccess
 from sb.store.ledger import Ledger
+from sb.targets import GenerationIdentityV1
 from sb.task30_barriers import Task30BarrierId
 from tests.task30_effect_factory import effect_request
 
 NOW = datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC)
 OLD = '강제종료 삭제 대상입니다'
 KEEP = '강제종료 뒤 남길 기억입니다'
+SCOPE = SourceAccess('principal:owner', ('project:a',), 'policy:1')
 
 
 def _config(root):
@@ -51,6 +55,14 @@ def _worker(root, ready, release, phase):
             original(path, apply)
             block(None, None)
         module.apply_with_prior_knowledge = after_rebind
+    elif phase == 'after_access':
+        import sb.request_executor as module
+        original_access = module.apply_with_prior_access
+
+        def after_access(path, apply):
+            original_access(path, apply)
+            block(None, None)
+        module.apply_with_prior_access = after_access
     else:
         class PointerBarrier:
             def reach(self, event):
@@ -64,14 +76,14 @@ def _worker(root, ready, release, phase):
         executor.close()
 
 
-@pytest.mark.parametrize('phase', ['before_bind', 'after_rebind', 'pointer_rename'])
+@pytest.mark.parametrize('phase', ['before_bind', 'after_rebind', 'after_access', 'pointer_rename'])
 def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase, monkeypatch):
     config = _config(tmp_path)
     executor = RequestExecutor(config)
     try:
         def seed(root):
             materialize_remember(root, content=OLD + '\n' + KEEP,
-                candidate_id='memcand:pos:v1:' + 'a' * 64, created_at=NOW.isoformat(), release_sha='a' * 40)
+                candidate_id='memcand:pos:v1:' + 'a' * 64, created_at=NOW.isoformat(), release_sha='a' * 40, source_access=SCOPE)
             with Ledger(root) as ledger:
                 for page in (root / 'wiki').glob('*.md'):
                     ledger.bind_knowledge(BoundKnowledge(page.relative_to(root).as_posix().removesuffix('.md'),
@@ -123,6 +135,16 @@ def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase, m
             assert index.search(OLD, scope='reference') == ()
             hits = index.search(KEEP, scope='active')
             assert len(hits) == 1 and hits[0].verification == 'VERIFIED'
+            generation = GenerationIdentityV1(active.manifest.provider_instance_id, active.generation_id,
+                active.manifest.generation_digest, active.head, active.tree)
+            classified = classified_page(active.root, hits[0].page_id, generation)
+            require_scope(classified, SCOPE)
+            assert classified.requirements == (SCOPE,)
+            for denied in (SourceAccess('principal:other', ('project:a',), 'policy:1'),
+                           SourceAccess('principal:owner', ('project:b',), 'policy:1'),
+                           SourceAccess('principal:owner', ('project:a',), 'policy:2')):
+                with pytest.raises(MemoryAccessError):
+                    require_scope(classified, denied)
             assert not tuple(recovered.generations.staging.iterdir())
         finally:
             recovered.close()
