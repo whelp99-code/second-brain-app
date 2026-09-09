@@ -1,0 +1,19 @@
+{
+  "exit": 0,
+  "inventory": [
+    {
+      "name": "_ast_grep",
+      "toolCount": 0,
+      "status": "disabled",
+      "authStatus": "unsupported"
+    },
+    {
+      "name": "jarvis_memory",
+      "toolCount": 1,
+      "status": "connected",
+      "authStatus": "unsupported"
+    }
+  ],
+  "model_requests": 0,
+  "user_config_changed": false
+}
