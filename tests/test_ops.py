@@ -228,3 +228,18 @@ def test_migrate_status_backs_up_legacy_database_before_apply(tmp_path: Path) ->
     backup = Path(str(applied["backup"]))
     assert backup.is_file()
     assert backup.parent == root / ".sb" / "migrations"
+
+
+@pytest.mark.parametrize('stage', [None, 'brief'])
+def test_retry_refuses_brief_without_replay_inputs_and_preserves_other_rows(tmp_path: Path, stage: str | None) -> None:
+    root, _ = _seed_vault(tmp_path)
+    with Ledger(root) as ledger:
+        for key, kind in [('a-compile', 'compile'), ('b-brief', 'brief')]:
+            ledger.ensure_derivation(key, kind, 'run-fixture')
+            ledger.mark_running(key, 'run-fixture')
+            ledger.mark_failed(key, 'unresolved citation')
+        before = ledger.list_derivations()
+    with pytest.raises(OperationError, match='BRIEF_REPLAY_INPUTS_UNAVAILABLE'):
+        retry_failed(root, stage=stage)
+    with Ledger(root) as ledger:
+        assert ledger.list_derivations() == before

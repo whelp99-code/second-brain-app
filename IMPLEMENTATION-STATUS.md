@@ -1,3 +1,5 @@
+> 2026-09-09 제품 수정: [브리핑 수동 재큐잉 보류](BRIEF-RETRY-HOLD-2026-09-09.md). 실행 입력 없는 brief를 pending으로만 바꾸던 경로 차단, 선택 전체 상태 보존. ops/CLI 61개 및 별도 CLI 프로세스 검증 통과. 과거 실패 복구 자체는 미완료.
+
 > 2026-09-09 진단: [브리핑 실패 5건](BRIEFING-FAILURE-DIAGNOSIS-2026-09-09.md)은 모두 9월 5일 unresolved uncited. 현재 제한 재생성·실패 시 미게시를 26개 테스트로 검증. 과거 키 일괄 requeue는 현재 날짜 실행 경로로 복구 보장 불가하여 미실행.
 
 > 2026-09-09 읽기 전용 운영 산정: [페이지 키 재컴파일 규모](OPERATIONAL-COMPILE-KEY-ESTIMATE-2026-09-09.md). 고정 generation 18개 페이지 재컴파일 대상/호출 cap 120, 설명되지 않은 CAS 누락 0, brief 실패 5개 남음. 모델 호출·운영 변경 없음.

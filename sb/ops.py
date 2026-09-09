@@ -371,6 +371,17 @@ def retry_failed(
     limit: int | None = None,
 ) -> int:
     with Ledger(vault_root) as ledger:
+        selected = list(ledger.list_derivations(status=DerivStatus.FAILED.value, stage=stage))
+        if limit is not None:
+            selected = selected[:max(limit, 0)]
+        if any(row.stage == "brief" for row in selected):
+            # Brief execution rebuilds today's key; it cannot replay arbitrary
+            # historical keys without their frozen inputs and target date.
+            # Reject the whole selection before resetting any other attempts.
+            raise OperationError(
+                "BRIEF_REPLAY_INPUTS_UNAVAILABLE: historical brief retry is held; "
+                "failed rows and attempts are preserved"
+            )
         return ledger.retry_failed(stage=stage, limit=limit, reset_attempts=True)
 
 

@@ -1460,3 +1460,18 @@ def test_brief_policy_upgrade_regenerates_once_without_new_sources(
     assert fake.calls == 2 and _deriv_count(root) == before + 1
     assert run_brief(config).git_commit is None
     assert fake.calls == 2 and _deriv_count(root) == before + 1
+
+
+def test_retry_brief_reports_hold_without_claiming_requeued(tmp_path: Path) -> None:
+    _config, root = _ready(tmp_path)
+    with Ledger(root) as ledger:
+        ledger.ensure_derivation('historical-brief', 'brief', 'run-old')
+        ledger.mark_running('historical-brief', 'run-old')
+        ledger.mark_failed('historical-brief', 'unresolved citation')
+        before = ledger.get_derivation('historical-brief')
+    code, out, err = _cli_with_config(tmp_path, root, ['retry', '--stage', 'brief'])
+    assert code == 1
+    assert 'BRIEF_REPLAY_INPUTS_UNAVAILABLE' in err
+    assert 'requeued=' not in out
+    with Ledger(root) as ledger:
+        assert ledger.get_derivation('historical-brief') == before
