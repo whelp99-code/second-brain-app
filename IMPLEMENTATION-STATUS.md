@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 세션 부분 기록 유실 수정:** [Codex/Claude cursor 보존·독립6프로세스](SESSION-PARTIAL-RECORDS-2026-09-09.md). 회귀2실패→관련20/전체1,358통과·2skip/257.79초, Ruff·정적검사 통과. 실제 Claude native user/assistant 형식 누락도 구조 표본으로 확인했으며 다음 수정 대상이다. 운영 변경 없음·전체 M1–M14 유지.
+
 **2026-09-09 verifier DB 버전 경계:** [시작/요청마다 migration 검사·실제 TLS/MCP](PROVIDER-MIGRATION-BOUNDARY-2026-09-09.md). J867c274, async 시작·오류 연결 정리·실행 중 unknown 거절. 관련67통과·emit/lint, 실제4상태 attempt1/FK0. 운영 전환과 실제 A→B 등 M1–M14 미완료.
 
 **2026-09-09 미확인028 원본 복원:** [과거 배포3곳 hash 일치·운영 사본 재인수](RECOVERED-MIGRATION-028-2026-09-09.md). Ja6afd5a가502bytes 원본을 그대로 복원. 사본58→81·기존journal58 및 업무테이블212 보존·FK0/replay변경0. 고유17통과·emit/lint. unknown 출처 차단은 해소, 혼합 버전/운영 전환·실제 A→B 및 M1–M14 인수는 유지.

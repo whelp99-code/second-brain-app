@@ -1,0 +1,38 @@
+{
+  "process_acceptance": [
+    {
+      "connector": "claude",
+      "separate_processes": 3,
+      "partial_rows": 0,
+      "completed_rows": 1,
+      "replay_rows": 0,
+      "skips": 0,
+      "utf8_split_recovered": true
+    },
+    {
+      "connector": "codex",
+      "separate_processes": 3,
+      "partial_rows": 0,
+      "completed_rows": 1,
+      "replay_rows": 0,
+      "skips": 0,
+      "utf8_split_recovered": true
+    }
+  ],
+  "tests": {
+    "initial_regression_failures": 2,
+    "focused_passed": 20,
+    "full_passed": 1358,
+    "full_skipped": 2,
+    "full_seconds": 257.79,
+    "embeddings_extra_excluded": true
+  },
+  "native_claude_shape_audit": {
+    "files_sampled": 3,
+    "maximum_lines_per_file": 100,
+    "user_records": 44,
+    "assistant_records": 75,
+    "native_support_gap_confirmed": true
+  },
+  "operational_activation": false
+}

@@ -60,7 +60,9 @@ class ClaudeSessionsAdapter:
                 current[rel] = size
                 if start >= size:
                     continue
-                items.extend(self._read_file(path, rel, start))
+                extracted, consumed = self._read_file(path, rel, start)
+                current[rel] = consumed
+                items.extend(extracted)
         self._next_cursor = json.dumps(current, separators=(",", ":"), sort_keys=True)
         yield from items
 
@@ -69,7 +71,8 @@ class ClaudeSessionsAdapter:
 
     def _read_file(
         self, path: Path, rel: str, start: int
-    ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
+    ) -> tuple[list[tuple[SourceRef, bytes, ItemMeta]], int]:
+        consumed = start
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         with path.open("rb") as handle:
             _ = handle.seek(start)
@@ -79,9 +82,14 @@ class ClaudeSessionsAdapter:
                     break
                 end = handle.tell()
                 stripped = raw.strip()
+                parsed = _obj(stripped) if stripped else None
+                if stripped and parsed is None and not raw.endswith(b"\n"):
+                    # An append may stop inside JSON or a UTF-8 codepoint. Keep
+                    # the cursor before this line until the writer completes it.
+                    break
+                consumed = end
                 if not stripped:
                     continue
-                parsed = _obj(stripped)
                 if parsed is None:
                     items.append(_skip(self.source_id, rel, "malformed-json"))
                     continue
@@ -94,7 +102,7 @@ class ClaudeSessionsAdapter:
                     token = str(end)
                     meta: ItemMeta = {"relative_path": rel, "cursor": token}
                     items.append((SourceRef(self.source_id, uri, token), text.encode(), meta))
-        return items
+        return items, consumed
 
 
 def create(config: _ConnectorConfig) -> SourceAdapter:
