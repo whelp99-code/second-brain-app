@@ -66,7 +66,7 @@ def test_real_ingest_uses_config_not_source_frontmatter_and_rejects_reclassifica
 def test_legacy_migration_does_not_infer_access_for_existing_sources(tmp_path: Path):
     import sqlite3
 
-    from sb.store.ledger import ledger_schema_version
+    from sb.store.ledger import CURRENT_SCHEMA_VERSION, ledger_schema_version
 
     with Ledger(tmp_path) as ledger:
         ledger.upsert_source_item(ITEM)
@@ -78,7 +78,8 @@ def test_legacy_migration_does_not_infer_access_for_existing_sources(tmp_path: P
     with Ledger(tmp_path) as migrated:
         assert migrated.list_source_items() == (ITEM,)
         assert migrated.source_access_for(ITEM) is None
-        assert ledger_schema_version(path) == 4
+        assert ledger_schema_version(path) == CURRENT_SCHEMA_VERSION
+        assert db.execute("SELECT COUNT(*) FROM bound_knowledge").fetchone() == (0,)
     backups = tuple((path.parent / "migrations").glob("ledger-v2-*.db"))
     assert len(backups) == 1
     assert ledger_schema_version(backups[0]) == 2
