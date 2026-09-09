@@ -1,0 +1,20 @@
+{
+  "receipt": {
+    "inbox_path": "inbox/2026-09-09T133528503186-실제웹실패검증.md"
+  },
+  "outcome": {
+    "run_id": "dcb54ef218284027911e12058bab0a93",
+    "status": "failed",
+    "pages": 0,
+    "conflicts": 0,
+    "errors": 1,
+    "exit_code": 1,
+    "already_running": false
+  },
+  "results": [],
+  "pageErrors": [],
+  "mockedHTTP": false,
+  "source_items": 1,
+  "raw_preserved": true,
+  "workspace": "/var/tmp/sb-real-web-failure-4851r0qb"
+}
