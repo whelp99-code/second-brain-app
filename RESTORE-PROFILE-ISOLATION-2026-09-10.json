@@ -1,0 +1,35 @@
+{
+  "root": "/var/tmp/sb-jarvis-restore-tIR8e1",
+  "backup": {
+    "source_generation_id": "sbgen:v1:ff38981a57d7cf4d870607ac2f72c83165eddd4b597dcff6adcd6c8758be00dd"
+  },
+  "deleted": {
+    "request_id": "memeff:req:v2:879ea6b037444ebb1b38270a2d41e82d7d72cad63639b75a33c05b4f16076ba8",
+    "provider_state": "proved",
+    "proof_id": "sbproof:v1:a21d8111f7246494ddb1deac891f952e958b438c2942fc37e4046c5871c6020d",
+    "observation_kind": "deletion",
+    "tombstone_sequence": 1
+  },
+  "restored": {
+    "generation_id": "sbgen:v1:45acf4b87a1322d46fd8497d4467eb0f9b2379e73c6fbb216c64eb997111e820",
+    "surviving_page_id": "wiki/memory-85498686fbeb4186e809ea0d51d8e0cb4dc74dea25dc8c787c94d5d947a37094",
+    "tombstone_sequence": 1,
+    "tombstone_set_root": "sha256:0efd8f518ecd6e25ba1391548b80951c2ed60a032bb4b53c7cc96488147dc378",
+    "blocked_matches": 0,
+    "scan_errors": 0
+  },
+  "scoped": {
+    "profile": "scoped-record-read-v3",
+    "allowed_pages": 1,
+    "restricted_pages": 0,
+    "withdrawal_denied": true,
+    "post_response_withdrawal_denied": true,
+    "intercepted_response_count": 2,
+    "restored_policy_resumes": true
+  },
+  "jarvis_owned_high_water": 1,
+  "deleted_records": 0,
+  "surviving_records": 1,
+  "model_calls": 0,
+  "scope": "Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance"
+}

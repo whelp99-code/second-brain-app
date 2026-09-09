@@ -1081,3 +1081,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 복원 응답 후 정책 철회 경합:** [실제 readPage/search 응답 확인→정책철회→client reject·정책복구 성공](RESTORE-POLICY-RACE-2026-09-10.md). 최종실행exit0·응답2경계·Node구문/diff. 제품 변경 없음. 이미 수신한 bytes의 완전 삭제나 운영/native 업무의 증거는 아니며 전체 목표 유지.
+
+
+**2026-09-10 복원 acceptance 프로필 고정:** [상위v5 환경에서 reference 실패 재현→명시 task32/v3 후 실제경로 통과](RESTORE-PROFILE-ISOLATION-2026-09-10.md). 최종exit0·Node구문/diff. 제품 환경변수 동작은 그대로이며 검증 경로만 고정했다. 운영·실업무/DR 및 전체 목표 유지.

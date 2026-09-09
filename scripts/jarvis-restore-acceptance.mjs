@@ -29,7 +29,7 @@ const database = await memoryDatabase();
 const {config,key} = memoryReadFenceFixture(database,new Date(Date.now()+86400000).toISOString());
 const runtime = createProductionMemoryReference(database.authority,{
   read_fence_config:config,projection_key:Buffer.alloc(32,7),
-  transport_options:{launcherPath:launcher,configPath:join(root,'config.toml')},
+  transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
 });
 let effects;
 try {

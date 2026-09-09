@@ -20,7 +20,7 @@ export async function referenceEffectFixture({load, database, key, config, launc
     .run('provider:key',config.provider_instance_id,'a'.repeat(40),publicKey,
       createHash('sha256').update(publicKey).digest('hex'), now.toISOString(),
       new Date(now.getTime()+86400000).toISOString(),now.toISOString());
-  const transport = createSecondBrainTransport({launcherPath:launcher,configPath:join(root,'config.toml')});
+  const transport = createSecondBrainTransport({contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')});
   const service = new SecondBrainEffectService({authority:database.authority,transport,clock:()=>new Date(),
     writer:{write:async()=>{throw new Error('no implicit writer');}},
     provider_instance_id:config.provider_instance_id,signing_key_id:config.signing_key_id,private_key:key});
