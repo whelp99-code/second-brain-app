@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 import tarfile
 
+from bundle_python_runtime import bundle_runtime
+
 repo = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('app_root', nargs='?', type=Path, default=Path.home() / '.local/state/second-brain/app')
@@ -53,8 +55,18 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     if release.exists():
         raise SystemExit(f'Release already exists; inspect it before reuse: {release}')
     release.mkdir(parents=True, mode=0o700)
-    run('uv', 'venv', '--python', '3.12', str(release / '.venv'))
+    managed_python = run('uv', 'python', 'find', '--managed-python', '--no-python-downloads', '--system', '3.12').strip()
+    runtime_source = Path(run(managed_python, '-I', '-c', 'import sys; print(sys.base_prefix)').strip())
+    runtime = release / 'runtime' / 'python'
+    bundle_runtime(runtime_source, runtime)
+    bundled_python = runtime / 'bin' / 'python3.12'
+    run(str(bundled_python), '-m', 'compileall', '-q', str(runtime / 'lib'))
+    run('uv', 'venv', '--python', str(bundled_python), str(release / '.venv'))
     python = release / '.venv/bin/python'
+    # uv emits an absolute interpreter link; the release contract requires
+    # relative links entirely within the artifact.
+    python.unlink()
+    python.symlink_to(os.path.relpath(bundled_python, python.parent))
     run('uv', 'pip', 'install', '--python', str(python), '--compile-bytecode', '-r', str(requirements))
     run('uv', 'pip', 'install', '--python', str(python), '--no-deps', '--compile-bytecode', str(wheel))
     (release / 'requirements.txt').write_bytes(requirements.read_bytes())
