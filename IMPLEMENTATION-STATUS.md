@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 OMO/GJC 내용 체크포인트:** [교체·헤더 재검증·네 수집기 공통 함수](EXPORT-CONTENT-CHECKPOINT-2026-09-09.md). 회귀11실패→관련50/전체1,388통과·2skip/250.16초·정적0오류0경고, 독립11프로세스 교체/append/헤더/FIFO 인수. legacy 소급 복구·다중 root·운영 및 전체 M1–M14 유지.
+
 **2026-09-09 세션 내용 결합 커서:** [동일크기 교체·수정 후 append 유실6재현·FIFO 회귀 수정](SESSION-CONTENT-CHECKPOINT-2026-09-09.md). Codex/Claude prefix 해시·읽는 중 변경 시 커서 보존/skip. 관련34/전체1,377통과·2skip/238.71초·Ruff/정적0오류0경고·독립8재개+2FIFO프로세스. legacy offset 소급 판별/OMO·GJC/운영 및 전체 M1–M14는 남는다.
 
 **2026-09-09 실제 native 작성·회수:** [Claude 공개 쓰기1회→원자 완료→별도 Claude 회수1회](NATIVE-SCOPED-WRITE-READ-2026-09-09.md). 원래 검토된 JSON과 실제 tool 인수 동일, accepted replay=false, provider proved/JARVIS settled/control completed·settlement1/attempt1/FK0·새 reader2records. 전체4상태 exit0. 작성 내용·작업 근거는 fixture, 다른 모델 계열/운영/전체 M1–M14는 남는다.

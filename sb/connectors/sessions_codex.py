@@ -14,9 +14,8 @@ type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.session_checkpoint import (
     CHECKPOINT_KEY,
-    file_revision,
-    prefix_digest,
     read_checkpoints,
+    read_session_checkpoint,
 )
 from sb.contracts import SourceRef
 
@@ -70,28 +69,14 @@ class CodexSessionsAdapter:
         for root in self._roots:
             for path in _jsonl_paths(root):
                 rel = path.relative_to(root).as_posix()
-                # Keep the old checkpoint if an active writer changes the file
-                # during this scan; never publish rows from a mixed revision.
-                old_offset = previous.get(rel, 0)
-                current[rel] = old_offset
-                if rel in prior_checks:
-                    checks[rel] = prior_checks[rel]
-                try:
-                    before = file_revision(path)
-                    size = before[2]
-                    start = old_offset if old_offset <= size else 0
-                    if start and rel in prior_checks and prefix_digest(path, start) != prior_checks[rel]:
-                        start = 0
-                    extracted, consumed = self._read_file(path, rel, start) if start < size else ([], start)
-                    checkpoint = prefix_digest(path, consumed)
-                    if file_revision(path) != before:
-                        items.append(_skip(self.source_id, rel, "unstable-session-file"))
-                        continue
-                except OSError:
-                    items.append(_skip(self.source_id, rel, "unreadable-session-file"))
-                    continue
+                extracted, consumed, checkpoint, reason = read_session_checkpoint(
+                    path, rel, previous.get(rel, 0), prior_checks.get(rel), self._read_file,
+                )
                 current[rel] = consumed
-                checks[rel] = checkpoint
+                if checkpoint is not None:
+                    checks[rel] = checkpoint
+                if reason is not None:
+                    items.append(_skip(self.source_id, rel, reason))
                 items.extend(extracted)
         self._next_cursor = json.dumps({**current, CHECKPOINT_KEY: checks}, separators=(",", ":"), sort_keys=True)
         yield from items

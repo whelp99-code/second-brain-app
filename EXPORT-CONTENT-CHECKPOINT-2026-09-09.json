@@ -1,0 +1,53 @@
+{
+  "process_acceptance": [
+    {
+      "kind": "omo",
+      "processes": 5,
+      "replacement_rows": [
+        "new"
+      ],
+      "replay_rows": [],
+      "append_rows": [
+        "add"
+      ],
+      "header_replacement_denied": false,
+      "fifo_rejected": true
+    },
+    {
+      "kind": "gjc",
+      "processes": 6,
+      "replacement_rows": [
+        "new"
+      ],
+      "replay_rows": [],
+      "append_rows": [
+        "add"
+      ],
+      "header_replacement_denied": true,
+      "fifo_rejected": true
+    }
+  ],
+  "tests": {
+    "initial_failed": 11,
+    "initial_passed": 10,
+    "focused_passed": 50,
+    "focused_seconds": 0.3,
+    "full_passed": 1388,
+    "full_skipped": 2,
+    "full_seconds": 250.16,
+    "embeddings_extra_excluded": true,
+    "ruff": "passed",
+    "existing_gjc_noqa_warnings": 2,
+    "basedpyright_errors": 0,
+    "basedpyright_warnings": 0
+  },
+  "operational_changes": false,
+  "full_goal_complete": false,
+  "limitations": [
+    "legacy offset-only cursors cannot detect past same-size changes",
+    "multi-root relative path collision remains",
+    "no native OMO/GJC app version acceptance",
+    "full prefix reads add I/O cost",
+    "operational transition and M1-M14 remain"
+  ]
+}

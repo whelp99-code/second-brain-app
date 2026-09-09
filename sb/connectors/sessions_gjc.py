@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from sb.connectors.base import ItemMeta, SourceAdapter
+from sb.connectors.session_checkpoint import (
+    CHECKPOINT_KEY,
+    read_checkpoints,
+    read_session_checkpoint,
+)
 from sb.contracts import SourceRef
 
 type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
@@ -54,6 +59,8 @@ class GjcSessionsAdapter:
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         previous = _cursor_map(cursor)
         current: dict[str, int] = {}
+        prior_checks = read_checkpoints(cursor)
+        checks: dict[str, str] = {}
         if not self._roots:
             self._next_cursor = "0"
             yield (
@@ -66,17 +73,16 @@ class GjcSessionsAdapter:
         for root in self._roots:
             for path in _jsonl_paths(root):
                 rel = path.relative_to(root).as_posix()
-                size = path.stat().st_size
-                start = previous.get(rel, 0)
-                if start > size:
-                    start = 0
-                current[rel] = size
-                if start >= size:
-                    continue
-                extracted, consumed = self._read_file(path, rel, start)
+                extracted, consumed, checkpoint, reason = read_session_checkpoint(
+                    path, rel, previous.get(rel, 0), prior_checks.get(rel), self._read_file,
+                )
                 current[rel] = consumed
+                if checkpoint is not None:
+                    checks[rel] = checkpoint
+                if reason is not None:
+                    items.append(_skip(self.source_id, rel, reason))
                 items.extend(extracted)
-        self._next_cursor = json.dumps(current, separators=(",", ":"), sort_keys=True)
+        self._next_cursor = json.dumps({**current, CHECKPOINT_KEY: checks}, separators=(",", ":"), sort_keys=True)
         yield from items
 
     def next_cursor(self) -> str:

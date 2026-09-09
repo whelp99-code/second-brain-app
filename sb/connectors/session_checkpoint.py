@@ -5,8 +5,15 @@ import hashlib
 import json
 import os
 import stat
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
+
+from sb.connectors.base import ItemMeta
+from sb.contracts import SourceRef
+
+type SessionRows = list[tuple[SourceRef, bytes, ItemMeta]]
+type SessionReader = Callable[[Path, str, int], tuple[SessionRows, int]]
 
 CHECKPOINT_KEY = "__sb_session_prefix_sha256_v1__"
 
@@ -48,3 +55,21 @@ def file_revision(path: Path) -> tuple[int, int, int, int, int]:
     if not stat.S_ISREG(info.st_mode):
         raise OSError("session checkpoint requires a regular file")
     return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
+def read_session_checkpoint(
+    path: Path, rel: str, offset: int, expected: str | None, read: SessionReader,
+) -> tuple[SessionRows, int, str | None, str | None]:
+    """Publish only one stable file revision; failures preserve the old checkpoint."""
+    try:
+        before = file_revision(path)
+        start = offset if offset <= before[2] else 0
+        if start and expected is not None and prefix_digest(path, start) != expected:
+            start = 0
+        rows, consumed = read(path, rel, start) if start < before[2] else ([], start)
+        checkpoint = prefix_digest(path, consumed)
+        if file_revision(path) != before:
+            return [], offset, expected, "unstable-session-file"
+    except OSError:
+        return [], offset, expected, "unreadable-session-file"
+    return rows, consumed, checkpoint, None

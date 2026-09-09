@@ -100,3 +100,6 @@ P0는 운영 완성의 선행 조건, P1은 안정적 사용의 인수 항목, P
 
 
 [세션 내용 결합 커서 후속](SESSION-CONTENT-CHECKPOINT-2026-09-09.md): Codex/Claude의 동일크기 교체·읽은 prefix 수정 누락을 수정했다. 전체1,377/2skip과 독립 재개/FIFO 프로세스를 검증했다. 과거 offset만 있는 이력의 소급 복구, OMO/GJC와 다중 root, 운영·전체 M1–M14는 유지한다.
+
+
+[OMO/GJC 후속](EXPORT-CONTENT-CHECKPOINT-2026-09-09.md): 네 수집기가 공통 내용 체크포인트를 사용하며 OMO/GJC 동일크기 교체·prefix 수정·읽는 중 변경과 GJC 헤더 교체를 검사한다. 전체1,388/2skip·독립11프로세스 인수. 과거 offset만 있는 이력, 다중 root, 실제 앱별 자동 수집/주입 및 운영·M1–M14는 남는다.
