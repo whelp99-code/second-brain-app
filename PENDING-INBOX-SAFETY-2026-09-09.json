@@ -1,0 +1,133 @@
+{
+  "focused_tests_passed": 11,
+  "focused_seconds": 4.87,
+  "type_errors": 0,
+  "type_warnings": 0,
+  "integration": {
+    "gateway_configuration": "CLI parser and independently owned existing authority connection",
+    "admission_surface": "mcp",
+    "execution_surface": "cli",
+    "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+    "identity_forwarder": "fixture",
+    "clock": "fixture",
+    "public_mcp_write": true,
+    "results": [
+      {
+        "mode": "valid",
+        "readback": {
+          "request_id": "memreq:scoped:v4:2eaa0813231c91d00319424eb342dd3fa6193dff69f5959661aca36ad3089e9a",
+          "request_digest": "sha256:2eaa0813231c91d00319424eb342dd3fa6193dff69f5959661aca36ad3089e9a",
+          "writer_agent": "agent:fixture",
+          "reader_agent": "agent:reader",
+          "fresh_login": true,
+          "provider_proved": true,
+          "jarvis_settled": true,
+          "control_completed": true,
+          "settlement_replay": true,
+          "settlements": 1,
+          "attempts": 1,
+          "same_generation": true,
+          "record_ids": [
+            "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+            "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+          ],
+          "source_refs": [
+            "Second Brain",
+            "Second Brain"
+          ],
+          "context_records": 2,
+          "clients": {
+            "independent_stdio_clients": 2,
+            "records_each": 2,
+            "https_calls": 2,
+            "omo_engine_calls": 0,
+            "native_mode": "off",
+            "native_claude_calls": 0,
+            "native_codex_calls": 0,
+            "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+          },
+          "reader_revocation": 403,
+          "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+        },
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:2eaa0813231c91d00319424eb342dd3fa6193dff69f5959661aca36ad3089e9a",
+          "request_digest": "sha256:2eaa0813231c91d00319424eb342dd3fa6193dff69f5959661aca36ad3089e9a",
+          "idempotency_key": "memidem:scoped:v4:142f74313bd355cc212d6deb5ad1af81b0107d8538c10389f62dcffd3bf0d101",
+          "scope_digest": "sha256:06902c9a3679c52b55ab0a40c3557e91372a594e9fa0ade087dd2940bd09c970",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:2eaa0813231c91d00319424eb342dd3fa6193dff69f5959661aca36ad3089e9a.v4.json",
+          "request_file_digest": "sha256:603127a4abe0ae193185729de0a9aca5dd952e50780474892c0d3f407438f89e",
+          "replayed": false
+        },
+        "provider_state": "proved",
+        "active_generation": true,
+        "authority_https_calls": 5,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_during_accept",
+        "admission": "denied",
+        "accepted_row": false,
+        "authority_https_calls": 2,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:3139ef836879e2237a981f5e8ce123b4aefc1d4d9a0fac3dbbba2f70ce1373d3",
+          "request_digest": "sha256:3139ef836879e2237a981f5e8ce123b4aefc1d4d9a0fac3dbbba2f70ce1373d3",
+          "idempotency_key": "memidem:scoped:v4:9888f2947dd2e1df8158828f6f312123e27294399a0a26ee24dc3ea5adacfd88",
+          "scope_digest": "sha256:46f4e597febde398f45da70bdfbca4caf0fd6ffdca58a35f27b67e37c39035e9",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:3139ef836879e2237a981f5e8ce123b4aefc1d4d9a0fac3dbbba2f70ce1373d3.v4.json",
+          "request_file_digest": "sha256:cfee73afa952cc1d27038f805743d48e843232be905cdd8890543edeee341074",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "expire_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:ae54888dfac741711984a27335121dabf6c3145737f1339eb4aa36721aad9cfd",
+          "request_digest": "sha256:ae54888dfac741711984a27335121dabf6c3145737f1339eb4aa36721aad9cfd",
+          "idempotency_key": "memidem:scoped:v4:d98486cc85c7fb95a47a9841939adf1221837b512c3149c395e8b35a1256c66d",
+          "scope_digest": "sha256:cf695f9735d3a434954c5c833a1e48a25fe79710bd3cb40801de12d48f83f44a",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:ae54888dfac741711984a27335121dabf6c3145737f1339eb4aa36721aad9cfd.v4.json",
+          "request_file_digest": "sha256:45b10992b8f3791141294b31c3f6b4181788c0242e1fa148c5f93971c440b2eb",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      }
+    ]
+  },
+  "production_activated": false
+}

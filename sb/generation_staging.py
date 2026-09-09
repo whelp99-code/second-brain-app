@@ -48,7 +48,7 @@ def copy_pending_inbox(source: Path, destination: Path, state_root: Path) -> Non
     )
     gate = ReingressGate(state_root / "reingress.db")
     try:
-        payloads = tuple((path, path.read_bytes()) for path in pending)
+        payloads = tuple((path, _read_pending_file(inbox, path.relative_to(inbox))) for path in pending)
         for path, payload in payloads:
             relative = path.relative_to(inbox).as_posix()
             gate.check(IngressIdentity(
@@ -63,6 +63,43 @@ def copy_pending_inbox(source: Path, destination: Path, state_root: Path) -> Non
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         _ = target.write_bytes(payload)
         target.chmod(0o600)
+
+
+def _read_pending_file(inbox: Path, relative: Path) -> bytes:
+    descriptors: list[int] = []
+    try:
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+        root = os.open(inbox, directory_flags)
+        descriptors.append(root)
+        device = os.fstat(root).st_dev
+        parent = root
+        for part in relative.parts[:-1]:
+            parent = os.open(part, directory_flags, dir_fd=parent)
+            descriptors.append(parent)
+        fd = os.open(relative.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                     dir_fd=parent)
+        descriptors.append(fd)
+        before = os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_uid != os.getuid() or before.st_dev != device):
+            raise GenerationMutationError("GENERATION_SOURCE_UNSAFE")
+        chunks = bytearray()
+        while len(chunks) <= before.st_size:
+            block = os.read(fd, min(1024 * 1024, before.st_size - len(chunks) + 1))
+            if not block:
+                break
+            chunks.extend(block)
+        after = os.fstat(fd)
+        if (len(chunks) != before.st_size or after.st_size != before.st_size
+                or after.st_mtime_ns != before.st_mtime_ns or after.st_ctime_ns != before.st_ctime_ns
+                or after.st_nlink != 1):
+            raise GenerationMutationError("GENERATION_SOURCE_UNSAFE")
+        return bytes(chunks)
+    except OSError as exc:
+        raise GenerationMutationError("GENERATION_SOURCE_UNSAFE") from exc
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
 
 
 def copy_operational_ledger(source: Path, destination: Path) -> None:
