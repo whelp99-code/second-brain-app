@@ -148,7 +148,7 @@ def compile_pending(
     remaining = False
     for page_id, grouped in _group_by_page(units):
         key = deriv_key(
-            [unit.unit_id for unit in grouped],
+            ["compile-page-v1:" + page_id, *(unit.unit_id for unit in grouped)],
             COMPILE_STAGE,
             prompt_version,
             model_id,

@@ -50,6 +50,27 @@ def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
     assert {item.source_id for item in first} == {"agent-0", "agent-1"}
     assert len({item.source_uri for item in first}) == 1
     assert set(cursors) == {"agent-0", "agent-1"}
+    compiled = subprocess.run(
+        [sys.executable, "-m", "sb.cli", "compile", "--llm", "fake"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert compiled.returncode == 0, compiled.stderr + compiled.stdout
+    assert len(list((vault / "wiki").glob("*.md"))) == 2
+    pages = {path.name: path.read_bytes() for path in (vault / "wiki").glob("*.md")}
+    repeated = subprocess.run(
+        [sys.executable, "-m", "sb.cli", "compile", "--llm", "fake"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert repeated.returncode == 0, repeated.stderr + repeated.stdout
+    assert {path.name: path.read_bytes() for path in (vault / "wiki").glob("*.md")} == pages
     ingest()
     assert snapshot() == (first, cursors)
     addition = record(kind, "next-id")

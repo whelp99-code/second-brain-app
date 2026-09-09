@@ -132,7 +132,7 @@ def test_compile_pages_returns_exact_pagespec_when_units_fixture(tmp_path: Path)
         status="active",
         prompt_version="v1",
         model_id="fake",
-        derivation_key=deriv_key((unit.unit_id,), "compile", "v1", "fake"),
+        derivation_key=deriv_key(("compile-page-v1:" + PAGE_PROFILE, unit.unit_id), "compile", "v1", "fake"),
     )
     assert pages == [expected]
     assert fake.calls == 1
