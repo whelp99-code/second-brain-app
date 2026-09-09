@@ -1,0 +1,13 @@
+{
+  "status": "implemented-focused-verified",
+  "baseline_failures": 2,
+  "tests_passed": 30,
+  "test_seconds": 15.38,
+  "crash_exit_code": 73,
+  "sqlite_integrity": "ok",
+  "prior_block_preserved": true,
+  "partial_rows_after_crash": 0,
+  "replay_blocked": true,
+  "operational_changes": false,
+  "full_goal_complete": false
+}

@@ -107,10 +107,19 @@ class ReingressGate:
                     ),
                 )
             )
-        _ = self.db.executemany(
-            "INSERT OR IGNORE INTO blocked_identities VALUES(?,?,?,?,?)",
-            rows,
-        )
+        # Autocommit executemany otherwise publishes each identity separately.
+        _ = self.db.execute("SAVEPOINT block_targets")
+        try:
+            _ = self.db.executemany(
+                "INSERT OR IGNORE INTO blocked_identities VALUES(?,?,?,?,?)",
+                rows,
+            )
+            _ = self.db.execute("RELEASE SAVEPOINT block_targets")
+        except BaseException:
+            if self.db.in_transaction:
+                _ = self.db.execute("ROLLBACK TO SAVEPOINT block_targets")
+                _ = self.db.execute("RELEASE SAVEPOINT block_targets")
+            raise
 
     def check(self, identity: IngressIdentity) -> None:
         checks = [("source", identity.source), ("content", identity.content)]
