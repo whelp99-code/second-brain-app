@@ -369,7 +369,7 @@ def build_server(
         if profile is None:
             task30_enabled = False
             contract_schema_version = 3
-        elif profile in {"scoped-record-read-v1", "scoped-record-read-v2", "scoped-record-read-v3"}:
+        elif profile in {"scoped-record-read-v1", "scoped-record-read-v2", "scoped-record-read-v3", "scoped-record-read-v4"}:
             if initial_scoped_policy is None:
                 raise ContractProfileError
             task30_enabled = False
@@ -1032,7 +1032,8 @@ def build_server(
         if generation_store is None or not public_keys:
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
 
-        scoped_v3 = os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v3"
+        scoped_v4 = os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v4"
+        scoped_v3 = scoped_v4 or os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v3"
         scoped_v2 = scoped_v3 or os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-record-read-v2"
         if initial_scoped_policy.identity[2] is None and not scoped_v2:
             raise ValueError("MEMORY_SCOPED_CONFIG_INVALID")
@@ -1045,7 +1046,7 @@ def build_server(
                     current = high_water()
                     policy = current_scoped_policy(config, initial_scoped_policy)
                     context = AccessContext(config.provider_instance_id, *policy.identity,
-                        "memory_status" if method == "sb_generation_status" else "memory_read", access_request_digest(method, arguments), *current)
+                        "memory_status" if method in {"sb_generation_status", "sb_request_status"} else "memory_read", access_request_digest(method, arguments), *current)
                     scope = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
                     require_active_high_water(generation, current)
                     payload = reader(current_root, generation, scope)
@@ -1053,7 +1054,7 @@ def build_server(
                         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
                     require_active_high_water(generation, current)
                     _ = verify_access_claim(access_claim, read_fence, policy.public_keys(), context, datetime.now(UTC))
-                    return {"profile": "scoped-record-read-v3" if scoped_v3 else "scoped-record-read-v2" if scoped_v2 else "scoped-record-read-v1", "request_digest": context.request_digest,
+                    return {"profile": "scoped-record-read-v4" if scoped_v4 else "scoped-record-read-v3" if scoped_v3 else "scoped-record-read-v2" if scoped_v2 else "scoped-record-read-v1", "request_digest": context.request_digest,
                         "access_claim_digest": access_claim_binding(access_claim), **payload,
                         **generation_read_binding(generation, current).as_dict()}
             except (ValueError, OSError, PathEscapeError) as exc:
@@ -1081,8 +1082,23 @@ def build_server(
             return scoped_request("sb_generation_status", {}, read_fence, access_claim,
                 lambda root, generation, scope: {"schema_version": 1, "pointer_health": "healthy", "journal_health": "healthy"})
 
+        def scoped_request_status(request: dict[str, JsonValue], read_fence: dict[str, JsonValue], access_claim: dict[str, JsonValue]) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+            """Read historical request metadata under current signed scope; no renewed write authority."""
+            from sb.scoped_request_status import read_scoped_request_status
+            def read(_root: Path, _generation: GenerationIdentityV1, scope: SourceAccess) -> dict[str, object]:
+                store = RequestStore(requests, maintenance_only=True)
+                try:
+                    return {"request_status": read_scoped_request_status(store, request,
+                        expected_provider=config.provider_instance_id, clock=lambda: datetime.now(UTC),
+                        resolve_scope=lambda _at: scope)}
+                finally:
+                    store.close()
+            return scoped_request("sb_request_status", {"request": request}, read_fence, access_claim, read)
+
         if scoped_v2:
             _ = server.tool(name="sb_generation_status")(scoped_generation_status)
+        if scoped_v4:
+            _ = server.tool(name="sb_request_status")(scoped_request_status)
         _ = server.tool(name="sb_read_page")(scoped_read_page)
         _ = server.tool(name="sb_search")(scoped_search)
         return server

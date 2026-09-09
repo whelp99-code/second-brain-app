@@ -16,7 +16,7 @@ from sb.scoped_request_acceptance import accept_scoped_request
 from tests.task30_process_harness import executor_config
 
 profile = sys.argv[2] if len(sys.argv) > 2 else 'scoped-record-read-v2'
-if profile not in {'scoped-record-read-v2', 'scoped-record-read-v3'}:
+if profile not in {'scoped-record-read-v2', 'scoped-record-read-v3', 'scoped-record-read-v4'}:
     raise ValueError('unsupported fixture profile')
 root = Path(tempfile.mkdtemp(prefix='remembered-artifact-mcp-'))
 app = Path(__file__).resolve().parents[1]

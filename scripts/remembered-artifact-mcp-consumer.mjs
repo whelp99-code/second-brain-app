@@ -22,12 +22,19 @@ try {
   const policy = { schema_version: 1, provider_instance_id: 'provider:fixture', principal_id: 'principal:owner',
     policy_revision: 'policy:fixture', valid_from: at.toISOString(), valid_until: until,
     sessions: [{ agent_id: 'agent:reader', session_id: 'session:reader', projects: ['project:shared-memory'], methods: ['sb_generation_status', 'sb_read_page'] }] };
+  if (profile === 'scoped-record-read-v4') {
+    policy.schema_version = 3;
+    policy.agents = policy.sessions.map(({ session_id, ...row }) => ({ ...row,
+      methods: ['sb_generation_status', 'sb_read_page', 'sb_request_status'] }));
+    delete policy.sessions;
+  }
+  const rows = profile === 'scoped-record-read-v4' ? 'agents' : 'sessions';
   writeFileSync(policyPath, JSON.stringify(policy), { mode: 0o600 });
   const resolve = createFileMemoryAccessScopeResolver(policyPath, config.provider_instance_id, () => ({
     principal_id: 'principal:owner', agent_id: 'agent:reader', session_id: 'session:reader', expires_at: until }));
   const monitored = { call: async (...args) => { const result = await transport.call(...args); if (result.kind !== 'data') console.error(JSON.stringify({ result, diagnostics: transport.diagnostics() })); return result; }, restart: () => transport.restart(), close: () => transport.close(), diagnostics: () => transport.diagnostics() };
   let client;
-  if (profile === 'scoped-record-read-v3') {
+  if ((profile === 'scoped-record-read-v3' || profile === 'scoped-record-read-v4')) {
     const { createProductionScopedMemory } = await moduleAt('src/memory-scoped-production.js');
     const projectionKey = join(db.root, 'projection.key');
     writeFileSync(projectionKey, Buffer.alloc(32, 7), { mode: 0o600 });
@@ -43,21 +50,30 @@ try {
       max_age_ms: 86400000, expiry_ms: 172800000 });
   }
   const first = await client.readRememberedArtifact(input.request, input.accepted);
-  assert.equal(first.kind, profile === 'scoped-record-read-v3' ? 'remembered_artifact_observed' : 'remembered_content_observed');
-  if (profile === 'scoped-record-read-v3') { assert.equal(first.access.sources.length, 1); assert.deepEqual(first.access.sources[0].classification.projects, ['project:shared-memory']); } assert.equal(first.record_ids.length, 4);
+  assert.equal(first.kind, (profile === 'scoped-record-read-v3' || profile === 'scoped-record-read-v4') ? 'remembered_artifact_observed' : 'remembered_content_observed');
+  if ((profile === 'scoped-record-read-v3' || profile === 'scoped-record-read-v4')) { assert.equal(first.access.sources.length, 1); assert.deepEqual(first.access.sources[0].classification.projects, ['project:shared-memory']); } assert.equal(first.record_ids.length, 4);
+  let completion;
+  if (profile === 'scoped-record-read-v4') {
+    completion = await client.requestStatus(input.request, input.accepted);
+    assert.equal(completion.status.state, 'proved');
+    assert.equal(completion.status.proof.request_digest, input.request.request_digest);
+  }
   await transport.restart();
   const restarted = await client.readRememberedArtifact(input.request, input.accepted);
   assert.deepEqual(restarted, first);
-  writeFileSync(policyPath, JSON.stringify({ ...policy, sessions: [{ ...policy.sessions[0], projects: ['project:other', 'project:shared-memory'] }] }));
+  if (completion) assert.deepEqual(await client.requestStatus(input.request, input.accepted), completion);
+  writeFileSync(policyPath, JSON.stringify({ ...policy, [rows]: [{ ...policy[rows][0], projects: ['project:other', 'project:shared-memory'] }] }));
   const broader = await client.readRememberedArtifact(input.request, input.accepted);
   assert.deepEqual(broader, first);
   const original = readFileSync(input.config, 'utf8');
   writeFileSync(input.config, original.replace('policy:fixture', 'policy:revoked'));
   await assert.rejects(client.readRememberedArtifact(input.request, input.accepted));
+  if (completion) await assert.rejects(client.requestStatus(input.request, input.accepted));
   writeFileSync(input.config, original);
-  writeFileSync(policyPath, JSON.stringify({ ...policy, sessions: [] }));
+  writeFileSync(policyPath, JSON.stringify({ ...policy, [rows]: [] }));
   await assert.rejects(client.readRememberedArtifact(input.request, input.accepted));
-  console.log(JSON.stringify({ fixture: true, profile, production_composition: profile === "scoped-record-read-v3", internal_write_authority_fixture: true, supervised_stdio: true,
+  if (completion) await assert.rejects(client.requestStatus(input.request, input.accepted));
+  console.log(JSON.stringify({ completion, request_status_after_restart: !!completion, fixture: true, profile, production_composition: (profile === "scoped-record-read-v3" || profile === "scoped-record-read-v4"), internal_write_authority_fixture: true, supervised_stdio: true,
     read_after_restart: true, broader_authenticated_scope_allowed: true, provider_policy_change_rejected: true, issuer_policy_withdrawal_rejected: true,
     observation: first, automatic_settlement: false }, null, 2));
 } finally { await transport.close(); closeMemoryDatabase(db); }
