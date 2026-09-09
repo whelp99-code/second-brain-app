@@ -318,6 +318,8 @@ def _select_adapters(
             expanded.add(key)
         candidates.append((key, adapter))
     if source_ids is None:
+        if "sources" in config.raw:
+            return [adapter for _, adapter in candidates if adapter.source_id in seen_ids]
         return [adapter for _, adapter in candidates]
     names = set(source_ids)
     available = {name for key, adapter in candidates for name in (key, adapter.source_id)}

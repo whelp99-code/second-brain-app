@@ -1,0 +1,208 @@
+{
+  "workspace": "/var/tmp/sb-managed-native-e9_8jeox",
+  "source_rows_before": [
+    [
+      "inbox",
+      1
+    ]
+  ],
+  "selected": [
+    "inbox"
+  ],
+  "outcome": {
+    "status": "ok",
+    "errors": 0,
+    "exit_code": 0
+  },
+  "batch": {
+    "run_id": "b43b3dd0ba984182b8882d2541e19906",
+    "status": "ok",
+    "started_at": "2026-09-09T15:06:49.197674+00:00",
+    "finished_at": "2026-09-09T15:06:49.861421+00:00",
+    "stages_attempted": 2,
+    "written": 0,
+    "errors": 0
+  },
+  "recent_stages": [
+    {
+      "run_id": "84bbd16bf74f46acb82a6c1212ea8866",
+      "stage": "compile",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    },
+    {
+      "run_id": "2b36ae4f25584b2ab18cd3341b20392c",
+      "stage": "ingest",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    },
+    {
+      "run_id": "b43b3dd0ba984182b8882d2541e19906",
+      "stage": "batch",
+      "status": "ok",
+      "errors": 0,
+      "error": "{\"selected_run_id\":\"84bbd16bf74f46acb82a6c1212ea8866\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"2b36ae4f25584b2ab18cd3341b20392c\",\"status\":\"ok\"},{\"stage\":\"compile\",\"run_id\":\"84bbd16bf74f46acb82a6c1212ea8866\",\"status\":\"ok\"}]}"
+    },
+    {
+      "run_id": "0d528ddd80964cd29e8ede374b3a5ec9",
+      "stage": "compile",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    },
+    {
+      "run_id": "18849280018948fc97ee30b6cbdc5d6a",
+      "stage": "ingest",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    },
+    {
+      "run_id": "bc59a110f49b49c5b30e0b1e6082cc5c",
+      "stage": "batch",
+      "status": "ok",
+      "errors": 0,
+      "error": "{\"selected_run_id\":\"0d528ddd80964cd29e8ede374b3a5ec9\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"18849280018948fc97ee30b6cbdc5d6a\",\"status\":\"ok\"},{\"stage\":\"compile\",\"run_id\":\"0d528ddd80964cd29e8ede374b3a5ec9\",\"status\":\"ok\"}]}"
+    },
+    {
+      "run_id": "cc7f69f010ab482ca95ddaf4d6949118",
+      "stage": "compile",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    },
+    {
+      "run_id": "c542ce7fc7624ff0b273e1cbd28f8051",
+      "stage": "ingest",
+      "status": "failed",
+      "errors": 1,
+      "error": "SafeSourceFilesystemError: source mutation observed: ."
+    },
+    {
+      "run_id": "55c1e13abbff42619c29c7a0bb43e3ac",
+      "stage": "batch",
+      "status": "failed",
+      "errors": 1,
+      "error": "{\"selected_run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"status\":\"failed\"},{\"stage\":\"compile\",\"run_id\":\"cc7f69f010ab482ca95ddaf4d6949118\",\"status\":\"ok\"}]}"
+    },
+    {
+      "run_id": "eb694d6ce6844da5af7a33ca92b4eb3c",
+      "stage": "compile",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    }
+  ],
+  "http_status": {
+    "status": "최근 단계 실행 84bbd16bf74f46acb82a6c1212ea8866: ok · 최근 전체 배치 b43b3dd0ba984182b8882d2541e19906: ok (오류 0)",
+    "last_run_status": "ok",
+    "last_batch": {
+      "run_id": "b43b3dd0ba984182b8882d2541e19906",
+      "status": "ok",
+      "started_at": "2026-09-09T15:06:49.197674+00:00",
+      "finished_at": "2026-09-09T15:06:49.861421+00:00",
+      "stages_attempted": 2,
+      "written": 0,
+      "errors": 0
+    },
+    "recent_stages": [
+      {
+        "run_id": "84bbd16bf74f46acb82a6c1212ea8866",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "2b36ae4f25584b2ab18cd3341b20392c",
+        "stage": "ingest",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "b43b3dd0ba984182b8882d2541e19906",
+        "stage": "batch",
+        "status": "ok",
+        "errors": 0,
+        "error": "{\"selected_run_id\":\"84bbd16bf74f46acb82a6c1212ea8866\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"2b36ae4f25584b2ab18cd3341b20392c\",\"status\":\"ok\"},{\"stage\":\"compile\",\"run_id\":\"84bbd16bf74f46acb82a6c1212ea8866\",\"status\":\"ok\"}]}"
+      },
+      {
+        "run_id": "0d528ddd80964cd29e8ede374b3a5ec9",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "18849280018948fc97ee30b6cbdc5d6a",
+        "stage": "ingest",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "bc59a110f49b49c5b30e0b1e6082cc5c",
+        "stage": "batch",
+        "status": "ok",
+        "errors": 0,
+        "error": "{\"selected_run_id\":\"0d528ddd80964cd29e8ede374b3a5ec9\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"18849280018948fc97ee30b6cbdc5d6a\",\"status\":\"ok\"},{\"stage\":\"compile\",\"run_id\":\"0d528ddd80964cd29e8ede374b3a5ec9\",\"status\":\"ok\"}]}"
+      },
+      {
+        "run_id": "cc7f69f010ab482ca95ddaf4d6949118",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "c542ce7fc7624ff0b273e1cbd28f8051",
+        "stage": "ingest",
+        "status": "failed",
+        "errors": 1,
+        "error": "SafeSourceFilesystemError: source mutation observed: ."
+      },
+      {
+        "run_id": "55c1e13abbff42619c29c7a0bb43e3ac",
+        "stage": "batch",
+        "status": "failed",
+        "errors": 1,
+        "error": "{\"selected_run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"status\":\"failed\"},{\"stage\":\"compile\",\"run_id\":\"cc7f69f010ab482ca95ddaf4d6949118\",\"status\":\"ok\"}]}"
+      },
+      {
+        "run_id": "eb694d6ce6844da5af7a33ca92b4eb3c",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      }
+    ],
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  },
+  "http_search": {
+    "results": [
+      {
+        "page_id": "wiki/inbox-2026-09-09t144140491156-관리형실제기억검증-59a920fe",
+        "section": "2026-09-09T144140491156-관리형실제기억검증",
+        "snippet": "...0491156-관리형실제기억검증.md span=...",
+        "score": 1.5714285714285712e-06,
+        "kind": "wiki",
+        "index_status": "active",
+        "knowledge_status": "UNKNOWN",
+        "approval_status": "UNKNOWN",
+        "canonical": "",
+        "source_ref": "",
+        "updated_at": "2026-09-09",
+        "role": "REFERENCE",
+        "verification": "UNVERIFIED"
+      }
+    ]
+  }
+}
