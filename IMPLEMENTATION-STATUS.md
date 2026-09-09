@@ -1,3 +1,5 @@
+[CLI·웹·MCP 검색 일치](SEARCH-SURFACE-PARITY-2026-09-09.md) — 실제 생성 자료 각2건의 ID·검증 상태 일치, CLI별도프로세스/실제HTTP/MCP client·다른 registry 미생성.
+
 [MCP 명시적 레지스트리](MCP-EXPLICIT-REGISTRY-2026-09-09.md) — 검색3경로 전달 누락 수정, VERIFIED 회귀 재현→관련20개 및 실제 생성 자료 MCP2건 확인.
 
 [공용 레지스트리 검증 영향 대조](REGISTRY-TEST-IMPACT-2026-09-09.md) — 임시6개와 일치5행(합성wiki4/daily1), 운영현재 경로없음·읽기전용. 범위제한 및 공유daily 복구 보류.
