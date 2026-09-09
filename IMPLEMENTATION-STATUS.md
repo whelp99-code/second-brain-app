@@ -1,3 +1,5 @@
+[복원 수정 후 전체 회귀](POST-RESTORE-FULL-REGRESSION-2026-09-09.md) — 1cfeafb에서1491통과/2skip(282.63초), Ruff 통과. [대규모 복원 제한 실측](RESTORE-SCAN-CAPACITY-2026-09-09.md)은 별도 보류.
+
 [관리형 복원 staging 보호](MANAGED-RESTORE-STAGING-2026-09-09.md) — 기존 요청 자료 삭제 재현→고유0700 staging; 성공/실패 보존 포함18개 통과.
 
 [위치 변경·복제된 삭제 대상 복원 수정](RESTORE-RELOCATED-CONTENT-FIX-2026-09-09.md) — 서명 복원3사례, bounded 내용 검사 및 최종 잔존 거부 구현; 관련19개/후속31개(중복8) 통과.

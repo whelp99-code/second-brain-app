@@ -1,0 +1,65 @@
+[
+  {
+    "file_bytes": 1024,
+    "target_bytes": 16,
+    "result": "scanned",
+    "matches": 0,
+    "milliseconds": 0.338
+  },
+  {
+    "file_bytes": 1024,
+    "target_bytes": 64,
+    "result": "scanned",
+    "matches": 0,
+    "milliseconds": 0.333
+  },
+  {
+    "file_bytes": 1024,
+    "target_bytes": 256,
+    "result": "scanned",
+    "matches": 0,
+    "milliseconds": 0.365
+  },
+  {
+    "file_bytes": 65536,
+    "target_bytes": 16,
+    "result": "scanned",
+    "matches": 0,
+    "milliseconds": 21.549
+  },
+  {
+    "file_bytes": 65536,
+    "target_bytes": 64,
+    "result": "scanned",
+    "matches": 0,
+    "milliseconds": 22.213
+  },
+  {
+    "file_bytes": 65536,
+    "target_bytes": 256,
+    "result": "scanned",
+    "matches": 0,
+    "milliseconds": 29.466
+  },
+  {
+    "file_bytes": 1048576,
+    "target_bytes": 16,
+    "result": "RESTORE_SCAN_BUDGET_EXCEEDED",
+    "matches": null,
+    "milliseconds": 0.014
+  },
+  {
+    "file_bytes": 1048576,
+    "target_bytes": 64,
+    "result": "RESTORE_SCAN_BUDGET_EXCEEDED",
+    "matches": null,
+    "milliseconds": 0.006
+  },
+  {
+    "file_bytes": 1048576,
+    "target_bytes": 256,
+    "result": "RESTORE_SCAN_BUDGET_EXCEEDED",
+    "matches": null,
+    "milliseconds": 0.004
+  }
+]
