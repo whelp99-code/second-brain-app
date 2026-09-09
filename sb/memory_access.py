@@ -9,7 +9,8 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 import subprocess
-from contextlib import closing
+from collections.abc import Callable, Generator
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -56,41 +57,68 @@ def classified_page(root: Path, page_id: str, generation: GenerationIdentityV1) 
     Missing legacy classifications, mutable vaults and changed inventories fail
     closed. No Ledger writer is opened, migrated or repaired during a read.
     """
+    with classified_pages(root, generation) as read:
+        return read(page_id)
+
+
+@contextmanager
+def classified_pages(root: Path, generation: GenerationIdentityV1) -> Generator[Callable[[str], ClassifiedPage]]:
+    """Validate one bounded read batch before entry and before publishing results.
+
+    The caller keeps the generation lease and must buffer results until this
+    context exits successfully. Each page still checks its committed content and
+    complete source classifications. The reader cannot be reused after exit.
+    """
+    active = False
     try:
         manifest = _verify_generation(root, generation)
-        rel = git_rel(page_id)
-        raw = subprocess.check_output(
-            ["git", "-C", str(root), "cat-file", "blob", f"{generation.vault_head}:{rel}"],
-            stderr=subprocess.DEVNULL,
-        )
-        checksum = "sha256:" + hashlib.sha256(raw).hexdigest()
-        path = root / ".sb" / "ledger.db"
-        with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
-            row = cast(tuple[str] | None, db.execute(
-                "SELECT requirements_json FROM page_access WHERE page_id=? AND content_digest=?",
-                (rel.removesuffix(".md"), checksum)).fetchone())
-            if row is None:
-                raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
-            access = PageAccess.decode(row[0])
-            if not access.complete:
-                raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
-            requirements: list[SourceAccess] = []
-            for source_ref in access.source_refs:
-                source = cast(tuple[str, str] | None, db.execute(
-                    "SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
-                    (source_ref,)).fetchone())
-                if source is None:
-                    raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
-                requirements.append(decode_source_access(source_ref, source[0], source[1]))
-        records = parse_page_records(raw, page_id)
+        active = True
+
+        def read(page_id: str) -> ClassifiedPage:
+            if not active:
+                raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
+            return _classified_page(root, page_id, generation, manifest)
+
+        yield read
         _ = _verify_generation(root, generation)
-        return ClassifiedPage(generation, rel.removesuffix(".md"), checksum,
-                              tuple(requirements), access.source_refs, records,
-                              cast(int, manifest["tombstone_sequence"]), cast(str, manifest["tombstone_set_root"]))
     except MemoryAccessError:
         raise
     except (ValueError, OSError, sqlite3.Error, subprocess.CalledProcessError) as exc:
         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE") from exc
+    finally:
+        active = False
+
+
+def _classified_page(root: Path, page_id: str, generation: GenerationIdentityV1,
+                     manifest: JsonObject) -> ClassifiedPage:
+    rel = git_rel(page_id)
+    raw = subprocess.check_output(
+        ["git", "-C", str(root), "cat-file", "blob", f"{generation.vault_head}:{rel}"],
+        stderr=subprocess.DEVNULL,
+    )
+    checksum = "sha256:" + hashlib.sha256(raw).hexdigest()
+    path = root / ".sb" / "ledger.db"
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
+        row = cast(tuple[str] | None, db.execute(
+            "SELECT requirements_json FROM page_access WHERE page_id=? AND content_digest=?",
+            (rel.removesuffix(".md"), checksum)).fetchone())
+        if row is None:
+            raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+        access = PageAccess.decode(row[0])
+        if not access.complete:
+            raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+        requirements: list[SourceAccess] = []
+        for source_ref in access.source_refs:
+            source = cast(tuple[str, str] | None, db.execute(
+                "SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
+                (source_ref,)).fetchone())
+            if source is None:
+                raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+            requirements.append(decode_source_access(source_ref, source[0], source[1]))
+    records = parse_page_records(raw, page_id)
+    return ClassifiedPage(generation, rel.removesuffix(".md"), checksum,
+                          tuple(requirements), access.source_refs, records,
+                          cast(int, manifest["tombstone_sequence"]), cast(str, manifest["tombstone_set_root"]))
 
 
 def require_scope(page: ClassifiedPage, scope: SourceAccess) -> None:

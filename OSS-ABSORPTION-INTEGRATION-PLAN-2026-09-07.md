@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-10 최신 인계 병합:** [현재 동작·네 OSS 대조·수정/개선/고도화 우선순위](HANDOFF-MERGED-REVIEW-2026-09-10.md). 기존 설치 paired 경로와 운영 인수를 구분하고 M1–M14를 유지한다. 합성 scoped300페이지 검색12.4→1.4초 개선; 상세 검증은 연결 보고서 참조.
+
 **2026-09-09 운영 전환 준비 결함2개:** [Ja7a98e9 의존성 재사용 차단·SB 고정 커밋 wheel](RELEASE-PREPARATION-GAPS-2026-09-09.md). 운영 SDK 부재/lock 불일치 거부, 관련9검사·격리 publisher4경계. wheel의 미추적 bak2개 혼입을 재현해 git archive 빌드로 수정; 후보175파일 commit일치·7모듈/CLI·설치 MCP4프로필 handshake. 실제 운영 전환/DB·세션 설정 및 M1–M14는 남는다.
 
 **2026-09-09 OMO/GJC 내용 체크포인트:** [교체·헤더 재검증·네 수집기 공통 함수](EXPORT-CONTENT-CHECKPOINT-2026-09-09.md). 회귀11실패→관련50/전체1,388통과·2skip/250.16초·정적0오류0경고, 독립11프로세스 교체/append/헤더/FIFO 인수. legacy 소급 복구·다중 root·운영 및 전체 M1–M14 유지.

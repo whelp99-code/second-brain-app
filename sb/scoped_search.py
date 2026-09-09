@@ -5,7 +5,7 @@ import heapq
 from contextlib import closing
 from pathlib import Path
 
-from sb.memory_access import MemoryAccessError, classified_page, require_scope
+from sb.memory_access import MemoryAccessError, classified_pages, require_scope
 from sb.memory_records import MemoryRecordV1
 from sb.search import SearchIndex
 from sb.search_query import LexicalQuery
@@ -28,7 +28,7 @@ def search_scoped_records(root: Path, generation: GenerationIdentityV1, scope: S
                     continue
                 seen.add(hit.page_id)
                 try:
-                    page = classified_page(root, hit.page_id, generation)
+                    page = read(hit.page_id)
                     require_scope(page, scope)
                 except MemoryAccessError as exc:
                     if str(exc) in {"MEMORY_ACCESS_DENIED", "MEMORY_ACCESS_UNCLASSIFIED"}:
@@ -43,5 +43,7 @@ def search_scoped_records(root: Path, generation: GenerationIdentityV1, scope: S
 
     # Do not limit by raw hit count or publish corpus scores/snippets. A hidden
     # page cannot consume the visible result limit or contribute response text.
-    return [{"page_id": page_id, "content_digest": digest, "record": record.as_dict()}
-            for page_id, digest, record in heapq.nsmallest(limit, candidates(), key=order)]
+    with classified_pages(root, generation) as read:
+        results: list[dict[str, object]] = [{"page_id": page_id, "content_digest": digest, "record": record.as_dict()}
+                   for page_id, digest, record in heapq.nsmallest(limit, candidates(), key=order)]
+    return results

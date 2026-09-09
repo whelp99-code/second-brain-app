@@ -1,0 +1,60 @@
+{
+  "baseline_300": {
+    "root": "/var/tmp/sb-scoped-scale-33j9atep",
+    "pages": 300,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 12.397102672141045,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 12.486739550251514,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 51068,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  },
+  "candidate_300": {
+    "root": "/var/tmp/sb-scoped-scale-k7wgw4ze",
+    "pages": 300,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 1.4075635648332536,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 1.4142892928794026,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 51352,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  },
+  "candidate_100": {
+    "root": "/var/tmp/sb-scoped-scale-8ym_j564",
+    "pages": 100,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 0.4559125630185008,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 0.45190174132585526,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 48792,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  },
+  "comparison": "sequential single runs; synthetic sealed library; no p95, native, or concurrent update claim"
+}

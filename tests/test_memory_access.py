@@ -120,3 +120,40 @@ def test_project_scope_does_not_implicitly_include_personal_memory(classified):
     with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_DENIED"):
         require_scope(personal, SourceAccess("principal:owner", ("project:a",), "1"))
     require_scope(personal, SourceAccess("principal:owner", (), "1"))
+
+
+def test_batch_reader_expires_and_rejects_changed_inventory(classified):
+    from sb.memory_access import classified_pages
+
+    root, name, generation = classified
+    with classified_pages(root, generation) as read:
+        assert read(name) == classified_page(root, name, generation)
+    with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"):
+        read(name)
+    with (pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"),
+          classified_pages(root, generation) as changed_read):
+        assert changed_read(name).records
+        ledger = root / ".sb" / "ledger.db"
+        ledger.parent.chmod(0o700)
+        ledger.chmod(0o600)
+        with sqlite3.connect(ledger) as db:
+            db.execute("DELETE FROM page_access")
+    with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"):
+        changed_read(name)
+
+
+def test_scoped_search_does_not_publish_results_if_generation_changes(classified, monkeypatch):
+    from sb import scoped_search
+
+    root, _name, generation = classified
+    original = scoped_search.require_scope
+
+    def tamper_after_access_check(page, scope):
+        original(page, scope)
+        root.chmod(0o700)
+        (root / "generation.json").unlink()
+
+    monkeypatch.setattr(scoped_search, "require_scope", tamper_after_access_check)
+    with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"):
+        scoped_search.search_scoped_records(root, generation,
+            SourceAccess("principal:owner", ("project:a",), "1"), "Cited", 10)
