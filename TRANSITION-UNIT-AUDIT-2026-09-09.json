@@ -1,0 +1,233 @@
+{
+  "named_units_drained": false,
+  "units": [
+    {
+      "unit": "jm-jarvis.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "Job": "",
+        "MainPID": "2123274",
+        "ControlPID": "0"
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED",
+        "UNIT_HAS_PROCESS"
+      ]
+    },
+    {
+      "unit": "jm-jarvis-dashboard.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "Job": "",
+        "MainPID": "1625716",
+        "ControlPID": "0"
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED",
+        "UNIT_HAS_PROCESS"
+      ]
+    },
+    {
+      "unit": "jm-jarvis-phone-gateway.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "Job": "",
+        "MainPID": "1625717",
+        "ControlPID": "0"
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED",
+        "UNIT_HAS_PROCESS"
+      ]
+    },
+    {
+      "unit": "jm-jarvis-backup.timer",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Job": ""
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED"
+      ]
+    },
+    {
+      "unit": "jm-jarvis-backup.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "jm-jarvis-portfolio-collector.timer",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Job": ""
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED"
+      ]
+    },
+    {
+      "unit": "jm-jarvis-portfolio-collector.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "jm-second-brain-refresh.timer",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Job": ""
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED"
+      ]
+    },
+    {
+      "unit": "jm-second-brain-refresh.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "jm-second-brain-maintenance.timer",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Job": ""
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED"
+      ]
+    },
+    {
+      "unit": "jm-second-brain-maintenance.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "jm-second-brain-requests.path",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Job": ""
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED"
+      ]
+    },
+    {
+      "unit": "jm-second-brain-requests.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "second-brain-web.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "Job": "",
+        "MainPID": "2236915",
+        "ControlPID": "0"
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED",
+        "UNIT_HAS_PROCESS"
+      ]
+    },
+    {
+      "unit": "second-brain.timer",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": ""
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "second-brain.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    },
+    {
+      "unit": "second-brain-backup.timer",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Job": ""
+      },
+      "hold_reasons": [
+        "UNIT_NOT_DRAINED"
+      ]
+    },
+    {
+      "unit": "second-brain-backup.service",
+      "state": {
+        "LoadState": "loaded",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "MainPID": "0",
+        "ControlPID": "0"
+      },
+      "hold_reasons": []
+    }
+  ],
+  "scope": "read-only named systemd units; not a complete process or activation gate",
+  "production_activation_authorized": false
+}
