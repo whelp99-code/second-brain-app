@@ -1336,3 +1336,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 동일본문 candidate 계보/범위 분리:** [실제봉인 scoped검색 각1·합산2·원출처해시일치·CAS1](CANDIDATE-LINEAGE-SCOPE-2026-09-10.md). 관련13통과/4.27초·Ruff/diff. 제품변경없음, generic label은 원작업증거아님. 실제업무 계보/운영 및 전체목표유지.
 
 **2026-09-10 inbox 제한·비차단 읽기:** [FIFO대기차단·읽기전교체skip/다음회수·ack동일읽기](INBOX-BOUNDED-READ-2026-09-10.md). 관련walking skeleton포함20통과/3.78초·Ruff/타입0오류0경고. 부모경로/rename직전경합 후속검토, 운영/실업무·전체목표유지.
+
+**2026-09-10 inbox 완료경로 링크 이탈 수정:** [외부.done링크로원문이동 실패재현→descriptor상대이동/링크거절](INBOX-DONE-LINK-2026-09-10.md). 관련21통과/4.10초·Ruff/타입0오류0경고. 검증후basename교체/목적지기존파일 등 후속경합·운영/전체목표유지.

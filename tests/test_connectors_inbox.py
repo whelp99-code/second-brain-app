@@ -293,3 +293,20 @@ def test_file_replacement_before_open_is_not_ingested(tmp_path, monkeypatch):
     assert _skipped(list(adapter.scan(None))) == ['unreadable']
     monkeypatch.setattr(module, '_read_regular', original)
     assert _delivered(list(adapter.scan(adapter.next_cursor()))) == [('note.txt', b'replaced')]
+
+
+def test_acknowledge_does_not_follow_done_directory_symlink(tmp_path):
+    from sb.connectors.base import AcknowledgingSourceAdapter
+
+    inbox = tmp_path / 'inbox'
+    outside = tmp_path / 'outside'
+    inbox.mkdir()
+    outside.mkdir()
+    (inbox / 'note.txt').write_text('keep inside inbox')
+    adapter = create(_cfg(inbox))
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    items = list(adapter.scan(None))
+    (inbox / '.done').symlink_to(outside, target_is_directory=True)
+    adapter.acknowledge(tuple(ref for ref, _, _ in items))
+    assert (inbox / 'note.txt').read_text() == 'keep inside inbox'
+    assert list(outside.iterdir()) == []

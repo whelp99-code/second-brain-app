@@ -226,13 +226,33 @@ def _parse_body(suffix: str, body: bytes) -> _InboxText | str:
         return str(exc)
 
 
-def _move_done(root: Path, path: Path, rel: str) -> None:
-    dest = root / ".done" / Path(rel)
+def _move_done(root: Path, _path: Path, rel: str) -> None:
+    parts = Path(rel).parts
+    if not parts or Path(rel).is_absolute() or any(part in {".", ".."} for part in parts):
+        return
+    descriptors: list[int] = []
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(path, dest)
+        base = os.open(root, flags)
+        descriptors.append(base)
+        source = base
+        for part in parts[:-1]:
+            source = os.open(part, flags, dir_fd=source)
+            descriptors.append(source)
+        destination = base
+        for part in (".done", *parts[:-1]):
+            try:
+                os.mkdir(part, mode=0o700, dir_fd=destination)
+            except FileExistsError:
+                pass
+            destination = os.open(part, flags, dir_fd=destination)
+            descriptors.append(destination)
+        os.replace(parts[-1], parts[-1], src_dir_fd=source, dst_dir_fd=destination)
     except OSError:
         return
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
 
 
 def _read_regular(path: Path, expected: os.stat_result) -> bytes:
