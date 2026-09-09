@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 운영 읽기 전용 대조:** [실행 릴리스·설정·브리핑 실패 이력](OPERATIONAL-HANDOFF-AUDIT-2026-09-09.md). SB health/ready 200·최근 배치 ok이나 새 scoped 모듈과 gateway 복구 옵션은 운영에 없음. 과거 brief 실패5건을 구버전 readiness가 판정에 반영하지 않으며 개발 로직에는 이미 검사 존재. 중복 구현 대신 배포 차이·실패 복구·실제 A→B를 우선한다. 운영 변경 없음, 전체 M1–M14 미완료.
+
 **2026-09-09 게이트웨이 CLI 복구 설정 공급:** [13개 명시적 옵션·startup 전달·실제 HTTP/MCP 재인수](SCOPED-GATEWAY-CLI-CONFIG-2026-09-09.md). 일부 설정은 시작 거절, 기존 context 유지. 관련55통과·emit/lint, parser 조립 설정으로 실제 3상태/철회/종료복구 attempt1/FK0. 운영 경로·키·서비스 인수·쓰기 verifier CLI 설정·실제 A→B 등 M1–M14는 남는다.
 
 **2026-09-09 실제 로그인 HTTP→scoped 복구:** [쿠키/CSRF·현재 세션·실제 3상태/종료 복구](SCOPED-RECONCILE-HTTP-2026-09-09.md). 명시적 서버 설정에서 새 POST가 실제 session store→CLI/production/MCP에 연결된다. 관련48통과·emit/lint. 실제 인증/본문/정책/만료 차단, pending/failed deferred와 proved control completed·exit73 replay·attempt1/FK0. gateway CLI 설정 공급·운영 Tailnet/서비스·실제 A→B 및 전체 M1–M14 인수는 남는다.
