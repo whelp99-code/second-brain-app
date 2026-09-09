@@ -42,7 +42,24 @@ try {
   assert.deepEqual(await client.recoverRequestStatus(input.request), first);
   writeFileSync(policyPath, JSON.stringify({ ...policy, agents: [] }));
   await assert.rejects(client.recoverRequestStatus(input.request));
+  let recovered;
+  if (input.recovery) {
+    writeFileSync(policyPath, JSON.stringify(policy));
+    const { AuthorityDb } = await load('src/db.js');
+    const { recoverMemoryScopedJournalAcceptance } = await load('src/memory-scoped-journal-recovery.js');
+    const authority = new AuthorityDb(input.recovery.database);
+    try {
+      recovered = await recoverMemoryScopedJournalAcceptance({ authority, spoolRoot: input.recovery.spoolRoot,
+        providerInstanceId: 'provider:fixture' }, input.recovery.lease, client, () => at);
+      assert.equal(recovered.kind, 'scoped_journal_acceptance_recovered');
+      assert.equal(recovered.acceptance.replayed, !input.recovery.crash_after_commit);
+    } finally { authority.close(); }
+    if (input.recovery.crash_after_commit) {
+      await transport.close(); closeMemoryDatabase(db);
+      process.exit(73);
+    }
+  }
   console.log(JSON.stringify({ state: first.status.state, original_acceptance_recovered: true,
     restarted_equal: true, provider_revocation_denied: true, issuer_revocation_denied: true,
-    current_artifact_claimed: false, request_id: first.status.request_id }));
+    current_artifact_claimed: false, request_id: first.status.request_id, ...(recovered ? { recovered, commit_exit: 73 } : {}) }));
 } finally { await transport.close(); closeMemoryDatabase(db); }

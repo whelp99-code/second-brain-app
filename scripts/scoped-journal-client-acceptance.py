@@ -48,10 +48,18 @@ try:
     code = 'from datetime import datetime,UTC\nimport sb.mcp as m\nimport sb.scoped_status_mcp as s\nclass Clock(datetime):\n @classmethod\n def now(cls,tz=None): return datetime(2026,8,31,3,30,tzinfo=UTC)\nm.datetime=Clock\ns.datetime=Clock\nm.main()\n'
     launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(app)) + '\nexec ' + shlex.quote(sys.executable) + ' -c ' + shlex.quote(code) + ' 2>' + shlex.quote(str(root / 'server.err')) + '\n')
     launcher.chmod(0o700)
-    result = subprocess.run(['node', str(app / 'scripts/scoped-journal-client-consumer.mjs'), sys.argv[1]],
-        input=json.dumps({'request': raw, 'expected_state': state, 'config': str(config_path),
-            'launcher': str(launcher), 'contract': str(app / 'contracts/second-brain-scoped-status-v1.json')}),
-        text=True, capture_output=True, timeout=60, check=False)
+    recovery = json.loads(Path(sys.argv[4]).read_text()) if len(sys.argv) > 4 else None
+    def consume(crash):
+        return subprocess.run(['node', str(app / 'scripts/scoped-journal-client-consumer.mjs'), sys.argv[1]],
+            input=json.dumps({'request': raw, 'expected_state': state, 'config': str(config_path),
+                'launcher': str(launcher), 'contract': str(app / 'contracts/second-brain-scoped-status-v1.json'),
+                **({'recovery': {**recovery, 'crash_after_commit': crash}} if recovery else {})}),
+            text=True, capture_output=True, timeout=60, check=False)
+    result = consume(recovery is not None)
+    if recovery is not None:
+        if result.returncode != 73:
+            raise RuntimeError('expected post-commit exit73: ' + result.stderr)
+        result = consume(False)
     if result.returncode != 0:
         raise RuntimeError(result.stderr + ((root / 'server.err').read_text() if (root / 'server.err').exists() else ''))
     print(result.stdout.strip())

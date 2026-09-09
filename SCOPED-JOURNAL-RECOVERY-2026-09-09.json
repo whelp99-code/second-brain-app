@@ -1,0 +1,52 @@
+[
+  {
+    "state": "pending",
+    "original_acceptance_recovered": true,
+    "restarted_equal": true,
+    "provider_revocation_denied": true,
+    "issuer_revocation_denied": true,
+    "current_artifact_claimed": false,
+    "request_id": "memreq:scoped:v4:1ddcaea183cca21747805a210c2a7309af3c9e64a400bce9e245623a24ee88fd",
+    "recovered": {
+      "kind": "scoped_journal_acceptance_recovered",
+      "acceptance": {
+        "kind": "acceptance_recorded",
+        "outbox_id": "memout:scoped:v4:edbb8f63a4630e13807f5a20778dd7f4d4d5d06faa6d88a9727110c862fb62df",
+        "attempt_id": "memattempt:pos:v2:114cea0fdf7820d2725ca52cb8470dcb715a6d760631835bdf46d23303f3d400",
+        "acceptance_receipt_digest": "sha256:0849e7381d361614a30b41c6a50aaad8c8881319d8f3a9e35ad3bd71adb0e4e5",
+        "replayed": true
+      },
+      "observed_provider_state": "pending"
+    },
+    "commit_exit": 73,
+    "attempts": 1,
+    "acceptance_events": 1,
+    "foreign_key_errors": 0,
+    "outbox": "reconciling"
+  },
+  {
+    "state": "failed",
+    "original_acceptance_recovered": true,
+    "restarted_equal": true,
+    "provider_revocation_denied": true,
+    "issuer_revocation_denied": true,
+    "current_artifact_claimed": false,
+    "request_id": "memreq:scoped:v4:5b481be54d5ae3920daee5d0360b3fb459f56fedf5fa4edb42a8921162ea47fd",
+    "recovered": {
+      "kind": "scoped_journal_acceptance_recovered",
+      "acceptance": {
+        "kind": "acceptance_recorded",
+        "outbox_id": "memout:scoped:v4:6e40318faafa70a3dc719951a7baaf2db2e13061856d10654fac2db6ea805755",
+        "attempt_id": "memattempt:pos:v2:d1aeb415016407d1b04ebc431cffee454dc692653e4e8b4ec446ed059c7193d2",
+        "acceptance_receipt_digest": "sha256:d790f37c4fc61f2e4aa862cef750b57fc4d5a194c9a3102efa85a0e9d01ff508",
+        "replayed": true
+      },
+      "observed_provider_state": "failed"
+    },
+    "commit_exit": 73,
+    "attempts": 1,
+    "acceptance_events": 1,
+    "foreign_key_errors": 0,
+    "outbox": "reconciling"
+  }
+]

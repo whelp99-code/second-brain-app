@@ -1,5 +1,7 @@
 # 자비스 인계 추가 대조와 구현 우선순위
 
+**2026-09-09 최초 세대 이전 수락의 영속 복구:** [현재 권한/lease·원자 기록·실제 commit 후 종료 복구](SCOPED-JOURNAL-RECOVERY-2026-09-09.md). journal 조회를 원래 outbox acceptance 기록에 연결했다. 관련41통과·emit/lint·실제 pending/failed 각각 exit73→새 프로세스 replay, attempt1/event1/FK0. 철회/취소/lease 만료는 전체 rollback. 현재 artifact/최종 완료·자동 재전송으로 승격하지 않으며 운영 worker 연결·실제 A→B 등 전체 M1–M14 인수는 남는다.
+
 **2026-09-09 자비스 최초 세대 이전 상태 소비 연결:** [전송 계약·현재 권한 재검사·실제 pending/failed 재시작](SCOPED-JOURNAL-CLIENT-2026-09-09.md). 새 journal 전용 클라이언트가 원래 acceptance를 회수하며 현재 artifact/완료로 승격하지 않는다. 실제 MCP schema 비교 등록 누락 수정, 관련56통과·타입/lint·패키징 확인. 실제 양쪽 철회 차단과 재시작 동일 결과. 원래 outbox/lease의 영속 복구 workflow·운영 설정·A→B 및 전체 M1–M14는 남는다.
 
 **2026-09-09 최초 세대 이전 원장 상태 표면:** [새 scoped-request-status-v1·별도 MCP 재시작·권한 경계](SCOPED-JOURNAL-STATUS-2026-09-09.md). provider의 pending/failed/원래 수락 조회를 활성 세대에서 분리했다. 기존 read v1–v5 유지, 현재 정책·서명·삭제 이력 전후 검사 및 원장 부재 거부. 전체1,354통과/2skip/290.17초(embeddings 제외)·관련31통과(중복)·정적검사/Ruff 통과. 자비스 전송/소비자·현재 인증 발급과 복구 workflow 연결은 다음 작업이며 이 원장 응답은 현재 artifact/최종 완료 증거가 아니다. 전체 M1–M14 운영 인수는 유지한다.
