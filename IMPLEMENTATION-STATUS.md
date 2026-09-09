@@ -1,3 +1,5 @@
+[충돌 복구 후 반복 실행](CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md) — 실제 HTTP 모델 호출0·pages0·실패0, 회귀에서 Git HEAD와 충돌 원장 불변 확인.
+
 [컴파일 완료 후 충돌 재시도](CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md) — 기존 페이지 비교 입력 유지, 실제 같은 vault 실패1→0·재제출 없음, 동일 키 done/attempts+1 포함 관련71개 통과.
 
 [충돌 실패 배치 반영](CONFLICT-FAILURE-BATCH-2026-09-09.md) — 실제 HTTP 실험 ok/errors0→partial/errors1, 실패 원장 보존·관련70개 및 충돌13개(중복) 통과. 마지막 단계 상태와 전체 배치 구분은 남음.

@@ -1,4 +1,5 @@
 """Conflict retries retain committed comparison pages after compilation is cached."""
+import subprocess
 from pathlib import Path
 
 from sb.config import Config
@@ -20,8 +21,10 @@ def test_conflict_retry_without_recompilation(tmp_path: Path, monkeypatch):
 
     class Model:
         recovered = False
+        calls = 0
 
         def generate(self, prompt, **kwargs):
+            self.calls += 1
             if kwargs.get('json_mode') and self.recovered:
                 return '{"relation":"unrelated","confidence":1,"rationale":"test","cites":[]}'
             return '검증기억 ' + _CitedFake().generate(prompt)
@@ -41,3 +44,14 @@ def test_conflict_retry_without_recompilation(tmp_path: Path, monkeypatch):
             current = ledger.get_derivation(previous.deriv_key)
             assert current.status == 'done'
             assert current.attempts == previous.attempts + 1
+    calls_after_recovery = model.calls
+    head = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'])
+    with Ledger(root) as ledger:
+        recovered = list(ledger.list_derivations(stage='conflict'))
+    again = run_compile(config)
+    assert again.errors == 0
+    assert again.pages == 0
+    assert model.calls == calls_after_recovery
+    assert subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD']) == head
+    with Ledger(root) as ledger:
+        assert list(ledger.list_derivations(stage='conflict')) == recovered
