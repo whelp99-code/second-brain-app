@@ -50,7 +50,17 @@ try {
     const authority = new AuthorityDb(input.recovery.database);
     try {
       const options = { authority, spoolRoot: input.recovery.spoolRoot, providerInstanceId: 'provider:fixture' };
-      if (input.recovery.cli) {
+      if (input.recovery.http) {
+        const { reconcileThroughHttp } = await import('./scoped-reconcile-http-fixture.mjs');
+        memoryReadFenceFixture({ ...db, authority });
+        writeFileSync(input.config, readFileSync(input.config, 'utf8').replace('session = "session:reader"', 'session_mode = "issuer_authenticated"'));
+        const response = await reconcileThroughHttp(process.argv[2], { database_path: input.recovery.database, agent_id: 'agent:reader',
+          memory: { policy_path: policyPath, read_fence_config: config, spool_root: input.recovery.spoolRoot, roots: {},
+            journal_transport_options: { launcherPath: input.launcher, configPath: input.config, contractPath: input.contract },
+            completion_transport_options: { launcherPath: input.launcher, configPath: input.config, contractPath: input.contract.replace('scoped-status-v1', 'scoped-read-v5') } } }, input.recovery.lease.outbox_id, at);
+        assert.equal(response.result.kind, 'scoped_reconciliation_deferred');
+        recovered = response.result.recovery;
+      } else if (input.recovery.cli) {
         const { execute } = await load('src/cli.js');
         memoryReadFenceFixture({ ...db, authority });
         const response = await execute(['memory', 'reconcile-scoped', input.recovery.lease.outbox_id,
@@ -84,5 +94,5 @@ try {
   console.log(JSON.stringify({ state: first.status.state, original_acceptance_recovered: true,
     restarted_equal: true, provider_revocation_denied: true, issuer_revocation_denied: true,
     current_artifact_claimed: false, request_id: first.status.request_id,
-    ...(recovered ? { recovered, commit_exit: 73, once: Boolean(input.recovery.once), cli: Boolean(input.recovery.cli) } : {}) }));
+    ...(recovered ? { recovered, commit_exit: 73, once: Boolean(input.recovery.once), cli: Boolean(input.recovery.cli), http: Boolean(input.recovery.http) } : {}) }));
 } finally { await transport.close(); closeMemoryDatabase(db); }

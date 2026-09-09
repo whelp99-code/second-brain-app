@@ -94,7 +94,18 @@ try {
         }
         if (input.reconciliation.atomic) {
           let result;
-          if (input.reconciliation.cli) {
+          if (input.reconciliation.http) {
+            const { reconcileThroughHttp } = await import('./scoped-reconcile-http-fixture.mjs');
+            const { releaseMemoryScopedReconciliation } = await moduleAt('src/memory-scoped-reconciliation.js');
+            memoryReadFenceFixture({ ...db, authority });
+            releaseMemoryScopedReconciliation(authority, input.reconciliation.lease, at);
+            writeFileSync(input.config, readFileSync(input.config, 'utf8').replace('session = "session:reader"', 'session_mode = "issuer_authenticated"'));
+            const response = await reconcileThroughHttp(process.argv[2], { database_path: input.reconciliation.database, agent_id: 'agent:reader',
+              memory: { policy_path: policyPath, read_fence_config: config, spool_root: input.reconciliation.spoolRoot, roots: input.reconciliation.roots,
+                journal_transport_options: { launcherPath: input.launcher, configPath: input.config, contractPath: input.contract.replace('scoped-read-v5', 'scoped-status-v1') },
+                completion_transport_options: { launcherPath: input.launcher, configPath: input.config, contractPath: input.contract } } }, input.reconciliation.lease.outbox_id, at);
+            result = response.result;
+          } else if (input.reconciliation.cli) {
             const { execute } = await moduleAt('src/cli.js');
             const { releaseMemoryScopedReconciliation } = await moduleAt('src/memory-scoped-reconciliation.js');
             memoryReadFenceFixture({ ...db, authority });
