@@ -1,3 +1,5 @@
+[웹 본문 응답 순서 보호](WEB-PAGE-RESPONSE-ORDER-2026-09-09.md) — 새검색/다른페이지 뒤 늦은본문 거부, 실제브라우저·HTTP12개통과.
+
 [웹 검색 응답 순서 보호](WEB-SEARCH-RESPONSE-ORDER-2026-09-09.md) — 이전응답 덮어쓰기 재현→브라우저3흐름·HTTP12개통과.
 
 [웹 기억 저장 중 새 초안 보존](WEB-DRAFT-PRESERVATION-2026-09-09.md) — 실제브라우저 유실재현→4흐름통과, HTTP12개통과.
