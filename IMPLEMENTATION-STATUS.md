@@ -1310,3 +1310,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 운영 lease 만료 구분:** [정본만료규칙·UTC시각·유효/만료/invalid 집계](JARVIS-LEASE-OBSERVATION-2026-09-10.md). 관련4통과·실제 GJC unexpired1/나머지0·큐6개0/activecursor0. 실행권 잔류로 운영전환 보류, 전체 목표 유지.
 
 **2026-09-10 관리형 runtime 백업 삭제:** [실제tar에 원문/제어원장 확인→forget proved→대상제거/무관백업bytes동일](MANAGED-RUNTIME-BACKUP-DISPOSAL-2026-09-10.md). 관련23통과/7.57초·Ruff/diff. 일반파일 fixture는 UNMANIFESTED_BACKUP으로 거부, 규칙유지. 합성provider 검사이며 운영/native 전체 수명·전체 목표 유지.
+
+**2026-09-10 유지 백업 복원 조회:** [선택적삭제 후 실제tar restore→무관기억1/삭제기억0](RETAINED-BACKUP-READBACK-2026-09-10.md). 관련23통과/7.46초·Ruff/diff. 합성provider/reference조회이며 운영활성화·DR/native 수명과 전체 목표 유지.

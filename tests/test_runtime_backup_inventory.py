@@ -57,6 +57,13 @@ def test_real_forget_disposes_runtime_archive_inside_managed_backup_root(tmp_pat
     import tarfile
 
     from sb.config import Config
+    from sb.generation_runtime_models import (
+        GenerationAuthority,
+        GenerationMutation,
+        GenerationOperation,
+    )
+    from sb.remember_page import materialize_remember
+    from sb.search import SearchIndex
     from tests import task30_restore_factory as factory
 
     original_accept = factory.accept_effect_request
@@ -78,7 +85,13 @@ def test_real_forget_disposes_runtime_archive_inside_managed_backup_root(tmp_pat
         other_config.raw['knowledge_registry'] = str(tmp_path / 'other-registry.sqlite')
         other = GenerationMutationService.from_config(other_config)
         try:
-            other.remember('preserve unrelated archived memory', None, datetime.now(UTC))
+            now = datetime.now(UTC)
+            other.mutate(GenerationMutation(
+                mutation_id='backup:unrelated-memory', operation=GenerationOperation.REMEMBER,
+                now=now, authority=GenerationAuthority(None, None),
+                apply=lambda root: materialize_remember(root, content='preserve unrelated archived memory',
+                    candidate_id='memcand:pos:v1:' + 'c' * 64, created_at=format_instant(now),
+                    release_sha='a' * 40)))
             backup_runtime(other_config, unrelated)
         finally:
             other.close()
@@ -103,6 +116,14 @@ def test_real_forget_disposes_runtime_archive_inside_managed_backup_root(tmp_pat
         assert observations == ['real-runtime-archive-contained-original']
         assert not archive.exists()
         assert unrelated.read_bytes() == unrelated_bytes[0]
+        restored = tmp_path / 'retained-backup-restored'
+        restore_backup(unrelated, restored)
+        hits = SearchIndex(restored, registry_path=tmp_path / 'readback-registry.sqlite').search(
+            'unrelated archived', scope='reference')
+        assert len(hits) == 1
+        assert 'preserve unrelated archived memory' in (restored / (hits[0].page_id + '.md')).read_text()
+        assert SearchIndex(restored, registry_path=tmp_path / 'readback-registry.sqlite').search(
+            factory.OLD, scope='reference') == ()
         assert fixture.executor.store.tombstone_high_water()[0] == 1
         assert not any(factory.OLD.encode() in path.read_bytes()
                        for path in archive.parent.rglob('*') if path.is_file())
