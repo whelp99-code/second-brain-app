@@ -1,3 +1,5 @@
+[실제 Claude 컴파일·검색 ID 수정](NATIVE-COMPILE-SEARCH-ID-2026-09-09.md) — 실제 원문 사실 생성 후 검색0 원인 bare ID 수정, 격리 재등록 후 검색·본문 회수 및72개 통과. 최초 검증의 공용 registry 사용 부수 효과 확인·후속 격리 수정 필요.
+
 [미해결 실패 자격증명 마스킹](FAILED-DETAIL-CREDENTIALS-2026-09-09.md) — token/AWS/GitHub/sk- 4누락 재현·공통 처리, 연락처 보존 및 관련73개 통과.
 
 [공통 자격증명 마스킹](SHARED-CREDENTIAL-REDACTION-2026-09-09.md) — stdlib 모듈 분리·기존 동등성 및 관련94개 통과, 독립 import/연락처 보존 확인.

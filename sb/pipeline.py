@@ -440,7 +440,7 @@ def _register_compiled(
         if page.page_id.startswith("wiki/_proposed/"):
             continue
         registry.put(
-            page.page_id,
+            git_rel(page.page_id).removesuffix(".md"),
             knowledge_status=ACTIVE,
             approval_status=APPROVED,
             decided_by="sb-compile",
