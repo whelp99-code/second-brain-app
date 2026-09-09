@@ -508,7 +508,7 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
             ledger.record_run(Run(run_id, started, finished, None, "failed"))
             line = f"{started} run {run_id} failed pages=0 conflicts=0 errors=1"
             _append_run_log(root, line)
-            return RunOutcome(run_id, "failed", 0, 0, 1, 1, None)
+            return RunOutcome(run_id, "failed", 0, 0, 1, 1, None, failure=detail)
         if report.failure is not None:
             status, exit_code = "failed", 1
         elif report.capped:

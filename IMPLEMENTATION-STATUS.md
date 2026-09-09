@@ -1,3 +1,5 @@
+[웹 단계 예외 상세·원인 정정](WEB-STAGE-FAILURE-DETAIL-2026-09-09.md) — 실행 ID별 compile 정책 거부 확인, RunOutcome→HTTP 상세·자격증명 마스킹. 관련68개 및 후속18개(중복), Ruff 통과.
+
 [웹 브리핑 재처리 보류 확인](WEB-BRIEF-RECOVERY-HOLD-2026-09-09.md) — 동일 임시 vault의 실패 단계 brief 확인·이전 설명 정정. 모델 명령 변경 후에도 입력 부재 보류·attempts1·검색0 유지.
 
 [실제 웹 배치 실패 인수](REAL-WEB-PIPELINE-FAILURE-2026-09-09.md) — mock 없는 저장·처리·실패 표시·검색0건, 영수증과 CAS 원문 보존 확인. 정상 모델 및 재처리 인수는 남음.

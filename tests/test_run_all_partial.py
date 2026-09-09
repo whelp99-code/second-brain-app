@@ -42,3 +42,16 @@ def test_partial_ingest_survives_real_stage_recording(tmp_path: Path, monkeypatc
     assert result.exit_code == 0
     tables = load_ledger_tables(root / '.sb/ledger.db')
     assert tables.runs[result.run_id].status == 'partial'
+
+
+def test_stage_exception_returns_recorded_failure(tmp_path: Path):
+    from sb.pipeline import _run_locked
+
+    _, root = _ready(tmp_path)
+
+    def rejected(*args):
+        raise RuntimeError('source test: LLM egress denied by source policy')
+
+    result = _run_locked(root, rejected, 'compile')
+    assert result.status == 'failed'
+    assert result.failure == 'RuntimeError: source test: LLM egress denied by source policy'

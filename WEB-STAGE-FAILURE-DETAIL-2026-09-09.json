@@ -1,0 +1,51 @@
+{
+  "before": [
+    [
+      "c4c98fd0c220ed0a66fce8712c2bb52d2acadf7f0b88bf24798b5a517cbd37b6",
+      "failed",
+      1
+    ]
+  ],
+  "outcome": {
+    "run_id": "8785c7a13ca744a390ff792190cc6509",
+    "status": "failed",
+    "pages": 0,
+    "conflicts": 0,
+    "errors": 1,
+    "exit_code": 1,
+    "already_running": false,
+    "failure": "SecurityPolicyError: source web-inbox: LLM egress denied by source policy"
+  },
+  "status": {
+    "status": "2026-09-09T22:40:52.158084+09:00 run 8785c7a13ca744a390ff792190cc6509 failed pages=0 conflicts=0 errors=1",
+    "last_run_status": "failed",
+    "failures": {
+      "total": 1,
+      "by_stage": {
+        "brief": 1
+      },
+      "items": [
+        {
+          "key": "c4c98fd0c220ed0a66fce8712c2bb52d2acadf7f0b88bf24798b5a517cbd37b6",
+          "stage": "brief",
+          "attempts": 1,
+          "error": "LLM unavailable after 2 attempts: command not found: /var/tmp/sb-real-web-failure-4851r0qb/deliberately-missing-model",
+          "retry_hold_reason": "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
+        }
+      ],
+      "omitted": 0
+    }
+  },
+  "search": {
+    "results": []
+  },
+  "after": [
+    [
+      "c4c98fd0c220ed0a66fce8712c2bb52d2acadf7f0b88bf24798b5a517cbd37b6",
+      "failed",
+      1
+    ]
+  ],
+  "model": "deterministic stand-in, not native model",
+  "http_mocked": false
+}
