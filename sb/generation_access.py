@@ -6,6 +6,7 @@ import stat
 from pathlib import Path
 from typing import cast
 
+from sb.bound_knowledge import BoundKnowledge
 from sb.effect_values import JsonObject, JsonValue, digest
 from sb.page_access import PageAccess
 from sb.source_access import decode_source_access
@@ -46,14 +47,35 @@ def access_bound_ledger_digest(root: Path, legacy_digest: str) -> str:
                     raise ValueError("GENERATION_ACCESS_INVALID")
                 _ = PageAccess.decode(encoded)
                 pages.append([page, checksum, encoded])
+        knowledge: list[list[str]] = []
+        if "bound_knowledge" in tables:
+            rows = cast(list[tuple[object, object, object, object]], connection.execute(
+                "SELECT page_id,content_digest,knowledge_status,approval_status FROM bound_knowledge "
+                + "ORDER BY page_id,content_digest").fetchall())
+            seen: set[tuple[str, str]] = set()
+            for page, checksum, status, approval in rows:
+                if (not isinstance(page, str) or not isinstance(checksum, str)
+                        or not isinstance(status, str) or not isinstance(approval, str)):
+                    raise ValueError("GENERATION_KNOWLEDGE_INVALID")  # noqa: TRY004 - corrupt stored data
+                state = BoundKnowledge(page, checksum, status, approval)
+                identity = (state.page_id, state.content_digest)
+                if identity in seen:
+                    raise ValueError("GENERATION_KNOWLEDGE_INVALID")
+                seen.add(identity)
+                knowledge.append([state.page_id, state.content_digest,
+                    state.knowledge_status, state.approval_status])
         after = path.lstat()
         if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
                 after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
             raise ValueError("GENERATION_ACCESS_CHANGED")
-        if not sources and not pages:
-            return legacy_digest
-        return digest("generation", {"profile": "access-bound-ledger-v1", "legacy_ledger_digest": legacy_digest,
-            "sources": sources, "pages": pages})
+        access_digest = legacy_digest
+        if sources or pages:
+            access_digest = digest("generation", {"profile": "access-bound-ledger-v1", "legacy_ledger_digest": legacy_digest,
+                "sources": sources, "pages": pages})
+        if not knowledge:
+            return access_digest
+        return digest("generation", {"profile": "knowledge-bound-ledger-v1",
+            "access_ledger_digest": access_digest, "knowledge": knowledge})
     finally:
         connection.close()
 
