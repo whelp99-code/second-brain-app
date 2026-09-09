@@ -62,7 +62,7 @@ try {
   const first = await client.readRememberedArtifact(input.request, accepted);
   assert.equal(first.kind, (profile === 'scoped-record-read-v3' || (profile === 'scoped-record-read-v4' || profile === 'scoped-record-read-v5')) ? 'remembered_artifact_observed' : 'remembered_content_observed');
   if ((profile === 'scoped-record-read-v3' || (profile === 'scoped-record-read-v4' || profile === 'scoped-record-read-v5'))) { assert.equal(first.access.sources.length, 1); assert.deepEqual(first.access.sources[0].classification.projects, requestScope.projects); } assert.equal(input.custom_request ? first.record_ids.length > 0 : first.record_ids.length === 4, true);
-  let combined;
+  let combined, durableObservation;
   if (profile === 'scoped-record-read-v5') {
     combined = await client.readRememberedCompletion(input.request);
     assert.equal(combined.kind, 'remembered_completion_observed');
@@ -80,6 +80,19 @@ try {
       cancellationProbe = undefined;
     }
     assert.deepEqual(await client.readRememberedCompletion(input.request), combined);
+    if (input.reconciliation) {
+      const { AuthorityDb } = await moduleAt('src/db.js');
+      const { observeMemoryScopedCompletion } = await moduleAt('src/memory-scoped-completion-observation.js');
+      const authority = new AuthorityDb(input.reconciliation.database);
+      try {
+        const options = { authority, spoolRoot: input.reconciliation.spoolRoot, providerInstanceId: 'provider:fixture' };
+        const recorded = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
+        assert.equal(recorded.replayed, false);
+        durableObservation = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
+        assert.deepEqual(durableObservation, { ...recorded, replayed: true });
+      } finally { authority.close(); }
+    }
+
 
   }
   let completion;
@@ -109,7 +122,7 @@ try {
   if (completion) await assert.rejects(client.requestStatus(input.request, accepted));
   if (profile === 'scoped-record-read-v5') await assert.rejects(client.recoverRequestStatus(input.request));
   if (combined) await assert.rejects(client.readRememberedCompletion(input.request));
-  console.log(JSON.stringify({ cancellation_checks: cancellationChecks, combined_completion: combined, recovered_without_local_acceptance: profile === 'scoped-record-read-v5', completion, request_status_after_restart: !!completion, fixture: true, profile, production_composition: (profile === "scoped-record-read-v3" || (profile === "scoped-record-read-v4" || profile === "scoped-record-read-v5")), internal_write_authority_fixture: true, supervised_stdio: true,
+  console.log(JSON.stringify({ durable_observation: durableObservation, cancellation_checks: cancellationChecks, combined_completion: combined, recovered_without_local_acceptance: profile === 'scoped-record-read-v5', completion, request_status_after_restart: !!completion, fixture: true, profile, production_composition: (profile === "scoped-record-read-v3" || (profile === "scoped-record-read-v4" || profile === "scoped-record-read-v5")), internal_write_authority_fixture: true, supervised_stdio: true,
     read_after_restart: true, broader_authenticated_scope_allowed: true, provider_policy_change_rejected: true, issuer_policy_withdrawal_rejected: true,
     observation: first, automatic_settlement: false }, null, 2));
 } finally { await transport.close(); closeMemoryDatabase(db); }

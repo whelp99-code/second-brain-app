@@ -26,8 +26,11 @@ try {
   assert.deepEqual(reconciliation.request, dispatched.request);
   writeFileSync(requestPath, JSON.stringify(reconciliation.request));
   requireMemoryScopedReconciliationLease(f.database.authority, reconciliation.lease, late);
+  const observationPath = join(f.database.root, 'observation.json');
+  writeFileSync(observationPath, JSON.stringify({ database: f.database.path,
+    spoolRoot: f.options.spoolRoot, lease: reconciliation.lease }), { mode: 0o600 });
   const child = spawnSync(join(sb, '.venv/bin/python'), [join(sb, 'scripts/remembered-artifact-mcp-acceptance.py'),
-    build, 'scoped-record-read-v5', requestPath], { cwd: process.cwd(), env: { ...process.env, PYTHONPATH: sb },
+    build, 'scoped-record-read-v5', requestPath, observationPath], { cwd: process.cwd(), env: { ...process.env, PYTHONPATH: sb },
     encoding: 'utf8', timeout: 60000 });
   assert.equal(child.status, 0, child.stderr + child.stdout);
   const observed = JSON.parse(child.stdout);
@@ -50,11 +53,13 @@ try {
   requireMemoryScopedReconciliationLease(f.database.authority, reconciliation.lease, late);
   releaseMemoryScopedReconciliation(f.database.authority, reconciliation.lease, late);
   const db = f.database.authority.db;
+  assert.equal(db.prepare('SELECT count(*) AS n FROM memory_scoped_completion_observations').get().n, 1);
+  assert.equal(observed.durable_observation.replayed, true);
   assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
   assert.equal(db.prepare("SELECT count(*) AS n FROM memory_reconciliation_events WHERE event_type='provider_accepted'").get().n, 1);
   assert.equal(db.prepare('SELECT state FROM memory_outbox').get().state, 'reconciling');
   assert.equal(claimMemoryScopedOutbox({ ...options, clock: () => late }, r.outbox_id, 'worker:repeat', 1000), undefined);
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
-  console.log(JSON.stringify({ reconciliation_lease: reconciliation.lease, lease_preserved_across_acceptance_recovery: true, observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
+  console.log(JSON.stringify({ durable_observations: 1, reconciliation_lease: reconciliation.lease, lease_preserved_across_acceptance_recovery: true, observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
     record_commit_exit: 73, record_processes: 3, replay_idempotent: true, redispatch: false, jarvis_state: 'reconciling', foreign_key_errors: 0 }, null, 2));
 } finally { closeMemoryDatabase(f.database); }

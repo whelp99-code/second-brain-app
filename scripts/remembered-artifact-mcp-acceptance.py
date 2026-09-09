@@ -47,7 +47,7 @@ try:
     launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(app)) + '\nexec ' + shlex.quote(sys.executable) + ' -c ' + shlex.quote(code) + ' 2>' + shlex.quote(str(root / 'server.err')) + '\n')
     launcher.chmod(0o700)
     result = subprocess.run(['node', str(app / 'scripts/remembered-artifact-mcp-consumer.mjs'), sys.argv[1]],
-        input=json.dumps({'request': raw, **({'accepted': dataclasses.asdict(accepted)} if profile != 'scoped-record-read-v5' else {}), 'config': str(config_path),
+        input=json.dumps({**({'reconciliation': json.loads(Path(sys.argv[4]).read_text())} if len(sys.argv) > 4 else {}), 'request': raw, **({'accepted': dataclasses.asdict(accepted)} if profile != 'scoped-record-read-v5' else {}), 'config': str(config_path),
             'launcher': str(launcher), 'profile': profile, 'custom_request': len(sys.argv) > 3, 'contract': str(app / f'contracts/second-brain-scoped-read-v{profile[-1]}.json')}),
         text=True, capture_output=True, timeout=60, check=False)
     if result.returncode != 0:

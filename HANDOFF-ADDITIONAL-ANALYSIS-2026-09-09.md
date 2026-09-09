@@ -1,5 +1,7 @@
 # 자비스 인계 추가 대조와 구현 우선순위
 
+**2026-09-09 scoped 완료 관찰 영구 기록:** [원래 attempt 결합·권한/lease rollback·실제 MCP](SCOPED-DURABLE-OBSERVATION-2026-09-09.md). migration079와 현재 읽기 검사 callback을 연결해 수락+관찰을 원자적으로 기록한다. 총55개 통과·격리 emit/lint·migration 패키징, 실제 관찰1/attempt1/수락event1/replay. 자동 최종 완료 및 운영 인수는 미완료다.
+
 **2026-09-09 취소 후 완료 관찰 반환 수정:** [회귀 재현·실제 MCP 응답 직후 취소](SCOPED-COMPLETION-CANCELLATION-2026-09-09.md). 신규5개 실패를 재현하고 공통 read 및 완료 반환 경계에 취소 검사를 추가했다. 관련25개 통과·타입/lint, 실제 응답0/1/2/3 경계 모두 거절·정상 재조회 및 기존 복구 통과. 원작업 철회와 영구 완료 기록의 연결은 남는다.
 
 **2026-09-09 scoped 재조정 단일 worker·원래 요청 복원:** [구현·경합·실제 MCP 복구](SCOPED-RECONCILIATION-LEASE-2026-09-09.md). 쓰기 만료 후 원래 요청을 복원하고 재조정 fence만 증가시킨다. 관련33통과/27.52초·격리 emit/lint, 독립7프로세스 경합 승자1·stale worker 거절·attempt1, MCP 수락 기록 직후 종료에도 lease 보존. 영구 완료 증거·원자적 최종 완료·운영 쓰기·실제 에이전트 인수는 남는다.
