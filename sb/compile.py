@@ -78,7 +78,8 @@ class _BodyCache:
                 # Non-weak-referenceable implementations can supply explicit
                 # existing_bodies/pages; retaining them globally is unsafe.
                 return
-            entry = (reference, {})
+            bucket: dict[str, str] = {}
+            entry = (reference, bucket)
             self._data[key] = entry
         entry[1][page_id] = body
 

@@ -1,3 +1,5 @@
+> 2026-09-09 전체 회귀·제품 수정: [원장 캐시 격리](LEDGER-CACHE-ISOLATION-2026-09-09.md). 재사용된 객체 id로 다른 원장 본문이 섞이는 결함 수정. 전체 1,418 passed/2 skipped, 설치 후보 연동 4경로 통과. 운영 전환 미완료.
+
 > 2026-09-09 제품 수정: 모호한 복수 root 수집이 성공 코드로 숨겨지던 문제를 수정. SOURCE_ROOTS_AMBIGUOUS 실패·커서 미갱신, 재실행 시 지속 표시. 실제 CLI 포함 관련 31개 검사 통과. 상세: SESSION-MULTIROOT-HOLD-2026-09-09.md.
 
 > 2026-09-09 정정 및 검증: [명시적 source ID별 세션 분리](SESSION-SOURCE-ISOLATION-2026-09-09.md)는 기존 파이프라인에서 지원됨. 네 형식 × 실제 CLI 3회(12프로세스)로 독립 원장/커서 및 무중복 재개 확인. 복수 root 보류는 ID별 분리가 없는 adapter instance에 한정.
