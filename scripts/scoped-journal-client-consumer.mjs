@@ -50,7 +50,21 @@ try {
     const authority = new AuthorityDb(input.recovery.database);
     try {
       const options = { authority, spoolRoot: input.recovery.spoolRoot, providerInstanceId: 'provider:fixture' };
-      if (input.recovery.once) {
+      if (input.recovery.cli) {
+        const { execute } = await load('src/cli.js');
+        memoryReadFenceFixture({ ...db, authority });
+        const response = await execute(['memory', 'reconcile-scoped', input.recovery.lease.outbox_id,
+          '--once', '--db', input.recovery.database], { clock: () => at,
+          scopedMemoryReconcileOptions: { policy_path: policyPath, read_fence_config: config,
+            spool_root: input.recovery.spoolRoot, roots: {},
+            authenticated_session: () => ({ principal_id: 'principal:owner', agent_id: 'agent:reader', session_id: 'session:reader', expires_at: until }),
+            journal_transport_options: { launcherPath: input.launcher, configPath: input.config, contractPath: input.contract },
+            completion_transport_options: { launcherPath: input.launcher, configPath: input.config,
+              contractPath: input.contract.replace('scoped-status-v1', 'scoped-read-v5') } } });
+        assert.equal(response.command, 'memory.reconcile-scoped');
+        assert.equal(response.result.kind, 'scoped_reconciliation_deferred');
+        recovered = response.result.recovery;
+      } else if (input.recovery.once) {
         const { reconcileMemoryScopedOnce } = await load('src/memory-scoped-reconcile-once.js');
         const result = await reconcileMemoryScopedOnce({ ...options, journal: client, clock: () => at, roots: {},
           completion: { withRememberedCompletion: () => { throw Error('pending/failed must not read artifacts'); } } },
@@ -70,5 +84,5 @@ try {
   console.log(JSON.stringify({ state: first.status.state, original_acceptance_recovered: true,
     restarted_equal: true, provider_revocation_denied: true, issuer_revocation_denied: true,
     current_artifact_claimed: false, request_id: first.status.request_id,
-    ...(recovered ? { recovered, commit_exit: 73, once: Boolean(input.recovery.once) } : {}) }));
+    ...(recovered ? { recovered, commit_exit: 73, once: Boolean(input.recovery.once), cli: Boolean(input.recovery.cli) } : {}) }));
 } finally { await transport.close(); closeMemoryDatabase(db); }

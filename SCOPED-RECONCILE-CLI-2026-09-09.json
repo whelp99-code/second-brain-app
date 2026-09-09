@@ -1,0 +1,95 @@
+{
+  "deferred": [
+    {
+      "state": "pending",
+      "original_acceptance_recovered": true,
+      "restarted_equal": true,
+      "provider_revocation_denied": true,
+      "issuer_revocation_denied": true,
+      "current_artifact_claimed": false,
+      "request_id": "memreq:scoped:v4:8fbc1cfa0060427f57cb92d4eb5f074527209eb11e0a12dd39eb70b0c8bf9a2c",
+      "recovered": {
+        "kind": "scoped_journal_acceptance_recovered",
+        "acceptance": {
+          "kind": "acceptance_recorded",
+          "outbox_id": "memout:scoped:v4:5a98f63ae5cbb2424dd965a78ddaa9a7a5f3333c9fa583618b939eecd59b1a49",
+          "attempt_id": "memattempt:pos:v2:e77997ebcd682fdadb07b45adf29b43a4c81dfe20cf9069b50013390461add85",
+          "acceptance_receipt_digest": "sha256:a6215623e75072332268de7b8e415a962deedcee59861f1d78cd38a616d8641e",
+          "replayed": true
+        },
+        "observed_provider_state": "pending"
+      },
+      "commit_exit": 73,
+      "once": true,
+      "cli": true,
+      "attempts": 1,
+      "acceptance_events": 1,
+      "foreign_key_errors": 0,
+      "outbox": "reconciling"
+    },
+    {
+      "state": "failed",
+      "original_acceptance_recovered": true,
+      "restarted_equal": true,
+      "provider_revocation_denied": true,
+      "issuer_revocation_denied": true,
+      "current_artifact_claimed": false,
+      "request_id": "memreq:scoped:v4:4a3f8308a553de6fd6f5c610b3185b192d4a8ddc5663fcf8fbac78298a6e7a85",
+      "recovered": {
+        "kind": "scoped_journal_acceptance_recovered",
+        "acceptance": {
+          "kind": "acceptance_recorded",
+          "outbox_id": "memout:scoped:v4:bcb06cb7127b73366c78cb38ca176e4c0c2e0f837565b8730acc1fa09d166f22",
+          "attempt_id": "memattempt:pos:v2:1db938efe647e0a94b8e4cf6b36a7ee36ee2450f0e2f3b9d76d1093ced5896c9",
+          "acceptance_receipt_digest": "sha256:9008d6306dd6589f175ea7a08f77b41d96b921242c82f79b83c801fe355564e7",
+          "replayed": true
+        },
+        "observed_provider_state": "failed"
+      },
+      "commit_exit": 73,
+      "once": true,
+      "cli": true,
+      "attempts": 1,
+      "acceptance_events": 1,
+      "foreign_key_errors": 0,
+      "outbox": "reconciling"
+    }
+  ],
+  "proved": {
+    "compaction": {
+      "reconstructed_tables": [
+        "memory_scoped_settlements",
+        "memory_scoped_completion_observations",
+        "memory_scoped_outbox_bindings",
+        "memory_outbox",
+        "memory_candidates"
+      ],
+      "target_rows": 0,
+      "source_rows_per_table": 1,
+      "foreign_key_errors": 0,
+      "integrity": "ok",
+      "triggers_restored": true,
+      "control_rows_preserved": true,
+      "source_generation": 1,
+      "result_generation": 2,
+      "physical_content_erasure_tested": false
+    },
+    "atomic_settlement": {
+      "kind": "memory_scoped_settled",
+      "outbox_id": "memout:scoped:v4:3e7886d64a7aa30dfaa963428719d80d0814b61c43c5ef9222f6d62f122fcf95",
+      "receipt_digest": "sha256:520567c34bbbe0c75699736baca8c46aa50733730e0386f77853d32b0ef54415",
+      "control_request_id": "memory-dispatch:e3aa8005b399ce0ffe9cf1297ffab1afa2e81690e338a2b216662cc99745cfbd",
+      "settled_at": "2026-08-31T03:30:00.000Z",
+      "replayed": true
+    },
+    "commit_exit": 73,
+    "independent_replay": true,
+    "provider_calls_on_replay": 0,
+    "outbox": "settled",
+    "candidate": "settled",
+    "control": "completed",
+    "settlements": 1,
+    "attempts": 1,
+    "foreign_key_errors": 0
+  }
+}

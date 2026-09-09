@@ -10,7 +10,8 @@ const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-stor
 const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js');
 const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch, recoverMemoryScopedOutboxDispatches } = await load('src/memory-scoped-outbox-worker.js');
 const { claimMemoryScopedReconciliation, requireMemoryScopedReconciliationLease, releaseMemoryScopedReconciliation } = await load('src/memory-scoped-reconciliation.js');
-const once = process.argv[3] === '--once';
+const cli = process.argv[3] === '--cli';
+const once = cli || process.argv[3] === '--once';
 const results = [];
 for (const state of ['pending', 'failed']) {
   const f = await scopedOutboxFixture();
@@ -24,7 +25,7 @@ for (const state of ['pending', 'failed']) {
     if (once) releaseMemoryScopedReconciliation(f.database.authority, reconciliation.lease, late);
     const requestPath = join(f.database.root, 'request.json'), recoveryPath = join(f.database.root, 'recovery.json');
     writeFileSync(requestPath, JSON.stringify(dispatched.request), { mode: 0o600 });
-    writeFileSync(recoveryPath, JSON.stringify({ database: f.database.path, spoolRoot: f.options.spoolRoot, lease: reconciliation.lease, once }), { mode: 0o600 });
+    writeFileSync(recoveryPath, JSON.stringify({ database: f.database.path, spoolRoot: f.options.spoolRoot, lease: reconciliation.lease, once, cli }), { mode: 0o600 });
     const child = spawnSync(join(sb, '.venv/bin/python'), [join(sb, 'scripts/scoped-journal-client-acceptance.py'), build, state, requestPath, recoveryPath],
       { cwd: process.cwd(), env: { ...process.env, PYTHONPATH: sb }, encoding: 'utf8', timeout: 120000 });
     assert.equal(child.status, 0, child.stderr + child.stdout);

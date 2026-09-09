@@ -94,7 +94,22 @@ try {
         }
         if (input.reconciliation.atomic) {
           let result;
-          if (input.reconciliation.once) {
+          if (input.reconciliation.cli) {
+            const { execute } = await moduleAt('src/cli.js');
+            const { releaseMemoryScopedReconciliation } = await moduleAt('src/memory-scoped-reconciliation.js');
+            memoryReadFenceFixture({ ...db, authority });
+            releaseMemoryScopedReconciliation(authority, input.reconciliation.lease, at);
+            const response = await execute(['memory', 'reconcile-scoped', input.reconciliation.lease.outbox_id,
+              '--once', '--db', input.reconciliation.database], { clock: () => at,
+              scopedMemoryReconcileOptions: { policy_path: policyPath, read_fence_config: config,
+                spool_root: input.reconciliation.spoolRoot, roots: input.reconciliation.roots,
+                authenticated_session: () => ({ principal_id: 'principal:owner', agent_id: 'agent:reader', session_id: 'session:reader', expires_at: until }),
+                journal_transport_options: { launcherPath: input.launcher, configPath: input.config,
+                  contractPath: input.contract.replace('scoped-read-v5', 'scoped-status-v1') },
+                completion_transport_options: { launcherPath: input.launcher, configPath: input.config, contractPath: input.contract } } });
+            assert.equal(response.command, 'memory.reconcile-scoped');
+            result = response.result;
+          } else if (input.reconciliation.once) {
             const { reconcileMemoryScopedOnce } = await moduleAt('src/memory-scoped-reconcile-once.js');
             const { releaseMemoryScopedReconciliation } = await moduleAt('src/memory-scoped-reconciliation.js');
             const { createMemoryScopedJournalClient } = await moduleAt('src/memory-scoped-journal-client.js');
