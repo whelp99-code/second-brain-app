@@ -1,3 +1,5 @@
+[검색 백업 삭제 수명·인계 우선순위 보완](SEARCH-BACKUP-LIFECYCLE-2026-09-09.md) — 실제 SQLite 및 백업 두 개 삭제·무관 기억 보존, 관련 47개 및 Ruff 통과. 운영·실업무·전체 수명 인수는 남음.
+
 [기존 검색 색인 자동 갱신](SEARCH-PROJECTION-UPGRADE-2026-09-09.md) —색인v3으로YAML해석변경반영, 원문HEAD불변·관련33개통과.
 
 [검색·MCP 공통 YAML 해석](SHARED-YAML-METADATA-2026-09-09.md) —제목불일치3회귀수정, 관련51개·추가제목9개(중복)통과.

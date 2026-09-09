@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from sb.erasure import (
     ReingressGate,
     scan_managed_surfaces,
 )
+from sb.search import _backup_index
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 
@@ -67,3 +69,31 @@ def test_unreadable_or_special_surface_is_not_reported_as_zero(tmp_path: Path) -
     fifo.chmod(0o600)
     inventory = scan_managed_surfaces((tmp_path,), (b"absent",))
     assert inventory.scan_errors == 0
+
+
+def test_correction_removes_sqlite_index_and_migration_backups(tmp_path: Path) -> None:
+    old = "폐기된 공통 기억 결정"
+    (tmp_path / "wiki").mkdir()
+    (tmp_path / "wiki/example-alpha.md").write_text(f"prefix {old} suffix")
+    derived = tmp_path / ".sb"
+    derived.mkdir()
+    index = derived / "search.db"
+    with sqlite3.connect(index) as connection:
+        connection.execute("CREATE TABLE docs (text TEXT)")
+        connection.execute("INSERT INTO docs VALUES (?)", (old,))
+    _backup_index(index)
+    _backup_index(index)
+    backups = list(derived.glob("search.db.*.bak"))
+    assert len(backups) == 2
+    assert all(old.encode() in path.read_bytes() for path in [index, *backups])
+    unrelated = derived / "unrelated-cache.txt"
+    unrelated.write_text("보존할 다른 기억")
+    gate = ReingressGate(tmp_path / "state/reingress.db")
+    try:
+        ErasureEngine(gate).apply(tmp_path, _request(tmp_path, old), NOW)
+        assert all(not path.exists() for path in [index, *backups])
+        assert unrelated.read_text() == "보존할 다른 기억"
+        inventory = scan_managed_surfaces((tmp_path,), (old.encode(),))
+        assert inventory.matches == 0 and inventory.scan_errors == 0
+    finally:
+        gate.close()
