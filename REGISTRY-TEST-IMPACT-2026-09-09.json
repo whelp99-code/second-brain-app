@@ -1,0 +1,130 @@
+{
+  "registry": "/home/jm/.local/share/second-brain/knowledge-registry.sqlite",
+  "temporary_vaults_inspected": 6,
+  "matching_rows": [
+    {
+      "row": {
+        "page_id": "daily/2026-09-09",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "decided_by": "sb-compile",
+        "decided_at": "2026-09-09T14:13:11+00:00",
+        "reason": "ai-first auto ingest",
+        "source_hash": "",
+        "revision": 4
+      },
+      "temporary_origins": [
+        {
+          "vault": "/var/tmp/sb-web-success-hnkbrssb/vault",
+          "path": "daily/2026-09-09.md"
+        },
+        {
+          "vault": "/var/tmp/sb-web-success-pul186zm/vault",
+          "path": "daily/2026-09-09.md"
+        },
+        {
+          "vault": "/var/tmp/sb-web-success-s47v9423/vault",
+          "path": "daily/2026-09-09.md"
+        },
+        {
+          "vault": "/var/tmp/sb-web-success-vekrtw4u/vault",
+          "path": "daily/2026-09-09.md"
+        },
+        {
+          "vault": "/var/tmp/sb-web-success-wwx69trr/vault",
+          "path": "daily/2026-09-09.md"
+        }
+      ],
+      "shared_daily_id": true,
+      "operational_committed_path_exists": false
+    },
+    {
+      "row": {
+        "page_id": "web-inbox-2026-09-09t135315154073-합성기억정상경로-742ff524",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "decided_by": "sb-compile",
+        "decided_at": "2026-09-09T13:53:15+00:00",
+        "reason": "ai-first auto ingest",
+        "source_hash": "",
+        "revision": 1
+      },
+      "temporary_origins": [
+        {
+          "vault": "/var/tmp/sb-web-success-hnkbrssb/vault",
+          "path": "wiki/web-inbox-2026-09-09t135315154073-합성기억정상경로-742ff524.md"
+        }
+      ],
+      "shared_daily_id": false,
+      "operational_committed_path_exists": false
+    },
+    {
+      "row": {
+        "page_id": "web-inbox-2026-09-09t141229151284-합성기억정상경로-a29087e4",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "decided_by": "sb-compile",
+        "decided_at": "2026-09-09T14:12:40+00:00",
+        "reason": "ai-first auto ingest",
+        "source_hash": "",
+        "revision": 1
+      },
+      "temporary_origins": [
+        {
+          "vault": "/var/tmp/sb-web-success-pul186zm/vault",
+          "path": "wiki/web-inbox-2026-09-09t141229151284-합성기억정상경로-a29087e4.md"
+        }
+      ],
+      "shared_daily_id": false,
+      "operational_committed_path_exists": false
+    },
+    {
+      "row": {
+        "page_id": "web-inbox-2026-09-09t134459846770-합성기억정상경로-6ce565eb",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "decided_by": "sb-compile",
+        "decided_at": "2026-09-09T13:45:00+00:00",
+        "reason": "ai-first auto ingest",
+        "source_hash": "",
+        "revision": 1
+      },
+      "temporary_origins": [
+        {
+          "vault": "/var/tmp/sb-web-success-s47v9423/vault",
+          "path": "wiki/web-inbox-2026-09-09t134459846770-합성기억정상경로-6ce565eb.md"
+        }
+      ],
+      "shared_daily_id": false,
+      "operational_committed_path_exists": false
+    },
+    {
+      "row": {
+        "page_id": "web-inbox-2026-09-09t134344343573-합성기억정상경로-0380cc50",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "decided_by": "sb-compile",
+        "decided_at": "2026-09-09T13:43:44+00:00",
+        "reason": "ai-first auto ingest",
+        "source_hash": "",
+        "revision": 1
+      },
+      "temporary_origins": [
+        {
+          "vault": "/var/tmp/sb-web-success-wwx69trr/vault",
+          "path": "wiki/web-inbox-2026-09-09t134344343573-합성기억정상경로-0380cc50.md"
+        }
+      ],
+      "shared_daily_id": false,
+      "operational_committed_path_exists": false
+    }
+  ],
+  "read_only": true,
+  "automatic_cleanup": false,
+  "operational_vault_tree_readable": true
+}

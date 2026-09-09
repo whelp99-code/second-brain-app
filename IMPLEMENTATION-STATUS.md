@@ -1,3 +1,5 @@
+[공용 레지스트리 검증 영향 대조](REGISTRY-TEST-IMPACT-2026-09-09.md) — 임시6개와 일치5행(합성wiki4/daily1), 운영현재 경로없음·읽기전용. 범위제한 및 공유daily 복구 보류.
+
 [명시적 레지스트리 저장·검색 전달](EXPLICIT-REGISTRY-PIPELINE-2026-09-09.md) — pipeline 전역 설정 재읽기 및 웹 검색 설정 누락 수정, 실제 Claude 사실 검색/본문 회수·다른 경로 미생성, 관련66/16개(중복) 통과.
 
 [실제 Claude 컴파일·검색 ID 수정](NATIVE-COMPILE-SEARCH-ID-2026-09-09.md) — 실제 원문 사실 생성 후 검색0 원인 bare ID 수정, 격리 재등록 후 검색·본문 회수 및72개 통과. 최초 검증의 공용 registry 사용 부수 효과 확인·후속 격리 수정 필요.
