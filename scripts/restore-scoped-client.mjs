@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 
-export async function checkRestoredScope({load,database,config,root,launcher,pageId,clientId='restore'}) {
+export async function checkRestoredScope({load,database,config,root,launcher,pageId,clientId='restore',coordinate}) {
   const {createProductionMemoryAccessClaim} = await load('src/memory-access-claim-production.js');
   const {createFileMemoryAccessScopeResolver} = await load('src/memory-access-policy.js');
   const {createMemoryScopedClient} = await load('src/memory-scoped-client.js');
@@ -43,6 +43,11 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
     const allowed = await client.readPage(pageId);
     assert.equal(allowed.pages.length,1);
     assert(JSON.stringify(allowed).includes('KeepBeta'));
+    if (coordinate) await coordinate(clientId, {
+      read:()=>client.readPage(pageId),
+      revoke:()=>writeFileSync(policyPath,JSON.stringify({...policy,sessions:[]})),
+      restore:()=>writeFileSync(policyPath,JSON.stringify(policy)),
+    });
     const searched = await client.search('KeepBeta',2);
     assert.equal(searched.pages.length,1);
     for (const action of [()=>client.readPage(pageId),()=>client.search('KeepBeta',2)]) {

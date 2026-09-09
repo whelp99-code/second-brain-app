@@ -53,15 +53,44 @@ try {
   const keep = await read('KeepBeta');
   assert.equal(keep.payload.records.length,1);
   assert(keep.payload.records[0].text.includes('KeepBeta'));
-  const scoped = await checkRestoredScope({load,database,config,root,launcher,pageId:restored.surviving_page_id});
-  const peer = await checkRestoredScope({load,database,config,root,launcher,pageId:restored.surviving_page_id,clientId:'restore-peer'});
+  const connected = new Map();
+  let release, reject;
+  const gate = new Promise((resolve,rejectGate)=>{release=resolve;reject=rejectGate;});
+  const timer = setTimeout(()=>reject(new Error('concurrent restore clients did not rendezvous')),20000);
+  let independentRevocations = 0;
+  const coordinate = async (id,client) => {
+    connected.set(id,client);
+    if (connected.size === 2) {
+      const [first,second] = [...connected.values()];
+      try {
+        for (const [revoked,allowed] of [[first,second],[second,first]]) {
+          revoked.revoke();
+          await assert.rejects(revoked.read,error=>error.code==='MEMORY_ACCESS_SCOPE_UNAVAILABLE');
+          assert.equal((await allowed.read()).pages.length,1);
+          revoked.restore();
+          independentRevocations++;
+        }
+        release();
+      } catch (error) {reject(error);}
+      finally {first.restore();second.restore();clearTimeout(timer);}
+    }
+    await gate;
+  };
+  let outcomes;
+  try {
+    outcomes = await Promise.allSettled(['restore','restore-peer'].map(clientId=>
+      checkRestoredScope({load,database,config,root,launcher,pageId:restored.surviving_page_id,clientId,coordinate})));
+  } finally {clearTimeout(timer);}
+  for (const outcome of outcomes) assert.equal(outcome.status,'fulfilled',String(outcome.reason));
+  const [scoped,peer] = outcomes.map(outcome=>outcome.value);
+  assert.equal(independentRevocations,2);
   assert.notEqual(scoped.agent,peer.agent);
   assert.notEqual(scoped.session,peer.session);
   assert.deepEqual(scoped.generation,peer.generation);
   assert.equal(scoped.generation.generation_id,restored.generation_id);
   assert.match(scoped.page_content_digest,/^sha256:[0-9a-f]{64}$/);
   assert.equal(scoped.page_content_digest,peer.page_content_digest);
-  const result = {root,backup,deleted,restored,scoped,peer,shared_restored_memory_equal:true,jarvis_owned_high_water:1,
+  const result = {root,backup,deleted,restored,scoped,peer,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:1,
     deleted_records:0,surviving_records:1,model_calls:0,
     scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));

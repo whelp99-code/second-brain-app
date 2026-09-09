@@ -1261,3 +1261,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 복원 기억 다중 client 공유:** [서로 다른 agent/session·새 transport→동일 복원 세대/본문·각 범위와 철회 검사](RESTORE-MULTI-CLIENT-2026-09-10.md). 최종exit0·Node구문/diff. fixture 식별자이며 실제 다중 모델 로그인/업무와 운영·DR 전체 목표는 남는다.
+
+
+**2026-09-10 동시 복원 client 정책 격리:** [실제 stdio 두 연결 rendezvous·양방향 세션철회/다른client 정상](RESTORE-CONCURRENT-CLIENTS-2026-09-10.md). 최종exit0·독립철회2·동일복원세대/본문·Node구문/diff. 동시쓰기/운영부하/native 업무의 증거는 아니며 전체 목표 유지.
