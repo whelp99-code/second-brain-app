@@ -252,3 +252,44 @@ def test_acknowledgment_does_not_move_changed_input(tmp_path: Path) -> None:
     adapter.acknowledge(tuple(ref for ref, _body, _meta in scanned))
     assert source.read_text() == "new content must remain pending"
     assert not (tmp_path / ".done").exists()
+
+
+def test_fifo_is_skipped_without_opening_a_writer(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    os.mkfifo(tmp_path / 'blocked.txt')
+    code = """
+import sys
+from pathlib import Path
+from sb.connectors.inbox_documents import create
+from tests.test_connectors_inbox import _cfg, _skipped
+adapter = create(_cfg(Path(sys.argv[1])))
+assert _skipped(list(adapter.scan(None))) == ['unreadable']
+assert list(adapter.scan(adapter.next_cursor())) == []
+"""
+    result = subprocess.run([sys.executable, '-c', code, str(tmp_path)], timeout=10, capture_output=True, check=False)
+    assert result.returncode == 0, result.stderr
+
+
+def test_file_replacement_before_open_is_not_ingested(tmp_path, monkeypatch):
+    import os
+
+    import sb.connectors.inbox_documents as module
+
+    path = tmp_path / 'note.txt'
+    path.write_text('original')
+    original = module._read_regular
+
+    def replace_before_read(target, metadata):
+        replacement = tmp_path / 'replacement'
+        replacement.write_text('replaced')
+        os.replace(replacement, target)
+        return original(target, metadata)
+
+    monkeypatch.setattr(module, '_read_regular', replace_before_read)
+    adapter = create(_cfg(tmp_path))
+    assert _skipped(list(adapter.scan(None))) == ['unreadable']
+    monkeypatch.setattr(module, '_read_regular', original)
+    assert _delivered(list(adapter.scan(adapter.next_cursor()))) == [('note.txt', b'replaced')]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat as stat_module
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
@@ -88,8 +89,12 @@ class InboxDocumentsAdapter:
         for rel, (path, token) in self._scanned.items():
             if (rel, token) not in versions or path.is_symlink() or not path.is_file():
                 continue
-            metadata = path.stat()
-            observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(path.read_bytes()).hexdigest()}"
+            try:
+                metadata = path.stat()
+                body = _read_regular(path, metadata)
+            except OSError:
+                continue
+            observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(body).hexdigest()}"
             if observed == token:
                 _move_done(self._root, path, rel)
 
@@ -112,7 +117,7 @@ class InboxDocumentsAdapter:
                 return token, None
             return token, _skip(self.source_id, rel, "size-limit")
         try:
-            body = path.read_bytes()
+            body = _read_regular(path, stat)
         except OSError:
             return self._resume_skip(rel, "unreadable", previous)
         token = f"{stat.st_mtime_ns}:{stat.st_size}:{sha256(body).hexdigest()}"
@@ -228,6 +233,27 @@ def _move_done(root: Path, path: Path, rel: str) -> None:
         os.replace(path, dest)
     except OSError:
         return
+
+
+def _read_regular(path: Path, expected: os.stat_result) -> bytes:
+    """Bound reads and reject special files or replacement during the read."""
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        before = os.fstat(fd)
+        def identity(info: os.stat_result) -> tuple[int, ...]:
+            return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+                    info.st_mtime_ns, info.st_ctime_ns)
+        if not stat_module.S_ISREG(before.st_mode) or identity(before) != identity(expected):
+            raise OSError("inbox file changed or is not regular")
+        with os.fdopen(os.dup(fd), "rb") as stream:
+            body = stream.read(MAX_INBOX_BYTES + 1)
+        if (len(body) > MAX_INBOX_BYTES or len(body) != before.st_size
+            or identity(before) != identity(os.fstat(fd))
+            or identity(before) != identity(path.lstat())):
+            raise OSError("inbox file changed during read")
+        return body
+    finally:
+        os.close(fd)
 
 
 def _skip(source_id: str, rel: str, reason: str) -> tuple[SourceRef, bytes, ItemMeta]:

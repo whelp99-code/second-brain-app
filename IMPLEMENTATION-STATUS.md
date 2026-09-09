@@ -1334,3 +1334,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 콘솔 실제 준비 복구/재실패:** 격리vault 백업없음503→실제create_backup/verify_backup후200→archive손상후503과 브라우저사유갱신/과거사유제거 확인, Playwright1280px·pageerror0·exit0. HTTP모의응답/clock패치없음. 증거 /var/tmp/sb-ready-recovery-u77m83wm/QA.md/result.json/단계스크린샷. 제품변경없음, 운영/managed DR/실업무 및 전체목표유지.
 
 **2026-09-10 동일본문 candidate 계보/범위 분리:** [실제봉인 scoped검색 각1·합산2·원출처해시일치·CAS1](CANDIDATE-LINEAGE-SCOPE-2026-09-10.md). 관련13통과/4.27초·Ruff/diff. 제품변경없음, generic label은 원작업증거아님. 실제업무 계보/운영 및 전체목표유지.
+
+**2026-09-10 inbox 제한·비차단 읽기:** [FIFO대기차단·읽기전교체skip/다음회수·ack동일읽기](INBOX-BOUNDED-READ-2026-09-10.md). 관련walking skeleton포함20통과/3.78초·Ruff/타입0오류0경고. 부모경로/rename직전경합 후속검토, 운영/실업무·전체목표유지.
