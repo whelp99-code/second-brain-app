@@ -1174,3 +1174,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 승인 본문 effect 상태 재결합:** [정정 결과 자동 상태·승격 제한·검증](EFFECT-KNOWLEDGE-REBIND-2026-09-10.md). 현재 본문 전체의 승인 상태가 있었던 경우만 성공한 effect 결과에 새 digest 상태를 기록한다. 미검증 page 전체 자동 승인 보류는 유지. 실제 lifecycle 4통과, helper/restore/generation 18통과, executor/cancellation/helper 18통과(중복 포함), Ruff/diff·새 helper 타입 통과. 복원·부분 record·운영 전체 목표는 남는다.
+
+
+**2026-09-10 승인 기억 부분 삭제 인수:** [남은 사실·효과 출처·외부 철회 유지](BOUND-PARTIAL-FORGET-2026-09-10.md). 실제 삭제 요청의 lexical/hybrid×외부 철회 4경우와 helper 6건, 총10통과/8.90초·Ruff/diff. 삭제 대상 제거, 남은 승인 사실 조회, 철회 상태 비활성 유지 확인. 복원·scoped 접근·crash·실제 업무·운영과 전체 목표는 남는다.
