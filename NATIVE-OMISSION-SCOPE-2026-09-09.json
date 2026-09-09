@@ -1,0 +1,133 @@
+{
+  "gateway_configuration": "CLI parser and independently owned existing authority connection",
+  "admission_surface": "mcp",
+  "execution_surface": "cli",
+  "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+  "identity_forwarder": "fixture",
+  "clock": "fixture",
+  "public_mcp_write": true,
+  "results": [
+    {
+      "mode": "valid",
+      "readback": {
+        "request_id": "memreq:scoped:v4:fc257b494c4b7b8f61a9d09666aba4d5486d2760e4dc4af658d029b977850088",
+        "request_digest": "sha256:fc257b494c4b7b8f61a9d09666aba4d5486d2760e4dc4af658d029b977850088",
+        "writer_agent": "agent:fixture",
+        "reader_agent": "agent:reader",
+        "fresh_login": true,
+        "provider_proved": true,
+        "jarvis_settled": true,
+        "control_completed": true,
+        "settlement_replay": true,
+        "settlements": 1,
+        "attempts": 1,
+        "same_generation": true,
+        "record_ids": [
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+        ],
+        "source_refs": [
+          "Second Brain",
+          "Second Brain"
+        ],
+        "context_records": 2,
+        "clients": {
+          "independent_stdio_clients": 2,
+          "records_each": 2,
+          "https_calls": 3,
+          "omo_engine_calls": 0,
+          "native_answer": {
+            "status": "insufficient_evidence",
+            "value": null,
+            "explanation": "The single memory query for \"결정\" returned only two records (sid 00b53881, record_ids sbrecord:v1:92bafd34... with text \"두 번째 결정\" and sbrecord:v1:513e70b8... with text \"첫 결정\"). Neither mentions a deployment server, a hostname, or any IP address, so the returned records do not establish a deployment server IP. The response reported zero omissions (stale, policy_redacted, unbound, duplicate, and all budget counts are 0), but those counts describe this response's filtering only and do not prove that no such information exists elsewhere in memory.",
+            "raw_response": "```json\n{\n  \"status\": \"insufficient_evidence\",\n  \"value\": null,\n  \"explanation\": \"The single memory query for \\\"결정\\\" returned only two records (sid 00b53881, record_ids sbrecord:v1:92bafd34... with text \\\"두 번째 결정\\\" and sbrecord:v1:513e70b8... with text \\\"첫 결정\\\"). Neither mentions a deployment server, a hostname, or any IP address, so the returned records do not establish a deployment server IP. The response reported zero omissions (stale, policy_redacted, unbound, duplicate, and all budget counts are 0), but those counts describe this response's filtering only and do not prove that no such information exists elsewhere in memory.\"\n}\n```"
+          },
+          "native_mode": "claude-abstention",
+          "native_claude_calls": 1,
+          "native_version": "2.1.261 (Claude Code)",
+          "native_codex_calls": 0,
+          "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+        },
+        "reader_revocation": 403,
+        "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+      },
+      "native_writer": null,
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:fc257b494c4b7b8f61a9d09666aba4d5486d2760e4dc4af658d029b977850088",
+        "request_digest": "sha256:fc257b494c4b7b8f61a9d09666aba4d5486d2760e4dc4af658d029b977850088",
+        "idempotency_key": "memidem:scoped:v4:6271fc6071c3e4f356abeda32d723ae16229a7f964b9245c0ba74283402ee28c",
+        "scope_digest": "sha256:51f1538b73b1127e79135321cd1c950c1659bdcbb6d019a9b1ecb6431746902c",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:fc257b494c4b7b8f61a9d09666aba4d5486d2760e4dc4af658d029b977850088.v4.json",
+        "request_file_digest": "sha256:87c190f0184ceaa1b2055c2d387f6ab656f4957783f623153f0458e25f7123fe",
+        "replayed": false
+      },
+      "provider_state": "proved",
+      "active_generation": true,
+      "authority_https_calls": 5,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "accepted_row": false,
+      "authority_https_calls": 2,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "native_writer": null,
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:8a0300976645ce6f31d314db74e80d8f7129ca1b343c82df2f15daff3d8d3471",
+        "request_digest": "sha256:8a0300976645ce6f31d314db74e80d8f7129ca1b343c82df2f15daff3d8d3471",
+        "idempotency_key": "memidem:scoped:v4:21448f6e0e19466df3b7ff6e16327064af8c7eaf3b4e39b13e136d9a6ada011f",
+        "scope_digest": "sha256:b30bf2467d340cd742b97965ffc4443a19db4929d954303d418e8a93e3cd66f4",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:8a0300976645ce6f31d314db74e80d8f7129ca1b343c82df2f15daff3d8d3471.v4.json",
+        "request_file_digest": "sha256:53d5b57027ed95ca00e82a4fb7a1f404437e8609709ab7ecbf0de3aa17e2566e",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "expire_before_execute",
+      "native_writer": null,
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:fc216951829dc46935ce699dc1c2daf89a31cc7fd70f7ac2096db794cbd71b3f",
+        "request_digest": "sha256:fc216951829dc46935ce699dc1c2daf89a31cc7fd70f7ac2096db794cbd71b3f",
+        "idempotency_key": "memidem:scoped:v4:f5751a0cb19f229354a24eb5a31895ca3de6c8982b20645ebfb334527ea9c7b6",
+        "scope_digest": "sha256:371813d11e9256574bf82663a5860df3829144c2508fbed915131343c5ffc52c",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:fc216951829dc46935ce699dc1c2daf89a31cc7fd70f7ac2096db794cbd71b3f.v4.json",
+        "request_file_digest": "sha256:d86247743a57aa31840e510ee179de1548c11a4480572ae3abbee3eb1b91fd0f",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    }
+  ]
+}

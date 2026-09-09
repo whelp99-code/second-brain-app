@@ -1,3 +1,5 @@
+> 2026-09-09 실제 모델 후속: [JARVIS f0394b9 제외 카운트 범위 안내](NATIVE-OMISSION-SCOPE-2026-09-09.md). 새 빌드 실제 Claude1회에서 IP 미추정 및 카운트가 검색 완전성을 증명하지 않음 명시. 통합15개·별도 빌드·4경로 통과, 단일 사례에 한정.
+
 > 2026-09-09 실제 native 답변 검사: [Claude 1회 근거 부족 응답](NATIVE-ABSTENTION-2026-09-09.md). IP 값 추정 없이 insufficient_evidence/null, 4경로 통과. 설명의 omission=0 완전성 추론은 미흡으로 기록, 전체 품질 합격 아님.
 
 > 2026-09-09 실행물 인수: [JARVIS 근거 안내 별도 빌드](GUIDANCE-INSTALLED-ACCEPTANCE-2026-09-09.md). 실제 stdio 도구 목록 전달·새 빌드 연동4경로 통과. native 답변 준수·운영 배포는 별도 미완료.
