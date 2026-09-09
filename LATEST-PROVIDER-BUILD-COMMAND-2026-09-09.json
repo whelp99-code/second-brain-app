@@ -1,0 +1,1 @@
+{"argv":["python","deploy/prepare-release.py","--offline","/var/tmp/sb-latest-release-00dj_4mr/app"],"cwd":"/home/jm/orca/projects/second-brain-app","environment":{"UV_CACHE_DIR":"/var/tmp/sb-latest-release-00dj_4mr/cache"}}

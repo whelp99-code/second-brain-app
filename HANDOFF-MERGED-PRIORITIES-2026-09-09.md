@@ -134,3 +134,5 @@ P0는 운영 완성의 선행 조건, P1은 안정적 사용의 인수 항목, P
 [각주 중복 후속 수정](NATIVE-FOOTNOTE-DEDUP-2026-09-09.md): 모델 span 정의와 vault 자동 정의 중복 제거, 코드 예시·상이한 span 보존. 관련47통과 및 실제 Claude 생성/기본 MCP2회 각주1개 인수. 다른 span의 통합과 운영 과거 자료 일괄 재작성은 하지 않았다.
 
 [최신 설치 후보·연동·재현](LATEST-INSTALLED-PAIR-2026-09-09.md) — fa79861 설치파일176개 Git일치, J195b1a 실제 연동4경로 통과, 같은 최종 경로2회 빌드18,458항목 동일. 정본 manifest/운영 전환·전체 M1–M14 유지.
+
+[최신 provider 정본 manifest](LATEST-PROVIDER-CANONICAL-MANIFEST-2026-09-09.md) — fa79861 소스/캐시/명령/재현성 연결, 두 manifest 바이트 동일·독립 Python 대조, manifest 포함 실제 연동4경로 재통과. JARVIS 동등 증거·운영 전환 및 M1–M14 유지.
