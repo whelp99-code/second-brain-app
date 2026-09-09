@@ -320,6 +320,9 @@ def test_capped_comparison_resumes_and_completed_cache_ignores_zero_budget(ledge
     '{"relation":"contradicts","confidence":NaN,"rationale":"x"}',
     '{"relation":"contradicts","confidence":0.9,"confidence":0.1,"rationale":"x"}',
     '{"relation":"contradicts","confidence":0.9,"rationale":"x","cites":[123]}',
+    '{"relation":"contradicts","confidence":0.9,"rationale":"x","cites":["invented-source"]}',
+    '{"relation":"supports","confidence":0.9,"rationale":"x","cites":["u1","invented-source"]}',
+    '{"relation":"supersedes","confidence":0.99,"rationale":"x","cites":[""]}',
     '{"nested":{"relation":"contradicts","confidence":0.9,"rationale":"x"}}',
 ])
 def test_invalid_verdict_never_creates_conflict(ledger, config, unit, raw):
@@ -336,10 +339,11 @@ def test_json_whitespace_exponent_and_escaped_rationale(ledger, config, unit):
     assert all(item.verdict.confidence == 0.1 and item.verdict.rationale == "line\nnext" for item in found)
 
 
-def test_prior_parser_cached_verdict_is_rejudged(ledger, config, unit, monkeypatch):
+@pytest.mark.parametrize("profile", ["conflict-inputs-v2", "conflict-inputs-v3"])
+def test_prior_parser_cached_verdict_is_rejudged(ledger, config, unit, monkeypatch, profile):
     units = [unit, _unit("c1", TEXT_DYNAMIC)]
     with monkeypatch.context() as old:
-        old.setattr("sb.conflict._INPUT_PROFILE", "conflict-inputs-v2")
+        old.setattr("sb.conflict._INPUT_PROFILE", profile)
         prior = check(units, EMPTY_PAGES, ledger,
                       FakeLLM([_verdict("contradicts", 1.0, "legacy interpretation", [])]), config)
         assert prior[0].route == "conflict"

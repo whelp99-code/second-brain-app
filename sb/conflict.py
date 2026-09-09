@@ -32,7 +32,7 @@ __all__ = (
     "lexical_top",
 )
 
-_INPUT_PROFILE: Final = "conflict-inputs-v3"
+_INPUT_PROFILE: Final = "conflict-inputs-v4"
 CONTRADICTION_FLOOR: Final = 0.8
 SUPERSEDE_FLOOR: Final = 0.9
 SECTIONS: Final = ("주장A", "주장B", "판정", "status")
@@ -267,6 +267,8 @@ def _parse(
         if any(not isinstance(item, str) for item in rows):
             return _open(pair)
         cites = tuple(cast(list[str], rows))
+        if any(cite not in {pair.left_id, pair.unit_id} for cite in cites):
+            return _open(pair)
         verdict = ConflictVerdict(relation=relation, confidence=float(score), rationale=rationale)
     except (ValueError, OverflowError):
         return _open(pair)

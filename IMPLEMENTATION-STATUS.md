@@ -1240,3 +1240,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 실제 충돌 모델·cache 버전 분리:** [Claude 합성 모순 응답/페이지 생성·구 parser cache 재판정](CONFLICT-PARSER-CACHE-2026-09-10.md). 모델 contradicts0.95·failure없음, 회귀24통과/3.78초·Ruff/diff·타입0오류0경고. 과거 생성 페이지 자동 정정은 하지 않으며 사용자 업무/운영 전체 목표는 남는다.
+
+
+**2026-09-10 충돌 인용 ID 검증:** [미확인/혼합/빈 ID 3실패 재현→입력 두 ID로 제한·v4 cache](CONFLICT-CITATION-IDENTITY-2026-09-10.md). 최종30통과/6.29초·Ruff/diff·타입0오류0경고. 실제 source 목록과 판정 cites를 구분하며 과거 페이지 자동정정·실제 업무/운영 전체 목표는 남는다.
