@@ -1286,3 +1286,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 복원 유지관리 CLI 연결:** [명시적 --restore-workspace·busy 건너뜀·실제 SIGKILL 사본 정리](RESTORE-MAINTENANCE-2026-09-10.md). 관련26통과/39.23초·Ruff/타입0오류0경고. CLI 독립 실행 정리1→재실행0, live 사본 보존. 운영 timer 경로·구버전 writer drain 및 전체 인수는 남는다.
 
 **2026-09-10 최신 설치 후보 유지관리:** [eea2c23 offline release·설치 CLI SIGKILL 정리·MCP4프로필](INSTALLED-MAINTENANCE-2026-09-10.md). 설치 CLI busy→정리1→재실행0, MCP 초기화/목록 통과. 운영 timer active/마지막exit0이나 sb41f0751·새 옵션 미연결. current/서비스 미변경, 운영 paired 전환과 전체 목표 유지.
+
+**2026-09-10 설치 유지관리 기억 보존:** [세 단계 새 프로세스 검색1건·generation/body/ledger/highwater 동일](INSTALLED-MAINTENANCE-PRESERVATION-2026-09-10.md). 실제 설치 후보 CLI busy→SIGKILL 정리→재실행 인수exit0·Ruff/diff. 합성 reference 기억이며 사용자 업무·운영/전체 목표 유지.

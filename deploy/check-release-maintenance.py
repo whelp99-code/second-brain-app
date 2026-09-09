@@ -21,11 +21,51 @@ def main() -> None:
             'knowledge_registry': 'registry.sqlite',
         }.items()))
         env = {**os.environ, 'SB_CONFIG': str(config), 'PYTHONDONTWRITEBYTECODE': '1'}
-        seed = ('from datetime import datetime,UTC; from sb.config import load_config; '
-                'from sb.generation_runtime import GenerationMutationService; '
-                's=GenerationMutationService.from_config(load_config()); '
-                's.remember("installed maintenance fixture",None,datetime.now(UTC)); s.close()')
+        seed = """
+from datetime import datetime, UTC
+from sb.config import load_config
+from sb.generation_runtime import GenerationMutationService
+from sb.generation_runtime_models import GenerationMutation, GenerationAuthority, GenerationOperation
+from sb.remember_page import materialize_remember
+s = GenerationMutationService.from_config(load_config())
+now = datetime.now(UTC)
+try:
+    s.mutate(GenerationMutation(mutation_id="installed:retained", operation=GenerationOperation.REMEMBER,
+        now=now, authority=GenerationAuthority(None, None),
+        apply=lambda root: materialize_remember(root, content="RetainedGamma maintenance memory",
+            candidate_id="memcand:pos:v1:" + "c" * 64, created_at=now.isoformat(),
+            release_sha="a" * 40)))
+finally:
+    s.close()
+"""
         subprocess.run([str(python), '-I', '-c', seed], cwd=root, env=env, check=True, capture_output=True)
+        snapshot_program = """
+import hashlib,json
+from sb.config import load_config
+from sb.generation_runtime import GenerationMutationService
+from sb.search import SearchIndex
+config=load_config()
+s=GenerationMutationService.from_config(config)
+try:
+    active=s.store.active()
+    hits=SearchIndex(active.root, registry_path=config.raw['knowledge_registry']).search('RetainedGamma', scope='reference')
+    assert len(hits)==1
+    page=active.root/(hits[0].page_id+'.md')
+    assert 'RetainedGamma maintenance memory' in page.read_text()
+    print(json.dumps({'generation':active.generation_id,
+        'body_sha256':hashlib.sha256(page.read_bytes()).hexdigest(),
+        'ledger_sha256':hashlib.sha256((active.root/'.sb/ledger.db').read_bytes()).hexdigest(),
+        'high_water':s.requests.tombstone_high_water(), 'retrieved_records':len(hits)}))
+finally:
+    s.close()
+"""
+
+        def snapshot():
+            done = subprocess.run([str(python), '-I', '-c', snapshot_program], cwd=root, env=env,
+                                  check=True, capture_output=True, text=True, timeout=20)
+            return json.loads(done.stdout)
+
+        retained = snapshot()
         workspace = root / 'restore'
         workspace.mkdir(mode=0o700)
         program = ('from pathlib import Path; import sys; '
@@ -52,16 +92,20 @@ def main() -> None:
             busy = maintain()
             assert busy['restore_workspace_busy'] is True
             assert len(list(workspace.rglob('original'))) == 1
+            assert snapshot() == retained
             worker.kill()
             worker.wait(timeout=10)
             assert worker.returncode == -9
             cleaned = maintain()
             assert cleaned['disposed_restore_workspaces'] == 1 and not cleaned['restore_workspace_busy']
             assert not list(workspace.iterdir())
+            assert snapshot() == retained
             repeated = maintain()
             assert repeated['disposed_restore_workspaces'] == 0
+            assert snapshot() == retained
             print(json.dumps({'release': str(release), 'busy': busy, 'cleaned': cleaned,
-                              'repeated': repeated, 'worker_exit': worker.returncode}))
+                              'repeated': repeated, 'worker_exit': worker.returncode,
+                              'retained_memory': retained, 'preservation_checks': 3}))
         finally:
             if worker.poll() is None:
                 worker.kill()
