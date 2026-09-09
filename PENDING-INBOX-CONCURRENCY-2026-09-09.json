@@ -1,0 +1,11 @@
+{
+  "status": "verified-managed-generation-path",
+  "tests_passed": 5,
+  "test_seconds": 10.52,
+  "real_processes": true,
+  "pending_before_preserved": true,
+  "concurrent_remember_preserved": true,
+  "next_successor_preserved": true,
+  "operational_changes": false,
+  "legacy_direct_write_verified": false
+}
