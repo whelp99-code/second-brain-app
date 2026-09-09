@@ -26,6 +26,7 @@ from sb.knowledge_registry import (
     missing_state,
 )
 from sb.page_metadata import frontmatter_value as _frontmatter_value
+from sb.page_metadata import frontmatter_values
 from sb.search_filters import SearchFilters
 from sb.search_query import LexicalQuery
 
@@ -323,9 +324,9 @@ class SearchIndex:
                             from sb.search_errors import GenerationIndexError
 
                             raise GenerationIndexError
-                        metadata[page] = (_frontmatter_value(text, "status"),
-                                          _frontmatter_value(text, "updated"),
-                                          _frontmatter_value(text, "source_ref"))
+                        fields = frontmatter_values(text)
+                        metadata[page] = (fields.get("status", ""), fields.get("updated", ""),
+                                          fields.get("source_ref", ""))
                     index_status, updated, source_ref = metadata[page]
                     if status and status != index_status:
                         continue
@@ -480,10 +481,11 @@ def _replace_path(
     if text is None:
         return
     kind = rel.partition("/")[0]
-    updated = _frontmatter_value(text, "updated")
-    status = _frontmatter_value(text, "status")
+    fields = frontmatter_values(text)
+    updated = fields.get("updated", "")
+    status = fields.get("status", "")
     state = registry.get(page_id)
-    source_ref = _frontmatter_value(text, "source_ref")
+    source_ref = fields.get("source_ref", "")
     rows = [
         (
             page_id,

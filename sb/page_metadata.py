@@ -7,13 +7,18 @@ from yaml import BaseLoader, MappingNode, ScalarNode, YAMLError
 
 
 def frontmatter_value(text: str, key: str) -> str:
+    return frontmatter_values(text).get(key, "")
+
+
+def frontmatter_values(text: str) -> dict[str, str]:
+    """Decode a page once when several scalar fields are needed."""
     if not text.startswith("---"):
-        return ""
+        return {}
     rest = text[3:].lstrip("\n")
     end = rest.find("\n---")
     if end < 0:
-        return ""
-    return scalar_frontmatter(rest[:end]).get(key, "")
+        return {}
+    return scalar_frontmatter(rest[:end])
 
 
 def scalar_frontmatter(block: str) -> dict[str, str]:
