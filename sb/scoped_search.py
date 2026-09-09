@@ -22,7 +22,7 @@ def search_scoped_records(root: Path, generation: GenerationIdentityV1, scope: S
     seen: set[str] = set()
 
     def candidates():
-        with closing(index.iter_lexical_hits(query, scope="reference")) as hits:
+        with closing(index.iter_lexical_hits(query, scope="reference", include_metadata=False)) as hits:
             for hit in hits:
                 if hit.page_id in seen:
                     continue

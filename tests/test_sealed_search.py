@@ -264,3 +264,19 @@ def test_external_restriction_overrides_compiled_state(tmp_path: Path, status: s
     assert index.search('기억검증', scope='active') == ()
     hit = index.search('기억검증', scope='reference')[0]
     assert (hit.knowledge_status, hit.approval_status) == (status, approval)
+
+
+def test_omitted_display_metadata_preserves_scope_and_explicit_filters(tmp_path: Path):
+    root = _sealed(tmp_path, {
+        "wiki/a": ("SharedProbe", "active", "2026-09-07", "SharedProbe [^aaaaaaaa]"),
+        "wiki/b": ("SharedProbe", "conflict", "2026-08-01", "SharedProbe [^aaaaaaaa]"),
+    }, approved=("wiki/a",))
+    index = SearchIndex(root, registry_path=tmp_path / "registry.sqlite")
+    for filters in ({"scope": "reference"}, {"scope": "active"}, {"scope": "candidate"},
+                    {"status": "conflict"}, {"updated_from": "2026-09-01"},
+                    {"updated_to": "2026-08-31"}, {"kinds": ["conflicts"]}):
+        full = list(index.iter_lexical_hits("SharedProbe", **filters))
+        lean = list(index.iter_lexical_hits("SharedProbe", include_metadata=False, **filters))
+        assert [(hit.page_id, hit.knowledge_status, hit.approval_status) for hit in lean] == [
+            (hit.page_id, hit.knowledge_status, hit.approval_status) for hit in full]
+    assert len(list(index.iter_lexical_hits("SharedProbe", scope="active", include_metadata=False))) == 1

@@ -1,0 +1,40 @@
+{
+  "before": {
+    "root": "/var/tmp/sb-scoped-scale-hlw726_n",
+    "pages": 1000,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 4.328288945835084,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 4.3941213130019605,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 57960,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  },
+  "after": {
+    "root": "/var/tmp/sb-scoped-scale-01t8d6cx",
+    "pages": 1000,
+    "allowed_pages": 1,
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "seconds": 2.1688053417019546,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "seconds": 2.16472103074193,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 58312,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  }
+}

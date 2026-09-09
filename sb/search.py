@@ -277,10 +277,13 @@ class SearchIndex:
         self, query: str, *, kinds: Sequence[str] | None = None,
         status: str | None = None, updated_from: str | None = None,
         updated_to: str | None = None, scope: str | None = None,
+        include_metadata: bool = True,
     ) -> Generator[SearchHit, None, None]:
         """Stream filtered hits so callers can limit after record selection/deduplication.
 
         The caller owns the generation pin and closes this iterator on early exit.
+        Sealed record consumers may omit display metadata; requested status/date
+        filters still load and evaluate it. Knowledge scope is always evaluated.
         """
         _ = LexicalQuery.parse(query)
         root = self.vault_root.resolve()
@@ -318,7 +321,8 @@ class SearchIndex:
                         state.knowledge_status != ACTIVE or state.approval_status != APPROVED
                     ):
                         continue
-                    if page not in metadata:
+                    needs_metadata = include_metadata or bool(status or updated_from or updated_to)
+                    if needs_metadata and page not in metadata:
                         text = committed_text(root, page + ".md")
                         if text is None:
                             from sb.search_errors import GenerationIndexError
@@ -327,7 +331,7 @@ class SearchIndex:
                         fields = frontmatter_values(text)
                         metadata[page] = (fields.get("status", ""), fields.get("updated", ""),
                                           fields.get("source_ref", ""))
-                    index_status, updated, source_ref = metadata[page]
+                    index_status, updated, source_ref = metadata[page] if needs_metadata else ("", "", "")
                     if status and status != index_status:
                         continue
                     if updated_from and updated < updated_from or updated_to and updated > updated_to:
