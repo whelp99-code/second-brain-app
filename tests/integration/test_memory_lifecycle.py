@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
@@ -39,11 +40,28 @@ class _StatusEnvelope(BaseModel):
 
 
 @pytest.mark.parametrize("hybrid", [False, True])
+@pytest.mark.parametrize("bound", [False, True])
 def test_real_provider_lifecycle_remember_correct_export_forget(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
     hybrid: bool,
+    bound: bool,
 ) -> None:
+    from sb.bound_knowledge import BoundKnowledge
+    from sb.knowledge_registry import KnowledgeRegistry
+    from sb.remember_page import materialize_remember
+    from sb.search import SearchIndex
+    from sb.store.ledger import Ledger
+
+    if bound:
+        def materialize_bound(root, **kwargs):
+            materialize_remember(root, **kwargs)
+            # Seed the same explicit state as compilation before the real seal.
+            with Ledger(root) as ledger:
+                for page in (root / 'wiki').glob('*.md'):
+                    ledger.bind_knowledge(BoundKnowledge(page.relative_to(root).as_posix().removesuffix('.md'),
+                        'sha256:' + hashlib.sha256(page.read_bytes()).hexdigest(), 'ACTIVE', 'APPROVED'))
+        monkeypatch.setattr('sb.request_executor.materialize_remember', materialize_bound)
     monkeypatch.setattr("sb.embeddings.resolve_encoder", CountingEncoder)
     key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     config = ExecutorConfig(
@@ -59,6 +77,12 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     remember = executor.apply_once(now=NOW)
     assert remember.request_id == accepted.request_id and remember.state == "proved"
     remembered_generation = executor.generations.active()
+    registry = KnowledgeRegistry(tmp_path / 'knowledge.sqlite')
+    if bound:
+        index = SearchIndex(remembered_generation.root, hybrid=hybrid, registry_path=registry.path)
+        hits = index.search(OLD, scope='active')
+        assert len(hits) == 1 and hits[0].verification == 'VERIFIED'
+        _ = registry.put(hits[0].page_id, knowledge_status='ACTIVE', approval_status='APPROVED')
     # The request memory carries its original CAS blob in addition to the page
     # and derived manifest, so citation validation also survives restoration.
     assert remembered_generation.manifest.file_count == 4
@@ -114,6 +138,14 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     if hybrid:
         with closing(sqlite3.connect(active.root / ".sb/vectors.db")) as vectors:
             assert vectors.execute("SELECT text FROM record_vectors").fetchall() == [(CORRECTED,)]
+
+    if bound:
+        index = SearchIndex(active.root, hybrid=hybrid, registry_path=registry.path)
+        assert tuple(index.iter_lexical_hits(OLD, scope='reference')) == ()
+        assert all(OLD not in hit.snippet for hit in index.search(OLD, scope='reference'))
+        assert index.search(CORRECTED, scope='active') == ()
+        hits = index.search(CORRECTED, scope='reference')
+        assert len(hits) == 1 and hits[0].verification == 'UNVERIFIED'
 
     export_time = NOW + timedelta(minutes=2)
     export = effect_request(
@@ -171,6 +203,10 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         if path.is_file()
     )
     assert OLD.encode() not in final_bytes and CORRECTED.encode() not in final_bytes
+    if bound:
+        index = SearchIndex(executor.generations.active().root, hybrid=hybrid, registry_path=registry.path)
+        assert index.search(CORRECTED, scope='reference') == ()
+        assert index.search(CORRECTED, scope='active') == ()
     if hybrid:
         with closing(sqlite3.connect(executor.generations.active().root / ".sb/vectors.db")) as vectors:
             assert vectors.execute("SELECT count(*) FROM record_vectors").fetchone() == (0,)
