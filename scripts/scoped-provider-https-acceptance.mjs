@@ -1,5 +1,6 @@
 // Actual TLS + gateway sessions + Python provider; forwarder identity is a fixture.
 import assert from 'node:assert/strict';
+import { acceptWrittenContext } from './scoped-written-context-acceptance.mjs';
 import { createHash, createHmac } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, chmodSync, lstatSync, readdirSync } from 'node:fs';
 import { createServer as httpsServer, request as httpsRequest } from 'node:https';
@@ -108,7 +109,11 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     assert.equal(f.database.authority.db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
     assert.deepEqual(f.database.authority.db.prepare('PRAGMA foreign_key_check').all(), []);
     assert(!JSON.stringify(result).includes(cookie));
-    results.push({ mode, ...result, authority_https_calls: calls, dispatch_attempts: 1, foreign_key_errors: 0 });
+    const readback = mode === 'valid' && process.argv.includes('--readback')
+      ? await acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result,
+          request: dispatched.request, outboxId: registered.outbox_id, writerCookie: cookie }) : undefined;
+    delete result.readback;
+    results.push({ mode, readback, ...result, authority_https_calls: calls, dispatch_attempts: 1, foreign_key_errors: 0 });
   } finally {
     gateway?.close(); provider?.close(); if (tls) await new Promise(resolve => tls.close(resolve));
     await upstream.close();

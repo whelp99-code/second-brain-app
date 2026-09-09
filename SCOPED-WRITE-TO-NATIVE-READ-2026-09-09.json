@@ -1,0 +1,129 @@
+{
+  "gateway_configuration": "CLI parser and independently owned existing authority connection",
+  "admission_surface": "mcp",
+  "execution_surface": "cli",
+  "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+  "identity_forwarder": "fixture",
+  "clock": "fixture",
+  "public_mcp_write": true,
+  "results": [
+    {
+      "mode": "valid",
+      "readback": {
+        "request_id": "memreq:scoped:v4:95f561781e97afe371f937be39ff698a3124db00e57dfa3d50e734c55ae6a889",
+        "request_digest": "sha256:95f561781e97afe371f937be39ff698a3124db00e57dfa3d50e734c55ae6a889",
+        "writer_agent": "agent:fixture",
+        "reader_agent": "agent:reader",
+        "fresh_login": true,
+        "provider_proved": true,
+        "jarvis_settled": true,
+        "control_completed": true,
+        "settlement_replay": true,
+        "settlements": 1,
+        "attempts": 1,
+        "same_generation": true,
+        "record_ids": [
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+        ],
+        "source_refs": [
+          "Second Brain",
+          "Second Brain"
+        ],
+        "context_records": 2,
+        "clients": {
+          "independent_stdio_clients": 2,
+          "records_each": 2,
+          "https_calls": 3,
+          "native_mode": "claude",
+          "native_claude_calls": 1,
+          "native_version": "2.1.261 (Claude Code)",
+          "native_codex_calls": 0,
+          "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+        },
+        "reader_revocation": 403,
+        "limits": "fixture verified task and write request, not native A model write or operational deployment"
+      },
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:95f561781e97afe371f937be39ff698a3124db00e57dfa3d50e734c55ae6a889",
+        "request_digest": "sha256:95f561781e97afe371f937be39ff698a3124db00e57dfa3d50e734c55ae6a889",
+        "idempotency_key": "memidem:scoped:v4:f6c15dae30547f267147997785287c846f311fe9c62577f88728ed419d010513",
+        "scope_digest": "sha256:fa62b26609cd075caf3df3cf25096892d9c7ae4d6d6d8fc3fc9e4d1df20c9f73",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:95f561781e97afe371f937be39ff698a3124db00e57dfa3d50e734c55ae6a889.v4.json",
+        "request_file_digest": "sha256:15df79205913634ad85b384fe23fbe5c78501c3c38102a5e46d26dfface3924f",
+        "replayed": false
+      },
+      "provider_state": "proved",
+      "active_generation": true,
+      "authority_https_calls": 5,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "accepted_row": false,
+      "authority_https_calls": 2,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:9e9bfd05c35d1234780fdb3844ba79d1e4bb5275d0000546e29d48f1dde12b88",
+        "request_digest": "sha256:9e9bfd05c35d1234780fdb3844ba79d1e4bb5275d0000546e29d48f1dde12b88",
+        "idempotency_key": "memidem:scoped:v4:b4778aff3f8eaa906c6442d6b8f76f0f228f3728473616034d394e9858b9acd2",
+        "scope_digest": "sha256:f34085622ed64fcd3769448dd8785ce081abf94668b0a34efc36ae6a5dbb4d07",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:9e9bfd05c35d1234780fdb3844ba79d1e4bb5275d0000546e29d48f1dde12b88.v4.json",
+        "request_file_digest": "sha256:95410ec61d9e5fc3f3a80621f5a9ace0047d2c2b8d5755305e9c6b119898cab1",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "expire_before_execute",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:1082a543717238551a25b9c7b66d18f5e65f146ca191e253c746f00a70ffb92e",
+        "request_digest": "sha256:1082a543717238551a25b9c7b66d18f5e65f146ca191e253c746f00a70ffb92e",
+        "idempotency_key": "memidem:scoped:v4:be6d59b82ff157fd09628b333d8ac152f4da45f1e5532af28a44f8c1b0283423",
+        "scope_digest": "sha256:011382b30f862e7f8a7c5eec83c7ab24f2c693a4a3af379f1fba8ee9d3864970",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:1082a543717238551a25b9c7b66d18f5e65f146ca191e253c746f00a70ffb92e.v4.json",
+        "request_file_digest": "sha256:31137bcef9282055e73165ca96130144716cd5e7320619e20eda7ef4100d4e4a",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    }
+  ],
+  "limitations": [
+    "fixture verified task and approvals; no native model A writes",
+    "fixture identity forwarder, policy, keys and clock",
+    "native Claude read only; Codex previous usage-limit hold remains",
+    "not operational deployment or full deletion/restore acceptance"
+  ]
+}

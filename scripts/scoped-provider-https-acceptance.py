@@ -3,6 +3,7 @@ import json
 import base64
 import subprocess
 import os
+import shlex
 from contextlib import redirect_stdout
 from io import StringIO
 from types import SimpleNamespace
@@ -82,7 +83,29 @@ else:
         else:
             assert result.state == 'failed' and result.code == 'SCOPED_WRITE_AUTHORITY_INVALID', result
             assert not executor.generations.active_link.exists() and status.proof_json is None
-        print(json.dumps({'admission': 'accepted', 'accepted': asdict(accepted), 'provider_state': result.state,
+        readback = {}
+        if state['mode'] == 'valid':
+            root = Path(state['provider_root'])
+            read_config = root / 'read-provider.toml'
+            public = base64.urlsafe_b64encode(config.jarvis_public_keys['jarvis:fixture'].public_bytes_raw()).rstrip(b'=').decode()
+            read_config.write_text('\n'.join([
+                f'vault_root = "{root / "share/vault"}"', f'request_root = "{config.request_root}"',
+                f'state_root = "{config.state_root}"', f'share_root = "{config.share_root}"',
+                'provider_instance_id = "provider:fixture"', f'provider_release_sha = "{"a" * 40}"',
+                f'jarvis_public_keys = {{ "jarvis:fixture" = "{public}" }}',
+                '[mcp_scoped_read]', 'principal = "principal:owner"', 'agent = "agent:reader"',
+                'session_mode = "issuer_authenticated"', 'policy_revision = "policy:1"']) + '\n')
+            read_config.chmod(0o600)
+            app = Path(__file__).resolve().parents[1]
+            code = ('from datetime import datetime,UTC\nimport sb.mcp as m\nimport sb.scoped_status_mcp as s\n'
+                'class Clock(datetime):\n @classmethod\n def now(cls,tz=None): return datetime(2026,8,31,3,30,tzinfo=UTC)\n'
+                'm.datetime=Clock\ns.datetime=Clock\nm.main()\n')
+            launcher = root / 'read-launcher'
+            launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(app)) + '\nexec ' + shlex.quote(sys.executable)
+                + ' -c ' + shlex.quote(code) + ' 2>' + shlex.quote(str(root / 'read.err')) + '\n')
+            launcher.chmod(0o700)
+            readback = {'config': str(read_config), 'launcher': str(launcher), 'proof': json.loads(status.proof_json)}
+        print(json.dumps({'readback': readback, 'admission': 'accepted', 'accepted': asdict(accepted), 'provider_state': result.state,
             'active_generation': executor.generations.active_link.exists()}))
     finally:
         executor.close()

@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 공개 쓰기→완료→실제 Claude 회수:** [동일 요청·새 reader 로그인·reconcile/세대 대조](SCOPED-WRITE-TO-NATIVE-READ-2026-09-09.md). 실제 MCP/TLS/CLI proved→자비스 settled/control completed→새 agent context2records→독립2클라이언트/Claude1호출 통과. replay settlement1/attempt1/FK0, 철회·만료3상태 차단 유지. 작성자는 합성 검증 작업 fixture이며 native A쓰기/운영 및 전체 M1–M14는 남는다.
+
 **2026-09-09 실제 인증 MCP 클라이언트:** [J70d0428·HTTPS 결함2개 수정·실제 Claude/독립2클라이언트](AUTHENTICATED-CLIENT-MCP-2026-09-09.md). 관련40통과·emit/lint. 실제 Claude1호출·각2records 회수, 범위 밖0·철회403/만료401 유지. Codex는 사용량 제한으로 호출 전 실패해 보류. 운영·scoped A쓰기→B새로그인·삭제/복원 등 M1–M14 유지.
 
 **2026-09-09 인계 추가 분석 갱신:** [최신 수정·연결 순서·클라이언트 지원 증거](HANDOFF-MERGED-PRIORITIES-2026-09-09.md). SB HEAD5201cce와 전체1,367/2skip 기록을 대조하고 수집 회귀13개를 이번에 재실행해 통과했다. 작성 중인 JARVIS MCP 연결부는 미검증으로 구분하며 실제 scoped A→B·운영 전환·삭제/복원 등 M1–M14를 유지한다.
