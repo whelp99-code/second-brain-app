@@ -9,6 +9,22 @@ import pytest
 bundle = runpy.run_path(str(Path(__file__).resolve().parents[1] / "deploy/bundle_python_runtime.py"))["bundle_runtime"]
 
 
+def test_release_identity_binds_runtime_bytes_and_not_staging_path(tmp_path):
+    api = runpy.run_path(str(Path(__file__).resolve().parents[1] / "deploy/bundle_python_runtime.py"))
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "python").write_bytes(b"runtime one")
+    target = tmp_path / "target"
+    bundle(source, target)
+    first = api["runtime_digest"](source)
+    assert api["runtime_digest"](target) == first
+    identity = api["release_identity"](b"wheel", b"locked requirements", first)
+    (target / "python").write_bytes(b"runtime two")
+    second = api["runtime_digest"](target)
+    assert second != first
+    assert api["release_identity"](b"wheel", b"locked requirements", second) != identity
+
+
 @pytest.mark.parametrize("external", [False, True])
 def test_runtime_links_are_internal(tmp_path, external):
     source = tmp_path / "source"

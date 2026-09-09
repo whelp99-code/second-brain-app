@@ -1,9 +1,28 @@
 """Copy a bounded standalone Python tree without external filesystem links."""
 
+import hashlib
+import json
 import os
+import runpy
 import shutil
 import stat
 from pathlib import Path
+
+
+def runtime_digest(root: Path) -> str:
+    inventory = runpy.run_path(str(Path(__file__).with_name("check-release-contents.py")))["inventory"]
+    # Paths inside the runtime are part of the identity; its staging directory is not.
+    entries = inventory(root)["entries"]
+    raw = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(b"sb-python-runtime-v1\0" + raw).hexdigest()
+
+
+def release_identity(wheel: bytes, requirements: bytes, runtime_sha256: str) -> str:
+    payload = {"wheel": hashlib.sha256(wheel).hexdigest(),
+               "requirements": hashlib.sha256(requirements).hexdigest(),
+               "python_runtime": runtime_sha256}
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(b"sb-release-inputs-v2\0" + raw).hexdigest()[:40]
 
 
 def bundle_runtime(source: Path, destination: Path) -> None:

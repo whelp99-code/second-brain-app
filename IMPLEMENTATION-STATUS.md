@@ -1,3 +1,5 @@
+> 2026-09-09 런타임 식별 보강: [Python 입력 hash를 release ID에 결합](PYTHON-RUNTIME-IDENTITY-2026-09-09.md). 관련20개·실제2준비 입력ID일치·설치연동4경로 통과. 전체 설치물은5,395항목 차이로 재현성 미완료를 명시, 최종 봉인/운영 인수 유지.
+
 > 2026-09-09 provider 런타임 내부 포함: [Python3.12 복사·내부 상대 링크 후보](BUNDLED-PYTHON-CANDIDATE-2026-09-09.md). 링크1,052개 외부/절대0, 내부 Python SSL/SQLite 실행·설치 연동4경로/MCP4프로파일 통과. 관련19개 및 후속중복5개 통과. provenance/재현성·정본 봉인·운영 인수는 남음.
 
 > 2026-09-09 정본 manifest 결함 수정: [JARVIS195b1a7 루트 파일만 자기 제외](RELEASE-MANIFEST-EXCLUSION-2026-09-09.md). nested 해시 누락 재현→관련7개·lint/별도emit·실제 Node 변경/링크거부 통과. 실제 provenance·provider 외부 실행기 및 운영 봉인은 남음.

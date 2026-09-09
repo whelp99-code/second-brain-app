@@ -12,11 +12,12 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import tempfile
 import tarfile
 
-from bundle_python_runtime import bundle_runtime
+from bundle_python_runtime import bundle_runtime, release_identity, runtime_digest
 
 repo = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
@@ -50,15 +51,21 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     requirements = temp / 'requirements.txt'
     build_run('uv', 'export', '--frozen', '--no-dev', '--no-emit-project', '--no-header', '--format', 'requirements-txt', '--output-file', str(requirements))
     wheel_hash = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    release_id = hashlib.sha256(wheel.read_bytes() + requirements.read_bytes()).hexdigest()[:40]
+    managed_python = run('uv', 'python', 'find', '--managed-python', '--no-python-downloads', '--system', '3.12').strip()
+    runtime_source = Path(run(managed_python, '-I', '-c', 'import sys; print(sys.base_prefix)').strip())
+    staged_runtime = temp / 'python-runtime'
+    bundle_runtime(runtime_source, staged_runtime)
+    runtime_sha256 = runtime_digest(staged_runtime)
+    release_id = release_identity(wheel.read_bytes(), requirements.read_bytes(), runtime_sha256)
     release = app / 'releases' / release_id
     if release.exists():
         raise SystemExit(f'Release already exists; inspect it before reuse: {release}')
     release.mkdir(parents=True, mode=0o700)
-    managed_python = run('uv', 'python', 'find', '--managed-python', '--no-python-downloads', '--system', '3.12').strip()
-    runtime_source = Path(run(managed_python, '-I', '-c', 'import sys; print(sys.base_prefix)').strip())
     runtime = release / 'runtime' / 'python'
-    bundle_runtime(runtime_source, runtime)
+    runtime.parent.mkdir()
+    shutil.move(staged_runtime, runtime)
+    if runtime_digest(runtime) != runtime_sha256:
+        raise RuntimeError("PYTHON_RUNTIME_COPY_CHANGED")
     bundled_python = runtime / 'bin' / 'python3.12'
     run(str(bundled_python), '-m', 'compileall', '-q', str(runtime / 'lib'))
     run('uv', 'venv', '--python', str(bundled_python), str(release / '.venv'))
@@ -84,6 +91,8 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
         path.write_text(base + command)
         path.chmod(0o700)
     manifest = {'schema': 1, 'release_id': release_id, 'wheel_sha256': wheel_hash,
+                'release_id_scheme': 'sb-release-inputs-v2',
+                'python_runtime_input_sha256': runtime_sha256,
                 'source_commit': source_commit, 'source_tree': source_tree, 'source_materialization': 'git-archive',
                 'working_tree_modified': working_tree_modified,
                 'contract_profile': 'task32-schema4',
