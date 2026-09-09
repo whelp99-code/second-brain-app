@@ -90,8 +90,23 @@ try {
   assert.equal(scoped.generation.generation_id,restored.generation_id);
   assert.match(scoped.page_content_digest,/^sha256:[0-9a-f]{64}$/);
   assert.equal(scoped.page_content_digest,peer.page_content_digest);
-  const result = {root,backup,deleted,restored,scoped,peer,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:1,
-    deleted_records:0,surviving_records:1,model_calls:0,
+  const deletedAfterRestore = await effects.apply('forget',keep.payload.records[0].record);
+  assert.equal(deletedAfterRestore.tombstone_sequence,2);
+  assert.equal((await read('KeepBeta')).payload.records.length,0);
+  const secondFence = authorize(new Date());
+  assert.equal(secondFence.tombstone_sequence,2);
+  const restoredAgain = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
+    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(secondFence)}));
+  assert.equal(restoredAgain.tombstone_sequence,2);
+  assert.equal(restoredAgain.tombstone_set_root,secondFence.tombstone_set_root);
+  assert.equal(restoredAgain.surviving_page_id,null);
+  assert.equal(restoredAgain.blocked_matches,0);
+  assert.equal(restoredAgain.scan_errors,0);
+  assert.equal((await read('DeleteAlpha')).payload.records.length,0);
+  assert.equal((await read('KeepBeta')).payload.records.length,0);
+  const result = {root,backup,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
+    restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:secondFence.tombstone_sequence,
+    deleted_records:0,first_restore_surviving_records:1,model_calls:0,
     scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result));

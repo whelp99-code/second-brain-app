@@ -1090,3 +1090,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 동시 복원 client 정책 격리:** [실제 stdio 두 연결 rendezvous·양방향 세션철회/다른client 정상](RESTORE-CONCURRENT-CLIENTS-2026-09-10.md). 최종exit0·독립철회2·동일복원세대/본문·Node구문/diff. 동시쓰기/운영부하/native 업무의 증거는 아니며 전체 목표 유지.
+
+
+**2026-09-10 복원 기억 재삭제/재복원:** [실제 자비스 두번째삭제 proved·chain2→최초백업 재복원→두기억0](RESTORE-REDELETE-2026-09-10.md). 최종exit0·blocked/scan0·Ruff/Node구문/diff. 첫 복원 동시 scoped 검증 유지. 합성 환경이며 운영/실업무/DR 전체 목표는 남는다.

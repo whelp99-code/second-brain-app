@@ -57,8 +57,8 @@ try:
         executor.generations.activate(generation, executor.generations.active(), now)
         pages = [path.relative_to(generation.root).with_suffix('').as_posix()
                  for path in (generation.root / 'wiki').glob('*.md') if 'KeepBeta' in path.read_text()]
-        assert len(pages) == 1
-        print(json.dumps({'generation_id': generation.generation_id, 'surviving_page_id': pages[0],
+        assert len(pages) <= 1
+        print(json.dumps({'generation_id': generation.generation_id, 'surviving_page_id': pages[0] if pages else None,
             'tombstone_sequence': generation.manifest.tombstone_sequence,
             'tombstone_set_root': generation.manifest.tombstone_set_root,
             'blocked_matches': proof.blocked_matches, 'scan_errors': proof.scan_errors}))
