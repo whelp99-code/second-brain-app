@@ -1,3 +1,5 @@
+[실제 웹 서버 검색·본문 인수](REAL-WEB-SEARCH-READ-2026-09-09.md) —mock없는 브라우저버튼→검색1개/본문출처/빈결과초기화, console/pageerror0.
+
 [웹 본문 응답 순서 보호](WEB-PAGE-RESPONSE-ORDER-2026-09-09.md) — 새검색/다른페이지 뒤 늦은본문 거부, 실제브라우저·HTTP12개통과.
 
 [웹 검색 응답 순서 보호](WEB-SEARCH-RESPONSE-ORDER-2026-09-09.md) — 이전응답 덮어쓰기 재현→브라우저3흐름·HTTP12개통과.
