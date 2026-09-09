@@ -1,0 +1,18 @@
+{
+  "workspace": "/var/tmp/sb-managed-native-e9_8jeox",
+  "managed_active_symlink": true,
+  "first": {
+    "page_id": "wiki/inbox-2026-09-09t144140491156-관리형실제기억검증-59a920fe",
+    "body": "## 2026-09-09T144140491156-관리형실제기억검증\n\n검증용 회의는 금요일 오후 세 시입니다[^ac209e18].\n\n[^ac209e18]: inbox:2026-09-09T144140491156-관리형실제기억검증.md span=0-33\n",
+    "results": 1
+  },
+  "second": {
+    "page_id": "wiki/inbox-2026-09-09t144140491156-관리형실제기억검증-59a920fe",
+    "body": "## 2026-09-09T144140491156-관리형실제기억검증\n\n검증용 회의는 금요일 오후 세 시입니다[^ac209e18].\n\n[^ac209e18]: inbox:2026-09-09T144140491156-관리형실제기억검증.md span=0-33\n",
+    "results": 1
+  },
+  "default_entrypoint": "python -m sb.mcp",
+  "real_claude": true,
+  "unused_registry_exists": false,
+  "final_renderer_recheck": true
+}

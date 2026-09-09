@@ -470,6 +470,41 @@ def _safe_rel(root: Path, rel: Path) -> Path:
     return dest
 
 
+def _render_definitions(body: str, sources: Sequence[SourceCite]) -> str:
+    """Deduplicate owned source definitions, leaving Markdown examples intact."""
+    definitions = {cite.sid: f"[^{cite.sid}]: {cite.origin}" for cite in sources}
+    lines = body.rstrip().splitlines()
+    owned: dict[str, list[int]] = {}
+    fence = ""
+    for index, line in enumerate(lines):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if fence:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= len(fence) and not marker[2].strip():
+                fence = ""
+            continue
+        if marker:
+            fence = marker[1]
+            continue
+        match = re.match(r"^ {0,3}\[\^([^\]]+)\]: (.*)$", line)
+        if not match or match[1] not in definitions:
+            continue
+        canonical = definitions[match[1]]
+        value = line.lstrip(" ")
+        if value == canonical or re.fullmatch(re.escape(canonical) + r" span=[0-9]+-[0-9]+", value):
+            owned.setdefault(match[1], []).append(index)
+    removed: set[int] = set()
+    for sid, indices in owned.items():
+        # Prefer the definition retaining the model's source span annotation.
+        keep = next((i for i in indices if " span=" in lines[i]), indices[0])
+        removed.update(i for i in indices if i != keep and
+            lines[i].strip() in {definitions[sid], lines[keep].strip()})
+    rendered = "\n".join(line for i, line in enumerate(lines) if i not in removed).rstrip()
+    missing = "\n".join(value for sid, value in definitions.items() if sid not in owned)
+    if missing:
+        rendered += "\n\n" + missing
+    return rendered
+
+
 def _render(page: PageSpec, *, compiled_by: str, updated: str) -> str:
     if page.sensitivity not in {None, "public", "personal", "sensitive", "restricted"}:
         raise VaultLintError((f"{page.page_id}: invalid sensitivity",))
@@ -496,10 +531,7 @@ def _render(page: PageSpec, *, compiled_by: str, updated: str) -> str:
     if page.sensitivity is not None:
         payload["sensitivity"] = page.sensitivity
     dumped = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
-    definitions = "\n".join(f"[^{cite.sid}]: {cite.origin}" for cite in page.sources)
-    body = page.body_md.rstrip()
-    if definitions:
-        body = f"{body}\n\n{definitions}"
+    body = _render_definitions(page.body_md, page.sources)
     return f"---\n{dumped}---\n\n{body}\n"
 
 

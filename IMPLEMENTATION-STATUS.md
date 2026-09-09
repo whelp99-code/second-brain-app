@@ -1,3 +1,5 @@
+[실제 모델 각주 중복 수정](NATIVE-FOOTNOTE-DEDUP-2026-09-09.md) — span/코드 예시 보존·재저장 불변, 관련47통과·Ruff. 새 실제 Claude 관리형 생성·기본 MCP2회 각주1개/출처 유지. 상이한 span 자동 통합은 보류.
+
 **최신 누적 회귀:** 제품 `6f330591` — 전체1,551통과/2skip, 321.62초·Ruff/diff 통과. [관리형 실제 모델·검증 범위](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md). 운영 전환 및 전체 M1–M14 미완료.
 
 [관리형 실제 모델 생성·기본 MCP 회수](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md) — 실제 Claude 컴파일 후 기본 stdio 서버2회 재시작·사실/출처 동일. 합성 사례이며 운영 인수 미완료, 각주 중복 개선 필요.

@@ -316,3 +316,48 @@ def test_write_pages_restores_page_log_index_when_commit_fails(
     assert not dest.exists()
     assert _git(tmp_path, "status", "--porcelain") == ""
     assert _git(tmp_path, "diff", "--cached", "--name-only") == ""
+
+
+@pytest.mark.parametrize('fence', ['```', '~~~~'])
+@pytest.mark.parametrize('span_first', [True, False])
+def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fence: str, span_first: bool) -> None:
+    from sb.vault import read_page_spec
+
+    origin = 'me-wiki:identity/profile.md'
+    definition = f'[^{CAS_SID}]: {origin}'
+    definitions = [definition + ' span=0-12', definition]
+    if not span_first:
+        definitions.reverse()
+    body = f'A fact.[^{CAS_SID}]\n\n{fence}\n{definition}\n{fence}\n\n' + '\n\n'.join(definitions)
+    vault = _ready(tmp_path)
+    vault.write_pages([_cited_page(body_md=body)], 'first', MemoryLedger())
+    text = (tmp_path / 'wiki/identity-profile.md').read_text()
+    assert text.count(definition) == 2  # code example and one real definition
+    assert f'{fence}\n{definition}\n{fence}' in text
+    assert f'{definition} span=0-12' in text
+    page = read_page_spec(tmp_path, 'identity-profile')
+    assert page is not None
+    assert page.sources[0].spans == ['0-12']
+    ledger = MemoryLedger()
+    ledger.hashes[page.page_id] = hashlib.sha256(text.encode()).hexdigest()
+    outcome = vault.write_pages([page], 'repeat', ledger)
+    assert outcome.commit is None
+    assert (tmp_path / 'wiki/identity-profile.md').read_text() == text
+
+
+def test_code_example_does_not_replace_real_source_definition(tmp_path: Path) -> None:
+    definition = f'[^{CAS_SID}]: me-wiki:identity/profile.md'
+    body = f'A fact.[^{CAS_SID}]\n\n```markdown\n{definition}\n```'
+    _ready(tmp_path).write_pages([_cited_page(body_md=body)], 'code', MemoryLedger())
+    text = (tmp_path / 'wiki/identity-profile.md').read_text()
+    assert text.count(definition) == 2
+
+
+def test_different_span_annotations_are_not_silently_discarded(tmp_path: Path) -> None:
+    definition = f"[^{CAS_SID}]: me-wiki:identity/profile.md"
+    body = f"A fact.[^{CAS_SID}]\n\n{definition} span=0-12\n\n{definition} span=20-30"
+    _ready(tmp_path).write_pages([_cited_page(body_md=body)], "spans", MemoryLedger())
+    text = (tmp_path / "wiki/identity-profile.md").read_text()
+    assert f"{definition} span=0-12" in text
+    assert f"{definition} span=20-30" in text
+    assert text.count(definition) == 2
