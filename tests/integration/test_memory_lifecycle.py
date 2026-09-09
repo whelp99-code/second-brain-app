@@ -40,22 +40,27 @@ class _StatusEnvelope(BaseModel):
 
 
 @pytest.mark.parametrize("hybrid", [False, True])
-@pytest.mark.parametrize("bound,binding_failure", [(False, False), (True, False), (True, True)])
+@pytest.mark.parametrize("bound,binding_failure", [(False, False), (True, False), (True, "knowledge"), (True, "access")])
 def test_real_provider_lifecycle_remember_correct_export_forget(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
     hybrid: bool,
     bound: bool,
-    binding_failure: bool,
+    binding_failure: str | bool,
 ) -> None:
     from sb.bound_knowledge import BoundKnowledge
     from sb.knowledge_registry import KnowledgeRegistry
+    from sb.memory_access import MemoryAccessError, classified_page, require_scope
     from sb.remember_page import materialize_remember
     from sb.search import SearchIndex
+    from sb.source_access import SourceAccess
     from sb.store.ledger import Ledger
+    from sb.targets import GenerationIdentityV1
 
+    scope = SourceAccess('principal:owner', ('project:a',), 'policy:1')
     if bound:
         def materialize_bound(root, **kwargs):
+            kwargs['source_access'] = scope
             materialize_remember(root, **kwargs)
             # Seed the same explicit state as compilation before the real seal.
             with Ledger(root) as ledger:
@@ -105,12 +110,14 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         public_keys=config.jarvis_public_keys, provider_instance_id="provider:fixture",
     )
     if binding_failure:
-        def fail_binding(_ledger, _state):
+        def fail_binding(*_args):
             raise RuntimeError('INJECTED_CORRECTION_STATE_FAILURE')
         with monkeypatch.context() as failing:
-            failing.setattr(Ledger, 'bind_knowledge', fail_binding)
+            method = 'bind_knowledge' if binding_failure == 'knowledge' else 'bind_page_access'
+            failing.setattr(Ledger, method, fail_binding)
             failed = executor.apply_once(now=correction_time + timedelta(seconds=1), lease_ms=1)
-        assert failed.state == 'reconciling' and failed.code == 'EFFECT_KNOWLEDGE_REBIND_FAILED'
+        expected = 'EFFECT_KNOWLEDGE_REBIND_FAILED' if binding_failure == 'knowledge' else 'EFFECT_ACCESS_REBIND_FAILED'
+        assert failed.state == 'reconciling' and failed.code == expected
         assert executor.generations.active().generation_id == remembered_generation.generation_id
         high_water = executor.store.tombstone_high_water()
         assert high_water[0] > 0
@@ -162,6 +169,16 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         assert all(OLD not in hit.snippet for hit in index.search(OLD, scope='reference'))
         hits = index.search(CORRECTED, scope='active')
         assert len(hits) == 1 and hits[0].verification == 'VERIFIED'
+        generation = GenerationIdentityV1(active.manifest.provider_instance_id, active.generation_id,
+            active.manifest.generation_digest, active.head, active.tree)
+        classified = classified_page(active.root, hits[0].page_id, generation)
+        require_scope(classified, scope)
+        assert classified.requirements == (scope,)
+        for denied in (SourceAccess('principal:other', ('project:a',), 'policy:1'),
+                       SourceAccess('principal:owner', ('project:b',), 'policy:1'),
+                       SourceAccess('principal:owner', ('project:a',), 'policy:2')):
+            with pytest.raises(MemoryAccessError):
+                require_scope(classified, denied)
     else:
         index = SearchIndex(active.root, hybrid=hybrid, registry_path=registry.path)
         assert index.search(CORRECTED, scope='active') == ()

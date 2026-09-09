@@ -1024,3 +1024,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 효과 접근 분류 결손 수정:** [정확한 prior 요구사항 전체 유지·제한 조회 복구](EFFECT-ACCESS-REBIND-2026-09-10.md). 실제 부분 삭제에서 UNCLASSIFIED 재현 후 수정. 새 본문 동일scope 조회·다른 owner/project/policy 거부, incomplete 승격 없음, access 저장 실패 reconciling→재처리. 최종부분삭제12통과/25.20초·관련16통과/37.79초·Ruff/diff·타입통과. JARVIS 세션 전체 인수·복원·운영 전체 목표는 남는다.
+
+
+**2026-09-10 정정 접근 분류 복구 인수:** [동일 scope 허용·다른 scope 거부·저장 실패 재처리](CORRECTION-ACCESS-RECOVERY-2026-09-10.md). 실제 lifecycle8+helper7 총15통과/37.97초·Ruff/diff. knowledge/access 저장 실패 후 새 executor proved와 단일 정정·요구사항 보존을 확인했다. JARVIS 실제 세션·복원·운영 전체 목표는 남는다.
