@@ -26,3 +26,18 @@ test('supported evidence must match the gold value; blanket abstention and wrong
   assert.throws(()=>supported(valid,'첫 결정'));
   assert.throws(()=>supported(JSON.stringify({...answer,value:'두 번째 결정'}),'첫 결정'));
 });
+
+test('reject duplicate and escaped duplicate response fields', () => {
+  for (const text of [
+    '{"status":"supported","status":"insufficient_evidence","value":null,"explanation":"No evidence"}',
+    '{"status":"insufficient_evidence","value":"wrong fact","value":null,"explanation":"No evidence"}',
+    '{"status":"insufficient_evidence","value":null,"explanation":"Contradiction","explan\\u0061tion":"No evidence"}',
+  ]) assert.throws(() => parse(text));
+});
+
+
+test('quoted field-like text inside explanation remains valid', () => {
+  const explanation = 'The record contains "status": "unknown" and a backslash \\.';
+  assert.equal(parse(JSON.stringify({status:'insufficient_evidence',value:null,explanation})).explanation,
+    explanation);
+});
