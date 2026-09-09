@@ -17,6 +17,9 @@ from sb.tombstone_snapshot import BlockedTargetIdentity, TombstoneSnapshot
     ('삭제첫째\n삭제둘째\n유지\n', ('삭제첫째', '삭제둘째'), '유지\n'),
     ('삭제첫째\n중간 유지\n삭제둘째\n마지막 유지', ('삭제첫째', '삭제둘째'),
      '중간 유지\n마지막 유지'),
+    ('삭제\n유지\n', ('삭제\n',), '유지\n'),
+    ('삭제\r\n유지\r\n', ('삭제\r\n',), '유지\r\n'),
+    ('첫삭제\n둘삭제\n유지', ('첫삭제\n둘삭제\n',), '유지'),
 ])
 def test_tombstone_spans_preserve_unrelated_memory(
     tmp_path: Path, original: str, phrases: tuple[str, ...], expected: str,

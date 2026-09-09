@@ -1,3 +1,5 @@
+[복원 인용 끝 개행 경계 수정](RESTORE-TOMBSTONE-SPAN-PRESERVATION-2026-09-09.md) — LF/CRLF/여러 줄 인용의 다음 정상 줄 보존, 관련15개 통과.
+
 [복원 삭제 구간 중복에 따른 정상 기억 훼손 수정](RESTORE-TOMBSTONE-SPAN-PRESERVATION-2026-09-09.md) — 수정 전 재현, 실제 파일 네 경우 및 관련12개 통과.
 
 [최근 복원 수정 포함 설치본 인수](CURRENT-PAIR-RESTORE-ACCEPTANCE-2026-09-09.md) — SB0ff54e2/JARVIS195b1a7 연동4경로 및 실제 설치 CLI 백업1회·복원3회 통과.

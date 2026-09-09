@@ -112,7 +112,8 @@ def _sanitize_markdown(
         if not record_matches:
             raise RestoreInventoryError("RESTORE_SANITATION_FAILED")
         line_start = payload.rfind(b"\n", 0, start) + 1
-        next_newline = payload.find(b"\n", end)
+        # end is exclusive: a terminating newline already belongs to this span.
+        next_newline = payload.find(b"\n", end - 1)
         line_end = len(payload) if next_newline < 0 else next_newline + 1
         intervals.append((line_start, line_end))
     # All offsets refer to the original bytes. Merge overlapping line removals
