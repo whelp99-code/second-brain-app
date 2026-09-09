@@ -8,6 +8,7 @@ import stat
 import tarfile
 from collections.abc import Mapping
 from pathlib import Path
+from tempfile import mkdtemp
 from typing import final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -148,10 +149,7 @@ class GenerationRestoreSanitizer:
         ):
             raise RestoreError("TOMBSTONE_SET_STALE")
         request_key = hashlib.sha256(request.request_id.encode("utf-8")).hexdigest()
-        staging = self.workspace / f"restore-{request_key}"
-        if staging.exists():
-            shutil.rmtree(staging)
-        staging.mkdir(mode=0o700)
+        staging = Path(mkdtemp(prefix=f"restore-{request_key}-", dir=self.workspace))
         try:
             self._extract(request.archive, staging)
             self._verify_manifest(staging, request.archive_manifest)

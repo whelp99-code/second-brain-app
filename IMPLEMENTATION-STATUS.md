@@ -1,3 +1,5 @@
+[관리형 복원 staging 보호](MANAGED-RESTORE-STAGING-2026-09-09.md) — 기존 요청 자료 삭제 재현→고유0700 staging; 성공/실패 보존 포함18개 통과.
+
 [위치 변경·복제된 삭제 대상 복원 수정](RESTORE-RELOCATED-CONTENT-FIX-2026-09-09.md) — 서명 복원3사례, bounded 내용 검사 및 최종 잔존 거부 구현; 관련19개/후속31개(중복8) 통과.
 
 [운영 인수 보류: 위치가 바뀐 삭제 대상 잔존](RESTORE-SHIFTED-CONTENT-HOLD-2026-09-09.md) — inventory 실제 파일 재현에서 대상 잔존인데 blocked_matches=0. 기존 복원 통과 결과를 전체 삭제 보장으로 확대하지 않음.

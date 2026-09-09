@@ -91,3 +91,29 @@ def test_restore_shifted_deleted_record_cannot_survive_signed_restore(
         assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
     finally:
         fixture.executor.close()
+
+
+@pytest.mark.parametrize("invalid_manifest", [False, True])
+def test_managed_restore_preserves_existing_request_staging(
+    tmp_path: Path, invalid_manifest: bool,
+) -> None:
+    import hashlib
+
+    fixture = restore_fixture(tmp_path)
+    try:
+        request_key = hashlib.sha256(fixture.request.request_id.encode()).hexdigest()
+        previous = fixture.sanitizer.workspace / f'restore-{request_key}'
+        previous.mkdir()
+        evidence = previous / 'recovery-evidence.txt'
+        evidence.write_text('other interrupted restore')
+        if invalid_manifest:
+            (fixture.request.archive / 'wiki' / 'unexpected.md').write_text('extra bytes')
+            with pytest.raises(RestoreError, match="RESTORE_ARCHIVE_INVALID"):
+                fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
+        else:
+            _, proof = fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
+            assert proof.scan_errors == 0
+        assert evidence.read_text() == 'other interrupted restore'
+        assert list(fixture.sanitizer.workspace.iterdir()) == [previous]
+    finally:
+        fixture.executor.close()
