@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 인계 추가 분석 갱신:** [최신 수정·연결 순서·클라이언트 지원 증거](HANDOFF-MERGED-PRIORITIES-2026-09-09.md). SB HEAD5201cce와 전체1,367/2skip 기록을 대조하고 수집 회귀13개를 이번에 재실행해 통과했다. 작성 중인 JARVIS MCP 연결부는 미검증으로 구분하며 실제 scoped A→B·운영 전환·삭제/복원 등 M1–M14를 유지한다.
+
 **2026-09-09 OMO/GJC 재개·헤더 우회 수정:** [부분 기록 보존·과거 cursor 거부·독립10프로세스](EXPORT-SESSION-RESUME-2026-09-09.md). 회귀4실패→관련35/전체1,367통과·2skip/231.54초, 정적검사 통과. GJC 첫 헤더를 재검사해 거절된 파일의 append 수집 우회를 차단한다. 운영 변경 없음·전체 M1–M14 유지.
 
 **2026-09-09 Claude 원본 수집 누락 수정:** [native user/assistant·출처/도구 오류·실제 CLI](CLAUDE-NATIVE-COLLECTION-2026-09-09.md). 회귀4실패→관련24/전체1,362통과·2skip/246.29초·Ruff/정적검사. 실제 표본96블록 및 새 Claude 세션2블록 회수·재조회0. 과거 cursor/운영 미변경, 실제 A→B와 전체 M1–M14 유지.
