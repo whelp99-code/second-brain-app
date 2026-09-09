@@ -18,7 +18,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path, PurePosixPath
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Final, cast, override
 
 from sb.config import Config
@@ -294,10 +294,7 @@ def restore_backup(
     _verify_sidecar(archive)
     parent = destination_path.parent
     parent.mkdir(parents=True, exist_ok=True)
-    temporary = parent / f".{destination_path.name}.restore-{os.getpid()}"
-    if temporary.exists():
-        shutil.rmtree(temporary)
-    temporary.mkdir(mode=0o700)
+    temporary = Path(mkdtemp(prefix=f".{destination_path.name}.restore-", dir=parent))
     files = 0
     total = 0
     try:

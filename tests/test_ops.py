@@ -249,6 +249,20 @@ def test_restore_failed_rollback_preserves_original(tmp_path: Path, monkeypatch,
         assert (destination / "new.txt").read_text() == "concurrent content"
 
 
+def test_restore_never_deletes_preexisting_staging(tmp_path: Path) -> None:
+    import os
+    root, _config = _seed_vault(tmp_path)
+    archive = tmp_path / "backup.tar.gz"
+    create_backup(root, archive)
+    destination = tmp_path / "restored"
+    existing = tmp_path / f".restored.restore-{os.getpid()}"
+    existing.mkdir()
+    (existing / "recovery-evidence.txt").write_text("other operation")
+    restore_backup(archive, destination)
+    assert (existing / "recovery-evidence.txt").read_text() == "other operation"
+    assert (destination / "wiki" / "계약-일정.md").is_file()
+
+
 def test_doctor_returns_machine_readable_pass_warn_fail_checks(tmp_path: Path) -> None:
     _root, config = _seed_vault(tmp_path)
 
