@@ -75,6 +75,9 @@ def test_batch_result_persists_after_successful_later_stage(tmp_path: Path, monk
     batch = snapshot['last_batch']
     assert batch['status'] == 'partial' and batch['errors'] == 1
     assert batch['finished_at'] and batch['stages_attempted'] == 2
+    history = next(row for row in snapshot['recent_stages'] if row['stage'] == 'batch')
+    assert history['error'] == ''
+    assert 'selected_run_id' in history['detail']
     with sqlite3.connect(root / '.sb/ledger.db') as conn:
         detail = json.loads(conn.execute("SELECT detail FROM run_stage WHERE stage='batch'").fetchone()[0])
     assert detail['selected_run_id'] == outcome.run_id

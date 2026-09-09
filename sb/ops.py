@@ -455,7 +455,9 @@ def status_snapshot(config: Config) -> dict[str, object]:
                 ):
                     recent_stages.append({
                         "run_id": row[0], "stage": row[1], "status": row[2],
-                        "errors": row[3], "error": _safe_detail(row[4]),
+                        "errors": row[3],
+                        "error": _safe_detail(row[4]) if row[1] != "batch" else "",
+                        "detail": _safe_detail(row[4]) if row[1] == "batch" else "",
                     })
         tables = load_ledger_tables(db)
         for row in tables.derivations.values():
