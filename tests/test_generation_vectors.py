@@ -1,6 +1,7 @@
 """Sealed vector inventory, incremental reuse, and deletion-safe unavailability."""
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from collections.abc import Sequence
 from contextlib import closing
@@ -11,9 +12,11 @@ from typing import final, override
 import pytest
 
 from sb import embeddings
+from sb.bound_knowledge import BoundKnowledge
 from sb.embeddings import EmbeddingUnavailable, ModelIdentity
 from sb.generation_integrity import load_verified_manifest
 from sb.generations import Generation, GenerationStore
+from sb.store.ledger import Ledger
 
 NOW = datetime(2026, 9, 8, tzinfo=UTC)
 ROOT = "sha256:" + "0" * 64
@@ -36,13 +39,19 @@ def _page(*texts: str) -> str:
 
 
 def _build(store: GenerationStore, contents: dict[str, str], parent: Generation | None = None,
-           *, tombstones: int = 0) -> Generation:
+           *, tombstones: int = 0, approved: tuple[str, ...] = ()) -> Generation:
     def materialize(root: Path) -> None:
         (root / "wiki").mkdir(exist_ok=True)
         for path in (root / "wiki").glob("*.md"):
             path.unlink()
         for name, text in contents.items():
             _ = (root / "wiki" / (name + ".md")).write_text(text)
+
+        if approved:
+            with Ledger(root) as ledger:
+                for name in approved:
+                    checksum = 'sha256:' + hashlib.sha256((root / 'wiki' / (name + '.md')).read_bytes()).hexdigest()
+                    ledger.bind_knowledge(BoundKnowledge('wiki/' + name, checksum, 'ACTIVE', 'APPROVED'))
 
     return store.build(request_id="fixture-vector", parent=parent, tombstone_sequence=tombstones,
                        tombstone_set_root=ROOT, created_at=NOW, allowed=lambda path: True,

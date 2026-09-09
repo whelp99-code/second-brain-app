@@ -99,3 +99,11 @@ def test_sealed_binding_readable_in_fresh_process(tmp_path):
         str(generation.root)], capture_output=True, text=True, check=False, timeout=10)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == generation.generation_id
+
+
+def test_old_body_binding_is_not_projected_onto_current_body(tmp_path):
+    from sb.knowledge_registry import KnowledgeState
+    from sb.sealed_knowledge import sealed_knowledge_states
+
+    generation = build(tmp_path, (replace(STATE, content_digest='sha256:' + 'f' * 64),))
+    assert sealed_knowledge_states(generation.root, (KnowledgeState(STATE.page_id, 'ACTIVE', 'APPROVED'),)) == ()

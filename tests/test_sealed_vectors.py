@@ -69,15 +69,17 @@ def test_filters_are_applied_before_semantic_limit(tmp_path: Path, monkeypatch: 
     _ = registry.put("wiki/allowed", knowledge_status="ACTIVE", approval_status="APPROVED", canonical="decision")
     try:
         generation = _build(store, {"hidden": _page("회의는 월요일").replace("status: active", "status: draft"),
-                                    "allowed": _page("회의는 화요일")})
+                                    "allowed": _page("회의는 화요일")}, approved=("allowed",))
         index = SearchIndex(generation.root, hybrid=True, registry_path=registry.path)
         hits = index.search("일정", 1, status="active", scope="active", kinds=("wiki",),
                             updated_from="2026-09-08", updated_to="2026-09-08")
         assert len(hits) == 1 and hits[0].page_id == "wiki/allowed"
-        assert hits[0].canonical == "decision" and hits[0].approval_status == "APPROVED"
+        assert hits[0].canonical == "" and hits[0].approval_status == "APPROVED"
         candidate = index.search("일정", 1, scope="candidate")
         assert len(candidate) == 1 and candidate[0].page_id == "wiki/hidden"
         assert index.search("일정", 1, status="active' OR 1=1 --", scope="reference") == ()
+        _ = registry.put("wiki/allowed", knowledge_status="RETIRED", approval_status="REVOKED")
+        assert index.search("일정", 1, scope="active") == ()
     finally:
         store.close()
 

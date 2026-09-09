@@ -145,6 +145,18 @@ def test_generated_page_updates_across_generations_without_becoming_a_proposal(t
         assert set(rows) == {(first_digest, 'APPROVED'), (second_digest, 'APPROVED')}
     finally:
         connection.close()
+    import subprocess
+    import sys
+
+    result = subprocess.run([sys.executable, '-c',
+        ('from pathlib import Path; import sys; from sb.search import SearchIndex; '
+         'hits=SearchIndex(Path(sys.argv[1]), registry_path=Path(sys.argv[2])).search("second",scope="active"); '
+         'assert len(hits)==1 and hits[0].verification=="VERIFIED"; print(hits[0].page_id)'),
+        str(active.resolve()), str(tmp_path / 'absent-registry.sqlite')],
+        capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == 'wiki/updating'
+    assert not (tmp_path / 'absent-registry.sqlite').exists()
 
 
 def test_repeated_proposals_never_bless_or_overwrite_a_human_edit(tmp_path: Path) -> None:

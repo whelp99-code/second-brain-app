@@ -297,11 +297,12 @@ class SearchIndex:
                     return
                 offset += len(rows)
         else:
+            from sb.sealed_knowledge import sealed_knowledge_states
             from sb.sealed_search import iter_sealed_rows
 
-            states = {state.page_id: state for state in KnowledgeRegistry(
+            states = {state.page_id: state for state in sealed_knowledge_states(root, KnowledgeRegistry(
                 resolve_registry_path(root, self.registry_path)
-            ).read_snapshot()}
+            ).read_snapshot())}
             chosen = _normalize_scope(scope or "reference")
             metadata: dict[str, tuple[str, str, str]] = {}
             with closing(iter_sealed_rows(root, query)) as rows:
@@ -347,7 +348,9 @@ class SearchIndex:
 
         try:
             module = _sealed_vector_module()
-            states = KnowledgeRegistry(resolve_registry_path(root, self.registry_path)).read_snapshot()
+            from sb.sealed_knowledge import sealed_knowledge_states
+
+            states = sealed_knowledge_states(root, KnowledgeRegistry(resolve_registry_path(root, self.registry_path)).read_snapshot())
             return module.query_sealed_cosine(root, query, limit, filters=filters, states=states)
         except (EmbeddingUnavailable, ImportError, OSError):
             _LOGGER.warning("sealed vector retrieval unavailable; using lexical results")

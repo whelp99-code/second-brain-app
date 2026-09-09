@@ -6,16 +6,18 @@ from pathlib import Path
 
 import pytest
 
+from sb.bound_knowledge import BoundKnowledge
 from sb.generations import GenerationStore
 from sb.knowledge_registry import KnowledgeRegistry
 from sb.mcp import build_server
 from sb.search import SearchIndex
+from sb.store.ledger import Ledger
 from sb.vault import init_vault
 from tests.integration.test_task32_schema4 import call, payload
 from tests.knowledge import commit_page
 
 
-def _sealed(tmp_path: Path, pages: dict[str, tuple[str, str, str, str]]) -> Path:
+def _sealed(tmp_path: Path, pages: dict[str, tuple[str, str, str, str]], *, approved: tuple[str, ...] = ()) -> Path:
     store = GenerationStore(tmp_path / "state", tmp_path / "share",
                             provider_instance_id="provider:search", provider_release_sha="a" * 40)
 
@@ -26,6 +28,12 @@ def _sealed(tmp_path: Path, pages: dict[str, tuple[str, str, str, str]]) -> Path
             _ = path.write_text(f"---\nid: {page_id}\ntitle: {title}\nstatus: {status}\n"
                                 + f"updated: {updated}\ncompiled_by: sb/1.0.0|v1|test\nsources:\n---\n\n"
                                 + f"{body}\n\n[^aaaaaaaa]: synthetic:search\n")
+
+        if approved:
+            with Ledger(root) as ledger:
+                for page_id in approved:
+                    checksum = 'sha256:' + hashlib.sha256((root / f'{page_id}.md').read_bytes()).hexdigest()
+                    ledger.bind_knowledge(BoundKnowledge(page_id, checksum, 'ACTIVE', 'APPROVED'))
 
     try:
         generation = store.build(request_id="search-test", parent=None, tombstone_sequence=0,
@@ -49,7 +57,7 @@ def test_sealed_filters_registry_and_final_limit_without_index_writes(tmp_path: 
         "wiki/a": ("공통검색", "active", "2026-09-01", "공통검색 [^aaaaaaaa]"),
         "wiki/b": ("공통검색", "active", "2026-09-07", "공통검색 [^aaaaaaaa]"),
         "wiki/c": ("공통검색", "active", "2026-09-07", "공통검색 [^aaaaaaaa]"),
-    })
+    }, approved=('wiki/c',))
     registry = KnowledgeRegistry(tmp_path / "registry.sqlite")
     _ = registry.put("wiki/b", knowledge_status="CANDIDATE", approval_status="PENDING")
     _ = registry.put("wiki/c", knowledge_status="ACTIVE", approval_status="APPROVED", canonical="decision:c")
@@ -58,7 +66,7 @@ def test_sealed_filters_registry_and_final_limit_without_index_writes(tmp_path: 
     approved = index.search(query, 1, kinds=["wiki"], status="active",
                             updated_from="2026-09-07", updated_to="2026-09-07", scope="active")
     assert len(approved) == 1 and approved[0].page_id == "wiki/c"
-    assert approved[0].verification == "VERIFIED" and approved[0].canonical == "decision:c"
+    assert approved[0].verification == "VERIFIED" and approved[0].canonical == ""
     assert approved[0].updated_at == "2026-09-07" and approved[0].index_status == "active"
     candidates = index.search(query, 1, scope="candidate")
     assert len(candidates) == 1 and candidates[0].page_id == "wiki/b"
@@ -111,10 +119,10 @@ def test_legacy_record_selection_continues_after_a_full_chunk_of_heading_hits(tm
     assert isinstance(result[0], dict) and result[0]["page_id"] == "wiki/b"
 
 
-def _query_corpus(tmp_path: Path, bodies: dict[str, str], sealed: bool) -> Path:
+def _query_corpus(tmp_path: Path, bodies: dict[str, str], sealed: bool, *, approved: tuple[str, ...] = ()) -> Path:
     if sealed:
         return _sealed(tmp_path, {page: ("자료", "active", "2026-09-07", body)
-                                   for page, body in bodies.items()})
+                                   for page, body in bodies.items()}, approved=approved)
     root = tmp_path / "legacy"
     _ = init_vault(root)
     for page, body in bodies.items():
@@ -166,7 +174,7 @@ def test_exact_phrase_precedes_unordered_terms_and_filters_still_apply(
         "wiki/a": "배포 오로라. [^aaaaaaaa]",
         "wiki/z": "오로라 배포는 목요일에 진행하며 기존 릴리스의 근거를 기록한다. [^aaaaaaaa]",
         "conflicts/first": "오로라 배포는 미정이다. [^aaaaaaaa]",
-    }, sealed)
+    }, sealed, approved=("wiki/z",))
     registry = KnowledgeRegistry(tmp_path / "registry.sqlite")
     _ = registry.put("wiki/a", knowledge_status="CANDIDATE", approval_status="PENDING")
     _ = registry.put("wiki/z", knowledge_status="ACTIVE", approval_status="APPROVED")
@@ -234,3 +242,25 @@ def test_mcp_invalid_query_is_tool_error_not_empty_success(tmp_path: Path, query
     assert result.is_error
     assert "SEARCH_QUERY_" in str(result.content)
     assert _hashes(root) == before
+
+
+def test_page_only_approval_cannot_promote_unbound_sealed_content(tmp_path: Path) -> None:
+    root = _sealed(tmp_path, {'wiki/a': ('기억', 'active', '2026-09-07', '기억검증 [^aaaaaaaa]')})
+    registry = KnowledgeRegistry(tmp_path / 'registry.sqlite')
+    _ = registry.put('wiki/a', knowledge_status='ACTIVE', approval_status='APPROVED', source_hash='f' * 64)
+    index = SearchIndex(root, registry_path=registry.path)
+    assert index.search('기억검증', scope='active') == ()
+    assert index.search('기억검증', scope='reference')[0].verification == 'UNVERIFIED'
+
+
+@pytest.mark.parametrize('status,approval', [('RETIRED', 'REVOKED'), ('CANDIDATE', 'PENDING'), ('UNKNOWN', 'UNKNOWN')])
+def test_external_restriction_overrides_compiled_state(tmp_path: Path, status: str, approval: str) -> None:
+    root = _sealed(tmp_path, {'wiki/a': ('기억', 'active', '2026-09-07', '기억검증 [^aaaaaaaa]')}, approved=('wiki/a',))
+    registry = KnowledgeRegistry(tmp_path / 'registry.sqlite')
+    index = SearchIndex(root, registry_path=registry.path)
+    assert index.search('기억검증', scope='active')[0].verification == 'VERIFIED'
+    assert not registry.path.exists()
+    _ = registry.put('wiki/a', knowledge_status=status, approval_status=approval)
+    assert index.search('기억검증', scope='active') == ()
+    hit = index.search('기억검증', scope='reference')[0]
+    assert (hit.knowledge_status, hit.approval_status) == (status, approval)

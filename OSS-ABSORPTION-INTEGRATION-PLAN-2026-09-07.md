@@ -985,3 +985,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 컴파일 지식 상태 연결:** [적용된 Git blob 기록·관리형 수정/proposal/실패 검증](COMPILED-KNOWLEDGE-BINDING-2026-09-10.md). 관련 38 passed/3.71초, Ruff/diff 및 타입 0오류/기존경고1. 검색 연결·외부 철회·출처 없는 문서 정책과 전체 운영 인수는 남는다. 새 상태 세대의 구버전 reader 거부 경계를 유지한다.
+
+
+**2026-09-10 관리형 검색 상태 연결:** [본문 일치 상태·외부 제한 우선·별도 프로세스 회수](SEALED-KNOWLEDGE-SEARCH-2026-09-10.md). 관련 69 passed/12.54초, Ruff/diff와 검색 모듈 타입 0오류/0경고. compile→수정→publication→별도 프로세스 VERIFIED 회수, ID-only 승인/과거 digest 거부, 벡터 철회 제외를 확인했다. 전체 회귀·사용자 업무·정정/삭제/복원·운영 및 M1–M14는 남는다.
