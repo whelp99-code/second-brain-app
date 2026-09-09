@@ -1189,3 +1189,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 상태/복구 최신 전체 통과:** [f323e16 전체1630통과/2skip·350.80초](EFFECT-FULL-PASS-2026-09-10.md). Ruff 전체 및 상태/검색/세대/요청 네 모듈 타입0오류/0경고. 실행 중 소스 불변. 이전 schema fixture 실패 이후 최신 기준선이며 OS 강제 종료·복원/scoped 접근·실제 업무·설치/운영 및 M1–M14는 남는다.
+
+
+**2026-09-10 실제 SIGKILL 상태 복구:** [저장 직전·저장 후 publication 전 종료](EFFECT-KNOWLEDGE-SIGKILL-2026-09-10.md). 소유한 spawn 자식 두 경우 exit=-SIGKILL 확인 후 새 executor의 동일 요청 proved, high water 불변, 남은 승인 사실 회수·staging 제거. 관련13통과/9.22초·Ruff/diff. 전원 손실·다른 경계·복원/scoped 접근·실제 업무/운영 전체 목표는 남는다.
