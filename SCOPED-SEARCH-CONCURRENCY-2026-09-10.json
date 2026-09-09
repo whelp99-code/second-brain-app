@@ -1,0 +1,39 @@
+{
+  "root": "/var/tmp/sb-scoped-scale-tsddrfyc",
+  "pages": 1000,
+  "allowed_pages": 1,
+  "observations": [
+    {
+      "query": "ScaleProbe",
+      "seconds": 5.251279929187149,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "seconds": 5.203432669863105,
+      "rows": 0
+    }
+  ],
+  "peak_process_rss_kib": 58088,
+  "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update",
+  "profile": [
+    {
+      "file": "/home/jm/orca/projects/second-brain-app/sb/search.py",
+      "function": "iter_lexical_hits",
+      "calls": 1001,
+      "cumulative_seconds": 6.0488365790000005
+    },
+    {
+      "file": "/home/jm/orca/projects/second-brain-app/sb/page_metadata.py",
+      "function": "scalar_frontmatter",
+      "calls": 3000,
+      "cumulative_seconds": 3.4757116640000003
+    },
+    {
+      "file": "/home/jm/orca/projects/second-brain-app/sb/page_metadata.py",
+      "function": "frontmatter_value",
+      "calls": 3000,
+      "cumulative_seconds": 3.499423553
+    }
+  ]
+}
