@@ -117,7 +117,7 @@ def source_policy_snapshot(config: Config) -> tuple[dict[str, object], ...]:
         source_id = _text(row.get("id")) or ""
         adapter = _text(row.get("adapter")) or _text(row.get("type")) or ""
         raw_root = _text(row.get("root"))
-        root = None if raw_root is None else str(Path(raw_root).expanduser())
+        root = None if raw_root is None else config.resolve_path(raw_root)
         llm_policy, sensitive = _policies(config, source_id)
         rows.append(
             {

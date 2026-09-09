@@ -250,6 +250,10 @@ class Config:
         resolved = expanded if expanded.is_absolute() else self.base_dir / expanded
         return os.path.abspath(resolved)
 
+    def resolve_path(self, value: str) -> str:
+        """Resolve an explicit path using the loaded configuration's directory."""
+        return self._path(value, self.base_dir)
+
     @property
     def vault_root(self) -> str:
         text = _as_str(self.raw.get("vault_root"))
@@ -422,7 +426,7 @@ class Config:
             copied = dict(item)
             root = copied.get("root")
             if root:
-                copied["root"] = self._path(root, self.base_dir)
+                copied["root"] = self.resolve_path(root)
             normalized.append(copied)
         return normalized
 
