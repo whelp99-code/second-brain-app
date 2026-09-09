@@ -49,7 +49,11 @@ try {
     assert.equal(db.prepare('SELECT count(*) AS n FROM memory_scoped_settlements').get().n, 1);
     assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
     assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
-    console.log(JSON.stringify({ ...observed, outbox: 'settled', candidate: 'settled', control: 'completed',
+    const compact = spawnSync(process.execPath, [join(sb, 'scripts/scoped-compaction-process.mjs'), build, observationPath],
+      { encoding: 'utf8', timeout: 30000 });
+    assert.equal(compact.status, 0, compact.stderr + compact.stdout);
+    const compaction = JSON.parse(compact.stdout);
+    console.log(JSON.stringify({ compaction, ...observed, outbox: 'settled' , candidate: 'settled', control: 'completed',
       settlements: 1, attempts: 1, foreign_key_errors: 0 }, null, 2));
     return;
   }

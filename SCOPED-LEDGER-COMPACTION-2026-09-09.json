@@ -1,0 +1,37 @@
+{
+  "compaction": {
+    "reconstructed_tables": [
+      "memory_scoped_settlements",
+      "memory_scoped_completion_observations",
+      "memory_scoped_outbox_bindings",
+      "memory_outbox",
+      "memory_candidates"
+    ],
+    "target_rows": 0,
+    "source_rows_per_table": 1,
+    "foreign_key_errors": 0,
+    "integrity": "ok",
+    "triggers_restored": true,
+    "control_rows_preserved": true,
+    "source_generation": 1,
+    "result_generation": 2,
+    "physical_content_erasure_tested": false
+  },
+  "atomic_settlement": {
+    "kind": "memory_scoped_settled",
+    "outbox_id": "memout:scoped:v4:7a333a079ad18e7553a277d0272cbb9b6a07553a70846b9a0db6a06128641d45",
+    "receipt_digest": "sha256:0d663e5fc5b28fd38a302e50c856d95ad105595ce40d31cb5c907fb276129e5d",
+    "control_request_id": "memory-dispatch:b93ae1bbcee900c0ba9f7cafbd054cbb709cc5e9937c14d980c77aa2a1376982",
+    "settled_at": "2026-08-31T03:30:00.000Z",
+    "replayed": true
+  },
+  "commit_exit": 73,
+  "independent_replay": true,
+  "provider_calls_on_replay": 0,
+  "outbox": "settled",
+  "candidate": "settled",
+  "control": "completed",
+  "settlements": 1,
+  "attempts": 1,
+  "foreign_key_errors": 0
+}
