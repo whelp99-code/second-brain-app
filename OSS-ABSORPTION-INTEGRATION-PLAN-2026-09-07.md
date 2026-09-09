@@ -976,3 +976,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-09 인계 현재판 재대조:** [최신 수정·개선·고도화 목록](HANDOFF-MERGED-PRIORITIES-2026-09-09.md)과 [실제 모델 관리형 기본 MCP 재시작 회수](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md)를 병합했다. 같은 사실/출처2회 회수, 일반 vault 우회 없음. 실제 업무·다른 모델·운영 및 M1–M14는 남는다.
+
+
+**2026-09-10 관리형 지식 상태 저장 기반:** [본문 digest 결합·원장 v5·검증 및 남은 연결](BOUND-KNOWLEDGE-STORAGE-2026-09-10.md). 관련 71 passed/3.76초, Ruff/diff 통과. 같은 ID의 다른 본문에 상태를 넘기지 않으며 v4 백업·기존 데이터·rollback을 검증했다. 컴파일 기록·세대 digest·검색 연결은 아직 미구현으로, VERIFIED 문제와 전체 운영 인수 완료를 주장하지 않는다. 인계의 세컨드브레인 정본·공통 기억·OSS 선별 흡수 방향과 M1–M14 범위를 유지한다.

@@ -13,6 +13,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Final, Self, cast
 
+from sb.bound_knowledge import BoundKnowledge
 from sb.page_access import PageAccess
 from sb.source_access import (
     SourceAccess,
@@ -41,8 +42,12 @@ from . import (
 )
 
 _HEX: Final = frozenset("0123456789abcdef")
-CURRENT_SCHEMA_VERSION: Final = 4
+CURRENT_SCHEMA_VERSION: Final = 5
 _SCHEMA: Final = (
+    "CREATE TABLE IF NOT EXISTS bound_knowledge ("
+    "page_id TEXT NOT NULL,content_digest TEXT NOT NULL,"
+    "knowledge_status TEXT NOT NULL,approval_status TEXT NOT NULL,"
+    "PRIMARY KEY(page_id,content_digest));"
     "CREATE TABLE IF NOT EXISTS source_item ("
     "source_id TEXT NOT NULL, source_uri TEXT NOT NULL, source_version TEXT NOT NULL, "
     "content_hash TEXT NOT NULL, first_seen_run TEXT NOT NULL, last_seen_run TEXT NOT NULL, "
@@ -542,6 +547,23 @@ class Ledger:
                     "stale running reset",
                 )
         return changed
+
+    def bind_knowledge(self, state: BoundKnowledge) -> None:
+        """Record explicit state for exact bytes; existing bindings are immutable."""
+        with self.transaction():
+            existing = self.knowledge_for(state.page_id, state.content_digest)
+            if existing is not None:
+                if existing != state:
+                    raise ValueError("BOUND_KNOWLEDGE_CONFLICT")
+                return
+            _ = self._exec("INSERT INTO bound_knowledge VALUES (?,?,?,?)",
+                (state.page_id, state.content_digest, state.knowledge_status, state.approval_status))
+
+    def knowledge_for(self, page_id: str, content_digest: str) -> BoundKnowledge | None:
+        row = self._db().execute(
+            "SELECT page_id,content_digest,knowledge_status,approval_status FROM bound_knowledge "
+            "WHERE page_id=? AND content_digest=?", (page_id, content_digest)).fetchone()
+        return None if row is None else BoundKnowledge(*row)
 
     def record_run(self, run: Run) -> None:
         _ = self._exec(
