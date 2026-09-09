@@ -1,3 +1,5 @@
+[웹 기억 저장 중 새 초안 보존](WEB-DRAFT-PRESERVATION-2026-09-09.md) — 실제브라우저 유실재현→4흐름통과, HTTP12개통과.
+
 [관리자 관측 대상UID 지정](DATABASE-OBSERVER-UID-2026-09-09.md) — --uid 및 관측자/대상 분리,10개통과. sudo비대화형 인증불가로 관리자 관측은 미실행.
 
 [운영 DB 접근 거부 단계 진단](DATABASE-DENIAL-STAGES-2026-09-09.md) —17PID 중16 FD목록/1 FD대상·maps, 관련8개 통과; exit2 유지.
