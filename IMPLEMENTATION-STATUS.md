@@ -1,3 +1,5 @@
+> 2026-09-09 배포 후보 개선: [자비스 의존성 내부 복사](CONTAINED-JARVIS-CANDIDATE-2026-09-09.md). 외부 symlink0·내부32, native SQLite 및 설치본 연동4경로 통과. 파일 해시 인벤토리 기록, 운영 봉인/전환은 미완료.
+
 > 2026-09-09 최신 후보 통합: [SB ebe227c + JARVIS e6984ad](CURRENT-INSTALLED-PAIR-2026-09-09.md). 고정 소스 신규 설치/emit, 설치본 연동4경로·실행 파일4프로파일 통과. 후속 전환 기준 후보이며 봉인 운영 배포는 미완료.
 
 > 2026-09-09 전환 관측 수정: [검사 중 DB/sidecar inode 변경 탐지](DATABASE-IDENTITY-RACE-2026-09-09.md). 실제 파일 교체·삭제·WAL 생성 회귀 포함5개 통과. 변경은 exit2, 운영은 읽기 전용 관측만 수행.
