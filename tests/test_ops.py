@@ -385,3 +385,28 @@ def test_failed_details_apply_shared_credential_rules(tmp_path: Path, secret: st
     assert secret not in result
     assert 'owner@example.com' in result
     assert '010-1234-5678' in result
+
+
+def test_status_orders_runs_by_instant_across_timezones(tmp_path: Path) -> None:
+    from sb.store import Run, RunStage
+
+    root, config = _seed_vault(tmp_path)
+    with Ledger(root) as ledger:
+        for name, timestamp in [('older', '2026-09-09T23:00:00+09:00'),
+                                ('newer', '2026-09-09T15:00:00+00:00')]:
+            ledger.record_run(Run(name, timestamp, timestamp, None, 'ok'))
+            ledger.record_stage(RunStage(name, 'compile', timestamp, timestamp, 'ok', 1, 1, 0))
+    with Ledger(root) as ledger:
+        assert [row.run_id for row in ledger.list_runs()] == ['older', 'newer']
+    snapshot = status_snapshot(config)
+    assert snapshot['last_run']['run_id'] == 'newer'
+    assert [row['run_id'] for row in snapshot['recent_stages']] == ['newer', 'older']
+
+
+def test_run_time_keys_preserve_precision_and_legacy_values() -> None:
+    from sb.store import run_time_key
+
+    assert run_time_key('2026-09-09T23:00:00+09:00') == run_time_key('2026-09-09T14:00:00Z')
+    assert run_time_key('2026-09-09T14:00:00') == run_time_key('2026-09-09T14:00:00Z')
+    assert run_time_key('2026-09-09T14:00:00.000001Z') < run_time_key('2026-09-09T23:00:00.000002+09:00')
+    assert run_time_key('invalid') < run_time_key('2026-09-09T14:00:00Z')

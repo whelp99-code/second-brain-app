@@ -24,7 +24,7 @@ from typing import Final, cast, override
 from sb.config import Config
 from sb.pipeline import audit_citations
 from sb.redaction import redact_credentials
-from sb.store import DerivStatus, assert_ledger_integrity, load_ledger_tables
+from sb.store import DerivStatus, assert_ledger_integrity, load_ledger_tables, run_time_key
 from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger, ledger_schema_version, migrate_ledger
 
 BACKUP_FORMAT: Final = "second-brain-backup-v1"
@@ -438,10 +438,11 @@ def status_snapshot(config: Config) -> dict[str, object]:
     recent_stages: list[dict[str, object]] = []
     if db.is_file():
         with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+            conn.create_function("sb_run_time", 1, run_time_key, deterministic=True)
             if conn.execute("SELECT 1 FROM sqlite_master WHERE name='run_stage'").fetchone():
                 for row in conn.execute(
                     "SELECT run_id,stage,status,errors,detail FROM run_stage "
-                    "ORDER BY started_at DESC,run_id DESC LIMIT 10"
+                    "ORDER BY sb_run_time(started_at) DESC,run_id DESC LIMIT 10"
                 ):
                     recent_stages.append({
                         "run_id": row[0], "stage": row[1], "status": row[2],
@@ -463,7 +464,7 @@ def status_snapshot(config: Config) -> dict[str, object]:
                         if row.stage == "brief" else None,
                     }
                 )
-        ordered = sorted(tables.runs.values(), key=lambda row: (row.started_at, row.run_id))
+        ordered = sorted(tables.runs.values(), key=lambda row: (run_time_key(row.started_at), row.run_id))
         for row in ordered:
             runs[row.status] = runs.get(row.status, 0) + 1
         if ordered:

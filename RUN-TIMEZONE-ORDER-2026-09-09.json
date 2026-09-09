@@ -1,0 +1,54 @@
+{
+  "workspace": "/var/tmp/sb-status-timezone-bozdyhl2",
+  "last_run": {
+    "run_id": "newer",
+    "started_at": "2026-09-09T15:00:00+00:00",
+    "finished_at": "2026-09-09T15:00:00+00:00",
+    "git_commit": null,
+    "status": "ok"
+  },
+  "recent_stages": [
+    {
+      "run_id": "newer",
+      "stage": "compile",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    },
+    {
+      "run_id": "older",
+      "stage": "compile",
+      "status": "ok",
+      "errors": 0,
+      "error": ""
+    }
+  ],
+  "synthetic_records": true,
+  "http_status": 200,
+  "http_response": {
+    "status": "no runs",
+    "last_run_status": "ok",
+    "recent_stages": [
+      {
+        "run_id": "newer",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "older",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      }
+    ],
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  }
+}

@@ -37,6 +37,7 @@ from . import (
     load_ledger_tables,
     parse_page_frontmatter,
     require_transition,
+    run_time_key,
 )
 
 _HEX: Final = frozenset("0123456789abcdef")
@@ -556,7 +557,7 @@ class Ledger:
 
     def list_runs(self) -> tuple[Run, ...]:
         rows = list(self._tables.runs.values())
-        rows.sort(key=lambda row: (row.started_at, row.run_id))
+        rows.sort(key=lambda row: (run_time_key(row.started_at), row.run_id))
         return tuple(rows)
 
     def record_stage(self, row: RunStage) -> None:

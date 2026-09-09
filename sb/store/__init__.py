@@ -7,6 +7,7 @@ import sqlite3
 from collections.abc import Iterator, Sequence
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Final, cast, override
@@ -90,6 +91,17 @@ class Derivation:
     error: str | None
     run_id: str | None
     finished_at: str | None
+
+
+def run_time_key(value: str) -> str:
+    """Chronological UTC key; legacy naive timestamps are UTC, invalid ones oldest."""
+    try:
+        stamp = datetime.fromisoformat(value)
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=UTC)
+        return stamp.astimezone(UTC).isoformat(timespec="microseconds")
+    except (TypeError, ValueError, OverflowError):
+        return ""
 
 
 @dataclass(frozen=True, slots=True)
