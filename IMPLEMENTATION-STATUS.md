@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 전송 후 현재 권한→provider 연결:** [상세 수정·검증·남은 우선순위](SCOPED-PROVIDER-AUTHORITY-2026-09-09.md). 기존 원장/원본/소비된 범위 검토와 현재 파일 정책으로 전송 시도를 재검증한다. J 관련 52통과, SB 관련 21통과·전체 Ruff, 격리 emit/lint 통과. 실제 Python 수락·실행에서 정상 proved, 수락 도중 철회는 원장 수락 없음, 실행 전 철회는 활성 세대 없음. 인증 세션은 fixture이며 공개 v4 전송·최종 완료 소비·운영 공통 기억 인수는 남는다.
+
 **2026-09-09 scoped read v3 정확한 접근 분류 연결:** [현재 분류 대조·실제 MCP/기존 v2 인수](SCOPED-READ-V3-ACCESS-2026-09-09.md). 같은 pinned generation에서 승인된 페이지의 전체 source 분류를 반환하고, 자비스가 원래 요청의 단일 출처·owner/projects/policy와 정확히 대조한다. 새 결과 remembered_artifact_observed, v1/v2 계약·기본 v2 유지. SB 전체1,241통과/2skip/224.67초, J 관련74통과/18.16초·타입/lint·격리 패키징. 실제 production 구성→MCP 재시작/다중 프로젝트/양측 정책 철회 검증. durable proof 소비·공개 v4 dispatch·자동 완료·운영 인수는 남는다.
 
 **2026-09-09 자비스 기억 관찰 연결·v4 MCP 읽기 수정:** [실제 MCP 재시작/정책 철회 검증](REMEMBERED-ARTIFACT-MCP-2026-09-09.md). JARVIS readRememberedArtifact가 수락된 요청의 문장·출처를 기존 인증된 read v2로 대조한다. 실제 v4 저장 후 REQUEST_SCHEMA_UNSUPPORTED 읽기 실패를 발견해, 업그레이드/수락/claim 없이 기존 schema를 인식하는 유지보수 모드를 scoped 읽기에 연결했다. SB 전체1,237통과/2skip/215.74초, J 관련53통과/9.62초·타입/lint·격리emit. 재시작 후4레코드 일치, 다중 프로젝트 권한 포함 조회, provider/issuer 정책 철회 거절. 정확한 분류 증거/공개 v4 전송/자동 완료/운영 인수는 남는다.

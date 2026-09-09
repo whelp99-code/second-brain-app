@@ -1,0 +1,37 @@
+{
+  "authenticated_session": "fixture",
+  "authority": "current JARVIS DB and file policy",
+  "transport": "local child processes; internal provider APIs",
+  "public_v4_write": false,
+  "results": [
+    {
+      "mode": "valid",
+      "admission": "accepted",
+      "provider_state": "proved",
+      "authority_processes": 5,
+      "active_generation": true,
+      "dispatch_attempts": 1,
+      "jarvis_settled": false,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "authority_processes": 2,
+      "accepted_row": false,
+      "dispatch_attempts": 1,
+      "jarvis_settled": false,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "admission": "accepted",
+      "provider_state": "failed",
+      "authority_processes": 3,
+      "active_generation": false,
+      "dispatch_attempts": 1,
+      "jarvis_settled": false,
+      "foreign_key_errors": 0
+    }
+  ]
+}
