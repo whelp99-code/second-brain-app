@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 공개 scoped MCP 쓰기 연결:** [고정 계약·별도 MCP→HTTPS→일반 CLI 인수](SCOPED-WRITE-MCP-2026-09-09.md). JARVIS `623afa6`의 scoped-request-write-v1과 SB sb_write_request를 연결했다. 최종 SB 전체1,342통과/2skip/273.05초(embeddings 제외), J 관련49통과·정적검사·패키징 확인. 실제 프로세스 정상 proved, 수락 중 철회/실행 전 철회/로그인 만료 차단. 운영 설정·자격증명·실제 에이전트 A→B 및 전체 M1–M14 인수는 남는다. [인계 병합 최신 우선순위](HANDOFF-MERGED-PRIORITIES-2026-09-09.md)를 현재 판단으로 사용하며 아래 기록은 각 당시 상태다.
+
 **2026-09-09 A1 복구 수정:** [활성화 직후 중단·만료·철회 복구](SCOPED-RESUME-FIX-2026-09-09.md). 수정 전 회귀2실패→관련46통과·전체1,212통과/2skip/221.83초·Ruff/변경 실행기 정적검사 통과. 이전 실패 provider를 새 프로세스로 같은 세대 proved/새 세대0/idle 복구하고 독립 reader 범위 검증. 실제 권한·공개 계약·승인 소비 및 전체 운영 목표는 유지한다.
 
 **2026-09-09 인계 최신 재대조:** [OSS 대조·현재 구현·우선 작업 A1~A10](HANDOFF-ADDITIONAL-ANALYSIS-2026-09-09.md). M2 내부 v4 구현 상태와 전체 검사 기록 갱신. 새 P0: 활성 포인터 저장 직후 종료→만료 후 재개 두 번 모두 reconciling/proof 없음 재현(미수정). 관련42통과/7.59초는 이 중단 결함을 포괄하지 않는다.

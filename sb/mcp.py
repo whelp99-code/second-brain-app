@@ -288,6 +288,11 @@ def build_server(
     """
     desktop = config is not None
     config = load_config() if config is None else config
+    if os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-request-write-v1":
+        from sb.scoped_write_mcp import build_scoped_write_server
+        if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
+            raise ContractProfileError
+        return build_scoped_write_server(config, barrier_sink=barrier_sink)
     root = Path(os.path.abspath(config.vault_root if vault_root is None else vault_root))
     requests = Path(
         config.request_root

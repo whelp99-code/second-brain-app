@@ -1,6 +1,7 @@
 """Actual HTTPS authority checks at provider admission and execution boundaries."""
 import json
 import base64
+import subprocess
 import os
 from contextlib import redirect_stdout
 from io import StringIO
@@ -15,7 +16,7 @@ from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
 from sb.scoped_provider_decision import create_scoped_provider_authority
 from sb.scoped_provider_https import create_scoped_provider_https
-from sb.scoped_request_acceptance import accept_scoped_request
+from sb.scoped_request_acceptance import ScopedWriteAccepted, accept_scoped_request
 from tests.task30_process_harness import executor_config
 
 state = json.loads(Path(sys.argv[1]).read_text())
@@ -23,8 +24,18 @@ now = datetime.fromisoformat(state['at'])
 config = executor_config(Path(state['provider_root']))
 authority = create_scoped_provider_authority(create_scoped_provider_https(Path(state['credentials'])), clock=lambda: now)
 try:
-    accepted = accept_scoped_request(config.request_root, state['request'], expected_provider=config.provider_instance_id,
-        clock=lambda: now, validate_authority=authority)
+    if state.get('admission_surface') == 'mcp':
+        response = subprocess.run([sys.executable, str(Path(__file__).with_name('scoped-write-mcp-admission.py')), sys.argv[1]],
+            capture_output=True, text=True, timeout=50, check=False)
+        assert response.returncode == 0, response.stderr
+        outcome = json.loads(response.stdout)
+        if outcome['kind'] == 'error':
+            raise ValueError('SCOPED_WRITE_AUTHORITY_INVALID')
+        assert outcome['kind'] == 'data'
+        accepted = ScopedWriteAccepted(**outcome['value'])
+    else:
+        accepted = accept_scoped_request(config.request_root, state['request'], expected_provider=config.provider_instance_id,
+            clock=lambda: now, validate_authority=authority)
 except ValueError as error:
     assert state['mode'] == 'revoke_during_accept' and str(error) == 'SCOPED_WRITE_AUTHORITY_INVALID', error
     store = RequestStore(config.request_root, scoped_v4=True)

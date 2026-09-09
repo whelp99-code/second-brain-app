@@ -1,0 +1,87 @@
+{
+  "admission_surface": "mcp",
+  "execution_surface": "cli",
+  "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+  "identity_forwarder": "fixture",
+  "clock": "fixture",
+  "public_mcp_write": true,
+  "results": [
+    {
+      "mode": "valid",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:598fc1ff0c5a7f1b367d0cf05f0ffe443d87c257a7104a46e860cd8859ea09fe",
+        "request_digest": "sha256:598fc1ff0c5a7f1b367d0cf05f0ffe443d87c257a7104a46e860cd8859ea09fe",
+        "idempotency_key": "memidem:scoped:v4:b9e02fb73b5021642a7b9b9626c817146c3ac91125070104791ab7abd8d6c1d7",
+        "scope_digest": "sha256:9649b11b77f3b2743bbbcdc5f774ef10f719a3b2f283a747402e1174a29cfaec",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:598fc1ff0c5a7f1b367d0cf05f0ffe443d87c257a7104a46e860cd8859ea09fe.v4.json",
+        "request_file_digest": "sha256:a09354abdc83c78807930c46ab6f169d7cb3f5dd07017c8e466b01e1c8232f43",
+        "replayed": false
+      },
+      "provider_state": "proved",
+      "active_generation": true,
+      "authority_https_calls": 5,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "accepted_row": false,
+      "authority_https_calls": 2,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:edaadc29fb63b9cb8caf95b2a7285035177bec3761f43a14c5625b53c31fbaef",
+        "request_digest": "sha256:edaadc29fb63b9cb8caf95b2a7285035177bec3761f43a14c5625b53c31fbaef",
+        "idempotency_key": "memidem:scoped:v4:9b4af92091936ce82784ef42ba5640dd9b64e87d954e73c4228408da70bf2892",
+        "scope_digest": "sha256:b4420de57026f18d332da7d0a10b48a5924d2551687dddbac23530ae03c813e5",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:edaadc29fb63b9cb8caf95b2a7285035177bec3761f43a14c5625b53c31fbaef.v4.json",
+        "request_file_digest": "sha256:88c478ef762eb9db4e5f2abb1221c9dd6ae218c4017c8316c6e15878041c19a9",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "expire_before_execute",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:6738273c000609f2e0552615b89104d61b2395bd567c9155f42a6d1f156919b4",
+        "request_digest": "sha256:6738273c000609f2e0552615b89104d61b2395bd567c9155f42a6d1f156919b4",
+        "idempotency_key": "memidem:scoped:v4:cd869d6f15ce6f9b91b443501ceb419302b9bb00291adcf8aeff41b4dd26ff16",
+        "scope_digest": "sha256:0428e49352085d7c52c2e6825fca279ad912304a3ca37fbc48c8db52b6786875",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:6738273c000609f2e0552615b89104d61b2395bd567c9155f42a6d1f156919b4.v4.json",
+        "request_file_digest": "sha256:ab6bd5325c26226eb486be32a1603c2a5a6ba84ae91915ac2db676e4ff9e54e6",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    }
+  ]
+}

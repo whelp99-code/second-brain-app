@@ -275,3 +275,14 @@ SB_CONFIG=/home/jm/.config/second-brain/config.toml sb apply-requests --once
 ```
 
 이 설정은 이미 수락된 scoped 요청의 실행을 연결한다. 공개 MCP scoped 쓰기나 자격증명 공급·회전을 자동 활성화하지 않는다. [CLI 연결과 실제 TLS 검증 범위](SCOPED-PROVIDER-RUNTIME-2026-09-09.md)를 참고한다.
+
+### Scoped V4 쓰기 MCP 프로필
+
+검증기 설정이 있는 별도 서버 설정으로 쓰기 전용 연결을 시작한다. 이 설정에는 `mcp_scoped_read`를 함께 넣지 않는다.
+
+```bash
+SB_CONFIG=/home/jm/.config/second-brain/write-config.toml \
+SB_MCP_CONTRACT_PROFILE=scoped-request-write-v1 sb mcp
+```
+
+이 프로필은 `sb_write_request(request)` 한 개만 제공한다. 자비스는 같은 `scoped-request-write-v1` 전송 프로필과 고정 계약을 선택한다. 응답은 수락 영수증이며, 처리는 `apply-requests --once`, 완료·수락 응답 유실 확인은 별도 `scoped-record-read-v5` 연결을 사용한다. 오류나 연결 종료만으로 미수락을 단정하고 재전송하지 않는다. [계약과 실제 MCP→HTTPS→CLI 검증](SCOPED-WRITE-MCP-2026-09-09.md)을 참고한다.

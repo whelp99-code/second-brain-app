@@ -1,4 +1,4 @@
-"""Internal V4 admission composition; no MCP exposure or implicit authority."""
+"""V4 admission composition; authority is supplied by the explicit provider runtime."""
 import hashlib
 import json
 from collections.abc import Callable
@@ -62,8 +62,8 @@ def accept_scoped_request(root: Path, value: object, *, expected_provider: str,
     """Trusted internal admission port, requiring current authorization twice.
 
     The callback must verify authenticated transport/current policy/consumed scope
-    review. It must not infer authority from hashes or request body labels. No
-    production MCP caller is wired until that concrete verifier is implemented.
+    review. It must not infer authority from hashes or request body labels. The explicit
+    scoped MCP profile and CLI share the configured HTTPS verifier runtime.
     """
     started = clock()
     entry = prepare_scoped_journal_entry(value, now=started, expected_provider=expected_provider)

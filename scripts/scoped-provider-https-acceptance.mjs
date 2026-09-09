@@ -80,7 +80,8 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     writeFileSync(credentials, canonicalize({ origin, cookie_id: cookie, csrf_token: login.body.csrf_token,
       ca_file: join(f.database.root, 'tls-cert.pem') }), { mode: 0o600 });
     const state = join(f.database.root, 'https-state.json');
-    writeFileSync(state, JSON.stringify({ credentials, mode, request: dispatched.request,
+    writeFileSync(state, JSON.stringify({ credentials, mode, node: process.execPath, build,
+      admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', request: dispatched.request,
       execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal',
       at: f.now.toISOString(), provider_root: join(f.database.root, 'provider') }), { mode: 0o600 });
     const result = await new Promise((resolve, reject) => {
@@ -108,5 +109,5 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     writable(f.database.root); closeMemoryDatabase(f.database); rmSync(home.home, { recursive: true, force: true });
   }
 }
-console.log(JSON.stringify({ execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal', transport: 'actual verified TLS, separate Python verifier children and live gateway sessions',
-  identity_forwarder: 'fixture', clock: 'fixture', public_mcp_write: false, results }, null, 2));
+console.log(JSON.stringify({ admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal', transport: 'actual verified TLS, separate Python verifier children and live gateway sessions',
+  identity_forwarder: 'fixture', clock: 'fixture', public_mcp_write: process.argv.includes('--mcp'), results }, null, 2));

@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 공개 scoped MCP 쓰기 연결:** [고정 계약·별도 MCP→HTTPS→일반 CLI 인수](SCOPED-WRITE-MCP-2026-09-09.md). JARVIS `623afa6`의 scoped-request-write-v1과 SB sb_write_request를 연결했다. 최종 SB 전체1,342통과/2skip/273.05초(embeddings 제외), J 관련49통과·정적검사·패키징 확인. 실제 프로세스 정상 proved, 수락 중 철회/실행 전 철회/로그인 만료 차단. 운영 설정·자격증명·실제 에이전트 A→B 및 전체 M1–M14 인수는 남는다. [인계 병합 최신 우선순위](HANDOFF-MERGED-PRIORITIES-2026-09-09.md)를 현재 판단으로 사용하며 아래 기록은 각 당시 상태다.
+
 **2026-09-09 일반 CLI에 scoped 실행 연결:** [명시적 설정·CA FIFO 정지 수정·실제 TLS/CLI](SCOPED-PROVIDER-RUNTIME-2026-09-09.md). apply-requests --once가 서버 고정 credentials_path로 현재 HTTPS 권한 검증기를 구성한다. 원장/claim 전 로컬 설정 검사, FIFO/디렉터리/크기 초과 CA 차단. 최종 전체1,335통과/2skip/303.28초·Ruff/정적검사, 실제 CLI 정상proved·실행 전 철회/로그인 만료 활성 세대 없음. 공개 MCP 쓰기·운영 자격증명/설정·실제 A→B 공유와 전체 인수는 남는다.
 
 **2026-09-09 HTTPS 현재 권한→SB 수락·실행 연결:** [실제 TLS/게이트웨이/별도 Python4시나리오](SCOPED-PROVIDER-HTTPS-2026-09-09.md). 비공개 자격증명·인증서 검사·크기/20초 제한을 갖춘 HTTPS 호출을 기존 판정 소비와 연결했다. 정상proved/수락 중 철회 원장 없음/실행 전 철회·세션 만료 활성 세대 없음, attempt1/FK0. Python76통과·정적검사, J HTTP1통과·emit/lint. 운영 자격증명/실행 설정·공개 쓰기·실제 A→B 공유 및 전체 인수는 남는다.
