@@ -1,3 +1,5 @@
+> 2026-09-09 정본 manifest 결함 수정: [JARVIS195b1a7 루트 파일만 자기 제외](RELEASE-MANIFEST-EXCLUSION-2026-09-09.md). nested 해시 누락 재현→관련7개·lint/별도emit·실제 Node 변경/링크거부 통과. 실제 provenance·provider 외부 실행기 및 운영 봉인은 남음.
+
 > 2026-09-09 최신 검증 기준: [SB997e814 전체1,469통과/2skip·동일 설치본 연동/브라우저 인수](CURRENT-VERIFIED-BASELINE-2026-09-09.md). 전체273.49초, Ruff·실제TLS4경로·MCP4프로파일·설치 웹 Chromium 통과, 종료 후 inventory 일치. 운영 및 전체 목표는 미완료.
 
 > 2026-09-09 복구 대상 잠금: [대상별 외부 inode 잠금·별도 프로세스 거부](RESTORE-DESTINATION-LOCK-2026-09-09.md). 관련68개+복구/준비/백업45개 통과, rename/예외 해제·하드링크 거부 확인. 외부 작성자/중첩 대상/강제 종료 및 운영 인수는 남음.
