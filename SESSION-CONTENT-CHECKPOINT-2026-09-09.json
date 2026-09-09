@@ -1,0 +1,104 @@
+{
+  "baseline": [
+    {
+      "kind": "claude",
+      "mode": "same_size",
+      "missing_new_record": true,
+      "old_collected": []
+    },
+    {
+      "kind": "claude",
+      "mode": "rename",
+      "missing_new_record": true,
+      "old_collected": []
+    },
+    {
+      "kind": "claude",
+      "mode": "rewrite_append",
+      "missing_new_record": true,
+      "old_collected": [
+        "add"
+      ]
+    },
+    {
+      "kind": "codex",
+      "mode": "same_size",
+      "missing_new_record": true,
+      "old_collected": []
+    },
+    {
+      "kind": "codex",
+      "mode": "rename",
+      "missing_new_record": true,
+      "old_collected": []
+    },
+    {
+      "kind": "codex",
+      "mode": "rewrite_append",
+      "missing_new_record": true,
+      "old_collected": [
+        "add"
+      ]
+    }
+  ],
+  "actual": [
+    {
+      "kind": "claude",
+      "independent_processes": 4,
+      "replacement_bodies": [
+        "new"
+      ],
+      "replay_bodies": [],
+      "append_bodies": [
+        "add"
+      ]
+    },
+    {
+      "kind": "codex",
+      "independent_processes": 4,
+      "replacement_bodies": [
+        "new"
+      ],
+      "replay_bodies": [],
+      "append_bodies": [
+        "add"
+      ]
+    }
+  ],
+  "fifo_processes": [
+    {
+      "kind": "claude",
+      "exit": 0,
+      "fifo_rejected": true
+    },
+    {
+      "kind": "codex",
+      "exit": 0,
+      "fifo_rejected": true
+    }
+  ],
+  "prefix_cost": {
+    "bytes_per_prefix": 67108864,
+    "hash_passes": 2,
+    "seconds": 0.08034938992932439,
+    "scope": "single warm local 64 MiB prefix; not whole connector or corpus benchmark"
+  },
+  "tests": {
+    "focused_passed": 34,
+    "focused_seconds": 0.26,
+    "full_passed": 1377,
+    "full_skipped": 2,
+    "full_seconds": 238.71,
+    "embeddings_extra_excluded": true,
+    "ruff": "passed",
+    "basedpyright_errors": 0,
+    "basedpyright_warnings": 0
+  },
+  "operational_changes": false,
+  "limitations": [
+    "legacy offset-only cursors cannot detect changes before first fingerprint",
+    "Codex/Claude only; OMO/GJC and multi-root relative path collisions remain",
+    "full prefix hashing adds read cost",
+    "not full native automatic collection/injection or M1-M14 completion"
+  ]
+}

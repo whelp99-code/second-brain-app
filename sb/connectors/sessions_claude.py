@@ -12,6 +12,12 @@ type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.claude_native import extract_native
+from sb.connectors.session_checkpoint import (
+    CHECKPOINT_KEY,
+    file_revision,
+    prefix_digest,
+    read_checkpoints,
+)
 from sb.contracts import SourceRef
 
 ADAPTER_ID: Final = "claude-sessions"
@@ -42,6 +48,8 @@ class ClaudeSessionsAdapter:
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         previous = _cursor_map(cursor)
         current: dict[str, int] = {}
+        prior_checks = read_checkpoints(cursor)
+        checks: dict[str, str] = {}
         if not self._roots:
             self._next_cursor = "0"
             yield (
@@ -54,17 +62,30 @@ class ClaudeSessionsAdapter:
         for root in self._roots:
             for path in _jsonl_paths(root):
                 rel = path.relative_to(root).as_posix()
-                size = path.stat().st_size
-                start = previous.get(rel, 0)
-                if start > size:
-                    start = 0
-                current[rel] = size
-                if start >= size:
+                # Keep the old checkpoint if an active writer changes the file
+                # during this scan; never publish rows from a mixed revision.
+                old_offset = previous.get(rel, 0)
+                current[rel] = old_offset
+                if rel in prior_checks:
+                    checks[rel] = prior_checks[rel]
+                try:
+                    before = file_revision(path)
+                    size = before[2]
+                    start = old_offset if old_offset <= size else 0
+                    if start and rel in prior_checks and prefix_digest(path, start) != prior_checks[rel]:
+                        start = 0
+                    extracted, consumed = self._read_file(path, rel, start) if start < size else ([], start)
+                    checkpoint = prefix_digest(path, consumed)
+                    if file_revision(path) != before:
+                        items.append(_skip(self.source_id, rel, "unstable-session-file"))
+                        continue
+                except OSError:
+                    items.append(_skip(self.source_id, rel, "unreadable-session-file"))
                     continue
-                extracted, consumed = self._read_file(path, rel, start)
                 current[rel] = consumed
+                checks[rel] = checkpoint
                 items.extend(extracted)
-        self._next_cursor = json.dumps(current, separators=(",", ":"), sort_keys=True)
+        self._next_cursor = json.dumps({**current, CHECKPOINT_KEY: checks}, separators=(",", ":"), sort_keys=True)
         yield from items
 
     def next_cursor(self) -> str:

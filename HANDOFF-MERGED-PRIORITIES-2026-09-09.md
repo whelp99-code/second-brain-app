@@ -97,3 +97,6 @@ P0는 운영 완성의 선행 조건, P1은 안정적 사용의 인수 항목, P
 
 
 [후속 native 작성·회수](NATIVE-SCOPED-WRITE-READ-2026-09-09.md): 같은 Claude 버전의 별도 실행에서 검토된 요청의 실제 쓰기1회→저장/원작업 완료→다른 agent 새 로그인 회수1회를 확인했다. native 제출 단계는 연결됐으며 내용·업무 검증 fixture, 다른 모델 계열·운영·전체 M1–M14 한계를 유지한다.
+
+
+[세션 내용 결합 커서 후속](SESSION-CONTENT-CHECKPOINT-2026-09-09.md): Codex/Claude의 동일크기 교체·읽은 prefix 수정 누락을 수정했다. 전체1,377/2skip과 독립 재개/FIFO 프로세스를 검증했다. 과거 offset만 있는 이력의 소급 복구, OMO/GJC와 다중 root, 운영·전체 M1–M14는 유지한다.
