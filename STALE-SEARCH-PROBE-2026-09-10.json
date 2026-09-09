@@ -1,0 +1,142 @@
+{
+  "state": "measured",
+  "workspace": "/var/tmp/sb-korean-search-tcv1tpby",
+  "started_at": "2026-09-09T18:44:19.670167+00:00",
+  "dataset_id": "korean-stale-decision-probe-v1",
+  "dataset_origin": "synthetic",
+  "provenance": "합성 최신/폐기 결정 동시 검색 노출 검사. 메타데이터 삭제·권한 검증이나 실사용 질의 평가를 대신하지 않는다.",
+  "dataset_sha256": "1cadd4bfe956caede0f1261ed0fec7e3c0645232c30805469a101030d23059d3",
+  "source_tree_sha256": "c3cbe7ce23e12714f9bd119fe8fd0271655585c1c501bf5a4905d9ccbad652ce",
+  "harness_sha256": "c751748461e90d607f1649c5e1322139571bbe73f35b763add74c617ca4e2bbb",
+  "metrics_sha256": "ee44b54bc42b808334c214f9e8787d757eb2ac3807e3bd39e9439053172f9c4f",
+  "commit": "40d5e7fb964fbcf412a547094fcbb4baa0d0530d",
+  "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "load_average_before": [
+    2.02978515625,
+    2.42919921875,
+    2.5966796875
+  ],
+  "documents": 2,
+  "cases": 3,
+  "limit": 5,
+  "min_similarity": -1.0,
+  "limitations": [
+    "isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
+    "single trusted owner at genesis; no scope, supersession or deletion test",
+    "SDK stdio MCP, not agent app injection; hybrid False",
+    "synthetic data cannot replace the real-user 100–300 question acceptance",
+    "small corpus, one pass; latency is diagnostic, not capacity certification"
+  ],
+  "vault_before": "d84d834e960633a3e926e9d02fc6d75ec62c0a9620458ed07d33fcc1ff045afb",
+  "completed_cases": 3,
+  "metrics": {
+    "cli": {
+      "overall": {
+        "forbidden_labeled_cases": 3,
+        "forbidden_exposure_at_5": 0.3333333333333333,
+        "positive_cases": 2,
+        "negative_cases": 1,
+        "hit_at_1": 0.5,
+        "recall_at_5": 0.5,
+        "mrr_at_5": 0.5,
+        "negative_empty_rate": 1.0
+      },
+      "by_kind": {
+        "no_answer": {
+          "forbidden_labeled_cases": 1,
+          "forbidden_exposure_at_5": 0.0,
+          "positive_cases": 0,
+          "negative_cases": 1,
+          "hit_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_5": null,
+          "negative_empty_rate": 1.0
+        },
+        "stale_decision": {
+          "forbidden_labeled_cases": 2,
+          "forbidden_exposure_at_5": 0.5,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 0.5,
+          "recall_at_5": 0.5,
+          "mrr_at_5": 0.5,
+          "negative_empty_rate": null
+        }
+      }
+    },
+    "mcp": {
+      "overall": {
+        "forbidden_labeled_cases": 3,
+        "forbidden_exposure_at_5": 0.3333333333333333,
+        "positive_cases": 2,
+        "negative_cases": 1,
+        "hit_at_1": 0.5,
+        "recall_at_5": 0.5,
+        "mrr_at_5": 0.5,
+        "negative_empty_rate": 1.0
+      },
+      "by_kind": {
+        "no_answer": {
+          "forbidden_labeled_cases": 1,
+          "forbidden_exposure_at_5": 0.0,
+          "positive_cases": 0,
+          "negative_cases": 1,
+          "hit_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_5": null,
+          "negative_empty_rate": 1.0
+        },
+        "stale_decision": {
+          "forbidden_labeled_cases": 2,
+          "forbidden_exposure_at_5": 0.5,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 0.5,
+          "recall_at_5": 0.5,
+          "mrr_at_5": 0.5,
+          "negative_empty_rate": null
+        }
+      }
+    }
+  },
+  "latency": {
+    "cli_search": {
+      "count": 3,
+      "p50_ms": 260.9754581935704,
+      "p95_ms": 266.5180037729442,
+      "max_ms": 266.5180037729442
+    },
+    "mcp_search": {
+      "count": 3,
+      "p50_ms": 34.89848971366882,
+      "p95_ms": 90.59534315019846,
+      "max_ms": 90.59534315019846
+    },
+    "mcp_read": {
+      "count": 2,
+      "p50_ms": 35.8358952216804,
+      "p95_ms": 37.28178795427084,
+      "max_ms": 37.28178795427084
+    }
+  },
+  "generation": {
+    "provider_instance_id": "provider:second-brain:linux",
+    "generation_id": "sbgen:v1:c8b6c1af9830a92941a60773e28dd8407af1ac699b96b14e8c9a89b88b191d3c",
+    "generation_manifest_digest": "sha256:c8b6c1af9830a92941a60773e28dd8407af1ac699b96b14e8c9a89b88b191d3c",
+    "vault_head": "1ec26e634ea1ef270740f310dc7f958d442a0a0d",
+    "vault_tree": "fec3a0977fca2aa42d7609980c332eb2d5b37c9e",
+    "tombstone_sequence": 0,
+    "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+  },
+  "selected_record_checks": 2,
+  "gold_answer_checks": 1,
+  "sealed_files_unchanged": true,
+  "finished_at": "2026-09-09T18:44:21.669116+00:00",
+  "artifact_sha256": {
+    "dataset.json": "1cadd4bfe956caede0f1261ed0fec7e3c0645232c30805469a101030d23059d3",
+    "cli.jsonl": "c3819a08df3715399c6a88d4d37048a07a4c8523cec9780861b6e2f9229d4448",
+    "mcp.jsonl": "04345b0d52f70c92484e27ebe3076fa5882e46c33b4cc83ebfbb27693356e90d",
+    "rankings.jsonl": "d8189af99884aae90e8048ba8ed2a66d4217ce445fa94e02e79cd965c1a54b7d"
+  }
+}

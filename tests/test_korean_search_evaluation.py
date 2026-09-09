@@ -86,3 +86,29 @@ def test_negative_cases_do_not_inflate_positive_recall() -> None:
 def test_missing_or_extra_case_cannot_be_reported_as_complete(rankings: dict[str, list[str]]) -> None:
     with pytest.raises(ValueError, match="exactly one"):
         _ = summarize((Case("p", "keyword", "질문", ("wiki/a",), "근거"),), rankings)
+
+
+def test_perfect_recall_does_not_hide_forbidden_old_decision() -> None:
+    current = Case('p', 'stale_decision', '현재 결정', ('wiki/new',), '최신', ('wiki/old',))
+    report = object_value(summarize((current,), {'p': ['wiki/new', 'wiki/old']})['overall'])
+    assert report['recall_at_5'] == 1
+    assert report['forbidden_exposure_at_5'] == 1
+    clean = object_value(summarize((current,), {'p': ['wiki/new']})['overall'])
+    assert clean['forbidden_exposure_at_5'] == 0
+    unlabeled = Case('u', 'keyword', '질문', ('wiki/a',), '근거')
+    missing = object_value(summarize((unlabeled,), {'u': ['wiki/a']})['overall'])
+    assert missing['forbidden_exposure_at_5'] is None
+    assert missing['forbidden_labeled_cases'] == 0
+
+
+@pytest.mark.parametrize('damage', ['unknown', 'overlap', 'duplicate'])
+def test_forbidden_labels_require_real_disjoint_unique_documents(damage):
+    raw = fixture()
+    first = object_value(array(raw['cases'])[0])
+    expected = array(first['expected_page_ids'])[0]
+    distractor = next(object_value(value)['page_id'] for value in array(raw['documents'])
+                      if object_value(value)['role'] == 'distractor')
+    first['forbidden_page_ids'] = {'unknown': ['wiki/absent'], 'overlap': [expected],
+                                   'duplicate': [distractor, distractor]}[damage]
+    with pytest.raises(ValueError, match='forbidden pages'):
+        load_dataset(raw)

@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "dataset_id": "korean-stale-decision-probe-v1",
+  "dataset_origin": "synthetic",
+  "provenance": "합성 최신/폐기 결정 동시 검색 노출 검사. 메타데이터 삭제·권한 검증이나 실사용 질의 평가를 대신하지 않는다.",
+  "documents": [
+    {
+      "page_id": "wiki/current-backup",
+      "title": "현재 은하 백업 결정",
+      "body": "현재 은하 백업 보관 기간은 21일이다. 과거 7일 결정은 폐기했다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/old-backup",
+      "title": "폐기된 은하 백업 결정",
+      "body": "폐기된 과거 기록: 은하 백업 보관 기간은 7일이다. 이 결정은 더 이상 유효하지 않다.",
+      "role": "distractor"
+    }
+  ],
+  "cases": [
+    {
+      "id": "current",
+      "kind": "stale_decision",
+      "query": "은하 백업 보관 기간",
+      "expected_page_ids": [
+        "wiki/current-backup"
+      ],
+      "answer_span": "21일",
+      "forbidden_page_ids": [
+        "wiki/old-backup"
+      ]
+    },
+    {
+      "id": "current-natural",
+      "kind": "stale_decision",
+      "query": "현재 은하 백업은 며칠 보관해야 하나",
+      "expected_page_ids": [
+        "wiki/current-backup"
+      ],
+      "answer_span": "21일",
+      "forbidden_page_ids": [
+        "wiki/old-backup"
+      ]
+    },
+    {
+      "id": "absent",
+      "kind": "no_answer",
+      "query": "달빛 프로젝트 담당자의 전화번호",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "forbidden_page_ids": [
+        "wiki/old-backup"
+      ]
+    }
+  ]
+}

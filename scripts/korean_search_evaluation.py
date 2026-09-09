@@ -40,6 +40,7 @@ class Case:
     query: str
     expected: tuple[str, ...]
     answer_span: str | None
+    forbidden: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,10 @@ def load_dataset(payload: object) -> Dataset:
         expected = tuple(string(item) for item in array(row.get("expected_page_ids")))
         if len(expected) != len(set(expected)):
             raise ValueError("duplicate expected page")
+        forbidden = tuple(string(item) for item in array(row.get("forbidden_page_ids", [])))
+        if (len(forbidden) != len(set(forbidden)) or set(forbidden).intersection(expected)
+                or any(page not in documents for page in forbidden)):
+            raise ValueError("forbidden pages must be unique, known, and disjoint from gold")
         span = row.get("answer_span")
         if kind == "no_answer":
             if expected or span is not None:
@@ -91,7 +96,7 @@ def load_dataset(payload: object) -> Dataset:
             if not expected or any(page not in documents or documents[page].role != "gold"
                                    or answer not in documents[page].body for page in expected):
                 raise ValueError("gold pages and answer span must exist in fixture bodies")
-        cases.append(Case(case_id, kind, query, expected, answer))
+        cases.append(Case(case_id, kind, query, expected, answer, forbidden))
         ids.add(case_id)
         queries.add(normalized)
     if not documents or not cases:
@@ -120,7 +125,11 @@ def summarize(cases: tuple[Case, ...], rankings: dict[str, list[str]]) -> dict[s
         negative = [score(case, rankings[case.id]) for case in selected if not case.expected]
         means = {key: sum(float(cast(float, row[key])) for row in positive) / len(positive)
                  if positive else None for key in ("hit_at_1", "recall_at_5", "mrr_at_5")}
-        return {"positive_cases": len(positive), "negative_cases": len(negative), **means,
+        restricted = [case for case in selected if case.forbidden]
+        exposures = [bool(set(case.forbidden).intersection(rankings[case.id][:5])) for case in restricted]
+        return {"forbidden_labeled_cases": len(restricted),
+                "forbidden_exposure_at_5": sum(exposures) / len(exposures) if exposures else None,
+                "positive_cases": len(positive), "negative_cases": len(negative), **means,
                 "negative_empty_rate": sum(bool(row["negative_empty"]) for row in negative)
                 / len(negative) if negative else None}
 

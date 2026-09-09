@@ -1288,3 +1288,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 최신 설치 후보 유지관리:** [eea2c23 offline release·설치 CLI SIGKILL 정리·MCP4프로필](INSTALLED-MAINTENANCE-2026-09-10.md). 설치 CLI busy→정리1→재실행0, MCP 초기화/목록 통과. 운영 timer active/마지막exit0이나 sb41f0751·새 옵션 미연결. current/서비스 미변경, 운영 paired 전환과 전체 목표 유지.
 
 **2026-09-10 설치 유지관리 기억 보존:** [세 단계 새 프로세스 검색1건·generation/body/ledger/highwater 동일](INSTALLED-MAINTENANCE-PRESERVATION-2026-09-10.md). 실제 설치 후보 CLI busy→SIGKILL 정리→재실행 인수exit0·Ruff/diff. 합성 reference 기억이며 사용자 업무·운영/전체 목표 유지.
+
+**2026-09-10 검색 폐기 결정 노출 계측:** [forbidden 라벨·미측정 null·실제 CLI/MCP3질의](STALE-SEARCH-PROBE-2026-09-10.md). 회귀20통과, 양쪽 최신+과거 동시 노출 및 자연어 결과0 확인. 합성 본문 최신성/검색 품질 공백이며 삭제 상태·권한 실패로 단정하지 않는다. 제품 개선과 실사용 gold/전체 목표 유지.
