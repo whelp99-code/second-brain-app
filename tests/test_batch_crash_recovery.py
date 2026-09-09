@@ -1,0 +1,53 @@
+"""A new single writer may retire an unfinished batch after the old writer exits."""
+import multiprocessing
+import sqlite3
+from contextlib import closing
+from pathlib import Path
+
+from sb.config import Config
+from sb.ops import status_snapshot
+from sb.pipeline import _run_all_mutable
+from sb.vault import init_vault
+
+
+def _blocked_batch(root: str, ready, release):
+    from sb import pipeline
+
+    def stage(*args):
+        ready.set()
+        release.wait(30)
+        return pipeline.StageReport((), 0, 0, 0, False)
+
+    pipeline._ingest = lambda *args: stage
+    pipeline._run_all_mutable(Config(raw={'vault_root': root, 'sources': []}))
+
+
+def test_killed_batch_is_interrupted_only_after_next_writer_acquires_lock(tmp_path: Path):
+    root = tmp_path / 'vault'
+    init_vault(root)
+    config = Config(raw={'vault_root': str(root), 'sources': []})
+    context = multiprocessing.get_context('spawn')
+    ready, release = context.Event(), context.Event()
+    child = context.Process(target=_blocked_batch, args=(str(root), ready, release))
+    child.start()
+    try:
+        assert ready.wait(10)
+        first = status_snapshot(config)['last_batch']
+        assert first['status'] == 'running' and first['finished_at'] is None
+        assert _run_all_mutable(config).already_running
+        assert status_snapshot(config)['last_batch'] == first
+        child.kill()
+        child.join(10)
+        assert child.exitcode is not None and child.exitcode != 0
+        assert status_snapshot(config)['last_batch']['status'] == 'running'
+        result = _run_all_mutable(config)
+        assert result.status == 'ok'
+        with closing(sqlite3.connect(root / '.sb/ledger.db')) as connection:
+            old = connection.execute('SELECT status,finished_at FROM run_stage WHERE run_id=? AND stage=?',
+                                     (first['run_id'], 'batch')).fetchone()
+        assert old[0] == 'interrupted' and old[1] is not None
+        assert status_snapshot(config)['last_batch']['status'] == 'ok'
+    finally:
+        if child.is_alive():
+            child.kill()
+        child.join(10)

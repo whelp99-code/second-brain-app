@@ -1084,6 +1084,7 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
     outcomes: list[tuple[str, RunOutcome]] = []
     try:
         with Ledger(root) as ledger:
+            ledger.interrupt_stale_batches(started)
             ledger.record_stage(RunStage(batch_id, "batch", started, None, "running", 0, 0, 0))
         try:
             ingest = _run_locked(root, _ingest(config, sources, None), "ingest", config)

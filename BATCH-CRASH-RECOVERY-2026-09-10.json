@@ -1,0 +1,18 @@
+{
+  "workspace": "/var/tmp/sb-crash-acceptance-xo3pytda",
+  "batch_rows": [
+    [
+      "interrupted",
+      "2026-09-09T15:32:20.496378+00:00",
+      "previous writer ended before batch completion"
+    ],
+    [
+      "ok",
+      "2026-09-09T15:32:20.544413+00:00",
+      "{\"selected_run_id\":\"d8d1407cd1cf40d18553da06d7e1d671\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"2590b7b81a154094b975b68c903192ca\",\"status\":\"ok\"},{\"stage\":\"compile\",\"run_id\":\"d8d1407cd1cf40d18553da06d7e1d671\",\"status\":\"ok\"}]}"
+    ]
+  ],
+  "real_child_killed": true,
+  "live_writer_preserved": true,
+  "scope": "ordinary temporary vault, blocked synthetic stage"
+}

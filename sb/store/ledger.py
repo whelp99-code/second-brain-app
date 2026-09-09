@@ -560,6 +560,14 @@ class Ledger:
         rows.sort(key=lambda row: (run_time_key(row.started_at), row.run_id))
         return tuple(rows)
 
+    def interrupt_stale_batches(self, finished_at: str) -> None:
+        """Retire unfinished batches; caller must own the pipeline writer lock."""
+        _ = self._exec(
+            "UPDATE run_stage SET status='interrupted',finished_at=?,detail=? "
+            "WHERE stage='batch' AND status='running' AND finished_at IS NULL",
+            (finished_at, "previous writer ended before batch completion"),
+        )
+
     def record_stage(self, row: RunStage) -> None:
         _ = self._exec(
             "INSERT INTO run_stage VALUES (?,?,?,?,?,?,?,?,?) "
