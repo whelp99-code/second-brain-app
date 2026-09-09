@@ -53,6 +53,13 @@ if (statePath) {
       assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
       assert.equal(db.prepare('SELECT state FROM memory_outbox').get().state, mode === 'revoke_during_accept' ? 'dispatching' : 'reconciling');
       assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+      if (mode === 'valid') {
+        const { verifySecondBrainScopedProof } = await load('src/second-brain-scoped-proof.js');
+        const verified = verifySecondBrainScopedProof(dispatch.request, result.accepted,
+          result.historical_status.proof, result.historical_status.receipt, result.generation, new Date(result.observed_at));
+        assert.equal(verified.kind, 'proof_consistent');
+        result.historical_proof_consistent = true;
+      }
       results.push({ ...result, dispatch_attempts: 1, jarvis_settled: false, foreign_key_errors: 0 });
     } finally {
       const writable = path => { const st = lstatSync(path); if (st.isSymbolicLink()) return;

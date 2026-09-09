@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 scoped 과거 요청 상태 조회:** [쓰기 만료 후 완료 증명·권한 철회 인수](SCOPED-REQUEST-STATUS-2026-09-09.md). 현재 읽기 scope를 전후 검사하고 원래 요청/수락/원장 proof를 대조한다. receipt 파일 없이도 완료 영수증을 원장에서 재구성한다. 실제 별도 reader에서 쓰기 만료 후 조회·읽기 철회 거절·JARVIS proof_consistent 확인. 전체 1,252통과/2skip/212.70초·Ruff·새 모듈 정적검사 통과. 운영 인증 공개 status와 현재 artifact를 결합한 자동 완료는 후속 범위다.
+
 **2026-09-09 전송 후 현재 권한→provider 연결:** [상세 수정·검증·남은 우선순위](SCOPED-PROVIDER-AUTHORITY-2026-09-09.md). 기존 원장/원본/소비된 범위 검토와 현재 파일 정책으로 전송 시도를 재검증한다. J 관련 52통과, SB 관련 21통과·전체 Ruff, 격리 emit/lint 통과. 실제 Python 수락·실행에서 정상 proved, 수락 도중 철회는 원장 수락 없음, 실행 전 철회는 활성 세대 없음. 인증 세션은 fixture이며 공개 v4 전송·최종 완료 소비·운영 공통 기억 인수는 남는다.
 
 **2026-09-09 scoped read v3 정확한 접근 분류 연결:** [현재 분류 대조·실제 MCP/기존 v2 인수](SCOPED-READ-V3-ACCESS-2026-09-09.md). 같은 pinned generation에서 승인된 페이지의 전체 source 분류를 반환하고, 자비스가 원래 요청의 단일 출처·owner/projects/policy와 정확히 대조한다. 새 결과 remembered_artifact_observed, v1/v2 계약·기본 v2 유지. SB 전체1,241통과/2skip/224.67초, J 관련74통과/18.16초·타입/lint·격리 패키징. 실제 production 구성→MCP 재시작/다중 프로젝트/양측 정책 철회 검증. durable proof 소비·공개 v4 dispatch·자동 완료·운영 인수는 남는다.

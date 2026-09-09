@@ -3,7 +3,7 @@ import json
 import subprocess
 import sys
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from sb.request_executor import RequestExecutor
@@ -74,7 +74,33 @@ else:
             assert result.state == 'failed', result
             assert status.proof_json is None
             assert not executor.generations.active_link.exists()
-        print(json.dumps({'mode': mode, 'admission': 'accepted', 'provider_state': result.state,
+        extra = {}
+        if mode == 'valid':
+            later = datetime.fromisoformat(raw['expires_at']) + timedelta(days=1)
+            request_file = Path(root) / 'status-request.json'
+            scope_file = Path(root) / 'read-scope.json'
+            request_file.write_text(json.dumps(raw))
+            scope_file.write_text(json.dumps({'owner': 'principal:owner', 'projects': ['project:a'],
+                'policy_revision': 'policy:1', 'valid_until': (later + timedelta(minutes=1)).isoformat()}))
+            status_args = [sys.executable, str(Path(__file__).with_name('scoped-request-status-reader.py')),
+                str(config.request_root), str(request_file), str(scope_file), later.isoformat()]
+            receipt_path = config.request_root / 'receipts' / f"{accepted.request_id}.json"
+            receipt_path.unlink()  # Read journal completion even if receipt publication is missing.
+            read = subprocess.run(status_args, text=True, capture_output=True, timeout=20, check=False)
+            assert read.returncode == 0, read.stderr + read.stdout
+            historical = json.loads(read.stdout)
+            assert historical['state'] == 'proved'
+            scope_file.write_text('null')
+            denied = subprocess.run(status_args, text=True, capture_output=True, timeout=20, check=False)
+            assert denied.returncode == 1 and json.loads(denied.stdout)['denied'] == 'SCOPED_REQUEST_STATUS_DENIED'
+            manifest = json.loads((executor.generations.active().root / 'generation.json').read_text())
+            extra = {'historical_status': historical, 'accepted': asdict(accepted),
+                'observed_at': later.isoformat(), 'read_after_expiry': True, 'revoked_read_denied': True,
+                'generation': {'provider_instance_id': manifest['provider_instance_id'],
+                    'generation_id': manifest['generation_id'], 'generation_manifest_digest': manifest['generation_digest'],
+                    'vault_head': manifest['head'], 'vault_tree': manifest['tree'],
+                    'tombstone_sequence': manifest['tombstone_sequence'], 'tombstone_set_root': manifest['tombstone_set_root']}}
+        print(json.dumps({**extra, 'mode': mode, 'admission': 'accepted', 'provider_state': result.state,
             'authority_processes': calls, 'active_generation': executor.generations.active_link.exists()}))
     finally:
         executor.close()

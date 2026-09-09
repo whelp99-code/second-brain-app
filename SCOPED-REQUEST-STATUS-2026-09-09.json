@@ -1,0 +1,96 @@
+{
+  "authenticated_session": "fixture",
+  "authority": "current JARVIS DB and file policy",
+  "transport": "local child processes; internal provider APIs",
+  "public_v4_write": false,
+  "results": [
+    {
+      "historical_status": {
+        "schema_version": 4,
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+        "request_digest": "sha256:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+        "scope_digest": "sha256:b0d8484df1f4aa7994fd20264b5cf9ddd9fbc3d1b7a16393726d48ddd6f32190",
+        "state": "proved",
+        "phase": "proved",
+        "updated_at": "2026-08-28T12:00:00.000Z",
+        "proof": {
+          "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "provider_instance_id": "provider:fixture",
+          "request_digest": "sha256:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+          "request_id": "memreq:scoped:v4:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+          "schema_version": 4,
+          "scope_digest": "sha256:b0d8484df1f4aa7994fd20264b5cf9ddd9fbc3d1b7a16393726d48ddd6f32190",
+          "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+        },
+        "receipt": {
+          "schema_version": 4,
+          "request_id": "memreq:scoped:v4:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+          "request_digest": "sha256:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+          "envelope_digest": null,
+          "state": "proved",
+          "code": "PROVIDER_PROVED",
+          "proof_digest": "sha256:7fe17430fdb190f3a5a95f97423c07e7b94b676c77eebe7c7361cdd12f00215a",
+          "status_digest": "sha256:3fa5901b47866cf537743248fbc0c32bf15f0aa3640bbb0f5c0a9b408de01471",
+          "updated_at": "2026-08-28T12:00:00.000Z"
+        }
+      },
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+        "request_digest": "sha256:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c",
+        "idempotency_key": "memidem:scoped:v4:918bf6ea305f6e639ea4c446e8bf6e6a3bf99dfab896f6ad61b5d4063bba47a8",
+        "scope_digest": "sha256:b0d8484df1f4aa7994fd20264b5cf9ddd9fbc3d1b7a16393726d48ddd6f32190",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:f3a89ac786d20e1cd5d77351c29b46a4773933d6c04276ea88c2583c9c21118c.v4.json",
+        "request_file_digest": "sha256:f0d053412caf525f3c8718291ccbd2dadd5feef9ec01d4c6ac6f1b0a22fc5da4",
+        "replayed": false
+      },
+      "observed_at": "2026-08-29T12:00:30+00:00",
+      "read_after_expiry": true,
+      "revoked_read_denied": true,
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "mode": "valid",
+      "admission": "accepted",
+      "provider_state": "proved",
+      "authority_processes": 5,
+      "active_generation": true,
+      "historical_proof_consistent": true,
+      "dispatch_attempts": 1,
+      "jarvis_settled": false,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "authority_processes": 2,
+      "accepted_row": false,
+      "dispatch_attempts": 1,
+      "jarvis_settled": false,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "admission": "accepted",
+      "provider_state": "failed",
+      "authority_processes": 3,
+      "active_generation": false,
+      "dispatch_attempts": 1,
+      "jarvis_settled": false,
+      "foreign_key_errors": 0
+    }
+  ]
+}
