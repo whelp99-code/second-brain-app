@@ -131,11 +131,20 @@ def test_generated_page_updates_across_generations_without_becoming_a_proposal(t
     first = run_compile(config, compiler=stage)
     assert first.exit_code == 0
     first_generation = active.resolve()
+    first_digest = 'sha256:' + hashlib.sha256((active / 'wiki/updating.md').read_bytes()).hexdigest()
     page = PageSpec('updating', 'Updating', f'second [^{digest[:8]}]', page.sources, 'active')
     second = run_compile(config, compiler=stage)
     assert second.exit_code == 0 and active.resolve() != first_generation
     assert 'second' in (active / 'wiki/updating.md').read_text()
     assert not tuple((active / 'wiki/_proposed').glob('*.md'))
+    second_digest = 'sha256:' + hashlib.sha256((active / 'wiki/updating.md').read_bytes()).hexdigest()
+    assert first_digest != second_digest
+    connection = sqlite3.connect(f"file:{active / '.sb' / 'ledger.db'}?mode=ro", uri=True)
+    try:
+        rows = connection.execute("SELECT content_digest,approval_status FROM bound_knowledge WHERE page_id='wiki/updating'").fetchall()
+        assert set(rows) == {(first_digest, 'APPROVED'), (second_digest, 'APPROVED')}
+    finally:
+        connection.close()
 
 
 def test_repeated_proposals_never_bless_or_overwrite_a_human_edit(tmp_path: Path) -> None:
@@ -183,6 +192,12 @@ def test_repeated_proposals_never_bless_or_overwrite_a_human_edit(tmp_path: Path
         assert 'human-edited' in (active / 'wiki/protected.md').read_text()
         assert replacement in (active / 'wiki/_proposed/protected.md').read_text()
         assert marker.read_bytes() == expected_marker
+        connection = sqlite3.connect(f"file:{active / '.sb' / 'ledger.db'}?mode=ro", uri=True)
+        try:
+            rows = connection.execute("SELECT page_id,content_digest FROM bound_knowledge").fetchall()
+            assert rows == [('wiki/protected', 'sha256:' + expected_marker.decode().strip())]
+        finally:
+            connection.close()
 
 
 def test_invalid_compiled_marker_cannot_replace_active_generation(tmp_path: Path) -> None:
@@ -217,3 +232,22 @@ def test_invalid_compiled_marker_cannot_replace_active_generation(tmp_path: Path
             _ = run_compile(config, compiler=stage)
         assert active.is_dir() and not active.is_symlink()
         assert outside.read_text() == 'a' * 64
+
+
+def test_failed_page_write_never_registers_knowledge(tmp_path: Path) -> None:
+    from sb.contracts import PageSpec, SourceCite
+
+    config, active = _config(tmp_path)
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, vault, run_id
+        return StageReport((PageSpec('invalid', 'Invalid', 'missing source [^aaaaaaaa]', [SourceCite('aaaaaaaa', 'inbox:missing', 'a' * 64)], 'active'),), 0, 0, 1, False)
+
+    outcome = run_compile(config, compiler=stage)
+    assert outcome.exit_code == 1
+    assert not (active / 'wiki/invalid.md').exists()
+    connection = sqlite3.connect(f"file:{active / '.sb' / 'ledger.db'}?mode=ro", uri=True)
+    try:
+        assert connection.execute('SELECT COUNT(*) FROM bound_knowledge').fetchone() == (0,)
+    finally:
+        connection.close()

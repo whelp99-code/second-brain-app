@@ -982,3 +982,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 지식 상태 세대 해시 결합:** [구현·변조 검증·이전 reader 호환 경계](GENERATION-KNOWLEDGE-BINDING-2026-09-10.md). 관련 68 passed/4.85초, 새 generation_access 타입 0오류/0경고, Ruff/diff 통과. 임시 봉인 세대 별도 프로세스 읽기와 inventory 갱신 후에도 상태 변조 거부를 확인했다. 컴파일/검색 연결·철회·정정·삭제·복원·운영 및 전체 목표는 남는다.
+
+
+**2026-09-10 컴파일 지식 상태 연결:** [적용된 Git blob 기록·관리형 수정/proposal/실패 검증](COMPILED-KNOWLEDGE-BINDING-2026-09-10.md). 관련 38 passed/3.71초, Ruff/diff 및 타입 0오류/기존경고1. 검색 연결·외부 철회·출처 없는 문서 정책과 전체 운영 인수는 남는다. 새 상태 세대의 구버전 reader 거부 경계를 유지한다.

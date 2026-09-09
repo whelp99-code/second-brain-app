@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Final, Protocol
 from uuid import uuid4
 
+from sb.bound_knowledge import BoundKnowledge
 from sb.config import Config
 from sb.connectors.base import AcknowledgingSourceAdapter, SourceAdapter
 from sb.contracts import Blob, BriefingInputs, PageSpec, SourceRef, Unit
@@ -412,7 +413,7 @@ def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]
 
 
 def _commit_pages(
-    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled, *, project: bool = True, config: Config | None = None
+    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled, *, ledger: Ledger, project: bool = True, config: Config | None = None
 ) -> tuple[str | None, int, int]:
     result = vault.write_pages(
         report.pages,
@@ -422,6 +423,16 @@ def _commit_pages(
         compiled_by=report.compiled_by,
     )
     applied = tuple(page for page in report.pages if page.page_id in result.applied_page_ids)
+    try:
+        with ledger.transaction():
+            for page in applied:
+                relative = git_rel(page.page_id)
+                raw = subprocess.check_output(["git", "-C", str(root), "show",
+                    f"{result.commit or 'HEAD'}:{relative}"], stderr=subprocess.PIPE)
+                ledger.bind_knowledge(BoundKnowledge(relative.removesuffix(".md"),
+                    "sha256:" + hashlib.sha256(raw).hexdigest(), "ACTIVE", "APPROVED"))
+    except (subprocess.CalledProcessError, ValueError) as exc:
+        raise VaultLintError(("COMPILED_KNOWLEDGE_BINDING_FAILED",)) from exc
     compiled.remember(applied)
     _register_compiled(root, applied, project=project, config=config)
     if result.proposals:
@@ -535,6 +546,7 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str, config: Config | No
                     report,
                     rendered.format(len(report.pages), conflicts, errors),
                     compiled,
+                    ledger=ledger,
                     config=config,
                 )
                 _finish_deriv(
@@ -879,6 +891,7 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                     single,
                     f"{run_id} compile {page.page_id}",
                     compiled,
+                    ledger=ledger,
                     project=False,
                     config=config,
                 )
