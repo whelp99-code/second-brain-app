@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from importlib.resources import files
 from typing import Final
 
@@ -85,7 +86,16 @@ def check(
     findings: list[ConflictFinding] = []
     cap = config.caps["max_llm_calls_conflict"]
     for pair in matches:
-        key = deriv_key((pair.left_id, pair.unit_id), "conflict", version, model)
+        # Stable page IDs survive edits; bind cached judgments to the actual
+        # text, temporal routing inputs, and citation provenance as well.
+        input_digest = hashlib.sha256(json.dumps(
+            [[item_id, texts.get(item_id, ""), stamps.get(item_id),
+              [asdict(cite) for cite in evidence.get(item_id, ())]]
+             for item_id in (pair.left_id, pair.unit_id)],
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode()).hexdigest()
+        key = deriv_key(("conflict-inputs-v2", pair.left_id, pair.unit_id, input_digest),
+                        "conflict", version, model)
         row = ledger.get_derivation(key)
         if row is not None and row.status == DerivStatus.DONE.value:
             findings.append(_with_lineage(_restore(row, pair, evidence), version, model, key))

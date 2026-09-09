@@ -280,3 +280,17 @@ def test_check_fills_pair_slots_and_uses_json_mode_once_per_pair(
         assert slot not in prompt
     assert type(found) is list
     assert any(item.route == "conflict" and item.page is not None for item in found)
+
+
+def test_changed_page_body_invalidates_judgment(ledger: Ledger, config: Config, unit: Unit):
+    from dataclasses import replace
+
+    page = _dated_page('wiki/same', ORIGIN_OLD, '2026-08-01', TEXT_STATIC)
+    llm = RecordingLLM(_verdict('unrelated', 1.0, 'test', []))
+    assert check([unit], [page], ledger, llm, config)
+    first = llm.calls
+    check([unit], [page], ledger, llm, config)
+    assert llm.calls == first
+    changed = replace(page, body_md=page.body_md + '\n정정된 추가 사실입니다.')
+    assert check([unit], [changed], ledger, llm, config)
+    assert llm.calls == first + 1

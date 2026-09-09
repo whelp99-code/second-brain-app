@@ -1,3 +1,5 @@
+[충돌 판정 입력 내용 결합](CONFLICT-CONTENT-IDENTITY-2026-09-09.md) — 같은 page ID 정정 후 캐시 재사용 결함 재현→본문·시점·출처 hash로 재판정, 관련72개 통과. 옛 키 운영 정리·재판정 비용 인수는 남음.
+
 [충돌 복구 후 반복 실행](CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md) — 실제 HTTP 모델 호출0·pages0·실패0, 회귀에서 Git HEAD와 충돌 원장 불변 확인.
 
 [컴파일 완료 후 충돌 재시도](CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md) — 기존 페이지 비교 입력 유지, 실제 같은 vault 실패1→0·재제출 없음, 동일 키 done/attempts+1 포함 관련71개 통과.
