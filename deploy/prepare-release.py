@@ -6,18 +6,20 @@ Uncommitted and untracked files are excluded; commit intended changes first.
 Usage: python deploy/prepare-release.py [app-root]
 Activation is an atomic replacement of app-root/current after validation.
 """
+import argparse
 import hashlib
 import json
 import os
 from pathlib import Path
 import shlex
 import subprocess
-import sys
 import tempfile
 import tarfile
 
 repo = Path(__file__).resolve().parent.parent
-app = Path(sys.argv[1]).expanduser().absolute() if len(sys.argv) > 1 else Path.home() / '.local/state/second-brain/app'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('app_root', nargs='?', type=Path, default=Path.home() / '.local/state/second-brain/app')
+app = parser.parse_args().app_root.expanduser().absolute()
 os.umask(0o077)
 
 def run(*args):
