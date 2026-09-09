@@ -46,3 +46,20 @@ def test_mismatched_migrations_rejected_before_database_open(tmp_path, monkeypat
     )
     with pytest.raises(ValueError, match="REHEARSAL_MIGRATIONS_DIFFER_FROM_BUILD"):
         module.main()
+
+
+@pytest.mark.parametrize('orphan', [False, True])
+def test_restored_health_checks_foreign_keys_even_when_database_opens(tmp_path, orphan):
+    import runpy
+    import sqlite3
+
+    module = runpy.run_path(str(SCRIPT))
+    path = tmp_path / 'restored.sqlite'
+    with sqlite3.connect(path) as connection:
+        connection.execute('CREATE TABLE parent(id INTEGER PRIMARY KEY)')
+        connection.execute('CREATE TABLE child(parent_id INTEGER REFERENCES parent(id))')
+        if not orphan:
+            connection.execute('INSERT INTO parent VALUES(1)')
+        connection.execute('INSERT INTO child VALUES(1)')
+    result = module['database_health'](path)
+    assert result == {'integrity_ok': True, 'foreign_key_errors': int(orphan)}

@@ -55,6 +55,14 @@ def migration_identity(root):
             for path in sorted(root.glob("*.sql"))}
 
 
+def database_health(path):
+    with closing(readonly(path)) as connection:
+        connection.execute("BEGIN")
+        integrity_ok = connection.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
+        foreign_key_errors = sum(1 for _row in connection.execute("PRAGMA foreign_key_check"))
+    return {"integrity_ok": integrity_ok, "foreign_key_errors": foreign_key_errors}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-db", required=True, type=Path)
@@ -183,6 +191,7 @@ try {
             rollback_check = {
                 "previous_binary_accepts_restored_database": json.loads(restored_probe.stdout)["accepted_upgraded_database"],
                 "original_inventory_preserved": inventory(restored) == before,
+                **database_health(restored),
                 "scope": "pre-upgrade snapshot restored to separate private file; post-upgrade writes not preserved",
             }
         observed_counts = {name: before[name]["rows"] for name in
@@ -196,7 +205,9 @@ try {
         if previous_check is not None and previous_check["accepted_upgraded_database"]:
             hold_reasons.append("PREVIOUS_BINARY_ACCEPTS_UPGRADED_DATABASE")
         if rollback_check is not None and (not rollback_check["previous_binary_accepts_restored_database"]
-                                          or not rollback_check["original_inventory_preserved"]):
+                                          or not rollback_check["original_inventory_preserved"]
+                                          or not rollback_check["integrity_ok"]
+                                          or rollback_check["foreign_key_errors"]):
             hold_reasons.append("PRE_UPGRADE_SNAPSHOT_ROLLBACK_FAILED")
         if initial_fk or upgrade["foreign_key_errors"]:
             hold_reasons.append("FOREIGN_KEY_ERRORS")

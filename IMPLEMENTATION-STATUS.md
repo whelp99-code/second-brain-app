@@ -1,3 +1,5 @@
+> 2026-09-09 복구 검사 보강: [복원 DB 무결성·외래 키 검사](ROLLBACK-DATABASE-HEALTH-2026-09-09.md). 정상/깨진 참조 회귀 포함5개 통과, 실제 복원 사본 integrity ok/FK0. 혼합 버전 hold 유지.
+
 > 2026-09-09 리허설 보강: [최신 후보 이전 및 이전 DB 스냅샷 복원](SNAPSHOT-ROLLBACK-REHEARSAL-2026-09-09.md). 58→81/기존212테이블 보존, 복원본 구버전 수용·원래 inventory 일치. 새 DB 구버전 수용 때문에 최종hold 유지, 운영 미변경.
 
 > 2026-09-09 후보 의존성 검증: [런타임 전체161개 설치 경로](RUNTIME-DEPENDENCY-CLOSURE-2026-09-09.md)의 버전이 lock과 일치. npm ls 전체300참조·problems없음/exit0, 네트워크·운영 변경 없음.
