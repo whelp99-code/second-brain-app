@@ -1,6 +1,7 @@
 // Client-facing TLS forwarder is a test identity mapper, not a production proxy.
 import assert from 'node:assert/strict';
 import { acceptOmoNativeMemory } from './omo-native-memory-acceptance.mjs';
+import { parseInsufficientEvidenceAnswer } from './native-answer-validation.mjs';
 import { createServer } from 'node:https';
 import { request } from 'node:http';
 import { execFile, spawnSync } from 'node:child_process';
@@ -101,14 +102,7 @@ export async function acceptPhoneMemoryClient({ build, root, port, identity, ori
       assert(events.some(event => event.type === 'result' && event.subtype === 'success' && !event.is_error));
       if (abstention) {
         const final = events.find(event => event.type === 'result' && event.subtype === 'success');
-        const answerText = final.result.trim();
-        const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(answerText);
-        nativeAnswer = JSON.parse(fenced ? fenced[1] : answerText);
-        nativeAnswer.raw_response = answerText;
-        assert.equal(nativeAnswer.status, 'insufficient_evidence');
-        assert.equal(nativeAnswer.value, null);
-        assert.equal(typeof nativeAnswer.explanation, 'string');
-        assert(nativeAnswer.explanation.trim());
+        nativeAnswer = parseInsufficientEvidenceAnswer(final.result);
       }
       nativeVersion = (await promisify(execFile)('claude', ['--version'])).stdout.trim();
       if (nativeMode === '1') {

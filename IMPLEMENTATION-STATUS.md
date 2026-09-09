@@ -1,3 +1,5 @@
+> 2026-09-09 검증기 수정: [native 응답 전체 형식 검사](NATIVE-ANSWER-VALIDATION-2026-09-09.md). JSON 바깥 모순 문장을 버리던 검사 누락 재현·수정. 3개 테스트·실제 응답 재생 통과, 의미적 품질 평가는 별도.
+
 > 2026-09-09 실제 모델 후속: [JARVIS f0394b9 제외 카운트 범위 안내](NATIVE-OMISSION-SCOPE-2026-09-09.md). 새 빌드 실제 Claude1회에서 IP 미추정 및 카운트가 검색 완전성을 증명하지 않음 명시. 통합15개·별도 빌드·4경로 통과, 단일 사례에 한정.
 
 > 2026-09-09 실제 native 답변 검사: [Claude 1회 근거 부족 응답](NATIVE-ABSTENTION-2026-09-09.md). IP 값 추정 없이 insufficient_evidence/null, 4경로 통과. 설명의 omission=0 완전성 추론은 미흡으로 기록, 전체 품질 합격 아님.
