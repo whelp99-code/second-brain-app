@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from importlib.resources import files
 from typing import Final
@@ -68,7 +68,7 @@ class ConflictFinding:
 
 def check(
     units: Sequence[Unit], pages: Sequence[PageSpec], ledger: Ledger, llm: LLMClient, config: Config,
-    *, finalize: bool = True,
+    *, finalize: bool = True, on_capped: Callable[[], None] | None = None,
 ) -> list[ConflictFinding]:
     units = protect_units(list(units), config)
     matches = lexical_top(units, pages)
@@ -100,6 +100,8 @@ def check(
         if row is not None and row.status == DerivStatus.DONE.value:
             findings.append(_with_lineage(_restore(row, pair, evidence), version, model, key))
         elif used >= cap:
+            if on_capped is not None:
+                on_capped()
             continue
         else:
             if row is not None and row.status == DerivStatus.FAILED.value:

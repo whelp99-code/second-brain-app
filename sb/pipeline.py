@@ -914,11 +914,16 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
         except ModuleNotFoundError:
             checker = None
         if checker is not None:
+            def conflict_limit_reached() -> None:
+                nonlocal capped
+                capped = True
+
             # Cached compilation must not remove pages needed to retry a failed
             # conflict judgment. Fresh page bodies take precedence over old ones.
             comparison_pages = {**existing, **{page.page_id: page for page in kept}}
             for finding in checker(
                 units, list(comparison_pages.values()), ledger, llm, config, finalize=False,
+                on_capped=conflict_limit_reached,
             ):
                 if finding.failure is not None:
                     errors += 1

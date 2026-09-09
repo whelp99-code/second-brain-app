@@ -234,7 +234,9 @@ def test_max_llm_calls_conflict_caps_invocations(
     """Given more lexical matches than max_llm_calls_conflict, when checked, then LLM calls are capped."""
     units = [unit, *[_unit(f"c{i}", TEXT_STATIC) for i in range(5)]]
     llm = FakeLLM([_verdict("unrelated", 0.1, "", [])] * 5)
-    found = check(units, EMPTY_PAGES, ledger, llm, config)
+    limits: list[bool] = []
+    found = check(units, EMPTY_PAGES, ledger, llm, config, on_capped=lambda: limits.append(True))
+    assert limits
     assert type(found) is list
     assert llm.calls <= config.caps["max_llm_calls_conflict"]
 

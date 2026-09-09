@@ -870,6 +870,7 @@ def test_compile_routes_conflict_pages_through_vault(
         config: Config,
         *,
         finalize: bool = True,
+        on_capped: Callable[[], None] | None = None,
     ) -> list[ConflictFinding]:
         del units, pages, ledger, llm, config, finalize
         verdict = ConflictVerdict("contradicts", 0.9, "clash")
@@ -960,6 +961,7 @@ def test_second_sb_run_exit0_no_new_commit_when_source_items_unchanged(
         config: Config,
         *,
         finalize: bool = True,
+        on_capped: Callable[[], None] | None = None,
     ) -> list[PageSpec]:
         del units, pages, ledger, llm, config, finalize
         return []

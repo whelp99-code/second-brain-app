@@ -1,0 +1,47 @@
+{
+  "workspace": "/var/tmp/sb-web-success-hnkbrssb",
+  "receipt": {
+    "inbox_path": "inbox/2026-09-09T135315154073-합성기억정상경로.md"
+  },
+  "outcome": {
+    "run_id": "d62b1646b4084a99945cbbcdade2b567",
+    "status": "capped",
+    "pages": 1,
+    "conflicts": 0,
+    "errors": 0,
+    "exit_code": 0,
+    "already_running": false,
+    "failure": null
+  },
+  "status": {
+    "status": "2026-09-09T22:53:15.466348+09:00 run cb7851e65f0c4c5bbd17ce108fd56243 ok pages=1 conflicts=0 errors=0",
+    "last_run_status": "ok",
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  },
+  "search": {
+    "results": [
+      {
+        "page_id": "daily/2026-09-09",
+        "section": "오늘의 추천",
+        "snippet": "합성기억정상경로 e...",
+        "score": 0.4953225974563997,
+        "kind": "daily",
+        "index_status": "active",
+        "knowledge_status": "ACTIVE",
+        "approval_status": "APPROVED",
+        "canonical": "",
+        "source_ref": "",
+        "updated_at": "2026-09-09",
+        "role": "CANONICAL",
+        "verification": "VERIFIED"
+      }
+    ]
+  },
+  "model": "deterministic local stand-in",
+  "mocked_http": false
+}
