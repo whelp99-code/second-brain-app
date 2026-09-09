@@ -55,11 +55,29 @@ try {
   const db = f.database.authority.db;
   assert.equal(db.prepare('SELECT count(*) AS n FROM memory_scoped_completion_observations').get().n, 1);
   assert.equal(observed.durable_observation.replayed, true);
+  const proofInput = { database: f.database.path, spoolRoot: f.options.spoolRoot,
+    observation_id: observed.durable_observation.observation_id, at: new Date(late.getTime() + 60000).toISOString() };
+  const proofPath = join(f.database.root, 'proof-reader.json');
+  const proofRun = provider => {
+    writeFileSync(proofPath, JSON.stringify({ ...proofInput, provider }), { mode: 0o600 });
+    return spawnSync(process.execPath, [join(sb, 'scripts/scoped-completion-proof-process.mjs'), build, proofPath],
+      { encoding: 'utf8', timeout: 30000 });
+  };
+  const proofRead = proofRun('provider:fixture');
+  assert.equal(proofRead.status, 0, proofRead.stderr + proofRead.stdout);
+  const reconstructed = JSON.parse(proofRead.stdout);
+  assert.equal(reconstructed.kind, 'completion_evidence_consistent');
+  assert.equal(reconstructed.evidence_digest, observed.durable_observation.evidence_digest);
+  assert.equal(reconstructed.historical_authority_expired, true);
+  const wrongProvider = proofRun('provider:other');
+  assert.equal(wrongProvider.status, 1);
+  assert.equal(JSON.parse(wrongProvider.stdout).rejected, 'SCOPED_COMPLETION_EVIDENCE_INVALID');
+
   assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
   assert.equal(db.prepare("SELECT count(*) AS n FROM memory_reconciliation_events WHERE event_type='provider_accepted'").get().n, 1);
   assert.equal(db.prepare('SELECT state FROM memory_outbox').get().state, 'reconciling');
   assert.equal(claimMemoryScopedOutbox({ ...options, clock: () => late }, r.outbox_id, 'worker:repeat', 1000), undefined);
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
-  console.log(JSON.stringify({ durable_observations: 1, reconciliation_lease: reconciliation.lease, lease_preserved_across_acceptance_recovery: true, observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
+  console.log(JSON.stringify({ reconstructed, independent_proof_readers: 2, wrong_provider_rejected: true, durable_observations: 1, reconciliation_lease: reconciliation.lease, lease_preserved_across_acceptance_recovery: true, observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
     record_commit_exit: 73, record_processes: 3, replay_idempotent: true, redispatch: false, jarvis_state: 'reconciling', foreign_key_errors: 0 }, null, 2));
 } finally { closeMemoryDatabase(f.database); }
