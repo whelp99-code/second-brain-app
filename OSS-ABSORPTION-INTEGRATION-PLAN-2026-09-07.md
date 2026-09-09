@@ -1099,3 +1099,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 실제 runtime backup 정제 호환 수정:** [recovery 경로 미지원 재현→제어 사본 집계/제외·실제 sanitizer 통과](RUNTIME-BACKUP-SANITATION-2026-09-10.md). 관련19통과·최종확장1통과/0.90초·Ruff/diff·타입0오류0경고. 기억 보존/active 불변, 제어 journal 자동승계 없음. 원장소실DR/운영 전체 목표는 남는다.
+
+
+**2026-09-10 실제 runtime archive 자비스 복원:** [copytree 대체→runtime tar/해제→삭제·동시scoped조회·재삭제/재복원](JARVIS-RUNTIME-BACKUP-2026-09-10.md). 최종exit0·제어journal존재/복원제외·최종highwater2/결과0·Ruff/diff. stale외부사본 fixture이며 managedbackup 처분/운영DR 전체 인수는 남는다.

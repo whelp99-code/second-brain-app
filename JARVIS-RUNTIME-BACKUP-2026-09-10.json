@@ -1,0 +1,89 @@
+{
+  "root": "/var/tmp/sb-jarvis-restore-o8Dpac",
+  "backup": {
+    "source_generation_id": "sbgen:v1:c02c7a48eb8ae09f5c6e05118841ba034ea9e14056f1f68253547d96f673d5f1",
+    "format": "runtime-backup",
+    "control_journals_present": true
+  },
+  "deleted": {
+    "request_id": "memeff:req:v2:cbd19dcf4d76ffa2260ced20291d75b17be54c853f5019044e302a813a5ab74f",
+    "provider_state": "proved",
+    "proof_id": "sbproof:v1:73aa8a8315e11465a0d44ab457acfa5489b122fa634cb7323f124c8010924c25",
+    "observation_kind": "deletion",
+    "tombstone_sequence": 1
+  },
+  "restored": {
+    "generation_id": "sbgen:v1:0dc45e6591deaf05e5acfb4c73c9f3909533a8cd1733a3dde7ade8b10e54834a",
+    "surviving_page_id": "wiki/memory-85498686fbeb4186e809ea0d51d8e0cb4dc74dea25dc8c787c94d5d947a37094",
+    "tombstone_sequence": 1,
+    "tombstone_set_root": "sha256:7d0287cc632b4b654f725ffa7331281d09ade1cb90f8a3091a39e40d8218746e",
+    "blocked_matches": 0,
+    "scan_errors": 0
+  },
+  "scoped": {
+    "agent": "agent:restore",
+    "session": "session:restore",
+    "generation": {
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:0dc45e6591deaf05e5acfb4c73c9f3909533a8cd1733a3dde7ade8b10e54834a",
+      "generation_manifest_digest": "sha256:0dc45e6591deaf05e5acfb4c73c9f3909533a8cd1733a3dde7ade8b10e54834a",
+      "vault_head": "07ea19ff95229bfc6657d280415de37bf6ed07a3",
+      "vault_tree": "7f2d6ab656783abdbec55d428dbf05d321f32e49",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:7d0287cc632b4b654f725ffa7331281d09ade1cb90f8a3091a39e40d8218746e"
+    },
+    "page_content_digest": "sha256:bce28cf60831989166a99f29ba7e31f74e022ee79d4e5438c462103b3c057483",
+    "profile": "scoped-record-read-v3",
+    "allowed_pages": 1,
+    "restricted_pages": 0,
+    "withdrawal_denied": true,
+    "post_response_withdrawal_denied": true,
+    "intercepted_response_count": 2,
+    "restored_policy_resumes": true
+  },
+  "peer": {
+    "agent": "agent:restore-peer",
+    "session": "session:restore-peer",
+    "generation": {
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:0dc45e6591deaf05e5acfb4c73c9f3909533a8cd1733a3dde7ade8b10e54834a",
+      "generation_manifest_digest": "sha256:0dc45e6591deaf05e5acfb4c73c9f3909533a8cd1733a3dde7ade8b10e54834a",
+      "vault_head": "07ea19ff95229bfc6657d280415de37bf6ed07a3",
+      "vault_tree": "7f2d6ab656783abdbec55d428dbf05d321f32e49",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:7d0287cc632b4b654f725ffa7331281d09ade1cb90f8a3091a39e40d8218746e"
+    },
+    "page_content_digest": "sha256:bce28cf60831989166a99f29ba7e31f74e022ee79d4e5438c462103b3c057483",
+    "profile": "scoped-record-read-v3",
+    "allowed_pages": 1,
+    "restricted_pages": 0,
+    "withdrawal_denied": true,
+    "post_response_withdrawal_denied": true,
+    "intercepted_response_count": 2,
+    "restored_policy_resumes": true
+  },
+  "deleted_after_restore": {
+    "request_id": "memeff:req:v2:20201abddd35bebaf9d5637c0143bc82237f0f2b98a7cbcd9e29d9b6909e2e34",
+    "provider_state": "proved",
+    "proof_id": "sbproof:v1:0b773527473c892c1965acc67c6c5b4776362f0ffc96c2959070d2da22cd7409",
+    "observation_kind": "deletion",
+    "tombstone_sequence": 2
+  },
+  "restored_again": {
+    "generation_id": "sbgen:v1:dd6c89ed36ad085762a61c2deb00188c38ac65519254753438a178b2accefd74",
+    "surviving_page_id": null,
+    "tombstone_sequence": 2,
+    "tombstone_set_root": "sha256:2d1d455b49fa179a10e8dbe707d9e33e5589f302f3fc533c7d15022250b8267f",
+    "blocked_matches": 0,
+    "scan_errors": 0
+  },
+  "second_restore_records": 0,
+  "concurrent_clients": 2,
+  "independent_revocations": 2,
+  "shared_restored_memory_equal": true,
+  "jarvis_owned_high_water": 2,
+  "deleted_records": 0,
+  "first_restore_surviving_records": 1,
+  "model_calls": 0,
+  "scope": "Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance"
+}
