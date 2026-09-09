@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -35,7 +36,7 @@ def read_root(config: Config) -> Generator[Path, None, None]:
 def read_config(config: Config) -> Generator[Config, None, None]:
     """Preserve configuration while binding every vault lookup to one reader pin."""
     with read_root(config) as root:
-        yield Config(raw={**config.raw, "vault_root": str(root)})
+        yield replace(config, raw={**config.raw, "vault_root": str(root)})
 
 
 def mutate_root[T](config: Config, operation: GenerationOperation, apply: Callable[[Path], T]) -> T:

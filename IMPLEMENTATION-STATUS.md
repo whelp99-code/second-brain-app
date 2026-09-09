@@ -1,3 +1,5 @@
+> 2026-09-09 CLI 설정 경로 수정: [read_config의 base_dir/source_path 보존](CLI-CONFIG-PATH-PRESERVATION-2026-09-09.md). 수정 전2회귀 실패→관련55개 통과, 별도 실제 CLI 원본 폴더 진단 pass, Ruff/정적0오류0경고. 운영·개별 진단 표면 전체 인수는 남음.
+
 > 2026-09-09 전체 회귀 및 상태 세대 수정: [a87a73d 전체1,457통과/2skip·HTTP pin 무시 재현/수정](WEB-STATUS-PIN-2026-09-09.md). 수정 후 관련22개·Ruff·web 정적0오류0경고. 전체 수치는 수정 전 기준이며 운영 배포/전체 인수는 남음.
 
 > 2026-09-09 웹 운영 가시성: [실패 원인·브리핑 재시도 보류 표시](WEB-FAILURE-VISIBILITY-2026-09-09.md). HTTP/ops21개·Ruff 통과, 실제 Chromium23건/생략3/가림/오류 표시·통신 실패 후 초기화 확인. 과거 실패 복구·운영 배포는 미완료.
