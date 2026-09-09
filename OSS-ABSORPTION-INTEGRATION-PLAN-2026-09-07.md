@@ -973,3 +973,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 **2026-09-09 JARVIS 파일 정책 `623ef50` / 인수 `79ede52`: [현재 정책·인증 세션 대조 공급자와 실제 MCP 연결](MEMORY-ACCESS-FILE-POLICY-2026-09-09.md).**
 소유자 전용 정책 파일을 매 발급 다시 읽고 session/project/method/provider/만료를 대조한다. 누락·손상·철회·불안전 파일은 캐시 없이 거부한다. 관련21통과/13.97초·lint/타입/격리emit통과, 실제 파일 공급자→issuer→stdio 조회/검색 인수. 실제 앱 인증 세션 연결·기발급 claim의 전역 철회 및 전체 운영 목표는 남는다.
+
+
+**2026-09-09 인계 현재판 재대조:** [최신 수정·개선·고도화 목록](HANDOFF-MERGED-PRIORITIES-2026-09-09.md)과 [실제 모델 관리형 기본 MCP 재시작 회수](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md)를 병합했다. 같은 사실/출처2회 회수, 일반 vault 우회 없음. 실제 업무·다른 모델·운영 및 M1–M14는 남는다.

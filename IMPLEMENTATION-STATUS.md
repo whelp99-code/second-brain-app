@@ -1,3 +1,7 @@
+**최신 누적 회귀:** 제품 `6f330591` — 전체1,551통과/2skip, 321.62초·Ruff/diff 통과. [관리형 실제 모델·검증 범위](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md). 운영 전환 및 전체 M1–M14 미완료.
+
+[관리형 실제 모델 생성·기본 MCP 회수](MANAGED-NATIVE-MCP-RECALL-2026-09-09.md) — 실제 Claude 컴파일 후 기본 stdio 서버2회 재시작·사실/출처 동일. 합성 사례이며 운영 인수 미완료, 각주 중복 개선 필요.
+
 [별도 MCP 서버 재시작 회수](INDEPENDENT-MCP-RECALL-2026-09-09.md) — 일반 vault 명시 bootstrap·stdio2회, 실제 생성 사실/출처·본문 hash 일치. 기본 관리형 진입점은 해당 fixture 경로 거부로 구분.
 
 [CLI·웹·MCP 검색 일치](SEARCH-SURFACE-PARITY-2026-09-09.md) — 실제 생성 자료 각2건의 ID·검증 상태 일치, CLI별도프로세스/실제HTTP/MCP client·다른 registry 미생성.
