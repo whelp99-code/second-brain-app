@@ -94,3 +94,6 @@ P0는 운영 완성의 선행 조건, P1은 안정적 사용의 인수 항목, P
 ### 후속 실제 통합 인수
 
 [공개 쓰기부터 새 로그인·실제 Claude 회수](SCOPED-WRITE-TO-NATIVE-READ-2026-09-09.md)를 같은 요청/저장소에서 검증했다. provider proved→자비스 settled/원작업 completed→context2records, 독립2클라이언트와 Claude tool1회, replay 완료1/시도1/FK0을 확인했다. 기존 별도 구간 증거를 한 흐름으로 연결했으며 native A 작성·Codex 회수·운영 전환·M1–M14를 완료 처리하지 않는다.
+
+
+[후속 native 작성·회수](NATIVE-SCOPED-WRITE-READ-2026-09-09.md): 같은 Claude 버전의 별도 실행에서 검토된 요청의 실제 쓰기1회→저장/원작업 완료→다른 agent 새 로그인 회수1회를 확인했다. native 제출 단계는 연결됐으며 내용·업무 검증 fixture, 다른 모델 계열·운영·전체 M1–M14 한계를 유지한다.

@@ -10,6 +10,9 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const build = resolve(process.argv[2]);
+const nativeWriter = process.env.SB_NATIVE_SCOPED_WRITE;
+if (nativeWriter !== undefined && (nativeWriter !== 'claude' || !process.argv.includes('--mcp') || !process.argv.includes('--cli')))
+  throw new Error('NATIVE_SCOPED_WRITE_REQUIRES_CLAUDE_PUBLIC_MCP_AND_CLI');
 const load = path => import(pathToFileURL(join(build, path)).href);
 const { scopedOutboxFixture } = await load('tests/fixtures/scoped-outbox.js');
 const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-store.js');
@@ -91,12 +94,12 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
       ca_file: join(f.database.root, 'tls-cert.pem') }), { mode: 0o600 });
     const state = join(f.database.root, 'https-state.json');
     writeFileSync(state, JSON.stringify({ credentials, mode, node: process.execPath, build,
-      admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', request: dispatched.request,
+      native_writer: process.env.SB_NATIVE_SCOPED_WRITE, admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', request: dispatched.request,
       execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal',
       at: f.now.toISOString(), provider_root: join(f.database.root, 'provider') }), { mode: 0o600 });
     const result = await new Promise((resolve, reject) => {
       const child = spawn(join(sb, '.venv/bin/python'), [join(sb, 'scripts/scoped-provider-https-acceptance.py'), state],
-        { cwd: sb, env: { ...process.env, PYTHONPATH: sb }, timeout: 60000 });
+        { cwd: sb, env: { ...process.env, PYTHONPATH: sb }, timeout: process.env.SB_NATIVE_SCOPED_WRITE ? 145000 : 60000 });
       let stdout = '', stderr = '';
       child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
       child.on('error', reject); child.on('close', code => {

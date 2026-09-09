@@ -22,18 +22,20 @@ from tests.task30_process_harness import executor_config
 
 state = json.loads(Path(sys.argv[1]).read_text())
 now = datetime.fromisoformat(state['at'])
+native_writer = None
 config = executor_config(Path(state['provider_root']))
 authority = create_scoped_provider_authority(create_scoped_provider_https(Path(state['credentials'])), clock=lambda: now)
 try:
     if state.get('admission_surface') == 'mcp':
         response = subprocess.run([sys.executable, str(Path(__file__).with_name('scoped-write-mcp-admission.py')), sys.argv[1]],
-            capture_output=True, text=True, timeout=50, check=False)
+            capture_output=True, text=True, timeout=125 if state.get('native_writer') else 50, check=False)
         assert response.returncode == 0, response.stderr
         outcome = json.loads(response.stdout)
         if outcome['kind'] == 'error':
             raise ValueError('SCOPED_WRITE_AUTHORITY_INVALID')
         assert outcome['kind'] == 'data'
         accepted = ScopedWriteAccepted(**outcome['value'])
+        native_writer = outcome.get('native_writer')
     else:
         accepted = accept_scoped_request(config.request_root, state['request'], expected_provider=config.provider_instance_id,
             clock=lambda: now, validate_authority=authority)
@@ -105,7 +107,7 @@ else:
                 + ' -c ' + shlex.quote(code) + ' 2>' + shlex.quote(str(root / 'read.err')) + '\n')
             launcher.chmod(0o700)
             readback = {'config': str(read_config), 'launcher': str(launcher), 'proof': json.loads(status.proof_json)}
-        print(json.dumps({'readback': readback, 'admission': 'accepted', 'accepted': asdict(accepted), 'provider_state': result.state,
+        print(json.dumps({'native_writer': native_writer, 'readback': readback, 'admission': 'accepted', 'accepted': asdict(accepted), 'provider_state': result.state,
             'active_generation': executor.generations.active_link.exists()}))
     finally:
         executor.close()

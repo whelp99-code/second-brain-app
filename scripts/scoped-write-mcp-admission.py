@@ -23,9 +23,11 @@ launcher = root / 'scoped-mcp'
 launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(app)) + '\nexec ' + shlex.quote(sys.executable)
     + ' -c ' + shlex.quote(code) + ' 2>' + shlex.quote(str(root / 'mcp.err')) + '\n')
 launcher.chmod(0o700)
-result = subprocess.run([state['node'], str(app / 'scripts/scoped-write-mcp-consumer.mjs'), state['build']],
-    input=json.dumps({'launcher': str(launcher), 'config': str(config), 'request': state['request'],
+native = state.get('native_writer') == 'claude' and state['mode'] == 'valid'
+consumer = 'scoped-native-write-admission.mjs' if native else 'scoped-write-mcp-consumer.mjs'
+result = subprocess.run([state['node'], str(app / 'scripts' / consumer), state['build']],
+    input=json.dumps({'root': str(root), 'launcher': str(launcher), 'config': str(config), 'request': state['request'],
         'contract': str(app / 'contracts/second-brain-scoped-write-v1.json'), 'at': state['at']}),
-    capture_output=True, text=True, timeout=45, check=False)
+    capture_output=True, text=True, timeout=110 if native else 45, check=False)
 assert result.returncode == 0, result.stderr
 print(result.stdout.strip())

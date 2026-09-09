@@ -1,0 +1,93 @@
+{
+  "writer": {
+    "client": "2.1.261 (Claude Code)",
+    "tool_calls": 1,
+    "exact_prepared_arguments": true,
+    "replayed": false,
+    "scope": "real native submission of a fixture-reviewed request; no new model-authored task verification"
+  },
+  "readback": {
+    "request_id": "memreq:scoped:v4:a9f62b3fa82da9a5c48904f5d60377d97ec7cdbec9b1214f89f5efe6be8fee30",
+    "request_digest": "sha256:a9f62b3fa82da9a5c48904f5d60377d97ec7cdbec9b1214f89f5efe6be8fee30",
+    "writer_agent": "agent:fixture",
+    "reader_agent": "agent:reader",
+    "fresh_login": true,
+    "provider_proved": true,
+    "jarvis_settled": true,
+    "control_completed": true,
+    "settlement_replay": true,
+    "settlements": 1,
+    "attempts": 1,
+    "same_generation": true,
+    "record_ids": [
+      "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+      "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+    ],
+    "source_refs": [
+      "Second Brain",
+      "Second Brain"
+    ],
+    "context_records": 2,
+    "clients": {
+      "independent_stdio_clients": 2,
+      "records_each": 2,
+      "https_calls": 3,
+      "native_mode": "claude",
+      "native_claude_calls": 1,
+      "native_version": "2.1.261 (Claude Code)",
+      "native_codex_calls": 0,
+      "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+    },
+    "reader_revocation": 403
+  },
+  "scenarios": [
+    {
+      "mode": "valid",
+      "admission": "accepted",
+      "provider_state": "proved",
+      "authority_https_calls": 5,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "provider_state": null,
+      "authority_https_calls": 2,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "admission": "accepted",
+      "provider_state": "failed",
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "expire_before_execute",
+      "admission": "accepted",
+      "provider_state": "failed",
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    }
+  ],
+  "checks": {
+    "actual_exit": 0,
+    "python_ast": 2,
+    "js_syntax": 3,
+    "invalid_native_modes_rejected": 3
+  },
+  "limitations": [
+    "same Claude Code version in two independent executions, not different model families",
+    "prepared content and task verification/approvals are fixtures; model submits exact reviewed request",
+    "fixture identity forwarder, credentials, keys, policy and clock",
+    "Codex previous usage-limit hold remains; not retried",
+    "not operational deployment, automatic collection/injection or full deletion/restore"
+  ],
+  "operational_changes": false,
+  "full_goal_complete": false,
+  "raw_evidence": "/var/tmp/native-write-read.out"
+}
