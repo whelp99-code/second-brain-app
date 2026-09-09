@@ -1,3 +1,5 @@
+> 2026-09-09 진단: [브리핑 실패 5건](BRIEFING-FAILURE-DIAGNOSIS-2026-09-09.md)은 모두 9월 5일 unresolved uncited. 현재 제한 재생성·실패 시 미게시를 26개 테스트로 검증. 과거 키 일괄 requeue는 현재 날짜 실행 경로로 복구 보장 불가하여 미실행.
+
 > 2026-09-09 읽기 전용 운영 산정: [페이지 키 재컴파일 규모](OPERATIONAL-COMPILE-KEY-ESTIMATE-2026-09-09.md). 고정 generation 18개 페이지 재컴파일 대상/호출 cap 120, 설명되지 않은 CAS 누락 0, brief 실패 5개 남음. 모델 호출·운영 변경 없음.
 
 > 2026-09-09 추가: [페이지 키 설치본 이전 검증](COMPILE-KEY-INSTALLED-UPGRADE-2026-09-09.md). 기존 설치본의 누락 페이지 복구·출처별 권한 유지·재컴파일 불변 확인. 변경 후 전체 1,418 passed/2 skipped 및 새 후보 자비스 연동 통과.

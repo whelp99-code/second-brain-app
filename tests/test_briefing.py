@@ -404,3 +404,25 @@ def test_budget_does_not_separate_recommendation_from_its_continuation(tmp_path:
     assert 'too-large' not in page.body_md and 'attached-evidence' not in page.body_md
     assert '추천 2줄' in page.body_md
     assert _committed_records(tmp_path, page) == 3
+
+
+def test_citation_regeneration_recovers_before_publishing(tmp_path: Path) -> None:
+    valid = '\n'.join(f'- recommendation {number} [^{CAS_SID}]' for number in range(3))
+    fake = FakeLLM(['- recommendation without citation', valid])
+    config = Config(raw={'caps': {'max_llm_calls_briefing': 5, 'max_briefing_validation_attempts': 3}})
+    page = generate_briefing(_inputs(), fake, config)
+    assert fake.calls == 2
+    assert UNCITED_SENTINEL not in page.body_md
+    assert _committed_records(tmp_path, page) > 0
+
+
+@pytest.mark.parametrize('cap,attempts,expected', [(1, 3, 1), (5, 3, 3)])
+def test_citation_regeneration_exhaustion_never_publishes(tmp_path: Path, cap: int, attempts: int, expected: int) -> None:
+    fake = FakeLLM(['- recommendation without citation'] * expected)
+    config = Config(raw={'caps': {'max_llm_calls_briefing': cap, 'max_briefing_validation_attempts': attempts}})
+    page = generate_briefing(_inputs(), fake, config)
+    assert fake.calls == expected
+    assert UNCITED_SENTINEL in page.body_md
+    error = _reject_write(tmp_path, page, 'retry-exhausted')
+    assert 'uncited' in str(error)
+    assert not (tmp_path / (page.page_id + '.md')).exists()

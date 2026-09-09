@@ -1,0 +1,36 @@
+{
+  "generation": "sbgen:v1:20beb2e1fb2cbf82bcfbc69326b87999380cc4ff2f83a3bf838738c690ce6734",
+  "failed_briefs": [
+    {
+      "category": "UNRESOLVED_UNCITED",
+      "attempts": 1,
+      "finished_at": "2026-09-05T10:26:02.302580+00:00"
+    },
+    {
+      "category": "UNRESOLVED_UNCITED",
+      "attempts": 1,
+      "finished_at": "2026-09-05T11:27:30.882233+00:00"
+    },
+    {
+      "category": "UNRESOLVED_UNCITED",
+      "attempts": 1,
+      "finished_at": "2026-09-05T12:31:31.755254+00:00"
+    },
+    {
+      "category": "UNRESOLVED_UNCITED",
+      "attempts": 1,
+      "finished_at": "2026-09-05T13:33:59.675195+00:00"
+    },
+    {
+      "category": "UNRESOLVED_UNCITED",
+      "attempts": 1,
+      "finished_at": "2026-09-05T14:36:13.527195+00:00"
+    }
+  ],
+  "operational_changes": false,
+  "validation_tests": {
+    "passed": 26,
+    "seconds": 0.51
+  },
+  "model": "FakeLLM; no external model calls"
+}
