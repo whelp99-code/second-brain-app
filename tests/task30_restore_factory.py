@@ -34,7 +34,7 @@ class RestoreFixture:
     unrelated: bytes
 
 
-def restore_fixture(tmp_path: Path) -> RestoreFixture:
+def restore_fixture(tmp_path: Path, *, full_source: bool = False) -> RestoreFixture:
     key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     config = ExecutorConfig(
         request_root=tmp_path / "requests",
@@ -53,7 +53,7 @@ def restore_fixture(tmp_path: Path) -> RestoreFixture:
     assert executor.apply_once(now=NOW).state == "proved"
     source_generation = executor.generations.active()
     archive = tmp_path / "archive"
-    _ = shutil.copytree(source_generation.root / "wiki", archive / "wiki")
+    _ = shutil.copytree(source_generation.root, archive) if full_source else shutil.copytree(source_generation.root / "wiki", archive / "wiki")
     for path in archive.rglob("*"):
         path.chmod(0o700 if path.is_dir() else 0o600)
     unrelated = b"unrelated-restore-record\n"
@@ -81,6 +81,9 @@ def restore_fixture(tmp_path: Path) -> RestoreFixture:
         source_high_water,
         key,
         "7",
+        page_id=next(path.relative_to(source_generation.root).with_suffix("").as_posix()
+                     for path in sorted((source_generation.root / "wiki").glob("memory-*.md"))
+                     if OLD in path.read_text()),
     )
     _ = accept_effect_request(
         config.request_root,

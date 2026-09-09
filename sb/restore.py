@@ -26,6 +26,7 @@ from sb.generation_runtime import (
 )
 from sb.generations import Generation
 from sb.restore_inventory import ManagedRestoreInventory
+from sb.restore_knowledge import matching_restore_knowledge
 from sb.restore_models import (
     RestoreArchiveManifestV1,
     RestoreProofV1,
@@ -34,6 +35,8 @@ from sb.restore_models import (
     archive_locator,
     manifest_preimage,
 )
+from sb.restore_source import read_restore_knowledge
+from sb.store.ledger import Ledger
 
 _MAX_RESTORE_MEMBERS: Final = 100_000
 _MAX_RESTORE_FILE_BYTES: Final = 64 * 1024 * 1024
@@ -234,7 +237,18 @@ class GenerationRestoreSanitizer:
         try:
             self._extract(request.archive, staging)
             self._verify_manifest(staging, request.archive_manifest)
+            states = (read_restore_knowledge(staging, request.archive_manifest, mutations.store)
+                      if (staging / "generation.json").is_file() else ())
             inventory = ManagedRestoreInventory().sanitize(staging, snapshot)
+            knowledge = matching_restore_knowledge(states, inventory, snapshot)
+
+            def materialize(root: Path) -> None:
+                ManagedRestoreInventory.materialize(root, inventory)
+                if knowledge:
+                    with Ledger(root) as ledger, ledger.transaction():
+                        for state in knowledge:
+                            ledger.bind_knowledge(state)
+
             result = mutations.mutate(
                 GenerationMutation(
                     mutation_id=request.request_id,
@@ -245,7 +259,7 @@ class GenerationRestoreSanitizer:
                         (snapshot.sequence, snapshot.set_root),
                         activate=False,
                     ),
-                    apply=lambda root: ManagedRestoreInventory.materialize(root, inventory),
+                    apply=materialize,
                 )
             )
             final_inventory = ManagedRestoreInventory().sanitize(

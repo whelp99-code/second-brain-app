@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final, Literal, final
 
@@ -113,6 +113,19 @@ class _ScanBudget:
                 if hashlib.sha256(payload[start:start + size]).hexdigest() in hashes:
                     found.append((start, start + size))
         return found
+
+
+@dataclass(slots=True)
+class RestoreMetadataScanner:
+    """Apply the same blocked-content scan with one aggregate metadata budget."""
+
+    snapshot: TombstoneSnapshot
+    _budget: _ScanBudget = field(default_factory=_ScanBudget, init=False)
+
+    def is_clean(self, payload: bytes) -> bool:
+        return not _is_whole_blocked(payload, self.snapshot.targets) and not self._budget.spans(
+            payload, self.snapshot.targets,
+        )
 
 
 def _sanitize_markdown(

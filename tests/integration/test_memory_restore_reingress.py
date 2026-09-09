@@ -86,3 +86,36 @@ def test_archived_knowledge_ledger_cannot_authorize_restored_content(tmp_path: P
         assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
     finally:
         fixture.executor.close()
+
+
+def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: Path, monkeypatch) -> None:
+    import hashlib
+
+    from sb.bound_knowledge import BoundKnowledge
+    from sb.remember_page import materialize_remember
+    from sb.store.ledger import Ledger
+
+    keep = '복원 후 유지할 승인된 사실입니다'
+
+    def seed(root, **kwargs):
+        materialize_remember(root, **kwargs)
+        materialize_remember(root, content=keep, candidate_id='memcand:pos:v1:' + 'c' * 64,
+            created_at=kwargs['created_at'], release_sha=kwargs['release_sha'])
+        with Ledger(root) as ledger:
+            for path in (root / 'wiki').glob('*.md'):
+                ledger.bind_knowledge(BoundKnowledge(path.relative_to(root).as_posix().removesuffix('.md'),
+                    'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest(), 'ACTIVE', 'APPROVED'))
+
+    monkeypatch.setattr('sb.request_executor.materialize_remember', seed)
+    fixture = restore_fixture(tmp_path, full_source=True)
+    try:
+        generation, proof = fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
+        index = SearchIndex(generation.root, registry_path=tmp_path / 'absent.sqlite')
+        assert index.search(OLD, scope='reference') == ()
+        hits = index.search(keep, scope='active')
+        assert len(hits) == 1 and hits[0].verification == 'VERIFIED'
+        assert index.search('unrelated-restore-record', scope='active') == ()
+        assert proof.blocked_matches == 0 and proof.scan_errors == 0
+        assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
+    finally:
+        fixture.executor.close()
