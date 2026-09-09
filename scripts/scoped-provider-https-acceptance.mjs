@@ -63,7 +63,7 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     const cli = parsePhoneGatewayCli(['--host', '127.0.0.1', '--port', '4176', '--upstream', 'http://127.0.0.1:4173',
       '--static-root', assets, '--env-file', home.envFile,
       ...Object.entries(providerFields).flatMap(([key, value]) => [`--${key}`, value])]);
-    provider = openPhoneMemoryProviderCli(cli.memoryProvider);
+    provider = await openPhoneMemoryProviderCli(cli.memoryProvider);
     assert.notEqual(provider.options.authority, f.database.authority);
     gateway = createPhoneGatewayServer({ host: '127.0.0.1', port: 0, upstream: upstream.origin, staticRoot: assets,
       config, now: () => at, audit: () => {}, memoryProviderVerifier: provider.options });
