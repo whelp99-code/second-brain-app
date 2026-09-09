@@ -1,0 +1,8 @@
+{
+  "fixture_root": "/var/tmp/restore-shifted-span-pofy4ut9",
+  "blocked_text_retained": true,
+  "reported_blocked_matches": 0,
+  "reported_scan_errors": 0,
+  "scope": "direct provider inventory; synthetic snapshot, not signed authority integration",
+  "hold": "RESTORE_SHIFTED_CONTENT_NOT_PROVEN_SAFE"
+}

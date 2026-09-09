@@ -1,3 +1,5 @@
+[운영 인수 보류: 위치가 바뀐 삭제 대상 잔존](RESTORE-SHIFTED-CONTENT-HOLD-2026-09-09.md) — inventory 실제 파일 재현에서 대상 잔존인데 blocked_matches=0. 기존 복원 통과 결과를 전체 삭제 보장으로 확대하지 않음.
+
 [복원 인용 끝 개행 경계 수정](RESTORE-TOMBSTONE-SPAN-PRESERVATION-2026-09-09.md) — LF/CRLF/여러 줄 인용의 다음 정상 줄 보존, 관련15개 통과.
 
 [복원 삭제 구간 중복에 따른 정상 기억 훼손 수정](RESTORE-TOMBSTONE-SPAN-PRESERVATION-2026-09-09.md) — 수정 전 재현, 실제 파일 네 경우 및 관련12개 통과.
