@@ -407,7 +407,7 @@ def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]
 
 
 def _commit_pages(
-    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled, *, project: bool = True
+    root: Path, vault: Vault, run_id: str, report: StageReport, line: str, compiled: _Compiled, *, project: bool = True, config: Config | None = None
 ) -> tuple[str | None, int, int]:
     result = vault.write_pages(
         report.pages,
@@ -418,14 +418,14 @@ def _commit_pages(
     )
     applied = tuple(page for page in report.pages if page.page_id in result.applied_page_ids)
     compiled.remember(applied)
-    _register_compiled(root, applied, project=project)
+    _register_compiled(root, applied, project=project, config=config)
     if result.proposals:
         raise VaultLintError((f"AUTOMATIC_PAGE_UPDATE_CONFLICT: {result.proposals} proposal(s); active pages preserved",))
     return result.commit, result.pages, result.conflicts
 
 
 def _register_compiled(
-    root: Path, pages: Sequence[PageSpec], *, project: bool = True
+    root: Path, pages: Sequence[PageSpec], *, project: bool = True, config: Config | None = None
 ) -> None:
     if not pages or ".staging" in root.parts:
         return
@@ -433,7 +433,7 @@ def _register_compiled(
     from sb.knowledge_registry import ACTIVE, APPROVED, KnowledgeRegistry
     from sb.search import SearchIndex, resolve_registry_path
 
-    config = load_config()
+    config = config if config is not None else load_config()
     explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
     registry = KnowledgeRegistry(resolve_registry_path(root, explicit))
     for page in pages:
@@ -491,7 +491,7 @@ def _append_run_log(root: Path, line: str) -> None:
         _ = handle.write(line.rstrip() + "\n")
 
 
-def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
+def _run_locked(root: Path, stage: StageFn, stage_name: str, config: Config | None = None) -> RunOutcome:
     run_id, started, vault = uuid4().hex, datetime.now().astimezone().isoformat(), Vault(root=root)
     compiled = _Compiled(root, ContentAddressedStore(root))
     with Ledger(root) as ledger:
@@ -530,6 +530,7 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str) -> RunOutcome:
                     report,
                     rendered.format(len(report.pages), conflicts, errors),
                     compiled,
+                    config=config,
                 )
                 _finish_deriv(
                     ledger,
@@ -576,14 +577,14 @@ def _execute(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
     try:
         if not managed:
-            return _run_locked(root, stage, stage_name)
+            return _run_locked(root, stage, stage_name, config)
         service = GenerationMutationService.from_config(config)
         try:
             result = service.mutate(GenerationMutation(
                 mutation_id=f"pipeline:{stage_name}:{uuid4().hex}",
                 operation=GenerationOperation(stage_name), now=datetime.now(UTC),
                 authority=GenerationAuthority(None, None),
-                apply=lambda staging: _run_locked(staging, stage, stage_name),
+                apply=lambda staging: _run_locked(staging, stage, stage_name, config),
             ))
             return replace(result.value, git_commit=result.generation.head if result.value.git_commit else None)
         finally:
@@ -874,6 +875,7 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                     f"{run_id} compile {page.page_id}",
                     compiled,
                     project=False,
+                    config=config,
                 )
             except (VaultLintError, GitCommandError, OSError) as exc:
                 ledger.mark_failed(item.key, str(exc))
@@ -948,11 +950,9 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
                     if row is not None and row.status == DerivStatus.RUNNING.value:
                         ledger.mark_failed(deriv[0], "conflict page failed citation readiness")
         if committed_pages and ".staging" not in vault.root.parts:
-            from sb.config import load_config as _load_cfg
             from sb.search import SearchIndex
 
-            cfg = _load_cfg()
-            explicit = Path(cfg.knowledge_registry) if "knowledge_registry" in cfg.raw else None
+            explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
             SearchIndex(vault_root=vault.root, registry_path=explicit).project()
         return StageReport(
             tuple(page for page in kept if page.page_id not in committed_ids),
@@ -1076,14 +1076,14 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
     try:
-        ingest = _run_locked(root, _ingest(config, sources, None), "ingest")
-        compiled = _run_locked(root, _compile_stage(config, "cli"), "compile")
+        ingest = _run_locked(root, _ingest(config, sources, None), "ingest", config)
+        compiled = _run_locked(root, _compile_stage(config, "cli"), "compile", config)
         if ingest.written == 0 and compiled.pages == 0:
             brief = compiled if compiled.exit_code == 0 else ingest
             if ingest.status == "capped" and ingest.exit_code == 0:
                 brief = ingest
         else:
-            brief = _run_locked(root, _brief_stage(config, None, "cli"), "brief")
+            brief = _run_locked(root, _brief_stage(config, None, "cli"), "brief", config)
     finally:
         _unlock(fd)
     chosen = brief

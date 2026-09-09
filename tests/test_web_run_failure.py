@@ -35,3 +35,19 @@ def test_status_includes_stage_exception_history(tmp_path: Path):
     assert row['status'] == 'failed'
     assert 'policy denied' in row['error']
     assert 'private-value' not in row['error']
+
+
+def test_web_search_uses_explicit_registry_over_environment(tmp_path: Path, monkeypatch):
+    from urllib.parse import quote
+
+    from sb.config import Config
+    from tests.test_web import TERM
+
+    config, root = _ready(tmp_path)
+    monkeypatch.setenv('SB_KNOWLEDGE_REGISTRY', str(tmp_path / 'unrelated.sqlite'))
+    config = Config(raw={**config.raw, 'knowledge_registry': str(root / '.sb/knowledge-registry.sqlite')})
+    with _running(config) as url:
+        status, result = _request(url + '/api/search?q=' + quote(TERM))
+    assert status == 200
+    assert result['results']
+    assert not (tmp_path / 'unrelated.sqlite').exists()

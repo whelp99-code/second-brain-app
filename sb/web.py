@@ -355,6 +355,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 query = values.get("q", [""])[0]
                 hits = SearchIndex(root, hybrid=context.config.search_hybrid,
+                                   registry_path=Path(context.config.knowledge_registry)
+                                   if "knowledge_registry" in context.config.raw else None,
                                    min_similarity=context.config.search_min_similarity).search(
                     query,
                     _query_int(values, "limit", 10, 100),

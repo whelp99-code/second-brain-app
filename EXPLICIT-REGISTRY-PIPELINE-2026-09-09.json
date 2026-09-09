@@ -1,0 +1,106 @@
+{
+  "native": {
+    "workspace": "/var/tmp/sb-web-success-vekrtw4u",
+    "receipt": {
+      "inbox_path": "inbox/2026-09-09T141821403705-합성기억정상경로.md"
+    },
+    "outcome": {
+      "run_id": "2da43de6681c4a87ab0b0962f23509bf",
+      "status": "ok",
+      "pages": 1,
+      "conflicts": 0,
+      "errors": 0,
+      "exit_code": 0,
+      "already_running": false,
+      "failure": null
+    },
+    "status": {
+      "status": "2026-09-09T23:18:44.100380+09:00 run 2da43de6681c4a87ab0b0962f23509bf ok pages=1 conflicts=0 errors=0",
+      "last_run_status": "ok",
+      "recent_stages": [
+        {
+          "run_id": "2da43de6681c4a87ab0b0962f23509bf",
+          "stage": "brief",
+          "status": "ok",
+          "errors": 0,
+          "error": ""
+        },
+        {
+          "run_id": "fe3cbdd3519448ee8304974ec301f77a",
+          "stage": "compile",
+          "status": "ok",
+          "errors": 0,
+          "error": ""
+        },
+        {
+          "run_id": "49c5c2612aa5442a83b7c176d3ec72ff",
+          "stage": "ingest",
+          "status": "ok",
+          "errors": 0,
+          "error": ""
+        }
+      ],
+      "failures": {
+        "total": 0,
+        "by_stage": {},
+        "items": [],
+        "omitted": 0
+      }
+    },
+    "search": {
+      "results": []
+    },
+    "model": "Claude Code 2.1.261, actual CLI, tools disabled, session persistence disabled",
+    "mocked_http": false,
+    "unrelated_registry_exists": false
+  },
+  "read_after_search_fix": {
+    "search": {
+      "results": [
+        {
+          "page_id": "wiki/web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+          "section": "title",
+          "snippet": "...5-합성기억정상경로",
+          "score": 1.1439784894664853,
+          "kind": "wiki",
+          "index_status": "active",
+          "knowledge_status": "ACTIVE",
+          "approval_status": "APPROVED",
+          "canonical": "",
+          "source_ref": "",
+          "updated_at": "2026-09-09",
+          "role": "CANONICAL",
+          "verification": "VERIFIED"
+        },
+        {
+          "page_id": "wiki/web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+          "section": "합성기억정상경로",
+          "snippet": "...-합성기억정상경로....",
+          "score": 1.0475076991484544,
+          "kind": "wiki",
+          "index_status": "active",
+          "knowledge_status": "ACTIVE",
+          "approval_status": "APPROVED",
+          "canonical": "",
+          "source_ref": "",
+          "updated_at": "2026-09-09",
+          "role": "CANONICAL",
+          "verification": "VERIFIED"
+        }
+      ]
+    },
+    "page": {
+      "frontmatter": {
+        "id": "web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+        "title": "2026-09-09T141821403705-합성기억정상경로",
+        "updated": "2026-09-09",
+        "compiled_by": "sb/1.0.0|v1|claude-native-2.1.261",
+        "status": "active",
+        "sources": "",
+        "derivation_key": "8723a976ec8c315a710664acc98a5b35638bae3cc2f23e1beb5740a5d6a7143e"
+      },
+      "body": "## 합성기억정상경로\n\n검증용 회의는 금요일 오후 세 시입니다.[^8f85e30b]\n\n[^8f85e30b]: web-inbox:2026-09-09T141821403705-합성기억정상경로.md span=0-32\n\n[^8f85e30b]: web-inbox:2026-09-09T141821403705-합성기억정상경로.md\n"
+    },
+    "unrelated_registry_exists": false
+  }
+}
