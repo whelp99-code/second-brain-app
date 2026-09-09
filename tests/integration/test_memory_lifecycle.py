@@ -143,9 +143,12 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         index = SearchIndex(active.root, hybrid=hybrid, registry_path=registry.path)
         assert tuple(index.iter_lexical_hits(OLD, scope='reference')) == ()
         assert all(OLD not in hit.snippet for hit in index.search(OLD, scope='reference'))
+        hits = index.search(CORRECTED, scope='active')
+        assert len(hits) == 1 and hits[0].verification == 'VERIFIED'
+    else:
+        index = SearchIndex(active.root, hybrid=hybrid, registry_path=registry.path)
         assert index.search(CORRECTED, scope='active') == ()
-        hits = index.search(CORRECTED, scope='reference')
-        assert len(hits) == 1 and hits[0].verification == 'UNVERIFIED'
+        assert index.search(CORRECTED, scope='reference')[0].verification == 'UNVERIFIED'
 
     export_time = NOW + timedelta(minutes=2)
     export = effect_request(

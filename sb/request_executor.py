@@ -16,6 +16,7 @@ from typing import Literal, Protocol, final
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from sb.disposition import sign_disposition_proof
+from sb.effect_knowledge import apply_with_prior_knowledge
 from sb.effect_values import (
     JsonValue,
     canonical_bytes,
@@ -489,7 +490,9 @@ class RequestExecutor:
             raise RequestExecutionError("EFFECT_PRIOR_STALE")
 
         def mutate(root: Path) -> None:
-            _ = self.erasure.apply(root, request, now)
+            def apply() -> None:
+                _ = self.erasure.apply(root, request, now)
+            apply_with_prior_knowledge(root, apply)
 
         def sealed(generation: Generation) -> None:
             nonlocal lease

@@ -1171,3 +1171,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 본문 결합 수명주기 검증:** [실제 정정/삭제/복원 경로의 상태 승계 차단](BOUND-KNOWLEDGE-LIFECYCLE-2026-09-10.md). 관련 16통과/21.31초·Ruff/diff. lexical/hybrid의 정정 전 내용 제거, 외부 오래된 승인 거부, 삭제 결과 없음, 정상 복원 reference 회수를 확인했다. 새 결과의 내부 자동 상태 기록은 미구현이며 사람 승인 gate는 추가하지 않는다. 전체 목표는 남는다.
+
+
+**2026-09-10 승인 본문 effect 상태 재결합:** [정정 결과 자동 상태·승격 제한·검증](EFFECT-KNOWLEDGE-REBIND-2026-09-10.md). 현재 본문 전체의 승인 상태가 있었던 경우만 성공한 effect 결과에 새 digest 상태를 기록한다. 미검증 page 전체 자동 승인 보류는 유지. 실제 lifecycle 4통과, helper/restore/generation 18통과, executor/cancellation/helper 18통과(중복 포함), Ruff/diff·새 helper 타입 통과. 복원·부분 record·운영 전체 목표는 남는다.
