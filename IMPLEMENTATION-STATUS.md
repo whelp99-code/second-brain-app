@@ -1,3 +1,5 @@
+> 2026-09-09 최신 후보 통합: [SB ebe227c + JARVIS e6984ad](CURRENT-INSTALLED-PAIR-2026-09-09.md). 고정 소스 신규 설치/emit, 설치본 연동4경로·실행 파일4프로파일 통과. 후속 전환 기준 후보이며 봉인 운영 배포는 미완료.
+
 > 2026-09-09 전환 관측 수정: [검사 중 DB/sidecar inode 변경 탐지](DATABASE-IDENTITY-RACE-2026-09-09.md). 실제 파일 교체·삭제·WAL 생성 회귀 포함5개 통과. 변경은 exit2, 운영은 읽기 전용 관측만 수행.
 
 > 2026-09-09 전환 진단 보강: [접근 불가 PID의 프로세스명/서비스 소속](DATABASE-UNREADABLE-DIAGNOSTICS-2026-09-09.md) 추가. 이름에 의한 제외 없이 불완전 exit2 유지, 실제 검사2개·Ruff 통과.
