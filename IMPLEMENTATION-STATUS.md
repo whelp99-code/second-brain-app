@@ -1,3 +1,5 @@
+[설치 후보 검증 자료 고정](CANDIDATE-HARNESS-PINNING-2026-09-09.md) — HEAD 대신 후보 commit/tree 대조·동일 버전 자료 사용, 관련17통과·실제 설치 연동4경로 통과. 운영 및 M1–M14 유지.
+
 [최신 provider 정본 manifest](LATEST-PROVIDER-CANONICAL-MANIFEST-2026-09-09.md) — fa79861 소스/캐시/명령/재현성 연결, 두 manifest 바이트 동일·독립 Python 대조, manifest 포함 실제 연동4경로 재통과. JARVIS 동등 증거·운영 전환 및 M1–M14 유지.
 
 [최신 설치 후보·연동·재현](LATEST-INSTALLED-PAIR-2026-09-09.md) — fa79861 설치파일176개 Git일치, J195b1a 실제 연동4경로 통과, 같은 최종 경로2회 빌드18,458항목 동일. 정본 manifest/운영 전환·전체 M1–M14 유지.

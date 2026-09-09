@@ -52,3 +52,27 @@ def test_runtime_replacement_rejects_acceptance(tmp_path):
         API["unchanged_candidates"](root, root, node),
     ):
         node.write_bytes(b"replacement executable")
+
+
+def test_harness_uses_candidate_commit_even_when_head_advances(tmp_path):
+    import subprocess
+
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(tmp_path), *args], text=True).strip()
+
+    git('init', '-q')
+    git('config', 'user.email', 'test@example.invalid')
+    git('config', 'user.name', 'Test')
+    (tmp_path / 'fixture').write_text('candidate')
+    git('add', 'fixture')
+    git('commit', '-qm', 'candidate')
+    commit, tree = git('rev-parse', 'HEAD'), git('rev-parse', 'HEAD^{tree}')
+    (tmp_path / 'fixture').write_text('unrelated newer fixture')
+    git('commit', '-qam', 'newer')
+    resolve = API['candidate_harness_commit']
+    assert resolve(tmp_path, {'source_commit': commit, 'source_tree': tree}) == commit
+    with pytest.raises(ValueError, match='CANDIDATE_SOURCE_TREE_MISMATCH'):
+        resolve(tmp_path, {'source_commit': commit, 'source_tree': git('rev-parse', 'HEAD^{tree}')})
+    for invalid in ['HEAD', '--help', None, '0' * 40]:
+        with pytest.raises(ValueError, match='CANDIDATE_SOURCE_COMMIT_INVALID'):
+            resolve(tmp_path, {'source_commit': invalid, 'source_tree': tree})

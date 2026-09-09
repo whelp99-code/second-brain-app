@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import runpy
 import shutil
 import subprocess
@@ -47,6 +48,23 @@ def unchanged_candidates(release: Path, jarvis_root: Path, executable: Path | No
             raise RuntimeError("ACCEPTANCE_CANDIDATE_CHANGED:" + ",".join(changed))
 
 
+def candidate_harness_commit(repo: Path, manifest: dict) -> str:
+    """Use the candidate's committed fixtures, independently of worktree HEAD."""
+    commit = manifest.get("source_commit")
+    if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("CANDIDATE_SOURCE_COMMIT_INVALID")
+    result = subprocess.run(
+        ["git", "show", "-s", "--format=%H%n%T", commit + "^{commit}", "--"],
+        cwd=repo, text=True, capture_output=True, check=False,
+    )
+    resolved = result.stdout.splitlines()
+    if result.returncode or len(resolved) != 2 or resolved[0] != commit:
+        raise ValueError("CANDIDATE_SOURCE_COMMIT_INVALID")
+    if manifest.get("source_tree") != resolved[1]:
+        raise ValueError("CANDIDATE_SOURCE_TREE_MISMATCH")
+    return commit
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("provider_release", type=Path)
@@ -58,8 +76,8 @@ def main() -> None:
     if not python.is_file() or not (build / "src/phone-gateway.js").is_file():
         parser.error("installed provider Python and compiled JARVIS gateway required")
     repo = Path(__file__).resolve().parents[1]
-    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
     manifest = json.loads((release / "release-manifest.json").read_text())
+    commit = candidate_harness_commit(repo, manifest)
     node = Path(shutil.which("node") or "node").resolve(strict=True)
     with (
         unchanged_candidates(release, build.parent, node) as candidate_contents,
