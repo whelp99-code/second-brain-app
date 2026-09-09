@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 STATES = (
@@ -19,7 +21,23 @@ COUNTS = {
 }
 
 
-def inspect(database: Path) -> dict[str, object]:
+def lease_counts(values: list[tuple[object]], now: datetime) -> dict[str, int]:
+    counts = {'unexpired': 0, 'expired': 0, 'invalid': 0}
+    for (value,) in values:
+        try:
+            if not isinstance(value, str) or re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z', value) is None:
+                raise ValueError('noncanonical lease time')
+            expires = datetime.fromisoformat(value)
+            counts['unexpired' if expires > now else 'expired'] += 1
+        except ValueError:
+            counts['invalid'] += 1
+    return counts
+
+
+def inspect(database: Path, now: datetime | None = None) -> dict[str, object]:
+    observed_at = datetime.now(UTC) if now is None else now
+    if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+        raise ValueError('timezone-aware observation time required')
     path = database.resolve(strict=True)
     conn = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=5)
     try:
@@ -28,7 +46,9 @@ def inspect(database: Path) -> dict[str, object]:
         states = {table: conn.execute(f'SELECT {column},count(*) FROM "{table}" '
                                      f'GROUP BY {column}').fetchall() for table, column in STATES}
         counts = {name: conn.execute(query).fetchone()[0] for name, query in COUNTS.items()}
-        return {'database': str(path), 'states': states, 'counts': counts,
+        leases = {table: lease_counts(conn.execute(f'SELECT expires_at FROM {table}').fetchall(), observed_at)
+                  for table in ('gjc_runtime_leases', 'microloop_leases')}
+        return {'observed_at': observed_at.isoformat(), 'leases': leases, 'database': str(path), 'states': states, 'counts': counts,
                 'scope': 'single read transaction; named queues only; lease rows are not liveness proof',
                 'drain_authorized': False}
     finally:

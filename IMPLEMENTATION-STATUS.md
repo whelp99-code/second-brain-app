@@ -1306,3 +1306,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 DB holder 서비스 식별:** [dashboard/authority 두 service·holder_processes 관측 추가](DATABASE-HOLDER-OWNERS-2026-09-10.md). 관련12통과·실제 CLI2서비스/관측불가17개exit2. 두 서비스 독립 실행을 확인했고 임의 종료/운영 전환 없이 보류 조건을 구체화했다. 전체 목표 유지.
 
 **2026-09-10 운영 pending 집계 도구:** [읽기전용 단일snapshot·6큐0/activecursor0/lease1](JARVIS-PENDING-OBSERVATION-2026-09-10.md). 테스트3통과·실제관측exit0·Ruff/diff. sudo 비대화인증불가로 관리자 핸들관측 미실행, 기존holder/관측불가·운영전환 보류 및 전체 목표 유지.
+
+**2026-09-10 운영 lease 만료 구분:** [정본만료규칙·UTC시각·유효/만료/invalid 집계](JARVIS-LEASE-OBSERVATION-2026-09-10.md). 관련4통과·실제 GJC unexpired1/나머지0·큐6개0/activecursor0. 실행권 잔류로 운영전환 보류, 전체 목표 유지.
