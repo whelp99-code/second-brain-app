@@ -1,0 +1,64 @@
+// Actual JARVIS-owned deletion chain -> provider restore -> JARVIS reference reader.
+// All sources, keys and authority are isolated fixtures; no operational activation.
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync, readFileSync, writeFileSync} from 'node:fs';
+import {join, resolve} from 'node:path';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {referenceEffectFixture} from './reference_effect_fixture.mjs';
+const build = resolve(process.argv[2]);
+const sb = fileURLToPath(new URL('..', import.meta.url));
+const load = name => import(pathToFileURL(join(build,name)).href);
+const root = mkdtempSync('/var/tmp/sb-jarvis-restore-');
+const python = join(sb,'.venv/bin/python');
+const run = (...args) => execFileSync(python,args,{cwd:sb,encoding:'utf8',timeout:120000});
+run('-m','tests.fixtures.jarvis_memory_provider','init',root);
+const configPath = join(root,'config.toml');
+writeFileSync(configPath,`knowledge_registry = ${JSON.stringify(join(root,'registry.sqlite'))}\n`+readFileSync(configPath,'utf8'),{mode:0o600});
+run('-m','tests.fixtures.jarvis_memory_provider','seed',root,'--content','DeleteAlpha synthetic obsolete memory');
+run('scripts/restore-probe.py','seed-keep',root);
+const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
+const launcher = join(root,'mcp');
+writeFileSync(launcher,`#!/bin/sh\ncd ${quote(sb)}\nexec ${quote(python)} -m sb.mcp\n`,{mode:0o700});
+const {memoryDatabase,closeMemoryDatabase} = await load('tests/fixtures/memory-candidate-store.js');
+const {memoryReadFenceFixture} = await load('tests/fixtures/memory-read-fence.js');
+const {createProductionMemoryReference} = await load('src/memory-reference-production.js');
+const {createProductionMemoryReadFence} = await load('src/memory-read-fence-production.js');
+const database = await memoryDatabase();
+const {config,key} = memoryReadFenceFixture(database,new Date(Date.now()+86400000).toISOString());
+const runtime = createProductionMemoryReference(database.authority,{
+  read_fence_config:config,projection_key:Buffer.alloc(32,7),
+  transport_options:{launcherPath:launcher,configPath:join(root,'config.toml')},
+});
+let effects;
+try {
+  const read = query => runtime.reader.read(query,{max_records:8,max_record_bytes:4096,max_bytes:8000});
+  const before = await read('DeleteAlpha');
+  assert.equal(before.payload.records.length,1);
+  const backup = JSON.parse(run('scripts/restore-probe.py','backup',root));
+  effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
+  const deleted = await effects.apply('forget',before.payload.records.find(row=>row.text.includes('DeleteAlpha')).record);
+  assert.equal(deleted.tombstone_sequence,1);
+  const authorize = createProductionMemoryReadFence(database.authority,config,'memory_status');
+  const fence = authorize(new Date());
+  assert.equal(fence.tombstone_sequence,1);
+  const restored = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
+    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(fence)}));
+  assert.equal(restored.tombstone_sequence,fence.tombstone_sequence);
+  assert.equal(restored.tombstone_set_root,fence.tombstone_set_root);
+  assert.equal(restored.blocked_matches,0);
+  assert.equal(restored.scan_errors,0);
+  assert.equal((await read('DeleteAlpha')).payload.records.length,0);
+  const keep = await read('KeepBeta');
+  assert.equal(keep.payload.records.length,1);
+  assert(keep.payload.records[0].text.includes('KeepBeta'));
+  const result = {root,backup,deleted,restored,jarvis_owned_high_water:1,
+    deleted_records:0,surviving_records:1,model_calls:0,
+    scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; not scoped-project or operational/native acceptance'};
+  writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));
+  console.log(JSON.stringify(result));
+} finally {
+  await effects?.close();
+  await runtime.close();
+  closeMemoryDatabase(database);
+}

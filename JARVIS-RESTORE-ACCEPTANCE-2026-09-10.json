@@ -1,0 +1,25 @@
+{
+  "root": "/var/tmp/sb-jarvis-restore-xlIAmG",
+  "backup": {
+    "source_generation_id": "sbgen:v1:825c709c9c92e14772295949425961d90ec2a431fd9f8b4c7a7dbe8ef7ff24d0"
+  },
+  "deleted": {
+    "request_id": "memeff:req:v2:fdf83ba92f193f90d4e978e2953053061515ff9d2eed41b2e5e2959576dc0d4b",
+    "provider_state": "proved",
+    "proof_id": "sbproof:v1:4d9471d92ec95de838bb54de7276597131a7782673e0ebbf1fc207dd6ceb0923",
+    "observation_kind": "deletion",
+    "tombstone_sequence": 1
+  },
+  "restored": {
+    "generation_id": "sbgen:v1:b9eb7f1ec757b9884c4d816db92a88f0f6ef81658716564f4e91049fb1966c72",
+    "tombstone_sequence": 1,
+    "tombstone_set_root": "sha256:b5b080fa3a14cd9904adc579025cdad4f141a8ef971d35023ff2a17f0781e4e7",
+    "blocked_matches": 0,
+    "scan_errors": 0
+  },
+  "jarvis_owned_high_water": 1,
+  "deleted_records": 0,
+  "surviving_records": 1,
+  "model_calls": 0,
+  "scope": "Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; not scoped-project or operational/native acceptance"
+}
