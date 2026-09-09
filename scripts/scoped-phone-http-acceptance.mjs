@@ -1,5 +1,6 @@
 // Real phone cookie -> scoped CLI -> MCP, using isolated operator policy/key fixtures.
 import assert from 'node:assert/strict';
+import { acceptPhoneMemoryClient } from './phone-memory-client-acceptance.mjs';
 import { createHash, createHmac } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -85,6 +86,8 @@ try {
   const found = await call(); assert.equal(found.statusCode, 200);
   const text = await found.body.text(); const result = JSON.parse(text);
   assert.equal(result.context.records.length, 2); assert.ok(Buffer.byteLength(text) <= 32768);
+  const clientAcceptance = await acceptPhoneMemoryClient({ build: process.argv[2], root: home.home,
+    port: gateway.address.port, identity, origin: FIXTURE_ORIGIN, cookie, csrf, expected: result.context.records });
   const tampered = await call({ agent_id: 'agent:attacker' }); assert.equal(tampered.statusCode, 400); await tampered.body.text();
   const missing = await call({}, { ...headers, Cookie: '' }); assert.equal(missing.statusCode, 401); await missing.body.text();
   const noCsrf = await call({}, { ...headers, 'X-JARVIS-CSRF': '' }); assert.equal(noCsrf.statusCode, 403); await noCsrf.body.text();
@@ -163,7 +166,7 @@ try {
   assert.ok(expiryExitObserved);
   assert.ok(String(expired.headers['set-cookie']).includes('Max-Age=0'));
   assert.ok(!upstream.captures.some(row => row.url === '/api/v1/memory/context'));
-  process.stdout.write(JSON.stringify({ agent_policy_new_sessions_without_policy_edits: 2,
+  process.stdout.write(JSON.stringify({ client_acceptance: clientAcceptance, agent_policy_new_sessions_without_policy_edits: 2,
     capabilities_verified: true, unsupported_write_http_status: forbiddenWrite.statusCode,
     independent_agent_shared_records_equal: true, restricted_peer_records: isolatedContext.records.length,
     original_agent_records_after_peer_restriction: 2,

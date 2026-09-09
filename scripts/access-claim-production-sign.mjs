@@ -95,7 +95,7 @@ try {
         const httpRun = spawnSync(process.execPath,
           [fileURLToPath(new URL('./scoped-phone-http-acceptance.mjs', import.meta.url)), build], {
             input: JSON.stringify({ database: db.path, agent_id: body.agent_id, now: body.issued_at, options: productionOptions }),
-            encoding: 'utf8', timeout: 45000, maxBuffer: 1024 * 1024,
+            encoding: 'utf8', timeout: ['1', 'claude'].includes(process.env.SB_PHONE_NATIVE_ACCEPTANCE) ? 240000 : 45000, maxBuffer: 1024 * 1024,
           });
         if (httpRun.error) throw httpRun.error;
         if (httpRun.status !== 0) throw new Error(`scoped HTTP acceptance failed: ${httpRun.stderr}`);
@@ -162,7 +162,7 @@ try {
           [fileURLToPath(new URL('./scoped-delivery-reopen.mjs', import.meta.url)), build], {
             input: JSON.stringify({ database: db.path, options: productionOptions,
               fixture_session: sessionSource(), now: body.issued_at, budgets, native_session: nativeSession }),
-            encoding: 'utf8', timeout: 45000, maxBuffer: 1024 * 1024,
+            encoding: 'utf8', timeout: ['1', 'claude'].includes(process.env.SB_PHONE_NATIVE_ACCEPTANCE) ? 240000 : 45000, maxBuffer: 1024 * 1024,
           });
         if (reopened.error) throw reopened.error;
         if (reopened.status !== 0) throw new Error(`independent delivery check failed: ${reopened.stderr}`);

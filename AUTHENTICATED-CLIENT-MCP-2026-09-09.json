@@ -1,0 +1,36 @@
+{
+  "client_acceptance": {
+    "independent_stdio_clients": 2,
+    "records_each": 2,
+    "https_calls": 3,
+    "native_mode": "claude",
+    "native_claude_calls": 1,
+    "native_version": "2.1.261 (Claude Code)",
+    "native_codex_calls": 0,
+    "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+  },
+  "gateway": {
+    "restricted_peer_records": 0,
+    "original_agent_records_after_peer_restriction": 2,
+    "policy_withdrawal_http_status": 403,
+    "cleanup_session_expiry_http_status": 401,
+    "independent_agent_shared_records_equal": true
+  },
+  "tests": {
+    "initial_failed": 2,
+    "focused_passed": 40,
+    "files": 3,
+    "seconds": 2.56,
+    "typescript_emit": true,
+    "eslint": true
+  },
+  "codex": {
+    "status": "blocked_usage_limit",
+    "observed_event": "turn.failed",
+    "tool_calls": 0,
+    "passed": false
+  },
+  "operational_changes": false,
+  "full_goal_complete": false,
+  "raw_evidence": "/var/tmp/page-access-acceptance-154k7f_x/scoped-mcp-result.json"
+}
