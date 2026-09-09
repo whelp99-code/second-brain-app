@@ -51,7 +51,7 @@ def test_managed_capture_compile_short_search_backup_restore(tmp_path: Path, mon
         def generate(self, prompt: str, *, system: str | None = None,
                      json_mode: bool = False, timeout: int = 120) -> str:
             if json_mode:
-                return '{"verdict":"compatible","confidence":1,"rationale":"independent facts"}'
+                return '{"relation":"unrelated","confidence":1,"rationale":"independent facts","cites":[]}'
             sid = re.search(r"sid=([0-9a-f]{8})", prompt)
             assert sid is not None
             return f"업무 기억 보존 검증.[^{sid.group(1)}]"

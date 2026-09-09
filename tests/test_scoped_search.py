@@ -29,6 +29,8 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
     assert run_ingest(config, [source["id"] for source in sources]).exit_code == 0
     class FixtureLLM:
         def generate(self, prompt, **kwargs):
+            if kwargs.get("json_mode"):
+                return '{"relation":"unrelated","confidence":1,"rationale":"fixture","cites":[]}'
             matched = re.search(r"sid=([0-9a-f]+)", prompt)
             if matched is None:
                 return "[]"

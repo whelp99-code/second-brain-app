@@ -1,0 +1,110 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+........................................................................ [ 13%]
+........................................................................ [ 18%]
+...............................................................s........ [ 23%]
+........................................................................ [ 27%]
+........................................................................ [ 32%]
+........................................................................ [ 37%]
+................................s....................................... [ 41%]
+........................................................................ [ 46%]
+........................................................................ [ 51%]
+........................................................................ [ 55%]
+........................................................................ [ 60%]
+........................................................................ [ 65%]
+.................................F...................................... [ 69%]
+........................................................................ [ 74%]
+......................F................................................. [ 79%]
+........................................................................ [ 83%]
+........................................................................ [ 88%]
+........................................................................ [ 93%]
+........................................................................ [ 97%]
+.................................                                        [100%]
+=================================== FAILURES ===================================
+___________ test_managed_capture_compile_short_search_backup_restore ___________
+
+tmp_path = PosixPath('/var/tmp/pytest-of-jm/pytest-614/test_managed_capture_compile_s0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78a69b4b3890>
+
+    def test_managed_capture_compile_short_search_backup_restore(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+        config = managed(tmp_path)
+        service = GenerationMutationService.from_config(config)
+        try:
+            _ = service.remember("업무 기억 보존 검증", "기억", datetime.now(UTC))
+        finally:
+            service.close()
+        active = Path(config.vault_root)
+        assert active.is_symlink()
+        assert generation_runtime_paths(config).active == active
+        receipt = mutate_root(config, GenerationOperation.INBOX, lambda root: accept_upload(
+            root, "note.md", "추가 업무 기억".encode(), device_id="test", relative_path="note.md",
+        ))
+        assert receipt.state == "queued"
+        assert run_ingest(config, ("inbox",)).exit_code == 0
+        class CitedKorean:
+            def generate(self, prompt: str, *, system: str | None = None,
+                         json_mode: bool = False, timeout: int = 120) -> str:
+                if json_mode:
+                    return '{"verdict":"compatible","confidence":1,"rationale":"independent facts"}'
+                sid = re.search(r"sid=([0-9a-f]{8})", prompt)
+                assert sid is not None
+                return f"업무 기억 보존 검증.[^{sid.group(1)}]"
+        monkeypatch.setattr("sb.pipeline._llm", lambda *_args: CitedKorean())
+>       assert run_compile(config, llm_mode="fake").exit_code == 0
+E       AssertionError: assert 1 == 0
+E        +  where 1 = RunOutcome(run_id='90113877faeb49edbff84a9924bcc377', status='failed', pages=2, conflicts=0, errors=5, exit_code=1, git_commit=None, already_running=False, written=2, failure=None).exit_code
+E        +    where RunOutcome(run_id='90113877faeb49edbff84a9924bcc377', status='failed', pages=2, conflicts=0, errors=5, exit_code=1, git_commit=None, already_running=False, written=2, failure=None) = run_compile(Config(), llm_mode='fake')
+
+tests/test_runtime_reliability.py:59: AssertionError
+____ test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text ____
+
+tmp_path = PosixPath('/var/tmp/pytest-of-jm/pytest-614/test_hidden_and_unclassified_m0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78a69b4febd0>
+
+    def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_path: Path, monkeypatch):
+        sources = []
+        for name, text in [("a_hidden", "Alpha forbidden content"), ("b_unknown", "Alpha unclassified content"),
+                           ("z_allowed", "Alpha permitted content")]:
+            folder = tmp_path / name
+            folder.mkdir()
+            (folder / "note.md").write_text(text)
+            sources.append({"id": name, "adapter": "markdown-vault", "root": str(folder)})
+        vault = tmp_path / "share" / "vault"
+        config = Config(raw={"vault_root": str(vault), "share_root": str(tmp_path / "share"), "state_root": str(tmp_path / "state"),
+            "knowledge_registry": str(tmp_path / "registry.db"), "sources": sources,
+            "source_access": {name: {"owner": "principal:owner", "projects": [project], "policy_revision": "1"}
+                for name, project in [("a_hidden", "project:b"), ("z_allowed", "project:a")]}})
+        assert run_ingest(config, [source["id"] for source in sources]).exit_code == 0
+        class FixtureLLM:
+            def generate(self, prompt, **kwargs):
+                matched = re.search(r"sid=([0-9a-f]+)", prompt)
+                if matched is None:
+                    return "[]"
+                sid = matched.group(1)
+                word = next(word for word in ("permitted", "forbidden", "unclassified") if word in prompt)
+                return f"Alpha {word} content.[^{sid}]"
+        monkeypatch.setattr("sb.pipeline._llm", lambda *_: FixtureLLM())
+>       assert run_compile(config, llm_mode="fake").exit_code == 0
+E       AssertionError: assert 1 == 0
+E        +  where 1 = RunOutcome(run_id='7de0b9d4e8764d128d846678a0edbec3', status='failed', pages=3, conflicts=0, errors=10, exit_code=1, git_commit=None, already_running=False, written=3, failure=None).exit_code
+E        +    where RunOutcome(run_id='7de0b9d4e8764d128d846678a0edbec3', status='failed', pages=3, conflicts=0, errors=10, exit_code=1, git_commit=None, already_running=False, written=3, failure=None) = run_compile(Config(), llm_mode='fake')
+
+tests/test_scoped_search.py:39: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_runtime_reliability.py::test_managed_capture_compile_short_search_backup_restore
+FAILED tests/test_scoped_search.py::test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text
+2 failed, 1541 passed, 2 skipped in 378.47s (0:06:18)
+
+FOLLOW-UP: tests/test_runtime_reliability.py tests/test_scoped_search.py tests/test_conflict.py tests/test_conflict_retry_pipeline.py: 22 passed in 6.28s; Ruff passed.
+
+/home/jm/orca/projects/second-brain-app/sb/ops.py
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:25:26 - warning: "_redact" is private and used outside of the module in which it is declared (reportPrivateUsage)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:424:17 - warning: Implicit string concatenation not allowed (reportImplicitStringConcatenation)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:442:21 - warning: Type of "row" is Any (reportAny)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:443:21 - warning: Implicit string concatenation not allowed (reportImplicitStringConcatenation)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:554:40 - warning: "_read_manifest" is protected and used outside of the class in which it is declared (reportPrivateUsage)
+/home/jm/orca/projects/second-brain-app/sb/pipeline.py
+  /home/jm/orca/projects/second-brain-app/sb/pipeline.py:442:9 - warning: Result of call expression is of type "KnowledgeState" and is not used; assign to variable "_" if this is intentional (reportUnusedCallResult)
+/home/jm/orca/projects/second-brain-app/sb/web.py
+  /home/jm/orca/projects/second-brain-app/sb/web.py:24:26 - warning: "_redact" is private and used outside of the module in which it is declared (reportPrivateUsage)
+0 errors, 7 warnings, 0 notes

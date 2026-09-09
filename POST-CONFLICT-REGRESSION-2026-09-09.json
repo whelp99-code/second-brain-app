@@ -1,0 +1,185 @@
+{
+  "harness_commit": "40c7baa4582f0a0722b4a20496e3ec64284c337b",
+  "provider_manifest": {
+    "schema": 1,
+    "release_id": "208abc402017a6a20fe1e203de2c137a2a34345c",
+    "wheel_sha256": "a2fe6cd1f2ce2be2408868bb8528469d13c4d5939add890e82e88cbfb483f5e4",
+    "release_id_scheme": "sb-release-inputs-v3",
+    "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+    "preparation_files_sha256": {
+      "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+      "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+      "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+    },
+    "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+    "source_commit": "40c7baa4582f0a0722b4a20496e3ec64284c337b",
+    "source_tree": "24df86d9eb2b50a104d0dd2be08864671e5e0f60",
+    "source_materialization": "git-archive",
+    "working_tree_modified": true,
+    "contract_profile": "task32-schema4",
+    "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+  },
+  "provider_imports": [
+    "/var/tmp/sb-conflict-release-3ld7u2vj/app/releases/208abc402017a6a20fe1e203de2c137a2a34345c/.venv/lib/python3.12/site-packages/sb/mcp.py",
+    "/var/tmp/sb-conflict-release-3ld7u2vj/app/releases/208abc402017a6a20fe1e203de2c137a2a34345c/.venv/lib/python3.12/site-packages/sb/cli.py",
+    "/var/tmp/sb-conflict-release-3ld7u2vj/app/releases/208abc402017a6a20fe1e203de2c137a2a34345c/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+    "/var/tmp/sb-conflict-release-3ld7u2vj/app/releases/208abc402017a6a20fe1e203de2c137a2a34345c/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+  ],
+  "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+  "acceptance": {
+    "gateway_configuration": "CLI parser and independently owned existing authority connection",
+    "admission_surface": "mcp",
+    "execution_surface": "cli",
+    "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+    "identity_forwarder": "fixture",
+    "clock": "fixture",
+    "public_mcp_write": true,
+    "results": [
+      {
+        "mode": "valid",
+        "readback": {
+          "request_id": "memreq:scoped:v4:01b6e78fa92e678d879ef85dca2e5a50e5baa58f5c12287fe567d258117c727c",
+          "request_digest": "sha256:01b6e78fa92e678d879ef85dca2e5a50e5baa58f5c12287fe567d258117c727c",
+          "writer_agent": "agent:fixture",
+          "reader_agent": "agent:reader",
+          "fresh_login": true,
+          "provider_proved": true,
+          "jarvis_settled": true,
+          "control_completed": true,
+          "settlement_replay": true,
+          "settlements": 1,
+          "attempts": 1,
+          "same_generation": true,
+          "record_ids": [
+            "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+            "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+          ],
+          "source_refs": [
+            "Second Brain",
+            "Second Brain"
+          ],
+          "context_records": 2,
+          "clients": {
+            "independent_stdio_clients": 2,
+            "records_each": 2,
+            "https_calls": 2,
+            "omo_engine_calls": 0,
+            "native_mode": "off",
+            "native_claude_calls": 0,
+            "native_codex_calls": 0,
+            "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+          },
+          "reader_revocation": 403,
+          "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+        },
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:01b6e78fa92e678d879ef85dca2e5a50e5baa58f5c12287fe567d258117c727c",
+          "request_digest": "sha256:01b6e78fa92e678d879ef85dca2e5a50e5baa58f5c12287fe567d258117c727c",
+          "idempotency_key": "memidem:scoped:v4:57c16a72c101764a814f0ad80e579b0cf0f1aaa58309afbdcd5614a881ee3e93",
+          "scope_digest": "sha256:21c203a786b0cdd6f6521df74bece97abdb25dd1068360c3d5cb6f5b54752937",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:01b6e78fa92e678d879ef85dca2e5a50e5baa58f5c12287fe567d258117c727c.v4.json",
+          "request_file_digest": "sha256:81702af5cd70065e1591921181f8a056eb6ba242fa6b75f14d53b82dfe40f4ae",
+          "replayed": false
+        },
+        "provider_state": "proved",
+        "active_generation": true,
+        "authority_https_calls": 5,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_during_accept",
+        "admission": "denied",
+        "accepted_row": false,
+        "authority_https_calls": 2,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "revoke_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:72aadb23c3a13650132acdd52f5edf27adf40cbeb2b48024ca69ba90fc3b8fa5",
+          "request_digest": "sha256:72aadb23c3a13650132acdd52f5edf27adf40cbeb2b48024ca69ba90fc3b8fa5",
+          "idempotency_key": "memidem:scoped:v4:f4627e85b0c9b512a4195bc773546c81ffc76b1ae6ba19b23c87747cd469114b",
+          "scope_digest": "sha256:24a9afe289bf3ee7b21853dd9f759f22650bba01b7e1bb503c9afc6c629549e0",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:72aadb23c3a13650132acdd52f5edf27adf40cbeb2b48024ca69ba90fc3b8fa5.v4.json",
+          "request_file_digest": "sha256:082d5bef79ae036a3bb5845628cb50237e142122b668d99bf0fc94be3ae8c28e",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      },
+      {
+        "mode": "expire_before_execute",
+        "native_writer": null,
+        "admission": "accepted",
+        "accepted": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:c2e78bddc544f428a8b270b16efd5ba78c1f19a3cf6456a56bea087d2223a96a",
+          "request_digest": "sha256:c2e78bddc544f428a8b270b16efd5ba78c1f19a3cf6456a56bea087d2223a96a",
+          "idempotency_key": "memidem:scoped:v4:c7ea1d58c863fa9fef076c168cee999f8a7218dc6acc43ee34f74d1778ae5023",
+          "scope_digest": "sha256:659ce9efc1f5b5c866d71ef3cd6e11422e0f52ff818f4e0dbc39c45abae2894d",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:c2e78bddc544f428a8b270b16efd5ba78c1f19a3cf6456a56bea087d2223a96a.v4.json",
+          "request_file_digest": "sha256:0e61a40cbe93f4effb1c8c7998c628fcfe3df5dee91a212672e620110dfc6728",
+          "replayed": false
+        },
+        "provider_state": "failed",
+        "active_generation": false,
+        "authority_https_calls": 3,
+        "dispatch_attempts": 1,
+        "foreign_key_errors": 0
+      }
+    ]
+  },
+  "production_activated": false,
+  "candidate_contents": {
+    "provider": {
+      "inventory_sha256": "7402375b588df017345d48ccc1171d14812ae5033dacb2cb9ae4ddfe54e490ac",
+      "entries": 18456
+    },
+    "jarvis": {
+      "inventory_sha256": "8b3ebc1901256636f33c6218adee47d6e294355afd64b569af343ea7676b8d10",
+      "entries": 19588
+    },
+    "node_executable": {
+      "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+      "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "size": 125989464,
+      "mode": 493
+    }
+  },
+  "full_suite": {
+    "source": "40c7baa4582f0a0722b4a20496e3ec64284c337b",
+    "passed": 1541,
+    "failed": 2,
+    "skipped": 2,
+    "seconds": 378.47
+  },
+  "followup": {
+    "fixture_contracts_corrected": true,
+    "focused_passed": 22,
+    "seconds": 6.28,
+    "full_suite_rerun": false
+  }
+}
