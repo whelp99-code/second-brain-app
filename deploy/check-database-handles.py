@@ -22,7 +22,10 @@ def file_identities(paths: list[Path]) -> dict[tuple[int, int], str]:
     return identities
 
 
-def inspect(database: Path) -> dict[str, object]:
+def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
+    observed_uid = os.getuid() if uid is None else uid
+    if observed_uid < 0:
+        raise ValueError("observed UID must be nonnegative")
     database = database.resolve(strict=True)
     paths = [database, *(Path(str(database) + suffix) for suffix in ('-wal', '-shm', '-journal'))]
     identities = file_identities(paths)
@@ -39,7 +42,7 @@ def inspect(database: Path) -> dict[str, object]:
             continue
         resource = 'process_metadata'
         try:
-            if process.stat().st_uid != os.getuid():
+            if process.stat().st_uid != observed_uid:
                 continue
             resource = 'fd_directory'
             descriptors = tuple((process / 'fd').iterdir())
@@ -88,21 +91,24 @@ def inspect(database: Path) -> dict[str, object]:
             except PermissionError:
                 detail[name] = 'permission-denied'
         diagnostics.append(detail)
-    return {'database': str(database), 'uid': os.getuid(), 'scanned_processes': scanned,
+    return {'database': str(database), 'uid': observed_uid, 'observer_uid': os.getuid(), 'scanned_processes': scanned,
             'open_handles': sorted(matches, key=lambda row: (row['pid'], row['fd'])),
             'mapped_files': sorted(mapped, key=lambda row: (row['pid'], row['file'])),
             'unreadable_pids': sorted(set(unreadable)),
             'unreadable_processes': diagnostics,
             'target_identity_changed': file_identities(paths) != identities,
-            'scope': 'same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
+            'scope': 'selected-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
             'drain_authorized': False}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('database', type=Path)
+    parser.add_argument('--uid', type=int, help='process owner UID to observe; defaults to current UID')
     args = parser.parse_args()
-    result = inspect(args.database)
+    if args.uid is not None and args.uid < 0:
+        parser.error("--uid must be nonnegative")
+    result = inspect(args.database, args.uid)
     print(json.dumps(result, indent=2))
     raise SystemExit(2 if result['unreadable_pids'] or result['target_identity_changed'] else 1
                      if result['open_handles'] or result['mapped_files'] else 0)

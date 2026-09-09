@@ -1,3 +1,5 @@
+[관리자 관측 대상UID 지정](DATABASE-OBSERVER-UID-2026-09-09.md) — --uid 및 관측자/대상 분리,10개통과. sudo비대화형 인증불가로 관리자 관측은 미실행.
+
 [운영 DB 접근 거부 단계 진단](DATABASE-DENIAL-STAGES-2026-09-09.md) —17PID 중16 FD목록/1 FD대상·maps, 관련8개 통과; exit2 유지.
 
 [운영 작성자 재관측](CURRENT-OPERATIONAL-WRITERS-2026-09-09.md) — 이전 SSH PID없음, 현재2서비스/6핸들/2매핑·접근불가17·DB58migrations. exit2로 운영 전환 보류 유지.

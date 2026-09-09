@@ -116,3 +116,29 @@ def test_permission_failure_identifies_unreadable_resource(tmp_path: Path, monke
     assert resource in detail['denied_resources']
     assert os.getpid() in report['unreadable_pids']
     assert report['drain_authorized'] is False
+
+
+def test_explicit_uid_keeps_target_owner_when_observer_differs(tmp_path: Path, monkeypatch) -> None:
+    import runpy
+
+    inspect = runpy.run_path(str(SCRIPT))['inspect']
+    database = tmp_path / 'fixture.sqlite'
+    connection = sqlite3.connect(database)
+    try:
+        target_uid = os.getuid()
+        monkeypatch.setattr(os, 'getuid', lambda: target_uid + 100_000)
+        report = inspect(database, uid=target_uid)
+        assert report['uid'] == target_uid
+        assert report['observer_uid'] != target_uid
+        assert any(row['pid'] == os.getpid() for row in report['open_handles'])
+        assert report['drain_authorized'] is False
+    finally:
+        connection.close()
+
+
+def test_negative_uid_is_rejected_before_observation(tmp_path: Path) -> None:
+    result = subprocess.run([sys.executable, str(SCRIPT), str(tmp_path / 'absent'), '--uid', '-1'],
+        capture_output=True, text=True, timeout=20, check=False)
+    assert result.returncode == 2
+    assert '--uid must be nonnegative' in result.stderr
+    assert not result.stdout
