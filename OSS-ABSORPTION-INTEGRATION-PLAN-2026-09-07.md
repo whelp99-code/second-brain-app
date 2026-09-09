@@ -1,5 +1,7 @@
 # Second Brain 기반 OSS 장점 흡수 — 통합 분석·구현 계획
 
+**2026-09-09 자비스 최초 세대 이전 상태 소비 연결:** [전송 계약·현재 권한 재검사·실제 pending/failed 재시작](SCOPED-JOURNAL-CLIENT-2026-09-09.md). 새 journal 전용 클라이언트가 원래 acceptance를 회수하며 현재 artifact/완료로 승격하지 않는다. 실제 MCP schema 비교 등록 누락 수정, 관련56통과·타입/lint·패키징 확인. 실제 양쪽 철회 차단과 재시작 동일 결과. 원래 outbox/lease의 영속 복구 workflow·운영 설정·A→B 및 전체 M1–M14는 남는다.
+
 **2026-09-09 최초 세대 이전 원장 상태 표면:** [새 scoped-request-status-v1·별도 MCP 재시작·권한 경계](SCOPED-JOURNAL-STATUS-2026-09-09.md). provider의 pending/failed/원래 수락 조회를 활성 세대에서 분리했다. 기존 read v1–v5 유지, 현재 정책·서명·삭제 이력 전후 검사 및 원장 부재 거부. 전체1,354통과/2skip/290.17초(embeddings 제외)·관련31통과(중복)·정적검사/Ruff 통과. 자비스 전송/소비자·현재 인증 발급과 복구 workflow 연결은 다음 작업이며 이 원장 응답은 현재 artifact/최종 완료 증거가 아니다. 전체 M1–M14 운영 인수는 유지한다.
 
 **2026-09-09 공개 scoped MCP 쓰기 연결:** [고정 계약·별도 MCP→HTTPS→일반 CLI 인수](SCOPED-WRITE-MCP-2026-09-09.md). JARVIS `623afa6`의 scoped-request-write-v1과 SB sb_write_request를 연결했다. 최종 SB 전체1,342통과/2skip/273.05초(embeddings 제외), J 관련49통과·정적검사·패키징 확인. 실제 프로세스 정상 proved, 수락 중 철회/실행 전 철회/로그인 만료 차단. 운영 설정·자격증명·실제 에이전트 A→B 및 전체 M1–M14 인수는 남는다. [인계 병합 최신 우선순위](HANDOFF-MERGED-PRIORITIES-2026-09-09.md)를 현재 판단으로 사용하며 아래 기록은 각 당시 상태다.
