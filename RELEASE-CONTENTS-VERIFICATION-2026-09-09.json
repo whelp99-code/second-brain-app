@@ -1,0 +1,54 @@
+{
+  "jarvis": {
+    "candidate_source": "/var/tmp/jarvis-contained-candidate-k54z40zc/source",
+    "baseline": {
+      "matches": true,
+      "added": [],
+      "removed": [],
+      "changed": [],
+      "entries": 19588,
+      "activation_authorized": false
+    },
+    "changed": {
+      "matches": false,
+      "added": [],
+      "removed": [],
+      "changed": [
+        "dist/src/cli.js"
+      ],
+      "entries": 19588,
+      "activation_authorized": false
+    },
+    "restored": {
+      "matches": true,
+      "added": [],
+      "removed": [],
+      "changed": [],
+      "entries": 19588,
+      "activation_authorized": false
+    },
+    "scope": "private full candidate copy; no operational changes"
+  },
+  "provider": {
+    "matches": true,
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "entries": 8045,
+    "activation_authorized": false,
+    "external_files": [
+      {
+        "entry": ".venv/bin/python",
+        "path": "/home/jm/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12"
+      },
+      {
+        "entry": ".venv/bin/python3",
+        "path": "/home/jm/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12"
+      },
+      {
+        "entry": ".venv/bin/python3.12",
+        "path": "/home/jm/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12"
+      }
+    ]
+  }
+}
