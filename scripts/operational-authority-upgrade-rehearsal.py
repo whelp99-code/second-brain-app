@@ -95,6 +95,10 @@ def main():
             original.backup(copied, pages=256, progress=progress)
         target.chmod(0o600)
         before = inventory(target)
+        rollback_snapshot = Path(directory) / "before-upgrade.sqlite"
+        with closing(readonly(target)) as current, closing(sqlite3.connect(rollback_snapshot)) as saved:
+            current.backup(saved)
+        rollback_snapshot.chmod(0o600)
         with closing(readonly(target)) as connection:
             old_journal = connection.execute("SELECT id,checksum,applied_at FROM schema_migrations ORDER BY id").fetchall()
             old_vector = [row[0] for row in old_journal]
@@ -118,7 +122,7 @@ try {
 """
         child = subprocess.run(["node", "--input-type=module", "-e", program,
                                 str(build), str(target), str(migrations)],
-                               capture_output=True, text=True, timeout=60)
+                               capture_output=True, text=True, timeout=60, check=False)
         if child.returncode != 0:
             raise RuntimeError("migration child failed; private diagnostics withheld")
         upgrade = json.loads(child.stdout)
@@ -132,14 +136,15 @@ try {
             return 1
         after = inventory(target, before)
         with closing(readonly(target)) as connection:
-            new_journal = dict((row[0], row[1:]) for row in connection.execute(
-                "SELECT id,checksum,applied_at FROM schema_migrations"))
+            new_journal = {row[0]: row[1:] for row in connection.execute(
+                "SELECT id,checksum,applied_at FROM schema_migrations")}
         journal_preserved = all(new_journal.get(row[0]) == row[1:] for row in old_journal)
         # schema_migrations intentionally gains rows. Every other original table
         # must preserve the multiset of its old columns, including duplicate rows.
         preserved = [name for name in before if name != "schema_migrations" and before[name] == after[name]]
         changed = [name for name in before if name != "schema_migrations" and before[name] != after[name]]
         previous_check = None
+        rollback_check = None
         if args.previous_build is not None:
             previous = args.previous_build.resolve(strict=True)
             check = """
@@ -158,13 +163,28 @@ try {
             checked = subprocess.run(["node", "--input-type=module", "-e", check, str(previous), str(target),
                                       str(args.previous_migrations.resolve(strict=True) if args.previous_migrations
                                           else previous / "migrations")],
-                                     capture_output=True, text=True, timeout=30)
+                                     capture_output=True, text=True, timeout=30, check=False)
             if checked.returncode != 0:
                 raise RuntimeError("previous readiness check failed; private diagnostics withheld")
             previous_check = json.loads(checked.stdout)
             # Readiness probes may not alter the upgraded data, even on the copy.
             if inventory(target, before) != after:
                 raise RuntimeError("previous readiness probe changed data")
+            restored = Path(directory) / "restored.sqlite"
+            with closing(readonly(rollback_snapshot)) as saved, closing(sqlite3.connect(restored)) as restored_db:
+                saved.backup(restored_db)
+            restored.chmod(0o600)
+            rollback_args = ["node", "--input-type=module", "-e", check, str(previous), str(restored),
+                             str(args.previous_migrations.resolve(strict=True) if args.previous_migrations
+                                 else previous / "migrations")]
+            restored_probe = subprocess.run(rollback_args, capture_output=True, text=True, timeout=30, check=False)
+            if restored_probe.returncode != 0:
+                raise RuntimeError("rollback readiness probe failed; private diagnostics withheld")
+            rollback_check = {
+                "previous_binary_accepts_restored_database": json.loads(restored_probe.stdout)["accepted_upgraded_database"],
+                "original_inventory_preserved": inventory(restored) == before,
+                "scope": "pre-upgrade snapshot restored to separate private file; post-upgrade writes not preserved",
+            }
         observed_counts = {name: before[name]["rows"] for name in
                            ("memory_candidates", "memory_outbox", "control_command_requests", "memory_correction_requests")
                            if name in before}
@@ -175,6 +195,9 @@ try {
             hold_reasons.append("ORIGINAL_BUSINESS_ROWS_CHANGED")
         if previous_check is not None and previous_check["accepted_upgraded_database"]:
             hold_reasons.append("PREVIOUS_BINARY_ACCEPTS_UPGRADED_DATABASE")
+        if rollback_check is not None and (not rollback_check["previous_binary_accepts_restored_database"]
+                                          or not rollback_check["original_inventory_preserved"]):
+            hold_reasons.append("PRE_UPGRADE_SNAPSHOT_ROLLBACK_FAILED")
         if initial_fk or upgrade["foreign_key_errors"]:
             hold_reasons.append("FOREIGN_KEY_ERRORS")
         if upgrade["integrity"] != ["ok"]:
@@ -184,6 +207,7 @@ try {
         report = {"source_open_mode": "read_only", "operational_activation": False,
                   "candidate_identity": candidate_identity, "hold_reasons": hold_reasons,
                   "previous_readiness_check": previous_check, "observed_original_counts": observed_counts,
+                  "snapshot_rollback_check": rollback_check,
                   "original_migration_entries_preserved": journal_preserved,
                   "migration_count_before": len(old_vector), "migration_count_after": len(upgrade["vector"]),
                   "added_migrations": [name for name in upgrade["vector"] if name not in old_vector],
