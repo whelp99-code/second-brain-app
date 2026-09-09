@@ -26,7 +26,7 @@ def apply_with_prior_knowledge(root: Path, apply: Callable[[], None]) -> None:
     with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as conn:
         rows = cast(list[tuple[str, str, str, str]], conn.execute(
             "SELECT page_id,content_digest,knowledge_status,approval_status FROM bound_knowledge "
-            + "WHERE knowledge_status='ACTIVE' AND approval_status='APPROVED'").fetchall())
+            + "WHERE knowledge_status='ACTIVE' AND approval_status='APPROVED' ORDER BY page_id,content_digest").fetchall())
         for row in rows:
             state = BoundKnowledge(*row)
             if _checksum(root, state) == state.content_digest:

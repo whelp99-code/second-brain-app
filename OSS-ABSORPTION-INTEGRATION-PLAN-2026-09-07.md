@@ -1003,3 +1003,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 승인 기억 부분 삭제 인수:** [남은 사실·효과 출처·외부 철회 유지](BOUND-PARTIAL-FORGET-2026-09-10.md). 실제 삭제 요청의 lexical/hybrid×외부 철회 4경우와 helper 6건, 총10통과/8.90초·Ruff/diff. 삭제 대상 제거, 남은 승인 사실 조회, 철회 상태 비활성 유지 확인. 복원·scoped 접근·crash·실제 업무·운영과 전체 목표는 남는다.
+
+
+**2026-09-10 상태 재결합 실패 원자성:** [여러 상태 rollback·실패 staging 비공개·다음 writer](EFFECT-KNOWLEDGE-ROLLBACK-2026-09-10.md). 관련16통과/27.67초·Ruff/diff·타입0오류/0경고. prior 행 순서를 명시했다. 실제 executor tombstone/reingress 이후 실패복구·SIGKILL 및 전체 목표는 남는다.
