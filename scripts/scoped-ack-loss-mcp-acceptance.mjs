@@ -11,6 +11,8 @@ const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-stor
 const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js');
 const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch, recoverMemoryScopedOutboxDispatches } = await load('src/memory-scoped-outbox-worker.js');
 const { claimMemoryScopedReconciliation, requireMemoryScopedReconciliationLease, releaseMemoryScopedReconciliation } = await load('src/memory-scoped-reconciliation.js');
+async function main() {
+const atomic = process.argv[3] === "--settle";
 const f = await scopedOutboxFixture();
 try {
   const r = registerMemoryScopedOutbox(f.options, f.claimed), options = { ...f.options, roots: f.dispatch.roots };
@@ -28,12 +30,29 @@ try {
   requireMemoryScopedReconciliationLease(f.database.authority, reconciliation.lease, late);
   const observationPath = join(f.database.root, 'observation.json');
   writeFileSync(observationPath, JSON.stringify({ database: f.database.path,
-    spoolRoot: f.options.spoolRoot, lease: reconciliation.lease }), { mode: 0o600 });
+    spoolRoot: f.options.spoolRoot, lease: reconciliation.lease, atomic,
+    roots: { candidate_dispatch_spool_root: f.options.dispatch.roots.dispatch,
+      candidate_review_spool_root: f.options.dispatch.roots.review } }), { mode: 0o600 });
   const child = spawnSync(join(sb, '.venv/bin/python'), [join(sb, 'scripts/remembered-artifact-mcp-acceptance.py'),
     build, 'scoped-record-read-v5', requestPath, observationPath], { cwd: process.cwd(), env: { ...process.env, PYTHONPATH: sb },
     encoding: 'utf8', timeout: 60000 });
   assert.equal(child.status, 0, child.stderr + child.stdout);
   const observed = JSON.parse(child.stdout);
+  if (atomic) {
+    assert.equal(observed.atomic_settlement.kind, 'memory_scoped_settled');
+    assert.equal(observed.atomic_settlement.replayed, true);
+    assert.equal(observed.commit_exit, 73);
+    const db = f.database.authority.db;
+    assert.equal(db.prepare('SELECT state FROM memory_outbox').get().state, 'settled');
+    assert.equal(db.prepare('SELECT state FROM memory_candidates').get().state, 'settled');
+    assert.equal(db.prepare('SELECT state FROM control_command_requests WHERE request_id=?').get(f.claimed.request_id).state, 'completed');
+    assert.equal(db.prepare('SELECT count(*) AS n FROM memory_scoped_settlements').get().n, 1);
+    assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
+    assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+    console.log(JSON.stringify({ ...observed, outbox: 'settled', candidate: 'settled', control: 'completed',
+      settlements: 1, attempts: 1, foreign_key_errors: 0 }, null, 2));
+    return;
+  }
   assert.equal(observed.recovered_without_local_acceptance, true);
   const accepted = observed.completion.status.acceptance;
   assert.equal(accepted.request_digest, dispatched.request.request_digest);
@@ -85,3 +104,6 @@ try {
   console.log(JSON.stringify({ reconstructed, independent_proof_readers: 2, wrong_provider_rejected: true, durable_observations: 1, reconciliation_lease: reconciliation.lease, lease_preserved_across_acceptance_recovery: true, observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
     record_commit_exit: 73, record_processes: 3, replay_idempotent: true, redispatch: false, jarvis_state: 'reconciling', foreign_key_errors: 0 }, null, 2));
 } finally { closeMemoryDatabase(f.database); }
+
+}
+await main();

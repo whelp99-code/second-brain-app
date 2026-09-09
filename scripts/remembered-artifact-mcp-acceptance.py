@@ -50,6 +50,12 @@ try:
         input=json.dumps({**({'reconciliation': json.loads(Path(sys.argv[4]).read_text())} if len(sys.argv) > 4 else {}), 'request': raw, **({'accepted': dataclasses.asdict(accepted)} if profile != 'scoped-record-read-v5' else {}), 'config': str(config_path),
             'launcher': str(launcher), 'profile': profile, 'custom_request': len(sys.argv) > 3, 'contract': str(app / f'contracts/second-brain-scoped-read-v{profile[-1]}.json')}),
         text=True, capture_output=True, timeout=60, check=False)
+    reconciliation = json.loads(Path(sys.argv[4]).read_text()) if len(sys.argv) > 4 else {}
+    if reconciliation.get('atomic'):
+        if result.returncode != 73:
+            raise RuntimeError(f'expected post-commit exit73: {result.returncode}: ' + result.stderr)
+        result = subprocess.run(['node', str(app / 'scripts/scoped-settlement-replay-process.mjs'), sys.argv[1], sys.argv[4]],
+            text=True, capture_output=True, timeout=30, check=False)
     if result.returncode != 0:
         raise RuntimeError(result.stderr + ((root / 'server.err').read_text() if (root / 'server.err').exists() else ''))
     print(result.stdout.strip())

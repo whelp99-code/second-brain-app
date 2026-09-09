@@ -90,6 +90,18 @@ try {
         assert.equal(recorded.replayed, false);
         durableObservation = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
         assert.deepEqual(durableObservation, { ...recorded, replayed: true });
+        if (input.reconciliation.atomic) {
+          const { settleMemoryScopedCompletion } = await moduleAt('src/memory-scoped-settlement.js');
+          const result = await settleMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at, input.reconciliation.roots);
+          assert.equal(result.kind, 'memory_scoped_settled');
+          assert.equal(result.replayed, false);
+          // Abrupt exit after the complete DB transaction; the next process
+          // must recover the committed receipt without another MCP write.
+          authority.close();
+          closeMemoryDatabase(db);
+          process.exit(73);
+        }
+
       } finally { authority.close(); }
     }
 
