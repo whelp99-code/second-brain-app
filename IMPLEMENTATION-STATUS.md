@@ -1,3 +1,5 @@
+> 2026-09-09 소비자 개선: [JARVIS 61b8a42 기억 도구 근거 안내](MEMORY-CONSUMER-EVIDENCE-GUIDANCE-2026-09-09.md). 후보/순위와 답변 가능성 구분·없는 사실 추정 금지·미정/충돌 보존 명시. 통합 15개 및 ESLint 통과. 실제 native 답변 품질·운영 반영은 미검증.
+
 > 2026-09-09 품질 기준선: [답변 불가 CLI/MCP 실제 측정](ABSTENTION-CLI-MCP-BASELINE-2026-09-09.md). 합성4문항 positive recall@5=1이나 negative_empty_rate=0, 양쪽 동일. 작은 반례 데이터셋 추가, 측정 완료와 품질 합격 구분.
 
 > 2026-09-09 검색 품질 반례: [실제 모델 20쌍 측정](SEMANTIC-ABSTENTION-COUNTEREXAMPLE-2026-09-09.md). 정답 일정 0.613보다 무관한 주소/날짜 0.651이 높음. 기본 임계값 일괄 상향 보류, 재현 스크립트 및 동일 재실행 증거 추가.
