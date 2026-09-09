@@ -8,7 +8,7 @@ import hashlib
 import hmac
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -284,7 +284,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 self._json(HTTPStatus.OK, {"status": "ok"})
                 return
             if parsed.path == "/api/status":
-                snapshot = status_snapshot(context.config)
+                pinned_config = replace(context.config, raw={**context.config.raw, "vault_root": str(root)})
+                snapshot = status_snapshot(pinned_config)
                 last_run = snapshot.get("last_run")
                 last_run_status: str | None = None
                 if isinstance(last_run, dict):
@@ -294,7 +295,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 self._json(
                     HTTPStatus.OK,
                     {
-                        "status": read_status(context.config),
+                        "status": read_status(pinned_config),
                         "last_run_status": last_run_status,
                         "failures": {
                             "total": sum(cast(dict[str, int], snapshot["failed_by_stage"]).values()),
