@@ -1,0 +1,12 @@
+{
+  "workspace": "/var/tmp/sb-adapter-name-audit-dyr1qo29",
+  "requested_adapter": "missing-adapter",
+  "configured_id": "inbox",
+  "selected": [
+    {
+      "class": "InboxDocumentsAdapter",
+      "source_id": "inbox"
+    }
+  ],
+  "scan_executed": false
+}

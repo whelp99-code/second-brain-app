@@ -1,0 +1,26 @@
+/home/jm/orca/projects/second-brain-app/sb/ops.py
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:424:17 - warning: Implicit string concatenation not allowed (reportImplicitStringConcatenation)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:444:17 - warning: Type of "batch" is Any (reportAny)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:445:21 - warning: Implicit string concatenation not allowed (reportImplicitStringConcatenation)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:451:86 - warning: Argument type is Any
+    Argument corresponds to parameter "iter2" in function "__new__" (reportAny)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:452:21 - warning: Type of "row" is Any (reportAny)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:453:21 - warning: Implicit string concatenation not allowed (reportImplicitStringConcatenation)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:458:65 - warning: Argument type is Any
+    Argument corresponds to parameter "value" in function "_safe_detail" (reportAny)
+  /home/jm/orca/projects/second-brain-app/sb/ops.py:565:40 - warning: "_read_manifest" is protected and used outside of the class in which it is declared (reportPrivateUsage)
+/home/jm/orca/projects/second-brain-app/sb/pipeline.py
+  /home/jm/orca/projects/second-brain-app/sb/pipeline.py:445:9 - warning: Result of call expression is of type "KnowledgeState" and is not used; assign to variable "_" if this is intentional (reportUnusedCallResult)
+/home/jm/orca/projects/second-brain-app/sb/web.py
+  /home/jm/orca/projects/second-brain-app/sb/web.py:322:47 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  /home/jm/orca/projects/second-brain-app/sb/web.py:325:48 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  /home/jm/orca/projects/second-brain-app/sb/web.py:326:36 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  /home/jm/orca/projects/second-brain-app/sb/web.py:326:67 - warning: Type of "get" is partially unknown
+    Type of "get" is "Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]" (reportUnknownMemberType)
+  /home/jm/orca/projects/second-brain-app/sb/web.py:329:21 - warning: Argument type is partially unknown
+    Argument corresponds to parameter "payload" in function "_json"
+    Argument type is "dict[str, str | dict[Unknown, Unknown] | object | dict[str, int | object] | None]" (reportUnknownArgumentType)
+0 errors, 14 warnings, 0 notes
