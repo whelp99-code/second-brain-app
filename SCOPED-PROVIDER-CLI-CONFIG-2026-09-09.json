@@ -1,0 +1,98 @@
+{
+  "gateway_configuration": "CLI parser and independently owned existing authority connection",
+  "admission_surface": "mcp",
+  "execution_surface": "cli",
+  "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+  "identity_forwarder": "fixture",
+  "clock": "fixture",
+  "public_mcp_write": true,
+  "results": [
+    {
+      "mode": "valid",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:21358f64418c3e883b7671587da1ffc8eb3a94864ea6a0727a8491ee9a3d758d",
+        "request_digest": "sha256:21358f64418c3e883b7671587da1ffc8eb3a94864ea6a0727a8491ee9a3d758d",
+        "idempotency_key": "memidem:scoped:v4:030358cab4276edc9f875f9750ce61634f8761d3aadd652a9b973bc94873a9a2",
+        "scope_digest": "sha256:7659ccc5c545b52d2cf1eba3dd9351778afc2f583d44c2fb84eb9e1541a44839",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:21358f64418c3e883b7671587da1ffc8eb3a94864ea6a0727a8491ee9a3d758d.v4.json",
+        "request_file_digest": "sha256:f785923df15942543c91898b917fc2f9fcb025290d797d06090131f148aeb8d2",
+        "replayed": false
+      },
+      "provider_state": "proved",
+      "active_generation": true,
+      "authority_https_calls": 5,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "accepted_row": false,
+      "authority_https_calls": 2,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:23e0a638c6ef4b79c85e077d1e34e5b34d86eaf6ad13c77d3be6a11dd244868b",
+        "request_digest": "sha256:23e0a638c6ef4b79c85e077d1e34e5b34d86eaf6ad13c77d3be6a11dd244868b",
+        "idempotency_key": "memidem:scoped:v4:e01934be54c92a64c05cbae6b6ee10abab73ecfc2983e35b6cbca1fe1dfdce3f",
+        "scope_digest": "sha256:f8f001dae52a45f828d6cde0bafc47fc2240496e8ec6c39e17c658d7e4dac15f",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:23e0a638c6ef4b79c85e077d1e34e5b34d86eaf6ad13c77d3be6a11dd244868b.v4.json",
+        "request_file_digest": "sha256:2a143cc2debcf26b86f6c089ffe4483cafcf4421f44322748c79a41ac38ffe66",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "expire_before_execute",
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:88723ffc4d9bd3fe5ee4988aa862f1c56e7898aceaca8ce788dd56788a7deebe",
+        "request_digest": "sha256:88723ffc4d9bd3fe5ee4988aa862f1c56e7898aceaca8ce788dd56788a7deebe",
+        "idempotency_key": "memidem:scoped:v4:c82c4814eec45a28f3bb71addf4f1b761a36d43498a2708ea3be1bc6f3593de7",
+        "scope_digest": "sha256:a12e90a9956855b1fd6b5a4f2cb2bba67bf6a26ea2131c5b251115d25ab7d7b3",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:88723ffc4d9bd3fe5ee4988aa862f1c56e7898aceaca8ce788dd56788a7deebe.v4.json",
+        "request_file_digest": "sha256:0f9d58680e8aacca79799e32031b4701ef711a118d90f302f6d1fe0d5380a365",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    }
+  ],
+  "jarvis_commit": "399fb4f",
+  "test_fixture_commit": "e6e36d7",
+  "validation": {
+    "related_tests_passed": 64,
+    "reconcile_cli_tests_passed": 6,
+    "cancellation_tests_final_passed": 12,
+    "initial_cancellation_fixture_failures": 1,
+    "distinct_final_passing_tests": 82,
+    "operational_deployment": false
+  }
+}

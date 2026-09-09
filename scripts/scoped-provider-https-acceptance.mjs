@@ -14,6 +14,8 @@ const { scopedOutboxFixture } = await load('tests/fixtures/scoped-outbox.js');
 const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-store.js');
 const { makePhoneHome, processUid, startFakeAuthority, FIXTURE_LOGIN, cookieFromSetCookie } = await load('tests/fixtures/phone-gateway-harness.js');
 const { createPhoneGatewayServer, parsePhoneGatewayConfig } = await load('src/phone-gateway.js');
+const { parsePhoneGatewayCli } = await load('src/phone-gateway-main.js');
+const { openPhoneMemoryProviderCli } = await load('src/phone-memory-provider-cli.js');
 const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js');
 const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch } = await load('src/memory-scoped-outbox-worker.js');
 const { recordMemoryScopedOutboxAcceptance } = await load('src/memory-scoped-outbox-result.js');
@@ -21,7 +23,7 @@ const { canonicalize } = await load('src/canonical.js');
 const results = [];
 for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'expire_before_execute']) {
   const f = await scopedOutboxFixture(), home = makePhoneHome(), upstream = await startFakeAuthority();
-  let gateway, tls;
+  let gateway, tls, provider;
   try {
     const generated = spawnSync(join(sb, '.venv/bin/python'), ['-c',
       'from pathlib import Path; import sys; from tests.scoped_https_harness import certificate; certificate(Path(sys.argv[1]))', f.database.root],
@@ -54,10 +56,17 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     writeFileSync(join(assets, 'index.html'), '<div id="root"></div>');
     writeFileSync(join(assets, 'manifest.json'), JSON.stringify({ 'index.html': { file: 'assets/app.js' } }));
     writeFileSync(join(assets, 'assets/app.js'), '1');
+    const providerFields = { 'provider-verify-db': f.database.path, 'provider-verify-agent': 'agent:fixture',
+      'provider-verify-provider': 'provider:fixture', 'provider-verify-policy': policyPath,
+      'provider-verify-spool': f.options.spoolRoot, 'provider-verify-dispatch-spool': f.dispatch.roots.dispatch,
+      'provider-verify-review-spool': f.dispatch.roots.review };
+    const cli = parsePhoneGatewayCli(['--host', '127.0.0.1', '--port', '4176', '--upstream', 'http://127.0.0.1:4173',
+      '--static-root', assets, '--env-file', home.envFile,
+      ...Object.entries(providerFields).flatMap(([key, value]) => [`--${key}`, value])]);
+    provider = openPhoneMemoryProviderCli(cli.memoryProvider);
+    assert.notEqual(provider.options.authority, f.database.authority);
     gateway = createPhoneGatewayServer({ host: '127.0.0.1', port: 0, upstream: upstream.origin, staticRoot: assets,
-      config, now: () => at, audit: () => {}, memoryProviderVerifier: { authority: f.database.authority,
-        agent_id: 'agent:fixture', provider_instance_id: 'provider:fixture', policy_path: policyPath,
-        spool_root: f.options.spoolRoot, roots: f.dispatch.roots } });
+      config, now: () => at, audit: () => {}, memoryProviderVerifier: provider.options });
     const login = await new Promise((resolve, reject) => {
       const req = httpsRequest(`${origin}/api/v1/phone/session`, { ca }, res => {
         let body = ''; res.on('data', chunk => { body += chunk; });
@@ -101,7 +110,7 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     assert(!JSON.stringify(result).includes(cookie));
     results.push({ mode, ...result, authority_https_calls: calls, dispatch_attempts: 1, foreign_key_errors: 0 });
   } finally {
-    gateway?.close(); if (tls) await new Promise(resolve => tls.close(resolve));
+    gateway?.close(); provider?.close(); if (tls) await new Promise(resolve => tls.close(resolve));
     await upstream.close();
     const writable = path => { const st = lstatSync(path); if (st.isSymbolicLink()) return;
       chmodSync(path, st.isDirectory() ? 0o700 : 0o600);
@@ -109,5 +118,5 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
     writable(f.database.root); closeMemoryDatabase(f.database); rmSync(home.home, { recursive: true, force: true });
   }
 }
-console.log(JSON.stringify({ admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal', transport: 'actual verified TLS, separate Python verifier children and live gateway sessions',
+console.log(JSON.stringify({ gateway_configuration: 'CLI parser and independently owned existing authority connection', admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal', transport: 'actual verified TLS, separate Python verifier children and live gateway sessions',
   identity_forwarder: 'fixture', clock: 'fixture', public_mcp_write: process.argv.includes('--mcp'), results }, null, 2));
