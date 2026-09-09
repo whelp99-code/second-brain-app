@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 
 from sb.config import Config
 from sb.request_executor import ExecutorConfig, RequestExecutor
+from sb.scoped_provider_runtime import configured_scoped_provider_authority
 from sb.task30_barriers import UnixBarrierSink
 
 
@@ -44,6 +45,11 @@ def apply_requests_once(config: Config, control_path: str | None) -> int:
     if not jarvis_keys:
         print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
         return 1
+    try:
+        scoped_authority = configured_scoped_provider_authority(config)
+    except ValueError:
+        print("SCOPED_PROVIDER_RUNTIME_CONFIG_INVALID", file=sys.stderr)
+        return 1
     barrier_sink = None if control_path is None else UnixBarrierSink(Path(control_path))
     if barrier_sink is not None:
         barrier_sink.await_trigger("apply-requests")
@@ -64,6 +70,7 @@ def apply_requests_once(config: Config, control_path: str | None) -> int:
             search_hybrid=config.search_hybrid,
         ),
         barrier_sink=barrier_sink,
+        scoped_authority=scoped_authority,
     )
     try:
         result = executor.apply_once()

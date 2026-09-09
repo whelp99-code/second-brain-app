@@ -47,9 +47,7 @@ def _config(path: Path) -> dict[str, str]:
     return {k: str(v) for k, v in value.items()}
 
 
-def _invoke(path: Path, payload: bytes) -> JsonValue:
-    if not 0 < len(payload) <= 32768:
-        raise ValueError("INPUT_INVALID")
+def _settings(path: Path) -> tuple[dict[str, str], str, int, ssl.SSLContext]:
     config = _config(path)
     origin = config["origin"]
     url = urlsplit(origin)
@@ -63,8 +61,36 @@ def _invoke(path: Path, payload: bytes) -> JsonValue:
     ca_file = config.get("ca_file")
     if ca_file is not None and not Path(ca_file).is_absolute():
         raise ValueError("CONFIG_INVALID")
-    context = ssl.create_default_context(cafile=ca_file)
-    connection = http.client.HTTPSConnection(url.hostname, url.port or 443, timeout=10, context=context)
+    if ca_file is None:
+        context = ssl.create_default_context()
+    else:
+        # Open nonblocking before checking the descriptor so a FIFO cannot stall
+        # CLI preflight. Public CA symlinks may resolve to bounded regular files.
+        fd = os.open(ca_file, os.O_RDONLY | os.O_NONBLOCK)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= 262144:
+                raise ValueError("CA_INVALID")
+            ca_bytes = os.read(fd, 262145)
+            if len(ca_bytes) != info.st_size:
+                raise ValueError("CA_INVALID")
+        finally:
+            os.close(fd)
+        context = ssl.create_default_context(cadata=ca_bytes.decode("ascii"))
+    return config, url.hostname, url.port or 443, context
+
+
+def validate_scoped_provider_https_config(path: Path) -> None:
+    """Local preflight only; neither sends a request nor asserts a live session."""
+    _ = _settings(path)
+
+
+def _invoke(path: Path, payload: bytes) -> JsonValue:
+    if not 0 < len(payload) <= 32768:
+        raise ValueError("INPUT_INVALID")
+    config, host, port, context = _settings(path)
+    origin = config["origin"]
+    connection = http.client.HTTPSConnection(host, port, timeout=10, context=context)
     try:
         connection.request("POST", _ROUTE, body=payload, headers={
             "Origin": origin, "Cookie": "__Host-jarvis-phone=" + config["cookie_id"],

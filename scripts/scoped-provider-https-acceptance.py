@@ -1,5 +1,11 @@
 """Actual HTTPS authority checks at provider admission and execution boundaries."""
 import json
+import base64
+import os
+from contextlib import redirect_stdout
+from io import StringIO
+from types import SimpleNamespace
+from unittest.mock import patch
 import sys
 from dataclasses import asdict
 from datetime import datetime
@@ -28,9 +34,37 @@ except ValueError as error:
         store.close()
     print(json.dumps({'admission': 'denied', 'accepted_row': False}))
 else:
-    executor = RequestExecutor(config, scoped_authority=authority)
-    try:
+    if state.get('execution_surface') == 'cli':
+        import sb.scoped_provider_runtime as runtime
+        from sb.cli import main
+        values = {name: str(getattr(config, name)) for name in ('request_root', 'state_root', 'share_root',
+            'export_root', 'backup_root', 'provider_instance_id', 'provider_release_sha', 'provider_signing_key_id')}
+        values.update(provider_private_key=base64.urlsafe_b64encode(config.provider_signing_key.private_bytes_raw()).decode(),
+            jarvis_signing_key_id='jarvis:fixture',
+            jarvis_public_key=base64.urlsafe_b64encode(config.jarvis_public_keys['jarvis:fixture'].public_bytes_raw()).decode())
+        config_path = Path(state['provider_root']) / 'cli-config.toml'
+        config_path.write_text(''.join(f'{name} = {json.dumps(value)}\n' for name, value in values.items())
+            + '\n[scoped_provider_verifier]\ncredentials_path = ' + json.dumps(state['credentials']) + '\n')
+        config_path.chmod(0o600)
+        os.environ['SB_CONFIG'] = str(config_path)
+        class FixtureClock:
+            @staticmethod
+            def now(_tz):
+                return now
+        original_apply = RequestExecutor.apply_once
+        def fixed_apply(self, **kwargs):
+            kwargs.setdefault('now', now)
+            return original_apply(self, **kwargs)
+        output = StringIO()
+        with patch.object(runtime, 'datetime', FixtureClock), patch.object(RequestExecutor, 'apply_once', fixed_apply), redirect_stdout(output):
+            code = main(['apply-requests', '--once'])
+        result = SimpleNamespace(**json.loads(output.getvalue()))
+        assert code == (0 if state['mode'] == 'valid' else 1), code
+        executor = RequestExecutor(config, scoped_authority=authority)
+    else:
+        executor = RequestExecutor(config, scoped_authority=authority)
         result = executor.apply_once(worker='fixture:https', now=now)
+    try:
         status = executor.store.get(accepted.request_id)
         if state['mode'] == 'valid':
             assert result.state == 'proved' and status.proof_json is not None, result

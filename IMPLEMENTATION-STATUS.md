@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 일반 CLI에 scoped 실행 연결:** [명시적 설정·CA FIFO 정지 수정·실제 TLS/CLI](SCOPED-PROVIDER-RUNTIME-2026-09-09.md). apply-requests --once가 서버 고정 credentials_path로 현재 HTTPS 권한 검증기를 구성한다. 원장/claim 전 로컬 설정 검사, FIFO/디렉터리/크기 초과 CA 차단. 최종 전체1,335통과/2skip/303.28초·Ruff/정적검사, 실제 CLI 정상proved·실행 전 철회/로그인 만료 활성 세대 없음. 공개 MCP 쓰기·운영 자격증명/설정·실제 A→B 공유와 전체 인수는 남는다.
+
 **2026-09-09 HTTPS 현재 권한→SB 수락·실행 연결:** [실제 TLS/게이트웨이/별도 Python4시나리오](SCOPED-PROVIDER-HTTPS-2026-09-09.md). 비공개 자격증명·인증서 검사·크기/20초 제한을 갖춘 HTTPS 호출을 기존 판정 소비와 연결했다. 정상proved/수락 중 철회 원장 없음/실행 전 철회·세션 만료 활성 세대 없음, attempt1/FK0. Python76통과·정적검사, J HTTP1통과·emit/lint. 운영 자격증명/실행 설정·공개 쓰기·실제 A→B 공유 및 전체 인수는 남는다.
 
 **2026-09-09 현재 인증 세션 기반 검증 HTTP 연결:** [실제 로그인/CSRF·원래 세션·현재 정책 검증](SCOPED-PROVIDER-LIVE-SESSION-2026-09-09.md). JARVIS ddf6ff9가 명시적 서버 설정 시 검증 전용 endpoint를 제공한다. 실제 테스트 HTTP에서 정상200/새 로그인 세션403/정책 철회403/만료401, DB 변경0·세션 연장 없음. 고유72개 통과·최종 HTTP1개 재검사·격리 emit/lint. 세션 복사 파일을 운영 인증으로 사용하는 구성은 보류한다. 운영 설정·SB 호출·공개 쓰기·실제 A→B 공유 등 전체 인수는 남는다.

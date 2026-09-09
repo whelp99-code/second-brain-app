@@ -258,3 +258,20 @@ v2는 `SB_MCP_CONTRACT_PROFILE=scoped-record-read-v2`로 명시적으로 선택�
 제한 검색은 query와 limit(1~50)을 서명에 결합하고 전체 페이지 분류 검사를 통과한 lexical record만 반환한다. 권한 밖 원본의 제목·snippet·corpus 점수는 반환하지 않으며, 허용 결과를 고른 뒤 limit을 적용한다. [검색 인수와 수집 결손](SCOPED-MCP-SEARCH-2026-09-09.md)을 참고한다.
 
 동일한 어댑터로 여러 원본을 수집할 때는 각 `[[sources]]`에 서로 다른 ID를 지정한다. pipeline이 ID별 인스턴스와 커서를 유지하며, 중복 ID는 거부한다. 명시적으로 선택한 source/adapter ID 중 해석되지 않는 이름이 있으면 `SOURCE_NOT_FOUND`로 실패하며 나머지 원본만 부분 수집하지 않는다. [markdown 다중 원본의 실제 CLI 검증](MULTI-SOURCE-INGEST-FIX-2026-09-09.md)을 참고한다.
+
+### Scoped V4 요청 실행 설정
+
+`apply-requests --once`에서 scoped V4 요청을 처리하려면 서버의 고정 설정 파일에 검증기 자격증명 경로를 명시한다. 기존 자비스 공개키·provider 서명키 설정도 필요하다.
+
+```toml
+[scoped_provider_verifier]
+credentials_path = "/home/jm/.config/second-brain/provider-credentials.json"
+```
+
+자격증명 파일은 서버 소유의 비공개 canonical JSON이다. `origin`(자비스 HTTPS origin), `cookie_id`, `csrf_token`을 담으며 별도 CA가 필요한 경우 절대 경로의 `ca_file`을 추가한다. 자격증명은 여기서 발급하지 않는다. CA는 최대256KiB의 일반 PEM 파일이어야 한다. 설정 형식·파일 권한·TLS 설정을 요청 원장보다 먼저 검사하고, 실제 처리 중에는 HTTPS를 통해 현재 로그인·정책을 매번 확인한다.
+
+```bash
+SB_CONFIG=/home/jm/.config/second-brain/config.toml sb apply-requests --once
+```
+
+이 설정은 이미 수락된 scoped 요청의 실행을 연결한다. 공개 MCP scoped 쓰기나 자격증명 공급·회전을 자동 활성화하지 않는다. [CLI 연결과 실제 TLS 검증 범위](SCOPED-PROVIDER-RUNTIME-2026-09-09.md)를 참고한다.
