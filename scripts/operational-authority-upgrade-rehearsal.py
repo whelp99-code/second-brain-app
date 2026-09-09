@@ -78,7 +78,8 @@ def main():
         target.chmod(0o600)
         before = inventory(target)
         with closing(readonly(target)) as connection:
-            old_vector = [row[0] for row in connection.execute("SELECT id FROM schema_migrations ORDER BY id")]
+            old_journal = connection.execute("SELECT id,checksum,applied_at FROM schema_migrations ORDER BY id").fetchall()
+            old_vector = [row[0] for row in old_journal]
             initial_fk = len(connection.execute("PRAGMA foreign_key_check").fetchall())
         program = """
 import {pathToFileURL} from 'node:url';
@@ -112,6 +113,10 @@ try {
                               "operational_activation": False}))
             return 1
         after = inventory(target, before)
+        with closing(readonly(target)) as connection:
+            new_journal = dict((row[0], row[1:]) for row in connection.execute(
+                "SELECT id,checksum,applied_at FROM schema_migrations"))
+        journal_preserved = all(new_journal.get(row[0]) == row[1:] for row in old_journal)
         # schema_migrations intentionally gains rows. Every other original table
         # must preserve the multiset of its old columns, including duplicate rows.
         preserved = [name for name in before if name != "schema_migrations" and before[name] == after[name]]
@@ -147,6 +152,7 @@ try {
                            if name in before}
         report = {"source_open_mode": "read_only", "operational_activation": False,
                   "previous_readiness_check": previous_check, "observed_original_counts": observed_counts,
+                  "original_migration_entries_preserved": journal_preserved,
                   "migration_count_before": len(old_vector), "migration_count_after": len(upgrade["vector"]),
                   "added_migrations": [name for name in upgrade["vector"] if name not in old_vector],
                   "original_tables_preserved": len(preserved), "changed_original_tables": changed,
@@ -154,7 +160,7 @@ try {
                                                     if name != "schema_migrations"),
                   "initial_foreign_key_errors": initial_fk, "upgrade": upgrade}
         print(json.dumps(report, indent=2))
-        return int(bool(changed) or (previous_check is not None
+        return int(not journal_preserved or bool(changed) or (previous_check is not None
                    and previous_check["accepted_upgraded_database"]) or initial_fk != 0 or upgrade["foreign_key_errors"] != 0
                    or upgrade["integrity"] != ["ok"] or upgrade["replay_changes"] != 0)
 

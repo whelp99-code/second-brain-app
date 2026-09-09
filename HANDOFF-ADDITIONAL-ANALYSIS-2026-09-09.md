@@ -1,5 +1,7 @@
 # 자비스 인계 추가 대조와 구현 우선순위
 
+**2026-09-09 미확인028 원본 복원:** [과거 배포3곳 hash 일치·운영 사본 재인수](RECOVERED-MIGRATION-028-2026-09-09.md). Ja6afd5a가502bytes 원본을 그대로 복원. 사본58→81·기존journal58 및 업무테이블212 보존·FK0/replay변경0. 고유17통과·emit/lint. unknown 출처 차단은 해소, 혼합 버전/운영 전환·실제 A→B 및 M1–M14 인수는 유지.
+
 **2026-09-09 운영 사본 전환·미확인 이력 차단:** [58→81 사본 보존 검사와 최종 HOLD](OPERATIONAL-AUTHORITY-UPGRADE-2026-09-09.md). 수정 전212테이블/FK0/재실행변경0이나 구 실행물이 최신 사본을 ready로 수락. Ja2e59eb가 unknown 이력을 차단, 실제 운영 사본의028_budgeted_evolution_memory.sql 거절·행 불변. 관련16통과·emit/lint. 운영 전환·혼합 버전은 원본 SQL/배포 경위 확인 전 보류, 전체 M1–M14 유지.
 
 **2026-09-09 쓰기 verifier CLI 설정 연결:** [명시적7옵션·기존 DB 연결 수명·실제 TLS/MCP](SCOPED-PROVIDER-CLI-CONFIG-2026-09-09.md). J399fb4f, 취소 fixture e6e36d7. 최종 고유82통과·emit/lint, 실제4시나리오 정상proved/철회·만료 차단·attempt1/FK0. 운영 배포·자격증명·DB 전환·실제 A→B와 M1–M14는 남는다.
