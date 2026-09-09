@@ -1332,3 +1332,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 콘솔 운영 준비 상태 연결:** 기존 /ready의503 degraded/사유를 최근단계ok와 별도로 표시. 실제Playwright1440/390px 준비미완료·검색/원문/기억추가대기 통과, 예상503외콘솔0·가로넘침0. 웹22통과/10.78초·Ruff/diff. 증거 /var/tmp/sb-console-qa-3ctc5y_o/QA.md/browser-result.json/스크린샷. 실제ready복구/운영 및 전체 목표 유지.
 
 **2026-09-10 콘솔 실제 준비 복구/재실패:** 격리vault 백업없음503→실제create_backup/verify_backup후200→archive손상후503과 브라우저사유갱신/과거사유제거 확인, Playwright1280px·pageerror0·exit0. HTTP모의응답/clock패치없음. 증거 /var/tmp/sb-ready-recovery-u77m83wm/QA.md/result.json/단계스크린샷. 제품변경없음, 운영/managed DR/실업무 및 전체목표유지.
+
+**2026-09-10 동일본문 candidate 계보/범위 분리:** [실제봉인 scoped검색 각1·합산2·원출처해시일치·CAS1](CANDIDATE-LINEAGE-SCOPE-2026-09-10.md). 관련13통과/4.27초·Ruff/diff. 제품변경없음, generic label은 원작업증거아님. 실제업무 계보/운영 및 전체목표유지.

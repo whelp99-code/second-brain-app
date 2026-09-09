@@ -70,3 +70,47 @@ def test_equal_retry_preserves_scope_and_reclassification_rolls_back(tmp_path):
         assert ledger.source_access_for(items[0]) == value.source_access
         binding = ledger.page_access_for("wiki/" + page.stem, "sha256:" + hashlib.sha256(original).hexdigest())
         assert binding is not None and binding.complete and len(binding.source_refs) == 1
+
+
+def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path):
+    from sb.scoped_search import search_scoped_records
+
+    content = 'SharedLineage 동일한 업무 결정'
+    candidates = ('memcand:pos:v1:' + 'a' * 64, 'memcand:pos:v1:' + 'b' * 64)
+    scopes = tuple(SourceAccess('principal:owner', (f'project:{name}',), '1') for name in ('a', 'b'))
+    store = GenerationStore(tmp_path / 'state', tmp_path / 'share',
+        provider_instance_id='provider:test', provider_release_sha='a' * 40)
+
+    def materialize(root):
+        for candidate, scope in zip(candidates, scopes, strict=True):
+            materialize_remember(root, content=content, candidate_id=candidate,
+                created_at=NOW.isoformat(), release_sha='a' * 40, source_access=scope)
+
+    try:
+        generation = store.build(request_id='distinct-lineage', parent=None,
+            tombstone_sequence=0, tombstone_set_root='sha256:' + '0' * 64,
+            created_at=NOW, allowed=lambda _path: True, mutate=materialize)
+        store.activate(generation, None, NOW)
+        with store.pin() as pin:
+            manifest = pin.generation.manifest
+            identity = GenerationIdentityV1(manifest.provider_instance_id, generation.generation_id,
+                manifest.generation_digest, generation.head, generation.tree)
+            results = []
+            for candidate, scope in zip(candidates, scopes, strict=True):
+                rows = search_scoped_records(generation.root, identity, scope, 'SharedLineage', 10)
+                assert len(rows) == 1
+                record = rows[0]['record']
+                expected = hashlib.sha256(f'memory-candidate:{candidate}'.encode()).hexdigest()
+                assert record['source_identity_full'] == expected
+                page = classified_page(generation.root, rows[0]['page_id'], identity)
+                assert page.requirements == (scope,)
+                assert len(page.source_refs) == 1
+                results.append(rows[0])
+            assert results[0]['record']['record_text'] == results[1]['record']['record_text']
+            assert results[0]['page_id'] != results[1]['page_id']
+            assert results[0]['record']['record_id'] != results[1]['record']['record_id']
+            combined = SourceAccess('principal:owner', ('project:a', 'project:b'), '1')
+            assert len(search_scoped_records(generation.root, identity, combined, 'SharedLineage', 10)) == 2
+            assert len(tuple((generation.root / 'raw').glob('*/*'))) == 1
+    finally:
+        store.close()
