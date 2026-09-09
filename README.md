@@ -286,3 +286,7 @@ SB_MCP_CONTRACT_PROFILE=scoped-request-write-v1 sb mcp
 ```
 
 이 프로필은 `sb_write_request(request)` 한 개만 제공한다. 자비스는 같은 `scoped-request-write-v1` 전송 프로필과 고정 계약을 선택한다. 응답은 수락 영수증이며, 처리는 `apply-requests --once`, 완료·수락 응답 유실 확인은 별도 `scoped-record-read-v5` 연결을 사용한다. 오류나 연결 종료만으로 미수락을 단정하고 재전송하지 않는다. [계약과 실제 MCP→HTTPS→CLI 검증](SCOPED-WRITE-MCP-2026-09-09.md)을 참고한다.
+
+### 최초 세대 이전의 scoped 원장 상태
+
+`SB_MCP_CONTRACT_PROFILE=scoped-request-status-v1`은 기존 `[mcp_scoped_read]`와 신뢰 공개키 설정을 사용하여 `sb_request_status`만 제공한다. 전체 원래 V4 요청과 현재 서명 `read_fence`/`access_claim`이 필요하다. 활성 기억 세대 없이 pending/failed와 원래 수락을 회수하며, 현재 기억 조회나 최종 완료 증거를 제공하지 않는다. 원장 부재는 조회 불가이며 not_found로 대체하지 않는다. 자비스 소비자 연결은 후속 작업이다. [계약·검증 및 제한](SCOPED-JOURNAL-STATUS-2026-09-09.md).
