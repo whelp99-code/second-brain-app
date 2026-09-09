@@ -1,3 +1,5 @@
+[커밋된 제목 YAML 복원](MCP-YAML-TITLE-ROUNDTRIP-2026-09-09.md) — 따옴표/여러줄3회귀 수정, MCP/web28개통과; sources문자열계약유지.
+
 [실제 웹 서버 검색·본문 인수](REAL-WEB-SEARCH-READ-2026-09-09.md) —mock없는 브라우저버튼→검색1개/본문출처/빈결과초기화, console/pageerror0.
 
 [웹 본문 응답 순서 보호](WEB-PAGE-RESPONSE-ORDER-2026-09-09.md) — 새검색/다른페이지 뒤 늦은본문 거부, 실제브라우저·HTTP12개통과.
