@@ -1,4 +1,4 @@
-"""Kill an owned worker after erasure, before knowledge rebind commits."""
+"""Kill an owned worker at knowledge rebind and publication boundaries."""
 import hashlib
 import multiprocessing
 import signal
@@ -20,6 +20,7 @@ from sb.remember_page import materialize_remember
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.search import SearchIndex
 from sb.store.ledger import Ledger
+from sb.task30_barriers import Task30BarrierId
 from tests.task30_effect_factory import effect_request
 
 NOW = datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC)
@@ -39,9 +40,10 @@ def _worker(root, ready, release, phase):
         ready.set()
         if not release.wait(30):
             raise RuntimeError('barrier timed out')
+    sink = None
     if phase == 'before_bind':
         Ledger.bind_knowledge = block
-    else:
+    elif phase == 'after_rebind':
         import sb.request_executor as module
         original = module.apply_with_prior_knowledge
 
@@ -49,15 +51,21 @@ def _worker(root, ready, release, phase):
             original(path, apply)
             block(None, None)
         module.apply_with_prior_knowledge = after_rebind
-    executor = RequestExecutor(_config(Path(root)))
+    else:
+        class PointerBarrier:
+            def reach(self, event):
+                if event.barrier_id is Task30BarrierId.POINTER_RENAME:
+                    block(None, None)
+        sink = PointerBarrier()
+    executor = RequestExecutor(_config(Path(root)), barrier_sink=sink)
     try:
         executor.apply_once(now=NOW + timedelta(minutes=1), lease_ms=1)
     finally:
         executor.close()
 
 
-@pytest.mark.parametrize('phase', ['before_bind', 'after_rebind'])
-def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase):
+@pytest.mark.parametrize('phase', ['before_bind', 'after_rebind', 'pointer_rename'])
+def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase, monkeypatch):
     config = _config(tmp_path)
     executor = RequestExecutor(config)
     try:
@@ -87,10 +95,19 @@ def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase):
         child.kill()
         child.join(10)
         assert child.exitcode == -signal.SIGKILL
-        assert OLD in next(before.root.joinpath('wiki').glob('*.md')).read_text()
+        if phase != 'pointer_rename':
+            assert OLD in next(before.root.joinpath('wiki').glob('*.md')).read_text()
         recovered = RequestExecutor(config)
         try:
-            assert recovered.generations.active().generation_id == before.generation_id
+            published_id = recovered.generations.active().generation_id
+            if phase == 'pointer_rename':
+                assert published_id != before.generation_id
+
+                def repeated_effect(*args, **kwargs):
+                    raise AssertionError('already published effect must not run twice')
+                monkeypatch.setattr(type(recovered.erasure), 'apply', repeated_effect)
+            else:
+                assert published_id == before.generation_id
             high_water = recovered.store.tombstone_high_water()
             assert high_water[0] > 0
             result = recovered.apply_once(now=NOW + timedelta(minutes=1, microseconds=2000), lease_ms=1)
@@ -98,6 +115,9 @@ def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase):
             assert recovered.store.tombstone_high_water() == high_water
             active = recovered.generations.active()
             assert active.generation_id != before.generation_id
+            if phase == 'pointer_rename':
+                assert active.generation_id == published_id
+                assert not tuple(recovered.generations.retired.iterdir())
             assert audit_citations(active.root) == ()
             index = SearchIndex(active.root, registry_path=tmp_path / 'absent.sqlite')
             assert index.search(OLD, scope='reference') == ()
