@@ -1,3 +1,5 @@
+> 2026-09-09 선택 검사 보완: [임베딩 모듈 30개 통과](OPTIONAL-EMBEDDINGS-VERIFICATION-2026-09-09.md), 실제 모델 1개 skip. 현재 기본 캐시 모델 부재·resolve_encoder unavailable 확인. 다운로드/운영 변경 없음, 실제 모델 품질 인수와 구분.
+
 > 2026-09-09 전체 회귀 갱신: [cf2be5a 검증](CURRENT-FULL-REGRESSION-2026-09-09.md). 1,435 passed/2 skipped, 263.15초, Ruff 통과. embeddings 파일 제외. 최근 삭제·inbox·동시성 변경 포함, 운영·실제 모델 최종 인수는 미완료.
 
 > 2026-09-09 동시성 검증: [대기 기억 세대 보존](PENDING-INBOX-CONCURRENCY-2026-09-09.md). 실제 두 작성자·독자 잠금 테스트 보강, 기존/동시 추가 기억을 다음 세대에서도 본문 비교. 관련 5개 통과. 세대 관리 경로에 한정하며 레거시/외부 직접 쓰기 혼용은 별도 인수 전 보류.

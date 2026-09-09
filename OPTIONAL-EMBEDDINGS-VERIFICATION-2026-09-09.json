@@ -1,0 +1,11 @@
+{
+  "command": "uv run pytest -q -rs tests/test_embeddings.py",
+  "passed": 30,
+  "skipped": 1,
+  "seconds": 2.42,
+  "skip_reason": "optional live smoke",
+  "default_encoder_available": false,
+  "hf_home_override": false,
+  "model_downloaded": false,
+  "operational_changes": false
+}
