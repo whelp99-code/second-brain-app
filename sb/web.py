@@ -320,11 +320,16 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     if isinstance(candidate, str):
                         last_run_status = candidate
                         summary = f"최근 단계 실행 {last_run.get('run_id')}: {candidate}"
+                last_batch = snapshot.get("last_batch")
+                if isinstance(last_batch, dict):
+                    summary += (f" · 최근 전체 배치 {last_batch.get('run_id')}: "
+                                f"{last_batch.get('status')} (오류 {last_batch.get('errors')})")
                 self._json(
                     HTTPStatus.OK,
                     {
                         "status": summary,
                         "last_run_status": last_run_status,
+                        "last_batch": last_batch,
                         "recent_stages": snapshot["recent_stages"],
                         "failures": {
                             "total": sum(cast(dict[str, int], snapshot["failed_by_stage"]).values()),

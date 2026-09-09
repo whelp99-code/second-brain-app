@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -1075,17 +1076,47 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
     fd = _try_lock(root)
     if fd is None:
         return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+    batch_id, started = uuid4().hex, datetime.now(UTC).isoformat()
+    outcomes: list[tuple[str, RunOutcome]] = []
     try:
-        ingest = _run_locked(root, _ingest(config, sources, None), "ingest", config)
-        compiled = _run_locked(root, _compile_stage(config, "cli"), "compile", config)
-        if ingest.written == 0 and compiled.pages == 0:
-            brief = compiled if compiled.exit_code == 0 else ingest
-            if ingest.status == "capped" and ingest.exit_code == 0:
-                brief = ingest
-        else:
-            brief = _run_locked(root, _brief_stage(config, None, "cli"), "brief", config)
+        with Ledger(root) as ledger:
+            ledger.record_stage(RunStage(batch_id, "batch", started, None, "running", 0, 0, 0))
+        try:
+            ingest = _run_locked(root, _ingest(config, sources, None), "ingest", config)
+            outcomes.append(("ingest", ingest))
+            compiled = _run_locked(root, _compile_stage(config, "cli"), "compile", config)
+            outcomes.append(("compile", compiled))
+            if ingest.written == 0 and compiled.pages == 0:
+                brief = compiled if compiled.exit_code == 0 else ingest
+                if ingest.status == "capped" and ingest.exit_code == 0:
+                    brief = ingest
+            else:
+                brief = _run_locked(root, _brief_stage(config, None, "cli"), "brief", config)
+                outcomes.append(("brief", brief))
+            chosen = _choose_batch_outcome(ingest, compiled, brief)
+        except Exception:
+            with Ledger(root) as ledger:
+                ledger.record_stage(RunStage(batch_id, "batch", started,
+                    datetime.now(UTC).isoformat(), "failed", len(outcomes),
+                    sum(value.written for _, value in outcomes),
+                    sum(value.errors for _, value in outcomes) + 1,
+                    "batch interrupted by an exception"))
+            raise
+        with Ledger(root) as ledger:
+            ledger.record_stage(RunStage(batch_id, "batch", started,
+                datetime.now(UTC).isoformat(), chosen.status, len(outcomes),
+                sum(value.written for _, value in outcomes),
+                sum(value.errors for _, value in outcomes), json.dumps({
+                    "selected_run_id": chosen.run_id,
+                    "stages": [{"stage": stage, "run_id": value.run_id,
+                                "status": value.status} for stage, value in outcomes],
+                }, separators=(",", ":"))))
+        return chosen
     finally:
         _unlock(fd)
+
+
+def _choose_batch_outcome(ingest: RunOutcome, compiled: RunOutcome, brief: RunOutcome) -> RunOutcome:
     chosen = brief
     for outcome in (ingest, compiled, brief):
         if outcome.exit_code != 0:

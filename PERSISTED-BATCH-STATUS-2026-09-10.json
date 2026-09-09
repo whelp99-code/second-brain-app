@@ -1,0 +1,114 @@
+{
+  "workspace": "/var/tmp/sb-managed-native-e9_8jeox",
+  "status_snapshot": {
+    "last_run": {
+      "run_id": "cc7f69f010ab482ca95ddaf4d6949118",
+      "started_at": "2026-09-10T00:02:00.882978+09:00",
+      "finished_at": "2026-09-09T15:02:17.392157+00:00",
+      "git_commit": null,
+      "status": "ok"
+    },
+    "last_batch": {
+      "run_id": "55c1e13abbff42619c29c7a0bb43e3ac",
+      "status": "failed",
+      "started_at": "2026-09-09T15:02:00.851873+00:00",
+      "finished_at": "2026-09-09T15:02:17.396399+00:00",
+      "stages_attempted": 2,
+      "written": 0,
+      "errors": 1
+    },
+    "recent_stages": [
+      {
+        "run_id": "cc7f69f010ab482ca95ddaf4d6949118",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "c542ce7fc7624ff0b273e1cbd28f8051",
+        "stage": "ingest",
+        "status": "failed",
+        "errors": 1,
+        "error": "SafeSourceFilesystemError: source mutation observed: ."
+      },
+      {
+        "run_id": "55c1e13abbff42619c29c7a0bb43e3ac",
+        "stage": "batch",
+        "status": "failed",
+        "errors": 1,
+        "error": "{\"selected_run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"status\":\"failed\"},{\"stage\":\"compile\",\"run_id\":\"cc7f69f010ab482ca95ddaf4d6949118\",\"status\":\"ok\"}]}"
+      },
+      {
+        "run_id": "eb694d6ce6844da5af7a33ca92b4eb3c",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "9bff73a104854cb78098e4d95e30c1ec",
+        "stage": "ingest",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      }
+    ]
+  },
+  "http": {
+    "status": "최근 단계 실행 cc7f69f010ab482ca95ddaf4d6949118: ok · 최근 전체 배치 55c1e13abbff42619c29c7a0bb43e3ac: failed (오류 1)",
+    "last_run_status": "ok",
+    "last_batch": {
+      "run_id": "55c1e13abbff42619c29c7a0bb43e3ac",
+      "status": "failed",
+      "started_at": "2026-09-09T15:02:00.851873+00:00",
+      "finished_at": "2026-09-09T15:02:17.396399+00:00",
+      "stages_attempted": 2,
+      "written": 0,
+      "errors": 1
+    },
+    "recent_stages": [
+      {
+        "run_id": "cc7f69f010ab482ca95ddaf4d6949118",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "c542ce7fc7624ff0b273e1cbd28f8051",
+        "stage": "ingest",
+        "status": "failed",
+        "errors": 1,
+        "error": "SafeSourceFilesystemError: source mutation observed: ."
+      },
+      {
+        "run_id": "55c1e13abbff42619c29c7a0bb43e3ac",
+        "stage": "batch",
+        "status": "failed",
+        "errors": 1,
+        "error": "{\"selected_run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"c542ce7fc7624ff0b273e1cbd28f8051\",\"status\":\"failed\"},{\"stage\":\"compile\",\"run_id\":\"cc7f69f010ab482ca95ddaf4d6949118\",\"status\":\"ok\"}]}"
+      },
+      {
+        "run_id": "eb694d6ce6844da5af7a33ca92b4eb3c",
+        "stage": "compile",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      },
+      {
+        "run_id": "9bff73a104854cb78098e4d95e30c1ec",
+        "stage": "ingest",
+        "status": "ok",
+        "errors": 0,
+        "error": ""
+      }
+    ],
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  }
+}

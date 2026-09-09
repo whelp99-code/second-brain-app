@@ -1,3 +1,5 @@
+[전체 배치 상태 영속화](PERSISTED-BATCH-STATUS-2026-09-10.md) — 기존 잠금·원장에 시작/종료·단계 계보·오류 합계, 웹 분리 표시. 관련102통과·실제 관리형 ingest실패→compile성공 후 새 프로세스/HTTP batch실패 보존. 원본 변경 감지 원인·강제 종료 인수·전체 M1–M14 유지.
+
 [웹 원장 상태 요약 일치](WEB-STATUS-LEDGER-SUMMARY-2026-09-09.md) — no runs/상세 실행 불일치 재현·같은 snapshot 기반 요약, 관련38통과·동일 임시 저장소 실제 HTTP 전후 확인. 전체 배치 영속 요약 및 M1–M14 유지.
 
 [실행 이력 시간대 정렬 수정](RUN-TIMEZONE-ORDER-2026-09-09.md) — 혼합 offset 최신 실행 오판 재현·UTC 공통 정렬, 관련54통과 및 실제 HTTP 순서 확인. 별도 no runs 요약 불일치 후속 대조·전체 M1–M14 유지.

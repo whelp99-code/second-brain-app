@@ -436,10 +436,19 @@ def status_snapshot(config: Config) -> dict[str, object]:
     failed_by_stage: dict[str, int] = {}
     last_run: dict[str, object] | None = None
     recent_stages: list[dict[str, object]] = []
+    last_batch: dict[str, object] | None = None
     if db.is_file():
         with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
             conn.create_function("sb_run_time", 1, run_time_key, deterministic=True)
             if conn.execute("SELECT 1 FROM sqlite_master WHERE name='run_stage'").fetchone():
+                batch = conn.execute(
+                    "SELECT run_id,status,started_at,finished_at,attempted,written,errors "
+                    "FROM run_stage WHERE stage='batch' "
+                    "ORDER BY sb_run_time(started_at) DESC,run_id DESC LIMIT 1"
+                ).fetchone()
+                if batch:
+                    last_batch = dict(zip(("run_id", "status", "started_at", "finished_at",
+                                           "stages_attempted", "written", "errors"), batch))
                 for row in conn.execute(
                     "SELECT run_id,stage,status,errors,detail FROM run_stage "
                     "ORDER BY sb_run_time(started_at) DESC,run_id DESC LIMIT 10"
@@ -489,6 +498,7 @@ def status_snapshot(config: Config) -> dict[str, object]:
         else False,
         "last_run": last_run,
         "recent_stages": recent_stages,
+        "last_batch": last_batch,
         "run_counts": runs,
         "derivation_counts": derivations,
         "failed_derivations": failed,

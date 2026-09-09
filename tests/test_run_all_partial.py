@@ -55,3 +55,45 @@ def test_stage_exception_returns_recorded_failure(tmp_path: Path):
     result = _run_locked(root, rejected, 'compile')
     assert result.status == 'failed'
     assert result.failure == 'RuntimeError: source test: LLM egress denied by source policy'
+
+
+def test_batch_result_persists_after_successful_later_stage(tmp_path: Path, monkeypatch):
+    import json
+    import sqlite3
+
+    from sb.ops import status_snapshot
+    from sb.pipeline import StageReport
+
+    config, root = _ready(tmp_path)
+    monkeypatch.setattr('sb.pipeline._ingest', lambda *args:
+                        lambda *stage_args: StageReport((), 0, 1, 3, False))
+    monkeypatch.setattr('sb.pipeline._compile_stage', lambda *args:
+                        lambda *stage_args: StageReport((), 0, 0, 0, False))
+    outcome = _run_all_mutable(config)
+    snapshot = status_snapshot(config)
+    assert snapshot['last_run']['status'] == 'ok'
+    batch = snapshot['last_batch']
+    assert batch['status'] == 'partial' and batch['errors'] == 1
+    assert batch['finished_at'] and batch['stages_attempted'] == 2
+    with sqlite3.connect(root / '.sb/ledger.db') as conn:
+        detail = json.loads(conn.execute("SELECT detail FROM run_stage WHERE stage='batch'").fetchone()[0])
+    assert detail['selected_run_id'] == outcome.run_id
+    assert [row['stage'] for row in detail['stages']] == ['ingest', 'compile']
+
+
+def test_batch_exception_is_recorded_and_lock_released(tmp_path: Path, monkeypatch):
+    from sb.ops import status_snapshot
+    from sb.pipeline import _try_lock, _unlock
+
+    config, root = _ready(tmp_path)
+    def explode(*args):
+        raise RuntimeError('private exception detail')
+    monkeypatch.setattr('sb.pipeline._run_locked', explode)
+    with pytest.raises(RuntimeError, match='private exception detail'):
+        _run_all_mutable(config)
+    batch = status_snapshot(config)['last_batch']
+    assert batch['status'] == 'failed' and batch['errors'] == 1
+    assert batch['finished_at'] and batch['stages_attempted'] == 0
+    fd = _try_lock(root)
+    assert fd is not None
+    _unlock(fd)
