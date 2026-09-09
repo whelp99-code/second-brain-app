@@ -1,0 +1,44 @@
+"""A successful later stage must not hide partial batch failures."""
+from pathlib import Path
+
+import pytest
+
+from sb.pipeline import RunOutcome, _run_all_mutable
+from tests.test_cli import _ready
+
+
+@pytest.mark.parametrize('statuses,expected', [
+    (('partial', 'ok', 'ok'), 'partial'),
+    (('ok', 'partial', 'ok'), 'partial'),
+    (('partial', 'capped', 'ok'), 'partial'),
+    (('partial', 'failed', 'ok'), 'failed'),
+])
+def test_run_all_preserves_stage_failure(tmp_path: Path, monkeypatch, statuses, expected):
+    config, _ = _ready(tmp_path)
+    outcomes = [RunOutcome(str(i), status, 1, 0,
+                           1 if status in {'partial', 'failed'} else 0,
+                           int(status == 'failed'), None, written=1)
+                for i, status in enumerate(statuses)]
+    pending = iter(outcomes)
+    monkeypatch.setattr('sb.pipeline._run_locked', lambda *args: next(pending))
+    result = _run_all_mutable(config)
+    assert result.status == expected
+    assert result.errors == 1
+    assert result in outcomes
+
+
+def test_partial_ingest_survives_real_stage_recording(tmp_path: Path, monkeypatch):
+    from sb.pipeline import StageReport
+    from sb.store.ledger import load_ledger_tables
+
+    config, root = _ready(tmp_path)
+    monkeypatch.setattr('sb.pipeline._ingest', lambda *args:
+                        lambda *stage_args: StageReport((), 0, 1, 3, False))
+    monkeypatch.setattr('sb.pipeline._compile_stage', lambda *args:
+                        lambda *stage_args: StageReport((), 0, 0, 0, False))
+    result = _run_all_mutable(config)
+    assert result.status == 'partial'
+    assert result.errors == 1
+    assert result.exit_code == 0
+    tables = load_ledger_tables(root / '.sb/ledger.db')
+    assert tables.runs[result.run_id].status == 'partial'

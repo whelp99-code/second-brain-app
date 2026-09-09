@@ -1080,6 +1080,11 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
             return outcome
         if outcome.status == "capped":
             chosen = outcome
+    # A later successful stage does not resolve errors from an earlier one.
+    # Preserve the failing stage's run ID and error count for callers.
+    for outcome in (ingest, compiled, brief):
+        if outcome.status == "partial":
+            return outcome
     if brief.exit_code == 0 and (
         brief.status == "capped"
         or (ingest.status != "capped" and compiled.status != "capped")
