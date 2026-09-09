@@ -143,6 +143,13 @@ resolve, web, sources, retention, gc, metrics
 운영 세대 활성화와 복원 권한 검사는 별도다. 출처가 없는 기존 백업은
 준비 상태의 정상 근거로 사용하지 않으므로 새 백업을 생성해 검증한다.
 
+복원 해제 작업공간의 중단 사본은 `sb maintain --once --restore-workspace /absolute/private/restore-work`
+명령으로 정리할 수 있다. sanitizer에 전달한 동일한 0700 폴더를 명시한다. 진행 중인
+복원은 기다리지 않고 `restore_workspace_busy: true`로 보고하며, 종료된 관리 사본 수는
+`disposed_restore_workspaces`에 나온다. 옵션을 생략하면 해당 폴더를 찾거나 정리하지 않는다.
+구형 이름의 복구 자료는 보존한다. 잠금을 사용하지 않는 구버전 복원 writer가 종료됐음을
+확인한 뒤 사용해야 한다. 기본 운영 timer에 경로를 자동 추가하지 않는다.
+
 웹의 `/health`는 프로세스 생존 여부, `/ready`는 작업·백업·요청 상태를 반환한다.
 검증되지 않았거나 변경된 최신 백업, 오래된 성공 실행, 정체된 요청 등은
 `/ready`에서 HTTP 503과 `reasons` 코드로 표시한다. 시간 기준은 설정할 수 있다.

@@ -13,7 +13,7 @@ from tempfile import mkdtemp
 
 
 @contextmanager
-def restore_workspace(folder: Path, request_key: str) -> Generator[Path, None, None]:
+def _clean_locked(folder: Path) -> Generator[tuple[int, tuple[str, ...]], None, None]:
     descriptor = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         metadata = os.fstat(descriptor)
@@ -38,6 +38,25 @@ def restore_workspace(folder: Path, request_key: str) -> Generator[Path, None, N
         for name in names:
             shutil.rmtree(name, dir_fd=descriptor)
         os.fsync(descriptor)
+        yield descriptor, tuple(names)
+    finally:
+        os.close(descriptor)
+
+
+def clean_restore_workspace(folder: Path) -> int | None:
+    """Return removed directory count, or None while a restore owns the lock."""
+    try:
+        with _clean_locked(folder) as (_descriptor, names):
+            return len(names)
+    except RuntimeError as exc:
+        if str(exc) == 'RESTORE_WORKSPACE_BUSY':
+            return None
+        raise
+
+
+@contextmanager
+def restore_workspace(folder: Path, request_key: str) -> Generator[Path, None, None]:
+    with _clean_locked(folder) as (descriptor, _names):
         staging = Path(mkdtemp(prefix=f'restore-{request_key}-', dir=folder))
         try:
             yield staging
@@ -45,5 +64,3 @@ def restore_workspace(folder: Path, request_key: str) -> Generator[Path, None, N
             if staging.exists():
                 shutil.rmtree(staging.name, dir_fd=descriptor)
                 os.fsync(descriptor)
-    finally:
-        os.close(descriptor)

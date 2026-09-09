@@ -1282,3 +1282,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 복원 중단 사본 회수 수정:** [작업공간 잠금·SIGKILL 다음 진입 정리·동시 진입/링크 보호](RESTORE-WORKSPACE-RECOVERY-2026-09-10.md). 최종 관련17통과·Ruff/타입0오류0경고·실제 JARVIS archive 경로exit0. 다음 진입 전 잔류/구형 이름 처분·혼합 구버전 writer·운영 maintenance 인수는 남는다. 전체 목표 유지.
 
 **2026-09-10 복원 작업공간 전체 회귀:** [제품 f45a1a1 전체1698통과/2skip·437.74초](RESTORE-WORKSPACE-FULL-2026-09-10.md). 검사 전후 HEAD/제품 동일·Ruff 및 복원 모듈 타입0오류0경고. 선택 embeddings 제외. 관리 workspace/maintenance 연결과 혼합 버전·운영/실업무 전체 목표는 남는다.
+
+**2026-09-10 복원 유지관리 CLI 연결:** [명시적 --restore-workspace·busy 건너뜀·실제 SIGKILL 사본 정리](RESTORE-MAINTENANCE-2026-09-10.md). 관련26통과/39.23초·Ruff/타입0오류0경고. CLI 독립 실행 정리1→재실행0, live 사본 보존. 운영 timer 경로·구버전 writer drain 및 전체 인수는 남는다.

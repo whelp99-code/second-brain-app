@@ -119,6 +119,7 @@ def _parser() -> argparse.ArgumentParser:
     _ = apply_requests.add_argument("--test-control-socket")
     maintain = sub.add_parser(Command.MAINTAIN.value)
     _ = maintain.add_argument("--once", action="store_true")
+    _ = maintain.add_argument("--restore-workspace", help="explicit private restore workspace to clean")
     retry = sub.add_parser(Command.RETRY.value)
     _ = retry.add_argument("--stage", choices=("compile", "conflict", "brief"))
     _ = retry.add_argument("--limit", type=int)
@@ -309,10 +310,22 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             result = mutations.maintain(datetime.now(UTC))
         finally:
             mutations.close()
+        workspace = _opt_str(ns, "restore_workspace")
+        restore_report: dict[str, object] = {}
+        if workspace is not None:
+            from sb.restore_workspace import clean_restore_workspace
+
+            try:
+                count = clean_restore_workspace(Path(workspace))
+            except (OSError, RuntimeError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            restore_report = {"disposed_restore_workspaces": count or 0,
+                              "restore_workspace_busy": count is None}
         print(
             json.dumps(
                 {"disposed_exports": len(result.disposed_export_digests),
-                 "disposed_staging": len(result.disposed_staging_keys)},
+                 "disposed_staging": len(result.disposed_staging_keys), **restore_report},
                 sort_keys=True,
                 separators=(",", ":"),
             )

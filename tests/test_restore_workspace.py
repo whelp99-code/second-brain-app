@@ -54,3 +54,51 @@ def test_unrecognized_entries_are_not_deleted(tmp_path):
     with restore_workspace(folder, 'b' * 64) as staging:
         assert staging.is_dir()
     assert (folder / 'notes').read_text() == 'not restore material'
+
+
+def test_maintenance_cli_skips_live_workspace_then_cleans_abandoned(tmp_path):
+    import json
+    import os
+    from datetime import UTC, datetime
+
+    from sb.generation_runtime import GenerationMutationService
+    from tests.test_runtime_reliability import managed
+
+    config = managed(tmp_path)
+    service = GenerationMutationService.from_config(config)
+    try:
+        service.remember('maintenance retained memory', None, datetime.now(UTC))
+    finally:
+        service.close()
+    config_path = tmp_path / 'config.toml'
+    config_path.write_text('\n'.join(f'{key} = {json.dumps(value)}'
+                                    for key, value in config.raw.items() if isinstance(value, str)))
+    env = {**os.environ, 'SB_CONFIG': str(config_path)}
+    folder = tmp_path / 'restore'
+    folder.mkdir(mode=0o700)
+    command = [sys.executable, '-c', 'from sb.cli import main; raise SystemExit(main())',
+               'maintain', '--once', '--restore-workspace', str(folder)]
+    with restore_workspace(folder, 'a' * 64) as staging:
+        (staging / 'live').write_text('keep')
+        done = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20, check=False)
+        assert done.returncode == 0, done.stderr
+        assert json.loads(done.stdout)['restore_workspace_busy'] is True
+        assert (staging / 'live').read_text() == 'keep'
+    worker = subprocess.run([sys.executable, '-c',
+        ('from pathlib import Path; import os,signal,sys; '
+         'from sb.restore_workspace import restore_workspace;\n'
+         'with restore_workspace(Path(sys.argv[1]), "b" * 64) as staging:\n'
+         ' (staging / "deleted-source").write_text("forgotten original")\n'
+         ' os.kill(os.getpid(), signal.SIGKILL)'), str(folder)],
+        capture_output=True, text=True, timeout=10, check=False)
+    assert worker.returncode == -9
+    assert list(folder.iterdir())
+    done = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20, check=False)
+    assert done.returncode == 0, done.stderr
+    result = json.loads(done.stdout)
+    assert result['disposed_restore_workspaces'] == 1
+    assert result['restore_workspace_busy'] is False
+    assert not list(folder.iterdir())
+    again = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20, check=False)
+    assert again.returncode == 0, again.stderr
+    assert json.loads(again.stdout)['disposed_restore_workspaces'] == 0
