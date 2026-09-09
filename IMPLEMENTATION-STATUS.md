@@ -1,3 +1,5 @@
+[관리형 복원 추출 예산](RESTORE-EXTRACTION-BUDGET-2026-09-09.md) — tar/디렉터리 항목·파일·합계 한도 사전 검사, 관련22개 및 정적검사 통과.
+
 [복원 tar 경로 모호성 거부](RESTORE-ARCHIVE-PATH-VALIDATION-2026-09-09.md) — 중복/별칭 경로 및 파일·상위경로 충돌을 추출 전 거부, 정상 tar 포함16개 통과.
 
 [실측 기반 복원 검사 예산 조정](RESTORE-SCAN-BUDGET-TUNING-2026-09-09.md) —1MiB 실제 파일 복원/정상 기억 보존,4MiB 탐지1.38~1.87초,8MiB초과 거부 유지. 대규모 전체 인수는 미완료.

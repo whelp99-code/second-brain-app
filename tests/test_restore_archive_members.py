@@ -53,3 +53,30 @@ def test_restore_extracts_unambiguous_archive(tmp_path: Path) -> None:
     destination.mkdir()
     GenerationRestoreSanitizer._extract(archive, destination)
     assert (destination / 'wiki/page.md').read_bytes() == b'kept'
+
+
+@pytest.mark.parametrize('kind', ['tar', 'directory'])
+@pytest.mark.parametrize('limit,value', [('_MAX_RESTORE_MEMBERS', 1),
+    ('_MAX_RESTORE_FILE_BYTES', 3), ('_MAX_RESTORE_TOTAL_BYTES', 7)])
+def test_restore_budget_rejection_precedes_output(
+    tmp_path: Path, monkeypatch, kind: str, limit: str, value: int,
+) -> None:
+    from sb import restore
+
+    monkeypatch.setattr(restore, limit, value, raising=False)
+    archive = tmp_path / 'archive'
+    if kind == 'tar':
+        with tarfile.open(archive, 'w') as bundle:
+            for name in ['one.md', 'two.md']:
+                member = tarfile.TarInfo(name)
+                member.size = 4
+                bundle.addfile(member, io.BytesIO(b'data'))
+    else:
+        archive.mkdir()
+        for name in ['one.md', 'two.md']:
+            (archive / name).write_bytes(b'data')
+    destination = tmp_path / 'extracted'
+    destination.mkdir()
+    with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_BUDGET_EXCEEDED'):
+        GenerationRestoreSanitizer._extract(archive, destination)
+    assert list(destination.iterdir()) == []

@@ -9,7 +9,7 @@ import tarfile
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import final
+from typing import Final, final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -32,6 +32,16 @@ from sb.restore_models import (
     archive_locator,
     manifest_preimage,
 )
+
+_MAX_RESTORE_MEMBERS: Final = 100_000
+_MAX_RESTORE_FILE_BYTES: Final = 64 * 1024 * 1024
+_MAX_RESTORE_TOTAL_BYTES: Final = 10 * 1024 * 1024 * 1024
+
+
+def _check_archive_budget(count: int, total: int, size: int) -> None:
+    if (size < 0 or count > _MAX_RESTORE_MEMBERS
+            or size > _MAX_RESTORE_FILE_BYTES or total > _MAX_RESTORE_TOTAL_BYTES):
+        raise RestoreError("RESTORE_ARCHIVE_BUDGET_EXCEEDED")
 
 
 class RestoreError(RuntimeError):
@@ -59,7 +69,18 @@ class GenerationRestoreSanitizer:
     @staticmethod
     def _extract(archive: Path, destination: Path) -> None:
         if archive.is_dir() and not archive.is_symlink():
-            for source in sorted(archive.rglob("*"), key=lambda item: item.as_posix()):
+            sources: list[Path] = []
+            total = 0
+            for source in archive.rglob("*"):
+                metadata = source.stat(follow_symlinks=False)
+                if not (stat.S_ISDIR(metadata.st_mode)
+                        or (stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1)):
+                    raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+                size = metadata.st_size if stat.S_ISREG(metadata.st_mode) else 0
+                total += size
+                _check_archive_budget(len(sources) + 1, total, size)
+                sources.append(source)
+            for source in sorted(sources, key=lambda item: item.as_posix()):
                 relative = source.relative_to(archive)
                 if ".." in relative.parts:
                     raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
@@ -69,16 +90,26 @@ class GenerationRestoreSanitizer:
                     target.mkdir(parents=True, exist_ok=True, mode=0o700)
                 elif stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1:
                     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-                    _ = target.write_bytes(source.read_bytes())
+                    with source.open("rb") as stream:
+                        payload = stream.read(_MAX_RESTORE_FILE_BYTES + 1)
+                    if len(payload) != metadata.st_size:
+                        raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+                    _check_archive_budget(1, len(payload), len(payload))
+                    _ = target.write_bytes(payload)
                     target.chmod(stat.S_IMODE(metadata.st_mode))
                 else:
                     raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
             return
         try:
             with tarfile.open(archive, mode="r:*") as bundle:
-                members = bundle.getmembers()
+                members: list[tarfile.TarInfo] = []
+                total = 0
                 paths: dict[Path, bool] = {}
-                for member in members:
+                for member in bundle:
+                    size = member.size if member.isfile() else 0
+                    total += size
+                    _check_archive_budget(len(members) + 1, total, size)
+                    members.append(member)
                     path = Path(member.name)
                     if path.is_absolute() or ".." in path.parts or member.issym() or member.islnk():
                         raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
@@ -90,7 +121,7 @@ class GenerationRestoreSanitizer:
                 for path in paths:
                     if any(parent in paths and not paths[parent] for parent in path.parents):
                         raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
-                bundle.extractall(destination, filter="data")
+                bundle.extractall(destination, members=members, filter="data")
         except (OSError, tarfile.TarError) as exc:
             raise RestoreError("RESTORE_ARCHIVE_UNSAFE") from exc
 
