@@ -1,0 +1,188 @@
+{
+  "cached_build": {
+    "root": "/var/tmp/sb-offline-preparation-k7u_8lj2/releases/ef56676c6f20ed5ee0fccf3f67563c512bd34756",
+    "offline_flag": true,
+    "trace_internet_address_calls": 0,
+    "trace_lines": 146,
+    "trace_path": "/var/tmp/sb-offline-preparation-k7u_8lj2/network.trace"
+  },
+  "cache_miss": {
+    "exit": 1,
+    "partial_release_directories": 1,
+    "complete_manifests": 0,
+    "internet_address_calls": 0,
+    "empty_cache": true
+  },
+  "integration": {
+    "harness_commit": "c5a8f3b435ff44b71a927c047638d5bbc354410d",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "ef56676c6f20ed5ee0fccf3f67563c512bd34756",
+      "wheel_sha256": "ec5b9a14f22ac61c34fe7458baff166fd13d47edfd2eee21482432f446068575",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "c5a8f3b435ff44b71a927c047638d5bbc354410d",
+      "source_tree": "02e0191834a90ddf6fd0a38ee569cf7c357ce490",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-offline-preparation-k7u_8lj2/releases/ef56676c6f20ed5ee0fccf3f67563c512bd34756/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-offline-preparation-k7u_8lj2/releases/ef56676c6f20ed5ee0fccf3f67563c512bd34756/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-offline-preparation-k7u_8lj2/releases/ef56676c6f20ed5ee0fccf3f67563c512bd34756/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-offline-preparation-k7u_8lj2/releases/ef56676c6f20ed5ee0fccf3f67563c512bd34756/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-contained-candidate-k54z40zc/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:7d46c6e362b690df636d6a3089d1c20fc63bbf8a164fa61d79193f6693507f99",
+            "request_digest": "sha256:7d46c6e362b690df636d6a3089d1c20fc63bbf8a164fa61d79193f6693507f99",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "omo_engine_calls": 0,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:7d46c6e362b690df636d6a3089d1c20fc63bbf8a164fa61d79193f6693507f99",
+            "request_digest": "sha256:7d46c6e362b690df636d6a3089d1c20fc63bbf8a164fa61d79193f6693507f99",
+            "idempotency_key": "memidem:scoped:v4:62b5f536a9fa0a7d10caae2b29e269f32583f20833298f3668cc416c66aaec50",
+            "scope_digest": "sha256:79615e7bbf923da67502540fe0ed42c0d5c6ccf6c1b8d201c97131a2bae0e030",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:7d46c6e362b690df636d6a3089d1c20fc63bbf8a164fa61d79193f6693507f99.v4.json",
+            "request_file_digest": "sha256:a606c01d53431d90b61a9f81fec008503077c5a1c26b183441eb7907d6b1efc1",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:c39628e1628965ddac07e3acadbb73c68693a6c9a2075e69d3d4f3bffd70849b",
+            "request_digest": "sha256:c39628e1628965ddac07e3acadbb73c68693a6c9a2075e69d3d4f3bffd70849b",
+            "idempotency_key": "memidem:scoped:v4:2ef97b26587b18f1fc84c2eec92abe2130eddf29e17e25ae2e914bdd8611848c",
+            "scope_digest": "sha256:ca2605028db1c5abe21844418d57ab66f8136cbc02a6dca873cbe84e63b18e3f",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:c39628e1628965ddac07e3acadbb73c68693a6c9a2075e69d3d4f3bffd70849b.v4.json",
+            "request_file_digest": "sha256:688e73d9abea72881a397cea667400fa57a216b76d1b2ca2f8729c053a5f60ed",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:9cbddc63ad4bf6d5eb3843b10d749be9168eb538cf533978479940aba34f2ce6",
+            "request_digest": "sha256:9cbddc63ad4bf6d5eb3843b10d749be9168eb538cf533978479940aba34f2ce6",
+            "idempotency_key": "memidem:scoped:v4:1199bd4844fa30d37f2ccae318d7d9db35ad084ab88f2758ffc84a2729b4e8fa",
+            "scope_digest": "sha256:c43d767b2c6fe51ede2900f2e9b8c1f3ea7253e83233cf8d046d1fdfc080df32",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:9cbddc63ad4bf6d5eb3843b10d749be9168eb538cf533978479940aba34f2ce6.v4.json",
+            "request_file_digest": "sha256:929cf0b3c9153c60d19b3e8edca671ce5e26c2ebe54adf5872d44a0d49c3c683",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "production_activated": false,
+    "candidate_contents": {
+      "provider": {
+        "inventory_sha256": "de4f9d96ddf8c59df9e65756079b65387dd1e2b837ee3f9733a2e906dacb69c4",
+        "entries": 18456
+      },
+      "jarvis": {
+        "inventory_sha256": "af1ba9da28ac82e9358238b7298e27f98113fd7a04e7a72138f9f57dd78a3b39",
+        "entries": 19588
+      },
+      "node_executable": {
+        "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+        "size": 125989464,
+        "mode": 493
+      }
+    }
+  }
+}

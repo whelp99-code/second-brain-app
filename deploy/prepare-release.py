@@ -22,11 +22,16 @@ from bundle_python_runtime import bundle_runtime, release_identity, runtime_dige
 repo = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('app_root', nargs='?', type=Path, default=Path.home() / '.local/state/second-brain/app')
-app = parser.parse_args().app_root.expanduser().absolute()
+parser.add_argument('--offline', action='store_true', help='require existing local build/dependency caches; disable uv network access')
+args = parser.parse_args()
+app = args.app_root.expanduser().absolute()
+execution_env = dict(os.environ)
+if args.offline:
+    execution_env['UV_OFFLINE'] = '1'
 os.umask(0o077)
 
 def run(*args):
-    return subprocess.run(args, cwd=repo, check=True, text=True, capture_output=True).stdout
+    return subprocess.run(args, cwd=repo, env=execution_env, check=True, text=True, capture_output=True).stdout
 
 source_commit = run("git", "rev-parse", "HEAD").strip()
 source_tree = run("git", "rev-parse", source_commit + "^{tree}").strip()
@@ -43,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
         subprocess.run(['git', 'archive', '--format=tar', source_commit], cwd=repo, stdout=output, check=True)
     with tarfile.open(archive) as packed:
         packed.extractall(source, filter='data')
-    build_env = {**os.environ, 'SOURCE_DATE_EPOCH': run('git', 'show', '-s', '--format=%ct', source_commit).strip()}
+    build_env = {**execution_env, 'SOURCE_DATE_EPOCH': run('git', 'show', '-s', '--format=%ct', source_commit).strip()}
     def build_run(*args):
         return subprocess.run(args, cwd=source, env=build_env, check=True, text=True, capture_output=True).stdout
     build_run('uv', 'build', '--wheel', '--out-dir', str(temp))
@@ -90,7 +95,7 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     subprocess.run(
         [str(python), '-m', 'compileall', '-q', '-f', '--invalidation-mode', 'checked-hash',
          str(runtime / 'lib'), str(release / '.venv' / 'lib')],
-        env={**os.environ, 'PYTHONHASHSEED': '0', 'SOURCE_DATE_EPOCH': str(source_epoch)},
+        env={**execution_env, 'PYTHONHASHSEED': '0', 'SOURCE_DATE_EPOCH': str(source_epoch)},
         cwd=repo, check=True, capture_output=True,
     )
     (release / 'requirements.txt').write_bytes(requirements.read_bytes())
