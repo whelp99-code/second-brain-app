@@ -161,3 +161,33 @@ def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: 
 
     finally:
         fixture.executor.close()
+
+
+def test_full_restore_without_operational_anchor_never_creates_candidate(tmp_path, monkeypatch):
+    import hashlib
+
+    from sb.generations import GenerationStore
+    from sb.restore_source import RestoreSourceError
+
+    fixture = restore_fixture(tmp_path, full_source=True)
+    original = fixture.executor.generations
+    empty = GenerationStore(tmp_path / 'lost-journal/state', tmp_path / 'lost-journal/share',
+        provider_instance_id=original.provider_instance_id, provider_release_sha='a' * 40)
+    try:
+        active = original.active()
+        before = hashlib.sha256((active.root / '.sb/ledger.db').read_bytes()).hexdigest()
+        water = fixture.executor.store.tombstone_high_water()
+        with monkeypatch.context() as patch:
+            # A real newly initialized operational journal has no source anchor.
+            # Retain the source backup and tombstone authority to isolate this loss.
+            patch.setattr(original, 'journal', empty.journal)
+            with pytest.raises(RestoreSourceError, match='RESTORE_SOURCE_ANCHOR_MISSING'):
+                fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
+        assert original.active().generation_id == active.generation_id
+        assert hashlib.sha256((active.root / '.sb/ledger.db').read_bytes()).hexdigest() == before
+        assert fixture.executor.store.tombstone_high_water() == water
+        assert not list(original.staging.iterdir())
+        assert not list((tmp_path / 'restore').iterdir())
+    finally:
+        empty.close()
+        fixture.executor.close()

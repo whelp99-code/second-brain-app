@@ -1093,3 +1093,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 복원 기억 재삭제/재복원:** [실제 자비스 두번째삭제 proved·chain2→최초백업 재복원→두기억0](RESTORE-REDELETE-2026-09-10.md). 최종exit0·blocked/scan0·Ruff/Node구문/diff. 첫 복원 동시 scoped 검증 유지. 합성 환경이며 운영/실업무/DR 전체 목표는 남는다.
+
+
+**2026-09-10 원장 anchor 소실 복원 거부:** [실제 빈 journal 주입→sanitizer 거부·활성/삭제이력 불변·임시정리](RESTORE-ANCHOR-LOSS-GATE-2026-09-10.md). 관련18통과/27.61초·Ruff/diff. 안전한 거부 검증이며 원장소실 자동DR는 독립 근거 확보 전 보류, 전체 목표 유지.
