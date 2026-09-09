@@ -1,0 +1,36 @@
+{
+  "workspace": "/var/tmp/sb-published-crash-075t02v9",
+  "results": [
+    {
+      "phase": "pointer_rename",
+      "batch": {
+        "run_id": "62a798f74c2f45f0b5fccfb7dec83c70",
+        "status": "ok",
+        "started_at": "2026-09-09T15:38:00.915324+00:00",
+        "finished_at": "2026-09-09T15:38:00.950218+00:00",
+        "stages_attempted": 2,
+        "written": 0,
+        "errors": 0
+      },
+      "same_published_generation": true,
+      "predecessor_disposed": true,
+      "pending_files": 1
+    },
+    {
+      "phase": "activation_verify",
+      "batch": {
+        "run_id": "646e69cc9e5745bc8efd25dde714abe2",
+        "status": "ok",
+        "started_at": "2026-09-09T15:38:01.694191+00:00",
+        "finished_at": "2026-09-09T15:38:01.729718+00:00",
+        "stages_attempted": 2,
+        "written": 0,
+        "errors": 0
+      },
+      "same_published_generation": true,
+      "predecessor_disposed": true,
+      "pending_files": 1
+    }
+  ],
+  "scope": "process SIGKILL at publication barriers, synthetic pending input; not power-loss simulation"
+}
