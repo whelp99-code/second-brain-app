@@ -1,0 +1,181 @@
+{
+  "observed_at": "2026-09-09T12:52:10.782371+00:00",
+  "handle_audit": {
+    "database": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
+    "uid": 1000,
+    "scanned_processes": 312,
+    "open_handles": [
+      {
+        "pid": 1625716,
+        "fd": 21,
+        "file": "jarvis.sqlite"
+      },
+      {
+        "pid": 1625716,
+        "fd": 22,
+        "file": "jarvis.sqlite-wal"
+      },
+      {
+        "pid": 1625716,
+        "fd": 23,
+        "file": "jarvis.sqlite-shm"
+      },
+      {
+        "pid": 2123274,
+        "fd": 21,
+        "file": "jarvis.sqlite"
+      },
+      {
+        "pid": 2123274,
+        "fd": 22,
+        "file": "jarvis.sqlite-wal"
+      },
+      {
+        "pid": 2123274,
+        "fd": 23,
+        "file": "jarvis.sqlite-shm"
+      }
+    ],
+    "mapped_files": [
+      {
+        "pid": 1625716,
+        "file": "jarvis.sqlite-shm"
+      },
+      {
+        "pid": 2123274,
+        "file": "jarvis.sqlite-shm"
+      }
+    ],
+    "unreadable_pids": [
+      1422,
+      1477,
+      7401,
+      114125,
+      719131,
+      1040584,
+      1775103,
+      1775104,
+      1775348,
+      1780457,
+      2089491,
+      2093019,
+      2105413,
+      2161277,
+      2164657,
+      2713372,
+      3771272
+    ],
+    "unreadable_processes": [
+      {
+        "pid": 1422,
+        "comm": "systemd",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/init.scope"
+      },
+      {
+        "pid": 1477,
+        "comm": "(sd-pam)",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/init.scope"
+      },
+      {
+        "pid": 7401,
+        "comm": "ssh-agent",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/ssh-agent.service"
+      },
+      {
+        "pid": 114125,
+        "comm": "sh",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-orca-112681.scope"
+      },
+      {
+        "pid": 719131,
+        "comm": "cat",
+        "cgroup": "0::/user.slice/user-1000.slice/session-16002.scope"
+      },
+      {
+        "pid": 1040584,
+        "comm": "ssh-agent",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/gcr-ssh-agent.service"
+      },
+      {
+        "pid": 1775103,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-73902.scope"
+      },
+      {
+        "pid": 1775104,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-73901.scope"
+      },
+      {
+        "pid": 1775348,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-73903.scope"
+      },
+      {
+        "pid": 1780457,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-73915.scope"
+      },
+      {
+        "pid": 2089491,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-74347.scope"
+      },
+      {
+        "pid": 2093019,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-74354.scope"
+      },
+      {
+        "pid": 2105413,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-74365.scope"
+      },
+      {
+        "pid": 2161277,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-74425.scope"
+      },
+      {
+        "pid": 2164657,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-74431.scope"
+      },
+      {
+        "pid": 2713372,
+        "comm": "sshd-session",
+        "cgroup": "0::/user.slice/user-1000.slice/session-34103.scope"
+      },
+      {
+        "pid": 3771272,
+        "comm": "sd_espeak-ng-mb",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/speech-dispatcher.service"
+      }
+    ],
+    "target_identity_changed": false,
+    "scope": "same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion",
+    "drain_authorized": false
+  },
+  "context": {
+    "previous_ssh_pid_exists": false,
+    "holders": [
+      {
+        "pid": 1625716,
+        "comm": "MainThread",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/jm-jarvis-dashboard.service"
+      },
+      {
+        "pid": 2123274,
+        "comm": "MainThread",
+        "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/jm-jarvis.service"
+      }
+    ],
+    "migration_tables": [
+      "schema_migrations",
+      "personal_recommendation_transition_migration_evidence",
+      "daily_loop_migration_035_evidence"
+    ],
+    "migration_count": 58
+  },
+  "audit_exit_code": 2
+}
