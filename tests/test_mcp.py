@@ -371,3 +371,15 @@ def test_mcp_sb_search_schema_includes_scope(tmp_path: Path) -> None:
     blob = anyio.run(_go).lower()
     assert "scope" in blob
     assert "reference" in blob
+
+
+def test_mcp_search_uses_explicit_registry(tmp_path: Path, monkeypatch):
+    root = _seed(tmp_path)
+    unrelated = tmp_path / 'unrelated-registry.sqlite'
+    monkeypatch.setenv('SB_KNOWLEDGE_REGISTRY', str(unrelated))
+    config = Config(raw={'vault_root': str(root),
+                         'knowledge_registry': str(root / '.sb/knowledge-registry.sqlite')})
+    result = _call(build_server(root, config=config), 'sb_search', {'query': EN_TERM})
+    assert _search_rows(result)
+    assert all(row.verification == 'VERIFIED' for row in _search_rows(result))
+    assert not unrelated.exists()

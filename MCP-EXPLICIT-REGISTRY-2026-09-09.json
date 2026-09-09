@@ -1,0 +1,36 @@
+{
+  "rows": [
+    {
+      "page_id": "wiki/web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+      "section": "title",
+      "snippet": "...5-합성기억정상경로",
+      "score": 1.1439784894664853,
+      "kind": "wiki",
+      "index_status": "active",
+      "knowledge_status": "ACTIVE",
+      "approval_status": "APPROVED",
+      "canonical": "",
+      "source_ref": "",
+      "updated_at": "2026-09-09",
+      "role": "CANONICAL",
+      "verification": "VERIFIED"
+    },
+    {
+      "page_id": "wiki/web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+      "section": "합성기억정상경로",
+      "snippet": "...-합성기억정상경로....",
+      "score": 1.0475076991484544,
+      "kind": "wiki",
+      "index_status": "active",
+      "knowledge_status": "ACTIVE",
+      "approval_status": "APPROVED",
+      "canonical": "",
+      "source_ref": "",
+      "updated_at": "2026-09-09",
+      "role": "CANONICAL",
+      "verification": "VERIFIED"
+    }
+  ],
+  "unrelated_registry_exists": false,
+  "model_recalled": false
+}
