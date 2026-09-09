@@ -132,5 +132,8 @@ def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: 
         assert index.search('unrelated-restore-record', scope='active') == ()
         assert proof.blocked_matches == 0 and proof.scan_errors == 0
         assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
+        from tests.restore_scoped_mcp import check_restored_mcp
+        check_restored_mcp(fixture, generation, hits[0].page_id, keep, monkeypatch)
+
     finally:
         fixture.executor.close()
