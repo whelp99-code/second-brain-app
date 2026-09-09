@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import weakref
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
@@ -51,21 +52,35 @@ class PendingCompile:
 
 
 class _BodyCache:
-    """Last compiled bodies keyed by ledger id. Ledger has no body column."""
+    """Bodies belong to one live ledger instance, never a recycled object id."""
 
     def __init__(self) -> None:
-        self._data: dict[int, dict[str, str]] = {}
+        self._data: dict[int, tuple[weakref.ReferenceType[CompileLedger], dict[str, str]]] = {}
 
     def get(self, ledger: CompileLedger, page_id: str) -> str:
-        stored = self._data.get(id(ledger), {}).get(page_id)
-        return "" if stored is None else stored
+        entry = self._data.get(id(ledger))
+        if entry is None or entry[0]() is not ledger:
+            return ""
+        return entry[1].get(page_id, "")
 
     def put(self, ledger: CompileLedger, page_id: str, body: str) -> None:
-        bucket = self._data.get(id(ledger))
-        if bucket is None:
-            bucket = {}
-            self._data[id(ledger)] = bucket
-        bucket[page_id] = body
+        key = id(ledger)
+        entry = self._data.get(key)
+        if entry is None or entry[0]() is not ledger:
+            def discard(reference: weakref.ReferenceType[CompileLedger]) -> None:
+                current = self._data.get(key)
+                if current is not None and current[0] is reference:
+                    del self._data[key]
+
+            try:
+                reference = weakref.ref(ledger, discard)
+            except TypeError:
+                # Non-weak-referenceable implementations can supply explicit
+                # existing_bodies/pages; retaining them globally is unsafe.
+                return
+            entry = (reference, {})
+            self._data[key] = entry
+        entry[1][page_id] = body
 
 
 _BODIES: Final = _BodyCache()
