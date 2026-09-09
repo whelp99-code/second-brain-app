@@ -1,3 +1,5 @@
+[실제 gzip 서명 복원 인수](COMPRESSED-SIGNED-RESTORE-2026-09-09.md) — 위치/복사/이동3사례 및 변경 실패 시 세대·staging 보존, 관련30개 통과.
+
 [tar 복원 입력 식별 고정](RESTORE-TAR-FILE-IDENTITY-2026-09-09.md) — 링크·처리 중 변경3회귀 재현→관련28개 및 정적검사 통과.
 
 [복원 원본 파일 식별 고정](RESTORE-SOURCE-FILE-IDENTITY-2026-09-09.md) — 같은크기 교체·symlink·FIFO 거부, 관련24개/FIFO후15개(중복) 및 정적검사 통과.

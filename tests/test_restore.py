@@ -52,9 +52,10 @@ def test_restore_rejects_arbitrary_lower_root(tmp_path: Path) -> None:
     fixture.executor.close()
 
 
+@pytest.mark.parametrize("archive_kind", ["directory", "gzip"])
 @pytest.mark.parametrize("change", ["shift", "copy", "move"])
 def test_restore_shifted_deleted_record_cannot_survive_signed_restore(
-    tmp_path: Path, change: str,
+    tmp_path: Path, change: str, archive_kind: str,
 ) -> None:
     from datetime import datetime
 
@@ -82,12 +83,20 @@ def test_restore_shifted_deleted_record_cannot_survive_signed_restore(
             source_tombstone_set_root=old.source_tombstone_set_root,
             created_at=datetime.fromisoformat(old.created_at),
         ))
-        request = fixture.request.model_copy(update={'archive_manifest': manifest})
+        if archive_kind == "gzip":
+            import tarfile
+            packed = tmp_path / 'backup.tar.gz'
+            with tarfile.open(packed, 'w:gz') as bundle:
+                for path in sorted(archive.rglob('*')):
+                    bundle.add(path, arcname=path.relative_to(archive).as_posix(), recursive=False)
+            archive = packed
+        request = fixture.request.model_copy(update={'archive': archive, 'archive_manifest': manifest})
         generation, proof = fixture.sanitizer.sanitize(request, fixture.executor.mutations)
         managed = b''.join(p.read_bytes() for p in generation.root.rglob('*') if p.is_file())
         assert OLD.encode() not in managed
         assert fixture.unrelated in managed
         assert proof.blocked_matches == 0
+        assert list(fixture.sanitizer.workspace.iterdir()) == []
         assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
     finally:
         fixture.executor.close()
@@ -115,5 +124,34 @@ def test_managed_restore_preserves_existing_request_staging(
             assert proof.scan_errors == 0
         assert evidence.read_text() == 'other interrupted restore'
         assert list(fixture.sanitizer.workspace.iterdir()) == [previous]
+    finally:
+        fixture.executor.close()
+
+
+def test_changed_tar_fails_without_generation_or_staging(tmp_path: Path, monkeypatch) -> None:
+    import tarfile
+
+    fixture = restore_fixture(tmp_path)
+    try:
+        archive = tmp_path / 'backup.tar.gz'
+        with tarfile.open(archive, 'w:gz') as bundle:
+            for path in sorted(fixture.request.archive.rglob('*')):
+                bundle.add(path, arcname=path.relative_to(fixture.request.archive).as_posix(),
+                    recursive=False)
+        request = fixture.request.model_copy(update={'archive': archive})
+        before = set(fixture.executor.generations.generations.iterdir())
+        extractall = tarfile.TarFile.extractall
+
+        def mutate_after_extract(bundle, *args, **kwargs):
+            extractall(bundle, *args, **kwargs)
+            with archive.open('ab') as output:
+                output.write(b'changed-after-read')
+
+        monkeypatch.setattr(tarfile.TarFile, 'extractall', mutate_after_extract)
+        with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
+            fixture.sanitizer.sanitize(request, fixture.executor.mutations)
+        assert set(fixture.executor.generations.generations.iterdir()) == before
+        assert list(fixture.sanitizer.workspace.iterdir()) == []
+        assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
     finally:
         fixture.executor.close()
