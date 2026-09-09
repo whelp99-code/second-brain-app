@@ -1,0 +1,221 @@
+{
+  "observed": {
+    "combined_completion": {
+      "kind": "remembered_completion_observed",
+      "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+      "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+      "status": {
+        "schema_version": 4,
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+        "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+        "scope_digest": "sha256:df63a7b889fe8ce5bcf5939c76d00ecc246ea2b943dcca10eeb164d4e1a5e0ad",
+        "state": "proved",
+        "phase": "proved",
+        "updated_at": "2026-08-28T12:00:00.000Z",
+        "proof": {
+          "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "provider_instance_id": "provider:fixture",
+          "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "schema_version": 4,
+          "scope_digest": "sha256:df63a7b889fe8ce5bcf5939c76d00ecc246ea2b943dcca10eeb164d4e1a5e0ad",
+          "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+        },
+        "receipt": {
+          "schema_version": 4,
+          "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "envelope_digest": null,
+          "state": "proved",
+          "code": "PROVIDER_PROVED",
+          "proof_digest": "sha256:0433f7d5967dd23286f4f1525491f03f315dfff05b8638db0ad3321ed31212b5",
+          "status_digest": "sha256:8aeb6e1a606d9a58ab3b9ae814e32e640c9319f037f998cc81b60ca68e13351c",
+          "updated_at": "2026-08-28T12:00:00.000Z"
+        },
+        "acceptance": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "idempotency_key": "memidem:scoped:v4:b2a9c8ce0553136720cd41003bb93dcdd47053c191fcf3be51244f3b5d8a65b8",
+          "scope_digest": "sha256:df63a7b889fe8ce5bcf5939c76d00ecc246ea2b943dcca10eeb164d4e1a5e0ad",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88.v4.json",
+          "request_file_digest": "sha256:088e3311d479fc65503b3527d53dc7ead5dabd2090710390ee393712aab47e73",
+          "replayed": true
+        }
+      },
+      "artifact": {
+        "kind": "remembered_artifact_observed",
+        "access": {
+          "schema_version": 1,
+          "complete": true,
+          "sources": [
+            {
+              "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+              "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+              "classification": {
+                "schema_version": 1,
+                "owner": "principal:owner",
+                "projects": [
+                  "project:a"
+                ],
+                "policy_revision": "policy:1"
+              }
+            }
+          ]
+        },
+        "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+        "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "checked_at": "2026-08-31T03:30:00.000Z",
+      "valid_until": "2026-08-31T03:31:00.000Z"
+    },
+    "recovered_without_local_acceptance": true,
+    "completion": {
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "status": {
+        "schema_version": 4,
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+        "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+        "scope_digest": "sha256:df63a7b889fe8ce5bcf5939c76d00ecc246ea2b943dcca10eeb164d4e1a5e0ad",
+        "state": "proved",
+        "phase": "proved",
+        "updated_at": "2026-08-28T12:00:00.000Z",
+        "proof": {
+          "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "provider_instance_id": "provider:fixture",
+          "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "schema_version": 4,
+          "scope_digest": "sha256:df63a7b889fe8ce5bcf5939c76d00ecc246ea2b943dcca10eeb164d4e1a5e0ad",
+          "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+        },
+        "receipt": {
+          "schema_version": 4,
+          "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "envelope_digest": null,
+          "state": "proved",
+          "code": "PROVIDER_PROVED",
+          "proof_digest": "sha256:0433f7d5967dd23286f4f1525491f03f315dfff05b8638db0ad3321ed31212b5",
+          "status_digest": "sha256:8aeb6e1a606d9a58ab3b9ae814e32e640c9319f037f998cc81b60ca68e13351c",
+          "updated_at": "2026-08-28T12:00:00.000Z"
+        },
+        "acceptance": {
+          "schema_version": 4,
+          "kind": "accepted",
+          "state": "pending",
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+          "idempotency_key": "memidem:scoped:v4:b2a9c8ce0553136720cd41003bb93dcdd47053c191fcf3be51244f3b5d8a65b8",
+          "scope_digest": "sha256:df63a7b889fe8ce5bcf5939c76d00ecc246ea2b943dcca10eeb164d4e1a5e0ad",
+          "accepted_at": "2026-08-28T12:00:00.000Z",
+          "inbox_path": "pending/memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88.v4.json",
+          "request_file_digest": "sha256:088e3311d479fc65503b3527d53dc7ead5dabd2090710390ee393712aab47e73",
+          "replayed": true
+        }
+      }
+    },
+    "request_status_after_restart": true,
+    "fixture": true,
+    "profile": "scoped-record-read-v5",
+    "production_composition": true,
+    "internal_write_authority_fixture": true,
+    "supervised_stdio": true,
+    "read_after_restart": true,
+    "broader_authenticated_scope_allowed": true,
+    "provider_policy_change_rejected": true,
+    "issuer_policy_withdrawal_rejected": true,
+    "observation": {
+      "kind": "remembered_artifact_observed",
+      "access": {
+        "schema_version": 1,
+        "complete": true,
+        "sources": [
+          {
+            "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+            "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+            "classification": {
+              "schema_version": 1,
+              "owner": "principal:owner",
+              "projects": [
+                "project:a"
+              ],
+              "policy_revision": "policy:1"
+            }
+          }
+        ]
+      },
+      "request_id": "memreq:scoped:v4:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+      "request_digest": "sha256:72e3f9d74c92a6d21ffa29b740d5408aa7a6e74e15f57f038936fdb425478d88",
+      "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+      "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+      "generation": {
+        "provider_instance_id": "provider:fixture",
+        "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+        "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+        "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+        "tombstone_sequence": 0,
+        "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      },
+      "record_ids": [
+        "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+        "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+        "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+        "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+      ]
+    },
+    "automatic_settlement": false
+  },
+  "acceptance_recorded": {
+    "kind": "acceptance_recorded",
+    "outbox_id": "memout:scoped:v4:b803a86a2e58305cfeaf90b0b99032e6c524d5a32c7f35633fe75f2b54007add",
+    "attempt_id": "memattempt:pos:v2:c7a650c55b08ef569d4aea66769922e8e8c3585f8f757c430ce96e6c1e5f5925",
+    "acceptance_receipt_digest": "sha256:60d9ccf26735cd385de52cb906a088328fd40353f9fc60cd1867db850c8c1419",
+    "replayed": true
+  },
+  "attempt_count": 1,
+  "acceptance_events": 1,
+  "record_commit_exit": 73,
+  "record_processes": 3,
+  "replay_idempotent": true,
+  "redispatch": false,
+  "jarvis_state": "reconciling",
+  "foreign_key_errors": 0
+}
