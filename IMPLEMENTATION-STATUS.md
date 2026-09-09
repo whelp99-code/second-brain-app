@@ -1,3 +1,5 @@
+[웹 검색 응답 순서 보호](WEB-SEARCH-RESPONSE-ORDER-2026-09-09.md) — 이전응답 덮어쓰기 재현→브라우저3흐름·HTTP12개통과.
+
 [웹 기억 저장 중 새 초안 보존](WEB-DRAFT-PRESERVATION-2026-09-09.md) — 실제브라우저 유실재현→4흐름통과, HTTP12개통과.
 
 [관리자 관측 대상UID 지정](DATABASE-OBSERVER-UID-2026-09-09.md) — --uid 및 관측자/대상 분리,10개통과. sudo비대화형 인증불가로 관리자 관측은 미실행.
