@@ -22,6 +22,7 @@ from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Final, cast, override
 
 from sb.config import Config
+from sb.normalize import _redact
 from sb.pipeline import audit_citations
 from sb.store import DerivStatus, assert_ledger_integrity, load_ledger_tables
 from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger, ledger_schema_version, migrate_ledger
@@ -434,7 +435,18 @@ def status_snapshot(config: Config) -> dict[str, object]:
     failed: list[dict[str, object]] = []
     failed_by_stage: dict[str, int] = {}
     last_run: dict[str, object] | None = None
+    recent_stages: list[dict[str, object]] = []
     if db.is_file():
+        with closing(sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE name='run_stage'").fetchone():
+                for row in conn.execute(
+                    "SELECT run_id,stage,status,errors,detail FROM run_stage "
+                    "ORDER BY started_at DESC,run_id DESC LIMIT 10"
+                ):
+                    recent_stages.append({
+                        "run_id": row[0], "stage": row[1], "status": row[2],
+                        "errors": row[3], "error": _safe_detail(_redact(row[4] or "")),
+                    })
         tables = load_ledger_tables(db)
         for row in tables.derivations.values():
             derivations[row.status] = derivations.get(row.status, 0) + 1
@@ -475,6 +487,7 @@ def status_snapshot(config: Config) -> dict[str, object]:
         if (root / ".git").is_dir()
         else False,
         "last_run": last_run,
+        "recent_stages": recent_stages,
         "run_counts": runs,
         "derivation_counts": derivations,
         "failed_derivations": failed,
