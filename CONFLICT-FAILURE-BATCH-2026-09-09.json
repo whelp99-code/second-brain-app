@@ -1,0 +1,116 @@
+{
+  "before": {
+    "workspace": "/var/tmp/sb-web-success-wwx69trr",
+    "receipt": {
+      "inbox_path": "inbox/2026-09-09T134344343573-합성기억정상경로.md"
+    },
+    "outcome": {
+      "run_id": "bdcf9a5a78064e639c8d68a2f8de4e57",
+      "status": "ok",
+      "pages": 1,
+      "conflicts": 0,
+      "errors": 0,
+      "exit_code": 0,
+      "already_running": false,
+      "failure": null
+    },
+    "status": {
+      "status": "2026-09-09T22:43:44.867637+09:00 run bdcf9a5a78064e639c8d68a2f8de4e57 ok pages=1 conflicts=0 errors=0",
+      "last_run_status": "ok",
+      "failures": {
+        "total": 1,
+        "by_stage": {
+          "conflict": 1
+        },
+        "items": [
+          {
+            "key": "cd8b0eaa6c7548dd130f5565fe2f46e0f5b73af53dc0ea2053d0b918e1bacb5d",
+            "stage": "conflict",
+            "attempts": 1,
+            "error": "no JSON object in LLM output (27 chars)",
+            "retry_hold_reason": null
+          }
+        ],
+        "omitted": 0
+      }
+    },
+    "search": {
+      "results": [
+        {
+          "page_id": "daily/2026-09-09",
+          "section": "오늘의 추천",
+          "snippet": "합성기억정상경로 e...",
+          "score": 0.4953225974563997,
+          "kind": "daily",
+          "index_status": "active",
+          "knowledge_status": "ACTIVE",
+          "approval_status": "APPROVED",
+          "canonical": "",
+          "source_ref": "",
+          "updated_at": "2026-09-09",
+          "role": "CANONICAL",
+          "verification": "VERIFIED"
+        }
+      ]
+    },
+    "model": "deterministic local stand-in",
+    "mocked_http": false
+  },
+  "after": {
+    "workspace": "/var/tmp/sb-web-success-s47v9423",
+    "receipt": {
+      "inbox_path": "inbox/2026-09-09T134459846770-합성기억정상경로.md"
+    },
+    "outcome": {
+      "run_id": "1871ee4800e146b183bc27bcc07eafc5",
+      "status": "partial",
+      "pages": 1,
+      "conflicts": 0,
+      "errors": 1,
+      "exit_code": 0,
+      "already_running": false,
+      "failure": null
+    },
+    "status": {
+      "status": "2026-09-09T22:45:00.387512+09:00 run f5a8f05b6e5a415492388c24eb4e8bdc ok pages=1 conflicts=0 errors=0",
+      "last_run_status": "ok",
+      "failures": {
+        "total": 1,
+        "by_stage": {
+          "conflict": 1
+        },
+        "items": [
+          {
+            "key": "2e3d3f4c571da4f916c1d5b8d25ddc563e2fd8cf44df00fb628942102dff4de7",
+            "stage": "conflict",
+            "attempts": 1,
+            "error": "no JSON object in LLM output (27 chars)",
+            "retry_hold_reason": null
+          }
+        ],
+        "omitted": 0
+      }
+    },
+    "search": {
+      "results": [
+        {
+          "page_id": "daily/2026-09-09",
+          "section": "오늘의 추천",
+          "snippet": "합성기억정상경로 e...",
+          "score": 0.4953225974563997,
+          "kind": "daily",
+          "index_status": "active",
+          "knowledge_status": "ACTIVE",
+          "approval_status": "APPROVED",
+          "canonical": "",
+          "source_ref": "",
+          "updated_at": "2026-09-09",
+          "role": "CANONICAL",
+          "verification": "VERIFIED"
+        }
+      ]
+    },
+    "model": "deterministic local stand-in",
+    "mocked_http": false
+  }
+}

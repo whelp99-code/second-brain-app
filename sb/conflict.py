@@ -62,6 +62,7 @@ class ConflictFinding:
     warning: bool | None
     deriv_key: str | None = None
     deriv_output: DerivationOutput | None = None
+    failure: str | None = None
 
 
 def check(
@@ -208,12 +209,12 @@ def _judge(
         raw = llm.generate(prompt, json_mode=True)
     except (LLMUnavailable, LLMBadJson) as exc:
         ledger.mark_failed(key, str(exc))
-        return _open(pair)
+        return replace(_open(pair), failure=str(exc))
     else:
         out = _parse(raw, pair, texts, stamps, evidence)
     if out.warning is True and out.route == "unrelated" and out.verdict.confidence == 0.0:
         ledger.mark_failed(key, "invalid conflict verdict")
-        return out
+        return replace(out, failure="invalid conflict verdict")
     payload = _dump(out)
     output = DerivationOutput(hashlib.sha256(payload.encode()).hexdigest(), payload)
     if finalize:

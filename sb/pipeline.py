@@ -915,6 +915,8 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
             checker = None
         if checker is not None:
             for finding in checker(units, kept, ledger, llm, config, finalize=False):
+                if finding.failure is not None:
+                    errors += 1
                 page = finding.page
                 deriv = (
                     (finding.deriv_key, finding.deriv_output)

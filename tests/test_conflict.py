@@ -211,6 +211,7 @@ def test_malformed_llm_json_fails_open_with_warning(
     )
     assert found
     assert all(item.route == "unrelated" and item.warning is True for item in found)
+    assert all(item.failure for item in found)
 
 
 def test_llm_call_failure_fails_open(ledger: Ledger, config: Config, unit: Unit) -> None:
@@ -224,6 +225,7 @@ def test_llm_call_failure_fails_open(ledger: Ledger, config: Config, unit: Unit)
     )
     assert found
     assert all(item.route == "unrelated" and item.warning is True for item in found)
+    assert all(item.failure for item in found)
 
 
 def test_max_llm_calls_conflict_caps_invocations(
