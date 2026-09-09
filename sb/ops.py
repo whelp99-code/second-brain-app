@@ -280,6 +280,28 @@ def _verify_sidecar(archive: Path) -> None:
         raise OperationError("backup checksum mismatch")
 
 
+@contextmanager
+def _exclusive_restore(destination: Path) -> Generator[None, None, None]:
+    """Keep the lock outside the directory that publication replaces."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    name = hashlib.sha256(os.fsencode(destination.name)).hexdigest()
+    lock = destination.parent / f".sb-restore-{name}.lock"
+    fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    try:
+        metadata = os.fstat(fd)
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1
+                or metadata.st_uid != os.getuid() or stat.S_IMODE(metadata.st_mode) & 0o077):
+            raise OperationError("RESTORE_LOCK_UNSAFE")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise OperationError("RESTORE_DESTINATION_BUSY") from exc
+        yield
+    finally:
+        os.close(fd)
+    # Never unlink a lock file: another process may already have opened it.
+
+
 def restore_backup(
     archive_path: Path | str,
     destination: Path | str,
@@ -292,6 +314,11 @@ def restore_backup(
     if not archive.is_file():
         raise OperationError(f"backup does not exist: {archive}")
     _verify_sidecar(archive)
+    with _exclusive_restore(destination_path):
+        return _restore_backup_locked(archive, destination_path, force=force)
+
+
+def _restore_backup_locked(archive: Path, destination_path: Path, *, force: bool) -> RestoreResult:
     parent = destination_path.parent
     parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(mkdtemp(prefix=f".{destination_path.name}.restore-", dir=parent))
