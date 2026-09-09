@@ -1039,3 +1039,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 복원 source 검증기:** [운영 원장과 봉인 backup manifest 교차검증](RESTORE-SOURCE-VERIFIER-2026-09-10.md). 관련13통과/7.72초·Ruff/diff·새 모듈 타입0오류/0경고. 정상/주장변조/ledger변조/독립원장누락 검사. 상태 추출·정제 본문 결합·실제 복원 연결과 원장 소실 DR는 아직 남는다. 전체 목표 유지.
+
+
+**2026-09-10 복원 지식 상태 추출:** [검증된 원장의 현재 record digest만 선택·재검증](RESTORE-KNOWLEDGE-EXTRACTION-2026-09-10.md). 관련11통과/1.76초·Ruff/diff·타입0오류/0경고. 과거 본문 제외·무상태 유지·추출 중 변조 거부. 정제 복원 본문 대조·실제 쓰기/접근 분류 연결·DR 및 전체 목표는 남는다.

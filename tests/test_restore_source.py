@@ -9,8 +9,8 @@ from sb.restore_source import RestoreSourceError, verified_restore_source
 from tests.test_generation_knowledge import STATE, build
 
 
-def fixture(tmp_path):
-    generation = build(tmp_path / 'provider', (STATE,))
+def fixture(tmp_path, states=(STATE,)):
+    generation = build(tmp_path / 'provider', states)
     archive = tmp_path / 'archive'
     shutil.copytree(generation.root, archive)
     store = GenerationStore(tmp_path / 'provider/state', tmp_path / 'provider/share',
@@ -72,3 +72,47 @@ def test_self_consistent_archive_without_independent_journal_is_not_trusted(tmp_
     finally:
         original.close()
         empty.close()
+
+
+def test_extract_only_state_matching_sealed_record_bytes(tmp_path):
+    from dataclasses import replace
+
+    from sb.restore_source import read_restore_knowledge
+
+    old = replace(STATE, content_digest='sha256:' + 'b' * 64)
+    archive, store, manifest = fixture(tmp_path, (old, STATE))
+    try:
+        assert read_restore_knowledge(archive, manifest, store) == (STATE,)
+    finally:
+        store.close()
+
+
+def test_unbound_generation_does_not_gain_state_during_extraction(tmp_path):
+    from sb.restore_source import read_restore_knowledge
+
+    archive, store, manifest = fixture(tmp_path, ())
+    try:
+        assert read_restore_knowledge(archive, manifest, store) == ()
+    finally:
+        store.close()
+
+
+def test_ledger_change_during_state_extraction_is_rejected(tmp_path, monkeypatch):
+    import sb.restore_source as module
+
+    archive, store, manifest = fixture(tmp_path)
+    original = module.BoundKnowledge
+
+    def tamper(*args):
+        state = original(*args)
+        path = archive / '.sb/ledger.db'
+        path.chmod(0o600)
+        path.write_bytes(b'changed after state rows were read')
+        return state
+
+    monkeypatch.setattr(module, 'BoundKnowledge', tamper)
+    try:
+        with pytest.raises(RestoreSourceError, match='RESTORE_SOURCE_INVALID'):
+            module.read_restore_knowledge(archive, manifest, store)
+    finally:
+        store.close()
