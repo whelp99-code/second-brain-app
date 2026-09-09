@@ -1304,3 +1304,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 DB 관측 경로 전환 누락 수정:** [심볼릭링크 전환 미탐지 실패재현→원래 입력경로 재검증](DATABASE-HANDLE-PATH-RACE-2026-09-10.md). 관련11통과/1.75초·Ruff/diff. 운영 관측exit2·DB holder2개/관측불가17개, drain/전환 보류·전체 목표 유지.
 
 **2026-09-10 DB holder 서비스 식별:** [dashboard/authority 두 service·holder_processes 관측 추가](DATABASE-HOLDER-OWNERS-2026-09-10.md). 관련12통과·실제 CLI2서비스/관측불가17개exit2. 두 서비스 독립 실행을 확인했고 임의 종료/운영 전환 없이 보류 조건을 구체화했다. 전체 목표 유지.
+
+**2026-09-10 운영 pending 집계 도구:** [읽기전용 단일snapshot·6큐0/activecursor0/lease1](JARVIS-PENDING-OBSERVATION-2026-09-10.md). 테스트3통과·실제관측exit0·Ruff/diff. sudo 비대화인증불가로 관리자 핸들관측 미실행, 기존holder/관측불가·운영전환 보류 및 전체 목표 유지.
