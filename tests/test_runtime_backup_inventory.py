@@ -51,3 +51,60 @@ def test_runtime_backup_inventory_discards_archived_control_state(tmp_path):
         assert service.store.active().generation_id == generation.generation_id
     finally:
         service.close()
+
+
+def test_real_forget_disposes_runtime_archive_inside_managed_backup_root(tmp_path, monkeypatch):
+    import tarfile
+
+    from sb.config import Config
+    from tests import task30_restore_factory as factory
+
+    original_accept = factory.accept_effect_request
+    archive = tmp_path / 'backups' / 'before-forget.tar.gz'
+    unrelated = tmp_path / 'backups' / 'unrelated.tar.gz'
+    observations = []
+    unrelated_bytes = []
+
+    def accept_after_backup(*args, **kwargs):
+        config = Config(raw={
+            'vault_root': str(tmp_path / 'share' / 'vault'),
+            'share_root': str(tmp_path / 'share'), 'state_root': str(tmp_path / 'state'),
+            'request_root': str(tmp_path / 'requests'), 'export_root': str(tmp_path / 'exports'),
+            'backup_root': str(tmp_path / 'backups'), 'provider_instance_id': 'provider:fixture',
+            'provider_release_sha': 'a' * 40, 'knowledge_registry': str(tmp_path / 'registry.sqlite'),
+        })
+        archive.parent.mkdir(exist_ok=True, mode=0o700)
+        other_config = managed(tmp_path / 'other')
+        other_config.raw['knowledge_registry'] = str(tmp_path / 'other-registry.sqlite')
+        other = GenerationMutationService.from_config(other_config)
+        try:
+            other.remember('preserve unrelated archived memory', None, datetime.now(UTC))
+            backup_runtime(other_config, unrelated)
+        finally:
+            other.close()
+        unrelated_bytes.append(unrelated.read_bytes())
+        backup_runtime(config, archive)
+        with tarfile.open(archive) as bundle:
+            names = bundle.getnames()
+            assert any('.recovery/requests/journal.db' in name for name in names)
+            payloads = []
+            for member in bundle:
+                if member.isfile():
+                    stream = bundle.extractfile(member)
+                    assert stream is not None
+                    payloads.append(stream.read())
+            assert any(factory.OLD.encode() in payload for payload in payloads)
+        observations.append('real-runtime-archive-contained-original')
+        return original_accept(*args, **kwargs)
+
+    monkeypatch.setattr(factory, 'accept_effect_request', accept_after_backup)
+    fixture = factory.restore_fixture(tmp_path, full_source=True)
+    try:
+        assert observations == ['real-runtime-archive-contained-original']
+        assert not archive.exists()
+        assert unrelated.read_bytes() == unrelated_bytes[0]
+        assert fixture.executor.store.tombstone_high_water()[0] == 1
+        assert not any(factory.OLD.encode() in path.read_bytes()
+                       for path in archive.parent.rglob('*') if path.is_file())
+    finally:
+        fixture.executor.close()
