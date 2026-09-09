@@ -116,3 +116,44 @@ def test_directory_restore_refuses_file_replaced_after_stat(tmp_path: Path, monk
         GenerationRestoreSanitizer._extract(archive, destination)
     assert not (destination / 'memory.md').exists()
     assert outside.read_bytes() == b'replaced'
+
+
+@pytest.mark.parametrize('link_type', ['symlink', 'hardlink'])
+def test_restore_refuses_linked_tar_input(tmp_path: Path, link_type: str) -> None:
+    import os
+
+    original = tmp_path / 'original.tar'
+    with tarfile.open(original, 'w') as bundle:
+        member = tarfile.TarInfo('wiki/page.md')
+        member.size = 4
+        bundle.addfile(member, io.BytesIO(b'kept'))
+    archive = tmp_path / 'input.tar'
+    if link_type == 'symlink':
+        archive.symlink_to(original)
+    else:
+        os.link(original, archive)
+    destination = tmp_path / 'extracted'
+    destination.mkdir()
+    with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
+        GenerationRestoreSanitizer._extract(archive, destination)
+    assert list(destination.iterdir()) == []
+
+
+def test_restore_refuses_tar_changed_during_extraction(tmp_path: Path, monkeypatch) -> None:
+    archive = tmp_path / 'input.tar'
+    with tarfile.open(archive, 'w') as bundle:
+        member = tarfile.TarInfo('wiki/page.md')
+        member.size = 4
+        bundle.addfile(member, io.BytesIO(b'kept'))
+    extractall = tarfile.TarFile.extractall
+
+    def change_after_extract(bundle, *args, **kwargs):
+        extractall(bundle, *args, **kwargs)
+        with archive.open('ab') as stream:
+            stream.write(b'changed')
+
+    monkeypatch.setattr(tarfile.TarFile, 'extractall', change_after_extract)
+    destination = tmp_path / 'extracted'
+    destination.mkdir()
+    with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
+        GenerationRestoreSanitizer._extract(archive, destination)

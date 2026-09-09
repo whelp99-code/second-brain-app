@@ -7,10 +7,11 @@ import os
 import shutil
 import stat
 import tarfile
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import mkdtemp
-from typing import Final, final
+from typing import BinaryIO, Final, final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -78,6 +79,24 @@ def _read_archive_file(source: Path, expected: os.stat_result) -> bytes:
         raise RestoreError("RESTORE_ARCHIVE_UNSAFE") from exc
 
 
+@contextmanager
+def _open_archive(source: Path) -> Generator[BinaryIO, None, None]:
+    expected = source.stat(follow_symlinks=False)
+    if not stat.S_ISREG(expected.st_mode) or expected.st_nlink != 1:
+        raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+    descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        if _file_identity(os.fstat(descriptor)) != _file_identity(expected):
+            raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+        with os.fdopen(descriptor, "rb", closefd=False) as stream:
+            yield stream
+        if (_file_identity(os.fstat(descriptor)) != _file_identity(expected)
+                or _file_identity(source.stat(follow_symlinks=False)) != _file_identity(expected)):
+            raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+    finally:
+        os.close(descriptor)
+
+
 @final
 class GenerationRestoreSanitizer:
     def __init__(
@@ -125,7 +144,7 @@ class GenerationRestoreSanitizer:
                     raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
             return
         try:
-            with tarfile.open(archive, mode="r:*") as bundle:
+            with _open_archive(archive) as source, tarfile.open(fileobj=source, mode="r:*") as bundle:
                 members: list[tarfile.TarInfo] = []
                 total = 0
                 paths: dict[Path, bool] = {}

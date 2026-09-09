@@ -1,3 +1,5 @@
+[tar 복원 입력 식별 고정](RESTORE-TAR-FILE-IDENTITY-2026-09-09.md) — 링크·처리 중 변경3회귀 재현→관련28개 및 정적검사 통과.
+
 [복원 원본 파일 식별 고정](RESTORE-SOURCE-FILE-IDENTITY-2026-09-09.md) — 같은크기 교체·symlink·FIFO 거부, 관련24개/FIFO후15개(중복) 및 정적검사 통과.
 
 [관리형 복원 추출 예산](RESTORE-EXTRACTION-BUDGET-2026-09-09.md) — tar/디렉터리 항목·파일·합계 한도 사전 검사, 관련22개 및 정적검사 통과.
