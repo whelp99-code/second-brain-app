@@ -147,12 +147,7 @@ def compile_pending(
     used = 0
     remaining = False
     for page_id, grouped in _group_by_page(units):
-        key = deriv_key(
-            ["compile-page-v1:" + page_id, *(unit.unit_id for unit in grouped)],
-            COMPILE_STAGE,
-            prompt_version,
-            model_id,
-        )
+        key = compile_page_key(page_id, [unit.unit_id for unit in grouped], prompt_version, model_id)
         if not _prepare_compile(ledger, key):
             continue
         if used >= cap:
@@ -225,6 +220,11 @@ def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
     return PendingCompile(page, job.key, DerivationOutput(digest, f"wiki/{job.page_id}.md"),
         tuple(sorted({(unit.origin, unit.content_hash) for unit in job.units})),
         bool(existing) and previous is None)
+
+
+def compile_page_key(page_id: str, unit_ids: Sequence[str], prompt_version: str, model_id: str) -> str:
+    """Identity shared by execution and read-only retry/upgrade diagnostics."""
+    return deriv_key(["compile-page-v1:" + page_id, *unit_ids], COMPILE_STAGE, prompt_version, model_id)
 
 
 def _prepare_compile(ledger: CompileLedger, key: str) -> bool:

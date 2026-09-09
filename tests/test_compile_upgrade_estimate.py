@@ -8,7 +8,10 @@ import sys
 from pathlib import Path
 
 from sb.config import load_config
+from sb.generation_runtime import GenerationOperation
 from sb.pipeline import run_compile, run_ingest
+from sb.runtime_access import mutate_root
+from sb.store.ledger import Ledger
 
 
 def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
@@ -24,6 +27,13 @@ def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
     config_path.write_text(text)
     config = load_config(config_path)
     assert run_ingest(config, ["a", "b"]).exit_code == 0
+
+    def seed_history(root):
+        with Ledger(root) as ledger:
+            ledger.ensure_derivation("obsolete-compile-key", "compile", "old-run")
+            ledger.mark_running("obsolete-compile-key", "old-run")
+            ledger.mark_failed("obsolete-compile-key", "fixture historical failure")
+    mutate_root(config, GenerationOperation.EFFECT, seed_history)
 
     def estimate():
         database = vault / ".sb/ledger.db"
@@ -46,7 +56,10 @@ def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
     assert first["page_groups"] == first["eligible_page_calls"] == 2
     assert first["distinct_legacy_keys"] == 1
     assert first["model_calls_made"] == 0
+    assert first["non_current_compile_states"] == {"failed": 1}
+    assert first["non_current_compile_unfinished"] == 1
     assert run_compile(config, llm_mode="fake").exit_code == 0
     second = estimate()
     assert second["eligible_page_calls"] == 0
     assert second["new_key_states"]["done"] == 2
+    assert second["non_current_compile_unfinished"] == 1
