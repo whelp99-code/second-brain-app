@@ -1009,3 +1009,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 삭제 후 상태 저장 실패 복구 수정:** [terminal 요청 소실 재현·reconciling 유지·재처리 완료](EFFECT-KNOWLEDGE-RECOVERY-2026-09-10.md). 관련22통과/21.50초·Ruff/diff·새 helper 타입0오류/0경고. 새 executor가 lease 만료 후 동일 요청을 proved로 완료하고 tombstone 순번 중복 증가 없음을 확인했다. OS 강제 종료·다른 효과 실패·복원·운영 전체 목표는 남는다.
+
+
+**2026-09-10 정정 상태 저장 실패 인수:** [reconciling→새 executor 재처리→후속 export/forget](CORRECTION-KNOWLEDGE-RECOVERY-2026-09-10.md). 실제 lifecycle 6통과/27.13초·Ruff/diff. tombstone high water 불변, 정정 문장 단일 저장, 기존 승인 여부별 검색 상태를 확인했다. OS 강제 종료·취소 경쟁·복원·운영 전체 목표는 남는다.

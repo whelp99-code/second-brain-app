@@ -40,12 +40,13 @@ class _StatusEnvelope(BaseModel):
 
 
 @pytest.mark.parametrize("hybrid", [False, True])
-@pytest.mark.parametrize("bound", [False, True])
+@pytest.mark.parametrize("bound,binding_failure", [(False, False), (True, False), (True, True)])
 def test_real_provider_lifecycle_remember_correct_export_forget(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
     hybrid: bool,
     bound: bool,
+    binding_failure: bool,
 ) -> None:
     from sb.bound_knowledge import BoundKnowledge
     from sb.knowledge_registry import KnowledgeRegistry
@@ -103,7 +104,22 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         config.request_root, correction, correction_time + timedelta(seconds=1),
         public_keys=config.jarvis_public_keys, provider_instance_id="provider:fixture",
     )
-    correction_result = executor.apply_once(now=correction_time + timedelta(seconds=1))
+    if binding_failure:
+        def fail_binding(_ledger, _state):
+            raise RuntimeError('INJECTED_CORRECTION_STATE_FAILURE')
+        with monkeypatch.context() as failing:
+            failing.setattr(Ledger, 'bind_knowledge', fail_binding)
+            failed = executor.apply_once(now=correction_time + timedelta(seconds=1), lease_ms=1)
+        assert failed.state == 'reconciling' and failed.code == 'EFFECT_KNOWLEDGE_REBIND_FAILED'
+        assert executor.generations.active().generation_id == remembered_generation.generation_id
+        high_water = executor.store.tombstone_high_water()
+        assert high_water[0] > 0
+        executor.close()
+        executor = RequestExecutor(config)
+        correction_result = executor.apply_once(now=correction_time + timedelta(seconds=1, microseconds=2000), lease_ms=1)
+        assert executor.store.tombstone_high_water() == high_water
+    else:
+        correction_result = executor.apply_once(now=correction_time + timedelta(seconds=1))
     assert correction_result.state == "proved", correction_result
     assert audit_citations(executor.generations.active().root) == ()
     correction_observations = executor.store.observations(correction_accepted.request_id)
@@ -135,6 +151,7 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
     active = executor.generations.active()
     active_bytes = b"".join(path.read_bytes() for path in active.root.rglob("*") if path.is_file())
     assert OLD.encode() not in active_bytes and CORRECTED.encode() in active_bytes
+    assert sum(page.read_text().count(CORRECTED) for page in active.root.joinpath("wiki").glob("*.md")) == 1
     if hybrid:
         with closing(sqlite3.connect(active.root / ".sb/vectors.db")) as vectors:
             assert vectors.execute("SELECT text FROM record_vectors").fetchall() == [(CORRECTED,)]
