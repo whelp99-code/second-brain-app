@@ -54,7 +54,14 @@ try {
   assert.equal(keep.payload.records.length,1);
   assert(keep.payload.records[0].text.includes('KeepBeta'));
   const scoped = await checkRestoredScope({load,database,config,root,launcher,pageId:restored.surviving_page_id});
-  const result = {root,backup,deleted,restored,scoped,jarvis_owned_high_water:1,
+  const peer = await checkRestoredScope({load,database,config,root,launcher,pageId:restored.surviving_page_id,clientId:'restore-peer'});
+  assert.notEqual(scoped.agent,peer.agent);
+  assert.notEqual(scoped.session,peer.session);
+  assert.deepEqual(scoped.generation,peer.generation);
+  assert.equal(scoped.generation.generation_id,restored.generation_id);
+  assert.match(scoped.page_content_digest,/^sha256:[0-9a-f]{64}$/);
+  assert.equal(scoped.page_content_digest,peer.page_content_digest);
+  const result = {root,backup,deleted,restored,scoped,peer,shared_restored_memory_equal:true,jarvis_owned_high_water:1,
     deleted_records:0,surviving_records:1,model_calls:0,
     scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));

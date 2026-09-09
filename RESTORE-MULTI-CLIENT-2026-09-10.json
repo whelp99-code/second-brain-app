@@ -1,0 +1,69 @@
+{
+  "root": "/var/tmp/sb-jarvis-restore-HwIUCj",
+  "backup": {
+    "source_generation_id": "sbgen:v1:5af1e117deb349d6034352bb57964951d140450e173e95e88683444ae6550907"
+  },
+  "deleted": {
+    "request_id": "memeff:req:v2:2a968b94ab1bbc91439abdb40cb8e0b876254fd15eb8359cee273d2a61838302",
+    "provider_state": "proved",
+    "proof_id": "sbproof:v1:88951ef3531ba39546cf78a96ff8fa0ab641dfd9eb942dd0ed3aed7261494bf0",
+    "observation_kind": "deletion",
+    "tombstone_sequence": 1
+  },
+  "restored": {
+    "generation_id": "sbgen:v1:504b72fa7149806afd290759f2d3a5078c648c79e7fd8ca99a18fc3e571c4b6a",
+    "surviving_page_id": "wiki/memory-85498686fbeb4186e809ea0d51d8e0cb4dc74dea25dc8c787c94d5d947a37094",
+    "tombstone_sequence": 1,
+    "tombstone_set_root": "sha256:23ea3264915d509811953c80dfaa8f004ff5970586be80a93bfb244dac5037eb",
+    "blocked_matches": 0,
+    "scan_errors": 0
+  },
+  "scoped": {
+    "agent": "agent:restore",
+    "session": "session:restore",
+    "generation": {
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:504b72fa7149806afd290759f2d3a5078c648c79e7fd8ca99a18fc3e571c4b6a",
+      "generation_manifest_digest": "sha256:504b72fa7149806afd290759f2d3a5078c648c79e7fd8ca99a18fc3e571c4b6a",
+      "vault_head": "07ea19ff95229bfc6657d280415de37bf6ed07a3",
+      "vault_tree": "7f2d6ab656783abdbec55d428dbf05d321f32e49",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:23ea3264915d509811953c80dfaa8f004ff5970586be80a93bfb244dac5037eb"
+    },
+    "page_content_digest": "sha256:bce28cf60831989166a99f29ba7e31f74e022ee79d4e5438c462103b3c057483",
+    "profile": "scoped-record-read-v3",
+    "allowed_pages": 1,
+    "restricted_pages": 0,
+    "withdrawal_denied": true,
+    "post_response_withdrawal_denied": true,
+    "intercepted_response_count": 2,
+    "restored_policy_resumes": true
+  },
+  "peer": {
+    "agent": "agent:restore-peer",
+    "session": "session:restore-peer",
+    "generation": {
+      "provider_instance_id": "provider:fixture",
+      "generation_id": "sbgen:v1:504b72fa7149806afd290759f2d3a5078c648c79e7fd8ca99a18fc3e571c4b6a",
+      "generation_manifest_digest": "sha256:504b72fa7149806afd290759f2d3a5078c648c79e7fd8ca99a18fc3e571c4b6a",
+      "vault_head": "07ea19ff95229bfc6657d280415de37bf6ed07a3",
+      "vault_tree": "7f2d6ab656783abdbec55d428dbf05d321f32e49",
+      "tombstone_sequence": 1,
+      "tombstone_set_root": "sha256:23ea3264915d509811953c80dfaa8f004ff5970586be80a93bfb244dac5037eb"
+    },
+    "page_content_digest": "sha256:bce28cf60831989166a99f29ba7e31f74e022ee79d4e5438c462103b3c057483",
+    "profile": "scoped-record-read-v3",
+    "allowed_pages": 1,
+    "restricted_pages": 0,
+    "withdrawal_denied": true,
+    "post_response_withdrawal_denied": true,
+    "intercepted_response_count": 2,
+    "restored_policy_resumes": true
+  },
+  "shared_restored_memory_equal": true,
+  "jarvis_owned_high_water": 1,
+  "deleted_records": 0,
+  "surviving_records": 1,
+  "model_calls": 0,
+  "scope": "Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance"
+}
