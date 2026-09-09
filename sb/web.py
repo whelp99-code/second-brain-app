@@ -72,15 +72,20 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <h2>기억 추가</h2>
 <label for="title">제목</label><input id="title" placeholder="예: 계약 일정">
 <label for="content">내용</label><textarea id="content" placeholder="기억할 내용을 입력하세요"></textarea>
-<p><button id="rememberButton" onclick="remember()">기억하기</button> <button class="secondary" onclick="runPipeline()">지금 처리</button></p>
+<p><button id="rememberButton" onclick="remember()">기억하기</button> <button class="secondary" data-run-button onclick="runPipeline()">지금 처리</button></p>
 <pre id="rememberResult" class="muted"></pre>
 </section>
 <section>
 <h2>파일 업로드</h2>
 <div id="dropzone" class="dropzone">PDF·DOCX·HWPX·XLSX·Markdown·TXT·JSON·YAML 파일을 여기에 놓으세요</div>
 <p><input id="fileInput" type="file" multiple accept=".pdf,.docx,.hwpx,.xlsx,.md,.txt,.json,.yaml"></p>
-<p><button class="secondary" onclick="byId('fileInput').click()">파일 선택</button> <button onclick="runPipeline()">업로드 후 지금 처리</button></p>
+<p><button class="secondary" onclick="byId('fileInput').click()">파일 선택</button> <button data-run-button onclick="runPipeline()">업로드 후 지금 처리</button></p>
 <pre id="uploadResult" class="muted"></pre>
+</section>
+<section>
+<h2>처리 결과</h2>
+<p id="runSummary" role="status">아직 이 화면에서 처리를 요청하지 않았습니다.</p>
+<pre id="runResult"></pre>
 </section>
 <section>
 <h2>검색</h2>
@@ -119,7 +124,20 @@ function saveToken(){localStorage.setItem('sb_token',byId('token').value);show('
 async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status;const failures=data.failures;byId('failureSummary').textContent=failures.total?'미해결 실패 '+failures.total+'건 (단계별: '+Object.entries(failures.by_stage).map(([stage,count])=>stage+' '+count+'건').join(', ')+')':'원장에 기록된 미해결 실패 없음';byId('failureDetails').textContent=failures.items.map(item=>item.stage+' · '+item.key+' · 시도 '+item.attempts+'회\\n'+(item.error||'오류 상세 없음')+(item.retry_hold_reason?'\\n재시도 보류: 원래 브리핑 입력을 복구해야 합니다.':'')).join('\\n\\n')+(failures.omitted?'\\n추가 '+failures.omitted+'건은 상세 목록에서 생략됐습니다.':'')}catch(error){byId('status').textContent=error.message;byId('failureSummary').textContent='실패 상태를 확인하지 못했습니다.';byId('failureDetails').textContent=''}}
 let remembering=false;
 async function remember(){if(remembering)return;remembering=true;byId('rememberButton').disabled=true;const draft={title:byId('title').value,content:byId('content').value};show('rememberResult','저장 중…');try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify(draft)});show('rememberResult',{message:'받은 편지함에 저장했습니다. 처리 대기 상태이며, 지금 처리 후 검색 결과를 확인하세요.',...data});if(byId('title').value===draft.title&&byId('content').value===draft.content)byId('content').value=''}catch(error){show('rememberResult',error.message)}finally{remembering=false;byId('rememberButton').disabled=false}}
-async function runPipeline(){try{show('rememberResult',await api('/api/run',{method:'POST',body:'{}'}));await loadStatus()}catch(error){show('rememberResult',error.message)}}
+let runningPipeline=false;
+async function runPipeline(){
+ if(runningPipeline)return;
+ runningPipeline=true;
+ document.querySelectorAll('[data-run-button]').forEach(button=>button.disabled=true);
+ show('runSummary','처리 중…');show('runResult','');
+ try{
+  const data=await api('/api/run',{method:'POST',body:'{}'});
+  const messages={ok:'이번 처리가 끝났습니다. 검색 결과와 미해결 실패를 확인하세요.',partial:'일부 처리에 실패했습니다. 처리 실패 목록을 확인하세요.',capped:'처리 한도에 도달했습니다. 남은 입력과 다음 처리 결과를 확인하세요.',failed:'처리에 실패했습니다. 아래 결과와 처리 실패 목록을 확인하세요.'};
+  show('runSummary',data.already_running?'다른 처리가 실행 중입니다. 이번 요청은 새 처리를 시작하지 않았습니다.':messages[data.status]||'처리 상태를 판별하지 못했습니다. 아래 결과를 확인하세요.');
+  show('runResult',data);
+ }catch(error){show('runSummary','처리 결과를 확인하지 못했습니다.');show('runResult',error.message)}
+ finally{await loadStatus();runningPipeline=false;document.querySelectorAll('[data-run-button]').forEach(button=>button.disabled=false)}
+}
 function readBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',',2)[1]||'');reader.onerror=()=>reject(reader.error||new Error('파일 읽기 실패'));reader.readAsDataURL(file)})}
 async function uploadFiles(files){const results=[];for(const file of files){try{const payload={filename:file.name,relative_path:file.webkitRelativePath||file.name,device_id:'mac-web',content_base64:await readBase64(file)};results.push(await api('/api/uploads',{method:'POST',body:JSON.stringify(payload)}))}catch(error){results.push({filename:file.name,error:error.message})}}show('uploadResult',results)}
 let searchRequestId=0;
