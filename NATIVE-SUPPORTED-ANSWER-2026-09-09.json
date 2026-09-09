@@ -1,0 +1,133 @@
+{
+  "gateway_configuration": "CLI parser and independently owned existing authority connection",
+  "admission_surface": "mcp",
+  "execution_surface": "cli",
+  "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+  "identity_forwarder": "fixture",
+  "clock": "fixture",
+  "public_mcp_write": true,
+  "results": [
+    {
+      "mode": "valid",
+      "readback": {
+        "request_id": "memreq:scoped:v4:35dac4274b69acfa61688b0652eb79e4b1f2d6a8076e1fa6b7c65b6be638aa74",
+        "request_digest": "sha256:35dac4274b69acfa61688b0652eb79e4b1f2d6a8076e1fa6b7c65b6be638aa74",
+        "writer_agent": "agent:fixture",
+        "reader_agent": "agent:reader",
+        "fresh_login": true,
+        "provider_proved": true,
+        "jarvis_settled": true,
+        "control_completed": true,
+        "settlement_replay": true,
+        "settlements": 1,
+        "attempts": 1,
+        "same_generation": true,
+        "record_ids": [
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+        ],
+        "source_refs": [
+          "Second Brain",
+          "Second Brain"
+        ],
+        "context_records": 2,
+        "clients": {
+          "independent_stdio_clients": 2,
+          "records_each": 2,
+          "https_calls": 3,
+          "omo_engine_calls": 0,
+          "native_answer": {
+            "status": "supported",
+            "value": "첫 결정",
+            "explanation": "Two records were returned, both from source_ref 'Second Brain' (page_id wiki/memory-725c050a...). The record with sid 00b53881 / record_id sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7 has text '첫 결정' ('first decision'), and its citation span (441-451) precedes that of the other record, '두 번째 결정' ('second decision', span 464-481). The record text itself is self-labeling as the first decision, so the exact Korean text of the first decision is '첫 결정'. Note: retrieval order in the response was ranked, not sequential, and the records contain no further descriptive content about what the decision was; omission counts were all zero for this response but that does not prove no other records exist.",
+            "raw_response": "```json\n{\n  \"status\": \"supported\",\n  \"value\": \"첫 결정\",\n  \"explanation\": \"Two records were returned, both from source_ref 'Second Brain' (page_id wiki/memory-725c050a...). The record with sid 00b53881 / record_id sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7 has text '첫 결정' ('first decision'), and its citation span (441-451) precedes that of the other record, '두 번째 결정' ('second decision', span 464-481). The record text itself is self-labeling as the first decision, so the exact Korean text of the first decision is '첫 결정'. Note: retrieval order in the response was ranked, not sequential, and the records contain no further descriptive content about what the decision was; omission counts were all zero for this response but that does not prove no other records exist.\"\n}\n```"
+          },
+          "native_mode": "claude-supported",
+          "native_claude_calls": 1,
+          "native_version": "2.1.261 (Claude Code)",
+          "native_codex_calls": 0,
+          "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+        },
+        "reader_revocation": 403,
+        "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+      },
+      "native_writer": null,
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:35dac4274b69acfa61688b0652eb79e4b1f2d6a8076e1fa6b7c65b6be638aa74",
+        "request_digest": "sha256:35dac4274b69acfa61688b0652eb79e4b1f2d6a8076e1fa6b7c65b6be638aa74",
+        "idempotency_key": "memidem:scoped:v4:eda1ed2c3965eb408af9638edee10246262c7936cd1f792cc81a3fd2a49fbf3f",
+        "scope_digest": "sha256:db8035451647847f3b4be948e061e2f9ff151b302936bd1c2984a420ce52f693",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:35dac4274b69acfa61688b0652eb79e4b1f2d6a8076e1fa6b7c65b6be638aa74.v4.json",
+        "request_file_digest": "sha256:7dc48ac797812a6199d062e1b01f3d68d11ee6364af9002210eef9a3c94b72b9",
+        "replayed": false
+      },
+      "provider_state": "proved",
+      "active_generation": true,
+      "authority_https_calls": 5,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_during_accept",
+      "admission": "denied",
+      "accepted_row": false,
+      "authority_https_calls": 2,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "revoke_before_execute",
+      "native_writer": null,
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:d683ab35a021a22578e5aee6a4c26346a111c7933dc31935217e9835a4ed4240",
+        "request_digest": "sha256:d683ab35a021a22578e5aee6a4c26346a111c7933dc31935217e9835a4ed4240",
+        "idempotency_key": "memidem:scoped:v4:11bac6772e9887ac039b990d194acbc56c35a9977d034d96b168eaffa0a5e65f",
+        "scope_digest": "sha256:916682fdf4fda8fe4a56cdbda2c82ba50ec2e60c5cb62490decff76092251c8c",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:d683ab35a021a22578e5aee6a4c26346a111c7933dc31935217e9835a4ed4240.v4.json",
+        "request_file_digest": "sha256:0243e9991bb3e6d76b2f48524fb539396d8a0f0da03c8f537b258e031df9ad48",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    },
+    {
+      "mode": "expire_before_execute",
+      "native_writer": null,
+      "admission": "accepted",
+      "accepted": {
+        "schema_version": 4,
+        "kind": "accepted",
+        "state": "pending",
+        "provider_instance_id": "provider:fixture",
+        "request_id": "memreq:scoped:v4:cbe5e0cd7a865d3e168e8acc8101d7ca6187ad9407710975b8de43d22e3d646d",
+        "request_digest": "sha256:cbe5e0cd7a865d3e168e8acc8101d7ca6187ad9407710975b8de43d22e3d646d",
+        "idempotency_key": "memidem:scoped:v4:b739b92b5d99aec3c158206f59b434e1209268bc8432809a4bc349827c57bee3",
+        "scope_digest": "sha256:350b03386d78c190b759f509a7cd974158c64996df4204387bae8de27fe2806a",
+        "accepted_at": "2026-08-28T12:00:00.000Z",
+        "inbox_path": "pending/memreq:scoped:v4:cbe5e0cd7a865d3e168e8acc8101d7ca6187ad9407710975b8de43d22e3d646d.v4.json",
+        "request_file_digest": "sha256:197dd3867c20303a390e3a5fe0ba4de95d7661ef1bd0a7b0012fe0c72375af7f",
+        "replayed": false
+      },
+      "provider_state": "failed",
+      "active_generation": false,
+      "authority_https_calls": 3,
+      "dispatch_attempts": 1,
+      "foreign_key_errors": 0
+    }
+  ]
+}

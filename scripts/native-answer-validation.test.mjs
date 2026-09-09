@@ -18,3 +18,11 @@ test('reject unsupported statuses, values and extra fields', () => {
   for (const value of [null,[],{...base,value:'192.0.2.1'},{...base,status:'supported'},
     {...base,explanation:''},{...base,ip:'192.0.2.1'}]) assert.throws(()=>parse(JSON.stringify(value)));
 });
+
+test('supported evidence must match the gold value; blanket abstention and wrong facts fail', async () => {
+  const {parseSupportedEvidenceAnswer: supported} = await import('./native-answer-validation.mjs');
+  const answer={status:'supported',value:'첫 결정',explanation:'The record text states this.'};
+  assert.equal(supported(JSON.stringify(answer),'첫 결정').value,'첫 결정');
+  assert.throws(()=>supported(valid,'첫 결정'));
+  assert.throws(()=>supported(JSON.stringify({...answer,value:'두 번째 결정'}),'첫 결정'));
+});
