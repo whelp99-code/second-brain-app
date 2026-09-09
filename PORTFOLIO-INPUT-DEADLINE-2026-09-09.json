@@ -1,0 +1,8 @@
+{
+  "exit_code": 2,
+  "error": "PORTFOLIO_INPUT_TIMEOUT",
+  "elapsed_ms": 60211,
+  "stdin_left_open": true,
+  "database_reopened": true,
+  "operational_changes": false
+}

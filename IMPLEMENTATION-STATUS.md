@@ -1,3 +1,5 @@
+> 2026-09-09 자비스 운영 준비 수정: [portfolio 입력60초 제한](PORTFOLIO-INPUT-DEADLINE-2026-09-09.md). 관련9개·emit/lint 및 실제 CLI 60,211ms timeout/exit2/DB 재개 통과. 열린 운영 구버전 프로세스는 미변경.
+
 > 2026-09-09 운영 DB 보유 원인: [SSH portfolio ingest](SSH-PORTFOLIO-DB-HOLDER-2026-09-09.md) 확인. 구 릴리스 CLI·sshd 부모·stdin pipe, 현/구 readPortfolioStdin에 대기 시간 제한 없음. 입력 대기/자원 종료 개선 대상으로 확정, 프로세스 중지 미실행.
 
 > 2026-09-09 운영 전환 증거: [DB 열린 핸들 조사](DATABASE-HANDLE-AUDIT-2026-09-09.md). 3프로세스/9핸들, 그중 로그인 세션1개로 명명된 서비스 목록만으로 부족함 확인. 접근 불가43 PID 때문에 exit2. 읽기 전용 도구·실제 프로세스 검사1개 추가, 운영 중지 없음.
