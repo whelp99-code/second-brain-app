@@ -1075,6 +1075,17 @@ def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
         _unlock(fd)
 
 
+def _record_batch_progress(root: Path, batch_id: str, started: str,
+                           outcomes: Sequence[tuple[str, RunOutcome]]) -> None:
+    with Ledger(root) as ledger:
+        ledger.record_stage(RunStage(batch_id, "batch", started, None, "running",
+            len(outcomes), sum(value.written for _, value in outcomes),
+            sum(value.errors for _, value in outcomes), json.dumps({
+                "stages": [{"stage": stage, "run_id": value.run_id, "status": value.status}
+                           for stage, value in outcomes],
+            }, separators=(",", ":"))))
+
+
 def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
     root = Path(config.vault_root)
     fd = _try_lock(root)
@@ -1089,8 +1100,10 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
         try:
             ingest = _run_locked(root, _ingest(config, sources, None), "ingest", config)
             outcomes.append(("ingest", ingest))
+            _record_batch_progress(root, batch_id, started, outcomes)
             compiled = _run_locked(root, _compile_stage(config, "cli"), "compile", config)
             outcomes.append(("compile", compiled))
+            _record_batch_progress(root, batch_id, started, outcomes)
             if ingest.written == 0 and compiled.pages == 0:
                 brief = compiled if compiled.exit_code == 0 else ingest
                 if ingest.status == "capped" and ingest.exit_code == 0:
@@ -1098,6 +1111,7 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
             else:
                 brief = _run_locked(root, _brief_stage(config, None, "cli"), "brief", config)
                 outcomes.append(("brief", brief))
+                _record_batch_progress(root, batch_id, started, outcomes)
             chosen = _choose_batch_outcome(ingest, compiled, brief)
         except Exception:
             with Ledger(root) as ledger:
@@ -1105,7 +1119,10 @@ def _run_all_mutable(config: Config, sources: Sequence[str] | None = None) -> Ru
                     datetime.now(UTC).isoformat(), "failed", len(outcomes),
                     sum(value.written for _, value in outcomes),
                     sum(value.errors for _, value in outcomes) + 1,
-                    "batch interrupted by an exception"))
+                    json.dumps({"failure": "batch interrupted by an exception",
+                                "stages": [{"stage": stage, "run_id": value.run_id,
+                                            "status": value.status}
+                                           for stage, value in outcomes]}, separators=(",", ":"))))
             raise
         with Ledger(root) as ledger:
             ledger.record_stage(RunStage(batch_id, "batch", started,

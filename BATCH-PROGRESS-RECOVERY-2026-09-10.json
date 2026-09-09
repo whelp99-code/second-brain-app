@@ -1,0 +1,22 @@
+{
+  "workspace": "/var/tmp/sb-crash-acceptance-7fvruqdp",
+  "batch_rows": [
+    [
+      "interrupted",
+      "2026-09-09T15:43:04.771216+00:00",
+      "{\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"4ea346dffde046d79e1e4b010155b116\",\"status\":\"partial\"}]}",
+      1,
+      1
+    ],
+    [
+      "ok",
+      "2026-09-09T15:43:04.815607+00:00",
+      "{\"selected_run_id\":\"940e929c1b8f4a28962d8fe926aa3c4f\",\"stages\":[{\"stage\":\"ingest\",\"run_id\":\"1bcec7732b214b67970f820470e69679\",\"status\":\"ok\"},{\"stage\":\"compile\",\"run_id\":\"940e929c1b8f4a28962d8fe926aa3c4f\",\"status\":\"ok\"}]}",
+      2,
+      0
+    ]
+  ],
+  "real_child_killed": true,
+  "live_writer_preserved": true,
+  "scope": "ordinary temporary vault, blocked synthetic stage"
+}

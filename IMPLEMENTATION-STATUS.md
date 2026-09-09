@@ -1,3 +1,5 @@
+[배치 진행량·중단 계보 보존](BATCH-PROGRESS-RECOVERY-2026-09-10.md) — 단계 완료마다 기록, interrupted 시 기존 detail 유지·외곽 예외에도 계보. 관련40/후속10통과(중복), 실제 partial ingest 뒤 SIGKILL 후 오류1/단계ID 보존. 운영·M1–M14 유지.
+
 [배치 설명·단계 오류 필드 분리](BATCH-DETAIL-FIELD-2026-09-10.md) — batch 계보 JSON의 error 오표시 재현·detail 이동, 관련46통과·실제 HTTP 과거 ingest 오류 보존 확인. 운영·M1–M14 유지.
 
 [세대 공개 직후 배치 강제 종료](PUBLISHED-BATCH-CRASH-2026-09-10.md) — 포인터교체/활성화기록2지점 SIGKILL·새서비스 maintain2회, 동일 공개세대/batch·원본 유지·이전세대 처분. 관련8통과·별도 반복. 전원차단/실업무/전체 M1–M14는 남음.
