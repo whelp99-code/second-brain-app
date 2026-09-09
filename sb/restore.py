@@ -25,6 +25,7 @@ from sb.generation_runtime import (
     GenerationOperation,
 )
 from sb.generations import Generation
+from sb.restore_access import read_restore_access
 from sb.restore_inventory import ManagedRestoreInventory
 from sb.restore_knowledge import matching_restore_knowledge
 from sb.restore_models import (
@@ -241,13 +242,19 @@ class GenerationRestoreSanitizer:
                       if (staging / "generation.json").is_file() else ())
             inventory = ManagedRestoreInventory().sanitize(staging, snapshot)
             knowledge = matching_restore_knowledge(states, inventory, snapshot)
+            access = (read_restore_access(staging, request.archive_manifest, mutations.store, inventory, snapshot)
+                      if (staging / "generation.json").is_file() else ())
 
             def materialize(root: Path) -> None:
                 ManagedRestoreInventory.materialize(root, inventory)
-                if knowledge:
+                if knowledge or access:
                     with Ledger(root) as ledger, ledger.transaction():
                         for state in knowledge:
                             ledger.bind_knowledge(state)
+                        for page in access:
+                            for identity, requirement in page.sources:
+                                ledger.bind_source_classification(identity, requirement)
+                            ledger.bind_page_access(page.page_id, page.content_digest, page.requirements)
 
             result = mutations.mutate(
                 GenerationMutation(

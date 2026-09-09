@@ -319,12 +319,22 @@ class Ledger:
     def bind_source_access(self, item: SourceItem, access: SourceAccess) -> None:
         """Bind trusted ingest configuration to one exact source content version."""
         identity = source_access_identity(item.source_id, item.source_uri, item.content_hash)
-        encoded = access.encode()
-        digest = source_access_digest(identity, access)
         with self.transaction():
             if self._db().execute("SELECT 1 FROM source_item WHERE source_id=? AND source_uri=? AND content_hash=?",
                 (item.source_id, item.source_uri, item.content_hash)).fetchone() is None:
                 raise ValueError("SOURCE_ACCESS_SOURCE_MISSING")
+            self.bind_source_classification(identity, access)
+
+    def bind_source_classification(self, identity: str, access: SourceAccess) -> None:
+        """Bind an exact source identity from trusted ingest or verified restore.
+
+        This records requirements, never a caller's permission or source existence.
+        """
+        if not identity.startswith("sha256:") or len(identity) != 71 or not set(identity[7:]) <= _HEX:
+            raise ValueError("SOURCE_ACCESS_IDENTITY_INVALID")
+        encoded = access.encode()
+        digest = source_access_digest(identity, access)
+        with self.transaction():
             prior = cast(tuple[str, str] | None, self._db().execute("SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
                 (identity,)).fetchone())
             if prior is not None:

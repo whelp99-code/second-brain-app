@@ -91,16 +91,22 @@ def test_archived_knowledge_ledger_cannot_authorize_restored_content(tmp_path: P
 def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: Path, monkeypatch) -> None:
     import hashlib
 
-    from sb.bound_knowledge import BoundKnowledge
-    from sb.remember_page import materialize_remember
-    from sb.store.ledger import Ledger
+    import pytest
 
+    from sb.bound_knowledge import BoundKnowledge
+    from sb.memory_access import MemoryAccessError, classified_page, require_scope
+    from sb.remember_page import materialize_remember
+    from sb.source_access import SourceAccess
+    from sb.store.ledger import Ledger
+    from sb.targets import GenerationIdentityV1
+
+    scope = SourceAccess("principal:owner", ("project:a",), "policy:1")
     keep = '복원 후 유지할 승인된 사실입니다'
 
     def seed(root, **kwargs):
         materialize_remember(root, **kwargs)
         materialize_remember(root, content=keep, candidate_id='memcand:pos:v1:' + 'c' * 64,
-            created_at=kwargs['created_at'], release_sha=kwargs['release_sha'])
+            created_at=kwargs['created_at'], release_sha=kwargs['release_sha'], source_access=scope)
         with Ledger(root) as ledger:
             for path in (root / 'wiki').glob('*.md'):
                 ledger.bind_knowledge(BoundKnowledge(path.relative_to(root).as_posix().removesuffix('.md'),
@@ -114,6 +120,15 @@ def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: 
         assert index.search(OLD, scope='reference') == ()
         hits = index.search(keep, scope='active')
         assert len(hits) == 1 and hits[0].verification == 'VERIFIED'
+        identity = GenerationIdentityV1(generation.manifest.provider_instance_id, generation.generation_id,
+            generation.manifest.generation_digest, generation.head, generation.tree)
+        page = classified_page(generation.root, hits[0].page_id, identity)
+        require_scope(page, scope)
+        for denied in (SourceAccess("principal:other", ("project:a",), "policy:1"),
+                       SourceAccess("principal:owner", ("project:b",), "policy:1"),
+                       SourceAccess("principal:owner", ("project:a",), "policy:2")):
+            with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_DENIED"):
+                require_scope(page, denied)
         assert index.search('unrelated-restore-record', scope='active') == ()
         assert proof.blocked_matches == 0 and proof.scan_errors == 0
         assert fixture.executor.generations.active().generation_id == fixture.active_generation_id
