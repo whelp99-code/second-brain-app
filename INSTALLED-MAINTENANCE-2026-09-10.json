@@ -1,0 +1,78 @@
+{
+  "maintenance": {
+    "release": "/var/tmp/sb-maintenance-release-7aycjs7i/releases/8b25969e345af2b11fef8ab60272a0100c5e859c",
+    "busy": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 0,
+      "disposed_staging": 0,
+      "restore_workspace_busy": true
+    },
+    "cleaned": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 1,
+      "disposed_staging": 0,
+      "restore_workspace_busy": false
+    },
+    "repeated": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 0,
+      "disposed_staging": 0,
+      "restore_workspace_busy": false
+    },
+    "worker_exit": -9
+  },
+  "mcp": [
+    {
+      "profile": "scoped-record-read-v2",
+      "tools": [
+        "sb_generation_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-record-read-v5",
+      "tools": [
+        "sb_generation_status",
+        "sb_request_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-request-status-v1",
+      "tools": [
+        "sb_request_status"
+      ],
+      "installed_release": true
+    },
+    {
+      "profile": "scoped-request-write-v1",
+      "tools": [
+        "sb_write_request"
+      ],
+      "installed_release": true
+    }
+  ],
+  "manifest": {
+    "schema": 1,
+    "release_id": "8b25969e345af2b11fef8ab60272a0100c5e859c",
+    "wheel_sha256": "1a01c882119d04f133a4181cceab350638f95be1ce2464044f5d53d7924e4f1e",
+    "release_id_scheme": "sb-release-inputs-v3",
+    "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+    "preparation_files_sha256": {
+      "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+      "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+      "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+    },
+    "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+    "source_commit": "eea2c23e4d19b0da425a81934b4b510f691706c8",
+    "source_tree": "e7789470927e704a94570c32d169561237ef1436",
+    "source_materialization": "git-archive",
+    "working_tree_modified": true,
+    "contract_profile": "task32-schema4",
+    "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+  }
+}
