@@ -1,0 +1,41 @@
+{
+  "process_acceptance": [
+    {
+      "kind": "omo",
+      "processes": 3,
+      "complete_rows": 1,
+      "replay_rows": 0,
+      "partial_skips": 0
+    },
+    {
+      "kind": "gjc",
+      "processes": 3,
+      "complete_rows": 1,
+      "replay_rows": 0,
+      "partial_skips": 0
+    },
+    {
+      "kind": "gjc",
+      "header": "live",
+      "processes": 2,
+      "legacy_cursor_append_denied": true,
+      "collected_rows": 0
+    },
+    {
+      "kind": "gjc",
+      "header": "unsupported",
+      "processes": 2,
+      "legacy_cursor_append_denied": true,
+      "collected_rows": 0
+    }
+  ],
+  "tests": {
+    "initial_failed": 4,
+    "focused_passed": 35,
+    "full_passed": 1367,
+    "full_skipped": 2,
+    "seconds": 231.54,
+    "embeddings_extra_excluded": true
+  },
+  "operational_changes": false
+}

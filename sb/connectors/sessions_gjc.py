@@ -73,7 +73,9 @@ class GjcSessionsAdapter:
                 current[rel] = size
                 if start >= size:
                     continue
-                items.extend(self._read_file(path, rel, start))
+                extracted, consumed = self._read_file(path, rel, start)
+                current[rel] = consumed
+                items.extend(extracted)
         self._next_cursor = json.dumps(current, separators=(",", ":"), sort_keys=True)
         yield from items
 
@@ -82,28 +84,43 @@ class GjcSessionsAdapter:
 
     def _read_file(
         self, path: Path, rel: str, start: int
-    ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
+    ) -> tuple[list[tuple[SourceRef, bytes, ItemMeta]], int]:
+        consumed = start
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
-        header_pending = start == 0
         with path.open("rb") as handle:
-            _ = handle.seek(start)
+            # The cursor is a byte offset, not evidence of an approved export.
+            # Revalidate the first nonblank line even after an earlier rejection.
+            while True:
+                header = handle.readline()
+                if not header:
+                    return [], 0
+                if not header.strip():
+                    continue
+                parsed_header = _obj(header.strip())
+                if parsed_header is None:
+                    if not header.endswith(b"\n"):
+                        return [], 0
+                    return [_skip(self.source_id, rel, "malformed-json")], 0
+                reason = _header_reason(parsed_header)
+                if reason is not None:
+                    return [_skip(self.source_id, rel, reason)], 0
+                consumed = max(start, handle.tell())
+                break
+            _ = handle.seek(consumed)
             while True:
                 raw = handle.readline()
                 if not raw:
                     break
                 end = handle.tell()
                 stripped = raw.strip()
+                parsed = _obj(stripped) if stripped else None
+                if stripped and parsed is None and not raw.endswith(b"\n"):
+                    break
+                consumed = end
                 if not stripped:
                     continue
-                parsed = _obj(stripped)
                 if parsed is None:
                     items.append(_skip(self.source_id, rel, "malformed-json"))
-                    continue
-                if header_pending:
-                    header_pending = False
-                    reason = _header_reason(parsed)
-                    if reason is not None:
-                        return [_skip(self.source_id, rel, reason)]
                     continue
                 extracted = _gjc_extract(parsed)
                 if isinstance(extracted, str):
@@ -114,7 +131,7 @@ class GjcSessionsAdapter:
                     token = str(end)
                     meta: ItemMeta = {"relative_path": rel, "cursor": token}
                     items.append((SourceRef(self.source_id, uri, token), text.encode(), meta))
-        return items
+        return items, consumed
 
 
 def create(config: _ConnectorConfig) -> SourceAdapter:
