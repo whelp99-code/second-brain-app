@@ -1,0 +1,17 @@
+{
+  "work": "/var/tmp/sb-native-conflict-xei2jr1j",
+  "findings": [
+    {
+      "route": "conflict",
+      "relation": "contradicts",
+      "confidence": 0.95,
+      "rationale": "c1은 파이썬이 동적 타입 언어라고 하고, u1은 정적 타입 언어라고 한다. 동일 대상에 대해 양립할 수 없는 타입 체계를 주장하므로 두 단위는 서로 모순된다.",
+      "cites": [
+        "c1",
+        "u1"
+      ],
+      "failure": null,
+      "has_page": true
+    }
+  ]
+}

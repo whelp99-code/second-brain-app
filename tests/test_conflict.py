@@ -334,3 +334,19 @@ def test_json_whitespace_exponent_and_escaped_rationale(ledger, config, unit):
     assert found
     assert all(item.failure is None and item.page is None for item in found)
     assert all(item.verdict.confidence == 0.1 and item.verdict.rationale == "line\nnext" for item in found)
+
+
+def test_prior_parser_cached_verdict_is_rejudged(ledger, config, unit, monkeypatch):
+    units = [unit, _unit("c1", TEXT_DYNAMIC)]
+    with monkeypatch.context() as old:
+        old.setattr("sb.conflict._INPUT_PROFILE", "conflict-inputs-v2")
+        prior = check(units, EMPTY_PAGES, ledger,
+                      FakeLLM([_verdict("contradicts", 1.0, "legacy interpretation", [])]), config)
+        assert prior[0].route == "conflict"
+    current = RecordingLLM('{"relation":"contradicts","confidence":1e-1,"rationale":"low confidence"}')
+    result = check(units, EMPTY_PAGES, ledger, current, config)
+    assert current.calls == 1
+    assert result[0].page is None and result[0].verdict.confidence == 0.1
+    again = check(units, EMPTY_PAGES, ledger, current, config)
+    assert current.calls == 1
+    assert again[0].verdict == result[0].verdict

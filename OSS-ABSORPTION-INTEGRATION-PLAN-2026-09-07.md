@@ -1063,3 +1063,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 충돌 JSON 파싱 수정:** [지수/공백/escape 정확 해석·중복/불량 타입 거부·cites 설명 정정](CONFLICT-JSON-PARSING-2026-09-10.md). 관련25통과/5.54초·Ruff/diff·타입0오류0경고. 이전 cites 필수 설명은 잘못됐으며 생략 호환성 유지. 실제 모델/자비스 복원·운영 및 전체 목표는 남는다.
+
+
+**2026-09-10 실제 충돌 모델·cache 버전 분리:** [Claude 합성 모순 응답/페이지 생성·구 parser cache 재판정](CONFLICT-PARSER-CACHE-2026-09-10.md). 모델 contradicts0.95·failure없음, 회귀24통과/3.78초·Ruff/diff·타입0오류0경고. 과거 생성 페이지 자동 정정은 하지 않으며 사용자 업무/운영 전체 목표는 남는다.

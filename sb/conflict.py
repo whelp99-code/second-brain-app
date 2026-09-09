@@ -32,6 +32,7 @@ __all__ = (
     "lexical_top",
 )
 
+_INPUT_PROFILE: Final = "conflict-inputs-v3"
 CONTRADICTION_FLOOR: Final = 0.8
 SUPERSEDE_FLOOR: Final = 0.9
 SECTIONS: Final = ("주장A", "주장B", "판정", "status")
@@ -93,7 +94,7 @@ def check(
              for item_id in (pair.left_id, pair.unit_id)],
             ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         ).encode()).hexdigest()
-        key = deriv_key(("conflict-inputs-v2", pair.left_id, pair.unit_id, input_digest),
+        key = deriv_key((_INPUT_PROFILE, pair.left_id, pair.unit_id, input_digest),
                         "conflict", version, model)
         row = ledger.get_derivation(key)
         if row is not None and row.status == DerivStatus.DONE.value:
