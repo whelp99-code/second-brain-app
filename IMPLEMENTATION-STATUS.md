@@ -1,3 +1,5 @@
+> 2026-09-09 전환 진단 보강: [접근 불가 PID의 프로세스명/서비스 소속](DATABASE-UNREADABLE-DIAGNOSTICS-2026-09-09.md) 추가. 이름에 의한 제외 없이 불완전 exit2 유지, 실제 검사2개·Ruff 통과.
+
 > 2026-09-09 전환 관측 보강: [DB 메모리 매핑 검사](DATABASE-MAPPING-AUDIT-2026-09-09.md). fd 닫힌 실제 mmap 누락 재현·수정, 2개 테스트 및 운영 읽기 전용 조사 완료. 일시 관측이며 전환 허가 아님.
 
 > 2026-09-09 자비스 운영 준비 수정: [portfolio 입력60초 제한](PORTFOLIO-INPUT-DEADLINE-2026-09-09.md). 관련9개·emit/lint 및 실제 CLI 60,211ms timeout/exit2/DB 재개 통과. 열린 운영 구버전 프로세스는 미변경.

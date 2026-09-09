@@ -63,10 +63,23 @@ def inspect(database: Path) -> dict[str, object]:
             if target is not None:
                 mapped_names.add(target)
         mapped.extend({'pid': int(process.name), 'file': name} for name in sorted(mapped_names))
+    diagnostics = []
+    for pid in sorted(set(unreadable)):
+        process = Path('/proc') / str(pid)
+        detail = {'pid': pid}
+        for name in ('comm', 'cgroup'):
+            try:
+                detail[name] = (process / name).read_text().strip()
+            except FileNotFoundError:
+                detail[name] = 'process-exited-during-observation'
+            except PermissionError:
+                detail[name] = 'permission-denied'
+        diagnostics.append(detail)
     return {'database': str(database), 'uid': os.getuid(), 'scanned_processes': scanned,
             'open_handles': sorted(matches, key=lambda row: (row['pid'], row['fd'])),
             'mapped_files': sorted(mapped, key=lambda row: (row['pid'], row['file'])),
             'unreadable_pids': sorted(set(unreadable)),
+            'unreadable_processes': diagnostics,
             'scope': 'same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
             'drain_authorized': False}
 
