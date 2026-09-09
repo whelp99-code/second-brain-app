@@ -1,0 +1,20 @@
+{
+  "first": {
+    "page_id": "wiki/web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+    "verification": "VERIFIED",
+    "body_sha256": "85ca60eb0ae4d01d482d59c9578424de75bc906b600372cdb43ae22aaaee2094",
+    "fact_and_origin_present": true,
+    "results": 2
+  },
+  "second": {
+    "page_id": "wiki/web-inbox-2026-09-09t141821403705-합성기억정상경로-3db79524",
+    "verification": "VERIFIED",
+    "body_sha256": "85ca60eb0ae4d01d482d59c9578424de75bc906b600372cdb43ae22aaaee2094",
+    "fact_and_origin_present": true,
+    "results": 2
+  },
+  "server_restarted_between_clients": true,
+  "mocked_transport": false,
+  "native_model_recalled": false,
+  "unrelated_registry_exists": false
+}

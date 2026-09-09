@@ -1,3 +1,5 @@
+[별도 MCP 서버 재시작 회수](INDEPENDENT-MCP-RECALL-2026-09-09.md) — 일반 vault 명시 bootstrap·stdio2회, 실제 생성 사실/출처·본문 hash 일치. 기본 관리형 진입점은 해당 fixture 경로 거부로 구분.
+
 [CLI·웹·MCP 검색 일치](SEARCH-SURFACE-PARITY-2026-09-09.md) — 실제 생성 자료 각2건의 ID·검증 상태 일치, CLI별도프로세스/실제HTTP/MCP client·다른 registry 미생성.
 
 [MCP 명시적 레지스트리](MCP-EXPLICIT-REGISTRY-2026-09-09.md) — 검색3경로 전달 누락 수정, VERIFIED 회귀 재현→관련20개 및 실제 생성 자료 MCP2건 확인.
