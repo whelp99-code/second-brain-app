@@ -1,0 +1,21 @@
+{
+  "workspace": "/var/tmp/sb-managed-crash-acceptance-c3t3gka9",
+  "active": "/var/tmp/sb-managed-crash-acceptance-c3t3gka9/share/vault-generations/sbgen:v1:cf62342e42413a57dad7d3ac396c2f1100b814c8ca3b654bc7271f1fa34de79c",
+  "pending_files": 1,
+  "pending_sha256": [
+    "3355319bd5e4cd4b1d6e9d256b2b3c71f3b4548ee2c364aeabf44017da72a6c4"
+  ],
+  "last_batch": {
+    "run_id": "b830e984321548b39684f271d1e250ca",
+    "status": "ok",
+    "started_at": "2026-09-09T15:35:20.918930+00:00",
+    "finished_at": "2026-09-09T15:35:20.951629+00:00",
+    "stages_attempted": 2,
+    "written": 0,
+    "errors": 0
+  },
+  "staging_empty": true,
+  "original_active_preserved_until_recovery": true,
+  "live_writer_blocked_second_batch": true,
+  "scope": "SIGKILL at synthetic ingest barrier before publication; no model calls"
+}

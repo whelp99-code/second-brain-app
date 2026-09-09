@@ -1,3 +1,5 @@
+[관리형 batch 공개 전 강제 종료](MANAGED-BATCH-CRASH-2026-09-10.md) — 실제 자식 SIGKILL·기존 active/대기 원본 보존, 다음 배치ok·staging정리. 관련10통과·별도 반복. 중간 시작 이력 영속 감사·전체 종료 지점·M1–M14는 남음.
+
 [강제 종료 배치의 다음 실행 복구](BATCH-CRASH-RECOVERY-2026-09-10.md) — 작성자 잠금 획득 후 미완료 batch만 interrupted, 살아 있는 작성자 보존. 관련57통과·별도 자식 SIGKILL→원장 interrupted/새ok 인수. 관리형 publication 전 crash 및 전체 M1–M14 유지.
 
 [adapter 이름·원본 ID 동시 검증](ADAPTER-NAME-VALIDATION-2026-09-10.md) — 기본ID 오타 우회 재현·기존 별칭 집합 공개 재사용, 관련144통과/1skip·타입0오류1기존경고. 실제 잘못된 설정 원본보존→documents별칭 수집1. 운영·전체 M1–M14 유지.
