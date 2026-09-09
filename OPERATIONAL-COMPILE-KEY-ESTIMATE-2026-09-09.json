@@ -1,0 +1,42 @@
+{
+  "vault_generation": "sbgen:v1:20beb2e1fb2cbf82bcfbc69326b87999380cc4ff2f83a3bf838738c690ce6734",
+  "ledger_sha256": "e6aa4d708732312e642651ec38f7092ddcf5c9364bae962ed9eb1d722183950f",
+  "source_rows": 321,
+  "rows_without_cas": 3,
+  "recorded_skip_rows_without_cas": 3,
+  "unexplained_missing_cas_rows": 0,
+  "page_groups": 18,
+  "distinct_legacy_keys": 18,
+  "new_key_states": {
+    "missing": 18,
+    "legacy_done_recompile": 18
+  },
+  "eligible_page_calls": 18,
+  "compile_call_cap": 120,
+  "minimum_runs_at_cap": 1,
+  "derivation_counts": [
+    {
+      "stage": "brief",
+      "status": "done",
+      "count": 7
+    },
+    {
+      "stage": "brief",
+      "status": "failed",
+      "count": 5
+    },
+    {
+      "stage": "compile",
+      "status": "done",
+      "count": 35
+    },
+    {
+      "stage": "conflict",
+      "status": "done",
+      "count": 49
+    }
+  ],
+  "model_calls_made": 0,
+  "read_only": true,
+  "limitations": "Successful-page call count only, not token/currency estimate; retries and failures may require more runs. Missing CAS rows include skips and require separate diagnosis."
+}
