@@ -1228,3 +1228,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 복원 저장 오류 재시도:** [세 실제 저장 직후 오류→기존 세대/삭제 이력 유지→같은 요청 복원/MCP 성공](RESTORE-WRITE-FAILURE-2026-09-10.md). 실제 integration6통과/15.68초·Ruff/diff. 제품 결함 발견 없음. 예외 경로 검증이며 복원 SIGKILL·DR·실제 JARVIS/native 업무 및 전체 목표는 남는다.
+
+
+**2026-09-10 복원 MCP 별도 프로세스 재시작:** [새 stdio 서버2개 응답 동일·다른 프로젝트 거부](RESTORE-STDIO-RESTART-2026-09-10.md). 정상/저장오류 재시도 네 경로 포함6통과/22.21초·서버8실행·Ruff/diff. fixture 키/시각이며 실제 JARVIS 발급/native 업무·운영/DR 및 전체 목표는 남는다.

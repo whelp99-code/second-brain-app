@@ -1,8 +1,11 @@
 """Exercise restored pages through the signed MCP read surface."""
 import base64
+import json
+import sys
 from datetime import datetime, timedelta
 
 import anyio
+from mcp import StdioServerParameters
 from mcp.client import Client
 
 from sb.access_claims import access_request_digest
@@ -65,3 +68,26 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
             assert revoked.is_error
             assert keep not in str(revoked)
     anyio.run(run)
+    config.raw.pop('revoked_jarvis_signing_key_ids')
+    path = root / 'restore-stdio-config.json'
+    path.write_text(json.dumps({'config': config.raw, 'now': now.isoformat()}))
+
+    async def restarted():
+        responses = []
+        for _ in range(2):
+            params = StdioServerParameters(command=sys.executable,
+                args=['-m', 'tests.restore_stdio_server', str(path)],
+                env={'SB_MCP_CONTRACT_PROFILE': 'scoped-record-read-v5'})
+            async with Client(params, mode='legacy', cache=None, read_timeout_seconds=10) as client:
+                with anyio.fail_after(15):
+                    args = {'id': page_id, 'read_fence': model_object(fence), 'access_claim': claim}
+                    response = await client.call_tool('sb_read_page', args)
+                    assert not response.is_error, response
+                    assert keep in str(response.structured_content)
+                    responses.append(response.structured_content)
+                    denied = await client.call_tool('sb_read_page', {**args,
+                        'access_claim': signed({**claim, 'projects': ['project:b']})})
+                    assert denied.is_error
+                    assert keep not in str(denied)
+        assert responses[0] == responses[1]
+    anyio.run(restarted)
