@@ -7,12 +7,44 @@ available in the harness. Does not activate either release or use operational da
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import runpy
 import shutil
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+
+
+@contextmanager
+def unchanged_candidates(release: Path, jarvis_root: Path, executable: Path | None = None):
+    """Bind acceptance to the complete candidates observed before and after it."""
+    contents = runpy.run_path(str(Path(__file__).with_name("check-release-contents.py")))
+    inventory = contents["inventory"]
+    roots = {"provider": release, "jarvis": jarvis_root}
+    before = {name: inventory(root) for name, root in roots.items()}
+    runtime = contents["file_digest"](executable) if executable is not None else None
+    evidence = {
+        name: {
+            "inventory_sha256": hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
+            "entries": len(value["entries"]),
+        }
+        for name, value in before.items()
+    }
+    if executable is not None:
+        evidence["node_executable"] = {"path": str(executable), **runtime}
+    try:
+        yield evidence
+    finally:
+        changed = [name for name, root in roots.items() if inventory(root) != before[name]]
+        if executable is not None and contents["file_digest"](executable) != runtime:
+            changed.append("node_executable")
+        if changed:
+            raise RuntimeError("ACCEPTANCE_CANDIDATE_CHANGED:" + ",".join(changed))
 
 
 def main() -> None:
@@ -28,9 +60,13 @@ def main() -> None:
     repo = Path(__file__).resolve().parents[1]
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
     manifest = json.loads((release / "release-manifest.json").read_text())
-    with tempfile.TemporaryDirectory(
-        prefix="installed-memory-integration-", dir="/var/tmp"
-    ) as directory:
+    node = Path(shutil.which("node") or "node").resolve(strict=True)
+    with (
+        unchanged_candidates(release, build.parent, node) as candidate_contents,
+        tempfile.TemporaryDirectory(
+            prefix="installed-memory-integration-", dir="/var/tmp"
+        ) as directory,
+    ):
         harness = Path(directory)
         names = subprocess.check_output(
             ["git", "ls-tree", "-r", "--name-only", commit, "--", "scripts", "tests", "contracts"],
@@ -48,6 +84,7 @@ def main() -> None:
             **os.environ,
             "PYTHONPATH": str(harness),
             "PYTHONNOUSERSITE": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
             "TMPDIR": "/var/tmp",
         }
         # This acceptance is deterministic SDK transport; native calls are a separate gate.
@@ -71,7 +108,7 @@ def main() -> None:
             raise RuntimeError("PROVIDER_IMPORT_OUTSIDE_INSTALLED_RELEASE")
         result = subprocess.run(
             [
-                shutil.which("node") or "node",
+                str(node),
                 str(harness / "scripts/scoped-provider-https-acceptance.mjs"),
                 str(build),
                 "--cli",
@@ -87,19 +124,17 @@ def main() -> None:
         )
         if result.returncode:
             raise RuntimeError(result.stderr)
-        print(
-            json.dumps(
-                {
-                    "harness_commit": commit,
-                    "provider_manifest": manifest,
-                    "provider_imports": imports,
-                    "jarvis_build": str(build),
-                    "acceptance": json.loads(result.stdout),
-                    "production_activated": False,
-                },
-                indent=2,
-            )
-        )
+        report = {
+            "harness_commit": commit,
+            "provider_manifest": manifest,
+            "provider_imports": imports,
+            "jarvis_build": str(build),
+            "acceptance": json.loads(result.stdout),
+            "production_activated": False,
+            "candidate_contents": candidate_contents,
+        }
+    # Do not publish a success report until the post-run content check passes.
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":
