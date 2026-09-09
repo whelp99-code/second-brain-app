@@ -1096,3 +1096,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 원장 anchor 소실 복원 거부:** [실제 빈 journal 주입→sanitizer 거부·활성/삭제이력 불변·임시정리](RESTORE-ANCHOR-LOSS-GATE-2026-09-10.md). 관련18통과/27.61초·Ruff/diff. 안전한 거부 검증이며 원장소실 자동DR는 독립 근거 확보 전 보류, 전체 목표 유지.
+
+
+**2026-09-10 실제 runtime backup 정제 호환 수정:** [recovery 경로 미지원 재현→제어 사본 집계/제외·실제 sanitizer 통과](RUNTIME-BACKUP-SANITATION-2026-09-10.md). 관련19통과·최종확장1통과/0.90초·Ruff/diff·타입0오류0경고. 기억 보존/active 불변, 제어 journal 자동승계 없음. 원장소실DR/운영 전체 목표는 남는다.

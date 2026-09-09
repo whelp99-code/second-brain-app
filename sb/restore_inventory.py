@@ -73,7 +73,10 @@ def _surface(relative: Path) -> SurfaceClass:
         return "raw_cas"
     if first == "inbox" and not {".done", ".requests"}.intersection(relative.parts):
         return "inbox"
-    if first == ".sb":
+    if first in {".sb", ".recovery"}:
+        # Runtime backups include control snapshots alongside derived state.
+        # Inventory these bytes, but never import old journals, pending requests,
+        # or authority from them into the sanitized generation.
         return "derived_sqlite"
     if first == ".git":
         return "git"
