@@ -1302,3 +1302,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 최신 설치물 paired 연동:** [SB eea2c23 설치+J195b1a7·TLS/MCP 쓰기→완료→새로그인 재조회](INSTALLED-PAIR-CURRENT-2026-09-10.md). 정상/철회/만료4경로·settlement1/attempt1/FK0·독립reader2개 각2records·전체설치물/Node불변exit0. 합성identity/clock·모델0회, 운영 전환/실업무·전체 목표 유지.
 
 **2026-09-10 DB 관측 경로 전환 누락 수정:** [심볼릭링크 전환 미탐지 실패재현→원래 입력경로 재검증](DATABASE-HANDLE-PATH-RACE-2026-09-10.md). 관련11통과/1.75초·Ruff/diff. 운영 관측exit2·DB holder2개/관측불가17개, drain/전환 보류·전체 목표 유지.
+
+**2026-09-10 DB holder 서비스 식별:** [dashboard/authority 두 service·holder_processes 관측 추가](DATABASE-HOLDER-OWNERS-2026-09-10.md). 관련12통과·실제 CLI2서비스/관측불가17개exit2. 두 서비스 독립 실행을 확인했고 임의 종료/운영 전환 없이 보류 조건을 구체화했다. 전체 목표 유지.

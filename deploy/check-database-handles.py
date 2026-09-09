@@ -22,6 +22,20 @@ def file_identities(paths: list[Path]) -> dict[tuple[int, int], str]:
     return identities
 
 
+def process_owner(pid: int) -> dict[str, object]:
+    """Best-effort owner metadata; no command line/environment or drain decision."""
+    process = Path('/proc') / str(pid)
+    detail: dict[str, object] = {'pid': pid}
+    for name in ('comm', 'cgroup'):
+        try:
+            detail[name] = (process / name).read_text().strip()
+        except FileNotFoundError:
+            detail[name] = 'process-exited-during-observation'
+        except PermissionError:
+            detail[name] = 'permission-denied'
+    return detail
+
+
 def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
     observed_uid = os.getuid() if uid is None else uid
     if observed_uid < 0:
@@ -96,9 +110,11 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
         target_path_changed = requested_database.resolve(strict=True) != database
     except (OSError, RuntimeError):
         target_path_changed = True
+    holders = sorted({row['pid'] for row in matches + mapped})
     return {'database': str(database), 'requested_database': str(requested_database), 'uid': observed_uid, 'observer_uid': os.getuid(), 'scanned_processes': scanned,
             'open_handles': sorted(matches, key=lambda row: (row['pid'], row['fd'])),
             'mapped_files': sorted(mapped, key=lambda row: (row['pid'], row['file'])),
+            'holder_processes': [process_owner(pid) for pid in holders],
             'unreadable_pids': sorted(set(unreadable)),
             'unreadable_processes': diagnostics,
             'target_identity_changed': target_path_changed or file_identities(paths) != identities,

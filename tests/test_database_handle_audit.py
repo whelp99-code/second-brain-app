@@ -25,6 +25,10 @@ def test_separate_process_observes_open_sqlite_then_closed_handles(tmp_path: Pat
         assert result.returncode == (2 if report['unreadable_pids'] else 1)
         ours = [row for row in report['open_handles'] if row['pid'] == os.getpid()]
         assert {row['file'] for row in ours} >= {'fixture.sqlite', 'fixture.sqlite-wal'}
+        owner = next(row for row in report['holder_processes'] if row['pid'] == os.getpid())
+        assert owner['comm'] == Path('/proc/self/comm').read_text().strip()
+        assert owner['cgroup'] == Path('/proc/self/cgroup').read_text().strip()
+        assert set(owner) == {'pid', 'comm', 'cgroup'}
         assert not report['drain_authorized']
     finally:
         connection.close()
@@ -165,3 +169,19 @@ def test_symlink_retarget_during_scan_is_incomplete(tmp_path: Path, monkeypatch)
     report = inspect(named)
     assert report['target_identity_changed'] is True
     assert report['drain_authorized'] is False
+
+
+def test_exited_holder_metadata_never_fabricates_an_owner(monkeypatch) -> None:
+    import runpy
+
+    owner = runpy.run_path(str(SCRIPT))['process_owner']
+    original = Path.read_text
+
+    def missing(path, *args, **kwargs):
+        if path.parent == Path('/proc/987654321'):
+            raise FileNotFoundError('process exited')
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'read_text', missing)
+    assert owner(987654321) == {'pid': 987654321, 'comm': 'process-exited-during-observation',
+                                'cgroup': 'process-exited-during-observation'}
