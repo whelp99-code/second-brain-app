@@ -296,3 +296,19 @@ def test_changed_page_body_invalidates_judgment(ledger: Ledger, config: Config, 
     changed = replace(page, body_md=page.body_md + '\n정정된 추가 사실입니다.')
     assert check([unit], [changed], ledger, llm, config)
     assert llm.calls == first + 1
+
+
+def test_capped_comparison_resumes_and_completed_cache_ignores_zero_budget(ledger: Ledger, unit: Unit):
+    units = [unit, _unit('resume-peer', TEXT_STATIC)]
+    llm = RecordingLLM(_verdict('unrelated', 1.0, 'test', []))
+    capped: list[bool] = []
+    assert check(units, EMPTY_PAGES, ledger, llm, _config(0),
+                 on_capped=lambda: capped.append(True)) == []
+    assert capped and llm.calls == 0
+    resumed = check(units, EMPTY_PAGES, ledger, llm, _config(1))
+    assert len(resumed) == 1 and llm.calls == 1
+    capped.clear()
+    replayed = check(units, EMPTY_PAGES, ledger, llm, _config(0),
+                     on_capped=lambda: capped.append(True))
+    assert replayed == resumed
+    assert not capped and llm.calls == 1

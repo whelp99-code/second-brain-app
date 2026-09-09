@@ -1,3 +1,5 @@
+[충돌 한도 후 재개·재사용](CONFLICT-CAP-OUTCOME-2026-09-09.md) — 실제 같은 vault cap0→1 처리·다음 호출0, 회귀 예산0→1→0 및 관련16개 통과.
+
 [충돌 호출 한도 배치 전달](CONFLICT-CAP-OUTCOME-2026-09-09.md) — 생략 비교가 있으면 capped, 실제 HTTP cap0 및 관련72개 통과.
 
 [충돌 판정 입력 내용 결합](CONFLICT-CONTENT-IDENTITY-2026-09-09.md) — 같은 page ID 정정 후 캐시 재사용 결함 재현→본문·시점·출처 hash로 재판정, 관련72개 통과. 옛 키 운영 정리·재판정 비용 인수는 남음.
