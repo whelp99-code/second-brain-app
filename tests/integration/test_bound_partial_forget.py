@@ -28,7 +28,8 @@ KEEP = '남길 기록은 금요일 배포입니다'
 
 @pytest.mark.parametrize('hybrid', [False, True])
 @pytest.mark.parametrize('revoked', [False, True])
-def test_partial_forget_rebinds_surviving_approved_body(tmp_path, monkeypatch, hybrid, revoked):
+@pytest.mark.parametrize('binding_failure', [False, True])
+def test_partial_forget_rebinds_surviving_approved_body(tmp_path, monkeypatch, hybrid, revoked, binding_failure):
     monkeypatch.setattr('sb.embeddings.resolve_encoder', CountingEncoder)
     key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     config = ExecutorConfig(request_root=tmp_path / 'requests', state_root=tmp_path / 'state',
@@ -57,7 +58,22 @@ def test_partial_forget_rebinds_surviving_approved_body(tmp_path, monkeypatch, h
             executor.store.tombstone_high_water(), key, '8')
         accept_effect_request(config.request_root, request, NOW + timedelta(minutes=1, seconds=1),
             public_keys=config.jarvis_public_keys, provider_instance_id=config.provider_instance_id)
+        if binding_failure:
+            def fail_binding(_ledger, _state):
+                raise RuntimeError('INJECTED_KNOWLEDGE_WRITE_FAILURE')
+            original_binding = Ledger.bind_knowledge
+            monkeypatch.setattr(Ledger, 'bind_knowledge', fail_binding)
         outcome = executor.apply_once(now=NOW + timedelta(minutes=1, seconds=1))
+        if binding_failure:
+            assert outcome.state == 'reconciling' and outcome.code == 'EFFECT_KNOWLEDGE_REBIND_FAILED'
+            assert executor.generations.active().generation_id == before.generation_id
+            committed_high_water = executor.store.tombstone_high_water()
+            assert committed_high_water[0] > 0
+            monkeypatch.setattr(Ledger, 'bind_knowledge', original_binding)
+            executor.close()
+            executor = RequestExecutor(config)
+            outcome = executor.apply_once(now=NOW + timedelta(minutes=2, seconds=2))
+            assert executor.store.tombstone_high_water() == committed_high_water
         assert outcome.state == 'proved', outcome
         after = executor.generations.active()
         assert audit_citations(after.root) == ()

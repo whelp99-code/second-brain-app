@@ -10,6 +10,10 @@ from sb.bound_knowledge import BoundKnowledge
 from sb.store.ledger import Ledger
 
 
+class EffectKnowledgeRebindError(RuntimeError):
+    """The effect ran; its request must remain recoverable until publication."""
+
+
 def _checksum(root: Path, state: BoundKnowledge) -> str | None:
     path = root / (state.page_id + '.md')
     if not path.exists():
@@ -36,9 +40,12 @@ def apply_with_prior_knowledge(root: Path, apply: Callable[[], None]) -> None:
     apply()
     if not prior:
         return
-    with Ledger(root) as ledger, ledger.transaction():
-        for state in prior:
-            checksum = _checksum(root, state)
-            if checksum is not None and checksum != state.content_digest:
-                ledger.bind_knowledge(BoundKnowledge(state.page_id, checksum,
-                    state.knowledge_status, state.approval_status))
+    try:
+        with Ledger(root) as ledger, ledger.transaction():
+            for state in prior:
+                checksum = _checksum(root, state)
+                if checksum is not None and checksum != state.content_digest:
+                    ledger.bind_knowledge(BoundKnowledge(state.page_id, checksum,
+                        state.knowledge_status, state.approval_status))
+    except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
+        raise EffectKnowledgeRebindError('EFFECT_KNOWLEDGE_REBIND_FAILED') from exc

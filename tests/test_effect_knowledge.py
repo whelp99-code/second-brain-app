@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from sb.bound_knowledge import BoundKnowledge
-from sb.effect_knowledge import apply_with_prior_knowledge
+from sb.effect_knowledge import EffectKnowledgeRebindError, apply_with_prior_knowledge
 from sb.store.ledger import Ledger
 
 
@@ -61,7 +61,7 @@ def test_late_binding_conflict_rolls_back_all_new_states(tmp_path, monkeypatch):
         for prior in pages:
             (tmp_path / (prior.page_id + '.md')).write_text('after')
 
-    with pytest.raises(ValueError, match='BOUND_KNOWLEDGE_CONFLICT'):
+    with pytest.raises(EffectKnowledgeRebindError, match='EFFECT_KNOWLEDGE_REBIND_FAILED'):
         apply_with_prior_knowledge(tmp_path, effect)
     assert visited == ['wiki/first', 'wiki/second']
     with Ledger(tmp_path) as ledger:
@@ -104,7 +104,7 @@ def test_binding_failure_does_not_publish_changed_staging_bytes(tmp_path):
                 (root / 'wiki/page.md').write_text('after')
             apply_with_prior_knowledge(root, effect)
 
-        with pytest.raises(ValueError, match='BOUND_KNOWLEDGE_CONFLICT'):
+        with pytest.raises(EffectKnowledgeRebindError, match='EFFECT_KNOWLEDGE_REBIND_FAILED'):
             service.mutate(mutation('effect:failure', fail))
         assert service.store.active().generation_id == before.generation_id
         assert (before.root / 'wiki/page.md').read_text() == 'before'

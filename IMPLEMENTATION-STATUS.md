@@ -1180,3 +1180,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 상태 재결합 실패 원자성:** [여러 상태 rollback·실패 staging 비공개·다음 writer](EFFECT-KNOWLEDGE-ROLLBACK-2026-09-10.md). 관련16통과/27.67초·Ruff/diff·타입0오류/0경고. prior 행 순서를 명시했다. 실제 executor tombstone/reingress 이후 실패복구·SIGKILL 및 전체 목표는 남는다.
+
+
+**2026-09-10 삭제 후 상태 저장 실패 복구 수정:** [terminal 요청 소실 재현·reconciling 유지·재처리 완료](EFFECT-KNOWLEDGE-RECOVERY-2026-09-10.md). 관련22통과/21.50초·Ruff/diff·새 helper 타입0오류/0경고. 새 executor가 lease 만료 후 동일 요청을 proved로 완료하고 tombstone 순번 중복 증가 없음을 확인했다. OS 강제 종료·다른 효과 실패·복원·운영 전체 목표는 남는다.
