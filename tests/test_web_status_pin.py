@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 
+from sb.store import Run
 from sb.store.ledger import Ledger
 from tests.test_web import _ready, _request, _running
 
@@ -12,6 +13,7 @@ def test_status_uses_pinned_generation_for_failure_inventory(tmp_path, monkeypat
     (pinned / ".sb/runs.log").write_text("pinned run status\n")
     (_active / ".sb/runs.log").write_text("different active run\n")
     with Ledger(pinned) as ledger:
+        ledger.record_run(Run("pinned-run", "2099-01-01T00:00:00Z", None, None, "failed"))
         ledger.ensure_derivation("historical-brief", "brief", "old-run")
         ledger.mark_running("historical-brief", "old-run")
         ledger.mark_failed("historical-brief", "unresolved citation")
@@ -24,6 +26,7 @@ def test_status_uses_pinned_generation_for_failure_inventory(tmp_path, monkeypat
     with _running(active_config) as base:
         status, payload = _request(f"{base}/api/status")
     assert status == 200
-    assert payload["status"] == "pinned run status"
+    assert payload["status"] == "최근 단계 실행 pinned-run: failed"
+    assert payload["last_run_status"] == "failed"
     assert payload["failures"]["total"] == 1
     assert payload["failures"]["items"][0]["key"] == "historical-brief"

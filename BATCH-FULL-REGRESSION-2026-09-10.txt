@@ -1,0 +1,166 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+........................................................................ [ 13%]
+........................................................................ [ 18%]
+.....................................................................s.. [ 22%]
+........................................................................ [ 27%]
+........................................................................ [ 32%]
+..............................................................F......FF. [ 36%]
+......................................s................................. [ 41%]
+........................................................................ [ 45%]
+........................................................................ [ 50%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+........................................................................ [ 64%]
+........................................................................ [ 68%]
+........................................................................ [ 73%]
+........................................................................ [ 78%]
+........................................................................ [ 82%]
+........................................................................ [ 87%]
+........................................................................ [ 91%]
+........................................................................ [ 96%]
+.............................F...........................                [100%]
+=================================== FAILURES ===================================
+___________ test_residual_budget_defers_whole_source_across_adapters ___________
+
+tmp_path = PosixPath('/var/tmp/pytest-of-jm/pytest-648/test_residual_budget_defers_wh0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76dda38c9940>
+
+    def test_residual_budget_defers_whole_source_across_adapters(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        config = configuration(tmp_path, 4)
+        root = Path(config.vault_root)
+        _ = init_vault(root)
+        adapters: dict[str, MarkdownVaultAdapter] = {}
+        for name, count in (("first", 3), ("deferred", 3), ("small", 1)):
+            directory = tmp_path / name
+            directory.mkdir()
+            _ = (directory / "note.md").write_bytes(body(name, count))
+            adapters[name] = MarkdownVaultAdapter(directory, name)
+        def discover(_config: Config) -> dict[str, MarkdownVaultAdapter]:
+            return adapters
+    
+        monkeypatch.setattr("sb.connectors.discover_adapters", discover)
+        first = run_ingest(config, None)
+>       assert first.status == "capped" and first.exit_code == 0
+E       AssertionError: assert ('failed' == 'capped'
+E         
+E         - capped
+E         + failed)
+
+tests/test_ingest_budget.py:92: AssertionError
+_______ test_source_cap_bounds_zero_unit_and_quarantined_versions[False] _______
+
+tmp_path = PosixPath('/var/tmp/pytest-of-jm/pytest-648/test_source_cap_bounds_zero_un0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76dda38cac90>
+skip = False
+
+    @pytest.mark.parametrize("skip", (False, True))
+    def test_source_cap_bounds_zero_unit_and_quarantined_versions(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, skip: bool,
+    ) -> None:
+        config = configuration(tmp_path, 100, source_cap=2)
+        root = Path(config.vault_root)
+        _ = init_vault(root)
+    
+        class EmptySources:
+            source_id: str = "empty"
+    
+            def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+                if cursor == "complete":
+                    return
+                for number in range(5):
+                    yield SourceRef("empty", f"{number}.unsupported", "v1"), b"unsupported", (
+                        {"skip_reason": "denied-path"} if skip else {})
+    
+            def next_cursor(self) -> str:
+                return "complete"
+    
+        def discover(_config: Config) -> dict[str, EmptySources]:
+            return {"empty": EmptySources()}
+    
+        monkeypatch.setattr("sb.connectors.discover_adapters", discover)
+        for expected, status in ((2, "capped"), (4, "capped"), (5, "ok")):
+>           assert run_ingest(config, None).status == status
+E           AssertionError: assert 'failed' == 'capped'
+E             
+E             - capped
+E             + failed
+
+tests/test_ingest_budget.py:208: AssertionError
+_______ test_source_cap_bounds_zero_unit_and_quarantined_versions[True] ________
+
+tmp_path = PosixPath('/var/tmp/pytest-of-jm/pytest-648/test_source_cap_bounds_zero_un1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76dda38cbb30>
+skip = True
+
+    @pytest.mark.parametrize("skip", (False, True))
+    def test_source_cap_bounds_zero_unit_and_quarantined_versions(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, skip: bool,
+    ) -> None:
+        config = configuration(tmp_path, 100, source_cap=2)
+        root = Path(config.vault_root)
+        _ = init_vault(root)
+    
+        class EmptySources:
+            source_id: str = "empty"
+    
+            def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, dict[str, str]]]:
+                if cursor == "complete":
+                    return
+                for number in range(5):
+                    yield SourceRef("empty", f"{number}.unsupported", "v1"), b"unsupported", (
+                        {"skip_reason": "denied-path"} if skip else {})
+    
+            def next_cursor(self) -> str:
+                return "complete"
+    
+        def discover(_config: Config) -> dict[str, EmptySources]:
+            return {"empty": EmptySources()}
+    
+        monkeypatch.setattr("sb.connectors.discover_adapters", discover)
+        for expected, status in ((2, "capped"), (4, "capped"), (5, "ok")):
+>           assert run_ingest(config, None).status == status
+E           AssertionError: assert 'failed' == 'capped'
+E             
+E             - capped
+E             + failed
+
+tests/test_ingest_budget.py:208: AssertionError
+___________ test_status_uses_pinned_generation_for_failure_inventory ___________
+
+tmp_path = PosixPath('/var/tmp/pytest-of-jm/pytest-648/test_status_uses_pinned_genera0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x76dda355d6d0>
+
+    def test_status_uses_pinned_generation_for_failure_inventory(tmp_path, monkeypatch):
+        _old_config, pinned = _ready(tmp_path / "pinned")
+        active_config, _active = _ready(tmp_path / "active")
+        (pinned / ".sb/runs.log").write_text("pinned run status\n")
+        (_active / ".sb/runs.log").write_text("different active run\n")
+        with Ledger(pinned) as ledger:
+            ledger.ensure_derivation("historical-brief", "brief", "old-run")
+            ledger.mark_running("historical-brief", "old-run")
+            ledger.mark_failed("historical-brief", "unresolved citation")
+    
+        @contextmanager
+        def pin(_config):
+            yield pinned
+    
+        monkeypatch.setattr("sb.web.read_root", pin)
+        with _running(active_config) as base:
+            status, payload = _request(f"{base}/api/status")
+        assert status == 200
+>       assert payload["status"] == "pinned run status"
+E       AssertionError: assert '최근 단계 실행 web-status-run: ok' == 'pinned run status'
+E         
+E         - pinned run status
+E         + 최근 단계 실행 web-status-run: ok
+
+tests/test_web_status_pin.py:27: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_ingest_budget.py::test_residual_budget_defers_whole_source_across_adapters
+FAILED tests/test_ingest_budget.py::test_source_cap_bounds_zero_unit_and_quarantined_versions[False]
+FAILED tests/test_ingest_budget.py::test_source_cap_bounds_zero_unit_and_quarantined_versions[True]
+FAILED tests/test_web_status_pin.py::test_status_uses_pinned_generation_for_failure_inventory
+4 failed, 1563 passed, 2 skipped in 303.25s (0:05:03)

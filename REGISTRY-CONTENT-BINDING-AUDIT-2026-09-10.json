@@ -1,0 +1,25 @@
+{
+  "workspace": "/var/tmp/sb-registry-binding-ti0mgswv",
+  "vault": "/var/tmp/sb-managed-native-e9_8jeox/share/vault-generations/sbgen:v1:b58b8ba0b16ea2d45e93ba66888848d9a79e51b1fbddbe12dc0df1304978b89c",
+  "page_id": "wiki/inbox-2026-09-09t144140491156-관리형실제기억검증-59a920fe",
+  "mismatched_source_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "results": 1,
+  "hits": [
+    {
+      "page_id": "wiki/inbox-2026-09-09t144140491156-관리형실제기억검증-59a920fe",
+      "section": "2026-09-09T144140491156-관리형실제기억검증",
+      "snippet": "...0491156-관리형실제기억검증.md span=...",
+      "score": 1.5714285714285712e-06,
+      "kind": "wiki",
+      "index_status": "active",
+      "knowledge_status": "ACTIVE",
+      "approval_status": "APPROVED",
+      "canonical": "",
+      "source_ref": "",
+      "updated_at": "2026-09-09",
+      "role": "CANONICAL",
+      "verification": "VERIFIED"
+    }
+  ],
+  "scope": "general SearchIndex active scope with isolated test registry; not scoped JARVIS authority"
+}

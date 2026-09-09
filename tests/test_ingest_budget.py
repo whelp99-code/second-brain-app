@@ -87,6 +87,7 @@ def test_residual_budget_defers_whole_source_across_adapters(
     def discover(_config: Config) -> dict[str, MarkdownVaultAdapter]:
         return adapters
 
+    config = Config(raw={**config.raw, "sources": [{"id": name, "adapter": "markdown-vault"} for name in adapters]})
     monkeypatch.setattr("sb.connectors.discover_adapters", discover)
     first = run_ingest(config, None)
     assert first.status == "capped" and first.exit_code == 0
@@ -203,6 +204,7 @@ def test_source_cap_bounds_zero_unit_and_quarantined_versions(
     def discover(_config: Config) -> dict[str, EmptySources]:
         return {"empty": EmptySources()}
 
+    config = Config(raw={**config.raw, "sources": [{"id": "empty", "adapter": "test-empty"}]})
     monkeypatch.setattr("sb.connectors.discover_adapters", discover)
     for expected, status in ((2, "capped"), (4, "capped"), (5, "ok")):
         assert run_ingest(config, None).status == status
