@@ -1,5 +1,6 @@
 """Exercise actual JARVIS authority decisions at Python admission/execution checks."""
 import json
+import os
 import subprocess
 import sys
 from dataclasses import asdict
@@ -10,6 +11,7 @@ from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
 from sb.scoped_request_acceptance import accept_scoped_request
 from sb.scoped_provider_decision import create_scoped_provider_authority
+from sb.scoped_provider_process import ScopedProviderChannelError, ScopedProviderProcess
 from tests.task30_process_harness import executor_config
 
 node, script, build, state_path, mode, root = sys.argv[1:]
@@ -18,6 +20,8 @@ raw = state['request']
 now = datetime.fromisoformat(state['at'])
 config = executor_config(Path(root))
 calls = 0
+channel = ScopedProviderProcess([node, script, build, state_path, 'verify'],
+    cwd=Path.cwd(), env={'PATH': '/usr/bin:/bin', 'TMPDIR': os.environ.get('TMPDIR', '/var/tmp')})
 
 def revoke():
     policy = Path(state['policyPath'])
@@ -34,10 +38,12 @@ def verify(payload):
     calls += 1
     if mode == 'revoke_during_accept' and calls == 2:
         revoke()
-    response = child('verify', json.loads(payload))
-    if response.returncode != 0:
-        return False
-    decision = json.loads(response.stdout)
+    try:
+        decision = channel(payload)
+    except ScopedProviderChannelError as error:
+        if str(error) == 'SCOPED_PROVIDER_CHANNEL_REJECTED':
+            return False
+        raise
     assert decision['outbox_id'] == state['outbox'] and decision['dispatch_fence'] == state['fence']
     return decision
 

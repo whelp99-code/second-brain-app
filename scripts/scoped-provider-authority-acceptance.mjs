@@ -21,7 +21,8 @@ if (statePath) {
       const verify = createProductionScopedProviderVerifier(authority, { policy_path: s.policyPath,
         provider_instance_id: s.provider, spool_root: s.spoolRoot, roots: s.roots,
         authenticated_session: () => s.session, clock: () => new Date(s.at) });
-      console.log(JSON.stringify(verify(value)));
+      const decision = verify(value);
+      console.log(JSON.stringify(decision, Object.keys(decision).sort()));
     }
   } catch (error) { console.log(JSON.stringify({ denied: error.code ?? error.message })); process.exitCode = 1; }
   finally { authority.close(); }
