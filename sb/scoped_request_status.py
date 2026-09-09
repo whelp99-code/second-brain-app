@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import datetime
 from typing import cast
 
@@ -21,6 +22,7 @@ from sb.source_access import SourceAccess
 def read_scoped_request_status(
     store: RequestStore, value: object, *, expected_provider: str,
     clock: Callable[[], datetime], resolve_scope: Callable[[datetime], SourceAccess | None],
+    include_acceptance: bool = False,
 ) -> JsonObject:
     """Read a detached journal snapshot under current authenticated scope twice.
 
@@ -59,7 +61,9 @@ def read_scoped_request_status(
     if status is not None:
         if status.identity != entry.identity:
             raise ValueError(denied)
-        _ = _replay(entry, status, started)
+        accepted = _replay(entry, status, started)
+        if include_acceptance:
+            result["acceptance"] = cast(JsonObject, asdict(accepted))
         updated = parse_instant(status.updated_at)
         if not parse_instant(status.accepted_at) <= updated <= started:
             raise ValueError(denied)

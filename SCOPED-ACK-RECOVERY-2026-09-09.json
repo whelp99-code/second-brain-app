@@ -1,0 +1,329 @@
+{
+  "ack_loss": {
+    "observed": {
+      "recovered_without_local_acceptance": true,
+      "completion": {
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "status": {
+          "schema_version": 4,
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+          "request_digest": "sha256:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+          "scope_digest": "sha256:16f3a27a16949da7922928b15ee9de79c98b0d095b89e43b3ec8ca31bf1d15ac",
+          "state": "proved",
+          "phase": "proved",
+          "updated_at": "2026-08-28T12:00:00.000Z",
+          "proof": {
+            "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+            "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+            "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+            "provider_instance_id": "provider:fixture",
+            "request_digest": "sha256:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+            "request_id": "memreq:scoped:v4:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+            "schema_version": 4,
+            "scope_digest": "sha256:16f3a27a16949da7922928b15ee9de79c98b0d095b89e43b3ec8ca31bf1d15ac",
+            "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+          },
+          "receipt": {
+            "schema_version": 4,
+            "request_id": "memreq:scoped:v4:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+            "request_digest": "sha256:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+            "envelope_digest": null,
+            "state": "proved",
+            "code": "PROVIDER_PROVED",
+            "proof_digest": "sha256:5fa9a501c7321ced541905a1e6aedf34c1ff17c8aadf367d8b30a2914da7d122",
+            "status_digest": "sha256:9c62d50cfbd73c530e7f90e447a88188a5a81f1fc3f239109c8fab542db230b0",
+            "updated_at": "2026-08-28T12:00:00.000Z"
+          },
+          "acceptance": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+            "request_digest": "sha256:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+            "idempotency_key": "memidem:scoped:v4:0c3e8ede9570a9c684d78b3fa5db60fef33cfba2cb7e2d795b86206b7a74ee37",
+            "scope_digest": "sha256:16f3a27a16949da7922928b15ee9de79c98b0d095b89e43b3ec8ca31bf1d15ac",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a.v4.json",
+            "request_file_digest": "sha256:b6477b8c700779ff8ecbee7c2cfeec803ee8104c611a377a103c881b03957a49",
+            "replayed": true
+          }
+        }
+      },
+      "request_status_after_restart": true,
+      "fixture": true,
+      "profile": "scoped-record-read-v5",
+      "production_composition": true,
+      "internal_write_authority_fixture": true,
+      "supervised_stdio": true,
+      "read_after_restart": true,
+      "broader_authenticated_scope_allowed": true,
+      "provider_policy_change_rejected": true,
+      "issuer_policy_withdrawal_rejected": true,
+      "observation": {
+        "kind": "remembered_artifact_observed",
+        "access": {
+          "schema_version": 1,
+          "complete": true,
+          "sources": [
+            {
+              "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+              "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+              "classification": {
+                "schema_version": 1,
+                "owner": "principal:owner",
+                "projects": [
+                  "project:a"
+                ],
+                "policy_revision": "policy:1"
+              }
+            }
+          ]
+        },
+        "request_id": "memreq:scoped:v4:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+        "request_digest": "sha256:345557fa4e9c5a7167ee3c5cd709580e2eede16d8b364515f9e0a26795690d0a",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "automatic_settlement": false
+    },
+    "acceptance_recorded": {
+      "kind": "acceptance_recorded",
+      "outbox_id": "memout:scoped:v4:5959e053f6199e1b7489875c65a5608a983c4fc9cbb67673208d42beb011e546",
+      "attempt_id": "memattempt:pos:v2:23bd76808bd02db4167ae91091deec884fb29ff4f986aa7021a00ef6890650b9",
+      "acceptance_receipt_digest": "sha256:957d42c3df9d24ed87c66d4ca250951bbc64cdbe3ad5286a5e586bcb348cb67c",
+      "replayed": true
+    },
+    "attempt_count": 1,
+    "acceptance_events": 1,
+    "record_commit_exit": 73,
+    "record_processes": 3,
+    "replay_idempotent": true,
+    "redispatch": false,
+    "jarvis_state": "reconciling",
+    "foreign_key_errors": 0
+  },
+  "package": {
+    "isolated_package": true,
+    "hashes": {
+      "1": "2c0bc8a467cb3f89f7c8cdb7df0a4eceb9790250b05d3fecffc13fb485417a7b",
+      "2": "a5af30045ba19eb6e79d07f649e3049842741822d75bdb7212d2ec7eabd9cb37",
+      "3": "c3d4b1d883d8966fcc39b5f26e999159cb60977c248683d5719da27fd5500ad8",
+      "4": "707ea8dcbdc2aebe0aaa5c90743ebb247adde9d469dd51a0564c2cb8728d53e2",
+      "5": "4aaadbd6c5670c6f69e811567e2a93abcd746112d86697cfd391ef49aa4853c3"
+    }
+  },
+  "compatibility": {
+    "v2": {
+      "recovered_without_local_acceptance": false,
+      "request_status_after_restart": false,
+      "fixture": true,
+      "profile": "scoped-record-read-v2",
+      "production_composition": false,
+      "internal_write_authority_fixture": true,
+      "supervised_stdio": true,
+      "read_after_restart": true,
+      "broader_authenticated_scope_allowed": true,
+      "provider_policy_change_rejected": true,
+      "issuer_policy_withdrawal_rejected": true,
+      "observation": {
+        "kind": "remembered_content_observed",
+        "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "generation_manifest_digest": "sha256:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "automatic_settlement": false
+    },
+    "v3": {
+      "recovered_without_local_acceptance": false,
+      "request_status_after_restart": false,
+      "fixture": true,
+      "profile": "scoped-record-read-v3",
+      "production_composition": true,
+      "internal_write_authority_fixture": true,
+      "supervised_stdio": true,
+      "read_after_restart": true,
+      "broader_authenticated_scope_allowed": true,
+      "provider_policy_change_rejected": true,
+      "issuer_policy_withdrawal_rejected": true,
+      "observation": {
+        "kind": "remembered_artifact_observed",
+        "access": {
+          "schema_version": 1,
+          "complete": true,
+          "sources": [
+            {
+              "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+              "classification_digest": "sha256:c6227da82601c6ef0c00dcd5f9bcde3e59a26b7996bdf4c40186a9f00b2d07c1",
+              "classification": {
+                "schema_version": 1,
+                "owner": "principal:owner",
+                "projects": [
+                  "project:shared-memory"
+                ],
+                "policy_revision": "policy:fixture"
+              }
+            }
+          ]
+        },
+        "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "generation_manifest_digest": "sha256:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "automatic_settlement": false
+    },
+    "v4": {
+      "recovered_without_local_acceptance": false,
+      "completion": {
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "generation_manifest_digest": "sha256:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "status": {
+          "schema_version": 4,
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+          "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+          "scope_digest": "sha256:5afd350ebcabbcbf83c7dfbcf98325239a3a6ace92e94d6cb9e7db932409956f",
+          "state": "proved",
+          "phase": "proved",
+          "updated_at": "2026-08-28T12:00:00.000Z",
+          "proof": {
+            "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+            "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+            "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+            "provider_instance_id": "provider:fixture",
+            "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+            "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+            "schema_version": 4,
+            "scope_digest": "sha256:5afd350ebcabbcbf83c7dfbcf98325239a3a6ace92e94d6cb9e7db932409956f",
+            "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+          },
+          "receipt": {
+            "schema_version": 4,
+            "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+            "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+            "envelope_digest": null,
+            "state": "proved",
+            "code": "PROVIDER_PROVED",
+            "proof_digest": "sha256:5df2573701bd40ee8a277036dd8e6633db470a2b10f6a007793f5c8b5d3790fe",
+            "status_digest": "sha256:3c624a2339668956c2c1b1edf1be7f7c288ac323afaf4c081cc198c2459f0f02",
+            "updated_at": "2026-08-28T12:00:00.000Z"
+          }
+        }
+      },
+      "request_status_after_restart": true,
+      "fixture": true,
+      "profile": "scoped-record-read-v4",
+      "production_composition": true,
+      "internal_write_authority_fixture": true,
+      "supervised_stdio": true,
+      "read_after_restart": true,
+      "broader_authenticated_scope_allowed": true,
+      "provider_policy_change_rejected": true,
+      "issuer_policy_withdrawal_rejected": true,
+      "observation": {
+        "kind": "remembered_artifact_observed",
+        "access": {
+          "schema_version": 1,
+          "complete": true,
+          "sources": [
+            {
+              "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+              "classification_digest": "sha256:c6227da82601c6ef0c00dcd5f9bcde3e59a26b7996bdf4c40186a9f00b2d07c1",
+              "classification": {
+                "schema_version": 1,
+                "owner": "principal:owner",
+                "projects": [
+                  "project:shared-memory"
+                ],
+                "policy_revision": "policy:fixture"
+              }
+            }
+          ]
+        },
+        "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "request_digest": "sha256:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "generation_manifest_digest": "sha256:f2b07f555b53add9ae8b294b87b814f73c735d3b120e0a85b62e6b0ad2dbdaae",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "automatic_settlement": false
+    }
+  }
+}

@@ -1,0 +1,53 @@
+// Original JARVIS spent attempt -> provider write fixture -> read-only MCP recovery.
+import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const sb = resolve(dirname(fileURLToPath(import.meta.url)), '..'), build = resolve(process.argv[2]);
+const load = path => import(pathToFileURL(join(build, path)).href);
+const { scopedOutboxFixture } = await load('tests/fixtures/scoped-outbox.js');
+const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-store.js');
+const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js');
+const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch, recoverMemoryScopedOutboxDispatches } = await load('src/memory-scoped-outbox-worker.js');
+const f = await scopedOutboxFixture();
+try {
+  const r = registerMemoryScopedOutbox(f.options, f.claimed), options = { ...f.options, roots: f.dispatch.roots };
+  const lease = claimMemoryScopedOutbox(options, r.outbox_id, 'worker:fixture', 1000);
+  const dispatched = markMemoryScopedOutboxDispatch(options, lease, 30000);
+  const requestPath = join(f.database.root, 'request.json');
+  writeFileSync(requestPath, JSON.stringify(dispatched.request), { mode: 0o600 });
+  const before = f.database.authority.db.prepare('SELECT accepted_result_json FROM memory_outbox_attempts').get();
+  assert.equal(before.accepted_result_json, null);
+  const late = new Date('2026-08-31T03:30:00.000Z');
+  assert.equal(recoverMemoryScopedOutboxDispatches(f.database.authority, late), 1);
+  const child = spawnSync(join(sb, '.venv/bin/python'), [join(sb, 'scripts/remembered-artifact-mcp-acceptance.py'),
+    build, 'scoped-record-read-v5', requestPath], { cwd: process.cwd(), env: { ...process.env, PYTHONPATH: sb },
+    encoding: 'utf8', timeout: 60000 });
+  assert.equal(child.status, 0, child.stderr + child.stdout);
+  const observed = JSON.parse(child.stdout);
+  assert.equal(observed.recovered_without_local_acceptance, true);
+  const accepted = observed.completion.status.acceptance;
+  assert.equal(accepted.request_digest, dispatched.request.request_digest);
+  const recoveryPath = join(f.database.root, 'recovery.json');
+  const record = crashAfter => {
+    writeFileSync(recoveryPath, JSON.stringify({ database: f.database.path, outbox: r.outbox_id, fence: lease.fence,
+      request: dispatched.request, accepted, at: late.toISOString(), crash_after: crashAfter }), { mode: 0o600 });
+    const result = spawnSync(process.execPath, [join(sb, 'scripts/scoped-outbox-result-acceptance.mjs'), build, recoveryPath],
+      { encoding: 'utf8', timeout: 30000 });
+    assert.equal(result.status, crashAfter ? 73 : 0, result.stderr + result.stdout);
+    return crashAfter ? undefined : JSON.parse(result.stdout);
+  };
+  record(true); // Hard exit after the acceptance transaction committed.
+  const first = record(false);
+  assert.equal(first.replayed, true);
+  assert.deepEqual(record(false), first);
+  const db = f.database.authority.db;
+  assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM memory_reconciliation_events WHERE event_type='provider_accepted'").get().n, 1);
+  assert.equal(db.prepare('SELECT state FROM memory_outbox').get().state, 'reconciling');
+  assert.equal(claimMemoryScopedOutbox({ ...options, clock: () => late }, r.outbox_id, 'worker:repeat', 1000), undefined);
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+  console.log(JSON.stringify({ observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
+    record_commit_exit: 73, record_processes: 3, replay_idempotent: true, redispatch: false, jarvis_state: 'reconciling', foreign_key_errors: 0 }, null, 2));
+} finally { closeMemoryDatabase(f.database); }

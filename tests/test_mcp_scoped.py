@@ -22,7 +22,7 @@ class FrozenDate(datetime):
         return datetime(2026, 9, 9, tzinfo=UTC)
 
 
-@pytest.mark.parametrize("version,issuer_sessions", [(1, False), (2, False), (2, True), (3, False), (3, True), (4, False), (4, True)])
+@pytest.mark.parametrize("version,issuer_sessions", [(1, False), (2, False), (2, True), (3, False), (3, True), (4, False), (4, True), (5, False), (5, True)])
 def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch, version, issuer_sessions):  # noqa: F811
     root, name, generation = classified
     work = root.parents[2]

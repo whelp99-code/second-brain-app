@@ -3,6 +3,7 @@ import json
 from datetime import UTC, datetime
 
 import anyio
+import pytest
 from mcp.client import Client
 
 from sb.access_claims import access_request_digest
@@ -14,7 +15,8 @@ from tests.test_access_claims import KEY, signed
 from tests.test_scoped_request_status import setup_status
 
 
-def test_scoped_status_claim_binds_original_request_and_scope(tmp_path, monkeypatch):
+@pytest.mark.parametrize("version", [4, 5])
+def test_scoped_status_claim_binds_original_request_and_scope(tmp_path, monkeypatch, version):
     raw, _now, execution, _accepted, _scope, store = setup_status(tmp_path)
     store.close()
     class Clock(datetime):
@@ -27,7 +29,7 @@ def test_scoped_status_claim_binds_original_request_and_scope(tmp_path, monkeypa
         "jarvis_public_keys": {"key:test": base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()},
         "mcp_scoped_read": {"principal": "principal:owner", "agent": "agent:test", "session": "session:test", "policy_revision": "policy:fixture"}})
     monkeypatch.setattr("sb.mcp.datetime", Clock)
-    monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v4")
+    monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", f"scoped-record-read-v{version}")
     server = build_server(config=config)
     fence = create_read_fence(provider_instance_id=execution.provider_instance_id, purpose="memory_status", operation="status",
         sequence=0, set_root=GENESIS_TOMBSTONE_ROOT, issued_at="2026-09-09T00:00:00.000Z", not_before="2026-09-09T00:00:00.000Z",
@@ -43,6 +45,7 @@ def test_scoped_status_claim_binds_original_request_and_scope(tmp_path, monkeypa
             response = await client.call_tool("sb_request_status", args)
             assert not response.is_error, response
             assert response.structured_content["request_status"]["state"] == "proved"
+            assert ("acceptance" in response.structured_content["request_status"]) == (version == 5)
             assert response.structured_content["request_status"]["proof"]["request_digest"] == raw["request_digest"]
             for change in [{"projects": ["project:other"]}, {"projects": []},
                 {"request_digest": access_request_digest("sb_generation_status", {})}]:
