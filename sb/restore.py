@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import stat
 import tarfile
@@ -52,6 +53,31 @@ class RestoreError(RuntimeError):
         super().__init__(code)
 
 
+def _file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink,
+            metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns)
+
+
+def _read_archive_file(source: Path, expected: os.stat_result) -> bytes:
+    try:
+        descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            before = os.fstat(descriptor)
+            if _file_identity(before) != _file_identity(expected):
+                raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+            with os.fdopen(descriptor, "rb", closefd=False) as stream:
+                payload = stream.read(_MAX_RESTORE_FILE_BYTES + 1)
+            if (_file_identity(os.fstat(descriptor)) != _file_identity(before)
+                    or len(payload) != before.st_size):
+                raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
+            _check_archive_budget(1, len(payload), len(payload))
+            return payload
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise RestoreError("RESTORE_ARCHIVE_UNSAFE") from exc
+
+
 @final
 class GenerationRestoreSanitizer:
     def __init__(
@@ -69,7 +95,7 @@ class GenerationRestoreSanitizer:
     @staticmethod
     def _extract(archive: Path, destination: Path) -> None:
         if archive.is_dir() and not archive.is_symlink():
-            sources: list[Path] = []
+            sources: dict[Path, os.stat_result] = {}
             total = 0
             for source in archive.rglob("*"):
                 metadata = source.stat(follow_symlinks=False)
@@ -79,22 +105,20 @@ class GenerationRestoreSanitizer:
                 size = metadata.st_size if stat.S_ISREG(metadata.st_mode) else 0
                 total += size
                 _check_archive_budget(len(sources) + 1, total, size)
-                sources.append(source)
+                sources[source] = metadata
             for source in sorted(sources, key=lambda item: item.as_posix()):
                 relative = source.relative_to(archive)
                 if ".." in relative.parts:
                     raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
                 metadata = source.stat(follow_symlinks=False)
+                if _file_identity(metadata) != _file_identity(sources[source]):
+                    raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
                 target = destination / relative
                 if stat.S_ISDIR(metadata.st_mode):
                     target.mkdir(parents=True, exist_ok=True, mode=0o700)
                 elif stat.S_ISREG(metadata.st_mode) and metadata.st_nlink == 1:
                     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-                    with source.open("rb") as stream:
-                        payload = stream.read(_MAX_RESTORE_FILE_BYTES + 1)
-                    if len(payload) != metadata.st_size:
-                        raise RestoreError("RESTORE_ARCHIVE_UNSAFE")
-                    _check_archive_budget(1, len(payload), len(payload))
+                    payload = _read_archive_file(source, metadata)
                     _ = target.write_bytes(payload)
                     target.chmod(stat.S_IMODE(metadata.st_mode))
                 else:
