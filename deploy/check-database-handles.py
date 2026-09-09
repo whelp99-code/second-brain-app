@@ -11,9 +11,7 @@ import os
 from pathlib import Path
 
 
-def inspect(database: Path) -> dict[str, object]:
-    database = database.resolve(strict=True)
-    paths = [database, *(Path(str(database) + suffix) for suffix in ('-wal', '-shm', '-journal'))]
+def file_identities(paths: list[Path]) -> dict[tuple[int, int], str]:
     identities = {}
     for path in paths:
         try:
@@ -21,6 +19,13 @@ def inspect(database: Path) -> dict[str, object]:
             identities[(metadata.st_dev, metadata.st_ino)] = path.name
         except FileNotFoundError:
             continue
+    return identities
+
+
+def inspect(database: Path) -> dict[str, object]:
+    database = database.resolve(strict=True)
+    paths = [database, *(Path(str(database) + suffix) for suffix in ('-wal', '-shm', '-journal'))]
+    identities = file_identities(paths)
     matches, mapped, unreadable = [], [], []
     scanned = 0
     for process in Path('/proc').iterdir():
@@ -80,6 +85,7 @@ def inspect(database: Path) -> dict[str, object]:
             'mapped_files': sorted(mapped, key=lambda row: (row['pid'], row['file'])),
             'unreadable_pids': sorted(set(unreadable)),
             'unreadable_processes': diagnostics,
+            'target_identity_changed': file_identities(paths) != identities,
             'scope': 'same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
             'drain_authorized': False}
 
@@ -90,7 +96,7 @@ def main() -> None:
     args = parser.parse_args()
     result = inspect(args.database)
     print(json.dumps(result, indent=2))
-    raise SystemExit(2 if result['unreadable_pids'] else 1
+    raise SystemExit(2 if result['unreadable_pids'] or result['target_identity_changed'] else 1
                      if result['open_handles'] or result['mapped_files'] else 0)
 
 

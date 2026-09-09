@@ -61,3 +61,31 @@ def test_mapping_without_open_fd_is_still_reported(tmp_path: Path) -> None:
         assert result.returncode == (2 if report['unreadable_pids'] else 1)
     finally:
         assert libc.munmap(address, 4096) == 0
+
+
+@pytest.mark.parametrize('change', ['replace', 'remove', 'sidecar'])
+def test_file_identity_change_during_scan_is_incomplete(tmp_path: Path, monkeypatch, change: str) -> None:
+    import runpy
+
+    inspect = runpy.run_path(str(SCRIPT))['inspect']
+    database = tmp_path / 'changing.sqlite'
+    database.write_bytes(b'original')
+    original = Path.iterdir
+    changed = False
+
+    def entries(path):
+        nonlocal changed
+        if path == Path('/proc') and not changed:
+            changed = True
+            if change == 'sidecar':
+                Path(str(database) + '-wal').write_bytes(b'new sidecar')
+            else:
+                database.rename(tmp_path / 'old.sqlite')
+                if change == 'replace':
+                    database.write_bytes(b'replacement')
+        return original(path)
+
+    monkeypatch.setattr(Path, 'iterdir', entries)
+    result = inspect(database)
+    assert result['target_identity_changed'] is True
+    assert not result['drain_authorized']

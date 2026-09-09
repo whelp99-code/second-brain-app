@@ -1,0 +1,331 @@
+{
+  "database": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
+  "uid": 1000,
+  "scanned_processes": 383,
+  "open_handles": [
+    {
+      "pid": 1553366,
+      "fd": 21,
+      "file": "jarvis.sqlite"
+    },
+    {
+      "pid": 1553366,
+      "fd": 22,
+      "file": "jarvis.sqlite-wal"
+    },
+    {
+      "pid": 1553366,
+      "fd": 23,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 1625716,
+      "fd": 21,
+      "file": "jarvis.sqlite"
+    },
+    {
+      "pid": 1625716,
+      "fd": 22,
+      "file": "jarvis.sqlite-wal"
+    },
+    {
+      "pid": 1625716,
+      "fd": 23,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 2123274,
+      "fd": 21,
+      "file": "jarvis.sqlite"
+    },
+    {
+      "pid": 2123274,
+      "fd": 22,
+      "file": "jarvis.sqlite-wal"
+    },
+    {
+      "pid": 2123274,
+      "fd": 23,
+      "file": "jarvis.sqlite-shm"
+    }
+  ],
+  "mapped_files": [
+    {
+      "pid": 1553366,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 1625716,
+      "file": "jarvis.sqlite-shm"
+    },
+    {
+      "pid": 2123274,
+      "file": "jarvis.sqlite-shm"
+    }
+  ],
+  "unreadable_pids": [
+    1422,
+    1477,
+    7401,
+    114125,
+    123343,
+    123344,
+    123345,
+    123348,
+    124121,
+    719131,
+    1040584,
+    1160262,
+    1160311,
+    1160383,
+    1160418,
+    1160508,
+    1160604,
+    1160778,
+    1160863,
+    1161011,
+    1161189,
+    1161268,
+    1161440,
+    1161586,
+    1220791,
+    1331853,
+    1332072,
+    1332133,
+    1332307,
+    1332420,
+    1332467,
+    1332629,
+    1332642,
+    1332768,
+    1332867,
+    1398129,
+    1457025,
+    1496211,
+    1533918,
+    1537182,
+    1553350,
+    2713372,
+    3771272
+  ],
+  "unreadable_processes": [
+    {
+      "pid": 1422,
+      "comm": "systemd",
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/init.scope"
+    },
+    {
+      "pid": 1477,
+      "comm": "(sd-pam)",
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/init.scope"
+    },
+    {
+      "pid": 7401,
+      "comm": "ssh-agent",
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/ssh-agent.service"
+    },
+    {
+      "pid": 114125,
+      "comm": "sh",
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-orca-112681.scope"
+    },
+    {
+      "pid": 123343,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-71966.scope"
+    },
+    {
+      "pid": 123344,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-71970.scope"
+    },
+    {
+      "pid": 123345,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-71969.scope"
+    },
+    {
+      "pid": 123348,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-71967.scope"
+    },
+    {
+      "pid": 124121,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-71974.scope"
+    },
+    {
+      "pid": 719131,
+      "comm": "cat",
+      "cgroup": "0::/user.slice/user-1000.slice/session-16002.scope"
+    },
+    {
+      "pid": 1040584,
+      "comm": "ssh-agent",
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/gcr-ssh-agent.service"
+    },
+    {
+      "pid": 1160262,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73233.scope"
+    },
+    {
+      "pid": 1160311,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73234.scope"
+    },
+    {
+      "pid": 1160383,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73236.scope"
+    },
+    {
+      "pid": 1160418,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73237.scope"
+    },
+    {
+      "pid": 1160508,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73238.scope"
+    },
+    {
+      "pid": 1160604,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73240.scope"
+    },
+    {
+      "pid": 1160778,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73245.scope"
+    },
+    {
+      "pid": 1160863,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73247.scope"
+    },
+    {
+      "pid": 1161011,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73248.scope"
+    },
+    {
+      "pid": 1161189,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73253.scope"
+    },
+    {
+      "pid": 1161268,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73255.scope"
+    },
+    {
+      "pid": 1161440,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73258.scope"
+    },
+    {
+      "pid": 1161586,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73262.scope"
+    },
+    {
+      "pid": 1220791,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73358.scope"
+    },
+    {
+      "pid": 1331853,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73528.scope"
+    },
+    {
+      "pid": 1332072,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73533.scope"
+    },
+    {
+      "pid": 1332133,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73534.scope"
+    },
+    {
+      "pid": 1332307,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73539.scope"
+    },
+    {
+      "pid": 1332420,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73542.scope"
+    },
+    {
+      "pid": 1332467,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73543.scope"
+    },
+    {
+      "pid": 1332629,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73546.scope"
+    },
+    {
+      "pid": 1332642,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73547.scope"
+    },
+    {
+      "pid": 1332768,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73550.scope"
+    },
+    {
+      "pid": 1332867,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73552.scope"
+    },
+    {
+      "pid": 1398129,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73674.scope"
+    },
+    {
+      "pid": 1457025,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73743.scope"
+    },
+    {
+      "pid": 1496211,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73795.scope"
+    },
+    {
+      "pid": 1533918,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73856.scope"
+    },
+    {
+      "pid": 1537182,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73863.scope"
+    },
+    {
+      "pid": 1553350,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-73884.scope"
+    },
+    {
+      "pid": 2713372,
+      "comm": "sshd-session",
+      "cgroup": "0::/user.slice/user-1000.slice/session-34103.scope"
+    },
+    {
+      "pid": 3771272,
+      "comm": "sd_espeak-ng-mb",
+      "cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/speech-dispatcher.service"
+    }
+  ],
+  "target_identity_changed": false,
+  "scope": "same-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion",
+  "drain_authorized": false
+}
