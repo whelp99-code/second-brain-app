@@ -1060,3 +1060,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 fake 충돌 형식·실제 JARVIS 읽기 재검증:** [CLI 실패 재현→JSON/cites 일치 수정→실제 issuer/stdio/HTTPS 통과](FAKE-CONFLICT-AND-JARVIS-READ-2026-09-10.md). 회귀28통과·Ruff/diff, 독립클라이언트2개 각2records·제한peer0·철회거부. 격리 J195b1a7 빌드 사용, 모델0호출. 복원 고수위/JARVIS 권한·실업무·운영/DR 및 전체 목표는 남는다.
+
+
+**2026-09-10 충돌 JSON 파싱 수정:** [지수/공백/escape 정확 해석·중복/불량 타입 거부·cites 설명 정정](CONFLICT-JSON-PARSING-2026-09-10.md). 관련25통과/5.54초·Ruff/diff·타입0오류0경고. 이전 cites 필수 설명은 잘못됐으며 생략 호환성 유지. 실제 모델/자비스 복원·운영 및 전체 목표는 남는다.

@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from importlib.resources import files
-from typing import Final
+from typing import Final, cast
 
 from sb.config import Config
 from sb.conflict_lexical import LEXICAL_FLOOR, LEXICAL_TOP, LexicalMatch, lexical_top
@@ -35,8 +36,6 @@ CONTRADICTION_FLOOR: Final = 0.8
 SUPERSEDE_FLOOR: Final = 0.9
 SECTIONS: Final = ("주장A", "주장B", "판정", "status")
 _ROUTES: Final = frozenset({"conflict", "supersede", "note", "unrelated"})
-_STR: Final = re.compile(r'"((?:\\.|[^"\\])*)"')
-_NUM: Final = re.compile(r"-?\d+(?:\.\d+)?")
 _STAMP: Final = re.compile(r"(?:updated:\s*)?(\d{4}-\d{2}-\d{2})")
 _SEP: Final = "\x1f"
 _SID_LEN: Final = 8
@@ -235,6 +234,15 @@ def _judge(
     return replace(out, deriv_key=key, deriv_output=output)
 
 
+def _unique_fields(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate conflict field")
+        result[key] = value
+    return result
+
+
 def _parse(
     raw: str,
     pair: LexicalMatch,
@@ -242,13 +250,24 @@ def _parse(
     stamps: Mapping[str, str | None],
     evidence: _Evidence,
 ) -> ConflictFinding:
-    relation, rationale, score = _fstr(raw, "relation"), _fstr(raw, "rationale"), _fnum(raw, "confidence")
-    cites = _fstrs(raw, "cites")
-    if relation is None or rationale is None or score is None or cites is None:
-        return _open(pair)
     try:
-        verdict = ConflictVerdict(relation=relation, confidence=score, rationale=rationale)
-    except ValueError:
+        decoded = cast(object, json.loads(raw, object_pairs_hook=_unique_fields))
+        if not isinstance(decoded, dict):
+            return _open(pair)
+        value = cast(dict[str, object], decoded)
+        relation, rationale, score = value.get("relation"), value.get("rationale"), value.get("confidence")
+        raw_cites = value.get("cites", [])
+        if (not isinstance(relation, str) or not isinstance(rationale, str)
+                or not isinstance(score, (int, float)) or isinstance(score, bool)
+                or not math.isfinite(score) or not 0 <= score <= 1
+                or not isinstance(raw_cites, list)):
+            return _open(pair)
+        rows = cast(list[object], raw_cites)
+        if any(not isinstance(item, str) for item in rows):
+            return _open(pair)
+        cites = tuple(cast(list[str], rows))
+        verdict = ConflictVerdict(relation=relation, confidence=float(score), rationale=rationale)
+    except (ValueError, OverflowError):
         return _open(pair)
     filled = cites or (pair.left_id, pair.unit_id)
     soft = {"unrelated": "unrelated", "supports": "note"}.get(relation)
@@ -327,32 +346,3 @@ def _restore(row: Derivation, pair: LexicalMatch, evidence: _Evidence) -> Confli
             )
     warning: bool | None = None if flag == "" else flag == "1"
     return ConflictFinding(left_id, right_id, verdict, route, page, target or None, cites, warning)
-
-
-def _rest(raw: str, key: str) -> str | None:
-    token = f'"{key}":'
-    start = raw.find(token)
-    return None if start < 0 else raw[start + len(token) :].lstrip()
-
-
-def _fstr(raw: str, key: str) -> str | None:
-    rest = _rest(raw, key)
-    matched = None if rest is None else _STR.match(rest)
-    return None if matched is None else matched.group(1)
-
-
-def _fnum(raw: str, key: str) -> float | None:
-    rest = _rest(raw, key)
-    matched = None if rest is None else _NUM.match(rest)
-    return None if matched is None else float(matched.group(0))
-
-
-def _fstrs(raw: str, key: str) -> tuple[str, ...] | None:
-    rest = _rest(raw, key)
-    if rest is None:
-        return ()
-    end = rest.find("]") if rest.startswith("[") else -1
-    if end < 0:
-        return None
-    inner = rest[1:end].strip()
-    return () if inner == "" else tuple(_STR.findall(inner))

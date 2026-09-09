@@ -2,7 +2,7 @@
 
 기준 SB 94d6095 이후 수정. JARVIS 작업공간 HEAD는 195b1a7. 사용한 격리 빌드는 /var/tmp/jarvis-current-pair-_mq15nmd/source/dist이며 build-receipt.json의 source_commit은 195b1a7d4588a8386def5e7dce2067a141942708, build_exit_code=0이다. 이번에 이 빌드를 재생성하거나 운영 실행물을 변경하지 않았다.
 
-실제 scripts/scoped-mcp-acceptance.py를 실행했더니 선행 CLI fixture의 소스 업데이트 후 compile이 실패했다. 격리 원장에서 conflict derivation의 invalid conflict verdict를 확인했다. 기본 --llm fake는 JSON 판정 요청에도 Cited 문장을 반환했고, 충돌 프롬프트는 relation/confidence/rationale만 요구하는 반면 parser는 cites도 요구했다.
+실제 scripts/scoped-mcp-acceptance.py를 실행했더니 선행 CLI fixture의 소스 업데이트 후 compile이 실패했다. 격리 원장에서 conflict derivation의 invalid conflict verdict를 확인했다. 기본 --llm fake는 JSON 판정 요청에도 Cited 문장을 반환했고, 충돌 프롬프트는 relation/confidence/rationale만 요구했다. 후속 확인 정정: parser는 cites 생략을 빈 배열로 처리하므로 cites가 필수라는 최초 설명은 잘못됐다. 실제 실패 원인은 fake의 비JSON 응답이었다.
 
 수정: fake의 JSON 요청은 명시적인 모의 unrelated 판정과 빈 cites를 반환한다. 이는 의미 판단을 수행했다는 주장이 아니다. 충돌 프롬프트에 cites 배열 요구를 추가해 parser와 맞췄다. acceptance fixture의 knowledge_registry 경로를 임시 작업공간으로 명시했다. 최초 실행은 경로가 명시되지 않았으므로 최초 실행까지 완전히 격리된 registry 증거로 확대하지 않는다. 운영 registry를 수정/정리하는 작업은 하지 않았다.
 

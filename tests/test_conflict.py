@@ -312,3 +312,25 @@ def test_capped_comparison_resumes_and_completed_cache_ignores_zero_budget(ledge
                      on_capped=lambda: capped.append(True))
     assert replayed == resumed
     assert not capped and llm.calls == 1
+
+
+@pytest.mark.parametrize("raw", [
+    '{"relation":"contradicts","confidence":1.5,"rationale":"x"}',
+    '{"relation":"contradicts","confidence":true,"rationale":"x"}',
+    '{"relation":"contradicts","confidence":NaN,"rationale":"x"}',
+    '{"relation":"contradicts","confidence":0.9,"confidence":0.1,"rationale":"x"}',
+    '{"relation":"contradicts","confidence":0.9,"rationale":"x","cites":[123]}',
+    '{"nested":{"relation":"contradicts","confidence":0.9,"rationale":"x"}}',
+])
+def test_invalid_verdict_never_creates_conflict(ledger, config, unit, raw):
+    found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, RecordingLLM(raw), config)
+    assert found
+    assert all(item.page is None and item.failure for item in found)
+
+
+def test_json_whitespace_exponent_and_escaped_rationale(ledger, config, unit):
+    raw = '{"relation" : "contradicts", "confidence" : 1e-1, "rationale" : "line\\nnext"}'
+    found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, RecordingLLM(raw), config)
+    assert found
+    assert all(item.failure is None and item.page is None for item in found)
+    assert all(item.verdict.confidence == 0.1 and item.verdict.rationale == "line\nnext" for item in found)
