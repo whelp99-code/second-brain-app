@@ -74,10 +74,21 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     # relative links entirely within the artifact.
     python.unlink()
     python.symlink_to(os.path.relpath(bundled_python, python.parent))
+    installed_wheel = release / wheel.name
+    installed_wheel.write_bytes(wheel.read_bytes())
+    source_epoch = int(build_env['SOURCE_DATE_EPOCH'])
+    os.utime(installed_wheel, (source_epoch, source_epoch))
     run('uv', 'pip', 'install', '--python', str(python), '--compile-bytecode', '-r', str(requirements))
-    run('uv', 'pip', 'install', '--python', str(python), '--no-deps', '--compile-bytecode', str(wheel))
+    run(str(bundled_python), '-I', '-m', 'pip', '--isolated', '--python', str(python),
+        'install', '--no-deps', '--no-compile', '--no-index', '--disable-pip-version-check', str(installed_wheel))
+    # Compile at the final path with source hashes, not installation timestamps.
+    subprocess.run(
+        [str(python), '-m', 'compileall', '-q', '-f', '--invalidation-mode', 'checked-hash',
+         str(runtime / 'lib'), str(release / '.venv' / 'lib')],
+        env={**os.environ, 'PYTHONHASHSEED': '0', 'SOURCE_DATE_EPOCH': str(source_epoch)},
+        cwd=repo, check=True, capture_output=True,
+    )
     (release / 'requirements.txt').write_bytes(requirements.read_bytes())
-    (release / wheel.name).write_bytes(wheel.read_bytes())
     bin_dir = release / 'bin'
     bin_dir.mkdir()
     base = '#!/bin/sh\nset -eu\nexport HOME="${HOME:-' + str(Path.home()) + '}"\nexport PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"\nexport SB_CONFIG="${SB_CONFIG:-$HOME/.config/second-brain/config.toml}"\ncd ' + shlex.quote(str(release)) + '\n'

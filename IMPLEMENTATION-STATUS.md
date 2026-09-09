@@ -1,3 +1,5 @@
+> 2026-09-09 고정 경로 재현성: [두 준비18,456항목 차이0·RECORD182검증](FIXED-PATH-REPRODUCIBILITY-2026-09-09.md). 안정된wheel경로·hash bytecode·번들pip앱설치, 관련20개/실제연동4경로 통과. 같은 로컬 환경/최종경로 범위이며 호스트간·이동·정본봉인/운영 인수는 남음.
+
 > 2026-09-09 런타임 식별 보강: [Python 입력 hash를 release ID에 결합](PYTHON-RUNTIME-IDENTITY-2026-09-09.md). 관련20개·실제2준비 입력ID일치·설치연동4경로 통과. 전체 설치물은5,395항목 차이로 재현성 미완료를 명시, 최종 봉인/운영 인수 유지.
 
 > 2026-09-09 provider 런타임 내부 포함: [Python3.12 복사·내부 상대 링크 후보](BUNDLED-PYTHON-CANDIDATE-2026-09-09.md). 링크1,052개 외부/절대0, 내부 Python SSL/SQLite 실행·설치 연동4경로/MCP4프로파일 통과. 관련19개 및 후속중복5개 통과. provenance/재현성·정본 봉인·운영 인수는 남음.
