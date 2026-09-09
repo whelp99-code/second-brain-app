@@ -1078,3 +1078,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 실제 자비스 scoped 복원 조회:** [자비스 chain1 유지·v3 issuer/client→허용1/다른프로젝트0·정책철회거부](JARVIS-SCOPED-RESTORE-2026-09-10.md). 최종실행exit0·Ruff/Node구문/diff. 실제 stdio/제품 발급소비지만 synthetic session/policy/source다. 운영 인증/native 업무·DR 및 전체 목표는 남는다.
+
+
+**2026-09-10 복원 응답 후 정책 철회 경합:** [실제 readPage/search 응답 확인→정책철회→client reject·정책복구 성공](RESTORE-POLICY-RACE-2026-09-10.md). 최종실행exit0·응답2경계·Node구문/diff. 제품 변경 없음. 이미 수신한 bytes의 완전 삭제나 운영/native 업무의 증거는 아니며 전체 목표 유지.

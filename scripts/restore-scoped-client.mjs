@@ -21,7 +21,22 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
   const resolve = createFileMemoryAccessScopeResolver(policyPath,config.provider_instance_id,()=>session);
   const issue = createProductionMemoryAccessClaim(database.authority,config,resolve);
   const transport = createSecondBrainTransport({contractProfile:'scoped-record-read-v3',launcherPath:launcher,configPath:scopedConfig});
-  const client = createMemoryScopedClient({issue,profile:'scoped-record-read-v3',transport,now:()=>new Date(),
+  let withdrawAfterResponse = false;
+  let intercepted = 0;
+  const monitored = {
+    call: async (...args) => {
+      const response = await transport.call(...args);
+      if (withdrawAfterResponse) {
+        assert.equal(response.kind,'data');
+        assert(JSON.stringify(response.value).includes('KeepBeta'));
+        intercepted++;
+        writeFileSync(policyPath,JSON.stringify({...policy,sessions:[]}));
+      }
+      return response;
+    },
+    restart:()=>transport.restart(), close:()=>transport.close(), diagnostics:()=>transport.diagnostics(),
+  };
+  const client = createMemoryScopedClient({issue,profile:'scoped-record-read-v3',transport:monitored,now:()=>new Date(),
     budgets:{max_hits:50,max_excerpt_bytes:8192,max_total_bytes:1000000,max_page_bytes:100000},
     max_age_ms:86400000,expiry_ms:172800000});
   try {
@@ -30,12 +45,20 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
     assert(JSON.stringify(allowed).includes('KeepBeta'));
     const searched = await client.search('KeepBeta',2);
     assert.equal(searched.pages.length,1);
+    for (const action of [()=>client.readPage(pageId),()=>client.search('KeepBeta',2)]) {
+      withdrawAfterResponse = true;
+      await assert.rejects(action, error=>error.code==='MEMORY_ACCESS_SCOPE_UNAVAILABLE');
+      withdrawAfterResponse = false;
+      writeFileSync(policyPath,JSON.stringify(policy));
+      assert.equal((await action()).pages.length,1);
+    }
+    assert.equal(intercepted,2);
     writeFileSync(policyPath,JSON.stringify({...policy,sessions:[{...policy.sessions[0],projects:['project:b']}]}));
     await assert.rejects(()=>client.readPage(pageId));
     const restricted = await client.search('KeepBeta',2);
     assert.equal(restricted.pages.length,0);
     writeFileSync(policyPath,JSON.stringify({...policy,sessions:[]}));
     await assert.rejects(()=>client.readPage(pageId), error=>error.code==='MEMORY_ACCESS_SCOPE_UNAVAILABLE');
-    return {profile:'scoped-record-read-v3',allowed_pages:1,restricted_pages:0,withdrawal_denied:true};
+    return {profile:'scoped-record-read-v3',allowed_pages:1,restricted_pages:0,withdrawal_denied:true,post_response_withdrawal_denied:true,intercepted_response_count:intercepted,restored_policy_resumes:true};
   } finally {await transport.close();}
 }
