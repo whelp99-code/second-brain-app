@@ -1,0 +1,14 @@
+{
+  "status": "implemented-focused-verified",
+  "tests_passed": 17,
+  "test_seconds": 6.57,
+  "type_errors": 0,
+  "type_warnings": 0,
+  "native_sql_variable_limit": 32766,
+  "lines": 32776,
+  "bytes": 349425,
+  "allowed_input_passed": true,
+  "last_digest_blocked": true,
+  "operational_changes": false,
+  "full_goal_complete": false
+}

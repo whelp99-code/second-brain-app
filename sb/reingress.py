@@ -146,14 +146,20 @@ class ReingressGate:
             for part in {text, *text.splitlines(), *text.split("\n\n")}
             if part
         )
-        placeholders = ",".join("?" for _candidate in candidates)
-        row = OPTIONAL_INTEGER_ROW.validate_python(self.db.execute(
-            "SELECT 1 FROM blocked_identities WHERE identity_kind='content' "
-            + f"AND identity_digest IN ({placeholders}) LIMIT 1",
-            tuple(sorted(candidates)),
-        ).fetchone())
-        if row is not None:
-            raise ErasureError("TOMBSTONE_REINGRESS_BLOCKED")
+        batch_size = min(512, self.db.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER))
+        if batch_size < 1:
+            raise ErasureError("REINGRESS_QUERY_LIMIT_UNAVAILABLE")
+        ordered = sorted(candidates)
+        for offset in range(0, len(ordered), batch_size):
+            batch = ordered[offset:offset + batch_size]
+            placeholders = ",".join("?" for _candidate in batch)
+            row = OPTIONAL_INTEGER_ROW.validate_python(self.db.execute(
+                "SELECT 1 FROM blocked_identities WHERE identity_kind='content' "
+                + f"AND identity_digest IN ({placeholders}) LIMIT 1",
+                tuple(batch),
+            ).fetchone())
+            if row is not None:
+                raise ErasureError("TOMBSTONE_REINGRESS_BLOCKED")
 
     def allow_new_version(self, authority: NewVersionAuthority) -> None:
         _ = self.db.execute(

@@ -32,3 +32,24 @@ def test_every_future_version_of_blocked_source_requires_exact_exception(tmp_pat
     ))
     gate.check(identity)
     gate.close()
+
+
+@pytest.mark.parametrize('blocked', [False, True])
+def test_large_content_checks_all_candidates_with_bounded_sql(tmp_path: Path, blocked: bool) -> None:
+    import hashlib
+    import sqlite3
+
+    content = '\n'.join(f'line-{number}' for number in range(200)).encode()
+    digests = {hashlib.sha256(part).hexdigest() for part in [content, *content.splitlines()]}
+    gate = ReingressGate(tmp_path / 'bounded.db')
+    try:
+        gate.db.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 16)
+        if blocked:
+            gate.db.execute('INSERT INTO blocked_identities VALUES(?,?,?,?,?)',
+                ('content', max(digests), 1, 'fixture-root', '2026-09-09T00:00:00Z'))
+            with pytest.raises(ErasureError, match='TOMBSTONE_REINGRESS_BLOCKED'):
+                gate.check_content(content)
+        else:
+            gate.check_content(content)
+    finally:
+        gate.close()
