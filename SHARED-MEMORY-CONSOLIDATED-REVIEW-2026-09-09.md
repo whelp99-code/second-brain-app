@@ -1,5 +1,7 @@
 # 자비스 공통 기억 완성 — 수정·개선·고도화 통합 분석
 
+**2026-09-09 상태별 단건 scoped 재조정 실행:** [journal 복구→현재 기억 검증→완료·실제 3상태/종료 복구](SCOPED-RECONCILE-ONCE-2026-09-09.md). pending/failed/not_found 보류·lease 해제, proved만 기존 완료 검증 연결, 오류 lease 보존. 관련20통과·emit/lint. 실제 pending/failed 재시작 attempt1/event1, proved settled/control completed/settlement1/attempt1/FK0·exit73 독립 replay. 운영 인증/명령 진입점·서비스 설정·실제 A→B 등 M1–M14 인수는 남는다.
+
 **2026-09-09 최초 세대 이전 수락의 영속 복구:** [현재 권한/lease·원자 기록·실제 commit 후 종료 복구](SCOPED-JOURNAL-RECOVERY-2026-09-09.md). journal 조회를 원래 outbox acceptance 기록에 연결했다. 관련41통과·emit/lint·실제 pending/failed 각각 exit73→새 프로세스 replay, attempt1/event1/FK0. 철회/취소/lease 만료는 전체 rollback. 현재 artifact/최종 완료·자동 재전송으로 승격하지 않으며 운영 worker 연결·실제 A→B 등 전체 M1–M14 인수는 남는다.
 
 **2026-09-09 자비스 최초 세대 이전 상태 소비 연결:** [전송 계약·현재 권한 재검사·실제 pending/failed 재시작](SCOPED-JOURNAL-CLIENT-2026-09-09.md). 새 journal 전용 클라이언트가 원래 acceptance를 회수하며 현재 artifact/완료로 승격하지 않는다. 실제 MCP schema 비교 등록 누락 수정, 관련56통과·타입/lint·패키징 확인. 실제 양쪽 철회 차단과 재시작 동일 결과. 원래 outbox/lease의 영속 복구 workflow·운영 설정·A→B 및 전체 M1–M14는 남는다.

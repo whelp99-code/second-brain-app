@@ -43,7 +43,7 @@ try:
         'session = "session:reader"', f'policy_revision = "{request_scope["policy_revision"]}"']) + '\n')
     config_path.chmod(0o600)
     launcher = root / 'launcher'
-    code = 'from datetime import datetime,UTC\nimport sb.mcp as m\nclass Clock(datetime):\n @classmethod\n def now(cls,tz=None): return datetime(2026,8,31,3,30,tzinfo=UTC)\nm.datetime=Clock\nm.main()\n'
+    code = 'from datetime import datetime,UTC\nimport sb.mcp as m\nimport sb.scoped_status_mcp as s\nclass Clock(datetime):\n @classmethod\n def now(cls,tz=None): return datetime(2026,8,31,3,30,tzinfo=UTC)\nm.datetime=Clock\ns.datetime=Clock\nm.main()\n'
     launcher.write_text('#!/bin/sh\ncd ' + shlex.quote(str(app)) + '\nexec ' + shlex.quote(sys.executable) + ' -c ' + shlex.quote(code) + ' 2>' + shlex.quote(str(root / 'server.err')) + '\n')
     launcher.chmod(0o700)
     result = subprocess.run(['node', str(app / 'scripts/remembered-artifact-mcp-consumer.mjs'), sys.argv[1]],

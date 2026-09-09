@@ -12,7 +12,8 @@ const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js')
 const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch, recoverMemoryScopedOutboxDispatches } = await load('src/memory-scoped-outbox-worker.js');
 const { claimMemoryScopedReconciliation, requireMemoryScopedReconciliationLease, releaseMemoryScopedReconciliation } = await load('src/memory-scoped-reconciliation.js');
 async function main() {
-const atomic = process.argv[3] === "--settle";
+const once = process.argv[3] === "--once";
+const atomic = once || process.argv[3] === "--settle";
 const f = await scopedOutboxFixture();
 try {
   const r = registerMemoryScopedOutbox(f.options, f.claimed), options = { ...f.options, roots: f.dispatch.roots };
@@ -30,7 +31,7 @@ try {
   requireMemoryScopedReconciliationLease(f.database.authority, reconciliation.lease, late);
   const observationPath = join(f.database.root, 'observation.json');
   writeFileSync(observationPath, JSON.stringify({ database: f.database.path,
-    spoolRoot: f.options.spoolRoot, lease: reconciliation.lease, atomic,
+    spoolRoot: f.options.spoolRoot, lease: reconciliation.lease, atomic, once,
     roots: { candidate_dispatch_spool_root: f.options.dispatch.roots.dispatch,
       candidate_review_spool_root: f.options.dispatch.roots.review } }), { mode: 0o600 });
   const child = spawnSync(join(sb, '.venv/bin/python'), [join(sb, 'scripts/remembered-artifact-mcp-acceptance.py'),

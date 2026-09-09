@@ -49,8 +49,16 @@ try {
     const { recoverMemoryScopedJournalAcceptance } = await load('src/memory-scoped-journal-recovery.js');
     const authority = new AuthorityDb(input.recovery.database);
     try {
-      recovered = await recoverMemoryScopedJournalAcceptance({ authority, spoolRoot: input.recovery.spoolRoot,
-        providerInstanceId: 'provider:fixture' }, input.recovery.lease, client, () => at);
+      const options = { authority, spoolRoot: input.recovery.spoolRoot, providerInstanceId: 'provider:fixture' };
+      if (input.recovery.once) {
+        const { reconcileMemoryScopedOnce } = await load('src/memory-scoped-reconcile-once.js');
+        const result = await reconcileMemoryScopedOnce({ ...options, journal: client, clock: () => at, roots: {},
+          completion: { withRememberedCompletion: () => { throw Error('pending/failed must not read artifacts'); } } },
+          input.recovery.lease.outbox_id, 'worker:once', 10000);
+        assert.equal(result.kind, 'scoped_reconciliation_deferred');
+        assert.equal(result.observed_provider_state, input.expected_state);
+        recovered = result.recovery;
+      } else recovered = await recoverMemoryScopedJournalAcceptance(options, input.recovery.lease, client, () => at);
       assert.equal(recovered.kind, 'scoped_journal_acceptance_recovered');
       assert.equal(recovered.acceptance.replayed, !input.recovery.crash_after_commit);
     } finally { authority.close(); }
@@ -61,5 +69,6 @@ try {
   }
   console.log(JSON.stringify({ state: first.status.state, original_acceptance_recovered: true,
     restarted_equal: true, provider_revocation_denied: true, issuer_revocation_denied: true,
-    current_artifact_claimed: false, request_id: first.status.request_id, ...(recovered ? { recovered, commit_exit: 73 } : {}) }));
+    current_artifact_claimed: false, request_id: first.status.request_id,
+    ...(recovered ? { recovered, commit_exit: 73, once: Boolean(input.recovery.once) } : {}) }));
 } finally { await transport.close(); closeMemoryDatabase(db); }

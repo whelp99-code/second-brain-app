@@ -86,13 +86,33 @@ try {
       const authority = new AuthorityDb(input.reconciliation.database);
       try {
         const options = { authority, spoolRoot: input.reconciliation.spoolRoot, providerInstanceId: 'provider:fixture' };
-        const recorded = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
-        assert.equal(recorded.replayed, false);
-        durableObservation = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
-        assert.deepEqual(durableObservation, { ...recorded, replayed: true });
+        if (!input.reconciliation.once) {
+          const recorded = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
+          assert.equal(recorded.replayed, false);
+          durableObservation = await observeMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at);
+          assert.deepEqual(durableObservation, { ...recorded, replayed: true });
+        }
         if (input.reconciliation.atomic) {
-          const { settleMemoryScopedCompletion } = await moduleAt('src/memory-scoped-settlement.js');
-          const result = await settleMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at, input.reconciliation.roots);
+          let result;
+          if (input.reconciliation.once) {
+            const { reconcileMemoryScopedOnce } = await moduleAt('src/memory-scoped-reconcile-once.js');
+            const { releaseMemoryScopedReconciliation } = await moduleAt('src/memory-scoped-reconciliation.js');
+            const { createMemoryScopedJournalClient } = await moduleAt('src/memory-scoped-journal-client.js');
+            const journalTransport = createSecondBrainTransport({ contractProfile: 'scoped-request-status-v1',
+              launcherPath: input.launcher, configPath: input.config,
+              contractPath: input.contract.replace('scoped-read-v5', 'scoped-status-v1') });
+            try {
+              const journal = createMemoryScopedJournalClient({ transport: journalTransport, now: () => at,
+                issue: createProductionMemoryAccessClaim(db.authority, config, resolve, 'memory_status'),
+                budgets: { max_hits: 1, max_excerpt_bytes: 8192, max_total_bytes: 100000, max_page_bytes: 100000 } });
+              releaseMemoryScopedReconciliation(authority, input.reconciliation.lease, at);
+              result = await reconcileMemoryScopedOnce({ ...options, journal, completion: client, clock: () => at,
+                roots: input.reconciliation.roots }, input.reconciliation.lease.outbox_id, 'worker:once', 10000);
+            } finally { await journalTransport.close(); }
+          } else {
+            const { settleMemoryScopedCompletion } = await moduleAt('src/memory-scoped-settlement.js');
+            result = await settleMemoryScopedCompletion(options, input.reconciliation.lease, client, () => at, input.reconciliation.roots);
+          }
           assert.equal(result.kind, 'memory_scoped_settled');
           assert.equal(result.replayed, false);
           // Abrupt exit after the complete DB transaction; the next process
