@@ -216,7 +216,9 @@ def test_search_empty_query_returns_no_hits(tmp_path: Path) -> None:
 
 
 def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path: Path) -> None:
-    """Given schema_version 2 and old 3-col FTS, when searching, then docs rebuilds and hits return."""
+    """Given current schema_version and old 3-col FTS, when searching, then docs rebuilds and hits return."""
+    from sb.search import _INDEX_SCHEMA_VERSION
+
     root = _seed(tmp_path)
     index = SearchIndex(vault_root=root)
     expected = index.search(EN_TERM)
@@ -229,8 +231,9 @@ def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path
             "CREATE VIRTUAL TABLE docs USING fts5(page_id, section, text, tokenize='trigram')"
         )
         conn.execute(
-            "INSERT INTO search_meta(key,value) VALUES('schema_version','2') "
-            + "ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+            "INSERT INTO search_meta(key,value) VALUES('schema_version',?) "
+            + "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (_INDEX_SCHEMA_VERSION,)
         )
         conn.commit()
         cols_before = [row[1] for row in conn.execute("PRAGMA table_info(docs)")]
@@ -256,7 +259,7 @@ def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path
         "canonical",
         "source_ref",
     ]
-    assert version is not None and str(version[0]) == "2"
+    assert version is not None and str(version[0]) == _INDEX_SCHEMA_VERSION
 
 
 def test_search_matches_yaml_title_and_empty_bodied_h1(tmp_path: Path) -> None:

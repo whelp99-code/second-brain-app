@@ -32,7 +32,8 @@ from sb.search_query import LexicalQuery
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
 _INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
-_INDEX_SCHEMA_VERSION: Final = "2"
+# Version includes indexed text semantics, not only SQLite columns.
+_INDEX_SCHEMA_VERSION: Final = "3"
 _REQUIRED_DOCS_COLUMNS: Final = (
     "page_id",
     "section",

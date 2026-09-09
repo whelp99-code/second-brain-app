@@ -47,3 +47,28 @@ def test_search_index_preserves_quoted_title_text(tmp_path: Path) -> None:
     assert len(hits) == 1
     assert hits[0].section == "title"
     assert read_page(root, hits[0].page_id).frontmatter["title"] == title
+
+
+def test_old_projection_rebuilds_without_vault_commit_change(tmp_path: Path) -> None:
+    import sqlite3
+
+    from sb.search import SearchIndex, git_run
+    from tests.knowledge import stamp_knowledge
+
+    root = tmp_path / 'vault'
+    vault = init_vault(root)
+    title = 'TitleRoundtrip "기억"'
+    vault.write_pages([PageSpec('wiki/title', title, '# 내용\n본문', [], 'active')],
+        'old-index', _NoPreviousHash())
+    stamp_knowledge(root)
+    index = SearchIndex(root)
+    assert index.search('TitleRoundtrip')
+    head = git_run(root, 'rev-parse', 'HEAD')
+    database = root / '.sb' / 'search.db'
+    with sqlite3.connect(database) as connection:
+        connection.execute("UPDATE docs SET text=? WHERE section='title'", (title[:-1],))
+        connection.execute("UPDATE search_meta SET value='2' WHERE key='schema_version'")
+    assert index.search('TitleRoundtrip')
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT text FROM docs WHERE section='title'").fetchone() == (title,)
+    assert git_run(root, 'rev-parse', 'HEAD') == head

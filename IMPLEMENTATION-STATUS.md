@@ -1,3 +1,5 @@
+[기존 검색 색인 자동 갱신](SEARCH-PROJECTION-UPGRADE-2026-09-09.md) —색인v3으로YAML해석변경반영, 원문HEAD불변·관련33개통과.
+
 [검색·MCP 공통 YAML 해석](SHARED-YAML-METADATA-2026-09-09.md) —제목불일치3회귀수정, 관련51개·추가제목9개(중복)통과.
 
 [커밋된 제목 YAML 복원](MCP-YAML-TITLE-ROUNDTRIP-2026-09-09.md) — 따옴표/여러줄3회귀 수정, MCP/web28개통과; sources문자열계약유지.
