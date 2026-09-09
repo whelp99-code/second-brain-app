@@ -1,5 +1,7 @@
 # 중앙 기억 완성 진행 원장
 
+**2026-09-09 운영 사본 전환·미확인 이력 차단:** [58→81 사본 보존 검사와 최종 HOLD](OPERATIONAL-AUTHORITY-UPGRADE-2026-09-09.md). 수정 전212테이블/FK0/재실행변경0이나 구 실행물이 최신 사본을 ready로 수락. Ja2e59eb가 unknown 이력을 차단, 실제 운영 사본의028_budgeted_evolution_memory.sql 거절·행 불변. 관련16통과·emit/lint. 운영 전환·혼합 버전은 원본 SQL/배포 경위 확인 전 보류, 전체 M1–M14 유지.
+
 **2026-09-09 쓰기 verifier CLI 설정 연결:** [명시적7옵션·기존 DB 연결 수명·실제 TLS/MCP](SCOPED-PROVIDER-CLI-CONFIG-2026-09-09.md). J399fb4f, 취소 fixture e6e36d7. 최종 고유82통과·emit/lint, 실제4시나리오 정상proved/철회·만료 차단·attempt1/FK0. 운영 배포·자격증명·DB 전환·실제 A→B와 M1–M14는 남는다.
 
 **2026-09-09 운영 읽기 전용 대조:** [실행 릴리스·설정·브리핑 실패 이력](OPERATIONAL-HANDOFF-AUDIT-2026-09-09.md). SB health/ready 200·최근 배치 ok이나 새 scoped 모듈과 gateway 복구 옵션은 운영에 없음. 과거 brief 실패5건을 구버전 readiness가 판정에 반영하지 않으며 개발 로직에는 이미 검사 존재. 중복 구현 대신 배포 차이·실패 복구·실제 A→B를 우선한다. 운영 변경 없음, 전체 M1–M14 미완료.
