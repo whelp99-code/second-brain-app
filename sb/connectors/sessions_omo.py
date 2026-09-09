@@ -47,6 +47,12 @@ class OmoSessionsAdapter:
         self._next_cursor: str = "0"
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
+        # Legacy cursors and source URIs contain no root identity. Do not merge
+        # histories or advance an ambiguous checkpoint before explicit migration.
+        if len(self._roots) > 1:
+            self._next_cursor = cursor if cursor is not None else "0"
+            yield _skip(self.source_id, "", "ambiguous-session-roots")
+            return
         previous = _cursor_map(cursor)
         current: dict[str, int] = {}
         prior_checks = read_checkpoints(cursor)

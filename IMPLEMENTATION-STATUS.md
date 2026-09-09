@@ -1,3 +1,5 @@
+> 2026-09-09 제품 수정: [복수 세션 루트 충돌](SESSION-MULTIROOT-HOLD-2026-09-09.md)을 확인해 Claude/Codex/OMO/GJC 복수 root 수집을 명시적으로 보류하고 커서를 보존. 관련 60개 검사 통과. root별 identity/migration 구현은 미완료.
+
 > 2026-09-09 추가: [전환 서비스 경계 조사](TRANSITION-UNIT-AUDIT-2026-09-09.md): 실제 systemd 재시작/trigger 의존성 확인, 18개 단위의 읽기 전용 drain 검사와 7개 테스트 추가. 현재 활성 상태이므로 전환 gate는 보류이며 운영 중지는 실행하지 않음.
 
 > 2026-09-09 추가: [신규 후보 DB 리허설](LOCKED-CANDIDATE-DB-REHEARSAL-2026-09-09.md)에서 58→81 및 기존 212개 테이블 보존 확인. 운영 구버전의 새 DB 수용 때문에 전환 검사 exit 1. SQL/build 일치 선검사와 회귀 테스트 3개 추가.
