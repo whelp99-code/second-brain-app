@@ -1207,3 +1207,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 복원 상태 신뢰 경계 인수:** [archive 승인/접근 원장과 inventory 재계산으로 승격 불가](RESTORE-STATE-TRUST-2026-09-10.md). 실제 restore 2통과/5.01초·Ruff/diff. 파생 상태 제거·reference 회수·제한 접근 거부를 확인했다. 원본 세대 소실 DR에서도 검증할 보관 근거 형식이 필요하며 단순 SQLite 승계는 보류. 복원/운영 전체 목표는 남는다.
+
+
+**2026-09-10 복원 source 세대 근거 확인:** [원본 디렉터리 처분 후 운영 manifest digest 보존](RESTORE-GENERATION-ANCHOR-2026-09-10.md). 실제 fixture에서5통과/6.98초·Ruff/diff. 운영 원장을 독립 근거로 쓸 수 있으나 상태 복원 연결은 아직 미구현이고 원장 소실 DR도 별도 해결 대상이다. 전체 목표는 남는다.
