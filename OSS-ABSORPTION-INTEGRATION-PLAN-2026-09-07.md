@@ -1030,3 +1030,6 @@ pipeline에서 configured source ID별 인스턴스를 선택해 첫 root만 수
 
 
 **2026-09-10 접근 분류 실제 SIGKILL 인수:** [네 종료 지점·재처리·동일scope 유지/타scope 거부](EFFECT-ACCESS-SIGKILL-2026-09-10.md). 실제종료4+helper7 총11통과/10.54초·Ruff/diff. knowledge/access 사이와 access 저장 후 publication 전까지 확대했다. 실제 JARVIS 인증 세션·복원·운영 전체 목표는 남는다.
+
+
+**2026-09-10 복원 상태 신뢰 경계 인수:** [archive 승인/접근 원장과 inventory 재계산으로 승격 불가](RESTORE-STATE-TRUST-2026-09-10.md). 실제 restore 2통과/5.01초·Ruff/diff. 파생 상태 제거·reference 회수·제한 접근 거부를 확인했다. 원본 세대 소실 DR에서도 검증할 보관 근거 형식이 필요하며 단순 SQLite 승계는 보류. 복원/운영 전체 목표는 남는다.
