@@ -22,8 +22,8 @@ from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Final, cast, override
 
 from sb.config import Config
-from sb.normalize import _redact
 from sb.pipeline import audit_citations
+from sb.redaction import redact_credentials
 from sb.store import DerivStatus, assert_ledger_integrity, load_ledger_tables
 from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger, ledger_schema_version, migrate_ledger
 
@@ -445,7 +445,7 @@ def status_snapshot(config: Config) -> dict[str, object]:
                 ):
                     recent_stages.append({
                         "run_id": row[0], "stage": row[1], "status": row[2],
-                        "errors": row[3], "error": _safe_detail(_redact(row[4] or "")),
+                        "errors": row[3], "error": _safe_detail(redact_credentials(row[4] or "")),
                     })
         tables = load_ledger_tables(db)
         for row in tables.derivations.values():

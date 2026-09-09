@@ -10,25 +10,12 @@ from typing import Final, Protocol, override
 from llama_index.core.node_parser import SentenceSplitter
 
 from sb.contracts import Blob, Unit
+from sb.redaction import redact_credentials as _redact
 
 NORMALIZER_VERSION: Final = "v2"
 CHUNK_SIZE: Final = 700
 CHUNK_OVERLAP: Final = 100
 
-_AWS: Final = re.compile(r"AKIA[0-9A-Z]{16}")
-_GITHUB: Final = re.compile(r"gh[pousr]_[A-Za-z0-9]{36,}")
-_OPENAI: Final = re.compile(r"sk-[A-Za-z0-9_-]{20,}")
-_PEM: Final = re.compile(
-    r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
-    flags=re.DOTALL,
-)
-_ASSIGN: Final = re.compile(r"(?i)(password|passwd|token|secret)\s*[=:]\s*\S+")
-_ASSIGN_LABELS: Final[dict[str, str]] = {
-    "password": "password",
-    "passwd": "password",
-    "token": "token",
-    "secret": "secret",
-}
 _TOKEN: Final = re.compile(r"\w+|[^\w\s]", flags=re.UNICODE)
 _SENTENCE: Final = re.compile(
     r".+?(?:[.!?。？！]+(?:\s+|$)|\n{2,}|$)",
@@ -49,27 +36,6 @@ class UnlocatableChunk(Exception):
     @override
     def __str__(self) -> str:
         return f"splitter chunk not found in source text: {self.prefix!r}"
-
-
-def _assignment_repl(match: re.Match[str]) -> str:
-    raw = match.group(1).lower()
-    return f"[REDACTED:{_ASSIGN_LABELS.get(raw, raw)}]"
-
-
-def _redact(text: str) -> str:
-    # Necessary literal gates only; preserve regexes and replacement order.
-    redacted = text
-    if "-----BEGIN " in redacted:
-        redacted = _PEM.sub("[REDACTED:pem]", redacted)
-    if "AKIA" in redacted:
-        redacted = _AWS.sub("[REDACTED:aws]", redacted)
-    if "gh" in redacted:
-        redacted = _GITHUB.sub("[REDACTED:github]", redacted)
-    if "sk-" in redacted:
-        redacted = _OPENAI.sub("[REDACTED:openai]", redacted)
-    if "=" in redacted or ":" in redacted:
-        redacted = _ASSIGN.sub(_assignment_repl, redacted)
-    return redacted
 
 
 def _splitter() -> _TextSplitter:

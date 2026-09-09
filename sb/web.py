@@ -21,9 +21,9 @@ from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
-from sb.normalize import _redact
 from sb.ops import status_snapshot
 from sb.pipeline import read_status, run_all
+from sb.redaction import redact_credentials
 from sb.runtime_access import mutate_root, read_root
 from sb.search import SearchIndex, committed_paths, committed_text
 from sb.uploads import (
@@ -459,7 +459,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         "errors": outcome.errors,
                         "exit_code": outcome.exit_code,
                         "already_running": outcome.already_running,
-                        "failure": _redact(outcome.failure)[:1000] if outcome.failure else None,
+                        "failure": redact_credentials(outcome.failure)[:1000] if outcome.failure else None,
                     },
                 )
                 return
