@@ -34,7 +34,9 @@ try {
   writeFileSync(policyPath, JSON.stringify(policy), { mode: 0o600 });
   const resolve = createFileMemoryAccessScopeResolver(policyPath, config.provider_instance_id, () => ({
     principal_id: 'principal:owner', agent_id: 'agent:reader', session_id: 'session:reader', expires_at: until }));
-  const monitored = { call: async (...args) => { const result = await transport.call(...args); if (result.kind !== 'data') console.error(JSON.stringify({ result, diagnostics: transport.diagnostics() })); return result; }, restart: () => transport.restart(), close: () => transport.close(), diagnostics: () => transport.diagnostics() };
+  let cancellationProbe;
+  const cancellationChecks = [];
+  const monitored = { call: async (...args) => { const result = await transport.call(...args); if (cancellationProbe && ++cancellationProbe.calls === cancellationProbe.after) cancellationProbe.controller.abort(); if (result.kind !== 'data') console.error(JSON.stringify({ result, diagnostics: transport.diagnostics() })); return result; }, restart: () => transport.restart(), close: () => transport.close(), diagnostics: () => transport.diagnostics() };
   let client;
   if ((profile === 'scoped-record-read-v3' || (profile === 'scoped-record-read-v4' || profile === 'scoped-record-read-v5'))) {
     const { createProductionScopedMemory } = await moduleAt('src/memory-scoped-production.js');
@@ -66,6 +68,19 @@ try {
     assert.equal(combined.kind, 'remembered_completion_observed');
     assert.equal(combined.status.state, 'proved');
     assert.deepEqual(combined.artifact, first);
+    // Abort after real MCP transport resolution, before the client consumes it.
+    // The transport has already fulfilled and cannot reject this race itself.
+    for (const after of [0, 1, 2, 3]) {
+      cancellationProbe = { controller: new AbortController(), calls: 0, after };
+      if (after === 0) cancellationProbe.controller.abort();
+      await assert.rejects(client.readRememberedCompletion(input.request, cancellationProbe.controller.signal),
+        { code: 'SECOND_BRAIN_CANCELLED' });
+      assert.equal(cancellationProbe.calls, after);
+      cancellationChecks.push({ after_responses: after, calls: cancellationProbe.calls, rejected: true });
+      cancellationProbe = undefined;
+    }
+    assert.deepEqual(await client.readRememberedCompletion(input.request), combined);
+
   }
   let completion;
   if ((profile === 'scoped-record-read-v4' || profile === 'scoped-record-read-v5')) {
@@ -94,7 +109,7 @@ try {
   if (completion) await assert.rejects(client.requestStatus(input.request, accepted));
   if (profile === 'scoped-record-read-v5') await assert.rejects(client.recoverRequestStatus(input.request));
   if (combined) await assert.rejects(client.readRememberedCompletion(input.request));
-  console.log(JSON.stringify({ combined_completion: combined, recovered_without_local_acceptance: profile === 'scoped-record-read-v5', completion, request_status_after_restart: !!completion, fixture: true, profile, production_composition: (profile === "scoped-record-read-v3" || (profile === "scoped-record-read-v4" || profile === "scoped-record-read-v5")), internal_write_authority_fixture: true, supervised_stdio: true,
+  console.log(JSON.stringify({ cancellation_checks: cancellationChecks, combined_completion: combined, recovered_without_local_acceptance: profile === 'scoped-record-read-v5', completion, request_status_after_restart: !!completion, fixture: true, profile, production_composition: (profile === "scoped-record-read-v3" || (profile === "scoped-record-read-v4" || profile === "scoped-record-read-v5")), internal_write_authority_fixture: true, supervised_stdio: true,
     read_after_restart: true, broader_authenticated_scope_allowed: true, provider_policy_change_rejected: true, issuer_policy_withdrawal_rejected: true,
     observation: first, automatic_settlement: false }, null, 2));
 } finally { await transport.close(); closeMemoryDatabase(db); }
