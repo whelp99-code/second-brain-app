@@ -1,3 +1,5 @@
+> 2026-09-09 추가: [새 잠금 의존성 후보](LOCKED-DEPENDENCY-CANDIDATE-2026-09-09.md)에서 컴파일·복원 리허설·HTTPS/MCP 쓰기→새 세션 읽기 4개 경로 통과. 운영 활성화 및 양쪽 설치본 동시 검증은 미완료.
+
 # 중앙 기억 완성 진행 원장
 
 **2026-09-09 운영 전환 준비 결함2개:** [Ja7a98e9 의존성 재사용 차단·SB 고정 커밋 wheel](RELEASE-PREPARATION-GAPS-2026-09-09.md). 운영 SDK 부재/lock 불일치 거부, 관련9검사·격리 publisher4경계. wheel의 미추적 bak2개 혼입을 재현해 git archive 빌드로 수정; 후보175파일 commit일치·7모듈/CLI·설치 MCP4프로필 handshake. 실제 운영 전환/DB·세션 설정 및 M1–M14는 남는다.
