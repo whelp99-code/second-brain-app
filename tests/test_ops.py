@@ -196,6 +196,59 @@ def test_restore_nonempty_destination_requires_force_and_preserves_previous(tmp_
     assert (destination / "wiki" / "계약-일정.md").is_file()
 
 
+def test_restore_publish_failure_recovers_previous_destination(tmp_path: Path, monkeypatch) -> None:
+    root, _config = _seed_vault(tmp_path)
+    archive = tmp_path / "backup.tar.gz"
+    create_backup(root, archive)
+    destination = tmp_path / "existing"
+    destination.mkdir()
+    (destination / "original.txt").write_text("original memory")
+    import os
+    original_replace = os.replace
+
+    def fail_publish(source, target):
+        if Path(source).name.startswith(".existing.restore-"):
+            raise OSError("injected publish failure")
+        return original_replace(source, target)
+
+    monkeypatch.setattr("sb.ops.os.replace", fail_publish)
+    with pytest.raises(OSError, match="injected publish failure"):
+        restore_backup(archive, destination, force=True)
+    assert (destination / "original.txt").read_text() == "original memory"
+    assert not list(tmp_path.glob(".existing.restore-*"))
+
+
+@pytest.mark.parametrize("new_occupant", [False, True])
+def test_restore_failed_rollback_preserves_original(tmp_path: Path, monkeypatch, new_occupant) -> None:
+    root, _config = _seed_vault(tmp_path)
+    archive = tmp_path / "backup.tar.gz"
+    create_backup(root, archive)
+    destination = tmp_path / "existing"
+    destination.mkdir()
+    (destination / "original.txt").write_text("original memory")
+    import os
+    original_replace = os.replace
+
+    def fail_publish_and_rollback(source, target):
+        if Path(source).name.startswith(".existing.restore-"):
+            if new_occupant:
+                destination.mkdir()
+                (destination / "new.txt").write_text("concurrent content")
+            raise OSError("publish failure")
+        if Path(source).name.startswith("existing.pre-restore-"):
+            raise OSError("rollback failure")
+        return original_replace(source, target)
+
+    monkeypatch.setattr("sb.ops.os.replace", fail_publish_and_rollback)
+    with pytest.raises(OperationError, match="RESTORE_ROLLBACK_FAILED") as error:
+        restore_backup(archive, destination, force=True)
+    previous = next(tmp_path.glob("existing.pre-restore-*"))
+    assert str(previous) in str(error.value)
+    assert (previous / "original.txt").read_text() == "original memory"
+    if new_occupant:
+        assert (destination / "new.txt").read_text() == "concurrent content"
+
+
 def test_doctor_returns_machine_readable_pass_warn_fail_checks(tmp_path: Path) -> None:
     _root, config = _seed_vault(tmp_path)
 

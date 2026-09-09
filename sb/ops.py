@@ -356,7 +356,21 @@ def restore_backup(
                 os.replace(destination_path, previous)
             else:
                 destination_path.rmdir()
-        os.replace(temporary, destination_path)
+        try:
+            os.replace(temporary, destination_path)
+        except OSError:
+            if previous is not None:
+                # Publication failed after moving the old vault aside. Restore
+                # its original entry point, without overwriting a new occupant.
+                try:
+                    if os.path.lexists(destination_path):
+                        raise OSError("restore destination appeared during publication")
+                    os.replace(previous, destination_path)
+                except OSError as rollback_error:
+                    raise OperationError(
+                        f"RESTORE_ROLLBACK_FAILED: previous vault preserved at {previous}"
+                    ) from rollback_error
+            raise
         return RestoreResult(destination_path, files, total, previous)
     except Exception:
         if temporary.exists():
