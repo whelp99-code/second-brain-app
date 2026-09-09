@@ -10,6 +10,7 @@ const { scopedOutboxFixture } = await load('tests/fixtures/scoped-outbox.js');
 const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-store.js');
 const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js');
 const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch, recoverMemoryScopedOutboxDispatches } = await load('src/memory-scoped-outbox-worker.js');
+const { claimMemoryScopedReconciliation, requireMemoryScopedReconciliationLease, releaseMemoryScopedReconciliation } = await load('src/memory-scoped-reconciliation.js');
 const f = await scopedOutboxFixture();
 try {
   const r = registerMemoryScopedOutbox(f.options, f.claimed), options = { ...f.options, roots: f.dispatch.roots };
@@ -21,6 +22,10 @@ try {
   assert.equal(before.accepted_result_json, null);
   const late = new Date('2026-08-31T03:30:00.000Z');
   assert.equal(recoverMemoryScopedOutboxDispatches(f.database.authority, late), 1);
+  const reconciliation = claimMemoryScopedReconciliation(options, r.outbox_id, 'worker:reconcile', late, 10000);
+  assert.deepEqual(reconciliation.request, dispatched.request);
+  writeFileSync(requestPath, JSON.stringify(reconciliation.request));
+  requireMemoryScopedReconciliationLease(f.database.authority, reconciliation.lease, late);
   const child = spawnSync(join(sb, '.venv/bin/python'), [join(sb, 'scripts/remembered-artifact-mcp-acceptance.py'),
     build, 'scoped-record-read-v5', requestPath], { cwd: process.cwd(), env: { ...process.env, PYTHONPATH: sb },
     encoding: 'utf8', timeout: 60000 });
@@ -42,12 +47,14 @@ try {
   const first = record(false);
   assert.equal(first.replayed, true);
   assert.deepEqual(record(false), first);
+  requireMemoryScopedReconciliationLease(f.database.authority, reconciliation.lease, late);
+  releaseMemoryScopedReconciliation(f.database.authority, reconciliation.lease, late);
   const db = f.database.authority.db;
   assert.equal(db.prepare('SELECT count(*) AS n FROM memory_outbox_attempts').get().n, 1);
   assert.equal(db.prepare("SELECT count(*) AS n FROM memory_reconciliation_events WHERE event_type='provider_accepted'").get().n, 1);
   assert.equal(db.prepare('SELECT state FROM memory_outbox').get().state, 'reconciling');
   assert.equal(claimMemoryScopedOutbox({ ...options, clock: () => late }, r.outbox_id, 'worker:repeat', 1000), undefined);
   assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
-  console.log(JSON.stringify({ observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
+  console.log(JSON.stringify({ reconciliation_lease: reconciliation.lease, lease_preserved_across_acceptance_recovery: true, observed, acceptance_recorded: first, attempt_count: 1, acceptance_events: 1,
     record_commit_exit: 73, record_processes: 3, replay_idempotent: true, redispatch: false, jarvis_state: 'reconciling', foreign_key_errors: 0 }, null, 2));
 } finally { closeMemoryDatabase(f.database); }

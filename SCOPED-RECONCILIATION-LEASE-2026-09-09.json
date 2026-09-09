@@ -1,0 +1,250 @@
+{
+  "unit_tests": {
+    "passed": 33,
+    "files": 4,
+    "seconds": 27.52
+  },
+  "isolated_typescript_emit": "passed",
+  "changed_eslint": "passed",
+  "process_race": {
+    "child_processes": 7,
+    "race_winners": 1,
+    "expired_lease_reclaimed": true,
+    "stale_release_rejected": true,
+    "released_lease_rejected": true,
+    "dispatch_fence": 1,
+    "first_reconcile_fence": 2,
+    "second_reconcile_fence": 3,
+    "dispatch_attempts": 1,
+    "foreign_key_errors": 0
+  },
+  "mcp_recovery": {
+    "reconciliation_lease": {
+      "outbox_id": "memout:scoped:v4:de366093618920a5332b62522baa65f2888f55219ebff6b011791f6f65c26d34",
+      "worker": "worker:reconcile",
+      "fence": 2,
+      "dispatch_fence": 1,
+      "lease_expires_at": "2026-08-31T03:30:10.000Z"
+    },
+    "lease_preserved_across_acceptance_recovery": true,
+    "observed": {
+      "combined_completion": {
+        "kind": "remembered_completion_observed",
+        "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+        "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+        "status": {
+          "schema_version": 4,
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+          "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+          "scope_digest": "sha256:1b1a1c1632810a820cf049bd570686cc4652e19cb354f56b2168f929ce07fd35",
+          "state": "proved",
+          "phase": "proved",
+          "updated_at": "2026-08-28T12:00:00.000Z",
+          "proof": {
+            "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+            "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+            "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+            "provider_instance_id": "provider:fixture",
+            "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "schema_version": 4,
+            "scope_digest": "sha256:1b1a1c1632810a820cf049bd570686cc4652e19cb354f56b2168f929ce07fd35",
+            "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+          },
+          "receipt": {
+            "schema_version": 4,
+            "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "envelope_digest": null,
+            "state": "proved",
+            "code": "PROVIDER_PROVED",
+            "proof_digest": "sha256:7b722a223660958bb119ccda3ee0faf9a2b997c64541be1aeac027a358b6445b",
+            "status_digest": "sha256:7237f4eab9c217589dc6e9efd6c3ccbc53c0758390aaa8dbfae2e13cd6d735b5",
+            "updated_at": "2026-08-28T12:00:00.000Z"
+          },
+          "acceptance": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "idempotency_key": "memidem:scoped:v4:dd58860fd77ddf34bb5c8f7d882f28c69ff2e2aac4c2aea7f8eba13e9e046ac5",
+            "scope_digest": "sha256:1b1a1c1632810a820cf049bd570686cc4652e19cb354f56b2168f929ce07fd35",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af.v4.json",
+            "request_file_digest": "sha256:b1a4e623963ef16a1dab9e93cd6ed252aa820100050a56806970cabd0174a47f",
+            "replayed": true
+          }
+        },
+        "artifact": {
+          "kind": "remembered_artifact_observed",
+          "access": {
+            "schema_version": 1,
+            "complete": true,
+            "sources": [
+              {
+                "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+                "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+                "classification": {
+                  "schema_version": 1,
+                  "owner": "principal:owner",
+                  "projects": [
+                    "project:a"
+                  ],
+                  "policy_revision": "policy:1"
+                }
+              }
+            ]
+          },
+          "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+          "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+          "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+          "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+          "generation": {
+            "provider_instance_id": "provider:fixture",
+            "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+            "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+            "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+            "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+            "tombstone_sequence": 0,
+            "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+          },
+          "record_ids": [
+            "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+            "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+            "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+            "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+          ]
+        },
+        "checked_at": "2026-08-31T03:30:00.000Z",
+        "valid_until": "2026-08-31T03:31:00.000Z"
+      },
+      "recovered_without_local_acceptance": true,
+      "completion": {
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "status": {
+          "schema_version": 4,
+          "provider_instance_id": "provider:fixture",
+          "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+          "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+          "scope_digest": "sha256:1b1a1c1632810a820cf049bd570686cc4652e19cb354f56b2168f929ce07fd35",
+          "state": "proved",
+          "phase": "proved",
+          "updated_at": "2026-08-28T12:00:00.000Z",
+          "proof": {
+            "content_digest": "sha256:00b53881082605e2da61f569617276057803d3381c4922591cc4b189ae2c0c39",
+            "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+            "head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+            "provider_instance_id": "provider:fixture",
+            "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "schema_version": 4,
+            "scope_digest": "sha256:1b1a1c1632810a820cf049bd570686cc4652e19cb354f56b2168f929ce07fd35",
+            "tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf"
+          },
+          "receipt": {
+            "schema_version": 4,
+            "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "envelope_digest": null,
+            "state": "proved",
+            "code": "PROVIDER_PROVED",
+            "proof_digest": "sha256:7b722a223660958bb119ccda3ee0faf9a2b997c64541be1aeac027a358b6445b",
+            "status_digest": "sha256:7237f4eab9c217589dc6e9efd6c3ccbc53c0758390aaa8dbfae2e13cd6d735b5",
+            "updated_at": "2026-08-28T12:00:00.000Z"
+          },
+          "acceptance": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+            "idempotency_key": "memidem:scoped:v4:dd58860fd77ddf34bb5c8f7d882f28c69ff2e2aac4c2aea7f8eba13e9e046ac5",
+            "scope_digest": "sha256:1b1a1c1632810a820cf049bd570686cc4652e19cb354f56b2168f929ce07fd35",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af.v4.json",
+            "request_file_digest": "sha256:b1a4e623963ef16a1dab9e93cd6ed252aa820100050a56806970cabd0174a47f",
+            "replayed": true
+          }
+        }
+      },
+      "request_status_after_restart": true,
+      "fixture": true,
+      "profile": "scoped-record-read-v5",
+      "production_composition": true,
+      "internal_write_authority_fixture": true,
+      "supervised_stdio": true,
+      "read_after_restart": true,
+      "broader_authenticated_scope_allowed": true,
+      "provider_policy_change_rejected": true,
+      "issuer_policy_withdrawal_rejected": true,
+      "observation": {
+        "kind": "remembered_artifact_observed",
+        "access": {
+          "schema_version": 1,
+          "complete": true,
+          "sources": [
+            {
+              "source_ref_digest": "sha256:9ae70157edc31c2f149671ffc2089164a6b609008ffedce08678692e248518f4",
+              "classification_digest": "sha256:57bb8189b26590c131679298b57e2f69e567571cebc1f4c7f68b9aeee52c8b42",
+              "classification": {
+                "schema_version": 1,
+                "owner": "principal:owner",
+                "projects": [
+                  "project:a"
+                ],
+                "policy_revision": "policy:1"
+              }
+            }
+          ]
+        },
+        "request_id": "memreq:scoped:v4:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+        "request_digest": "sha256:982dfcd671fa33d9934023713c356567381f8c21fb22df6b8040cbcb22f275af",
+        "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+        "content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "generation_manifest_digest": "sha256:47fa3b1569066b7f3460f4b0141612d0cd42bf6ec5e1770511ce78bebc80f4b2",
+          "vault_head": "7d081a0b28b72c895e5ee52c21f2719fee666de7",
+          "vault_tree": "c109ddfda12189bffeaac164c61fc292b8acf5cf",
+          "tombstone_sequence": 0,
+          "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+        },
+        "record_ids": [
+          "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7",
+          "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+          "sbrecord:v1:251deb849711cdfae1c3c2afaa19a27b309cd48747a2d619f847c68a466be10a",
+          "sbrecord:v1:110d161508cc57b19c1e6763f62700bb47ab2f25ec9637e34ec77ef738f43ec4"
+        ]
+      },
+      "automatic_settlement": false
+    },
+    "acceptance_recorded": {
+      "kind": "acceptance_recorded",
+      "outbox_id": "memout:scoped:v4:de366093618920a5332b62522baa65f2888f55219ebff6b011791f6f65c26d34",
+      "attempt_id": "memattempt:pos:v2:9bf4a2828f8d79e30dc7de214c90eb30ea1dba5b34a09aa7787ccfece9793c05",
+      "acceptance_receipt_digest": "sha256:e7f5de971b1e01760df9c626fc8bf6dfe8b5bb86dd3718599aa3b63187aa285b",
+      "replayed": true
+    },
+    "attempt_count": 1,
+    "acceptance_events": 1,
+    "record_commit_exit": 73,
+    "record_processes": 3,
+    "replay_idempotent": true,
+    "redispatch": false,
+    "jarvis_state": "reconciling",
+    "foreign_key_errors": 0
+  }
+}
