@@ -1243,3 +1243,6 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 
 
 **2026-09-10 충돌 인용 ID 검증:** [미확인/혼합/빈 ID 3실패 재현→입력 두 ID로 제한·v4 cache](CONFLICT-CITATION-IDENTITY-2026-09-10.md). 최종30통과/6.29초·Ruff/diff·타입0오류0경고. 실제 source 목록과 판정 cites를 구분하며 과거 페이지 자동정정·실제 업무/운영 전체 목표는 남는다.
+
+
+**2026-09-10 복원·충돌 통합 전체 회귀:** [0445d7e 전체1,690통과/2skip·438.89초](CONFLICT-RESTORE-FULL-2026-09-10.md). 실행 중 제품/테스트 변경 없음. Ruff 전체 및 conflict/restore/restore_access/restore_knowledge 타입0오류0경고. 선택 embeddings 테스트 제외. 실제 JARVIS 복원/사용자 업무·운영/DR 및 전체 목표는 남는다.
