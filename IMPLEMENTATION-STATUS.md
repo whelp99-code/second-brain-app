@@ -1395,3 +1395,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 JSONL 세션 열기 경합:** [revision검사후FIFO교체·실제Codex10초대기재현→네adapter비차단일반파일열기](SESSION-OPEN-RACE-2026-09-10.md). 관련50통과/0.60초·Ruff/변경타입0오류0경고·cursor보존. 운영세션변경없음·전체목표유지.
 
 **2026-09-10 OpenCode snapshot 읽기 복구:** [이전scan전체중단재현→파일별오류/이전cursor·정상형제수집/복구·FIFO거부](OPENCODE-SNAPSHOT-READ-RECOVERY-2026-09-10.md). 관련43통과/0.65초·Ruff/타입0오류0경고. 크기기반변경감지·참조DB경계후속/운영·전체목표유지.
+
+**2026-09-10 OpenCode DB 참조 경계:** [절대/부모/상위링크외부본문수집3재현→상대하위경로·unsafe명시거부/URI인코딩](OPENCODE-DATABASE-BOUNDARY-2026-09-10.md). 관련47통과/0.63초·특수문자파일정상/DBbytes불변·Ruff/타입0오류0경고. open직전경합·snapshot변경감지후속/운영·전체목표유지.

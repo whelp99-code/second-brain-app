@@ -89,7 +89,10 @@ class OpenCodeSessionsAdapter:
         if not extracted:
             database = parsed.get("database")
             if isinstance(database, str):
-                extracted = _from_sqlite(path.parent / database)
+                selected = _snapshot_database(path, database)
+                if selected is None:
+                    return [_skip(self.source_id, rel, "unsafe-database-path")]
+                extracted = _from_sqlite(selected)
         token = str(size)
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         for item_id, text in extracted:
@@ -214,12 +217,28 @@ def _part(item_id: str, data: dict[str, JVal]) -> tuple[str, str] | None:
             return None
 
 
+def _snapshot_database(snapshot: Path, reference: str) -> Path | None:
+    relative = Path(reference)
+    if (not relative.parts or relative.is_absolute() or "\\" in reference
+        or ".." in relative.parts or "\0" in reference):
+        return None
+    base = snapshot.parent.resolve()
+    selected = base
+    for part in relative.parts:
+        selected = selected / part
+        if selected.is_symlink():
+            return None
+    if not selected.resolve().is_relative_to(base):
+        return None
+    return selected
+
+
 def _from_sqlite(database: Path) -> list[tuple[str, str]]:
     if database.is_symlink() or not database.is_file():
         return []
     try:
         connection = sqlite3.connect(
-            f"file:{database.resolve().as_posix()}?mode=ro&immutable=1", uri=True
+            database.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
         )
     except sqlite3.Error:
         return []
