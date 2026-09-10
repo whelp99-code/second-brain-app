@@ -1,3 +1,19 @@
+# 현재 인수 상태 — 2026-09-10
+
+**핵심 기능과 격리 설치물은 검증됐지만, 운영 메인 기억 저장소 전체 인수는 미완료다.** 아래 표를 최신 진입점으로 사용한다. 뒤의 개별 기록은 해당 커밋·실행 시점의 이력이다.
+
+| 범위 | 최신 확인 결과 | 증거 |
+|---|---|---|
+| 설치물 자비스 연결 | 제품 f0fec14: 실제 TLS/MCP 저장→완료→새 로그인 재조회, 독립 reader2개; 합성 신원·업무 | [설치 인수](INSTALLED-INBOX-PAIR-2026-09-10.md) |
+| 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex는 사용량 제한으로 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md) |
+| 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
+| 운영 전환 | UTC09-10 00:28 관측: DB 사용2서비스·유효lease1, 전환보류; 운영 변경 없음 | [운영 관측](MAINTENANCE-CLI-AND-OPS-2026-09-10.md) |
+| 전체 요구사항 | M1–M14 유지: 실제 업무·권한/세션/삭제 수명·클라이언트 수집/주입·검색 평가·GUI·복구 인수 남음 | [전체 목록](SHARED-MEMORY-CONSOLIDATED-REVIEW-2026-09-09.md), [인계 병합](HANDOFF-CURRENT-GAPS-2026-09-10.md) |
+
+최신 전체 회귀: **f9fbe55 기준 1,730 passed / 2 skipped, 516.23초, exit0**. [실행 보고서](LATEST-FULL-REGRESSION-2026-09-10.md). optional embeddings 모듈은 지정 명령대로 제외했으며, 실제 운영 전환·모든 클라이언트 인수와 구분한다.
+
+---
+
 [관리형 지식 상태 결합 구현 경계](MANAGED-KNOWLEDGE-BINDING-DESIGN-2026-09-10.md) — .sb 임의 registry의 복사/해시 제외 확인, 기존 운영 원장+명시적 세대 digest 결합 방향 선택. 기존 관련46통과. 신규 상태 저장/검색 연결은 아직 미구현·M1–M14 유지.
 
 [배치 진행량·중단 계보 보존](BATCH-PROGRESS-RECOVERY-2026-09-10.md) — 단계 완료마다 기록, interrupted 시 기존 detail 유지·외곽 예외에도 계보. 관련40/후속10통과(중복), 실제 partial ingest 뒤 SIGKILL 후 오류1/단계ID 보존. 운영·M1–M14 유지.
