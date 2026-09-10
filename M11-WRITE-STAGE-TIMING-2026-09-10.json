@@ -1,0 +1,268 @@
+{
+  "candidate_release": "c04dee1a11ff0833b634c30796924d1ea19f8a6a",
+  "candidate_sb_help_exit": 0,
+  "production_touched": false,
+  "corpora": [
+    {
+      "name": "ops-scale-copy",
+      "files": 17343,
+      "bytes": 36525237,
+      "remember": {
+        "seconds": 21.3579,
+        "exit": 0,
+        "stdout": "inbox/2026-09-10T113146375014-m11-stage-probe.md",
+        "stderr": "",
+        "stages": [
+          {
+            "func": "remember",
+            "file": "cli.py",
+            "line": 288,
+            "ncalls": 1,
+            "cumtime": 20.9405
+          },
+          {
+            "func": "remember",
+            "file": "generation_runtime.py",
+            "line": 89,
+            "ncalls": 1,
+            "cumtime": 20.9389
+          },
+          {
+            "func": "mutate",
+            "file": "generation_runtime.py",
+            "line": 206,
+            "ncalls": 1,
+            "cumtime": 20.9388
+          },
+          {
+            "func": "build",
+            "file": "generations.py",
+            "line": 759,
+            "ncalls": 1,
+            "cumtime": 19.4357
+          },
+          {
+            "func": "_fsync_tree",
+            "file": "generations.py",
+            "line": 743,
+            "ncalls": 1,
+            "cumtime": 15.3501
+          },
+          {
+            "func": "_copy_allowed",
+            "file": "generations.py",
+            "line": 694,
+            "ncalls": 1,
+            "cumtime": 1.6705
+          },
+          {
+            "func": "activate",
+            "file": "generations.py",
+            "line": 954,
+            "ncalls": 2,
+            "cumtime": 1.476
+          },
+          {
+            "func": "_complete_disposal",
+            "file": "generations.py",
+            "line": 1046,
+            "ncalls": 1,
+            "cumtime": 1.4389
+          },
+          {
+            "func": "_build_derived_stores",
+            "file": "generations.py",
+            "line": 318,
+            "ncalls": 1,
+            "cumtime": 0.0627
+          },
+          {
+            "func": "copy_operational_ledger",
+            "file": "generation_staging.py",
+            "line": 105,
+            "ncalls": 1,
+            "cumtime": 0.0167
+          },
+          {
+            "func": "build",
+            "file": "_decorators.py",
+            "line": 431,
+            "ncalls": 40,
+            "cumtime": 0.001
+          },
+          {
+            "func": "replace",
+            "file": "inspect.py",
+            "line": 3097,
+            "ncalls": 120,
+            "cumtime": 0.0007
+          },
+          {
+            "func": "publish_inbox",
+            "file": "inbox.py",
+            "line": 42,
+            "ncalls": 1,
+            "cumtime": 0.0006
+          },
+          {
+            "func": "_copy_compiled_markers",
+            "file": "generation_staging.py",
+            "line": 128,
+            "ncalls": 1,
+            "cumtime": 0.0005
+          },
+          {
+            "func": "build",
+            "file": "_decorators.py",
+            "line": 239,
+            "ncalls": 2,
+            "cumtime": 0.0
+          }
+        ]
+      },
+      "search": {
+        "seconds": 0.266,
+        "exit": 0,
+        "hit": false,
+        "stdout_head": "[]\n"
+      },
+      "status": {
+        "seconds": 0.2586,
+        "exit": 0
+      },
+      "same_bytes_retry": {
+        "seconds": 18.1059,
+        "exit": 0,
+        "stdout": "inbox/2026-09-10T113207231193-m11-stage-probe.md"
+      },
+      "ingest": {
+        "seconds": 20.2027,
+        "exit": 0,
+        "stderr_tail": ""
+      },
+      "ledger_after_retry_ingest": {
+        "source_item": 19,
+        "unit": 17
+      },
+      "search_after_ingest": {
+        "seconds": 0.2646,
+        "exit": 0,
+        "hit": false,
+        "stdout_head": "[]\n"
+      }
+    },
+    {
+      "name": "fresh-init",
+      "init_exit": 0,
+      "init_stderr": "",
+      "files": 31,
+      "bytes": 27202,
+      "remember": {
+        "seconds": 0.6972,
+        "exit": 0,
+        "stdout": "inbox/2026-09-10T113245301874-m11-stage-probe.md",
+        "stderr": "",
+        "stages": [
+          {
+            "func": "remember",
+            "file": "cli.py",
+            "line": 288,
+            "ncalls": 1,
+            "cumtime": 0.2937
+          },
+          {
+            "func": "remember",
+            "file": "generation_runtime.py",
+            "line": 89,
+            "ncalls": 1,
+            "cumtime": 0.1993
+          },
+          {
+            "func": "mutate",
+            "file": "generation_runtime.py",
+            "line": 206,
+            "ncalls": 1,
+            "cumtime": 0.1992
+          },
+          {
+            "func": "build",
+            "file": "generations.py",
+            "line": 759,
+            "ncalls": 1,
+            "cumtime": 0.1753
+          },
+          {
+            "func": "_build_derived_stores",
+            "file": "generations.py",
+            "line": 318,
+            "ncalls": 1,
+            "cumtime": 0.0556
+          },
+          {
+            "func": "activate",
+            "file": "generations.py",
+            "line": 954,
+            "ncalls": 1,
+            "cumtime": 0.0212
+          },
+          {
+            "func": "_fsync_tree",
+            "file": "generations.py",
+            "line": 743,
+            "ncalls": 1,
+            "cumtime": 0.0103
+          },
+          {
+            "func": "_complete_disposal",
+            "file": "generations.py",
+            "line": 1046,
+            "ncalls": 1,
+            "cumtime": 0.0023
+          },
+          {
+            "func": "directory_fsync",
+            "file": "generation_staging.py",
+            "line": 172,
+            "ncalls": 2,
+            "cumtime": 0.0012
+          },
+          {
+            "func": "build",
+            "file": "_decorators.py",
+            "line": 431,
+            "ncalls": 36,
+            "cumtime": 0.0009
+          },
+          {
+            "func": "publish_inbox",
+            "file": "inbox.py",
+            "line": 42,
+            "ncalls": 1,
+            "cumtime": 0.0008
+          },
+          {
+            "func": "replace",
+            "file": "inspect.py",
+            "line": 3097,
+            "ncalls": 120,
+            "cumtime": 0.0007
+          },
+          {
+            "func": "copy_operational_ledger",
+            "file": "generation_staging.py",
+            "line": 105,
+            "ncalls": 1,
+            "cumtime": 0.0001
+          },
+          {
+            "func": "build",
+            "file": "_decorators.py",
+            "line": 239,
+            "ncalls": 2,
+            "cumtime": 0.0
+          }
+        ]
+      }
+    }
+  ]
+}
