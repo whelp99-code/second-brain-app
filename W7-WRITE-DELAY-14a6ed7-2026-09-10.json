@@ -1,0 +1,39 @@
+{
+  "release_id": "14a6ed7ce284fa24a4e8157b97302f5d5786a275",
+  "production_touched": false,
+  "init_exit": 0,
+  "tiny": {
+    "files": 31,
+    "bytes": 27203,
+    "repeats": [
+      {
+        "seconds": 0.2496,
+        "exit": 1,
+        "stdout": "",
+        "stderr": "WRITE_REQUEST_INBOX_UNSAFE"
+      },
+      {
+        "seconds": 0.2415,
+        "exit": 1,
+        "stdout": "",
+        "stderr": "WRITE_REQUEST_INBOX_UNSAFE"
+      },
+      {
+        "seconds": 0.2405,
+        "exit": 1,
+        "stdout": "",
+        "stderr": "WRITE_REQUEST_INBOX_UNSAFE"
+      }
+    ]
+  },
+  "ops_scale_copy": {
+    "files": 17343,
+    "bytes": 36525237,
+    "remember": {
+      "seconds": 21.5365,
+      "exit": 0,
+      "stdout": "inbox/2026-09-10T140855234861-w7.md",
+      "stderr": ""
+    }
+  }
+}
