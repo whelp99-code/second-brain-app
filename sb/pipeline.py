@@ -461,7 +461,7 @@ def _register_compiled(
     for page in pages:
         if page.page_id.startswith("wiki/_proposed/"):
             continue
-        registry.put(
+        _ = registry.put(
             git_rel(page.page_id).removesuffix(".md"),
             knowledge_status=ACTIVE,
             approval_status=APPROVED,

@@ -1446,3 +1446,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### 재유입 검사 불능의 실패 보고 — 2026-09-10
 
 [상세](INGEST-REINGRESS-VERIFICATION-2026-09-10.md): 모든 ErasureError를 정상 tombstone 차단처럼 삼키던 경로를 분리했다. 정상 TOMBSTONE_REINGRESS_BLOCKED는 유지하고 나머지는 REINGRESS_VERIFICATION_FAILED/errors1/exit1, 원문·cursor 보존. 실제 SQLite 변수 한도0으로 오류 재현→복구 후 정상 수집. 관련 및 삭제/복원 재유입 통합22 passed / 41.38초, 전체Ruff·diff통과. 운영 미배포·전체 M1–M14 유지.
+
+### 수집 실패 처리 확대 회귀·타입 경고 정리 — 2026-09-10
+
+[상세](INGEST-FAILURE-EXPANDED-REGRESSION-2026-09-10.md): df5d822의 실패 정책과 기존 수집/원문 보존/웹/준비 상태/배치 복구/출처 분리97개 검사 통과(69개59.33초+28개3.11초). 이후 registry.put 반환값의 의도적 미사용 표기를 추가해 pipeline 타입0오류0경고, 캐시 없는 전체Ruff와 walking-skeleton2개3.99초 통과. 전체/설치 인수는 이전13cab77 기준이며 운영·M1–M14 유지.
