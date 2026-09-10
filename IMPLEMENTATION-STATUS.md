@@ -1442,3 +1442,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### 읽기 실패의 전체 배치·HTTP 상태 인수 — 2026-09-10
 
 [상세](READ-FAILURE-BATCH-ACCEPTANCE-2026-09-10.md): 별도 sb run2회에서 크기 초과 ingest 실패→빈 compile 성공 이후에도 종료1, CLI/실제HTTP last_batch failed·오류1·사유 유지 확인. 새 통합 회귀1 passed / 3.70초·캐시 없는 전체Ruff통과. 기존 제품 로직으로 처리되어 제품 변경은 없고 회귀 추가. last_run 개별단계ok와 last_batch 전체실패를 구분하며 native/GUI/운영 인수로 확대하지 않는다.
+
+### 재유입 검사 불능의 실패 보고 — 2026-09-10
+
+[상세](INGEST-REINGRESS-VERIFICATION-2026-09-10.md): 모든 ErasureError를 정상 tombstone 차단처럼 삼키던 경로를 분리했다. 정상 TOMBSTONE_REINGRESS_BLOCKED는 유지하고 나머지는 REINGRESS_VERIFICATION_FAILED/errors1/exit1, 원문·cursor 보존. 실제 SQLite 변수 한도0으로 오류 재현→복구 후 정상 수집. 관련 및 삭제/복원 재유입 통합22 passed / 41.38초, 전체Ruff·diff통과. 운영 미배포·전체 M1–M14 유지.

@@ -695,8 +695,11 @@ def _prepare_adapter_ingest(
         try:
             reingress.check(IngressIdentity(source=ref.source_id, content=digest))
             reingress.check_content(data)
-        except ErasureError:
+        except ErasureError as exc:
             adapter_failed = True
+            if str(exc) != "TOMBSTONE_REINGRESS_BLOCKED":
+                errors += 1
+                failure = failure or "REINGRESS_VERIFICATION_FAILED"
             continue
         units = _materialize(
             data,
