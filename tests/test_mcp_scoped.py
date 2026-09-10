@@ -101,6 +101,18 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             wrong_limit = await client.call_tool("sb_search", {"query": "Cited", "limit": 2,
                 "read_fence": model_object(fence), "access_claim": search_claim})
             assert wrong_limit.is_error
+            # Search returns title, snippet and score, so its denials need the same
+            # no-leak bar as sb_read_page. Comparing against the payload the allowed
+            # call actually returned keeps these absence checks from passing vacuously.
+            allowed_results = str(searched.structured_content["results"])
+            for bad_scope in [{"projects": ["project:b"]}, {"agent_id": "agent:other"}]:
+                denied_search = await client.call_tool("sb_search", {"query": "Cited", "limit": 1,
+                    "read_fence": model_object(fence), "access_claim": signed({**claim, **bad_scope,
+                        "request_digest": access_request_digest("sb_search", {"query": "Cited", "limit": 1})})})
+                # A project outside the claim narrows the visible set to nothing; a wrong
+                # agent identity is refused outright. Neither may return the allowed rows.
+                assert denied_search.is_error or denied_search.structured_content["results"] == []
+                assert allowed_results not in str(denied_search)
             other_session = await client.call_tool("sb_read_page", {**args, "access_claim": signed({**claim, "session_id": "session:other"})})
             assert other_session.is_error is (not issuer_sessions)
             for bad in [signed({**claim, "projects": ["project:b"]}),
