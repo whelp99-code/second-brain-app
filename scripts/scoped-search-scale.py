@@ -28,11 +28,14 @@ from sb.targets import GenerationIdentityV1
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pages', type=int, default=100)
+    parser.add_argument('--allowed-pages', type=int, default=1)
     parser.add_argument('--repetitions', type=int, default=1,
                         help='queries per type on the same generation (1-100); no discarded warmup')
     args = parser.parse_args()
     if not 2 <= args.pages <= 10000:
         parser.error('pages must be between 2 and 10000')
+    if not 0 <= args.allowed_pages <= args.pages:
+        parser.error('allowed-pages must be between 0 and pages')
     if not 1 <= args.repetitions <= 100:
         parser.error('repetitions must be between 1 and 100')
     root = Path(tempfile.mkdtemp(prefix='sb-scoped-scale-', dir='/var/tmp'))
@@ -46,10 +49,11 @@ def main():
 
     def seed(folder):
         for number in range(args.pages):
-            materialize_remember(folder, content=f'ScaleProbe {number} ' + ('permitted' if number == args.pages - 1 else 'forbidden'),
+            permitted = number >= args.pages - args.allowed_pages
+            materialize_remember(folder, content=f'ScaleProbe {number} ' + ('permitted' if permitted else 'forbidden'),
                 candidate_id='memcand:pos:v1:' + hashlib.sha256(str(number).encode()).hexdigest(),
                 created_at=now.isoformat(), release_sha='a' * 40,
-                source_access=scope if number == args.pages - 1 else denied)
+                source_access=scope if permitted else denied)
 
     try:
         generation = service.mutate(GenerationMutation('scale:seed', GenerationOperation.REMEMBER,
@@ -63,7 +67,7 @@ def main():
                 started = time.perf_counter()
                 rows = search_scoped_records(generation.root, identity, scope, query, 1)
                 elapsed = time.perf_counter() - started
-                assert len(rows) == (1 if query == 'ScaleProbe' else 0)
+                assert len(rows) == (1 if query == 'ScaleProbe' and args.allowed_pages else 0)
                 assert 'forbidden' not in json.dumps(rows)
                 observations.append({'query': query, 'repetition': repetition + 1,
                                      'seconds': elapsed, 'rows': len(rows)})
@@ -74,7 +78,7 @@ def main():
                 'p50_seconds': statistics.median(samples),
                 'p95_seconds': samples[math.ceil(len(samples) * .95) - 1],
                 'min_seconds': samples[0], 'max_seconds': samples[-1]})
-        result = {'root': str(root), 'pages': args.pages, 'allowed_pages': 1,
+        result = {'root': str(root), 'pages': args.pages, 'allowed_pages': args.allowed_pages,
                   'repetitions': args.repetitions, 'summaries': summaries,
                   'percentiles': 'p50 median; p95 nearest-rank; all samples including first; alternating query order',
                   'observations': observations, 'peak_process_rss_kib': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,

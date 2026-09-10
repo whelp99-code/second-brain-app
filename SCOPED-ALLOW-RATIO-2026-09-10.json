@@ -1,0 +1,180 @@
+{
+  "before": {
+    "root": "/var/tmp/sb-scoped-scale-gtuzngw0",
+    "pages": 1000,
+    "allowed_pages": 1000,
+    "repetitions": 5,
+    "summaries": [
+      {
+        "query": "ScaleProbe",
+        "samples": 5,
+        "p50_seconds": 2.1636560698971152,
+        "p95_seconds": 2.227895734831691,
+        "min_seconds": 2.129728727042675,
+        "max_seconds": 2.227895734831691
+      },
+      {
+        "query": "forbidden",
+        "samples": 5,
+        "p50_seconds": 0.2745107379741967,
+        "p95_seconds": 0.281297056004405,
+        "min_seconds": 0.2725619659759104,
+        "max_seconds": 0.281297056004405
+      }
+    ],
+    "percentiles": "p50 median; p95 nearest-rank; all samples including first; alternating query order",
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "repetition": 1,
+        "seconds": 2.225873833987862,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "repetition": 1,
+        "seconds": 0.2725619659759104,
+        "rows": 0
+      },
+      {
+        "query": "forbidden",
+        "repetition": 2,
+        "seconds": 0.281297056004405,
+        "rows": 0
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 2,
+        "seconds": 2.129728727042675,
+        "rows": 1
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 3,
+        "seconds": 2.160615334752947,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "repetition": 3,
+        "seconds": 0.275287052616477,
+        "rows": 0
+      },
+      {
+        "query": "forbidden",
+        "repetition": 4,
+        "seconds": 0.2742119701579213,
+        "rows": 0
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 4,
+        "seconds": 2.1636560698971152,
+        "rows": 1
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 5,
+        "seconds": 2.227895734831691,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "repetition": 5,
+        "seconds": 0.2745107379741967,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 59032,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  },
+  "after": {
+    "root": "/var/tmp/sb-scoped-scale-g92ol86_",
+    "pages": 1000,
+    "allowed_pages": 1000,
+    "repetitions": 5,
+    "summaries": [
+      {
+        "query": "ScaleProbe",
+        "samples": 5,
+        "p50_seconds": 2.4382390780374408,
+        "p95_seconds": 2.4499024827964604,
+        "min_seconds": 2.414458937011659,
+        "max_seconds": 2.4499024827964604
+      },
+      {
+        "query": "forbidden",
+        "samples": 5,
+        "p50_seconds": 0.27702139504253864,
+        "p95_seconds": 0.28566894587129354,
+        "min_seconds": 0.27619382040575147,
+        "max_seconds": 0.28566894587129354
+      }
+    ],
+    "percentiles": "p50 median; p95 nearest-rank; all samples including first; alternating query order",
+    "observations": [
+      {
+        "query": "ScaleProbe",
+        "repetition": 1,
+        "seconds": 2.414458937011659,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "repetition": 1,
+        "seconds": 0.27619382040575147,
+        "rows": 0
+      },
+      {
+        "query": "forbidden",
+        "repetition": 2,
+        "seconds": 0.28566894587129354,
+        "rows": 0
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 2,
+        "seconds": 2.4382390780374408,
+        "rows": 1
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 3,
+        "seconds": 2.4499024827964604,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "repetition": 3,
+        "seconds": 0.2799675930291414,
+        "rows": 0
+      },
+      {
+        "query": "forbidden",
+        "repetition": 4,
+        "seconds": 0.276274390053004,
+        "rows": 0
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 4,
+        "seconds": 2.4213257445953786,
+        "rows": 1
+      },
+      {
+        "query": "ScaleProbe",
+        "repetition": 5,
+        "seconds": 2.4485579798929393,
+        "rows": 1
+      },
+      {
+        "query": "forbidden",
+        "repetition": 5,
+        "seconds": 0.27702139504253864,
+        "rows": 0
+      }
+    ],
+    "peak_process_rss_kib": 58612,
+    "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+  }
+}
