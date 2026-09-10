@@ -83,6 +83,16 @@ class DoctorCheck:
         return asdict(self)
 
 
+def _activated_orphan_count(journal: Path, current_id: str) -> int:
+    uri = journal.resolve().as_uri() + "?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
+        row = connection.execute(
+            "SELECT count(*) FROM activations WHERE phase = 'activated' AND generation_id != ?",
+            (current_id,),
+        ).fetchone()
+    return 0 if row is None else int(row[0])
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -568,6 +578,17 @@ def doctor(config: Config) -> tuple[DoctorCheck, ...]:
             valid = (_git_value(root, "rev-parse", "HEAD") == manifest.head
                      and _git_value(root, "rev-parse", "HEAD^{tree}") == manifest.tree)
             add("generation", "pass" if valid else "fail", manifest.generation_id)
+            journal = paths.state / "generation-journal.db"
+            if journal.is_file():
+                try:
+                    orphans = _activated_orphan_count(journal, manifest.generation_id)
+                    add(
+                        "activation-orphans",
+                        "warn" if orphans else "pass",
+                        f"count={orphans}" if orphans else "none",
+                    )
+                except sqlite3.Error as exc:
+                    add("activation-orphans", "warn", type(exc).__name__)
         except (OSError, RuntimeError, ValueError) as exc:
             add("generation", "fail", str(exc))
     command = config.llm.argv_template[0] if config.llm.argv_template else ""

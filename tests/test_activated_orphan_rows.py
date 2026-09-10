@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
+from sb.ops import doctor
 
 NOW = datetime(2026, 9, 10, tzinfo=UTC)
 ORPHAN = "sbgen:v1:" + "ab" * 32
@@ -56,3 +57,25 @@ def test_remember_does_not_prove_non_current_activated_orphans(tmp_path: Path) -
     assert phase[0] == "activated"
     assert current is not None
     assert current[0] == "proved"
+
+
+def test_doctor_warns_on_non_current_activated_orphans(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    mutations = GenerationMutationService.from_config(config)
+    try:
+        mutations.remember("first", "one", NOW)
+        mutations.remember("second", "two", NOW)
+        mutations.store.journal.execute(
+            """
+            INSERT INTO activations(
+              generation_id, parent_generation_id, phase, manifest_digest,
+              pointer_target, created_at, updated_at
+            ) VALUES (?, NULL, 'activated', 'sha256:' || ?, NULL, ?, ?)
+            """,
+            (ORPHAN, "c" * 64, NOW.isoformat(), NOW.isoformat()),
+        )
+    finally:
+        mutations.close()
+    checks = {check.name: check for check in doctor(config)}
+    assert checks["activation-orphans"].status == "warn"
+    assert checks["activation-orphans"].detail == "count=1"
