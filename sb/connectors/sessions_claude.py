@@ -191,7 +191,7 @@ def _pairs(pairs: list[tuple[str, JVal]]) -> dict[str, JVal]:
 def _obj(raw: bytes) -> dict[str, JVal] | None:
     try:
         loaded = _loads()(raw, object_pairs_hook=_pairs)
-    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, RecursionError):
         return None
     return loaded if isinstance(loaded, dict) else None
 

@@ -1426,3 +1426,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### OpenCode 참조 DB 변경·활성 WAL 보류 — 2026-09-10
 
 [상세](OPENCODE-DATABASE-STABILITY-2026-09-10.md), [실제 CLI](OPENCODE-DATABASE-STABILITY-2026-09-10.json): DB 전후 식별자/시각 검증으로 불안정한 결과 배제·커서 유지. 실제 참조 DB 이름의 WAL/SHM/journal 검사로 live-store 보류. 관련77 passed / 0.81초·Ruff·basedpyright 통과. 실제 CLI WAL 활성 중 보류→checkpoint 후 최신 본문 수집 확인. descriptor 고정/모든 경로 교체 방어는 미완. 전체1,767통과·설치 인수는 이번 수정 전 13cab77 기준이다.
+
+### 세션 파서 과도한 JSON 중첩 격리 — 2026-09-10
+
+[상세](SESSION-DEEP-JSON-2026-09-10.md), [CLI 결과](SESSION-DEEP-JSON-2026-09-10.json): 약20KB/깊이10,000 JSON이 다섯 세션 어댑터를 RecursionError로 중단시키던 결함 재현·각 파서의 기존 형식 오류 처리에 포함. 관련69 passed / 0.67초, 5모듈 타입0오류0경고. Ruff exit0·기존 GJC noqa 표기 경고2개. 실제 OpenCode CLI에서 잘못된 파일 사유/정상 형제 본문 저장·반복 원장 불변 확인. 최신 전체/설치 인수는 이번 수정 전13cab77 기준이며 native/운영 인수는 미완.

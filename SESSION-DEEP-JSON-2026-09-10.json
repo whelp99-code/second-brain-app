@@ -1,0 +1,47 @@
+{
+  "root": "/var/tmp/sb-deep-json-cli-9w9b5fjg",
+  "commands": [
+    {
+      "args": [
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "rows": [
+    [
+      "bad/snapshot.json",
+      "invalid-format",
+      "32d77c8917d7dcca7fe551f48cb89259588f938629c0ad041dac96a534d4474a"
+    ],
+    [
+      "good/snapshot.json#good",
+      "sha256:c028e7db964eb77dd53b6df3fdb6d4f479e247a53912361f45f8ce3f37c1ba98",
+      "69b69424cf36a78fd84902ffc882db96984ec78a29a84fd243f8eb1178a820d5"
+    ]
+  ],
+  "depth": 10000,
+  "scope": "actual CLI; synthetic deep JSON and valid sibling; no native client"
+}
