@@ -8,7 +8,7 @@ import os
 import sqlite3
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
-from typing import Final, Protocol
+from typing import Final, Protocol, cast
 
 type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 
@@ -25,6 +25,13 @@ DEFAULT_ROOTS: Final = (
 )
 _LIVE: Final = frozenset({"opencode.db-wal", "opencode.db-shm", "auth.json"})
 MAX_SNAPSHOT_BYTES: Final = 64 * 1024 * 1024
+MAX_DATABASE_ROWS: Final = 5000
+MAX_DATABASE_BYTES: Final = 64 * 1024 * 1024
+MAX_DATABASE_STEPS: Final = 1_000_000
+
+
+class _DatabaseReadLimit(OSError):
+    """A complete database snapshot cannot be read within the resource budget."""
 
 
 class _SnapshotSizeLimit(OSError):
@@ -79,6 +86,9 @@ class OpenCodeSessionsAdapter:
                     current[rel] = revision
                     if start != revision:
                         items.extend(extracted)
+                except _DatabaseReadLimit:
+                    current[rel] = start
+                    items.append(_skip(self.source_id, rel, "database-limit"))
                 except _SnapshotSizeLimit:
                     current[rel] = start
                     items.append(_skip(self.source_id, rel, "size-limit"))
@@ -266,17 +276,44 @@ def _snapshot_database(snapshot: Path, reference: str) -> Path | None:
 
 def _from_sqlite(database: Path) -> list[tuple[str, str]]:
     if database.is_symlink() or not database.is_file():
-        return []
+        raise OSError("snapshot database is not a regular file")
+    if database.stat().st_size > MAX_DATABASE_BYTES:
+        raise _DatabaseReadLimit
     try:
         connection = sqlite3.connect(
             database.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
         )
-    except sqlite3.Error:
-        return []
+    except sqlite3.Error as exc:
+        raise OSError("snapshot database cannot be opened") from exc
+    interval = min(1000, MAX_DATABASE_STEPS)
+    steps = 0
+
+    def progress() -> int:
+        nonlocal steps
+        steps += interval
+        return int(steps >= MAX_DATABASE_STEPS)
+
     try:
-        rows = connection.execute("SELECT id, data FROM part ORDER BY time_created, id").fetchall()
-    except sqlite3.Error:
-        return []
+        _ = connection.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_DATABASE_BYTES)
+        connection.set_progress_handler(progress, interval)
+        cursor = connection.execute(
+            "SELECT id, data FROM part ORDER BY time_created, id LIMIT ?",
+            (MAX_DATABASE_ROWS + 1,),
+        )
+        rows: list[tuple[object, ...]] = []
+        total = 0
+        for row in cast(Iterator[tuple[object, ...]], cursor):
+            if len(rows) >= MAX_DATABASE_ROWS:
+                raise _DatabaseReadLimit
+            total += sum(len(value.encode()) if isinstance(value, str) else len(value)
+                         if isinstance(value, bytes) else 8 for value in row)
+            if total > MAX_DATABASE_BYTES:
+                raise _DatabaseReadLimit
+            rows.append(row)
+    except sqlite3.Error as exc:
+        if steps >= MAX_DATABASE_STEPS or exc.sqlite_errorcode == sqlite3.SQLITE_TOOBIG:
+            raise _DatabaseReadLimit from exc
+        raise OSError("snapshot database cannot be read") from exc
     finally:
         connection.close()
     return _parts_from_rows(rows)

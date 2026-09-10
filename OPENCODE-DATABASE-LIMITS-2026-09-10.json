@@ -1,0 +1,76 @@
+{
+  "root": "/var/tmp/sb-opencode-db-limit-oit4y_65",
+  "commands": [
+    {
+      "args": [
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "before": [
+    [
+      "good/snapshot.json#good",
+      "sha256:568dd8ef8a467517580262f185a48b65c0884a6acdd9c7b3dc0adcd7fa12d9b2",
+      "fc9e384cfbe48b8cfba8a0ba61436013fdf6232abcdec52788e0c99f32c2544d"
+    ],
+    [
+      "snapshot.json",
+      "database-limit",
+      "af27d31670968983c9f51616d0b7ed4e3635494f476348c8d0217665976eb3b0"
+    ]
+  ],
+  "after": [
+    [
+      "good/snapshot.json#good",
+      "sha256:568dd8ef8a467517580262f185a48b65c0884a6acdd9c7b3dc0adcd7fa12d9b2",
+      "fc9e384cfbe48b8cfba8a0ba61436013fdf6232abcdec52788e0c99f32c2544d"
+    ],
+    [
+      "snapshot.json",
+      "database-limit",
+      "af27d31670968983c9f51616d0b7ed4e3635494f476348c8d0217665976eb3b0"
+    ],
+    [
+      "snapshot.json#0",
+      "sha256:8f7fac23886f8f2fe38faf3d1a0cf68d344999adab772bbe558c4e44da0082dc",
+      "9736988467bc3dfa3d3bd7db53c55804e23dd8e2a96d548c39aaa08a5a29ba88"
+    ]
+  ],
+  "initial_rows": 5001,
+  "recovered_rows": 1,
+  "partial_database_items": 0,
+  "scope": "isolated actual CLI and ledger/CAS; synthetic SQLite; no native client"
+}

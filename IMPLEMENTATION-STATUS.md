@@ -1405,3 +1405,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### OpenCode 내용 기반 재개 — 2026-09-10
 
 [상세 및 한계](OPENCODE-CONTENT-RESUME-2026-09-10.md), [실제 CLI 결과](OPENCODE-CONTENT-RESUME-2026-09-10.json): 동일 크기 수정·축소·참조 SQLite 단독 변경·구형 커서에서 놓친 변경 4개를 재현하고 내용 해시 커서/항목 버전으로 수정했다. 관련 56 passed / 0.70초, walking-skeleton 2 passed / 3.99초, Ruff·basedpyright 통과. 실제 격리 CLI 4회 수집 결과 3개 원문/버전 보존·변경 없는 재실행 중복0. 구형 커서는 1회 재수집되며 매 scan 읽기 비용과 SQLite 예산·읽는 중 변경 일관성·다중 root 충돌은 남는다. 전체 회귀/설치 인수는 이전 커밋 기준이다.
+
+### OpenCode SQLite 읽기 예산 — 2026-09-10
+
+[상세](OPENCODE-DATABASE-LIMITS-2026-09-10.md), [CLI 원본 결과](OPENCODE-DATABASE-LIMITS-2026-09-10.json): snapshot별 파일/반환 총량 64 MiB·5,000행·SQLite VM 100만 명령 상한. 초과 시 부분 수집 없이 database-limit, 오류는 명시적 읽기 실패, 커서 유지. 관련 62 passed / 0.72초, Ruff·basedpyright 통과. 실제 CLI 5,001행 거부→형제 정상 수집→1행 복구→중복 없는 재실행 확인. 전체 프로세스 메모리/벽시계 상한·경로 교체·읽기 일관성·다중 root 충돌은 미완이며 native 운영 완료를 뜻하지 않는다.
