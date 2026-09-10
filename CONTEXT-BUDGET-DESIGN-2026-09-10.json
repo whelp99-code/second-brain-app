@@ -1,0 +1,170 @@
+{
+  "pair_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+  "ops_build": "/home/jm/.local/state/orca-jarvis/authority/current/dist",
+  "pair_source_commit": "195b1a7d4588a8386def5e7dce2067a141942708",
+  "ops_authority_release": "a3cbbbe1604798052db6051a8751f039573eb126",
+  "identical_modules": [
+    "context-assembler",
+    "context-assembler-input",
+    "context-assembler-budget",
+    "second-brain-adapter-types"
+  ],
+  "different_modules": {
+    "context-assembler-sources": {
+      "ops": "sha256:14db86cce788a2ae9a14767495ca5f3b25948de39f9d2d88936c90b3ef7b2390",
+      "pair": "sha256:026e0be421d01210116a5940f509c2a73fbf3c064179ab0fc49558925cdeb633"
+    }
+  },
+  "pair": {
+    "schema_version": 1,
+    "status": "boundary_gaps_reproduced",
+    "delivery_acceptance": false,
+    "fixture_origin": "synthetic",
+    "build_root": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+    "module_sha256": {
+      "context-assembler": "sha256:860ffd7c49fbbddfa23feb41328b7434ce4df32fb9a8ed2315ff45207f22556f",
+      "context-assembler-input": "sha256:0bcc3b86a560980be3b3c589768078ce91bbcdd6bb47787c5c47f5282aaaf06f",
+      "context-assembler-sources": "sha256:026e0be421d01210116a5940f509c2a73fbf3c064179ab0fc49558925cdeb633",
+      "context-assembler-budget": "sha256:5edf13a5367556eb940104415e6494aabc9a3db85f230935f69bf37be7d92c79",
+      "second-brain-adapter-types": "sha256:5da14ad9cd623fd6e5d1f21e9d0a516fc4af2a83d18328a866dba1a2b780cf9c"
+    },
+    "confirmed": {
+      "state": "sufficient",
+      "refs": [
+        "sid:principle:customer-first"
+      ],
+      "omissions": [],
+      "bytes": 1966,
+      "excerpt_present": false
+    },
+    "provider": {
+      "state": "insufficient",
+      "refs": [],
+      "omissions": [
+        "MEMORY_REQUIRED:062807f0",
+        "UNCONFIRMED_MEMORY:2b2ad5ca"
+      ],
+      "bytes": 1775,
+      "excerpt_present": false
+    },
+    "memory_only": {
+      "state": "insufficient",
+      "refs": [
+        "sid:principle:customer-first"
+      ],
+      "omissions": [
+        "LIVE_LINUX_REQUIRED:55d8a603"
+      ],
+      "bytes": 1685,
+      "excerpt_present": false
+    },
+    "multiline": [
+      {
+        "separator": "\n",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      },
+      {
+        "separator": "\r\n",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      },
+      {
+        "separator": "\r",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      },
+      {
+        "separator": "\t",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      }
+    ],
+    "snapshot_budget": {
+      "short_excerpt_bytes": 3,
+      "long_excerpt_bytes": 3600,
+      "short_snapshot_bytes": 1967,
+      "long_snapshot_bytes": 1967,
+      "counts_delivered_body": false
+    },
+    "limits": [
+      "No provider RPC or model delivery",
+      "No project authorization acceptance",
+      "No session deduplication or deletion/compaction acceptance",
+      "A successful probe means the gaps were reproduced, not that B5 is complete"
+    ]
+  },
+  "ops": {
+    "schema_version": 1,
+    "status": "boundary_gaps_reproduced",
+    "delivery_acceptance": false,
+    "fixture_origin": "synthetic",
+    "build_root": "/home/jm/.local/state/orca-jarvis/authority/current/dist",
+    "module_sha256": {
+      "context-assembler": "sha256:860ffd7c49fbbddfa23feb41328b7434ce4df32fb9a8ed2315ff45207f22556f",
+      "context-assembler-input": "sha256:0bcc3b86a560980be3b3c589768078ce91bbcdd6bb47787c5c47f5282aaaf06f",
+      "context-assembler-sources": "sha256:14db86cce788a2ae9a14767495ca5f3b25948de39f9d2d88936c90b3ef7b2390",
+      "context-assembler-budget": "sha256:5edf13a5367556eb940104415e6494aabc9a3db85f230935f69bf37be7d92c79",
+      "second-brain-adapter-types": "sha256:5da14ad9cd623fd6e5d1f21e9d0a516fc4af2a83d18328a866dba1a2b780cf9c"
+    },
+    "confirmed": {
+      "state": "sufficient",
+      "refs": [
+        "sid:principle:customer-first"
+      ],
+      "omissions": [],
+      "bytes": 1966,
+      "excerpt_present": false
+    },
+    "provider": {
+      "state": "insufficient",
+      "refs": [],
+      "omissions": [
+        "MEMORY_REQUIRED:062807f0",
+        "UNCONFIRMED_MEMORY:2b2ad5ca"
+      ],
+      "bytes": 1775,
+      "excerpt_present": false
+    },
+    "memory_only": {
+      "state": "insufficient",
+      "refs": [
+        "sid:principle:customer-first"
+      ],
+      "omissions": [
+        "LIVE_LINUX_REQUIRED:55d8a603"
+      ],
+      "bytes": 1685,
+      "excerpt_present": false
+    },
+    "multiline": [
+      {
+        "separator": "\n",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      },
+      {
+        "separator": "\r\n",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      },
+      {
+        "separator": "\r",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      },
+      {
+        "separator": "\t",
+        "code": "CONTEXT_ASSEMBLER_INPUT_INVALID"
+      }
+    ],
+    "snapshot_budget": {
+      "short_excerpt_bytes": 3,
+      "long_excerpt_bytes": 3600,
+      "short_snapshot_bytes": 1967,
+      "long_snapshot_bytes": 1967,
+      "counts_delivered_body": false
+    },
+    "limits": [
+      "No provider RPC or model delivery",
+      "No project authorization acceptance",
+      "No session deduplication or deletion/compaction acceptance",
+      "A successful probe means the gaps were reproduced, not that B5 is complete"
+    ]
+  },
+  "delivery_acceptance": false,
+  "production_mutated": false
+}
