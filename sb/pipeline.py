@@ -817,6 +817,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     ))
                 except OSError:
                     errors += 1
+                    failure = failure or "SOURCE_ACKNOWLEDGEMENT_FAILED"
             seen.update(prepared.version_keys)
             used_units += len(prepared.units)
             errors += prepared.errors

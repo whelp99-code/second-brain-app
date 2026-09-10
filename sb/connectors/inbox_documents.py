@@ -248,8 +248,6 @@ def _move_done(root: Path, _path: Path, rel: str) -> None:
             destination = os.open(part, flags, dir_fd=destination)
             descriptors.append(destination)
         os.replace(parts[-1], parts[-1], src_dir_fd=source, dst_dir_fd=destination)
-    except OSError:
-        return
     finally:
         for descriptor in reversed(descriptors):
             os.close(descriptor)

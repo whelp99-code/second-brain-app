@@ -296,6 +296,8 @@ def test_file_replacement_before_open_is_not_ingested(tmp_path, monkeypatch):
 
 
 def test_acknowledge_does_not_follow_done_directory_symlink(tmp_path):
+    import pytest
+
     from sb.connectors.base import AcknowledgingSourceAdapter
 
     inbox = tmp_path / 'inbox'
@@ -307,6 +309,7 @@ def test_acknowledge_does_not_follow_done_directory_symlink(tmp_path):
     assert isinstance(adapter, AcknowledgingSourceAdapter)
     items = list(adapter.scan(None))
     (inbox / '.done').symlink_to(outside, target_is_directory=True)
-    adapter.acknowledge(tuple(ref for ref, _, _ in items))
+    with pytest.raises(OSError):
+        adapter.acknowledge(tuple(ref for ref, _, _ in items))
     assert (inbox / 'note.txt').read_text() == 'keep inside inbox'
     assert list(outside.iterdir()) == []

@@ -1342,3 +1342,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 누적 변경 전체 회귀:** [제품6b3c906·전체1724통과/2skip·483.04초](INBOX-CONSOLE-FULL-2026-09-10.md). 검사전후HEAD동일·제품/테스트무변경·Ruff/diff통과. 현재 M1–M14증거표갱신, 설치a2861f3이후변경의설치인수/운영·실업무·잔여경합과전체목표유지.
 
 **2026-09-10 최신 전체회귀 설치 인수:** [92db131 archive설치·자비스paired4경로·maintenance기억보존3회](CURRENT-INSTALLED-ACCEPTANCE-2026-09-10.md). 두검증exit0,새로그인/독립2reader각2records·settlement1/FK0·paired설치물불변·busy/SIGKILL정리1/replay0. 합성fixture/native0,운영/실업무/잔여경합·전체목표유지.
+
+**2026-09-10 inbox 완료 실패 보고/복구:** [실제run_ingest거짓ok재현→SOURCE_ACKNOWLEDGEMENT_FAILED·경로복구후written0/원장동일정리](INBOX-ACK-RECOVERY-2026-09-10.md). 관련22통과/5.19초·Ruff/diff·타입0오류/기존경고1. 전체/설치재검증으로확대없음,잔여경합/운영/실업무·전체목표유지.
