@@ -13,7 +13,7 @@ from typing import Final, Protocol, cast
 type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 
 from sb.connectors.base import ItemMeta, SourceAdapter
-from sb.connectors.session_checkpoint import open_session_file
+from sb.connectors.session_checkpoint import file_revision, open_session_file
 from sb.contracts import SourceRef
 
 ADAPTER_ID: Final = "opencode-sessions"
@@ -72,10 +72,15 @@ class OpenCodeSessionsAdapter:
                 rel = path.relative_to(root).as_posix()
                 start = previous.get(rel, 0)
                 try:
-                    size = path.stat().st_size
+                    before = file_revision(path)
+                    size = before[2]
                     if size > MAX_SNAPSHOT_BYTES:
                         raise _SnapshotSizeLimit
                     extracted = self._read_snapshot(path, rel, size)
+                    if file_revision(path) != before:
+                        current[rel] = start
+                        items.append(_skip(self.source_id, rel, "unstable-session-file"))
+                        continue
                     if any(meta.get("skip_reason") for _, _, meta in extracted):
                         current[rel] = start
                         items.extend(extracted)

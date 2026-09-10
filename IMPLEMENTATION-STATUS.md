@@ -1409,3 +1409,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### OpenCode SQLite 읽기 예산 — 2026-09-10
 
 [상세](OPENCODE-DATABASE-LIMITS-2026-09-10.md), [CLI 원본 결과](OPENCODE-DATABASE-LIMITS-2026-09-10.json): snapshot별 파일/반환 총량 64 MiB·5,000행·SQLite VM 100만 명령 상한. 초과 시 부분 수집 없이 database-limit, 오류는 명시적 읽기 실패, 커서 유지. 관련 62 passed / 0.72초, Ruff·basedpyright 통과. 실제 CLI 5,001행 거부→형제 정상 수집→1행 복구→중복 없는 재실행 확인. 전체 프로세스 메모리/벽시계 상한·경로 교체·읽기 일관성·다중 root 충돌은 미완이며 native 운영 완료를 뜻하지 않는다.
+
+### OpenCode snapshot 읽기 일관성 — 2026-09-10
+
+[상세](OPENCODE-SNAPSHOT-STABILITY-2026-09-10.md), [정상 CLI 재검증](OPENCODE-SNAPSHOT-STABILITY-2026-09-10.json): 공통 file_revision으로 JSON 읽기 전후 식별자/크기/시각을 비교한다. 변경 시 unstable-session-file·본문 배제·커서 보존. 실제 같은 길이 덮어쓰기/atomic replace 회귀 2개를 수정했고 관련 64 passed / 0.72초, Ruff·basedpyright 통과. 실제 CLI 4회에서 3개 원문/버전·중복0 유지. 참조 DB와 상위 경로 교체, native 동시 쓰기 및 운영 인수는 남는다.
