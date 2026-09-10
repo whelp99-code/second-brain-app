@@ -52,6 +52,46 @@ def test_sealed_reader_returns_same_records_and_never_writes(classified):
     assert classified_page(root, name, generation) == page
 
 
+def test_scoped_batch_reads_classification_once_and_preserves_full_page(classified, monkeypatch):
+    import sb.memory_access as module
+
+    root, name, generation = classified
+    expected = classified_page(root, name, generation)
+    statements = []
+    connect = module.sqlite3.connect
+
+    def trace(*args, **kwargs):
+        connection = connect(*args, **kwargs)
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr(module.sqlite3, 'connect', trace)
+    scope = SourceAccess('principal:owner', ('project:a',), '1')
+    with module.classified_pages(root, generation, scope=scope) as read:
+        actual = read(name)
+        require_scope(actual, scope)
+    assert actual == expected
+    assert len([sql for sql in statements if sql.startswith(
+        'SELECT classification_json,classification_digest FROM source_access WHERE')]) == len(expected.source_refs)
+
+
+def test_scoped_prepared_classification_still_verifies_git_body(classified, monkeypatch):
+    import sb.memory_access as module
+
+    root, name, generation = classified
+    original = module.subprocess.check_output
+
+    def substituted(args, **kwargs):
+        result = original(args, **kwargs)
+        return result + b'\nsubstituted body' if args[3:5] == ['cat-file', 'blob'] else result
+
+    monkeypatch.setattr(module.subprocess, 'check_output', substituted)
+    with (pytest.raises(MemoryAccessError, match='MEMORY_ACCESS_UNAVAILABLE'),
+          module.classified_pages(root, generation,
+              scope=SourceAccess('principal:owner', ('project:a',), '1')) as read):
+        read(name)
+
+
 @pytest.mark.parametrize("owner,projects,revision", [
     ("principal:other", ("project:a",), "1"),
     ("principal:owner", ("project:b",), "1"),
