@@ -1,0 +1,94 @@
+{
+  "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+  "work_item": {
+    "subject": "second-brain 릴리스 후보 25d49b4 인수 검증",
+    "authority_id": "sb-110b474"
+  },
+  "clock": "2026-08-28T12:00:00.000Z",
+  "identity": "fixture",
+  "content": "real verified work item",
+  "cases": 10,
+  "published_total": 1,
+  "results": [
+    {
+      "case": "positive_control",
+      "expect": "approved",
+      "published": 1,
+      "state": "approved",
+      "reason": "VERIFIED_OUTCOME_APPROVED",
+      "error": null
+    },
+    {
+      "case": "no_verification",
+      "expect": "authority_error",
+      "published": 0,
+      "state": null,
+      "reason": null,
+      "error": "MEMORY_CANDIDATE_AUTHORITY_INVALID"
+    },
+    {
+      "case": "expired_verification",
+      "expect": "authority_error",
+      "published": 0,
+      "state": null,
+      "reason": null,
+      "error": "MEMORY_CANDIDATE_AUTHORITY_INVALID"
+    },
+    {
+      "case": "not_yet_valid_verification",
+      "expect": "authority_error",
+      "published": 0,
+      "state": null,
+      "reason": null,
+      "error": "MEMORY_CANDIDATE_AUTHORITY_INVALID"
+    },
+    {
+      "case": "statement_changed_after_verification",
+      "expect": "authority_error",
+      "published": 0,
+      "state": null,
+      "reason": null,
+      "error": "MEMORY_CANDIDATE_AUTHORITY_INVALID"
+    },
+    {
+      "case": "worker_assertion",
+      "expect": "WORKER_ASSERTION_REJECTED",
+      "published": 0,
+      "state": "rejected",
+      "reason": "WORKER_ASSERTION_REJECTED",
+      "error": null
+    },
+    {
+      "case": "model_assertion",
+      "expect": "MODEL_AUTHORITY_REJECTED",
+      "published": 0,
+      "state": "rejected",
+      "reason": "MODEL_AUTHORITY_REJECTED",
+      "error": null
+    },
+    {
+      "case": "unverified_summary",
+      "expect": "UNVERIFIED_SUMMARY_REJECTED",
+      "published": 0,
+      "state": "rejected",
+      "reason": "UNVERIFIED_SUMMARY_REJECTED",
+      "error": null
+    },
+    {
+      "case": "raw_transcript",
+      "expect": "RAW_TRANSCRIPT_REJECTED",
+      "published": 0,
+      "state": "rejected",
+      "reason": "RAW_TRANSCRIPT_REJECTED",
+      "error": null
+    },
+    {
+      "case": "open_conflict",
+      "expect": "OPEN_CONFLICT",
+      "published": 0,
+      "state": "rejected",
+      "reason": "OPEN_CONFLICT",
+      "error": null
+    }
+  ]
+}
