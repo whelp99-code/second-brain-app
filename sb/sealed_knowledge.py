@@ -12,7 +12,7 @@ from sb.search_errors import GenerationIndexError
 
 def sealed_knowledge_states(root: Path, external: tuple[KnowledgeState, ...]) -> tuple[KnowledgeState, ...]:
     try:
-        _ = load_verified_manifest(root)
+        manifest = load_verified_manifest(root)
         states: dict[str, KnowledgeState] = {}
         with closing(sqlite3.connect((root / '.sb/ledger.db').as_uri() + '?mode=ro', uri=True)) as conn:
             if conn.execute("SELECT 1 FROM sqlite_master WHERE name='bound_knowledge' AND type='table'").fetchone():
@@ -28,6 +28,9 @@ def sealed_knowledge_states(root: Path, external: tuple[KnowledgeState, ...]) ->
             # explicit restriction still overrides automatic compilation state.
             if state.knowledge_status != ACTIVE or state.approval_status != APPROVED:
                 states[state.page_id] = state
-        return tuple(states[key] for key in sorted(states))
+        result = tuple(states[key] for key in sorted(states))
+        if load_verified_manifest(root) != manifest:
+            raise GenerationIndexError
+        return result
     except (OSError, ValueError, sqlite3.Error) as exc:
         raise GenerationIndexError from exc

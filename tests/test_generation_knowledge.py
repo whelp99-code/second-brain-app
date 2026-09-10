@@ -107,3 +107,29 @@ def test_old_body_binding_is_not_projected_onto_current_body(tmp_path):
 
     generation = build(tmp_path, (replace(STATE, content_digest='sha256:' + 'f' * 64),))
     assert sealed_knowledge_states(generation.root, (KnowledgeState(STATE.page_id, 'ACTIVE', 'APPROVED'),)) == ()
+
+
+def test_knowledge_projection_rejects_ledger_change_after_initial_validation(tmp_path, monkeypatch):
+    import sb.sealed_knowledge as module
+    from sb.search_errors import GenerationIndexError
+
+    generation = build(tmp_path, (replace(STATE, approval_status='PENDING'),))
+    verify = module.load_verified_manifest
+    calls = 0
+
+    def change_after_validation(root):
+        nonlocal calls
+        manifest = verify(root)
+        calls += 1
+        if calls == 1:
+            ledger = root / '.sb/ledger.db'
+            ledger.parent.chmod(0o700)
+            ledger.chmod(0o600)
+            with closing(sqlite3.connect(ledger)) as connection:
+                connection.execute("UPDATE bound_knowledge SET approval_status='APPROVED'")
+                connection.commit()
+        return manifest
+
+    monkeypatch.setattr(module, 'load_verified_manifest', change_after_validation)
+    with pytest.raises(GenerationIndexError):
+        module.sealed_knowledge_states(generation.root, ())

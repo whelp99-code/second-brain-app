@@ -1372,3 +1372,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 최신 수집 수정 설치 재인수:** [f0fec14 archive/offline설치→자비스paired4경로·복구3회·실제설치CLI원본보존](INSTALLED-INBOX-PAIR-2026-09-10.md). 세검증exit0·독립reader2개각2records·settlement1/FK0·busy/SIGKILL정리1/replay0·원본2/sourceversion2. paired설치물/Node불변. 합성fixture/native0, 운영current변경없음·전체목표유지.
 
 **2026-09-10 유지보수 CLI/운영 재관측:** [--help traceback수정·입력오류exit2·실제설치복구재검증exit0](MAINTENANCE-CLI-AND-OPS-2026-09-10.md). UTC00:28:40 pending6큐0/activecursor0/유효lease1, 별도DB holder2서비스/관측불가22로전환보류. SIGKILL정리1/replay0/기억보존3회·Ruff/diff. 운영변경없음·전체목표유지.
+
+**2026-09-10 지식 상태 읽기 재검증:** [최초검증후PENDING→APPROVED 실제원장변경 실패재현→반환전세대동일성검사](KNOWLEDGE-READ-REVALIDATION-2026-09-10.md). 관련80통과/5.91초·Ruff/타입0오류0경고·1,000페이지허용1/불허0·각약2.2초. 과거미구현설계표기보충. 앞선전체1730/설치후속제품변경이며운영/전체목표유지.
