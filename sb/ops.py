@@ -86,11 +86,19 @@ class DoctorCheck:
 def _activated_orphan_count(journal: Path, current_id: str) -> int:
     uri = journal.resolve().as_uri() + "?mode=ro"
     with closing(sqlite3.connect(uri, uri=True)) as connection:
-        row = connection.execute(
-            "SELECT count(*) FROM activations WHERE phase = 'activated' AND generation_id != ?",
-            (current_id,),
-        ).fetchone()
-    return 0 if row is None else int(row[0])
+        fetched = cast(
+            tuple[object, ...] | None,
+            connection.execute(
+                "SELECT count(*) FROM activations WHERE phase = 'activated' AND generation_id != ?",
+                (current_id,),
+            ).fetchone(),
+        )
+    if fetched is None:
+        return 0
+    value = fetched[0]
+    if not isinstance(value, int):
+        raise sqlite3.Error("activation count is not an integer")
+    return value
 
 
 def _sha256(path: Path) -> str:

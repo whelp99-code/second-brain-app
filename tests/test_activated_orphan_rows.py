@@ -79,3 +79,16 @@ def test_doctor_warns_on_non_current_activated_orphans(tmp_path: Path) -> None:
     checks = {check.name: check for check in doctor(config)}
     assert checks["activation-orphans"].status == "warn"
     assert checks["activation-orphans"].detail == "count=1"
+
+
+def test_doctor_passes_without_activated_orphans(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    mutations = GenerationMutationService.from_config(config)
+    try:
+        mutations.remember("first", "one", NOW)
+        mutations.remember("second", "two", NOW)
+    finally:
+        mutations.close()
+    checks = {check.name: check for check in doctor(config)}
+    assert checks["activation-orphans"].status == "pass"
+    assert checks["activation-orphans"].detail == "none"
