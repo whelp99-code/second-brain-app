@@ -23,6 +23,6 @@
 
 상태 기계 SQL이 양쪽에 있다는 [쓰기 비용](WRITE-COST-AND-INTERRUPT-2026-09-10.md) 관찰은 유지한다. “정리 코드 부재”가 아니라 **현재가 아닌 activated 고아 행을 훑는 경로가 없다.** 후보 전환만으로 이 3행이 사라진다고 보지 않는다.
 
-운영 journal을 수동으로 `proved`로 고치지 않는다. 고아 행 sweep은 별도 설계·회귀가 필요하다.
+운영 journal을 수동으로 `proved`로 고치지 않는다. 고아 행 sweep은 별도 설계가 필요하다. 회귀: `tests/test_activated_orphan_rows.py` — 현재가 아닌 `activated` 행은 이후 `remember`에도 `proved`가 되지 않는다.
 
 JSON: [ACTIVATED-ORPHAN-ROWS-2026-09-10.json](ACTIVATED-ORPHAN-ROWS-2026-09-10.json).

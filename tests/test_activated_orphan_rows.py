@@ -1,0 +1,58 @@
+"""Non-current activated journal rows are not proved by a later remember."""
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+from sb.config import Config
+from sb.generation_runtime import GenerationMutationService
+
+NOW = datetime(2026, 9, 10, tzinfo=UTC)
+ORPHAN = "sbgen:v1:" + "ab" * 32
+
+
+def _config(tmp_path: Path) -> Config:
+    share = tmp_path / "share"
+    return Config(
+        raw={
+            "vault_root": str(share / "vault"),
+            "share_root": str(share),
+            "state_root": str(tmp_path / "state"),
+            "request_root": str(tmp_path / "requests"),
+            "provider_instance_id": "provider:fixture",
+            "provider_release_sha": "a" * 40,
+            "sources": [{"id": "inbox", "adapter": "inbox-documents", "llm_policy": "deny"}],
+        }
+    )
+
+
+def test_remember_does_not_prove_non_current_activated_orphans(tmp_path: Path) -> None:
+    mutations = GenerationMutationService.from_config(_config(tmp_path))
+    try:
+        mutations.remember("first", "one", NOW)
+        mutations.remember("second", "two", NOW)
+        mutations.store.journal.execute(
+            """
+            INSERT INTO activations(
+              generation_id, parent_generation_id, phase, manifest_digest,
+              pointer_target, created_at, updated_at
+            ) VALUES (?, NULL, 'activated', 'sha256:' || ?, NULL, ?, ?)
+            """,
+            (ORPHAN, "c" * 64, NOW.isoformat(), NOW.isoformat()),
+        )
+        mutations.store.journal.commit()
+        mutations.remember("third", "three", NOW)
+        phase = mutations.store.journal.execute(
+            "SELECT phase FROM activations WHERE generation_id=?",
+            (ORPHAN,),
+        ).fetchone()
+        current = mutations.store.journal.execute(
+            "SELECT phase FROM activations WHERE generation_id=?",
+            (mutations.store.active().generation_id,),
+        ).fetchone()
+    finally:
+        mutations.close()
+    assert phase is not None
+    assert phase[0] == "activated"
+    assert current is not None
+    assert current[0] == "proved"
