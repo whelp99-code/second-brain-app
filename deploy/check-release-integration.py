@@ -69,9 +69,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("provider_release", type=Path)
     parser.add_argument("jarvis_build", type=Path)
+    parser.add_argument("--work", type=Path, default=None,
+                        help="already verified real work item carried through the lineage instead of the fixture statement")
     args = parser.parse_args()
     release = args.provider_release.resolve(strict=True)
     build = args.jarvis_build.resolve(strict=True)
+    work = args.work.resolve(strict=True) if args.work is not None else None
     python = release / ".venv/bin/python"
     if not python.is_file() or not (build / "src/phone-gateway.js").is_file():
         parser.error("installed provider Python and compiled JARVIS gateway required")
@@ -132,6 +135,7 @@ def main() -> None:
                 "--cli",
                 "--mcp",
                 "--readback",
+                *([] if work is None else ["--work", str(work)]),
             ],
             cwd=build.parent,
             env=env,
@@ -148,6 +152,10 @@ def main() -> None:
             "provider_imports": imports,
             "jarvis_build": str(build),
             "acceptance": json.loads(result.stdout),
+            "work_item": None if work is None else {
+                "path": str(work),
+                "sha256": hashlib.sha256(work.read_bytes()).hexdigest(),
+            },
             "production_activated": False,
             "candidate_contents": candidate_contents,
         }

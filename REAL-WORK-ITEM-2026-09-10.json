@@ -1,0 +1,22 @@
+{
+  "authority_id": "sb-110b474",
+  "idempotency_key": "candidate:sb-real-work:2026-09-10",
+  "subject": "second-brain 릴리스 후보 25d49b4 인수 검증",
+  "statement": "2026-09-10 second-brain-app 검증 결과. 릴리스 후보 25d49b4367945c8fa01ea71f2d83932d8da934d8은 소스 커밋 d4cbdda 기준이며 JARVIS 195b1a7 빌드와의 paired 연동 검사와 유지보수 검사를 모두 exit 0으로 통과했다. 이후 각주 중복 결함을 커밋 110b474로 수정했고 그 트리의 전체 회귀는 1,793 passed / 2 skipped, 593.22초, exit 0이다. 운영 current는 전환하지 않았다.",
+  "assert_substring": "25d49b4367945c8fa01ea71f2d83932d8da934d8",
+  "evidence": {
+    "repo": "second-brain-app",
+    "branch": "codex/shared-memory-completion-20260907",
+    "head_at_capture": "8d53c903a3444285774302cb4d635a7c8df8e8fd",
+    "verification_commit": "110b474",
+    "candidate_source_commit": "d4cbdda68932b788f91b462d283249b84779e344",
+    "release_id": "25d49b4367945c8fa01ea71f2d83932d8da934d8",
+    "wheel_sha256": "aa6fad5fc76ebda509ad3ac616b4e94b538bad2ae2161c83b86158a09a886dcf",
+    "jarvis_build_commit": "195b1a7d4588a8386def5e7dce2067a141942708",
+    "reports": {
+      "CONTINUATION-FULL-REGRESSION-2026-09-10.md": "5c1e310b54df18301d11568239b61e8fde7e3160eca4196a655ca8aa3aaaab75",
+      "CONTINUATION-INSTALLED-PAIR-2026-09-10.md": "c0c940171590506af4a67587d6f79814dccff87a2f5253361c2525e72c48ee93",
+      "FOOTNOTE-SPAN-SEPARATOR-2026-09-10.md": "ba3f820bc34d77b504f4e85bda7ad0b4b6957970d0d4bedbb0fd7eb722974431"
+    }
+  }
+}

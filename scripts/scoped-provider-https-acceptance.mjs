@@ -15,7 +15,16 @@ if (nativeWriter !== undefined && (nativeWriter !== 'claude' || !process.argv.in
   throw new Error('NATIVE_SCOPED_WRITE_REQUIRES_CLAUDE_PUBLIC_MCP_AND_CLI');
 const load = path => import(pathToFileURL(join(build, path)).href);
 const { scopedOutboxFixture } = await load('tests/fixtures/scoped-outbox.js');
-const { closeMemoryDatabase } = await load('tests/fixtures/memory-candidate-store.js');
+const { closeMemoryDatabase, memoryDatabase, insertMemoryVerification, memoryVerificationPayload } = await load('tests/fixtures/memory-candidate-store.js');
+const { verifiedMemoryInput, memoryPolicy, MEMORY_NOW } = await load('tests/fixtures/memory-candidate-fixture.js');
+const { execute: jarvisCli } = await load('src/cli.js');
+const { readMemoryCandidate } = await load('src/memory-candidate-reader.js');
+const { resolveSpooledDispatch } = await load('src/memory-outbox-dispatch-request.js');
+const { ControlPlane, signCommandApproval } = await load('src/control-plane.js');
+const { stageMemoryRememberDispatch } = await load('src/memory-remember-dispatch.js');
+const { proposeMemoryCandidateScope } = await load('src/memory-candidate-scope.js');
+const { stageMemoryScopeReview } = await load('src/memory-scope-review.js');
+const { localKey } = await load('tests/helpers.js');
 const { makePhoneHome, processUid, startFakeAuthority, FIXTURE_LOGIN, cookieFromSetCookie } = await load('tests/fixtures/phone-gateway-harness.js');
 const { createPhoneGatewayServer, parsePhoneGatewayConfig } = await load('src/phone-gateway.js');
 const { parsePhoneGatewayCli } = await load('src/phone-gateway-main.js');
@@ -24,9 +33,81 @@ const { registerMemoryScopedOutbox } = await load('src/memory-scoped-outbox.js')
 const { claimMemoryScopedOutbox, markMemoryScopedOutboxDispatch } = await load('src/memory-scoped-outbox-worker.js');
 const { recordMemoryScopedOutboxAcceptance } = await load('src/memory-scoped-outbox-result.js');
 const { canonicalize } = await load('src/canonical.js');
+// `--work <file>` swaps only the candidate subject/statement for an already verified real work
+// item. Identity, policy, transport, clock and every assertion below stay exactly as they are.
+const workIndex = process.argv.indexOf('--work');
+const work = workIndex > 0 ? JSON.parse(readFileSync(resolve(process.argv[workIndex + 1]), 'utf8')) : undefined;
+async function realWorkOutboxFixture() {
+  const database = await memoryDatabase();
+  try {
+    const now = new Date(MEMORY_NOW), statement = work.statement;
+    const input = { ...verifiedMemoryInput({ statement, subject: work.subject,
+      authority_id: work.authority_id, idempotency_key: work.idempotency_key }),
+      schema_version: 2, body_profile: 'plain-text-v1' };
+    insertMemoryVerification(database.authority, memoryVerificationPayload(input, {
+      issued_at: now.toISOString(), not_before: now.toISOString(),
+      expires_at: new Date(now.getTime() + 86400000).toISOString() }));
+    const roots = { review: join(database.root, 'candidate-review'), dispatch: join(database.root, 'candidate-dispatch') };
+    const inputFile = join(database.root, 'input.json'), policyFile = join(database.root, 'policy.json');
+    writeFileSync(inputFile, JSON.stringify(input), { mode: 0o600 });
+    writeFileSync(policyFile, JSON.stringify(memoryPolicy()), { mode: 0o600 });
+    const classified = await jarvisCli(['memory', 'classify', inputFile, policyFile, '--db', database.path],
+      { clock: () => now, memoryOutboxOptions: { candidate_review_spool_root: roots.review, candidate_dispatch_spool_root: roots.dispatch } });
+    assert.equal(classified.ok, true, 'REAL_WORK_CLASSIFY_FAILED');
+    const row = database.authority.db.prepare('SELECT candidate_id,dispatch_spool_digest FROM memory_candidate_dispatch_publications').get();
+    assert.notEqual(row, undefined, 'REAL_WORK_DISPATCH_NOT_PUBLISHED');
+    const candidate = readMemoryCandidate(database.authority.db, row.candidate_id);
+    assert.notEqual(candidate, undefined, 'REAL_WORK_CANDIDATE_MISSING');
+    const dispatch = { dispatch_spool_digest: row.dispatch_spool_digest, roots };
+    const request = resolveSpooledDispatch({ ...dispatch, candidate_id: candidate.candidate_id, now });
+    const control = new ControlPlane(database.authority);
+    const approve = command => control.decide(signCommandApproval({ schema_version: 1,
+      receipt_id: `receipt:${command.request_id}`, request_id: command.request_id, decision: 'approve',
+      command_digest: command.command_digest, signer_principal_id: 'principal:owner',
+      authenticated_session_id: 'session:fixture', key_id: 'decision-test', algorithm: 'Ed25519',
+      issued_at: now.toISOString(), not_before: now.toISOString(), expires_at: command.expires_at,
+      nonce: command.request_id, max_uses: 1, status: 'issued' }, localKey(database.authority)), now);
+    const staged = stageMemoryRememberDispatch(database.authority, candidate.candidate_id, now,
+      { candidate_dispatch_spool_root: roots.dispatch, candidate_review_spool_root: roots.review });
+    approve(staged);
+    const claimed = control.claim(staged.request_id, 'fixture:dispatch', now);
+    const scope = { owner: 'principal:owner', projects: ['project:a'], policy_revision: 'policy:1',
+      valid_until: new Date(now.getTime() + 30000).toISOString() };
+    const proposal = proposeMemoryCandidateScope(database.authority, candidate.candidate_id, scope, now);
+    const review = stageMemoryScopeReview(database.authority, proposal, now);
+    approve(review);
+    const spoolRoot = `${database.root}/scoped`;
+    mkdirSync(spoolRoot, { mode: 0o700 });
+    const options = { authority: database.authority, proposal, reviewRequestId: review.request_id,
+      dispatch, providerInstanceId: 'provider:fixture', spoolRoot, clock: () => now,
+      resolveWriteScope: () => ({ principal_id: scope.owner, agent_id: 'agent:fixture', session_id: 'session:fixture',
+        provider_instance_id: 'provider:fixture', method: 'sb_write_request', projects: scope.projects,
+        policy_revision: scope.policy_revision, valid_until: scope.valid_until }) };
+    return { database, candidate, now, statement, request, dispatch, cli_published: true, options, claimed, review };
+  } catch (error) {
+    closeMemoryDatabase(database);
+    throw error;
+  }
+}
+/** Prove the real statement survived the whole lineage into provider-stored bytes. */
+function verifyRealWorkBody(root, needle) {
+  const pages = [];
+  const walk = directory => {
+    for (const name of readdirSync(directory)) {
+      const full = join(directory, name), entry = lstatSync(full);
+      if (entry.isSymbolicLink() || name === '.git') continue;
+      if (entry.isDirectory()) { walk(full); continue; }
+      if (entry.size > 1_000_000) continue;
+      if (readFileSync(full, 'utf8').includes(needle)) pages.push(full.slice(root.length + 1));
+    }
+  };
+  walk(root);
+  assert(pages.length > 0, 'REAL_WORK_BODY_NOT_STORED');
+  return { verified: true, needle, stored_in: pages.sort() };
+}
 const results = [];
-for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'expire_before_execute']) {
-  const f = await scopedOutboxFixture(), home = makePhoneHome(), upstream = await startFakeAuthority();
+for (const mode of work ? ['valid'] : ['valid', 'revoke_during_accept', 'revoke_before_execute', 'expire_before_execute']) {
+  const f = work ? await realWorkOutboxFixture() : await scopedOutboxFixture(), home = makePhoneHome(), upstream = await startFakeAuthority();
   let gateway, tls, provider;
   try {
     const generated = spawnSync(join(sb, '.venv/bin/python'), ['-c',
@@ -116,7 +197,9 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
       ? await acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result,
           request: dispatched.request, outboxId: registered.outbox_id, writerCookie: cookie }) : undefined;
     delete result.readback;
-    results.push({ mode, readback, ...result, authority_https_calls: calls, dispatch_attempts: 1, foreign_key_errors: 0 });
+    const real_work = work && mode === 'valid'
+      ? verifyRealWorkBody(join(f.database.root, 'provider'), work.assert_substring) : undefined;
+    results.push({ mode, readback, real_work, ...result, authority_https_calls: calls, dispatch_attempts: 1, foreign_key_errors: 0 });
   } finally {
     gateway?.close(); provider?.close(); if (tls) await new Promise(resolve => tls.close(resolve));
     await upstream.close();
@@ -127,4 +210,5 @@ for (const mode of ['valid', 'revoke_during_accept', 'revoke_before_execute', 'e
   }
 }
 console.log(JSON.stringify({ gateway_configuration: 'CLI parser and independently owned existing authority connection', admission_surface: process.argv.includes('--mcp') ? 'mcp' : 'internal', execution_surface: process.argv.includes('--cli') ? 'cli' : 'internal', transport: 'actual verified TLS, separate Python verifier children and live gateway sessions',
-  identity_forwarder: 'fixture', clock: 'fixture', public_mcp_write: process.argv.includes('--mcp'), results }, null, 2));
+  identity_forwarder: 'fixture', clock: 'fixture', content_profile: work ? 'real verified work item' : 'fixture',
+  work_item: work?.evidence, public_mcp_write: process.argv.includes('--mcp'), results }, null, 2));
