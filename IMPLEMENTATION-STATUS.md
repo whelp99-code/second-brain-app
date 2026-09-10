@@ -1,6 +1,6 @@
 # 현재 인수 상태 — 2026-09-10
 
-> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 그록 회신의 독립 검증과 W0–W9 작업 순서·수정 대상·완료 조건·검증 명령을 포함한다. 코드 기준 `0033c22`, 회신 추가 `4173b2e`. 관련 72개 테스트 통과이며 이 HEAD의 전체 회귀·운영 전환은 미실행이다.
+> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 코드 HEAD `859691d`. 전체 회귀 **1832 passed / 3 skipped**. 새 설치 후보·운영 전환은 미실행. [W3.1](W3-FULL-REGRESSION-2026-09-10.md).
 
 > **회신 검토 보완:** [CODEX-REPLY-REVIEW-2026-09-10.md](CODEX-REPLY-REVIEW-2026-09-10.md). 두 후보 wheel은 서로 다르며, Codex 사본 0건은 해당 관측 범위로 제한한다. 후속 운영 인수와 M3·M5 및 M8–M13 작업은 이 보완을 함께 적용한다.
 
