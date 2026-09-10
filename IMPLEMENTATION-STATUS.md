@@ -1438,3 +1438,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### 재시도할 읽기 실패의 상태 노출 — 2026-09-10
 
 [상세](INGEST-READ-FAILURE-STATUS-2026-09-10.md), [실제 CLI/HTTP](INGEST-READ-FAILURE-STATUS-2026-09-10.json): size-limit/database-limit/unstable-session-file/unreadable-session-file을 오류0·ok로 숨기던 pipeline을 수정했다. 과거 skip dedup보다 먼저 오류를 기록·커서 유지하며 정상 원문은 저장한다. 8회귀 재현→관련45 passed / 20.11초·전체Ruff통과. 타입0오류/기존경고1개. 실제 CLI exit1/status failed/HTTP recent_stages 오류1·사유 확인, 복구 후exit0·중복0. 과거 한도 시험exit0과 다른 의도적 동작 변경이며 운영 미배포·전체/설치 검사는 이전13cab77 기준이다.
+
+### 읽기 실패의 전체 배치·HTTP 상태 인수 — 2026-09-10
+
+[상세](READ-FAILURE-BATCH-ACCEPTANCE-2026-09-10.md): 별도 sb run2회에서 크기 초과 ingest 실패→빈 compile 성공 이후에도 종료1, CLI/실제HTTP last_batch failed·오류1·사유 유지 확인. 새 통합 회귀1 passed / 3.70초·캐시 없는 전체Ruff통과. 기존 제품 로직으로 처리되어 제품 변경은 없고 회귀 추가. last_run 개별단계ok와 last_batch 전체실패를 구분하며 native/GUI/운영 인수로 확대하지 않는다.
