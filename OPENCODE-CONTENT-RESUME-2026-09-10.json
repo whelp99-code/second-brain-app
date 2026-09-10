@@ -1,0 +1,76 @@
+{
+  "root": "/var/tmp/sb-opencode-content-x1qv_gt1",
+  "commands": [
+    {
+      "args": [
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "ledger_rows": [
+    [
+      "snapshot.json#same-id",
+      "sha256:fce9be2da7d303c47047b07b7b7adf1c1c9f7aa688ccf0598dca3aa872539aa2",
+      "c9fbd865f5b1419c9e65d4381bfee26fb252a303d4cdd689aed446bf252ca847"
+    ],
+    [
+      "snapshot.json#same-id",
+      "sha256:5db4258aa826cc52fe9fa701cfa4b138ab7465961786e94d47727e147fad0548",
+      "cb0208b0b1fa06bc59f85c8b2be1e45ff2ef6ddbf0cef02e9f276b8208ea48ab"
+    ],
+    [
+      "snapshot.json#same-id",
+      "sha256:5d7f6ddb0ada0aec042bffdd56534bffa39269e20d471549d6a6ab9da87f9822",
+      "f9b0078b5df596d2ea19010c001bbd009e651de2c57e8fb7e355f31eb9d3f739"
+    ]
+  ],
+  "cas_bodies": [
+    "old text",
+    "new text",
+    "short"
+  ],
+  "scope": "isolated actual CLI and sealed ledger/CAS; synthetic source; no LLM or native client"
+}

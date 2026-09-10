@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -49,7 +50,7 @@ class OpenCodeSessionsAdapter:
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         previous = _cursor_map(cursor)
-        current: dict[str, int] = {}
+        current: dict[str, int | str] = {}
         if not self._roots:
             self._next_cursor = "0"
             yield (
@@ -67,10 +68,17 @@ class OpenCodeSessionsAdapter:
                     size = path.stat().st_size
                     if size > MAX_SNAPSHOT_BYTES:
                         raise _SnapshotSizeLimit
-                    current[rel] = size
-                    if start >= size:
+                    extracted = self._read_snapshot(path, rel, size)
+                    if any(meta.get("skip_reason") for _, _, meta in extracted):
+                        current[rel] = start
+                        items.extend(extracted)
                         continue
-                    items.extend(self._read_snapshot(path, rel, size))
+                    revision = _content_revision([
+                        (ref.source_uri, ref.source_version) for ref, _, _ in extracted
+                    ])
+                    current[rel] = revision
+                    if start != revision:
+                        items.extend(extracted)
                 except _SnapshotSizeLimit:
                     current[rel] = start
                     items.append(_skip(self.source_id, rel, "size-limit"))
@@ -84,7 +92,7 @@ class OpenCodeSessionsAdapter:
         return self._next_cursor
 
     def _read_snapshot(
-        self, path: Path, rel: str, size: int
+        self, path: Path, rel: str, _size: int
     ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
         with open_session_file(path) as stream:
             raw = stream.read(MAX_SNAPSHOT_BYTES + 1)
@@ -106,9 +114,9 @@ class OpenCodeSessionsAdapter:
                 if selected is None:
                     return [_skip(self.source_id, rel, "unsafe-database-path")]
                 extracted = _from_sqlite(selected)
-        token = str(size)
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         for item_id, text in extracted:
+            token = _content_revision([(item_id, text)])
             uri = f"{rel}#{item_id}"
             meta: ItemMeta = {"relative_path": rel, "cursor": token}
             items.append((SourceRef(self.source_id, uri, token), text.encode(), meta))
@@ -141,15 +149,25 @@ def _configured_roots(config: _ConnectorConfig) -> tuple[str, tuple[Path, ...]]:
     return source_id, tuple(found)
 
 
-def _cursor_map(cursor: str | None) -> dict[str, int]:
+def _content_revision(values: list[tuple[str, str]]) -> str:
+    raw = json.dumps(values, ensure_ascii=True, separators=(",", ":")).encode()
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _cursor_map(cursor: str | None) -> dict[str, int | str]:
     if cursor is None or cursor in {"", "0"}:
         return {}
     parsed = _obj(cursor.encode())
     if parsed is None:
         return {}
-    out: dict[str, int] = {}
+    out: dict[str, int | str] = {}
     for key, value in parsed.items():
-        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        if (
+            isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        ) or (
+            isinstance(value, str) and value.startswith("sha256:")
+            and len(value) == 71 and all(c in "0123456789abcdef" for c in value[7:])
+        ):
             out[key] = value
     return out
 

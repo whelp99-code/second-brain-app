@@ -1401,3 +1401,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### OpenCode snapshot 입력 크기 제한 — 2026-09-10
 
 [상세](OPENCODE-SNAPSHOT-SIZE-LIMIT-2026-09-10.md): 64 MiB 사전 검사 및 제한 읽기, 초과 파일 커서 보존/다른 파일 계속 수집/복구 재시도. 관련 50 passed (0.63초), Ruff 통과. 크기 기반 변경 감지와 참조 SQLite의 읽기 예산은 남아 있다. 설치 인수 및 전체 회귀는 이전 커밋 기준이며 이번 수정 포함 재실행은 아니다.
+
+### OpenCode 내용 기반 재개 — 2026-09-10
+
+[상세 및 한계](OPENCODE-CONTENT-RESUME-2026-09-10.md), [실제 CLI 결과](OPENCODE-CONTENT-RESUME-2026-09-10.json): 동일 크기 수정·축소·참조 SQLite 단독 변경·구형 커서에서 놓친 변경 4개를 재현하고 내용 해시 커서/항목 버전으로 수정했다. 관련 56 passed / 0.70초, walking-skeleton 2 passed / 3.99초, Ruff·basedpyright 통과. 실제 격리 CLI 4회 수집 결과 3개 원문/버전 보존·변경 없는 재실행 중복0. 구형 커서는 1회 재수집되며 매 scan 읽기 비용과 SQLite 예산·읽는 중 변경 일관성·다중 root 충돌은 남는다. 전체 회귀/설치 인수는 이전 커밋 기준이다.
