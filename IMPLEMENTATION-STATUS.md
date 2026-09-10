@@ -12,6 +12,7 @@
 | 정정 기억 공유 | Codex 저장→Claude 새 세션이 정정을 최신으로 판정. 다만 **정정이 기존 daily 페이지에 반영되지 않고 `wiki/_proposed`로 우회**되는 운영 결함 발견 | [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md) |
 | 실제 업무 자비스 계보 | **실제 검증 업무 본문**이 `memory classify`→승인→outbox→provider `proved`→새 reader 회수·철회403까지 통과(exit0). 본문이 CAS·컴파일 페이지·검색 색인에 실재함을 확인. 신원·정책·clock은 여전히 fixture | [계보 인수](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
 | 실패 결과 승격 차단 | 같은 실제 본문으로 10개 케이스 exit0. 근거 없음/만료/효력전/**검증 후 문장 변조**는 후보 생성 0, 자격 없는 입력4종·충돌은 사유와 함께 `rejected`. 발행은 정상 1건뿐 | [승격 차단 인수](REAL-WORK-REFUSAL-2026-09-10.md) |
+| 삭제 후 재등장 차단 | HEAD `d1d06e2`에서 재실행 exit0: 삭제→조회0, 복원이 high-water 승계(`seq 1`), 재삭제(`seq 2`)·재복원 뒤에도 **둘 다 0건**. 관련 단위20통과. 격리 fixture·모델호출0 | [삭제 수명](DELETION-LIFECYCLE-2026-09-10.md) |
 | 운영 자비스 전환 | 운영 authority `a3cbbbe`에 memory 모듈 **77개 부재**(`cli-memory-intake.js` 등, 371 vs 516). 운영에서의 계보 재현은 새 authority 활성화가 선행 조건 | [계보 인수 7절](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
 | 실사용 발견 결함 | 각주 중복(쉼표 span) **수정 완료**. `_proposed` 우회는 후보에 **이미 수정됨**(A/B 확인). 실패 오보는 **기전 확정**(운영 규모 쓰기18.51초 vs 클라이언트 타임아웃), 재시도 피해는 동일 바이트일 때 unit1개로 한정 | [각주 수정](FOOTNOTE-SPAN-SEPARATOR-2026-09-10.md), [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md), [쓰기 비용·중단 재현](WRITE-COST-AND-INTERRUPT-2026-09-10.md) |
 | `activated` 잔여 세대 | 포인터 교체 순간 중단으로 **재현 성공**(3/3, 원문은 저장됨). 격리에서는 다음 쓰기가 정리. 상태 기계가 두 릴리스에 동일해 운영 3행이 남는 이유는 **미규명·열린 항목** | [쓰기 비용·중단 재현 4절](WRITE-COST-AND-INTERRUPT-2026-09-10.md) |
