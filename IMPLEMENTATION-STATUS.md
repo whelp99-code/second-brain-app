@@ -10,6 +10,8 @@
 | 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex0.154.0은 운영 MCP 회수 성공(`--approve-for-me` 필요), scoped 인증 경로는 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md), [실제 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
 | 실제 업무 기억 공유 | 운영 경로에서 실제 검증 업무1건 저장→단일작성자 수집→**두 제품 새 세션 회수**(Claude·Codex), 근거없음0건·vault이탈 거부 | [실제 업무 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
 | 정정 기억 공유 | Codex 저장→Claude 새 세션이 정정을 최신으로 판정. 다만 **정정이 기존 daily 페이지에 반영되지 않고 `wiki/_proposed`로 우회**되는 운영 결함 발견 | [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md) |
+| 실제 업무 자비스 계보 | **실제 검증 업무 본문**이 `memory classify`→승인→outbox→provider `proved`→새 reader 회수·철회403까지 통과(exit0). 본문이 CAS·컴파일 페이지·검색 색인에 실재함을 확인. 신원·정책·clock은 여전히 fixture | [계보 인수](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
+| 운영 자비스 전환 | 운영 authority `a3cbbbe`에 memory 모듈 **77개 부재**(`cli-memory-intake.js` 등, 371 vs 516). 운영에서의 계보 재현은 새 authority 활성화가 선행 조건 | [계보 인수 7절](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
 | 실사용 발견 결함 | 각주 중복(쉼표 span)은 수정·회귀 추가 완료. 성공 쓰기의 실패 보고·`activated` 잔여 세대·`_proposed` 우회는 재현/수정 남음 | [각주 수정](FOOTNOTE-SPAN-SEPARATOR-2026-09-10.md), [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md) |
 | 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
 | 운영 전환 | UTC09-10 01:40 관측: DB 사용2서비스·유효lease1·관측불가22개, 전환보류; 운영 변경 없음 | [운영 재확인](OPS-RECHECK-2026-09-10-0140.md) |
