@@ -1,0 +1,54 @@
+{
+  "candidate_release": "c04dee1a11ff0833b634c30796924d1ea19f8a6a",
+  "production_current_unchanged": true,
+  "ops_backup": "/home/jm/.local/state/second-brain/backups/second-brain-20260910T032857+0900.tar.gz",
+  "ops_backup_bytes": 14990156,
+  "tiny": {
+    "init": {
+      "seconds": 0.2992,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "remember": {
+      "seconds": 0.4906,
+      "exit": 0,
+      "stdout": "inbox/2026-09-10T113937469296-m12-dr.md\n",
+      "stderr": ""
+    },
+    "backup": {
+      "seconds": 0.3037,
+      "exit": 0,
+      "stdout": "{\"archive\": \"/var/tmp/sb-m12-dr/tiny/state/backups/second-brain-20260910T203937+0900.tar.gz\", \"checksum\": \"5d52cb993a689d015c562fd628226b747024189ecebd97d5f08f8bdc2ba363af\", \"verification\": {\"schema_version\": 1, \"validation\": \"isolated-vault-restore-v1\", \"archive_name\": \"second-brain-20260910T203937+0900.tar.gz\", \"origin\": \"provider:provider:m12:tiny\", \"generation\": {\"provider_instance_id\": \"provider:m12:tiny\", \"tombstone_sequence\": 0, \"tombstone_set_root\": \"sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3\"}, \"archive_sha256\": \"5d52cb993a689d015c562fd628226b747024189ecebd97d5f08f8bdc2ba363af\", \"archive_identity\": {\"device\": 64770, \"inode\": 49724020, \"size\": 15588, \"mtime_ns\": 1789040377846267371, \"ctime_ns\": 1789040377846267371}, \"backup_created_at\": \"2026-09-10T11:39:37.835104+00:00\", \"verified_at\": \"2026-09-10T11:39:37.859307+00:00\", \"files\": 25, \"bytes\": 426000}, \"files\": 25, \"bytes\": 426000}\n",
+      "stderr": ""
+    },
+    "verify": {
+      "seconds": 0.2681,
+      "exit": 0,
+      "stdout": "{\"schema_version\":1,\"validation\":\"isolated-vault-restore-v1\",\"archive_name\":\"second-brain-20260910T203937+0900.tar.gz\",\"origin\":\"provider:provider:m12:tiny\",\"generation\":{\"provider_instance_id\":\"provider:m12:tiny\",\"tombstone_sequence\":0,\"tombstone_set_root\":\"sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3\"},\"archive_sha256\":\"5d52cb993a689d015c562fd628226b747024189ecebd97d5f08f8bdc2ba363af\",\"archive_identity\":{\"device\":64770,\"inode\":49724020,\"size\":15588,\"mtime_ns\":1789040377846267371,\"ctime_ns\":1789040377846267371},\"backup_created_at\":\"2026-09-10T11:39:37.835104+00:00\",\"verified_at\":\"2026-09-10T11:39:38.134373+00:00\",\"files\":25,\"bytes\":426000}\n",
+      "stderr": ""
+    },
+    "restore": {
+      "seconds": 0.2484,
+      "exit": 0,
+      "stdout": "{\"destination\": \"/var/tmp/sb-m12-dr/restore-tiny\", \"files\": 25, \"bytes\": 426000, \"previous\": null}\n",
+      "stderr": ""
+    },
+    "archive": "/var/tmp/sb-m12-dr/tiny/state/backups/second-brain-20260910T203937+0900.tar.gz"
+  },
+  "ops_archive_to_isolated_dest": {
+    "verify": {
+      "seconds": 1.0282,
+      "exit": 1,
+      "stdout": "",
+      "stderr": "BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH\n"
+    },
+    "restore": {
+      "seconds": 6.6887,
+      "exit": 0,
+      "stdout": "{\"destination\": \"/var/tmp/sb-m12-dr/restore-ops-backup\", \"files\": 17386, \"bytes\": 38779728, \"previous\": null}\n",
+      "stderr": ""
+    },
+    "destination": "/var/tmp/sb-m12-dr/restore-ops-backup"
+  }
+}
