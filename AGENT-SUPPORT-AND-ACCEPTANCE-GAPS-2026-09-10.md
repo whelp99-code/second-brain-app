@@ -15,6 +15,8 @@
 
 이번 실행: `tests/test_connectors_sessions_a.py`와 `tests/test_claude_native_sessions.py` **20 passed / 0.34초**. 이는 수집 형식·resume 등 fixture 회귀이며 실제 모든 에이전트 로그인·수집 활성화 검증이 아니다. 제품 변경 없음.
 
+W5 빈 격리 HOME: Claude 2.1.261 `mcp list`와 Codex 0.154.0 `--version`은 운영 홈 항목을 바꾸지 않았다. 인증·MCP 없는 프로필은 기억을 만들지 못해 M5 삭제 수명 **미지원**. [격리 경계](W5-NATIVE-ISOLATION-2026-09-10.md).
+
 ## 실제 업무 인수에서 필요한 식별 정보
 
 사용자에게 자비스 작업 ID 또는 원문 문서 경로, 공유할 프로젝트와 에이전트를 요청했다. 아직 답변을 받지 않았다. 선택한 업무에 대해 다음을 한 묶음으로 입증한다.
