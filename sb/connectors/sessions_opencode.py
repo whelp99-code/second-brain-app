@@ -12,6 +12,7 @@ from typing import Final, Protocol
 type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 
 from sb.connectors.base import ItemMeta, SourceAdapter
+from sb.connectors.session_checkpoint import open_session_file
 from sb.contracts import SourceRef
 
 ADAPTER_ID: Final = "opencode-sessions"
@@ -56,12 +57,16 @@ class OpenCodeSessionsAdapter:
         for root in self._roots:
             for path in _snapshot_paths(root):
                 rel = path.relative_to(root).as_posix()
-                size = path.stat().st_size
                 start = previous.get(rel, 0)
-                current[rel] = size
-                if start >= size:
-                    continue
-                items.extend(self._read_snapshot(path, rel, size))
+                try:
+                    size = path.stat().st_size
+                    current[rel] = size
+                    if start >= size:
+                        continue
+                    items.extend(self._read_snapshot(path, rel, size))
+                except OSError:
+                    current[rel] = start
+                    items.append(_skip(self.source_id, rel, "unreadable-session-file"))
         self._next_cursor = json.dumps(current, separators=(",", ":"), sort_keys=True)
         yield from items
 
@@ -71,7 +76,8 @@ class OpenCodeSessionsAdapter:
     def _read_snapshot(
         self, path: Path, rel: str, size: int
     ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
-        parsed = _obj(path.read_bytes())
+        with open_session_file(path) as stream:
+            parsed = _obj(stream.read())
         if parsed is None:
             return [_skip(self.source_id, rel, "invalid-format")]
         names: set[str] = (
