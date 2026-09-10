@@ -1348,3 +1348,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 인계 현재판·잔여 조건 재대조:** [수정/개선/고도화 목록과 최신 인증 HTTP 실패 구분](HANDOFF-CURRENT-GAPS-2026-09-10.md). native 소비자 재시험은 모델 호출 전503/PHONE_UPSTREAM_UNAVAILABLE로 중단, 근본 원인 미확정·과거 quota 재발로 단정하지 않음. 공개 오류 코드 진단 추가, inbox 관련22통과/6.61초·Node문법/diff통과. 이전 설치 성공과 최신 workspace 실패를 분리하며 운영/실업무 및 M1–M14 전체 목표 유지.
 
 **2026-09-10 인증 시험 날짜 불일치 해결:** [실제날짜 문서/고정조회시각→미래기억 stale→503 원인확인·fixture생성시각일치](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md). 비모델전체exit0, 최종Claude Code2.1.261 실제MCP1회/독립SDK2개각2records/HTTPS3회·후속전체exit0. Codex재시험은HTTP통과후사용량제한turn.failed·호출0,전체지원인수보류. 제품권한/유효기간불변·Ruff/diff통과·운영/실업무·전체목표유지.
+
+**2026-09-10 inbox 동일이름 원본 보존:** [done 덮어쓰기 실패재현→no-overwrite 게시·버전별보존·중단재시도](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md). 관련25통과/4.34초·Ruff전체/변경타입0오류0경고·실제CLI2회exit0/원본2/원장version2. 최종unlink경합·동일inode변경/전원장애전체증명·운영/실업무와전체목표유지.

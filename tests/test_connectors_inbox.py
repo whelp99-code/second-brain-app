@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
+
 from sb.connectors import discover_adapters
 from sb.connectors.base import AcknowledgingSourceAdapter, ItemMeta
 from sb.connectors.inbox_documents import ADAPTER_ID as INBOX_ID
@@ -114,6 +116,60 @@ def test_inbox_moves_parsed_file_to_done_after_success(tmp_path: Path) -> None:
     assert not source.exists()
     assert (inbox / ".done" / "keep.md").is_file()
     assert (inbox / ".done" / "keep.md").read_text(encoding="utf-8") == "move-me\n"
+
+
+def test_acknowledge_preserves_previous_file_with_same_name(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    done = inbox / ".done"
+    done.mkdir(parents=True)
+    (done / "keep.md").write_text("previous original\n")
+    source = inbox / "keep.md"
+    source.write_text("new original\n")
+    adapter = create(_cfg(inbox))
+    items = list(adapter.scan(None))
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    adapter.acknowledge(tuple(ref for ref, _, _ in items))
+    assert not source.exists()
+    assert (done / "keep.md").read_text() == "previous original\n"
+    assert sorted(path.read_text() for path in done.iterdir()) == [
+        "new original\n", "previous original\n"]
+
+
+@pytest.mark.parametrize("collision", [False, True])
+def test_acknowledge_resumes_published_file_after_unlink_failure(tmp_path, monkeypatch, collision):
+    import sb.connectors.inbox_documents as module
+
+    inbox = tmp_path / "inbox"
+    done = inbox / ".done"
+    done.mkdir(parents=True)
+    if collision:
+        (done / "keep.md").write_text("previous\n")
+    source = inbox / "keep.md"
+    source.write_text("current\n")
+    adapter = create(_cfg(inbox))
+    items = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    refs = tuple(ref for ref, _, _ in items)
+
+    def fail_unlink(*args, **kwargs):
+        raise OSError("simulated failure after publication")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(module.os, "unlink", fail_unlink)
+        with pytest.raises(OSError, match="after publication"):
+            adapter.acknowledge(refs)
+    assert source.read_text() == "current\n"
+    published = sorted(path.name for path in done.iterdir())
+    assert len(published) == (2 if collision else 1)
+    resumed = create(_cfg(inbox))
+    assert list(resumed.scan(cursor)) == []
+    assert isinstance(resumed, AcknowledgingSourceAdapter)
+    resumed.acknowledge(refs)
+    assert not source.exists()
+    assert sorted(path.name for path in done.iterdir()) == published
+    assert sorted(path.read_text() for path in done.iterdir()) == (
+        ["current\n", "previous\n"] if collision else ["current\n"])
 
 
 def test_inbox_rejects_oversize_file_and_leaves_it_in_place(tmp_path: Path) -> None:

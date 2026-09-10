@@ -96,7 +96,7 @@ class InboxDocumentsAdapter:
                 continue
             observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(body).hexdigest()}"
             if observed == token:
-                _move_done(self._root, path, rel)
+                _move_done(self._root, rel, token)
 
     def _ingest(
         self, path: Path, rel: str, previous: str | None
@@ -226,7 +226,7 @@ def _parse_body(suffix: str, body: bytes) -> _InboxText | str:
         return str(exc)
 
 
-def _move_done(root: Path, _path: Path, rel: str) -> None:
+def _move_done(root: Path, rel: str, version: str) -> None:
     parts = Path(rel).parts
     if not parts or Path(rel).is_absolute() or any(part in {".", ".."} for part in parts):
         return
@@ -247,7 +247,34 @@ def _move_done(root: Path, _path: Path, rel: str) -> None:
                 pass
             destination = os.open(part, flags, dir_fd=destination)
             descriptors.append(destination)
-        os.replace(parts[-1], parts[-1], src_dir_fd=source, dst_dir_fd=destination)
+        name = parts[-1]
+        original = os.stat(name, dir_fd=source, follow_symlinks=False)
+        if not stat_module.S_ISREG(original.st_mode):
+            raise OSError("inbox acknowledgement source is not regular")
+        # link is an atomic no-overwrite publication on this same filesystem.
+        # Keep the source until publication succeeds; recognize a previous link
+        # when retrying after interruption between publication and unlink.
+        archived = name
+        try:
+            os.link(name, archived, src_dir_fd=source, dst_dir_fd=destination,
+                    follow_symlinks=False)
+        except FileExistsError:
+            prior = os.stat(archived, dir_fd=destination, follow_symlinks=False)
+            if (prior.st_dev, prior.st_ino) != (original.st_dev, original.st_ino):
+                archived = "version-" + sha256((rel + "\0" + version).encode()).hexdigest() + Path(name).suffix
+                try:
+                    os.link(name, archived, src_dir_fd=source, dst_dir_fd=destination,
+                            follow_symlinks=False)
+                except FileExistsError:
+                    prior = os.stat(archived, dir_fd=destination, follow_symlinks=False)
+                    if (prior.st_dev, prior.st_ino) != (original.st_dev, original.st_ino):
+                        raise
+        published = os.stat(archived, dir_fd=destination, follow_symlinks=False)
+        current = os.stat(name, dir_fd=source, follow_symlinks=False)
+        if any((entry.st_dev, entry.st_ino) != (original.st_dev, original.st_ino)
+               for entry in (published, current)):
+            raise OSError("inbox acknowledgement source changed")
+        os.unlink(name, dir_fd=source)
     finally:
         for descriptor in reversed(descriptors):
             os.close(descriptor)
