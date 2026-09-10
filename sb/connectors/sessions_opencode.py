@@ -23,6 +23,11 @@ DEFAULT_ROOTS: Final = (
     Path.home() / ".opencode",
 )
 _LIVE: Final = frozenset({"opencode.db-wal", "opencode.db-shm", "auth.json"})
+MAX_SNAPSHOT_BYTES: Final = 64 * 1024 * 1024
+
+
+class _SnapshotSizeLimit(OSError):
+    """Snapshot exceeded the bounded input budget; retain its retry cursor."""
 
 
 class _ConnectorConfig(Protocol):
@@ -60,10 +65,15 @@ class OpenCodeSessionsAdapter:
                 start = previous.get(rel, 0)
                 try:
                     size = path.stat().st_size
+                    if size > MAX_SNAPSHOT_BYTES:
+                        raise _SnapshotSizeLimit
                     current[rel] = size
                     if start >= size:
                         continue
                     items.extend(self._read_snapshot(path, rel, size))
+                except _SnapshotSizeLimit:
+                    current[rel] = start
+                    items.append(_skip(self.source_id, rel, "size-limit"))
                 except OSError:
                     current[rel] = start
                     items.append(_skip(self.source_id, rel, "unreadable-session-file"))
@@ -77,7 +87,10 @@ class OpenCodeSessionsAdapter:
         self, path: Path, rel: str, size: int
     ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
         with open_session_file(path) as stream:
-            parsed = _obj(stream.read())
+            raw = stream.read(MAX_SNAPSHOT_BYTES + 1)
+        if len(raw) > MAX_SNAPSHOT_BYTES:
+            raise _SnapshotSizeLimit
+        parsed = _obj(raw)
         if parsed is None:
             return [_skip(self.source_id, rel, "invalid-format")]
         names: set[str] = (
