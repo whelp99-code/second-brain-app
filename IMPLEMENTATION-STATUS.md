@@ -7,7 +7,8 @@
 | 범위 | 최신 확인 결과 | 증거 |
 |---|---|---|
 | 설치물 자비스 연결 | d4cbdda 후보 25d49b4: paired 연동·유지보수 exit0, 철회/만료 4종·FK0·inventory 불변·production_activated false; 합성 신원·clock | [후보 인수](CONTINUATION-INSTALLED-PAIR-2026-09-10.md), [이전 13cab77](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md) |
-| 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex는 사용량 제한으로 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md) |
+| 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex0.154.0은 운영 MCP 회수 성공(`--approve-for-me` 필요), scoped 인증 경로는 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md), [실제 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
+| 실제 업무 기억 공유 | 운영 경로에서 실제 검증 업무1건 저장→단일작성자 수집→**두 제품 새 세션 회수**(Claude·Codex), 근거없음0건·vault이탈 거부 | [실제 업무 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
 | 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
 | 운영 전환 | UTC09-10 01:40 관측: DB 사용2서비스·유효lease1·관측불가22개, 전환보류; 운영 변경 없음 | [운영 재확인](OPS-RECHECK-2026-09-10-0140.md) |
 | scoped 검색 | 1,000페이지 각5회: 전체허용 p50 2.023초, 허용1개 p50 0.317초; library 측정 | [연결 공유 검증](SCOPED-SHARED-READ-2026-09-10.md) |

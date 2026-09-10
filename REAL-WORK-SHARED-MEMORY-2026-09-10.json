@@ -1,0 +1,166 @@
+{
+  "generated_at": "2026-09-10T03:26:00Z",
+  "purpose": "실제 사용자 업무 한 건을 실제 에이전트 제품 두 개가 운영 세컨드브레인을 통해 공유",
+  "operational_entry_point": {
+    "agent_mcp_launcher": "/home/jm/.local/bin/second-brain-agent-mcp",
+    "sb_binary": "/home/jm/.local/state/second-brain/app/current/bin/sb",
+    "active_release": "41f0751aca8906d612961e704bc60dd0855fdabd",
+    "config": "/home/jm/.config/second-brain/config.toml",
+    "registered_in": {
+      "claude_code": "2.1.261 (claude mcp list: connected)",
+      "codex_cli": "0.154.0 (codex mcp list: second-brain enabled)"
+    },
+    "activation_changed": false
+  },
+  "work_item": {
+    "description": "2026-09-10 second-brain-app 검증 결과 (HEAD d4cbdda 전체 회귀 + 릴리스 후보 25d49b4 paired 인수)",
+    "verified_before_storage": {
+      "pytest": "1785 passed / 2 skipped / 569.06s / exit 0",
+      "ruff": "exit 0",
+      "basedpyright": "0 errors 0 warnings",
+      "check_release_integration": "exit 0",
+      "check_release_maintenance": "exit 0"
+    },
+    "source_documents": [
+      "CONTINUATION-FULL-REGRESSION-2026-09-10.md",
+      "CONTINUATION-INSTALLED-PAIR-2026-09-10.md"
+    ],
+    "repo_commit": "1c203ed"
+  },
+  "write": {
+    "client": "Claude Code 2.1.261",
+    "session_id": "b78bbcda-60ab-43ad-8e79-77db513d27f9",
+    "tool": "mcp__second-brain__sb_remember",
+    "receipt": {
+      "inbox_path": "inbox/2026-09-10T031904232122-세컨드브레인-d4cbdda-검증과-릴리스-후보-25d49b4-인수.md"
+    },
+    "stored_bytes": 684,
+    "stored_sha256": "8d98629a024cdba18221c4e4fb88b54f3a2f2954831a291b715c9f16bcd971c7"
+  },
+  "ingest": {
+    "unit": "jm-second-brain-refresh.service (운영 시간별 타이머와 동일 단위)",
+    "result": "success",
+    "exec_main_status": 0,
+    "wall_seconds": 49.084,
+    "runs": [
+      {
+        "run": "f997ea6c56264f218a4dca90f738e9cb",
+        "pages": 1,
+        "errors": 0
+      },
+      {
+        "run": "c0898f00d14b4f24b4de6249edd18762",
+        "pages": 1,
+        "errors": 0,
+        "compiled": "inbox-2026-09-10t031904232122-…-df9d6669"
+      },
+      {
+        "run": "f44fc54497e342ce97dd35c3bb8e662f",
+        "pages": 1,
+        "errors": 0
+      }
+    ]
+  },
+  "lineage": {
+    "ledger_source_item": {
+      "source_id": "inbox",
+      "source_version": "1789010462090458520:684:8d98629a024cdba18221c4e4fb88b54f3a2f2954831a291b715c9f16bcd971c7",
+      "content_hash": "8d98629a024cdba18221c4e4fb88b54f3a2f2954831a291b715c9f16bcd971c7",
+      "first_seen_run": "f997ea6c56264f218a4dca90f738e9cb"
+    },
+    "ledger_unit": {
+      "unit_id": "ed22ceff04b98742872c9ef3643a43c3a5b5d4f4f3c3211809d96b3e781484f1",
+      "span": "0-480",
+      "normalizer_version": "v2"
+    },
+    "derivations": [
+      {
+        "stage": "compile",
+        "deriv_key": "7e0da3ad0550be4bf94f6d52599022087e4dd28c4a10354495f6888794d9c74f",
+        "output_path": "wiki/inbox-2026-09-10t031904232122-세컨드브레인-d4cbdda-검증과-릴리스-후보-25d49b4-인수-df9d6669.md",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "stage": "brief",
+        "deriv_key": "392ee46e68166c72fd610adff4b10242c3c6b2efbce15004f5b758d33643948c",
+        "output_path": "daily/2026-09-10.md",
+        "status": "done",
+        "attempts": 1
+      }
+    ],
+    "generation": {
+      "generation_id": "sbgen:v1:0d8e8501c061d241f1c66bf1a3d42e1a1f921623f654085ed1e9566495afe97f",
+      "parent_generation_id": "sbgen:v1:c7b034c3e6dba61a6abd53f420747e6e462526e1d9cf0516e500713ba47e76a9",
+      "head": "a3e1c50f30f9b18125b29d5d11881cbec25e6635",
+      "created_at": "2026-09-10T03:20:44.669Z",
+      "file_count": 17344
+    },
+    "vault_commit": "a3e1c50 sealed generation"
+  },
+  "recall": [
+    {
+      "client": "Claude Code 2.1.261",
+      "product": "claude-code",
+      "session_id": "a7089fa6-a53b-46ff-98b8-d96b29a176eb",
+      "new_session": true,
+      "tools": [
+        "sb_search",
+        "sb_read_page"
+      ],
+      "page_id": "daily/2026-09-10",
+      "reported": {
+        "release_candidate": "25d49b4367945c8fa01ea71f2d83932d8da934d8",
+        "wheel_sha256": "aa6fad5fc76ebda509ad3ac616b4e94b538bad2ae2161c83b86158a09a886dcf",
+        "origin": "inbox:2026-09-10T031904232122-세컨드브레인-d4cbdda-검증과-릴리스-후보-25d49b4-인수.md",
+        "hash": "8d98629a024cdba18221c4e4fb88b54f3a2f2954831a291b715c9f16bcd971c7"
+      }
+    },
+    {
+      "client": "Codex CLI 0.154.0 (model gpt-6-astra)",
+      "product": "codex",
+      "session_log": "/var/tmp/codex-recall2.log",
+      "new_session": true,
+      "tools": [
+        "sb_search",
+        "sb_read_page"
+      ],
+      "page_id": "daily/2026-09-10",
+      "reported": {
+        "release_candidate": "25d49b4367945c8fa01ea71f2d83932d8da934d8",
+        "wheel_sha256": "aa6fad5fc76ebda509ad3ac616b4e94b538bad2ae2161c83b86158a09a886dcf",
+        "origin": "inbox:2026-09-10T031904232122-세컨드브레인-d4cbdda-검증과-릴리스-후보-25d49b4-인수.md",
+        "hash": "8d98629a024cdba18221c4e4fb88b54f3a2f2954831a291b715c9f16bcd971c7"
+      },
+      "notes": "codex exec는 --approve-for-me 없이는 MCP 호출을 approval policy never로 거부한다. codex_login refresh token 오류는 로그에 남지만 이번 실행을 막지 않았다."
+    }
+  ],
+  "negative_controls": [
+    {
+      "client": "Claude Code 2.1.261",
+      "session_id": "97361b62-27f5-46e8-9a88-d979768ac02c",
+      "unknown_query": {
+        "query": "zzq내부에없는키워드20260910",
+        "result": {
+          "results": []
+        },
+        "fabrication": false
+      },
+      "vault_escape": {
+        "id": "../../../etc/passwd",
+        "error": "page_id escapes vault: ../../../etc/passwd"
+      }
+    }
+  ],
+  "observed_defect": {
+    "what": "운영 릴리스 41f0751a가 컴파일한 wiki 페이지에 같은 sid의 각주 정의가 2줄(span 있는 것과 없는 것) 남는다",
+    "page": "wiki/inbox-2026-09-10t031904232122-세컨드브레인-d4cbdda-검증과-릴리스-후보-25d49b4-인수-df9d6669.md",
+    "fixed_in": "현재 HEAD/후보 25d49b4의 sb/vault.py span-우선 각주 dedup",
+    "operational_impact": "운영 릴리스가 후보보다 오래되어 이미 수정된 결함이 실제 사용자 기억에 남는다"
+  },
+  "remaining_gaps": [
+    "JARVIS 작업→검증 결과→candidate→영수증 계보: 운영 authority 릴리스 a3cbbbe에는 memory intake CLI가 없고, 새 릴리스 활성화는 운영 전환 보류 대상",
+    "불허 프로젝트 범위 거부는 scoped MCP 경로의 증거이며 이번 운영 agent MCP 경로에서는 vault 이탈 거부만 확인",
+    "정정·삭제 후 재사용 차단은 운영 tombstone high-water를 영구히 올리므로 사용자 승인 전까지 수행하지 않음"
+  ]
+}

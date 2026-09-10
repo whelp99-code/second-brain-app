@@ -28,4 +28,15 @@
 
 현재의 병목은 단일 검색 속도만이 아니다. 실제 업무 인수와 M1–M9의 인증·계보·수명 연결을 우선하고, M10 실제 질문집·M11 MCP/동시 갱신·M12 복구·M13 GUI 인수를 병행한다. M14 그래프 및 hybrid 기본 활성화는 검색 품질 이득·삭제 일관성 근거 전까지 보류한다. 사용자 응답을 합성 작업으로 대신해 실제 업무 완료를 선언하지 않는다.
 
-최신 설치 인수: [13cab77 설치물](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md). OpenCode 수집 근거: [출처 분리·정상 CLI와 모호한 설정 거부](OPENCODE-SOURCE-ISOLATION-2026-09-10.md), [읽기 중 변경](OPENCODE-SNAPSHOT-STABILITY-2026-09-10.md), [SQLite 제한/복구](OPENCODE-DATABASE-LIMITS-2026-09-10.md). 모두 native 모델의 자동 수집·주입 전체 인수와 구분한다. 최신 운영 읽기 관측은 [UTC01:40 재확인](OPS-RECHECK-2026-09-10-0140.md)을 따른다.
+## 후속 갱신 — 운영 경로의 실제 업무 공유(2026-09-10)
+
+이후 실제 업무 한 건을 운영 agent MCP로 저장하고 두 제품이 각자 새 세션에서 회수했다. 위 표의 "미확인" 문구를 이 결과로 일괄 확대하지 말고 아래 범위로만 갱신한다.
+
+- Claude Code 2.1.261: 운영 MCP로 `sb_remember` 저장 영수증, 별도 새 세션의 `sb_search`+`sb_read_page` 회수, 근거 없는 질의의 빈 결과와 vault 이탈 거부까지 확인.
+- Codex CLI 0.154.0: 같은 운영 MCP에서 새 세션 회수 성공. 단 `codex exec`는 `--approve-for-me` 없이는 MCP 호출을 approval policy로 거부하며, 이 옵션은 `-s/--sandbox`와 함께 쓸 수 없다. 로그의 `refresh_token_invalidated`는 이번 실행을 막지 않았다.
+- 두 제품 모두 **자동 수집·자동 문맥 주입·세션 사본 삭제 수명은 여전히 미확인**이다. 이번 증거는 명시적 저장과 명시적 조회 경로다.
+- 사용자에게 요청했던 자비스 작업 ID는 여전히 받지 못했다. 대신 오늘 실제로 수행·검증한 개발 업무를 대상으로 삼았고, JARVIS 계보(candidate→영수증)는 운영 authority 릴리스에 memory CLI가 없어 미완으로 남는다.
+
+근거: [실제 업무 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md).
+
+최신 설치 인수: [d4cbdda 후보 25d49b4](CONTINUATION-INSTALLED-PAIR-2026-09-10.md), 이전 [13cab77 설치물](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md). OpenCode 수집 근거: [출처 분리·정상 CLI와 모호한 설정 거부](OPENCODE-SOURCE-ISOLATION-2026-09-10.md), [읽기 중 변경](OPENCODE-SNAPSHOT-STABILITY-2026-09-10.md), [SQLite 제한/복구](OPENCODE-DATABASE-LIMITS-2026-09-10.md). 모두 native 모델의 자동 수집·주입 전체 인수와 구분한다. 최신 운영 읽기 관측은 [UTC01:40 재확인](OPS-RECHECK-2026-09-10-0140.md)을 따른다.
