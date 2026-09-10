@@ -4,7 +4,7 @@
 
 | 범위 | 최신 확인 결과 | 증거 |
 |---|---|---|
-| 설치물 자비스 연결 | 제품 f0fec14: 실제 TLS/MCP 저장→완료→새 로그인 재조회, 독립 reader2개; 합성 신원·업무 | [설치 인수](INSTALLED-INBOX-PAIR-2026-09-10.md) |
+| 설치물 자비스 연결 | 제품8e5b4a3/후속검사5f242ed: 실제 TLS/MCP 저장→완료→새 로그인 재조회, 독립 reader2개; 합성 신원·업무 | [최신 설치 인수](INSTALLED-SHARED-READ-2026-09-10.md) |
 | 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex는 사용량 제한으로 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md) |
 | 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
 | 운영 전환 | UTC09-10 00:28 관측: DB 사용2서비스·유효lease1, 전환보류; 운영 변경 없음 | [운영 관측](MAINTENANCE-CLI-AND-OPS-2026-09-10.md) |
@@ -1387,3 +1387,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 scoped 연결 공유:** [조회별readonly연결1개·정상/오류종료닫힘·끝난reader거부](SCOPED-SHARED-READ-2026-09-10.md). 관련51통과·실제HTTP/CLI/MCP전체exit0·Ruff/타입0오류0경고. 전체허용p50 2.308→2.023초/허용1개0.317초. 소표본library·운영/전체목표유지.
 
 **2026-09-10 공유연결 변조 검사:** [scope유무실제원장변경·권한검사직후manifest/ledger변경모두반환차단](SCOPED-SHARED-READ-MUTATION-2026-09-10.md). 관련21통과/13.96초·Ruff/diff. 제품8e5b4a3불변·운영/전체목표유지.
+
+**2026-09-10 최신 scoped 설치 인수:** [5f242ed archive/offline→paired/maintenance exit0](INSTALLED-SHARED-READ-2026-09-10.md). 독립2reader각2/settlement1/FK0·철회/만료·SIGKILL정리1/replay0·기억보존3회·paired설치물불변. 합성fixture/native0·운영변경없음·전체목표유지.
