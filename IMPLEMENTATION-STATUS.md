@@ -1413,3 +1413,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### OpenCode snapshot 읽기 일관성 — 2026-09-10
 
 [상세](OPENCODE-SNAPSHOT-STABILITY-2026-09-10.md), [정상 CLI 재검증](OPENCODE-SNAPSHOT-STABILITY-2026-09-10.json): 공통 file_revision으로 JSON 읽기 전후 식별자/크기/시각을 비교한다. 변경 시 unstable-session-file·본문 배제·커서 보존. 실제 같은 길이 덮어쓰기/atomic replace 회귀 2개를 수정했고 관련 64 passed / 0.72초, Ruff·basedpyright 통과. 실제 CLI 4회에서 3개 원문/버전·중복0 유지. 참조 DB와 상위 경로 교체, native 동시 쓰기 및 운영 인수는 남는다.
+
+### OpenCode 다중 root 출처 분리 — 2026-09-10
+
+[상세·설정 예시](OPENCODE-SOURCE-ISOLATION-2026-09-10.md), [실제 CLI 결과](OPENCODE-SOURCE-ISOLATION-2026-09-10.json): 동일 source ID에 여러 root를 묶어 출처/커서가 충돌하던 경로에 기존 ambiguous-session-roots 보류 규칙을 적용했다. 고유 sources.id별 명시적 설정은 실제 CLI에서 별도 원장/커서·A 변경 시 B 불변·재실행 중복0 확인. 모호한 설정은 CLI 재시작 2회 모두 오류·원장/커서 기록0. 관련 74 passed / 0.77초, CLI 통합 9 passed / 28.60초, Ruff·basedpyright 통과. source ID 임의 변경·운영 자동 설정 이전은 수행하지 않았고 native/운영 인수는 미완이다.

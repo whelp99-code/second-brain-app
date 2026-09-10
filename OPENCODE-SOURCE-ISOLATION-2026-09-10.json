@@ -1,0 +1,80 @@
+{
+  "root": "/var/tmp/sb-opencode-multi-source-ewpu5j96",
+  "commands": [
+    {
+      "args": [
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "before": [
+    [
+      "agent-a",
+      "snapshot.json#same-id",
+      "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+      "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+    ],
+    [
+      "agent-b",
+      "snapshot.json#same-id",
+      "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+      "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+    ]
+  ],
+  "after": [
+    [
+      "agent-a",
+      "snapshot.json#same-id",
+      "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+      "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+    ],
+    [
+      "agent-a",
+      "snapshot.json#same-id",
+      "sha256:e6df26fe82c4d8f7b99d40b9b5c515818d621d13addff651afe63e3852adb2e3",
+      "b92d13bbe02db7ca7686a8e7b854de49c7455948c05cf91a47044278395e212e"
+    ],
+    [
+      "agent-b",
+      "snapshot.json#same-id",
+      "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+      "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+    ]
+  ],
+  "cursors_before": {
+    "agent-a": "{\"snapshot.json\":\"sha256:2127d8ee57d446cc84863b24560148c210775f57c3752500ecb59659f4585224\"}",
+    "agent-b": "{\"snapshot.json\":\"sha256:2127d8ee57d446cc84863b24560148c210775f57c3752500ecb59659f4585224\"}"
+  },
+  "cursors_after": {
+    "agent-a": "{\"snapshot.json\":\"sha256:a28fe89d9c197e59e180897ae803f3b61f839119564e0b61527b82a5a9ecfd76\"}",
+    "agent-b": "{\"snapshot.json\":\"sha256:2127d8ee57d446cc84863b24560148c210775f57c3752500ecb59659f4585224\"}"
+  },
+  "scope": "two explicit sources through actual CLI; synthetic exports; no native clients"
+}

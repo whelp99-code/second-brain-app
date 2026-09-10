@@ -85,12 +85,17 @@ def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
     assert after["agent-0"] != cursors["agent-0"]
 
 
-@pytest.mark.parametrize("kind", list(FACTORIES))
+@pytest.mark.parametrize("kind", [*FACTORIES, "opencode"])
 def test_ambiguous_roots_fail_cli_on_every_restart(tmp_path, kind):
     roots = [tmp_path / "a", tmp_path / "b"]
     for root in roots:
         root.mkdir()
-        (root / "session.jsonl").write_bytes(record(kind, "same-id"))
+        if kind == "opencode":
+            (root / "snapshot.json").write_text(
+                '{"parts":[{"id":"same-id","data":{"type":"text","text":"same body"}}]}'
+            )
+        else:
+            (root / "session.jsonl").write_bytes(record(kind, "same-id"))
     vault = tmp_path / "vault"
     config = tmp_path / "config.toml"
     config.write_text(
