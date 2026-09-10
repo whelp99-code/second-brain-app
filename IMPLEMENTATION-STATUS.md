@@ -1,6 +1,6 @@
 # 현재 인수 상태 — 2026-09-10
 
-> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 후보 `14a6ed7` 유지보수·fixture 연동 EXIT 0. JARVIS는 기존 페어 `195b1a7` dist. `--work` 실무 게이트·새 JARVIS artifact·운영 전환 미실행. [W3.3](W3-GATES-2026-09-10.md).
+> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 후보 `14a6ed7` 유지보수·fixture·`--work` 연동 모두 EXIT 0. JARVIS는 기존 페어 `195b1a7` dist. 새 JARVIS artifact·운영 전환 미실행. [W3.4](W3-WORK-GATE-2026-09-10.md).
 
 > **회신 검토 보완:** [CODEX-REPLY-REVIEW-2026-09-10.md](CODEX-REPLY-REVIEW-2026-09-10.md). 두 후보 wheel은 서로 다르며, Codex 사본 0건은 해당 관측 범위로 제한한다. 후속 운영 인수와 M3·M5 및 M8–M13 작업은 이 보완을 함께 적용한다.
 
