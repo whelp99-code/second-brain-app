@@ -14,6 +14,7 @@ type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.session_checkpoint import (
     CHECKPOINT_KEY,
+    open_session_file,
     read_checkpoints,
     read_session_checkpoint,
 )
@@ -98,7 +99,7 @@ class CodexSessionsAdapter:
         consumed = start
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         state = _State()
-        with path.open("rb") as handle:
+        with open_session_file(path) as handle:
             if start > 0:
                 for line in handle.read(start).splitlines():
                     parsed = _obj(line.strip())

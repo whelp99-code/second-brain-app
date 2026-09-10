@@ -13,6 +13,7 @@ type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.session_checkpoint import (
     CHECKPOINT_KEY,
+    open_session_file,
     read_checkpoints,
     read_session_checkpoint,
 )
@@ -99,7 +100,7 @@ class OmoSessionsAdapter:
     ) -> tuple[list[tuple[SourceRef, bytes, ItemMeta]], int]:
         consumed = start
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
-        with path.open("rb") as handle:
+        with open_session_file(path) as handle:
             _ = handle.seek(start)
             while True:
                 raw = handle.readline()

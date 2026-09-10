@@ -1,6 +1,8 @@
 """A byte offset must not silently consume a different session file prefix."""
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,33 @@ from sb.connectors.sessions_omo import OmoSessionsAdapter
 from sb.contracts import SourceRef
 
 FACTORIES = {"claude": ClaudeSessionsAdapter, "codex": CodexSessionsAdapter, "omo": OmoSessionsAdapter, "gjc": GjcSessionsAdapter}
+
+
+@pytest.mark.parametrize('kind', tuple(FACTORIES))
+def test_fifo_replacement_after_revision_check_does_not_block(tmp_path, kind):
+    program = '''
+import importlib, json, os, sys
+from pathlib import Path
+import sb.connectors.session_checkpoint as checkpoint
+root = Path(sys.argv[3])
+path = root / 'session.jsonl'
+path.write_bytes(b'{}\\n')
+revision = checkpoint.file_revision
+def replace_after_check(selected):
+    value = revision(selected)
+    selected.unlink()
+    os.mkfifo(selected)
+    return value
+checkpoint.file_revision = replace_after_check
+factory = getattr(importlib.import_module('sb.connectors.sessions_' + sys.argv[1]), sys.argv[2])
+adapter = factory((root,), 'fixture')
+rows = list(adapter.scan(None))
+assert len(rows) == 1 and rows[0][2]['skip_reason'] == 'unreadable-session-file'
+assert json.loads(adapter.next_cursor())['session.jsonl'] == 0
+'''
+    result = subprocess.run([sys.executable, '-c', program, kind, FACTORIES[kind].__name__, str(tmp_path)],
+                            capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 0, result.stderr
 
 def record(kind: str, marker: str) -> bytes:
     if kind == "omo":

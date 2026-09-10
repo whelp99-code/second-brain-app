@@ -11,6 +11,7 @@ from typing import Final, Protocol
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.session_checkpoint import (
     CHECKPOINT_KEY,
+    open_session_file,
     read_checkpoints,
     read_session_checkpoint,
 )
@@ -101,7 +102,7 @@ class GjcSessionsAdapter:
     ) -> tuple[list[tuple[SourceRef, bytes, ItemMeta]], int]:
         consumed = start
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
-        with path.open("rb") as handle:
+        with open_session_file(path) as handle:
             # The cursor is a byte offset, not evidence of an approved export.
             # Revalidate the first nonblank line even after an earlier rejection.
             while True:

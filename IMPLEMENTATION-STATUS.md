@@ -1391,3 +1391,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 최신 scoped 설치 인수:** [5f242ed archive/offline→paired/maintenance exit0](INSTALLED-SHARED-READ-2026-09-10.md). 독립2reader각2/settlement1/FK0·철회/만료·SIGKILL정리1/replay0·기억보존3회·paired설치물불변. 합성fixture/native0·운영변경없음·전체목표유지.
 
 **2026-09-10 클라이언트/실사용 인수 재대조:** [Claude/Codex/OMO/OpenCode/GJC/SDK 지원범위·실제작업식별정보](AGENT-SUPPORT-AND-ACCEPTANCE-GAPS-2026-09-10.md). 관련수집20통과/0.34초·제품변경없음. 사용자작업/프로젝트/공유agent질문pending. 실제업무·native수명·운영및M1–M14전체목표유지.
+
+**2026-09-10 JSONL 세션 열기 경합:** [revision검사후FIFO교체·실제Codex10초대기재현→네adapter비차단일반파일열기](SESSION-OPEN-RACE-2026-09-10.md). 관련50통과/0.60초·Ruff/변경타입0오류0경고·cursor보존. 운영세션변경없음·전체목표유지.

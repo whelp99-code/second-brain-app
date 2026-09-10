@@ -5,9 +5,10 @@ import hashlib
 import json
 import os
 import stat
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from pathlib import Path
-from typing import cast
+from typing import IO, cast
 
 from sb.connectors.base import ItemMeta
 from sb.contracts import SourceRef
@@ -16,6 +17,19 @@ type SessionRows = list[tuple[SourceRef, bytes, ItemMeta]]
 type SessionReader = Callable[[Path, str, int], tuple[SessionRows, int]]
 
 CHECKPOINT_KEY = "__sb_session_prefix_sha256_v1__"
+
+
+@contextmanager
+def open_session_file(path: Path) -> Generator[IO[bytes]]:
+    """Reject links and special files at open time without waiting for a writer."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | getattr(os, 'O_CLOEXEC', 0))
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError('session reader requires a regular file')
+        with os.fdopen(descriptor, 'rb', closefd=False) as stream:
+            yield stream
+    finally:
+        os.close(descriptor)
 
 
 def read_checkpoints(cursor: str | None) -> dict[str, str]:
