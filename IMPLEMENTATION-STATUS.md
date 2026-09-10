@@ -15,7 +15,7 @@
 | 설치물 자비스 연결 | 기준 후보 c04dee1 / 소스4aa7111 / wheel ac8fcd16…: 표준·실제 업무 gate 통과, 신원·정책·clock은 fixture. 이후 추가된 doctor 경고는 이 후보에 없음 | [계보 인수](REAL-WORK-JARVIS-LINEAGE-2026-09-10.json), [최신 검토](CODEX-FOLLOWUP-REVIEW-2026-09-10.md) |
 | 실제 모델 클라이언트 | Claude Code2.1.261 해당 인증 시험 통과; Codex0.154.0은 운영 MCP 회수 성공 이력, scoped 인증 경로는 미완. 당시 실행 옵션은 해당 버전·환경의 관측이며 현재 승인 정책 변경 지시가 아님 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md), [실제 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
 | 실제 업무 기억 공유 | 운영 경로에서 실제 검증 업무1건 저장→단일작성자 수집→**두 제품 새 세션 회수**(Claude·Codex), 근거없음0건·vault이탈 거부 | [실제 업무 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
-| 정정 기억 공유 | Codex 저장→Claude 새 세션이 정정을 최신으로 판정. 다만 **정정이 기존 daily 페이지에 반영되지 않고 `wiki/_proposed`로 우회**되는 운영 결함 발견 | [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md) |
+| 정정 기억 공유 | 운영은 여전히 `_proposed` 우회. **코드**는 marker 없는 compiled 페이지를 dest에 쓰도록 고쳤다. 운영 세대 compile은 전환 전 | [W1](W1-COMPILED-MARKER-RECOVERY-2026-09-10.md), [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md) |
 | 실제 업무 자비스 계보 | **실제 검증 업무 본문**이 `memory classify`→승인→outbox→provider `proved`→새 reader 회수·철회403까지 통과(exit0). 본문이 CAS·컴파일 페이지·검색 색인에 실재함을 확인. 신원·정책·clock은 여전히 fixture | [계보 인수](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
 | 실패 결과 승격 차단 | 같은 실제 본문으로 10개 케이스 exit0. 근거 없음/만료/효력전/**검증 후 문장 변조**는 후보 생성 0, 자격 없는 입력4종·충돌은 사유와 함께 `rejected`. 발행은 정상 1건뿐 | [승격 차단 인수](REAL-WORK-REFUSAL-2026-09-10.md) |
 | 삭제 후 재등장 차단 | HEAD `d1d06e2`에서 재실행 exit0: 삭제→조회0, 복원이 high-water 승계(`seq 1`), 재삭제(`seq 2`)·재복원 뒤에도 **둘 다 0건**. 관련 단위20통과. 격리 fixture·모델호출0 | [삭제 수명](DELETION-LIFECYCLE-2026-09-10.md) |

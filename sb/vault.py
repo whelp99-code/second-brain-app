@@ -18,7 +18,7 @@ from typing import Final, Protocol, cast, override
 import yaml
 
 from sb.contracts import PageSpec, SourceCite
-from sb.store import parse_compiled_by
+from sb.store import parse_compiled_by, parse_page_frontmatter
 
 BOT_NAME: Final = "second-brain-bot"
 BOT_EMAIL: Final = "sb@local"
@@ -376,6 +376,12 @@ def init_vault(root: str | Path) -> Vault:
     return Vault(root=root_path)
 
 
+def _divert_to_proposed(dest: Path, previous: str | None) -> bool:
+    if previous is not None:
+        return hashlib.sha256(dest.read_bytes()).hexdigest() != previous
+    return parse_page_frontmatter(dest.read_text(encoding="utf-8")) is None
+
+
 def _plan_writes(
     root: Path,
     planned: Sequence[tuple[Path, PageSpec]],
@@ -398,9 +404,7 @@ def _plan_writes(
             compiled_by=f"{package_stamp}|{prompt_version}|{model_id}",
             updated=updated,
         )
-        if dest.is_file() and hashlib.sha256(
-            dest.read_bytes()
-        ).hexdigest() != ledger.last_compiled_hash(page.page_id):
+        if dest.is_file() and _divert_to_proposed(dest, ledger.last_compiled_hash(page.page_id)):
             slug = page.page_id.replace("/", "-")
             proposed = _safe_rel(root, Path("wiki/_proposed") / f"{slug}.md")
             if not (proposed.is_file() and proposed.read_text(encoding="utf-8") == text):

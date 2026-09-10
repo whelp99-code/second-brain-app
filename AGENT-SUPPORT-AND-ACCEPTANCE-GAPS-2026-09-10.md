@@ -46,5 +46,5 @@
 [인계 보완](CODEX-REPLY-REVIEW-2026-09-10.md)과 라이브 재측정을 이 표에 반영한다. 표를 완료로 바꾸지 않는다.
 
 - **Codex 사본 0건:** 지정 문자열 주사에서 `~/.codex` 0건은 보존한다. 모든 `codex exec`·대화형 세션·로그/압축 형식에 사본이 없다고 보지 않으며 M5를 이 관측만으로 닫지 않는다. [사본 정책](M5-COPY-POLICY-2026-09-10.md).
-- **운영 authority memory 모듈:** “memory CLI가 없다”는 말은 재측정과 맞지 않는다. 운영 `a3cbbbe`/`7023f7c`의 `dist/src`에 memory 관련 JS 125개가 있다. 격리 페어 `195b1a7`에는 198개이며 scoped/production 스택(144개 JS 차이)이 운영에 없다. 모듈 개수만으로 활성화 후 연결이 정상이라고 보지 않는다. [전환 준비](OPERATIONAL-CUTOVER-PREP-2026-09-10.md).
+- **운영 authority memory 모듈:** “memory CLI가 없다”는 말은 재측정과 맞지 않는다. 세는 규칙은 `dist/src/*.js` 파일명이 `memory-`로 시작하거나 `second-brain`을 포함하는 경우다. 운영 `a3cbbbe`는 **124**, 페어 `195b1a7`은 **197**(JS 차 144). 이전 125/198은 파일명 substring `memory`까지 넣은 값이다. `cli-memory-*.js`와 `memory-outbox-production.js`는 페어에만 있다. 개수만으로 활성화 후 연결이 정상이라고 보지 않는다. [W0](W0-BASELINE-2026-09-10.md).
 - **설치 후보 wheel:** 업무 본문에 인용된 `25d49b4`/`aa6fad5f…`와 실행 후보 `c04dee1`/`ac8fcd16…`는 다르다.
