@@ -10,9 +10,14 @@
 |---|---|---|---|
 | A. 빈 journal / 원본 세대 근거 없음 | 기존 sanitizer 검사 | 백업 주장으로 운영 anchor 생성 | [거부 게이트](RESTORE-ANCHOR-LOSS-GATE-2026-09-10.md) `RESTORE_SOURCE_ANCHOR_MISSING`. 이번 재실행 없음 |
 | B. 작은 격리 vault 백업→검증→`--to` 복원 | `sb init`·`remember`·`backup`·`verify-backup`·`restore --to` | 운영 경로 | backup 0.30s, verify 0.27s, restore 0.25s, 25파일 / 426KB, exit 0 |
-| C. 운영 tarball을 격리 디렉터리로 복원 | 최신 운영 백업을 `--to /var/tmp/...` | `current` 교체, tombstone 하향 | verify **exit 1** `BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH` 1.03s. restore는 exit 0, 6.69s, 17,386파일 / 38.8MB |
+| C. 운영 tarball을 격리 디렉터리로 복원 | 최신 운영 백업을 `--to /var/tmp/...` | `current` 교체, tombstone 하향 | restore exit 0, 6.69s, 17,386파일 / 38.8MB |
+| D. 같은 tarball을 `/var/tmp` 복사본에서 아카이브만 검증 | `verify_backup(archive)` — 운영 journal 잠금 없음 | 운영 `backups/`에 receipt/temp를 쓰지 않음 | **7.42s, ok**, 17,386파일 / 38.8MB, sha256 `a099f592eebee1aa4d21e86d447aca59af310491985c5d93aa65bf49d46a4300` |
 
-운영 백업: `/home/jm/.local/state/second-brain/backups/second-brain-20260910T032857+0900.tar.gz` (14,990,156 bytes). 후보 검증기가 운영 백업의 tombstone/provider와 맞지 않아 verify가 실패했다. **verify 실패 뒤에도 `restore`가 파일을 풀어 준 것**을 DR 성공으로 치지 않는다. 복원본은 격리 목적지이며 운영 세대 원장·권한·삭제 high-water를 재증명한 것이 아니다.
+운영 백업: `/home/jm/.local/state/second-brain/backups/second-brain-20260910T032857+0900.tar.gz` (14,990,156 bytes).
+
+처음 C의 `verify-backup` exit 1 `BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH`는 **후보 wheel이 운영 백업을 못 읽는다는 뜻이 아니다.** tiny 실험 설정의 현재 tombstone/provider를 운영 아카이브 세대와 대조했기 때문이다. 설정 바인딩 검증은 다른 vault에 대해 실패하는 것이 맞다. 아카이브만 복사해 검증하면 후보 `c04dee1`에서 통과한다.
+
+격리 `restore` 성공을 운영 복구 완료로 치지 않는다. 복원본은 권한·삭제 high-water·검색을 재증명한 것이 아니다.
 
 JSON: [DR-SCENARIO-2026-09-10.json](DR-SCENARIO-2026-09-10.json).
 
@@ -26,6 +31,6 @@ JSON: [DR-SCENARIO-2026-09-10.json](DR-SCENARIO-2026-09-10.json).
 
 1. 독립 세대 근거와 운영 원장 digest가 모두 맞는 상태 복원 후보다가 아니다.
 2. 복원 후 조회·범위 거부·삭제 억제를 이 목적지에서 인수하지 않았다.
-3. 후보 verify와 운영 백업 identity가 불일치한다. 전환 대상 wheel로 운영 백업을 검증·복구하는 절차가 [전환 준비서](OPERATIONAL-CUTOVER-PREP-2026-09-10.md)에 아직 없다.
+3. 운영 journal에 묶인 verify는 산 운영 경로를 잠그므로 전환 런북에 별도 절차가 필요하다. 아카이브 단독 검증은 복사본에서만 한다.
 
 M12를 완료 처리하지 않는다.

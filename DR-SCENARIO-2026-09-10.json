@@ -49,6 +49,16 @@
       "stdout": "{\"destination\": \"/var/tmp/sb-m12-dr/restore-ops-backup\", \"files\": 17386, \"bytes\": 38779728, \"previous\": null}\n",
       "stderr": ""
     },
-    "destination": "/var/tmp/sb-m12-dr/restore-ops-backup"
+    "destination": "/var/tmp/sb-m12-dr/restore-ops-backup",
+    "note": "verify used tiny lab config expected_generation against the ops archive; mismatch is expected"
+  },
+  "ops_archive_copied_verify": {
+    "copy": "/var/tmp/sb-m12-verify/second-brain-20260910T032857+0900.tar.gz",
+    "ok": true,
+    "seconds": 7.4197,
+    "files": 17386,
+    "bytes": 38779728,
+    "archive_sha256": "a099f592eebee1aa4d21e86d447aca59af310491985c5d93aa65bf49d46a4300",
+    "wrote_into_ops_backup_dir": false
   }
 }
