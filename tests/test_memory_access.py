@@ -92,6 +92,36 @@ def test_scoped_prepared_classification_still_verifies_git_body(classified, monk
         read(name)
 
 
+@pytest.mark.parametrize('aborted', [False, True])
+def test_scoped_batch_closes_shared_connection_on_success_and_abort(classified, monkeypatch, aborted):
+    import sb.memory_access as module
+
+    root, name, generation = classified
+    opened = []
+    connect = module.sqlite3.connect
+
+    def observe(database, *args, **kwargs):
+        connection = connect(database, *args, **kwargs)
+        if str(database).endswith('ledger.db?mode=ro&immutable=1'):
+            opened.append(connection)
+        return connection
+
+    monkeypatch.setattr(module.sqlite3, 'connect', observe)
+    try:
+        with module.classified_pages(root, generation,
+                scope=SourceAccess('principal:owner', ('project:a',), '1')) as read:
+            assert read(name) == read(name)
+            if aborted:
+                raise RuntimeError('caller aborted')
+    except RuntimeError:
+        assert aborted
+    assert len(opened) == 1
+    with pytest.raises(sqlite3.ProgrammingError, match='closed'):
+        opened[0].execute('SELECT 1')
+    with pytest.raises(MemoryAccessError, match='MEMORY_ACCESS_UNAVAILABLE'):
+        read(name)
+
+
 @pytest.mark.parametrize("owner,projects,revision", [
     ("principal:other", ("project:a",), "1"),
     ("principal:owner", ("project:b",), "1"),

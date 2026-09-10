@@ -80,17 +80,25 @@ def classified_pages(root: Path, generation: GenerationIdentityV1, *,
     applies require_scope. The reader cannot be reused after exit.
     """
     active = False
+    db: sqlite3.Connection | None = None
     try:
         manifest = _verify_generation(root, generation)
+        if scope is not None:
+            path = root / ".sb" / "ledger.db"
+            db = sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)
         active = True
 
         def read(page_id: str) -> ClassifiedPage:
             if not active:
                 raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
-            prepared = _preflight_scope(root, page_id, scope) if scope is not None else None
+            prepared = _preflight_scope(db, page_id, scope) if db is not None and scope is not None else None
             return _classified_page(root, page_id, generation, manifest, prepared)
 
         yield read
+        active = False
+        if db is not None:
+            db.close()
+            db = None
         _ = _verify_generation(root, generation)
     except MemoryAccessError:
         raise
@@ -98,6 +106,8 @@ def classified_pages(root: Path, generation: GenerationIdentityV1, *,
         raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE") from exc
     finally:
         active = False
+        if db is not None:
+            db.close()
 
 
 def _classified_page(root: Path, page_id: str, generation: GenerationIdentityV1,
@@ -138,7 +148,7 @@ def _classified_page(root: Path, page_id: str, generation: GenerationIdentityV1,
                           cast(int, manifest["tombstone_sequence"]), cast(str, manifest["tombstone_set_root"]))
 
 
-def _preflight_scope(root: Path, page_id: str, scope: SourceAccess) -> _PageClassification:
+def _preflight_scope(db: sqlite3.Connection, page_id: str, scope: SourceAccess) -> _PageClassification:
     """Reject denied candidates before Git I/O; never replace the full page read.
 
     Called only inside the generation-verified batch. The sealed records digest
@@ -147,28 +157,26 @@ def _preflight_scope(root: Path, page_id: str, scope: SourceAccess) -> _PageClas
     The caller still applies final scope and generation verification.
     """
     page = git_rel(page_id).removesuffix(".md")
-    path = root / ".sb" / "ledger.db"
-    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
-        row = cast(tuple[str, str] | None, db.execute(
-            "SELECT p.requirements_json,r.content_digest FROM page_access p JOIN records r "
-            + "ON p.page_id=r.page_id AND p.content_digest=r.content_digest WHERE p.page_id=?",
-            (page,)).fetchone())
-        if row is None:
+    row = cast(tuple[str, str] | None, db.execute(
+        "SELECT p.requirements_json,r.content_digest FROM page_access p JOIN records r "
+        + "ON p.page_id=r.page_id AND p.content_digest=r.content_digest WHERE p.page_id=?",
+        (page,)).fetchone())
+    if row is None:
+        raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+    access = PageAccess.decode(row[0])
+    if not access.complete or not access.source_refs:
+        raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+    requirements: list[SourceAccess] = []
+    for source_ref in access.source_refs:
+        source = cast(tuple[str, str] | None, db.execute(
+            "SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
+            (source_ref,)).fetchone())
+        if source is None:
             raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
-        access = PageAccess.decode(row[0])
-        if not access.complete or not access.source_refs:
-            raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
-        requirements: list[SourceAccess] = []
-        for source_ref in access.source_refs:
-            source = cast(tuple[str, str] | None, db.execute(
-                "SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
-                (source_ref,)).fetchone())
-            if source is None:
-                raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
-            requirement = decode_source_access(source_ref, source[0], source[1])
-            _require_source_scope(requirement, scope)
-            requirements.append(requirement)
-        return _PageClassification(row[1], tuple(requirements), access.source_refs)
+        requirement = decode_source_access(source_ref, source[0], source[1])
+        _require_source_scope(requirement, scope)
+        requirements.append(requirement)
+    return _PageClassification(row[1], tuple(requirements), access.source_refs)
 
 
 def _require_source_scope(requirement: SourceAccess, scope: SourceAccess) -> None:

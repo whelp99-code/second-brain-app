@@ -8,6 +8,7 @@
 | 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex는 사용량 제한으로 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md) |
 | 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
 | 운영 전환 | UTC09-10 00:28 관측: DB 사용2서비스·유효lease1, 전환보류; 운영 변경 없음 | [운영 관측](MAINTENANCE-CLI-AND-OPS-2026-09-10.md) |
+| scoped 검색 | 1,000페이지 각5회: 전체허용 p50 2.023초, 허용1개 p50 0.317초; library 측정 | [연결 공유 검증](SCOPED-SHARED-READ-2026-09-10.md) |
 | 전체 요구사항 | M1–M14 유지: 실제 업무·권한/세션/삭제 수명·클라이언트 수집/주입·검색 평가·GUI·복구 인수 남음 | [전체 목록](SHARED-MEMORY-CONSOLIDATED-REVIEW-2026-09-09.md), [인계 병합](HANDOFF-CURRENT-GAPS-2026-09-10.md) |
 
 최신 전체 회귀: **f9fbe55 기준 1,730 passed / 2 skipped, 516.23초, exit0**. [실행 보고서](LATEST-FULL-REGRESSION-2026-09-10.md). optional embeddings 모듈은 지정 명령대로 제외했으며, 실제 운영 전환·모든 클라이언트 인수와 구분한다.
@@ -1382,3 +1383,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 허용비율별 성능 대조:** [전체허용1,000페이지/각5회·이전archive import검증](SCOPED-ALLOW-RATIO-2026-09-10.md). p50 2.164→2.438초(약12.7%증가) 관측·허용분류중복조회후속. 전체불허20페이지4회결과0. 비율옵션추가·Ruff/diff·제품/운영불변·전체목표유지.
 
 **2026-09-10 허용 분류 중복 제거:** [호출내frozen분류재사용·Git본문hash/최종권한/세대검증유지](SCOPED-CLASSIFICATION-ONCE-2026-09-10.md). 관련49통과·실제HTTP/CLI/MCP전체exit0·Ruff/타입0오류0경고. 전체허용p50 2.438→2.308초/허용1개0.463초. 최초2.164초와차이남음·전체목표유지.
+
+**2026-09-10 scoped 연결 공유:** [조회별readonly연결1개·정상/오류종료닫힘·끝난reader거부](SCOPED-SHARED-READ-2026-09-10.md). 관련51통과·실제HTTP/CLI/MCP전체exit0·Ruff/타입0오류0경고. 전체허용p50 2.308→2.023초/허용1개0.317초. 소표본library·운영/전체목표유지.
