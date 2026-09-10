@@ -62,12 +62,15 @@ def classified_page(root: Path, page_id: str, generation: GenerationIdentityV1) 
 
 
 @contextmanager
-def classified_pages(root: Path, generation: GenerationIdentityV1) -> Generator[Callable[[str], ClassifiedPage]]:
+def classified_pages(root: Path, generation: GenerationIdentityV1, *,
+                     scope: SourceAccess | None = None) -> Generator[Callable[[str], ClassifiedPage]]:
     """Validate one bounded read batch before entry and before publishing results.
 
     The caller keeps the generation lease and must buffer results until this
-    context exits successfully. Each page still checks its committed content and
-    complete source classifications. The reader cannot be reused after exit.
+    context exits successfully. Every returned page checks its committed content
+    and complete source classifications. Optional scope filtering only rejects
+    candidates earlier; it never authorizes a returned page. The caller still
+    applies require_scope. The reader cannot be reused after exit.
     """
     active = False
     try:
@@ -77,6 +80,8 @@ def classified_pages(root: Path, generation: GenerationIdentityV1) -> Generator[
         def read(page_id: str) -> ClassifiedPage:
             if not active:
                 raise MemoryAccessError("MEMORY_ACCESS_UNAVAILABLE")
+            if scope is not None:
+                _preflight_scope(root, page_id, scope)
             return _classified_page(root, page_id, generation, manifest)
 
         yield read
@@ -121,6 +126,42 @@ def _classified_page(root: Path, page_id: str, generation: GenerationIdentityV1,
                           cast(int, manifest["tombstone_sequence"]), cast(str, manifest["tombstone_set_root"]))
 
 
+def _preflight_scope(root: Path, page_id: str, scope: SourceAccess) -> None:
+    """Reject denied candidates before Git I/O; never replace the full page read.
+
+    Called only inside the generation-verified batch. The sealed records digest
+    selects current-body classifications; permitted pages still verify Git bytes
+    and all source requirements again in the existing read path.
+    """
+    page = git_rel(page_id).removesuffix(".md")
+    path = root / ".sb" / "ledger.db"
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as db:
+        row = cast(tuple[str] | None, db.execute(
+            "SELECT p.requirements_json FROM page_access p JOIN records r "
+            + "ON p.page_id=r.page_id AND p.content_digest=r.content_digest WHERE p.page_id=?",
+            (page,)).fetchone())
+        if row is None:
+            raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+        access = PageAccess.decode(row[0])
+        if not access.complete or not access.source_refs:
+            raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+        for source_ref in access.source_refs:
+            source = cast(tuple[str, str] | None, db.execute(
+                "SELECT classification_json,classification_digest FROM source_access WHERE source_ref_digest=?",
+                (source_ref,)).fetchone())
+            if source is None:
+                raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
+            _require_source_scope(decode_source_access(source_ref, source[0], source[1]), scope)
+
+
+def _require_source_scope(requirement: SourceAccess, scope: SourceAccess) -> None:
+    if (requirement.owner != scope.owner
+        or requirement.policy_revision != scope.policy_revision
+        or (not requirement.projects and bool(scope.projects))
+        or not set(requirement.projects) <= set(scope.projects)):
+        raise MemoryAccessError("MEMORY_ACCESS_DENIED")
+
+
 def require_scope(page: ClassifiedPage, scope: SourceAccess) -> None:
     """Evaluate an already authenticated owner/project/revision scope.
 
@@ -131,8 +172,4 @@ def require_scope(page: ClassifiedPage, scope: SourceAccess) -> None:
     if not page.requirements or len(page.requirements) != len(page.source_refs):
         raise MemoryAccessError("MEMORY_ACCESS_UNCLASSIFIED")
     for requirement in page.requirements:
-        if (requirement.owner != scope.owner
-            or requirement.policy_revision != scope.policy_revision
-            or (not requirement.projects and bool(scope.projects))
-            or not set(requirement.projects) <= set(scope.projects)):
-            raise MemoryAccessError("MEMORY_ACCESS_DENIED")
+        _require_source_scope(requirement, scope)

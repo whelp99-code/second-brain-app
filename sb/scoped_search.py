@@ -43,7 +43,7 @@ def search_scoped_records(root: Path, generation: GenerationIdentityV1, scope: S
 
     # Do not limit by raw hit count or publish corpus scores/snippets. A hidden
     # page cannot consume the visible result limit or contribute response text.
-    with classified_pages(root, generation) as read:
+    with classified_pages(root, generation, scope=scope) as read:
         results: list[dict[str, object]] = [{"page_id": page_id, "content_digest": digest, "record": record.as_dict()}
                    for page_id, digest, record in heapq.nsmallest(limit, candidates(), key=order)]
     return results

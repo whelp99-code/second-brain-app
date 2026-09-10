@@ -44,12 +44,27 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
     generation = GenerationIdentityV1(*(str(manifest[name]) for name in (
         "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
     scope = SourceAccess("principal:owner", ("project:a",), "1")
+    import sb.memory_access as access_module
+
+    blob_reads = []
+    check_output = access_module.subprocess.check_output
+
+    def observe_blob_reads(args, **kwargs):
+        if args[3:5] == ["cat-file", "blob"]:
+            blob_reads.append(args[-1])
+        return check_output(args, **kwargs)
+
+    monkeypatch.setattr(access_module.subprocess, "check_output", observe_blob_reads)
     rows = search_scoped_records(root, generation, scope, "Alpha", 1)
     assert len(rows) == 1
     assert "permitted" in str(rows)
     assert "forbidden" not in str(rows) and "unclassified" not in str(rows)
     assert "score" not in rows[0] and "snippet" not in rows[0]
+    assert len(blob_reads) == 1
+    blob_reads.clear()
     assert search_scoped_records(root, generation, scope, "forbidden", 10) == []
+    assert blob_reads == []
     assert search_scoped_records(root, generation, SourceAccess("principal:other", ("project:a",), "1"), "Alpha", 10) == []
+    assert blob_reads == []
     with pytest.raises(ValueError):
         search_scoped_records(root, generation, scope, "Alpha", 51)
