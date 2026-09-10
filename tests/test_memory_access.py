@@ -192,16 +192,17 @@ def test_project_scope_does_not_implicitly_include_personal_memory(classified):
     require_scope(personal, SourceAccess("principal:owner", (), "1"))
 
 
-def test_batch_reader_expires_and_rejects_changed_inventory(classified):
+@pytest.mark.parametrize('scope', [None, SourceAccess('principal:owner', ('project:a',), '1')])
+def test_batch_reader_expires_and_rejects_changed_inventory(classified, scope):
     from sb.memory_access import classified_pages
 
     root, name, generation = classified
-    with classified_pages(root, generation) as read:
+    with classified_pages(root, generation, scope=scope) as read:
         assert read(name) == classified_page(root, name, generation)
     with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"):
         read(name)
     with (pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"),
-          classified_pages(root, generation) as changed_read):
+          classified_pages(root, generation, scope=scope) as changed_read):
         assert changed_read(name).records
         ledger = root / ".sb" / "ledger.db"
         ledger.parent.chmod(0o700)
@@ -212,7 +213,8 @@ def test_batch_reader_expires_and_rejects_changed_inventory(classified):
         changed_read(name)
 
 
-def test_scoped_search_does_not_publish_results_if_generation_changes(classified, monkeypatch):
+@pytest.mark.parametrize('changed_surface', ['manifest', 'ledger'])
+def test_scoped_search_does_not_publish_results_if_generation_changes(classified, monkeypatch, changed_surface):
     from sb import scoped_search
 
     root, _name, generation = classified
@@ -220,8 +222,19 @@ def test_scoped_search_does_not_publish_results_if_generation_changes(classified
 
     def tamper_after_access_check(page, scope):
         original(page, scope)
-        root.chmod(0o700)
-        (root / "generation.json").unlink()
+        if changed_surface == 'manifest':
+            root.chmod(0o700)
+            (root / "generation.json").unlink()
+        else:
+            ledger = root / '.sb/ledger.db'
+            ledger.parent.chmod(0o700)
+            ledger.chmod(0o600)
+            connection = sqlite3.connect(ledger)
+            try:
+                connection.execute('DELETE FROM page_access')
+                connection.commit()
+            finally:
+                connection.close()
 
     monkeypatch.setattr(scoped_search, "require_scope", tamper_after_access_check)
     with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"):

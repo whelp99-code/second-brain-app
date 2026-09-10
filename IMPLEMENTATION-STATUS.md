@@ -1385,3 +1385,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 허용 분류 중복 제거:** [호출내frozen분류재사용·Git본문hash/최종권한/세대검증유지](SCOPED-CLASSIFICATION-ONCE-2026-09-10.md). 관련49통과·실제HTTP/CLI/MCP전체exit0·Ruff/타입0오류0경고. 전체허용p50 2.438→2.308초/허용1개0.463초. 최초2.164초와차이남음·전체목표유지.
 
 **2026-09-10 scoped 연결 공유:** [조회별readonly연결1개·정상/오류종료닫힘·끝난reader거부](SCOPED-SHARED-READ-2026-09-10.md). 관련51통과·실제HTTP/CLI/MCP전체exit0·Ruff/타입0오류0경고. 전체허용p50 2.308→2.023초/허용1개0.317초. 소표본library·운영/전체목표유지.
+
+**2026-09-10 공유연결 변조 검사:** [scope유무실제원장변경·권한검사직후manifest/ledger변경모두반환차단](SCOPED-SHARED-READ-MUTATION-2026-09-10.md). 관련21통과/13.96초·Ruff/diff. 제품8e5b4a3불변·운영/전체목표유지.
