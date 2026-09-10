@@ -1,0 +1,269 @@
+{
+  "root": "/var/tmp/sb-scoped-scale-0nvua0ht",
+  "pages": 1000,
+  "allowed_pages": 1,
+  "repetitions": 20,
+  "summaries": [
+    {
+      "query": "ScaleProbe",
+      "samples": 20,
+      "p50_seconds": 2.197210870916024,
+      "p95_seconds": 2.290513406973332,
+      "min_seconds": 2.1331948000006378,
+      "max_seconds": 2.2959405723959208
+    },
+    {
+      "query": "forbidden",
+      "samples": 20,
+      "p50_seconds": 2.177719321101904,
+      "p95_seconds": 2.198160541243851,
+      "min_seconds": 2.1342165363021195,
+      "max_seconds": 2.208317284937948
+    }
+  ],
+  "percentiles": "p50 median; p95 nearest-rank; all samples including first; alternating query order",
+  "observations": [
+    {
+      "query": "ScaleProbe",
+      "repetition": 1,
+      "seconds": 2.179690065793693,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 1,
+      "seconds": 2.1614496600814164,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 2,
+      "seconds": 2.1750336289405823,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 2,
+      "seconds": 2.2119880584068596,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 3,
+      "seconds": 2.1711056251078844,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 3,
+      "seconds": 2.1804050132632256,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 4,
+      "seconds": 2.18514258088544,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 4,
+      "seconds": 2.176233652047813,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 5,
+      "seconds": 2.172945807222277,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 5,
+      "seconds": 2.208317284937948,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 6,
+      "seconds": 2.1557103567756712,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 6,
+      "seconds": 2.200982678681612,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 7,
+      "seconds": 2.290513406973332,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 7,
+      "seconds": 2.1871424820274115,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 8,
+      "seconds": 2.186828934121877,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 8,
+      "seconds": 2.171229963656515,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 9,
+      "seconds": 2.1331948000006378,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 9,
+      "seconds": 2.1342165363021195,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 10,
+      "seconds": 2.146470808889717,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 10,
+      "seconds": 2.2251013168133795,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 11,
+      "seconds": 2.196150430943817,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 11,
+      "seconds": 2.1941212387755513,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 12,
+      "seconds": 2.1517992839217186,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 12,
+      "seconds": 2.1819397071376443,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 13,
+      "seconds": 2.2102243159897625,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 13,
+      "seconds": 2.193164234980941,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 14,
+      "seconds": 2.198160541243851,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 14,
+      "seconds": 2.2091181608848274,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 15,
+      "seconds": 2.253921365365386,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 15,
+      "seconds": 2.182341543957591,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 16,
+      "seconds": 2.197943771723658,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 16,
+      "seconds": 2.218839075881988,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 17,
+      "seconds": 2.198271310888231,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 17,
+      "seconds": 2.1569440909661353,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 18,
+      "seconds": 2.1686565768904984,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 18,
+      "seconds": 2.172792138066143,
+      "rows": 1
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 19,
+      "seconds": 2.169513403903693,
+      "rows": 1
+    },
+    {
+      "query": "forbidden",
+      "repetition": 19,
+      "seconds": 2.159485239069909,
+      "rows": 0
+    },
+    {
+      "query": "forbidden",
+      "repetition": 20,
+      "seconds": 2.1685573966242373,
+      "rows": 0
+    },
+    {
+      "query": "ScaleProbe",
+      "repetition": 20,
+      "seconds": 2.2959405723959208,
+      "rows": 1
+    }
+  ],
+  "peak_process_rss_kib": 58236,
+  "scope": "synthetic sealed provider library; peak RSS includes build; no MCP/native/concurrent update"
+}
