@@ -1,5 +1,7 @@
 # 현재 인수 상태 — 2026-09-10
 
+> **회신 검토 보완:** [CODEX-REPLY-REVIEW-2026-09-10.md](CODEX-REPLY-REVIEW-2026-09-10.md). 두 후보 wheel은 서로 다르며, Codex 사본 0건은 해당 관측 범위로 제한한다. 후속 운영 인수와 M3·M5 및 M8–M13 작업은 이 보완을 함께 적용한다.
+
 > **Codex 회신서: [CODEX-REPLY-2026-09-10.md](CODEX-REPLY-2026-09-10.md)** — 인계 수행 결과, 정정한 서술, 남은 4개 결정. 이어받는 세션은 이것부터 읽는다.
 >
 > 후속 작업의 시작점: [상세 인계 지시서](/home/jm/orca/projects/second-brain-app/CURSOR-HANDOFF-2026-09-10.md). 인계를 이어받아 8-A 전체 검증과 8-B 설치 후보 인수를 **HEAD d4cbdda 기준으로 갱신**했다([회귀](CONTINUATION-FULL-REGRESSION-2026-09-10.md), [설치 후보](CONTINUATION-INSTALLED-PAIR-2026-09-10.md)). 전체 목표 완료나 운영 전환을 뜻하지 않으며, 8-C 실제 업무·에이전트 간 공유 인수가 다음 작업이다.
