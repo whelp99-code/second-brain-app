@@ -42,3 +42,5 @@ Tencent에서 공통 범위·기억 인터페이스, memory-bank에서 출처·�
 운영 데이터·서비스·다른 저장소는 변경하지 않았다. 운영 핸들/lease 수치는 이전 시점 관측이며 이번 문서 작성 시 새로 관측한 결과가 아니다. 전체 M1–M14 완료 조건은 그대로 유지한다.
 
 추가 검증: inbox/완료 복구/pending/walking skeleton 관련 **22 passed / 6.61초**, Node 문법 검사와 `git diff --check` 통과. 최초 테스트 명령은 존재하지 않는 `tests/test_connectors_inbox_documents.py`를 지정해 수집 전 실패했으며, 실제 파일 `tests/test_connectors_inbox.py`로 정정한 위 실행 결과만 통과로 집계했다.
+
+후속 갱신: 위 HTTP503의 원인을 시험 문서 실제 생성 날짜와 고정 인증 시각의 불일치로 특정했고 시험 시각을 일치시켜 전체 비모델 연결을 통과했다. 실제 Codex 재시험은 이후 모델 실행 단계의 명시적인 사용량 제한으로 실패했다. [원인·수정·재검증](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md)을 최신 상태로 따른다. 제품의 유효기간·권한 검사는 변경하지 않았다.
