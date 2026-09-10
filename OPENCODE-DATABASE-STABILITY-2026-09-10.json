@@ -1,0 +1,73 @@
+{
+  "root": "/var/tmp/sb-opencode-wal-ut4jrppp",
+  "commands": [
+    {
+      "args": [
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "during_wal": [
+    [
+      "sha256:e0ed3e228ae9dbe2aa95fecb07b850e7e456dee08e91fb5d30e204bf4382eb3d"
+    ],
+    [
+      "live-store"
+    ]
+  ],
+  "after_checkpoint": [
+    [
+      "snapshot.json#part",
+      "sha256:e0ed3e228ae9dbe2aa95fecb07b850e7e456dee08e91fb5d30e204bf4382eb3d",
+      "6db7d803e74f1ffa7d8f5adc0bf95b3e15bf4c8373fffadf546227cc6c6742cb"
+    ],
+    [
+      "snapshot.json",
+      "live-store",
+      "d62160fb8a7f8b2513e9aba9ed90897725d455ad8f939914941b7dfd5a945e8a"
+    ],
+    [
+      "snapshot.json#part",
+      "sha256:534ae56e638c44822a03b453192c0c89e117c041bffe372563c612c7ce7639e1",
+      "f778dacc09a326990d63568063853fdffb39d070ee6049054e23b1a666d1bf63"
+    ]
+  ],
+  "bodies": [
+    "after!",
+    "before"
+  ],
+  "scope": "actual CLI with live SQLite WAL in synthetic export; no native OpenCode"
+}

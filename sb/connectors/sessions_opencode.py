@@ -34,6 +34,14 @@ class _DatabaseReadLimit(OSError):
     """A complete database snapshot cannot be read within the resource budget."""
 
 
+class _UnstableDatabase(OSError):
+    """The referenced database changed before its extracted rows were published."""
+
+
+class _LiveDatabase(OSError):
+    """Referenced SQLite sidecars indicate an unfinished or live export."""
+
+
 class _SnapshotSizeLimit(OSError):
     """Snapshot exceeded the bounded input budget; retain its retry cursor."""
 
@@ -95,6 +103,12 @@ class OpenCodeSessionsAdapter:
                     current[rel] = revision
                     if start != revision:
                         items.extend(extracted)
+                except _LiveDatabase:
+                    current[rel] = start
+                    items.append(_skip(self.source_id, rel, "live-store"))
+                except _UnstableDatabase:
+                    current[rel] = start
+                    items.append(_skip(self.source_id, rel, "unstable-session-file"))
                 except _DatabaseReadLimit:
                     current[rel] = start
                     items.append(_skip(self.source_id, rel, "database-limit"))
@@ -283,10 +297,16 @@ def _snapshot_database(snapshot: Path, reference: str) -> Path | None:
     return selected
 
 
+def _require_export_database(database: Path) -> None:
+    for suffix in ("-wal", "-shm", "-journal"):
+        if os.path.lexists(str(database) + suffix):
+            raise _LiveDatabase
+
+
 def _from_sqlite(database: Path) -> list[tuple[str, str]]:
-    if database.is_symlink() or not database.is_file():
-        raise OSError("snapshot database is not a regular file")
-    if database.stat().st_size > MAX_DATABASE_BYTES:
+    _require_export_database(database)
+    before = file_revision(database)
+    if before[2] > MAX_DATABASE_BYTES:
         raise _DatabaseReadLimit
     try:
         connection = sqlite3.connect(
@@ -303,6 +323,9 @@ def _from_sqlite(database: Path) -> list[tuple[str, str]]:
         return int(steps >= MAX_DATABASE_STEPS)
 
     try:
+        _require_export_database(database)
+        if file_revision(database) != before:
+            raise _UnstableDatabase
         _ = connection.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_DATABASE_BYTES)
         connection.set_progress_handler(progress, interval)
         cursor = connection.execute(
@@ -325,7 +348,11 @@ def _from_sqlite(database: Path) -> list[tuple[str, str]]:
         raise OSError("snapshot database cannot be read") from exc
     finally:
         connection.close()
-    return _parts_from_rows(rows)
+    extracted = _parts_from_rows(rows)
+    _require_export_database(database)
+    if file_revision(database) != before:
+        raise _UnstableDatabase
+    return extracted
 
 
 def _parts_from_rows(rows: Sequence[tuple[object, ...]]) -> list[tuple[str, str]]:

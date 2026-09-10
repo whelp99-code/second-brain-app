@@ -1422,3 +1422,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### 최근 변경 전체 회귀 및 설치 인수 — 2026-09-10
 
 13cab77 제품/테스트 고정 상태에서 전체1,767 passed / 2 skipped (516.57초), Ruff 통과. [전체 출력/범위](CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md). 같은 소스의 offline 설치물에서 실제 TLS/MCP 저장→완료→새 로그인 회수, 권한 철회/만료 거부, 복원 SIGKILL 정리/기억 보존과 설치 OpenCode 두 출처 CLI 검사를 통과했다. [설치물 증거](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md). 운영은 UTC01:40 읽기 관측에서 DB 사용2서비스·만료 전lease1·관측불가22개로 전환 보류이며 전체 M1–M14는 미완료다.
+
+### OpenCode 참조 DB 변경·활성 WAL 보류 — 2026-09-10
+
+[상세](OPENCODE-DATABASE-STABILITY-2026-09-10.md), [실제 CLI](OPENCODE-DATABASE-STABILITY-2026-09-10.json): DB 전후 식별자/시각 검증으로 불안정한 결과 배제·커서 유지. 실제 참조 DB 이름의 WAL/SHM/journal 검사로 live-store 보류. 관련77 passed / 0.81초·Ruff·basedpyright 통과. 실제 CLI WAL 활성 중 보류→checkpoint 후 최신 본문 수집 확인. descriptor 고정/모든 경로 교체 방어는 미완. 전체1,767통과·설치 인수는 이번 수정 전 13cab77 기준이다.
