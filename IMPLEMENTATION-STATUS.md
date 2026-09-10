@@ -4,18 +4,19 @@
 
 | 범위 | 최신 확인 결과 | 증거 |
 |---|---|---|
-| 설치물 자비스 연결 | 제품8e5b4a3/후속검사5f242ed: 실제 TLS/MCP 저장→완료→새 로그인 재조회, 독립 reader2개; 합성 신원·업무 | [최신 설치 인수](INSTALLED-SHARED-READ-2026-09-10.md) |
+| 설치물 자비스 연결 | 13cab77: 실제 TLS/MCP 저장→완료→새 로그인 재조회, 독립 reader2개·철회/만료 거부·복원 중단 정리; 합성 신원·업무 | [최신 설치 인수](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md) |
 | 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex는 사용량 제한으로 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md) |
 | 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
-| 운영 전환 | UTC09-10 00:28 관측: DB 사용2서비스·유효lease1, 전환보류; 운영 변경 없음 | [운영 관측](MAINTENANCE-CLI-AND-OPS-2026-09-10.md) |
+| 운영 전환 | UTC09-10 01:40 관측: DB 사용2서비스·유효lease1·관측불가22개, 전환보류; 운영 변경 없음 | [운영 재확인](OPS-RECHECK-2026-09-10-0140.md) |
 | scoped 검색 | 1,000페이지 각5회: 전체허용 p50 2.023초, 허용1개 p50 0.317초; library 측정 | [연결 공유 검증](SCOPED-SHARED-READ-2026-09-10.md) |
+| OpenCode 수집 | 13cab77: 내용 변경·제한 읽기·불안정 snapshot 재시도·출처 분리, 합성 입력 실제 CLI 확인 | [출처 분리](OPENCODE-SOURCE-ISOLATION-2026-09-10.md), [읽기 예산](OPENCODE-DATABASE-LIMITS-2026-09-10.md) |
 | 전체 요구사항 | M1–M14 유지: 실제 업무·권한/세션/삭제 수명·클라이언트 수집/주입·검색 평가·GUI·복구 인수 남음 | [전체 목록](SHARED-MEMORY-CONSOLIDATED-REVIEW-2026-09-09.md), [인계 병합](HANDOFF-CURRENT-GAPS-2026-09-10.md) |
 
-최신 전체 회귀: **f9fbe55 기준 1,730 passed / 2 skipped, 516.23초, exit0**. [실행 보고서](LATEST-FULL-REGRESSION-2026-09-10.md). optional embeddings 모듈은 지정 명령대로 제외했으며, 실제 운영 전환·모든 클라이언트 인수와 구분한다.
+최신 전체 회귀: **13cab77 기준 1,767 passed / 2 skipped, 516.57초, exit0**. [실행 보고서](CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md). optional embeddings 모듈은 지정 명령대로 제외했으며, 실제 운영 전환·모든 클라이언트 인수와 구분한다.
 
 ---
 
-[관리형 지식 상태 결합 구현 경계](MANAGED-KNOWLEDGE-BINDING-DESIGN-2026-09-10.md) — .sb 임의 registry의 복사/해시 제외 확인, 기존 운영 원장+명시적 세대 digest 결합 방향 선택. 기존 관련46통과. 신규 상태 저장/검색 연결은 아직 미구현·M1–M14 유지.
+[관리형 지식 상태 결합 구현 경계](MANAGED-KNOWLEDGE-BINDING-DESIGN-2026-09-10.md) — 초기 설계 당시 기록이다. 현재는 bound_knowledge 저장 및 봉인 검색 연결이 구현되어 있으며, [읽기 후 재검증](KNOWLEDGE-READ-REVALIDATION-2026-09-10.md)까지 보강했다. 전체 운영 인수·M1–M14는 유지한다.
 
 [배치 진행량·중단 계보 보존](BATCH-PROGRESS-RECOVERY-2026-09-10.md) — 단계 완료마다 기록, interrupted 시 기존 detail 유지·외곽 예외에도 계보. 관련40/후속10통과(중복), 실제 partial ingest 뒤 SIGKILL 후 오류1/단계ID 보존. 운영·M1–M14 유지.
 
@@ -1417,3 +1418,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### OpenCode 다중 root 출처 분리 — 2026-09-10
 
 [상세·설정 예시](OPENCODE-SOURCE-ISOLATION-2026-09-10.md), [실제 CLI 결과](OPENCODE-SOURCE-ISOLATION-2026-09-10.json): 동일 source ID에 여러 root를 묶어 출처/커서가 충돌하던 경로에 기존 ambiguous-session-roots 보류 규칙을 적용했다. 고유 sources.id별 명시적 설정은 실제 CLI에서 별도 원장/커서·A 변경 시 B 불변·재실행 중복0 확인. 모호한 설정은 CLI 재시작 2회 모두 오류·원장/커서 기록0. 관련 74 passed / 0.77초, CLI 통합 9 passed / 28.60초, Ruff·basedpyright 통과. source ID 임의 변경·운영 자동 설정 이전은 수행하지 않았고 native/운영 인수는 미완이다.
+
+### 최근 변경 전체 회귀 및 설치 인수 — 2026-09-10
+
+13cab77 제품/테스트 고정 상태에서 전체1,767 passed / 2 skipped (516.57초), Ruff 통과. [전체 출력/범위](CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md). 같은 소스의 offline 설치물에서 실제 TLS/MCP 저장→완료→새 로그인 회수, 권한 철회/만료 거부, 복원 SIGKILL 정리/기억 보존과 설치 OpenCode 두 출처 CLI 검사를 통과했다. [설치물 증거](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md). 운영은 UTC01:40 읽기 관측에서 DB 사용2서비스·만료 전lease1·관측불가22개로 전환 보류이며 전체 M1–M14는 미완료다.

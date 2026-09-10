@@ -1,0 +1,288 @@
+{
+  "paired": {
+    "harness_commit": "13cab776643574f6559282e26d93087694e55cf6",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "0d6938efdf9073044c9cd0f63b8d6972e24c0793",
+      "wheel_sha256": "3c5c5ddeaab9979839575c379c91a5b0225c1d4d7dd6328b1b9fbf2b59b9db08",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "13cab776643574f6559282e26d93087694e55cf6",
+      "source_tree": "708ad2a5f23df9957efc3786f9dd889c3099ea39",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-connectors-release-o9xq0aek/releases/0d6938efdf9073044c9cd0f63b8d6972e24c0793/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-connectors-release-o9xq0aek/releases/0d6938efdf9073044c9cd0f63b8d6972e24c0793/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-connectors-release-o9xq0aek/releases/0d6938efdf9073044c9cd0f63b8d6972e24c0793/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-connectors-release-o9xq0aek/releases/0d6938efdf9073044c9cd0f63b8d6972e24c0793/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:00fcaa48a3acfe5a7bbecff318104e37ee9573ba602ebb584039ff7d94ae1478",
+            "request_digest": "sha256:00fcaa48a3acfe5a7bbecff318104e37ee9573ba602ebb584039ff7d94ae1478",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "omo_engine_calls": 0,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:00fcaa48a3acfe5a7bbecff318104e37ee9573ba602ebb584039ff7d94ae1478",
+            "request_digest": "sha256:00fcaa48a3acfe5a7bbecff318104e37ee9573ba602ebb584039ff7d94ae1478",
+            "idempotency_key": "memidem:scoped:v4:647e2546280a7a3128637af7a14fe362ab151dc5651ae556f9dcb1a553ecc27a",
+            "scope_digest": "sha256:c3c2cea6af75f5d9d4a0f2f6680091dfaf8c1165dee07b7090e5dc1abc805a7e",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:00fcaa48a3acfe5a7bbecff318104e37ee9573ba602ebb584039ff7d94ae1478.v4.json",
+            "request_file_digest": "sha256:3f4ee53ccd6e021546ba1b0e5fd12d5ca81595ca626e6d1a37ecf204f5b1dcac",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:085d45ddb8bf4e92df7b409bb8a37ea5b6bf56b0854b3bc1ffef15322da495ed",
+            "request_digest": "sha256:085d45ddb8bf4e92df7b409bb8a37ea5b6bf56b0854b3bc1ffef15322da495ed",
+            "idempotency_key": "memidem:scoped:v4:e919339628dd61f61cdb3aa8ad0eef5bde6e8b2cc901d9840e60a2582336191c",
+            "scope_digest": "sha256:ad335fffc804d53141e148139d38b2e5eba49bb98daaa01f52009f22fcb62311",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:085d45ddb8bf4e92df7b409bb8a37ea5b6bf56b0854b3bc1ffef15322da495ed.v4.json",
+            "request_file_digest": "sha256:103f935da0676e18b22ebf940c67945a22b51ef69156f16059f8029f4b6d36f4",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:fbba92c792b51550ff3135de6d16ef42ab3f7614b019e0561e583b46169825f6",
+            "request_digest": "sha256:fbba92c792b51550ff3135de6d16ef42ab3f7614b019e0561e583b46169825f6",
+            "idempotency_key": "memidem:scoped:v4:feaa58ebcb0cf556b8d1f29e875dbf7d597a5027cacee374cd2c6f3844f596a8",
+            "scope_digest": "sha256:f92cfd9ad40cb60d40166c85d49e2649f42abfb3d17f02feb54680af7a6dd561",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:fbba92c792b51550ff3135de6d16ef42ab3f7614b019e0561e583b46169825f6.v4.json",
+            "request_file_digest": "sha256:40ff81a2f864923a6c0efa2452eb4e2f0615749721f96bb94fd131a8b6849259",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "production_activated": false,
+    "candidate_contents": {
+      "provider": {
+        "inventory_sha256": "3ba9bf903a2c7bd507c417337c769a7c2c5662e70eab3e48ddd4d05b943d429e",
+        "entries": 18474
+      },
+      "jarvis": {
+        "inventory_sha256": "8b3ebc1901256636f33c6218adee47d6e294355afd64b569af343ea7676b8d10",
+        "entries": 19588
+      },
+      "node_executable": {
+        "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+        "size": 125989464,
+        "mode": 493
+      }
+    }
+  },
+  "maintenance": {
+    "release": "/var/tmp/sb-connectors-release-o9xq0aek/releases/0d6938efdf9073044c9cd0f63b8d6972e24c0793",
+    "busy": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 0,
+      "disposed_staging": 0,
+      "restore_workspace_busy": true
+    },
+    "cleaned": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 1,
+      "disposed_staging": 0,
+      "restore_workspace_busy": false
+    },
+    "repeated": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 0,
+      "disposed_staging": 0,
+      "restore_workspace_busy": false
+    },
+    "worker_exit": -9,
+    "retained_memory": {
+      "generation": "sbgen:v1:b6dd3a3c806fbadb3625f08f6df52ea207912155bfff00ad30fe816f89de812d",
+      "body_sha256": "d7ab82bf20e632d23d8bb04212b4e52b7367ddc34889285d66c16c6f32a7dd15",
+      "ledger_sha256": "2cbf494668d050e5a62bd91920afb6eca191c5d4142595af9c492aa032e36003",
+      "high_water": [
+        0,
+        "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      ],
+      "retrieved_records": 1
+    },
+    "preservation_checks": 3
+  },
+  "installed_opencode": {
+    "root": "/var/tmp/sb-installed-opencode-sources-l0pw0487",
+    "commands": [
+      {
+        "args": [
+          "init"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "ingest"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "ingest"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "args": [
+          "ingest"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "before": [
+      [
+        "agent-a",
+        "snapshot.json#same-id",
+        "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+        "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+      ],
+      [
+        "agent-b",
+        "snapshot.json#same-id",
+        "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+        "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+      ]
+    ],
+    "after": [
+      [
+        "agent-a",
+        "snapshot.json#same-id",
+        "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+        "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+      ],
+      [
+        "agent-a",
+        "snapshot.json#same-id",
+        "sha256:e6df26fe82c4d8f7b99d40b9b5c515818d621d13addff651afe63e3852adb2e3",
+        "b92d13bbe02db7ca7686a8e7b854de49c7455948c05cf91a47044278395e212e"
+      ],
+      [
+        "agent-b",
+        "snapshot.json#same-id",
+        "sha256:5416efe4ad776b7e8a08aaddbb323cc4fc90248c33994459d26f2a391ab12450",
+        "a636bd7cd42060a4d07fa1bfbcc010eb7794c2ba721e1e3e4c20335a15b66eaf"
+      ]
+    ],
+    "cursors_before": {
+      "agent-a": "{\"snapshot.json\":\"sha256:2127d8ee57d446cc84863b24560148c210775f57c3752500ecb59659f4585224\"}",
+      "agent-b": "{\"snapshot.json\":\"sha256:2127d8ee57d446cc84863b24560148c210775f57c3752500ecb59659f4585224\"}"
+    },
+    "cursors_after": {
+      "agent-a": "{\"snapshot.json\":\"sha256:a28fe89d9c197e59e180897ae803f3b61f839119564e0b61527b82a5a9ecfd76\"}",
+      "agent-b": "{\"snapshot.json\":\"sha256:2127d8ee57d446cc84863b24560148c210775f57c3752500ecb59659f4585224\"}"
+    },
+    "installed_release": "/var/tmp/sb-connectors-release-o9xq0aek/releases/0d6938efdf9073044c9cd0f63b8d6972e24c0793",
+    "scope": "two explicit sources through actual CLI; synthetic exports; no native clients"
+  }
+}
