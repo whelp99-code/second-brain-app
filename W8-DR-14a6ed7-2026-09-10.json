@@ -1,0 +1,13 @@
+{
+  "release_id": "14a6ed7ce284fa24a4e8157b97302f5d5786a275",
+  "production_touched": false,
+  "backup_seconds": 18.1786,
+  "verify_ok": true,
+  "verify_seconds": 7.5164,
+  "restore_seconds": 6.9651,
+  "files": 17349,
+  "bytes": 36791790,
+  "archive_sha256": "a678d4a244758d8b93beb1a07fb624074382265b8f7005cc7afb3998989b3848",
+  "search_exit": 0,
+  "search_hits_w7_large": 0
+}
