@@ -1350,3 +1350,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 인증 시험 날짜 불일치 해결:** [실제날짜 문서/고정조회시각→미래기억 stale→503 원인확인·fixture생성시각일치](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md). 비모델전체exit0, 최종Claude Code2.1.261 실제MCP1회/독립SDK2개각2records/HTTPS3회·후속전체exit0. Codex재시험은HTTP통과후사용량제한turn.failed·호출0,전체지원인수보류. 제품권한/유효기간불변·Ruff/diff통과·운영/실업무·전체목표유지.
 
 **2026-09-10 inbox 동일이름 원본 보존:** [done 덮어쓰기 실패재현→no-overwrite 게시·버전별보존·중단재시도](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md). 관련25통과/4.34초·Ruff전체/변경타입0오류0경고·실제CLI2회exit0/원본2/원장version2. 최종unlink경합·동일inode변경/전원장애전체증명·운영/실업무와전체목표유지.
+
+**2026-09-10 inbox 검증본과 완료대상 결합:** [검증직후 inode교체/내용변경 실패재현→검증stat전달/재검사·다음scan회수](INBOX-VERIFIED-IDENTITY-2026-09-10.md). 관련27통과/4.52초·Ruff/변경타입0오류0경고. 최종unlink경합 등 잔여보장과 운영/전체목표유지.

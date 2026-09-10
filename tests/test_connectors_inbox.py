@@ -172,6 +172,40 @@ def test_acknowledge_resumes_published_file_after_unlink_failure(tmp_path, monke
         ["current\n", "previous\n"] if collision else ["current\n"])
 
 
+@pytest.mark.parametrize("replace_inode", [False, True])
+def test_acknowledge_rejects_change_after_verified_read(tmp_path, monkeypatch, replace_inode):
+    import sb.connectors.inbox_documents as module
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    source = inbox / "note.md"
+    source.write_text("committed original\n")
+    adapter = create(_cfg(inbox))
+    items = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    move = module._move_done
+
+    def changed(*args, **kwargs):
+        if replace_inode:
+            replacement = inbox / "replacement.md"
+            replacement.write_text("uncommitted replacement\n")
+            replacement.replace(source)
+        else:
+            source.write_text("uncommitted replacement\n")
+        return move(*args, **kwargs)
+
+    assert isinstance(adapter, AcknowledgingSourceAdapter)
+    with monkeypatch.context() as patch:
+        patch.setattr(module, "_move_done", changed)
+        with pytest.raises(OSError, match="changed"):
+            adapter.acknowledge(tuple(ref for ref, _, _ in items))
+    assert source.read_text() == "uncommitted replacement\n"
+    assert list((inbox / ".done").iterdir()) == []
+    resumed = list(adapter.scan(cursor))
+    assert len(resumed) == 1
+    assert resumed[0][0].source_version != items[0][0].source_version
+
+
 def test_inbox_rejects_oversize_file_and_leaves_it_in_place(tmp_path: Path) -> None:
     # Given: an 11 MiB inbox file above the 10 MiB cap.
     inbox = tmp_path / "inbox"

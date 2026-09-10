@@ -96,7 +96,7 @@ class InboxDocumentsAdapter:
                 continue
             observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(body).hexdigest()}"
             if observed == token:
-                _move_done(self._root, rel, token)
+                _move_done(self._root, rel, token, metadata)
 
     def _ingest(
         self, path: Path, rel: str, previous: str | None
@@ -226,7 +226,7 @@ def _parse_body(suffix: str, body: bytes) -> _InboxText | str:
         return str(exc)
 
 
-def _move_done(root: Path, rel: str, version: str) -> None:
+def _move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> None:
     parts = Path(rel).parts
     if not parts or Path(rel).is_absolute() or any(part in {".", ".."} for part in parts):
         return
@@ -251,6 +251,8 @@ def _move_done(root: Path, rel: str, version: str) -> None:
         original = os.stat(name, dir_fd=source, follow_symlinks=False)
         if not stat_module.S_ISREG(original.st_mode):
             raise OSError("inbox acknowledgement source is not regular")
+        if _file_identity(original) != _file_identity(verified):
+            raise OSError("inbox acknowledgement source changed after verification")
         # link is an atomic no-overwrite publication on this same filesystem.
         # Keep the source until publication succeeds; recognize a previous link
         # when retrying after interruption between publication and unlink.
@@ -271,7 +273,9 @@ def _move_done(root: Path, rel: str, version: str) -> None:
                         raise
         published = os.stat(archived, dir_fd=destination, follow_symlinks=False)
         current = os.stat(name, dir_fd=source, follow_symlinks=False)
-        if any((entry.st_dev, entry.st_ino) != (original.st_dev, original.st_ino)
+        # Creating the hard link changes ctime itself; the other verified fields
+        # must remain stable through publication, including same-inode writes.
+        if any(_file_identity(entry)[:-1] != _file_identity(original)[:-1]
                for entry in (published, current)):
             raise OSError("inbox acknowledgement source changed")
         os.unlink(name, dir_fd=source)
@@ -280,21 +284,23 @@ def _move_done(root: Path, rel: str, version: str) -> None:
             os.close(descriptor)
 
 
+def _file_identity(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns)
+
+
 def _read_regular(path: Path, expected: os.stat_result) -> bytes:
     """Bound reads and reject special files or replacement during the read."""
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         before = os.fstat(fd)
-        def identity(info: os.stat_result) -> tuple[int, ...]:
-            return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
-                    info.st_mtime_ns, info.st_ctime_ns)
-        if not stat_module.S_ISREG(before.st_mode) or identity(before) != identity(expected):
+        if not stat_module.S_ISREG(before.st_mode) or _file_identity(before) != _file_identity(expected):
             raise OSError("inbox file changed or is not regular")
         with os.fdopen(os.dup(fd), "rb") as stream:
             body = stream.read(MAX_INBOX_BYTES + 1)
         if (len(body) > MAX_INBOX_BYTES or len(body) != before.st_size
-            or identity(before) != identity(os.fstat(fd))
-            or identity(before) != identity(path.lstat())):
+            or _file_identity(before) != _file_identity(os.fstat(fd))
+            or _file_identity(before) != _file_identity(path.lstat())):
             raise OSError("inbox file changed during read")
         return body
     finally:
