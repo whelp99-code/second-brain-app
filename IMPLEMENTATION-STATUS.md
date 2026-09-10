@@ -1352,3 +1352,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 inbox 동일이름 원본 보존:** [done 덮어쓰기 실패재현→no-overwrite 게시·버전별보존·중단재시도](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md). 관련25통과/4.34초·Ruff전체/변경타입0오류0경고·실제CLI2회exit0/원본2/원장version2. 최종unlink경합·동일inode변경/전원장애전체증명·운영/실업무와전체목표유지.
 
 **2026-09-10 inbox 검증본과 완료대상 결합:** [검증직후 inode교체/내용변경 실패재현→검증stat전달/재검사·다음scan회수](INBOX-VERIFIED-IDENTITY-2026-09-10.md). 관련27통과/4.52초·Ruff/변경타입0오류0경고. 최종unlink경합 등 잔여보장과 운영/전체목표유지.
+
+**2026-09-10 최신 수집 수정 설치 재인수:** [f0fec14 archive/offline설치→자비스paired4경로·복구3회·실제설치CLI원본보존](INSTALLED-INBOX-PAIR-2026-09-10.md). 세검증exit0·독립reader2개각2records·settlement1/FK0·busy/SIGKILL정리1/replay0·원본2/sourceversion2. paired설치물/Node불변. 합성fixture/native0, 운영current변경없음·전체목표유지.

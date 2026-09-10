@@ -1,0 +1,215 @@
+{
+  "paired": {
+    "harness_commit": "f0fec140aee0fbe14fcd9289e7461509144a6c7e",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1",
+      "wheel_sha256": "e58e53206cca84d417ab0845c30464c609e004e88fc00b241782bc719784ccab",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "f0fec140aee0fbe14fcd9289e7461509144a6c7e",
+      "source_tree": "2506a5d24ed86f17334337f25a750ed2ead31024",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-inbox-release-gicqbwxw/releases/78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-inbox-release-gicqbwxw/releases/78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-inbox-release-gicqbwxw/releases/78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-inbox-release-gicqbwxw/releases/78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:456af2cb9e4d37dda4fdb9062df5f27cea8da4d186e331fdf57c807ef7eac9a8",
+            "request_digest": "sha256:456af2cb9e4d37dda4fdb9062df5f27cea8da4d186e331fdf57c807ef7eac9a8",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "omo_engine_calls": 0,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:456af2cb9e4d37dda4fdb9062df5f27cea8da4d186e331fdf57c807ef7eac9a8",
+            "request_digest": "sha256:456af2cb9e4d37dda4fdb9062df5f27cea8da4d186e331fdf57c807ef7eac9a8",
+            "idempotency_key": "memidem:scoped:v4:9b9fd67090d0e068871411d8fa7ee328ca83470764c3246d00c83dff1a647797",
+            "scope_digest": "sha256:fa942d7b360a2f9726b51847dbd1b0ebe027478d4663a93a9da066ab323e2d6d",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:456af2cb9e4d37dda4fdb9062df5f27cea8da4d186e331fdf57c807ef7eac9a8.v4.json",
+            "request_file_digest": "sha256:24c3e829c098eed2312b0e200307e0748a0d0dcbe483902804a6443c4b43c415",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:42829be7ccf2cde59bd538523992136df622b711bdc09781a85f10d6331d02b9",
+            "request_digest": "sha256:42829be7ccf2cde59bd538523992136df622b711bdc09781a85f10d6331d02b9",
+            "idempotency_key": "memidem:scoped:v4:cbf20026c004b3a7e6c4f3cd902b404f047ea02d133217f741d15150dd67db94",
+            "scope_digest": "sha256:ea44f9d832f811ef61296e9875dc85d68a3b947b69a218e676988a0a0a084072",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:42829be7ccf2cde59bd538523992136df622b711bdc09781a85f10d6331d02b9.v4.json",
+            "request_file_digest": "sha256:f3a4d0de42929539795e1dc8bf55196add5938e2594e909a268b7507f0340de7",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:26ecc774baa362ab1f28d9d46937b0ace31fba40c864cefe39dde3f921b11d0d",
+            "request_digest": "sha256:26ecc774baa362ab1f28d9d46937b0ace31fba40c864cefe39dde3f921b11d0d",
+            "idempotency_key": "memidem:scoped:v4:8e5ed638cde84e20529c20b2acc7ff636b28128eff580900eea616c60fcd1649",
+            "scope_digest": "sha256:2f469189643a1ccde798a454cd866806156279485a3c5924682a3d9d7dcc7557",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:26ecc774baa362ab1f28d9d46937b0ace31fba40c864cefe39dde3f921b11d0d.v4.json",
+            "request_file_digest": "sha256:0cfc4b095c654ea67e1e88f87e4e443637bf8d85472ac5d1c0d7901602ce6576",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "production_activated": false,
+    "candidate_contents": {
+      "provider": {
+        "inventory_sha256": "babb369eec8daf16f72659b34ad4a300c18875bc7ec34a0b3c163dfd5247fb2e",
+        "entries": 18474
+      },
+      "jarvis": {
+        "inventory_sha256": "8b3ebc1901256636f33c6218adee47d6e294355afd64b569af343ea7676b8d10",
+        "entries": 19588
+      },
+      "node_executable": {
+        "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+        "size": 125989464,
+        "mode": 493
+      }
+    }
+  },
+  "maintenance": {
+    "release": "/var/tmp/sb-inbox-release-gicqbwxw/releases/78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1",
+    "busy": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 0,
+      "disposed_staging": 0,
+      "restore_workspace_busy": true
+    },
+    "cleaned": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 1,
+      "disposed_staging": 0,
+      "restore_workspace_busy": false
+    },
+    "repeated": {
+      "disposed_exports": 0,
+      "disposed_restore_workspaces": 0,
+      "disposed_staging": 0,
+      "restore_workspace_busy": false
+    },
+    "worker_exit": -9,
+    "retained_memory": {
+      "generation": "sbgen:v1:79110a6cd2651ea52b44c232f4b0e7247a92cb257be4803436ada2e81c5908ea",
+      "body_sha256": "d7ab82bf20e632d23d8bb04212b4e52b7367ddc34889285d66c16c6f32a7dd15",
+      "ledger_sha256": "678ef2d6fb10982d7f27360e150ee2be41547e3ac892786b8d42c500c4115b34",
+      "high_water": [
+        0,
+        "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+      ],
+      "retrieved_records": 1
+    },
+    "preservation_checks": 3
+  },
+  "inbox": {
+    "root": "/var/tmp/sb-installed-inbox-qyza638d",
+    "installed_module": "/var/tmp/sb-inbox-release-gicqbwxw/releases/78a5792d53a7cbdb1b4d4c50f58ca63cd97c77f1/.venv/lib/python3.12/site-packages/sb/connectors/inbox_documents.py",
+    "cli_runs": 2,
+    "preserved_originals": 2,
+    "ledger_versions": 2,
+    "isolated_python": true
+  }
+}
