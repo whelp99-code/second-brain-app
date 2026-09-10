@@ -1,0 +1,32 @@
+{
+  "query": "readonly sqlite after current generation already proved",
+  "journal": "/home/jm/.local/state/second-brain/generation-journal.db",
+  "mode": "readonly",
+  "mutated": false,
+  "phase_counts": {"proved": 89, "activated": 3},
+  "current": {
+    "generation_id": "sbgen:v1:8dbef8a6877a232b46ff75b8b97c30f439010f94c14dd0f601d84beb248b36ea",
+    "phase": "proved",
+    "updated_at": "2026-09-10T11:01:17.192Z"
+  },
+  "leftover_activated": [
+    {
+      "generation_id": "sbgen:v1:b974e542f0263307444409b2f5408a421a8a564a9589a2326a73fa96eeea2a91",
+      "updated_at": "2026-09-04T23:59:59.976Z",
+      "directory_present": false
+    },
+    {
+      "generation_id": "sbgen:v1:84f964dfd3543f16bd2cb2d55467848e6a5eb8ae3dedc41486355acdb9abce65",
+      "updated_at": "2026-09-07T12:24:35.365Z",
+      "directory_present": false
+    },
+    {
+      "generation_id": "sbgen:v1:abed9a62058b8a9c11f7cec3d1daad133a3e6ef64af1e18b2f6f6bf9200e05fe",
+      "updated_at": "2026-09-10T03:37:49.339Z",
+      "directory_present": false
+    }
+  ],
+  "ops_wheel_has_finish_prior_pointer_switch": false,
+  "candidate_c04dee1_has_finish_prior_pointer_switch": true,
+  "finish_prior_sweeps_non_current_orphans": false
+}
