@@ -1,17 +1,26 @@
 """Exercise installed restore maintenance against an isolated SIGKILL workspace."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
 
 def main() -> None:
-    release = Path(sys.argv[1]).resolve(strict=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('provider_release', type=Path,
+                        help='prepared release directory containing .venv/bin/python; does not activate it')
+    args = parser.parse_args()
+    try:
+        release = args.provider_release.resolve(strict=True)
+    except OSError:
+        parser.error('provider release directory is unavailable')
     python = release / '.venv/bin/python'
+    if not release.is_dir() or not python.is_file() or not os.access(python, os.X_OK):
+        parser.error('provider release must contain an executable .venv/bin/python')
     with tempfile.TemporaryDirectory(prefix='sb-installed-maintenance-', dir='/var/tmp') as temporary:
         root = Path(temporary)
         config = root / 'config.toml'
