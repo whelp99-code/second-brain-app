@@ -1,0 +1,53 @@
+{
+  "observed_at": "2026-09-10T11:24:40.852018+00:00",
+  "review_commit": "a6b36205d4c9899045a4c2f4843c71d2213dcdf0",
+  "production_activated": false,
+  "drain_authorized": false,
+  "cutover_target": {
+    "provider_source_commit": "4aa7111abe5e58e27d70f77bdf3bd55335348275",
+    "release_id": "c04dee1a11ff0833b634c30796924d1ea19f8a6a",
+    "wheel_sha256": "ac8fcd1655356124ec0c51b56b9e23cc4b9054ede9283649fd2fecb4703502ca",
+    "path": "/var/tmp/sb-final-candidate-4aa7111/releases/c04dee1a11ff0833b634c30796924d1ea19f8a6a"
+  },
+  "older_quoted_candidate": {
+    "provider_source_commit": "d4cbdda68932b788f91b462d283249b84779e344",
+    "release_id": "25d49b4367945c8fa01ea71f2d83932d8da934d8",
+    "wheel_sha256": "aa6fad5fc76ebda509ad3ac616b4e94b538bad2ae2161c83b86158a09a886dcf",
+    "note": "cited inside real-work item JSON; not the cutover target"
+  },
+  "operational_provider": {
+    "source_commit": "0ef3866d29179fd2da4d235737c99a1e311ddb3c",
+    "release_id": "41f0751aca8906d612961e704bc60dd0855fdabd",
+    "wheel_sha256": "5fc0f688ec19950f9b674c351db8097b54a1ee6be6c92f36258033d0a0907fa1",
+    "current": "/home/jm/.local/state/second-brain/app/current",
+    "provider_release_sha_in_config": "41f0751aca8906d612961e704bc60dd0855fdabd",
+    "active_generation": "sbgen:v1:8dbef8a6877a232b46ff75b8b97c30f439010f94c14dd0f601d84beb248b36ea",
+    "compiled_markers_present": false,
+    "copy_compiled_markers_in_wheel": false
+  },
+  "operational_jarvis": {
+    "authority_release": "a3cbbbe1604798052db6051a8751f039573eb126",
+    "authority_source_head": "7023f7cbc9c301ba118e739b1a2efe443bf78fd8",
+    "authority_js_modules": 369,
+    "authority_memory_js_modules": 125,
+    "control_center_release": "artifact-4146a192b5fb9e489e2ce3fcb9629077739df0134bc26094750628369dcfdb98",
+    "control_center_source_head": "331c92e26810f8d762453a8e2dd043448f747c36",
+    "db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite"
+  },
+  "pair_jarvis": {
+    "source_commit": "195b1a7d4588a8386def5e7dce2067a141942708",
+    "source_archive_sha256": "40e0ed0fccaa10d549e8945a6113be7c42676344b70c2a969c49c65231e8d333",
+    "js_modules": 513,
+    "memory_js_modules": 198,
+    "js_only_in_pair": 144
+  },
+  "pending_state": {
+    "named_queues_empty": true,
+    "active_cursor_rows": 0,
+    "gjc_unexpired_leases": 1,
+    "microloop_leases": 0,
+    "sb_request_pending_files": 0,
+    "sb_request_processing_files": 0
+  },
+  "candidate_has_copy_compiled_markers": true
+}
