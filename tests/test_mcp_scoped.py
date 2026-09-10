@@ -113,6 +113,17 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
                 # agent identity is refused outright. Neither may return the allowed rows.
                 assert denied_search.is_error or denied_search.structured_content["results"] == []
                 assert allowed_results not in str(denied_search)
+            if version == 1 and not issuer_sessions:
+                import pytest
+
+                from sb.scoped_read_policy import current_scoped_policy, scoped_policy
+                bound = scoped_policy(config)
+                revoked = Config(raw={**dict(config.raw), "revoked_jarvis_signing_key_ids": ["key:test"]})
+                with pytest.raises(ValueError, match="MEMORY_SCOPED_CONFIG_INVALID"):
+                    current_scoped_policy(revoked, bound)
+                restored = await client.call_tool("sb_read_page", args)
+                assert restored.is_error
+                assert "Alpha fixture" not in str(restored)
             other_session = await client.call_tool("sb_read_page", {**args, "access_claim": signed({**claim, "session_id": "session:other"})})
             assert other_session.is_error is (not issuer_sessions)
             for bad in [signed({**claim, "projects": ["project:b"]}),
@@ -134,7 +145,8 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             changed = await client.call_tool("sb_read_page", args)
             assert changed.is_error
             assert "Alpha fixture" not in str(changed)
-            config.raw.pop("revoked_jarvis_signing_key_ids")
+            if isinstance(config.raw, dict):
+                config.raw.pop("revoked_jarvis_signing_key_ids", None)
             class ExpiredDate(datetime):
                 @classmethod
                 def now(cls, tz=None):

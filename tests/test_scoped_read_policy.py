@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from sb.config import load_config
 from sb.scoped_read_policy import current_scoped_policy, scoped_policy
@@ -13,7 +14,8 @@ from tests.test_access_claims import KEY
 def test_fixed_path_refreshes_revocation_and_policy_without_rebinding_session(tmp_path: Path, monkeypatch):
     path = tmp_path / "config.toml"
     encoded = base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()
-    original = f'''jarvis_public_keys = {{ "key:test" = "{encoded}" }}
+    original = f'''state_root = "{tmp_path / "state"}"
+jarvis_public_keys = {{ "key:test" = "{encoded}" }}
 [mcp_scoped_read]
 principal = "principal:owner"
 agent = "agent:test"
@@ -50,4 +52,14 @@ policy_revision = "policy:1"
     with pytest.raises(ValueError):
         current_scoped_policy(config, initial)
     path.write_text(original)
-    assert current_scoped_policy(config, initial) == initial
+    with pytest.raises(ValueError, match="MEMORY_SCOPED_CONFIG_INVALID"):
+        current_scoped_policy(config, initial)
+    other = Ed25519PrivateKey.from_private_bytes(bytes(range(32, 64)))
+    other_encoded = base64.urlsafe_b64encode(other.public_key().public_bytes_raw()).rstrip(b"=").decode()
+    path.write_text(original.replace(
+        f'"key:test" = "{encoded}"',
+        f'"key:test" = "{encoded}", "key:next" = "{other_encoded}"',
+    ))
+    recovered = current_scoped_policy(config, initial)
+    assert "key:test" not in recovered.public_keys()
+    assert "key:next" in recovered.public_keys()
