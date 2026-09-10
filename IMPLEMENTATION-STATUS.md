@@ -1434,3 +1434,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### 커넥터 검사 경고 제거 — 2026-09-10
 
 캐시 없는 `uv run ruff check --no-cache sb tests`로 기존 invalid-noqa 경고4개를 확인했다(GJC2·Orca records1·project records1). `# noqa: MATCH_OK`를 일반 `# MATCH_OK` 주석으로 바꾸어 실제 Ruff 규칙 억제처럼 해석되지 않게 했다. 세 모듈 각각 변경 전 HEAD와 AST dump가 완전히 동일함을 확인했다. 캐시 없는 전체 Ruff가 경고 없이 통과했다. 관련 기존 세션 테스트26 passed / 0.35초, GJC basedpyright0오류0경고. 실행 동작 변경은 없으며 이전 native/운영 미완료 조건을 유지한다. 전체 회귀·설치 인수는13cab77, 이후 DB/파서 기능 변경은 집중·CLI 검증 기준이다.
+
+### 재시도할 읽기 실패의 상태 노출 — 2026-09-10
+
+[상세](INGEST-READ-FAILURE-STATUS-2026-09-10.md), [실제 CLI/HTTP](INGEST-READ-FAILURE-STATUS-2026-09-10.json): size-limit/database-limit/unstable-session-file/unreadable-session-file을 오류0·ok로 숨기던 pipeline을 수정했다. 과거 skip dedup보다 먼저 오류를 기록·커서 유지하며 정상 원문은 저장한다. 8회귀 재현→관련45 passed / 20.11초·전체Ruff통과. 타입0오류/기존경고1개. 실제 CLI exit1/status failed/HTTP recent_stages 오류1·사유 확인, 복구 후exit0·중복0. 과거 한도 시험exit0과 다른 의도적 동작 변경이며 운영 미배포·전체/설치 검사는 이전13cab77 기준이다.

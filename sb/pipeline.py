@@ -48,6 +48,9 @@ UPCOMING_WINDOW: Final = timedelta(days=7)
 _UPDATED: Final = re.compile(r"^updated:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
 _ISO_DATE: Final = re.compile(r"\d{4}-\d{2}-\d{2}")
 _SID: Final = re.compile(r"\bsid=([0-9a-f]{8})\b")
+_RETRYABLE_READ_FAILURES: Final = frozenset({
+    "size-limit", "database-limit", "unstable-session-file", "unreadable-session-file",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -656,6 +659,16 @@ def _prepare_adapter_ingest(
             adapter_failed = True
             failure = "SOURCE_ROOTS_AMBIGUOUS"
             break
+        reason = meta.get("skip_reason")
+        if reason in _RETRYABLE_READ_FAILURES:
+            if attempted >= remaining:
+                capped = True
+                break
+            attempted += 1
+            errors += 1
+            adapter_failed = True
+            failure = failure or f"SOURCE_READ_INCOMPLETE: {adapter.source_id}: {reason}"
+            continue
         version_key = (ref.source_id, ref.source_uri, ref.source_version)
         if version_key in seen or version_key in accepted:
             continue

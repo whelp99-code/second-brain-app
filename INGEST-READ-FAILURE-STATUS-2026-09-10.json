@@ -1,0 +1,143 @@
+{
+  "root": "/var/tmp/sb-read-failure-cli-mm90yljh",
+  "commands": [
+    {
+      "args": [
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "SOURCE_READ_INCOMPLETE: fixture-opencode: database-limit\n"
+    },
+    {
+      "args": [
+        "status",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"vault_root\": \"/var/tmp/sb-read-failure-cli-mm90yljh/vault-generations/sbgen:v1:374d95b868ed3440e34400bf9bbab885e27499f3bbb626b16a1cfaa24754a407\",\n  \"initialized\": true,\n  \"schema_version\": 5,\n  \"schema_current\": 5,\n  \"git_head\": \"de68e13c2eaff139ec694b288468e116dc956430\",\n  \"git_clean\": true,\n  \"last_run\": {\n    \"run_id\": \"15c608c6721240db85a15c6a50443338\",\n    \"started_at\": \"2026-09-10T11:01:36.074632+09:00\",\n    \"finished_at\": \"2026-09-10T02:01:36.724002+00:00\",\n    \"git_commit\": null,\n    \"status\": \"failed\"\n  },\n  \"recent_stages\": [\n    {\n      \"run_id\": \"15c608c6721240db85a15c6a50443338\",\n      \"stage\": \"ingest\",\n      \"status\": \"failed\",\n      \"errors\": 1,\n      \"error\": \"SOURCE_READ_INCOMPLETE: fixture-opencode: database-limit\",\n      \"detail\": \"\"\n    }\n  ],\n  \"last_batch\": null,\n  \"run_counts\": {\n    \"failed\": 1\n  },\n  \"derivation_counts\": {\n    \"pending\": 0,\n    \"running\": 0,\n    \"done\": 0,\n    \"failed\": 0\n  },\n  \"failed_derivations\": [],\n  \"failed_by_stage\": {},\n  \"failed_details_omitted\": 0,\n  \"pages\": {\n    \"wiki\": 0,\n    \"daily\": 0,\n    \"conflicts\": 0\n  },\n  \"raw\": {\n    \"files\": 1,\n    \"bytes\": 12\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "ingest",
+        "--source",
+        "fixture-opencode"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "before": [
+    [
+      "good/snapshot.json#good",
+      "sha256:568dd8ef8a467517580262f185a48b65c0884a6acdd9c7b3dc0adcd7fa12d9b2",
+      "fc9e384cfbe48b8cfba8a0ba61436013fdf6232abcdec52788e0c99f32c2544d"
+    ]
+  ],
+  "after": [
+    [
+      "good/snapshot.json#good",
+      "sha256:568dd8ef8a467517580262f185a48b65c0884a6acdd9c7b3dc0adcd7fa12d9b2",
+      "fc9e384cfbe48b8cfba8a0ba61436013fdf6232abcdec52788e0c99f32c2544d"
+    ],
+    [
+      "snapshot.json#0",
+      "sha256:8f7fac23886f8f2fe38faf3d1a0cf68d344999adab772bbe558c4e44da0082dc",
+      "9736988467bc3dfa3d3bd7db53c55804e23dd8e2a96d548c39aaa08a5a29ba88"
+    ]
+  ],
+  "initial_rows": 5001,
+  "recovered_rows": 1,
+  "partial_database_items": 0,
+  "failed_status": {
+    "vault_root": "/var/tmp/sb-read-failure-cli-mm90yljh/vault-generations/sbgen:v1:374d95b868ed3440e34400bf9bbab885e27499f3bbb626b16a1cfaa24754a407",
+    "initialized": true,
+    "schema_version": 5,
+    "schema_current": 5,
+    "git_head": "de68e13c2eaff139ec694b288468e116dc956430",
+    "git_clean": true,
+    "last_run": {
+      "run_id": "15c608c6721240db85a15c6a50443338",
+      "started_at": "2026-09-10T11:01:36.074632+09:00",
+      "finished_at": "2026-09-10T02:01:36.724002+00:00",
+      "git_commit": null,
+      "status": "failed"
+    },
+    "recent_stages": [
+      {
+        "run_id": "15c608c6721240db85a15c6a50443338",
+        "stage": "ingest",
+        "status": "failed",
+        "errors": 1,
+        "error": "SOURCE_READ_INCOMPLETE: fixture-opencode: database-limit",
+        "detail": ""
+      }
+    ],
+    "last_batch": null,
+    "run_counts": {
+      "failed": 1
+    },
+    "derivation_counts": {
+      "pending": 0,
+      "running": 0,
+      "done": 0,
+      "failed": 0
+    },
+    "failed_derivations": [],
+    "failed_by_stage": {},
+    "failed_details_omitted": 0,
+    "pages": {
+      "wiki": 0,
+      "daily": 0,
+      "conflicts": 0
+    },
+    "raw": {
+      "files": 1,
+      "bytes": 12
+    }
+  },
+  "http_status": {
+    "status": "\ucd5c\uadfc \ub2e8\uacc4 \uc2e4\ud589 15c608c6721240db85a15c6a50443338: failed",
+    "last_run_status": "failed",
+    "last_batch": null,
+    "recent_stages": [
+      {
+        "run_id": "15c608c6721240db85a15c6a50443338",
+        "stage": "ingest",
+        "status": "failed",
+        "errors": 1,
+        "error": "SOURCE_READ_INCOMPLETE: fixture-opencode: database-limit",
+        "detail": ""
+      }
+    ],
+    "failures": {
+      "total": 0,
+      "by_stage": {},
+      "items": [],
+      "omitted": 0
+    }
+  },
+  "scope": "isolated actual CLI and ledger/CAS; synthetic SQLite; no native client"
+}
