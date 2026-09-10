@@ -1,6 +1,6 @@
 # 현재 인수 상태 — 2026-09-10
 
-> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 후보 `14a6ed7` 게이트 EXIT 0. 전환 런북 미실행. W5 빈 격리 프로필은 M5 미지원. [W5](W5-NATIVE-ISOLATION-2026-09-10.md).
+> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). W6 한글 붙여쓰기 Recall 2/2. 자연어/의역은 0. 후보 `14a6ed7`는 이 검색 변경 이전 wheel. [W6](W6-KOREAN-SPACING-2026-09-10.md).
 
 > **회신 검토 보완:** [CODEX-REPLY-REVIEW-2026-09-10.md](CODEX-REPLY-REVIEW-2026-09-10.md). 두 후보 wheel은 서로 다르며, Codex 사본 0건은 해당 관측 범위로 제한한다. 후속 운영 인수와 M3·M5 및 M8–M13 작업은 이 보완을 함께 적용한다.
 

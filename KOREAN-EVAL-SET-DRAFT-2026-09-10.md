@@ -31,7 +31,7 @@ TMPDIR=/var/tmp uv run python scripts/korean-search-acceptance.py --dataset test
 | stale_decision | 2/2, 이전 결정 노출 0 |
 | mixed_alnum / short_token / multi_gold / exact / keyword / reordered | 전부 회수 |
 | no_answer | 빈 결과 3/3 |
-| spacing | 0/2 |
+| spacing | 2/2 (W6 hangul compact `instr`) |
 | natural_question / paraphrase | 0/1 각각 |
 
-정답 있는 15문 Recall@5 73.3%. 붙여 쓴 주제명과 자연어/의역은 기존 100문과 같이 미회수다. 증거 `/var/tmp/sb-korean-search-cycjfz2o/evidence.json`. 제품 코드는 바꾸지 않았다.
+정답 있는 15문 Recall@5 73.3% → **86.7%**. 자연어/의역은 미회수. 최신 증거 `/var/tmp/sb-korean-search-jw_mb63m/evidence.json`. [W6](W6-KOREAN-SPACING-2026-09-10.md).

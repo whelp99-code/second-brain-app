@@ -7,6 +7,16 @@ from sb.search_errors import SearchQueryError
 
 MAX_QUERY_BYTES = 4096
 MAX_QUERY_GROUPS = 32
+_HANGUL_START = 0xAC00
+_HANGUL_END = 0xD7A3
+
+
+def _has_hangul(text: str) -> bool:
+    return any(_HANGUL_START <= ord(char) <= _HANGUL_END for char in text)
+
+
+def _compact(text: str) -> str:
+    return "".join(char for char in text if not char.isspace())
 
 
 def _groups(text: str) -> tuple[str, ...]:
@@ -64,15 +74,21 @@ class LexicalQuery:
 
     @property
     def uses_fts(self) -> bool:
-        return any(len(term) >= 3 for term in self.terms)
+        return any(len(term) >= 3 and not _has_hangul(term) for term in self.terms)
 
     def predicate(self) -> tuple[str, tuple[str, ...]]:
         long = [term for term in self.terms if len(term) >= 3]
         clauses: list[str] = []
         params: list[str] = []
         if long:
-            clauses.append("docs MATCH ?")
-            params.append(" AND ".join('"' + term.replace('"', '""') + '"' for term in long))
+            latin = [term for term in long if not _has_hangul(term)]
+            hangul = [term for term in long if _has_hangul(term)]
+            if latin:
+                clauses.append("docs MATCH ?")
+                params.append(" AND ".join('"' + term.replace('"', '""') + '"' for term in latin))
+            for term in hangul:
+                clauses.append("instr(replace(replace(text,' ',''), char(9), ''), ?) > 0")
+                params.append(_compact(term))
         for term in self.terms:
             if len(term) < 3:
                 clauses.append("(instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 "
@@ -93,4 +109,9 @@ class LexicalQuery:
 
     def matches_record(self, text: str) -> bool:
         folded = text.casefold()
-        return bool(self.terms) and all(term.casefold() in folded for term in self.terms)
+        compact = _compact(folded)
+        return bool(self.terms) and all(
+            term.casefold() in folded
+            or (_has_hangul(term) and _compact(term.casefold()) in compact)
+            for term in self.terms
+        )
