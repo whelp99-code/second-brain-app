@@ -5,7 +5,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acceptPhoneMemoryClient } from './phone-memory-client-acceptance.mjs';
-export async function acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result, request: written, outboxId, writerCookie, query: contextQuery }) {
+export async function acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result, request: written, outboxId, writerCookie, query: contextQuery, contentProfile }) {
   const load = name => import(pathToFileURL(join(build, name)).href);
   const { createPhoneGatewayServer } = await load('src/phone-gateway.js');
   const { parsePhoneGatewayCli } = await load('src/phone-gateway-main.js');
@@ -86,6 +86,6 @@ export async function acceptWrittenContext({ build, sb, f, home, upstream, confi
       writer_agent: 'agent:fixture', reader_agent: 'agent:reader', fresh_login: true,
       provider_proved: true, jarvis_settled: true, control_completed: true, settlement_replay: true, settlements: 1, attempts: 1, same_generation: true, record_ids: records.map(row => row.record.record_id),
       source_refs: records.map(row => row.source_ref), context_records: records.length, clients, reader_revocation: 403,
-      limits: 'fixture verified task and reviewed content; native submission is reported separately; not operational deployment' };
+      limits: `${contentProfile ?? 'fixture verified task and reviewed content'}; native submission is reported separately; not operational deployment` };
   } finally { gateway.close(); }
 }
