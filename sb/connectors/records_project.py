@@ -202,7 +202,7 @@ def _project_extract(obj: dict[str, JVal]) -> list[tuple[str, str]] | str:
     rec = obj.get("type")
     if not isinstance(rec, str) or rec in _DENIED or set(obj) & _FORBIDDEN:
         return []
-    match rec:  # noqa: MATCH_OK
+    match rec:  # MATCH_OK
         case "export_meta" | "project_meta" | "tombstone":
             return []
         case "record":

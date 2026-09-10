@@ -238,7 +238,7 @@ def _gjc_extract(obj: dict[str, JVal]) -> list[tuple[str, str]] | str:
     rec = obj.get("type")
     if not isinstance(rec, str) or rec in _DENIED or set(obj) & _FORBIDDEN:
         return []
-    match rec:  # noqa: MATCH_OK
+    match rec:  # MATCH_OK
         case "export_meta" | "session_meta":
             return []
         case "conversation":
@@ -264,7 +264,7 @@ def _gjc_tool(obj: dict[str, JVal]) -> list[tuple[str, str]] | str:
     item_id = obj.get("id")
     ident = item_id if isinstance(item_id, str) else "tool"
     phase = obj.get("phase")
-    match phase:  # noqa: MATCH_OK
+    match phase:  # MATCH_OK
         case "call":
             name = obj.get("name")
             arguments = obj.get("arguments")

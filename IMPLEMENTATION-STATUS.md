@@ -1430,3 +1430,7 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 ### 세션 파서 과도한 JSON 중첩 격리 — 2026-09-10
 
 [상세](SESSION-DEEP-JSON-2026-09-10.md), [CLI 결과](SESSION-DEEP-JSON-2026-09-10.json): 약20KB/깊이10,000 JSON이 다섯 세션 어댑터를 RecursionError로 중단시키던 결함 재현·각 파서의 기존 형식 오류 처리에 포함. 관련69 passed / 0.67초, 5모듈 타입0오류0경고. Ruff exit0·기존 GJC noqa 표기 경고2개. 실제 OpenCode CLI에서 잘못된 파일 사유/정상 형제 본문 저장·반복 원장 불변 확인. 최신 전체/설치 인수는 이번 수정 전13cab77 기준이며 native/운영 인수는 미완.
+
+### 커넥터 검사 경고 제거 — 2026-09-10
+
+캐시 없는 `uv run ruff check --no-cache sb tests`로 기존 invalid-noqa 경고4개를 확인했다(GJC2·Orca records1·project records1). `# noqa: MATCH_OK`를 일반 `# MATCH_OK` 주석으로 바꾸어 실제 Ruff 규칙 억제처럼 해석되지 않게 했다. 세 모듈 각각 변경 전 HEAD와 AST dump가 완전히 동일함을 확인했다. 캐시 없는 전체 Ruff가 경고 없이 통과했다. 관련 기존 세션 테스트26 passed / 0.35초, GJC basedpyright0오류0경고. 실행 동작 변경은 없으며 이전 native/운영 미완료 조건을 유지한다. 전체 회귀·설치 인수는13cab77, 이후 DB/파서 기능 변경은 집중·CLI 검증 기준이다.
