@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "release_id": "0eefce70378a2b0051ee0d8c159a542d1fd9f554",
+  "wheel_sha256": "dc705e8a058565fc6f98cc8d3a6ca9a62c47119b1ad8c51f9bdc7f2c6bbbb3dd",
+  "release_id_scheme": "sb-release-inputs-v3",
+  "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+  "preparation_files_sha256": {
+    "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+    "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+    "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+  },
+  "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+  "source_commit": "f142a76907cd52787103f7f51635ca8fb2ed6026",
+  "source_tree": "bff263c7e4d0abf75f2005442acde069e8b7e51f",
+  "source_materialization": "git-archive",
+  "working_tree_modified": true,
+  "contract_profile": "task32-schema4",
+  "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177",
+  "candidate_root": "/var/tmp/sb-candidate-f142a76",
+  "includes_w6_hangul_compact": true,
+  "previous_candidate": "14a6ed7ce284fa24a4e8157b97302f5d5786a275",
+  "operational_current_unchanged": true
+}

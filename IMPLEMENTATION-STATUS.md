@@ -1,6 +1,6 @@
 # 현재 인수 상태 — 2026-09-10
 
-> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). W0–W9 중간 보고: 전환 미실행. [W9](W9-STATUS-2026-09-10.md).
+> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 최신 격리 후보 `0eefce7` (소스 `f142a76`, W6 포함). 이전 `14a6ed7` 유지. 전환 미실행. [후보](W3-CANDIDATE-F142A76-2026-09-10.md).
 
 > **회신 검토 보완:** [CODEX-REPLY-REVIEW-2026-09-10.md](CODEX-REPLY-REVIEW-2026-09-10.md). 두 후보 wheel은 서로 다르며, Codex 사본 0건은 해당 관측 범위로 제한한다. 후속 운영 인수와 M3·M5 및 M8–M13 작업은 이 보완을 함께 적용한다.
 
