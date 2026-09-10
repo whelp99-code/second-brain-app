@@ -35,6 +35,10 @@
 
 운영 vault나 `~/.claude`를 이 순서의 실험장으로 쓰지 않는다.
 
+## 격리 고정 (관리 대상이 아닌 클라이언트 사본)
+
+`tests/test_managed_copy_disposal.py::test_forget_does_not_dispose_unmanaged_client_session_copy`: forget이 관리형 backup/export는 처분해도 `client-home/.claude/.../session.jsonl` 바이트는 그대로다. 실제 Claude 바이너리 `--resume`이 아니다. 운영 `~/.claude`를 쓰지 않았다.
+
 ## 완료 증거 (아직 없음)
 
 사본 종류마다: 삭제 전 목록, 처분 행위, 삭제 후 재개/복원/재색인에서 내용 0. Codex 0건 한 줄은 이 표를 채우지 않는다.

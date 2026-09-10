@@ -146,3 +146,20 @@ def test_new_backup_before_pointer_is_rescanned_on_retry(tmp_path: Path, operati
         assert not archive.exists() and not base.root.exists()
     finally:
         restarted.close()
+
+
+def test_forget_does_not_dispose_unmanaged_client_session_copy(tmp_path: Path) -> None:
+    session = tmp_path / "client-home" / ".claude" / "projects" / "demo" / "session.jsonl"
+    session.parent.mkdir(parents=True)
+    payload = b'{"type":"user","message":{"content":"' + OLD.encode() + b'"}}\n'
+    session.write_bytes(payload)
+    executor, operation_id, archive, export_dir = prepare_copies(tmp_path, "forget")
+    try:
+        result = apply(executor, "forget", operation_id)
+        assert result["state"] == "proved", result
+        assert session.is_file()
+        assert session.read_bytes() == payload
+        assert not archive.exists()
+        assert not export_dir.exists()
+    finally:
+        executor.close()
