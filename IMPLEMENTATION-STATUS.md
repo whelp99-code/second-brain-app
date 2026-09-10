@@ -1,35 +1,37 @@
 # 현재 인수 상태 — 2026-09-10
 
+> **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 그록 회신의 독립 검증과 W0–W9 작업 순서·수정 대상·완료 조건·검증 명령을 포함한다. 코드 기준 `0033c22`, 회신 추가 `4173b2e`. 관련 72개 테스트 통과이며 이 HEAD의 전체 회귀·운영 전환은 미실행이다.
+
 > **회신 검토 보완:** [CODEX-REPLY-REVIEW-2026-09-10.md](CODEX-REPLY-REVIEW-2026-09-10.md). 두 후보 wheel은 서로 다르며, Codex 사본 0건은 해당 관측 범위로 제한한다. 후속 운영 인수와 M3·M5 및 M8–M13 작업은 이 보완을 함께 적용한다.
 
-> **Codex 회신서: [CODEX-REPLY-2026-09-10.md](CODEX-REPLY-2026-09-10.md)** — 인계 수행 결과, 정정한 서술, 남은 4개 결정. 이어받는 세션은 이것부터 읽는다.
+> **이전 회신서: [CODEX-REPLY-2026-09-10.md](CODEX-REPLY-2026-09-10.md)** — 당시 수행 결과와 결정 목록. 후속 회신·검토의 정정을 함께 적용한다.
 >
-> 후속 작업의 시작점: [상세 인계 지시서](/home/jm/orca/projects/second-brain-app/CURSOR-HANDOFF-2026-09-10.md). 인계를 이어받아 8-A 전체 검증과 8-B 설치 후보 인수를 **HEAD d4cbdda 기준으로 갱신**했다([회귀](CONTINUATION-FULL-REGRESSION-2026-09-10.md), [설치 후보](CONTINUATION-INSTALLED-PAIR-2026-09-10.md)). 전체 목표 완료나 운영 전환을 뜻하지 않으며, 8-C 실제 업무·에이전트 간 공유 인수가 다음 작업이다.
+> 전체 M1–M14 요구는 [기존 상세 인계서](/home/jm/orca/projects/second-brain-app/CURSOR-HANDOFF-2026-09-10.md)를 유지한다. 이후 실제 업무 공유·격리 계보 인수가 추가됐으며, 다음 단계는 위 최신 지시서의 결함 개선과 운영 신원 종단 인수다.
 
 **핵심 기능과 격리 설치물은 검증됐지만, 운영 메인 기억 저장소 전체 인수는 미완료다.** 아래 표를 최신 진입점으로 사용한다. 뒤의 개별 기록은 해당 커밋·실행 시점의 이력이다.
 
 | 범위 | 최신 확인 결과 | 증거 |
 |---|---|---|
-| 설치물 자비스 연결 | d4cbdda 후보 25d49b4: paired 연동·유지보수 exit0, 철회/만료 4종·FK0·inventory 불변·production_activated false; 합성 신원·clock | [후보 인수](CONTINUATION-INSTALLED-PAIR-2026-09-10.md), [이전 13cab77](INSTALLED-CONNECTOR-UPDATES-2026-09-10.md) |
-| 실제 모델 클라이언트 | Claude Code2.1.261 전체 시험 통과; Codex0.154.0은 운영 MCP 회수 성공(`--approve-for-me` 필요), scoped 인증 경로는 미완 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md), [실제 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
+| 설치물 자비스 연결 | 기준 후보 c04dee1 / 소스4aa7111 / wheel ac8fcd16…: 표준·실제 업무 gate 통과, 신원·정책·clock은 fixture. 이후 추가된 doctor 경고는 이 후보에 없음 | [계보 인수](REAL-WORK-JARVIS-LINEAGE-2026-09-10.json), [최신 검토](CODEX-FOLLOWUP-REVIEW-2026-09-10.md) |
+| 실제 모델 클라이언트 | Claude Code2.1.261 해당 인증 시험 통과; Codex0.154.0은 운영 MCP 회수 성공 이력, scoped 인증 경로는 미완. 당시 실행 옵션은 해당 버전·환경의 관측이며 현재 승인 정책 변경 지시가 아님 | [인증 시험](SCOPED-ACCEPTANCE-CLOCK-2026-09-10.md), [실제 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
 | 실제 업무 기억 공유 | 운영 경로에서 실제 검증 업무1건 저장→단일작성자 수집→**두 제품 새 세션 회수**(Claude·Codex), 근거없음0건·vault이탈 거부 | [실제 업무 공유](REAL-WORK-SHARED-MEMORY-2026-09-10.md) |
 | 정정 기억 공유 | Codex 저장→Claude 새 세션이 정정을 최신으로 판정. 다만 **정정이 기존 daily 페이지에 반영되지 않고 `wiki/_proposed`로 우회**되는 운영 결함 발견 | [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md) |
 | 실제 업무 자비스 계보 | **실제 검증 업무 본문**이 `memory classify`→승인→outbox→provider `proved`→새 reader 회수·철회403까지 통과(exit0). 본문이 CAS·컴파일 페이지·검색 색인에 실재함을 확인. 신원·정책·clock은 여전히 fixture | [계보 인수](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
 | 실패 결과 승격 차단 | 같은 실제 본문으로 10개 케이스 exit0. 근거 없음/만료/효력전/**검증 후 문장 변조**는 후보 생성 0, 자격 없는 입력4종·충돌은 사유와 함께 `rejected`. 발행은 정상 1건뿐 | [승격 차단 인수](REAL-WORK-REFUSAL-2026-09-10.md) |
 | 삭제 후 재등장 차단 | HEAD `d1d06e2`에서 재실행 exit0: 삭제→조회0, 복원이 high-water 승계(`seq 1`), 재삭제(`seq 2`)·재복원 뒤에도 **둘 다 0건**. 관련 단위20통과. 격리 fixture·모델호출0 | [삭제 수명](DELETION-LIFECYCLE-2026-09-10.md) |
 | 철회 수명(M3) | revision 상승·발급 후 철회·읽기 중 철회·설정 파손은 **충족**. 다만 **철회 이전 설정을 복원하면 과거 권한이 되살아난다**(`assert current_scoped_policy(config, initial) == initial`). 삭제는 manifest high-water라 복원을 견디는 것과 비대칭 — 설계 판단 필요 | [철회 rollback 간극](REVOCATION-ROLLBACK-GAP-2026-09-10.md) |
-| native 사본 목록(M5 선행) | 기준 해시 실측: provider7, **Claude Code 클라이언트 세션3**, Codex **0**. `codex exec`는 rollout·sqlite·archived 어디에도 사본을 남기지 않음(방법은 provider search.db 6건 적중으로 검증). provider 삭제로 `~/.claude` 사본은 사라지지 않음 | [사본 목록](NATIVE-COPY-INVENTORY-2026-09-10.md) |
+| native 사본 목록(M5 선행) | 당시 기준 해시 조사: provider7, Claude 세션3, Codex0. 지정 경로·형식에서 미검출이며 모든 Codex 실행의 무보존 보장이 아님. provider 삭제 후 native 재개·compaction·백업 수명은 미완 | [사본 정책](M5-COPY-POLICY-2026-09-10.md), [최신 검토](CODEX-FOLLOWUP-REVIEW-2026-09-10.md) |
 | 읽기 표면 범위 일관성 | 범위검사 표면4종 중 **`sb_search`만 MCP 계층 범위 단정이 없어** 추가. 불허 프로젝트=결과0, 잘못된 신원=명시적 거부로 계약 두 형태 확정, 허용 payload 누출0. 관련44통과·Ruff통과 | [읽기 표면 일관성](SCOPED-READ-SURFACE-CONSISTENCY-2026-09-10.md) |
-| 운영 자비스 전환 | 운영 authority `a3cbbbe`에 memory 모듈 **77개 부재**(`cli-memory-intake.js` 등, 371 vs 516). 운영에서의 계보 재현은 새 authority 활성화가 선행 조건 | [계보 인수 7절](REAL-WORK-JARVIS-LINEAGE-2026-09-10.md) |
+| 운영 자비스 전환 | 운영 기본 memory 코드는 존재. JS 파일은 운영369 / 페어513, 페어 전용144. intake/scoped-reconcile/production outbox 등 새 명령 경로가 운영에 없음. memory 하위 개수는 집계 규칙별 차이가 있어 파일 목록으로 판정 | [전환 준비](OPERATIONAL-CUTOVER-PREP-2026-09-10.md), [독립 대조](CODEX-FOLLOWUP-REVIEW-2026-09-10.md) |
 | 실사용 발견 결함 | 각주 중복(쉼표 span) **수정 완료**. `_proposed` 우회는 후보에 **이미 수정됨**(A/B 확인). 실패 오보는 **기전 확정**(운영 규모 쓰기18.51초 vs 클라이언트 타임아웃), 재시도 피해는 동일 바이트일 때 unit1개로 한정 | [각주 수정](FOOTNOTE-SPAN-SEPARATOR-2026-09-10.md), [정정 공유·결함](CORRECTION-SHARED-MEMORY-2026-09-10.md), [쓰기 비용·중단 재현](WRITE-COST-AND-INTERRUPT-2026-09-10.md) |
-| `activated` 잔여 세대 | 포인터 교체 순간 중단으로 **재현 성공**(3/3, 원문은 저장됨). 격리에서는 다음 쓰기가 정리. 상태 기계가 두 릴리스에 동일해 운영 3행이 남는 이유는 **미규명·열린 항목** | [쓰기 비용·중단 재현 4절](WRITE-COST-AND-INTERRUPT-2026-09-10.md) |
+| `activated` 잔여 세대 | 같은 고아 journal 3행 잔존, 대응 active/retired 세대 디렉터리 없음. 후보는 현재 parent만 마무리하므로 옛 3행이 남음. 새 doctor는 관측 경고이며 정리 아님. 최초 생성·소실 사건 전체는 미규명 | [고아 행 원인](ACTIVATED-ORPHAN-ROWS-2026-09-10.md), [독립 대조](CODEX-FOLLOWUP-REVIEW-2026-09-10.md) |
 | 입력 원본 보존 | 동일 이름 보존·중단 재시도·검증 직후 파일 변경 차단; 관련27통과 | [보존](INBOX-ORIGINAL-PRESERVATION-2026-09-10.md), [경합](INBOX-VERIFIED-IDENTITY-2026-09-10.md) |
-| 운영 전환 | UTC09-10 01:40 관측: DB 사용2서비스·유효lease1·관측불가22개, 전환보류; 운영 변경 없음 | [운영 재확인](OPS-RECHECK-2026-09-10-0140.md) |
+| 운영 전환 | 전환 미실행. 준비서의 큐·lease·백업은 당시 스냅샷이며, 검토 시 current 세대와 proved 수는 이미 갱신됨. 전환 직전 현재 설정 경로·writer·DB 핸들·백업을 다시 확인 | [전환 준비](OPERATIONAL-CUTOVER-PREP-2026-09-10.md), [최신 검토](CODEX-FOLLOWUP-REVIEW-2026-09-10.md) |
 | scoped 검색 | 1,000페이지 각5회: 전체허용 p50 2.023초, 허용1개 p50 0.317초; library 측정 | [연결 공유 검증](SCOPED-SHARED-READ-2026-09-10.md) |
 | OpenCode 수집 | 13cab77: 내용 변경·제한 읽기·불안정 snapshot 재시도·출처 분리, 합성 입력 실제 CLI 확인 | [출처 분리](OPENCODE-SOURCE-ISOLATION-2026-09-10.md), [읽기 예산](OPENCODE-DATABASE-LIMITS-2026-09-10.md) |
 | 전체 요구사항 | M1–M14 유지: 실제 업무·권한/세션/삭제 수명·클라이언트 수집/주입·검색 평가·GUI·복구 인수 남음 | [전체 목록](SHARED-MEMORY-CONSOLIDATED-REVIEW-2026-09-09.md), [인계 병합](HANDOFF-CURRENT-GAPS-2026-09-10.md) |
 
-최신 전체 회귀: **범위 단정 추가 후 1,793 passed / 2 skipped, 503.77초, exit0**. 각주 수정(`110b474`) 기준도 1,793이며, 이번 변경은 기존 파라미터 테스트 **안에** 단정을 더한 것이라 개수가 같다. 그 이전 d4cbdda 1,785(569.06초, Ruff·basedpyright 동시 통과)와 13cab77 1,767은 [회귀 보고서](CONTINUATION-FULL-REGRESSION-2026-09-10.md)·[과거 보고서](CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md)에 남긴다. optional embeddings 모듈은 지정 명령대로 제외했으며, 실제 운영 전환·모든 클라이언트 인수와 구분한다.
+마지막으로 기록된 전체 회귀는 **범위 단정 추가 후 1,793 passed / 2 skipped, 503.77초, exit0**다. 이후 doctor 제품 변경과 테스트 추가가 있으므로 현재 HEAD의 전체 통과 수치로 사용하지 않는다. 이번 독립 검토는 관련 72개 통과·Ruff 통과다. 그 이전 d4cbdda 1,785와 13cab77 1,767은 [회귀 보고서](CONTINUATION-FULL-REGRESSION-2026-09-10.md)·[과거 보고서](CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md)에 남긴다. optional embeddings 제외 및 실제 운영/모든 클라이언트 인수 미완료 경계를 유지한다.
 
 ---
 
