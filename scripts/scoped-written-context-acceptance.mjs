@@ -5,7 +5,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acceptPhoneMemoryClient } from './phone-memory-client-acceptance.mjs';
-export async function acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result, request: written, outboxId, writerCookie }) {
+export async function acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result, request: written, outboxId, writerCookie, query: contextQuery }) {
   const load = name => import(pathToFileURL(join(build, name)).href);
   const { createPhoneGatewayServer } = await load('src/phone-gateway.js');
   const { parsePhoneGatewayCli } = await load('src/phone-gateway-main.js');
@@ -47,7 +47,8 @@ export async function acceptWrittenContext({ build, sb, f, home, upstream, confi
     const cookie = cookieFromSetCookie(login.headers['set-cookie']);
     const csrf = (await login.body.json()).csrf_token;
     assert.notEqual(cookie, writerCookie);
-    const query = '결정';
+    // Fixture bodies contain '결정'; a real work item supplies a term from its own statement.
+    const query = contextQuery ?? '결정';
     const headers = { ...identity, Origin: config.publicOrigin, Cookie: `__Host-jarvis-phone=${cookie}`,
       'X-JARVIS-CSRF': csrf, 'Content-Type': 'application/json; charset=utf-8' };
     const reconcile = () => request(`${base}/api/v1/memory/reconcile`, { method: 'POST', headers,

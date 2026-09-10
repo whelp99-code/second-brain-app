@@ -195,7 +195,7 @@ for (const mode of work ? ['valid'] : ['valid', 'revoke_during_accept', 'revoke_
     assert(!JSON.stringify(result).includes(cookie));
     const readback = mode === 'valid' && process.argv.includes('--readback')
       ? await acceptWrittenContext({ build, sb, f, home, upstream, config, assets, result,
-          request: dispatched.request, outboxId: registered.outbox_id, writerCookie: cookie }) : undefined;
+          request: dispatched.request, outboxId: registered.outbox_id, writerCookie: cookie, query: work?.query }) : undefined;
     delete result.readback;
     const real_work = work && mode === 'valid'
       ? verifyRealWorkBody(join(f.database.root, 'provider'), work.assert_substring) : undefined;
