@@ -54,6 +54,58 @@ def test_status_exposes_held_brief_failures_without_changing_rows(tmp_path: Path
         assert len(list(ledger.list_derivations(status="failed", stage="brief"))) == 23
 
 
+def test_web_run_does_not_clear_held_brief_failures(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    config, root = _ready(tmp_path)
+    with Ledger(root) as ledger:
+        for index in range(23):
+            key = f"brief-failure-{index:02}"
+            ledger.ensure_derivation(key, "brief", "past-run")
+            ledger.mark_running(key, "past-run")
+            ledger.mark_failed(key, "password=secret-value unresolved citation")
+        before = [
+            (row.deriv_key, row.attempts, row.status)
+            for row in ledger.list_derivations(status="failed", stage="brief")
+        ]
+    monkeypatch.setattr(
+        "sb.web.run_all",
+        lambda *args: RunOutcome(
+            "console-retry",
+            "failed",
+            0,
+            0,
+            1,
+            1,
+            None,
+            failure="BRIEF_REPLAY_INPUTS_UNAVAILABLE",
+        ),
+    )
+    with _running(config) as base:
+        status, result = _request(base + "/api/run", method="POST", payload={})
+        assert status == 200
+        assert isinstance(result, dict)
+        assert result.get("status") == "failed"
+        assert result.get("run_id") == "console-retry"
+        assert "BRIEF_REPLAY_INPUTS_UNAVAILABLE" in str(result.get("failure"))
+        status, payload = _request(f"{base}/api/status")
+    assert status == 200
+    assert isinstance(payload, dict)
+    failures = cast(dict[str, object], cast(dict[str, object], payload).get("failures"))
+    assert failures.get("total") == 23
+    assert failures.get("by_stage") == {"brief": 23}
+    items = failures.get("items")
+    assert isinstance(items, list)
+    assert all(
+        cast(dict[str, object], item).get("retry_hold_reason") == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
+        for item in items
+    )
+    with Ledger(root) as ledger:
+        after = [
+            (row.deriv_key, row.attempts, row.status)
+            for row in ledger.list_derivations(status="failed", stage="brief")
+        ]
+    assert after == before
+
+
 class _NoPreviousHash:
     def last_compiled_hash(self, page_id: str) -> str | None:
         del page_id
