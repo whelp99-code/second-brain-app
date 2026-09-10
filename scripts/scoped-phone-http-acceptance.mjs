@@ -83,8 +83,9 @@ try {
     method: 'POST', headers: selected,
     body: JSON.stringify({ schema_version: 1, query: 'Cited', limit: 8, max_bytes: 32768, ...extra }),
   });
-  const found = await call(); assert.equal(found.statusCode, 200);
+  const found = await call();
   const text = await found.body.text(); const result = JSON.parse(text);
+  assert.equal(found.statusCode, 200, `context request failed: ${result.error?.code ?? "unknown"}`);
   assert.equal(result.context.records.length, 2); assert.ok(Buffer.byteLength(text) <= 32768);
   const clientAcceptance = await acceptPhoneMemoryClient({ build: process.argv[2], root: home.home,
     port: gateway.address.port, identity, origin: FIXTURE_ORIGIN, cookie, csrf, expected: result.context.records });

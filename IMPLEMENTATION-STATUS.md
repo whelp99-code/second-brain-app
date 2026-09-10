@@ -1344,3 +1344,5 @@ B4~B8 전체 완료와 자비스 자동 전달/session 계약의 기존 미완�
 **2026-09-10 최신 전체회귀 설치 인수:** [92db131 archive설치·자비스paired4경로·maintenance기억보존3회](CURRENT-INSTALLED-ACCEPTANCE-2026-09-10.md). 두검증exit0,새로그인/독립2reader각2records·settlement1/FK0·paired설치물불변·busy/SIGKILL정리1/replay0. 합성fixture/native0,운영/실업무/잔여경합·전체목표유지.
 
 **2026-09-10 inbox 완료 실패 보고/복구:** [실제run_ingest거짓ok재현→SOURCE_ACKNOWLEDGEMENT_FAILED·경로복구후written0/원장동일정리](INBOX-ACK-RECOVERY-2026-09-10.md). 관련22통과/5.19초·Ruff/diff·타입0오류/기존경고1. 전체/설치재검증으로확대없음,잔여경합/운영/실업무·전체목표유지.
+
+**2026-09-10 인계 현재판·잔여 조건 재대조:** [수정/개선/고도화 목록과 최신 인증 HTTP 실패 구분](HANDOFF-CURRENT-GAPS-2026-09-10.md). native 소비자 재시험은 모델 호출 전503/PHONE_UPSTREAM_UNAVAILABLE로 중단, 근본 원인 미확정·과거 quota 재발로 단정하지 않음. 공개 오류 코드 진단 추가, inbox 관련22통과/6.61초·Node문법/diff통과. 이전 설치 성공과 최신 workspace 실패를 분리하며 운영/실업무 및 M1–M14 전체 목표 유지.
