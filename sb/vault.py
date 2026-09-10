@@ -25,6 +25,8 @@ BOT_EMAIL: Final = "sb@local"
 GITIGNORE_BODY: Final = "raw/\n.sb/\n"
 INIT_MESSAGE: Final = "sb: init vault"
 FOOTNOTE_RE: Final = re.compile(r"\[\^([^\]]+)\]")
+# Models annotate the source span either as "origin span=0-12" or "origin, span=0-12".
+SPAN_SUFFIX_RE: Final = r",? span=[0-9]+-[0-9]+"
 VAULT_DIRS: Final = ("wiki", "daily", "conflicts", "inbox", "raw", ".sb", "wiki/_proposed")
 
 
@@ -492,8 +494,8 @@ def _render_definitions(body: str, sources: Sequence[SourceCite]) -> str:
         value = line.lstrip(" ")
         origin = canonical.split(": ", 1)[1]
         native = f"[^{match[1]}]: sid={match[1]} origin={origin}"
-        if (value == canonical or re.fullmatch(re.escape(canonical) + r" span=[0-9]+-[0-9]+", value)
-                or re.fullmatch(re.escape(native) + r" span=[0-9]+-[0-9]+", value)):
+        if (value == canonical or re.fullmatch(re.escape(canonical) + SPAN_SUFFIX_RE, value)
+                or re.fullmatch(re.escape(native) + SPAN_SUFFIX_RE, value)):
             owned.setdefault(match[1], []).append(index)
     removed: set[int] = set()
     for sid, indices in owned.items():

@@ -321,12 +321,13 @@ def test_write_pages_restores_page_log_index_when_commit_fails(
 @pytest.mark.parametrize('fence', ['```', '~~~~'])
 @pytest.mark.parametrize('span_first', [True, False])
 @pytest.mark.parametrize('native_format', [False, True])
-def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fence: str, span_first: bool, native_format: bool) -> None:
+@pytest.mark.parametrize('span_separator', [' ', ', '])
+def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fence: str, span_first: bool, native_format: bool, span_separator: str) -> None:
     from sb.vault import read_page_spec
 
     origin = 'me-wiki:identity/profile.md'
     definition = f'[^{CAS_SID}]: {origin}'
-    annotated = (f'[^{CAS_SID}]: sid={CAS_SID} origin={origin}' if native_format else definition) + ' span=0-12'
+    annotated = (f'[^{CAS_SID}]: sid={CAS_SID} origin={origin}' if native_format else definition) + f'{span_separator}span=0-12'
     definitions = [annotated, definition]
     if not span_first:
         definitions.reverse()
