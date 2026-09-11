@@ -74,5 +74,17 @@
     "has_scoped_read_policy": false,
     "filename_refs": []
   },
-  "sb_source_commit_docs": "159b611"
+  "sb_source_commit_docs": "159b611",
+  "r7_candidate": {
+    "source_commit": "edd2cb5cb547c72b169e86892a0ed07f5846b776",
+    "release_id": "5b9687bf912b9de314a7d4308b7e091f88d8008b",
+    "wheel_sha256": "cdcb402733993f698b138f5f5a59ccf24f035517932b93ff6144d7f505548e83",
+    "jarvis_source": "6ce2356",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-6ce2356/source/dist",
+    "jarvis_artifact_digest": "sha256:2ec1f72757522e6d36f99b549c7dae4b3b787bea717395782d03964a1f104e42",
+    "maintenance_exit": 0,
+    "integration_exit": 0,
+    "work_exit": 0,
+    "production_activated": false
+  }
 }
