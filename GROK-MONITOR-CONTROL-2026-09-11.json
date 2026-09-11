@@ -1,0 +1,234 @@
+{
+  "automation_id": "c92a741e-d1ae-4591-8fd3-80d3f117cbc4",
+  "name": "Second Brain Grok 완료 감시",
+  "scope": "Monitor this Grok completion task only; do not implement or authorize cutover.",
+  "created_at_utc": "2026-09-11T06:26:10.516813+00:00",
+  "baseline_head": "77c6d951bb4f4b289564f178e433dde090a1bbe7",
+  "terminal_handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+  "schedule": "*/30 * * * *",
+  "timezone": "Asia/Seoul",
+  "resume_count": 2,
+  "last_notified_event": "New d564688 submission: SB48686de/bda0804 x JARVIS635b4b5 includes V1-V5 response, changed sources and completed self-check logs. Original Codex independent review requested; monitoring retained.",
+  "setup_state": "enabled_policy_v2_manual_check_verified",
+  "last_check_at": "2026-09-11T13:31:51.806906+00:00",
+  "observed_status": "new_d564688_candidate_waiting_original_codex_review",
+  "current_head": "d5646882708055134b64ce14be890cac772727d6",
+  "last_cursor": "1120304",
+  "observation_evidence": {
+    "screen_source": "screen",
+    "screen_request_id": "8d814c11-1942-44e1-acee-9f17e8543c3e",
+    "screen_cursor": "1120304",
+    "public_response": "Grok submitted48686de/bda0804 x JARVIS635b4b5 at d564688, ready_for_final_review; explicitly requested Codex review and disclaimed operational completion.",
+    "screen_state": "Final response and input prompt; native Goal achieved refers only to candidate preparation.",
+    "submission_checks": "MD and JSON pins agree with release manifest. V1-V5 response present; SB/JARVIS commit stats show source and test changes. Raw standard/work/maintenance logs end in0; full regression log reports1823 passed,2 skipped,EXIT:0. These are self-validation results, not monitor acceptance.",
+    "action": "No implementation resume while new submission awaits independent review.",
+    "continuation_status": "Prior work-gate stage progressed to final candidate submission without monitor input; future implementation continuation_unverified and not requested while review pending.",
+    "final_acceptance": false,
+    "automation_action": "Kept30-minute monitoring; no automation edit or operational changes."
+  },
+  "execution_host": "local",
+  "monitor_workspace": "/home/jm/orca/projects/second-brain-app",
+  "monitor_terminal_handle": "term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "verified_manual_run_id": "2fd3a08c-1483-43b1-a7d6-fc44372467ec",
+  "enabled_at_utc": "2026-09-11T10:09:49.511015+00:00",
+  "schedule_updated_at": "2026-09-11T15:30:21.176071+09:00",
+  "schedule_change_reason": "User requested automatic checks only once every 30 minutes.",
+  "last_resume_reason": "Final reply and idle prompt despite package declaring R4/R6/R7 implemented_unverified, compiled_search_hits=0 and incomplete performance/recovery evidence.",
+  "disabled_at_utc": null,
+  "disabled_reason": null,
+  "final_review_handoff": {
+    "submission_head": "26cf158",
+    "ack_commit": "7706689",
+    "ack_path": "/home/jm/orca/projects/second-brain-app/GROK-CODEX-REPLY-ACK-2026-09-11.md",
+    "ack_sha256": "6c1799472c213f28cffd6386563e070df7767d9ad44bb1560d0850a25b9fb577",
+    "reply_path": "/home/jm/orca/projects/second-brain-app/CODEX-TO-GROK-REPLY-2026-09-11.md",
+    "receipt_request_id": "c1490e18-4210-42ea-bcd6-9a260b66a13e",
+    "final_acceptance": false
+  },
+  "active_review": "CODEX-FINAL-REVIEW-D26DD7A-2026-09-11.md",
+  "review_round_resume_count": 2,
+  "review_round_baseline": "d26dd7a799d256352fd6b7e8cc9b0fad6f98cb8a",
+  "review_round_status": "d26dd7a_not_accepted_native_goal_resumed",
+  "current_open_findings": [
+    "V1/R4",
+    "V2/compile-cap",
+    "V3/R5",
+    "V4/R2-marker",
+    "V5/R6"
+  ],
+  "review_round_ack": {
+    "at_utc": "2026-09-11T07:27:25.968310+00:00",
+    "path": "/home/jm/orca/projects/second-brain-app/GROK-RESUME-STATUS-2026-09-11.md",
+    "sha256": "fa1ad6b10ce2e38e6196ae626f7216507f68bac94b9e6d7cc651fecece1d13bf"
+  },
+  "policy_history": [
+    {
+      "replaced_at_utc": "2026-09-11T10:09:49.511015+00:00",
+      "previous_setup_state": "disabled_review_round_resume_limit",
+      "previous_review_round_status": "repeated_idle_limit_reached",
+      "previous_disabled_reason": "Current review-round resume limit reached: two resumes followed by final reply/input wait while restore compile exit 1 and sealed search 0 remain.",
+      "previous_disabled_at_utc": "2026-09-11T09:01:39.642673+00:00",
+      "review_round_resume_count": 2,
+      "reason": "User reports stopped worker. Remove assistant-imposed premature cutoff; preserve 30-minute schedule."
+    },
+    {
+      "at_utc": "2026-09-11T13:38:47.156370+00:00",
+      "previous_policy_version": "2026-09-11-rendered-state-and-continuation-v3",
+      "reason": "User explicitly requested continued work until morning; existing Codex monitor now handles overnight independent verification and Grok follow-through."
+    }
+  ],
+  "policy_version": "2026-09-11-overnight-implementation-and-independent-review",
+  "policy_path": "/home/jm/orca/projects/second-brain-app/CODEX-GROK-OVERNIGHT-2026-09-11.md",
+  "policy_sha256": "7baf57623d7ac6744b8ddd6db97a67694524fcc33319744374359a77c9d43739",
+  "policy_edit_request_id": "cc03836b-f2df-4a43-8c66-a8015a2c72fa",
+  "final_acceptance": false,
+  "monitor_recovery_ack": {
+    "at_utc": "2026-09-11T10:09:49.511015+00:00",
+    "path": "/home/jm/orca/projects/second-brain-app/GROK-RESUME-STATUS-2026-09-11.md",
+    "sha256": "2a7eda2c0c4c4f8325123bbd64da46ae432f2364f80a3c9e740439b44269082b",
+    "text": "2970cc3 이후 미완료 작업 재개, R4/R6/R7 원인 해결 진행",
+    "terminal_action": "Grok wrote status=running and ran compile; captured SecurityPolicyError failure."
+  },
+  "recovery_verified_at_utc": "2026-09-11T10:11:50.376487+00:00",
+  "recovery_next_run_at": 1789122600000,
+  "policy_v2_resume_count": 2,
+  "latest_resume_ack": {
+    "at_utc": "2026-09-11T12:02:38.595690+00:00",
+    "send_request_id": "4a96d4d1-2c32-487a-8fb6-0d461093aad1",
+    "send_accepted": true,
+    "confirmation": "status_file_changed_and_tool_output",
+    "path": "/home/jm/orca/projects/second-brain-app/GROK-RESUME-STATUS-2026-09-11.md",
+    "sha256": "7990a4bf26ca2e56350649ef3547ea6ec9ca965886a32fbd3312a19c803b6d55",
+    "text": "# Grok 재개 상태\n\n시각: 2026-09-11. **status=running**\n\n588ce9f 이후. 다음: R4 실제 세션→transport 요청 생성. 인증 없는 격리 transport에서 전송 직전 JSON(query·본문·출처·버전·누락) 예산, 새 세션, compaction, 만료/철회, no_data. live LLM 호출 없음. 전환 없음.\n",
+    "idle_cursor_before_send": "896781",
+    "confirmed_cursor": "900670",
+    "tool_evidence": "Rendered output block lists context-assembler unit tests and context-model-request.test.ts; Working displayed. No claim those tests passed."
+  },
+  "policy_v2_resume_history": [
+    {
+      "at_utc": "2026-09-11T10:33:54.863881+00:00",
+      "send_request_id": "618372b6-4871-47a2-9629-71d0c1419ba0",
+      "send_accepted": true,
+      "confirmation": "status_file_changed",
+      "path": "/home/jm/orca/projects/second-brain-app/GROK-RESUME-STATUS-2026-09-11.md",
+      "sha256": "676fce445f781344c5a91b38fa282f789eadd4c58c561ed47b5ac6061071b168",
+      "text": "# Grok 재개 상태\n\n시각: 2026-09-11. **status=running**\n\n061c8e6 이후. sealed 기본 검색 1 기록은 보존. 다음: 격리 소/중/대 corpus에서 후보 MCP의 p50/p95/최대·RSS, 동시 조회/정정 후 최신, 권한 불변, 유실 재시도. live 모델 없음. 전환 없음.\n",
+      "idle_cursor_before_send": "854167"
+    }
+  ],
+  "continuation_repair": {
+    "at_utc": "2026-09-11T12:20:32.681069+00:00",
+    "baseline": "e0143d4",
+    "actual_screen_state": "final_response_then_input_prompt_despite_status_file_running",
+    "old_native_goal_footer": "Goal blocked: W4 operational cutover cannot proceed: drain_authorized=false",
+    "instruction_path": "/home/jm/orca/projects/second-brain-app/CODEX-GROK-CONTINUATION-FIX-2026-09-11.md",
+    "send_request_id": "22185e25-7fb7-4607-ac90-268532738725",
+    "ack_confirmed": true,
+    "continuation_verified": true,
+    "native_active_verified": true,
+    "official_command": "/goal <authorized implementation and isolated verification objective>",
+    "official_confirmation_request_id": "7ea01260-a483-4aa0-a066-28c54eb3b51f",
+    "previous_goal_preserved_in": "/home/jm/orca/projects/second-brain-app/GROK-RESUME-DELIVERY-2026-09-11.json",
+    "last_observation_at_utc": "2026-09-11T12:24:12.975166+00:00",
+    "evidence": "Actual screen now shows Pursuing goal and watching 3; old blocked objective corrected using official UI. Independent work in progress, no final acceptance.",
+    "post_activation_progress": {
+      "at_utc": "2026-09-11T12:25:05.843418+00:00",
+      "screen_cursor": "938652",
+      "observed": "New active-goal turn inspects isolated JARVIS artifact external symlink after dependency failure; full regression log advanced from 5 dots to 67. No additional resume prompt sent after official goal activation.",
+      "continuation_verified": true
+    }
+  },
+  "independent_review": {
+    "status": "finished_not_accepted",
+    "submission": "d26dd7a799d256352fd6b7e8cc9b0fad6f98cb8a",
+    "started_at_utc": "2026-09-11T12:40:02.476878+00:00",
+    "evidence_dir": "/var/tmp/codex-final-d26dd7a-uemozlpf",
+    "owner": "original Codex",
+    "final_acceptance": false,
+    "report": "CODEX-FINAL-REVIEW-D26DD7A-2026-09-11.md",
+    "finished_at_utc": "2026-09-11T12:48:31.467189+00:00"
+  },
+  "latest_review_delivery": {
+    "at_utc": "2026-09-11T12:49:37.788537+00:00",
+    "send_request_id": "8da8df74-8235-45c4-aa3c-03a20ce4cef7",
+    "native_resume_request_id": "5f4780b1-1e52-4793-9131-fef0453e54a7",
+    "native_active_screen_cursor": "966897",
+    "ack_confirmed": true,
+    "ack_evidence": {
+      "at_utc": "2026-09-11T12:50:33.303824+00:00",
+      "path": "/home/jm/orca/projects/second-brain-app/GROK-RESUME-STATUS-2026-09-11.md",
+      "sha256": "e653d72c28f75bc16b23c93baaa676042c18e8b68cd0e312fccece13a24019cc",
+      "text": "# Grok 재개 상태\n\n시각: 2026-09-11. **status=running**\n\nCODEX-FINAL-REVIEW-D26DD7A 수신. get_goal status=active. 후보 인수 미통과. V1–V5 통합 구현 재개. 운영 전환 보류 유지. 외부 입력만 남음 판정은 정정.\n\n다음: V1 세션→transport 연결, V2 LLM cap, V3 FTS 순위, V4 marker symlink, V5 실제 브라우저 복구.\n",
+      "screen_cursor": "967437",
+      "public_tool_evidence": "Read browser harness and search_query.py; ran Find persistAssembledContextSnapshot and session send; V1-V5 todo with V1 in progress; Pursuing goal."
+    }
+  },
+  "latest_candidate_handoff": {
+    "observed_at_utc": "2026-09-11T13:31:51.806906+00:00",
+    "submission_head": "d5646882708055134b64ce14be890cac772727d6",
+    "pin": {
+      "sb_source": "bda08041771859e129ec59c325d7fe259560ed4d",
+      "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
+      "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
+      "candidate": "/var/tmp/sb-candidate-bda0804/releases/48686de7744355ac51fa7a91807ce3160860b4d5",
+      "jarvis_source": "635b4b5",
+      "jarvis_dist": "/var/tmp/jarvis-artifact-635b4b5/source/dist",
+      "jarvis_inventory_sha256": "827217404a053390408d0284bbc76cef003997ef69dda223ce17e252cdedf17d",
+      "jarvis_inventory_entries": 34776,
+      "operational_current": "41f0751",
+      "production_activated": false,
+      "supersedes": [
+        "c5b4308",
+        "839f718",
+        "87fc787",
+        "d26dd7a"
+      ]
+    },
+    "manifest_identity": {
+      "source_commit": "bda08041771859e129ec59c325d7fe259560ed4d",
+      "source_tree": "c8be71e9e9311d9fd81c381b748e45a31036cd15",
+      "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
+      "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b"
+    },
+    "review_requested_via": "monitor user-facing notification; no separate Codex worker created or terminal contacted",
+    "final_acceptance": false,
+    "remaining_conditions": [
+      "Original Codex independent review of V1-V5 and original A-F/M1-M14",
+      "Real login and native client sessions",
+      "Operational drain permission",
+      "User-curated questions"
+    ],
+    "evidence_logs": {
+      "/var/tmp/w3-bda0804-maint.log": {
+        "sha256": "8f11fe5b48d7898cf363b8a6eda062c6df60d43579cce39810353ac250e1dc65",
+        "tail": "49446493bc4da1c01b50690c1db5b2c20b9d3\"], \"retrieved_records\": 1}, \"preservation_checks\": 3}\nMAINT:0\n"
+      },
+      "/var/tmp/w3-bda0804-integ.log": {
+        "sha256": "09fbc5da637a10b7930eee272c219bfb638736ab983fd28ce77a98147fdaa461",
+        "tail": "2f8e78da65350e63c3eceb56fa688aa5e12\",\n      \"size\": 125989464,\n      \"mode\": 493\n    }\n  }\n}\nEXIT:0\n"
+      },
+      "/var/tmp/w3-bda0804-work.log": {
+        "sha256": "3c566769c1bac80d04c20fcbd56607dcbfb0c8afd3a5d3a32b3acc46815b285e",
+        "tail": "2f8e78da65350e63c3eceb56fa688aa5e12\",\n      \"size\": 125989464,\n      \"mode\": 493\n    }\n  }\n}\nEXIT:0\n"
+      },
+      "/var/tmp/sb-full-pytest-bda0804.log": {
+        "sha256": "ac7483378fdffae046a83ac9701535469f7c8b9a1ee248249e44f4f5bb9f3a06",
+        "tail": "                                          [100%]\n1823 passed, 2 skipped in 604.65s (0:10:04)\nEXIT:0\n"
+      }
+    }
+  },
+  "night_shift": {
+    "phase": "await_codex_independent_review",
+    "frozen_submission": "d5646882708055134b64ce14be890cac772727d6",
+    "source": "bda08041771859e129ec59c325d7fe259560ed4d",
+    "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
+    "jarvis": "635b4b5",
+    "owner_implementation": "Grok term_dc97574f3e548cff6e25679d713ed8c2",
+    "owner_review": "Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+    "started_at_utc": "2026-09-11T13:40:38.631306+00:00",
+    "updated_at_utc": "2026-09-11T13:40:38.631348+00:00",
+    "ack_path": "GROK-OVERNIGHT-ACK-2026-09-11.md",
+    "next_action": "Keep frozen candidate. On CODEX-NIGHT-REVIEW not_accepted, resume implementation. No cutover.",
+    "final_acceptance": false
+  }
+}
