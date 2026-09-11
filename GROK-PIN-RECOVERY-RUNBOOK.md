@@ -28,7 +28,7 @@ TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS" --wo
 
 ## 세션/compaction/public transport (V1)
 
-격리: `gjc.dispatch` nested `{task, assemble_context}`. extra keys send 0. `model_send_started` 후 local receipt 없으면 재전송하지 않는다 (`recovered: unknown_accepted`). 죽은 pid + send 시작 전은 회수 후 send.
+격리: `gjc.dispatch` nested `{task, assemble_context}`. extra keys send 0. 전송 JSON session은 task.session_id. 실패는 fence별. accepted 후 crash/timeout은 unknown. reconcile accepted는 durable model_dispatched.
 
 ## DR
 
