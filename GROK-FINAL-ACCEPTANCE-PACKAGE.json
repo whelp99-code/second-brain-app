@@ -1,32 +1,33 @@
 {
   "pin": {
-    "sb_source": "5b67bbad6d4c011e8bd6079242f3b1433e649a01",
-    "release_id": "e51b068d7601aa97279b96080faf20ae059c83a7",
-    "wheel_sha256": "646f0577070be044ae3412df56247cb307b4901ba72d3d7ba07e9288b7bb867e",
-    "candidate": "/var/tmp/sb-candidate-5b67bba/releases/e51b068d7601aa97279b96080faf20ae059c83a7",
-    "jarvis_source": "401f0c1",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-401f0c1/source/dist",
-    "jarvis_inventory_sha256": "f4f82237c2207534f32ffd7db05e859140eeed0828fa1ef1db7697ed334b55dd",
-    "jarvis_inventory_entries": 34776,
+    "sb_source": "15f8933439bd272f5e60839a88d2609b1d005164",
+    "release_id": "caba60cb6c304151a1e5f8e593723dbac286fa1d",
+    "wheel_sha256": "ab258c894fd1827d569309dd05d66d50b345965391d184af1cbf2fbfb95979c2",
+    "candidate": "/var/tmp/sb-candidate-15f8933/releases/caba60cb6c304151a1e5f8e593723dbac286fa1d",
+    "jarvis_source": "ad2d645",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-ad2d645/source/dist",
+    "jarvis_inventory_sha256": "43438a602e055562ca8309857697264c5c2a187754c1da3b8d28d781bc2a1e98",
+    "jarvis_inventory_entries": 34778,
     "operational_current": "41f0751",
     "production_activated": false,
-    "preserves": ["d564688", "48686de", "635b4b5"]
+    "preserves": ["d564688", "e51b068", "401f0c1"]
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-5b67bba-maint.log",
+    "maintenance_log": "/var/tmp/w3-15f8933-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-5b67bba-integ.log",
+    "integration_log": "/var/tmp/w3-15f8933-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-5b67bba-work.log",
+    "work_log": "/var/tmp/w3-15f8933-work.log",
     "work_exit": 0
   },
   "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-5b67bba.log",
-    "passed": 1825,
+    "log": "/var/tmp/sb-full-pytest-15f8933.log",
+    "passed": 1826,
     "skipped": 2,
-    "seconds": 599.98,
+    "seconds": 600.76,
     "exit": 0
   },
+  "mcp_corpus": "M11-MCP-CORPUS-LATENCY-2026-09-11.json",
   "codex_final_review_requested": true,
   "product_acceptance": false
 }

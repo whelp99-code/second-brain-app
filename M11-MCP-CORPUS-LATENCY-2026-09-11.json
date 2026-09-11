@@ -1,119 +1,119 @@
 {
-  "candidate": "/var/tmp/sb-candidate-839f718/releases/c5b4308e7a4277d526c8d73e7332b0450b17021d",
+  "candidate": "/var/tmp/sb-candidate-15f8933/releases/caba60cb6c304151a1e5f8e593723dbac286fa1d",
   "samples": 11,
   "sizes": {
     "small": {
       "pages": 30,
-      "root": "/var/tmp/sb-m11-small-vhrardh7",
+      "root": "/var/tmp/sb-m11-small-muaii6k7",
       "seconds": [
-        0.0873,
-        0.0552,
-        0.0568,
+        0.086,
+        0.0557,
+        0.0525,
+        0.0547,
+        0.0556,
         0.0561,
-        0.0595,
-        0.064,
-        0.125,
-        0.2201,
-        0.0612,
-        0.0651,
-        0.0606
+        0.0542,
+        0.052,
+        0.0525,
+        0.0539,
+        0.0519
       ],
-      "p50": 0.0612,
-      "p95": 0.2201,
-      "max": 0.2201,
+      "p50": 0.0542,
+      "p95": 0.086,
+      "max": 0.086,
       "hits": [
         "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
       ],
       "concurrent_seconds": [
-        0.0834,
-        0.0905
+        0.0773,
+        0.0826
       ],
       "retry": {
         "lost_error": "ExceptionGroup",
-        "retry_seconds": 0.7744,
+        "retry_seconds": 0.768,
         "retry_error": false,
         "retry_hits": 1
       },
-      "correction_seconds": 0.0625,
+      "correction_seconds": 0.0604,
       "correction_hits": [
         "wiki/memory-dca543d88f5e11e1b9485ec045ba224b758ea5695e5251367dfaab94d5119773"
       ]
     },
     "medium": {
       "pages": 100,
-      "root": "/var/tmp/sb-m11-medium-mj3ju_xb",
+      "root": "/var/tmp/sb-m11-medium-p56s70hi",
       "seconds": [
-        0.0971,
-        0.0847,
-        0.0902,
-        0.0833,
-        0.0872,
-        0.0827,
-        0.0833,
-        0.0821,
-        0.0833,
+        0.097,
+        0.0814,
+        0.0832,
         0.0812,
-        0.0832
+        0.0819,
+        0.0837,
+        0.0824,
+        0.0829,
+        0.0825,
+        0.0832,
+        0.082
       ],
-      "p50": 0.0833,
-      "p95": 0.0971,
-      "max": 0.0971,
+      "p50": 0.0825,
+      "p95": 0.097,
+      "max": 0.097,
       "hits": [
         "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
       ],
       "concurrent_seconds": [
-        0.1363,
-        0.1364
+        0.128,
+        0.1342
       ],
       "retry": {
         "lost_error": "ExceptionGroup",
-        "retry_seconds": 0.794,
+        "retry_seconds": 0.7897,
         "retry_error": false,
         "retry_hits": 1
       },
-      "correction_seconds": 0.1172,
+      "correction_seconds": 0.1152,
       "correction_hits": [
         "wiki/memory-f7bea627d0e5d10cf0829dbb27c162a89c8873defda755b962fb328cbdcc1f66"
       ]
     },
     "large": {
       "pages": 300,
-      "root": "/var/tmp/sb-m11-large-3z6qbefx",
+      "root": "/var/tmp/sb-m11-large-qoskx43o",
       "seconds": [
-        0.1783,
-        0.1652,
-        0.1598,
-        0.1888,
-        0.1592,
-        0.1644,
-        0.162,
-        0.1599,
-        0.1605,
+        0.1714,
+        0.1647,
+        0.163,
+        0.1861,
+        0.1586,
         0.1607,
-        0.1605
+        0.1608,
+        0.1601,
+        0.1622,
+        0.1611,
+        0.1596
       ],
-      "p50": 0.1607,
-      "p95": 0.1888,
-      "max": 0.1888,
+      "p50": 0.1611,
+      "p95": 0.1861,
+      "max": 0.1861,
       "hits": [
         "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
       ],
       "concurrent_seconds": [
-        0.2658,
-        0.2661
+        0.2653,
+        0.2655
       ],
       "retry": {
         "lost_error": "ExceptionGroup",
-        "retry_seconds": 0.8876,
+        "retry_seconds": 0.8782,
         "retry_error": false,
         "retry_hits": 1
       },
-      "correction_seconds": 0.1728,
+      "correction_seconds": 0.1677,
       "correction_hits": [
         "wiki/memory-7f28bfeb53fb11f34e93322bc552596bbcb8338d3a5eefba4722201883817af1"
       ]
     }
   },
   "live_model": false,
-  "peak_process_rss_kib": 84592
+  "peak_process_rss_kib": 84812
 }
