@@ -1,119 +1,128 @@
 {
-  "candidate": "/var/tmp/sb-candidate-15f8933/releases/caba60cb6c304151a1e5f8e593723dbac286fa1d",
+  "candidate": "/var/tmp/sb-candidate-55a2dfd/releases/8a85e133340baf66e58cedc517108d4529d44ba8",
   "samples": 11,
   "sizes": {
     "small": {
       "pages": 30,
-      "root": "/var/tmp/sb-m11-small-muaii6k7",
+      "root": "/var/tmp/sb-m11-small-or616uzq",
       "seconds": [
-        0.086,
+        0.108,
+        0.0615,
+        0.064,
+        0.0596,
+        0.0554,
+        0.0576,
+        0.0573,
         0.0557,
-        0.0525,
-        0.0547,
-        0.0556,
-        0.0561,
-        0.0542,
-        0.052,
-        0.0525,
-        0.0539,
-        0.0519
+        0.0603,
+        0.0562,
+        0.0619
       ],
-      "p50": 0.0542,
-      "p95": 0.086,
-      "max": 0.086,
+      "p50": 0.0596,
+      "p95": 0.108,
+      "max": 0.108,
       "hits": [
         "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
       ],
       "concurrent_seconds": [
-        0.0773,
-        0.0826
+        0.083,
+        0.0834
       ],
       "retry": {
         "lost_error": "ExceptionGroup",
-        "retry_seconds": 0.768,
+        "retry_seconds": 0.8149,
         "retry_error": false,
         "retry_hits": 1
       },
-      "correction_seconds": 0.0604,
+      "correction_of_existing_page": "M11Corrected-small",
+      "correction_seconds": 0.0581,
       "correction_hits": [
-        "wiki/memory-dca543d88f5e11e1b9485ec045ba224b758ea5695e5251367dfaab94d5119773"
-      ]
+        "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+      ],
+      "stale_needle_hits_after_correction": [],
+      "mcp_server_rss_kib": null
     },
     "medium": {
       "pages": 100,
-      "root": "/var/tmp/sb-m11-medium-p56s70hi",
+      "root": "/var/tmp/sb-m11-medium-kxksim_l",
       "seconds": [
-        0.097,
+        0.0869,
         0.0814,
-        0.0832,
+        0.0826,
+        0.0815,
+        0.083,
+        0.0806,
         0.0812,
-        0.0819,
-        0.0837,
-        0.0824,
-        0.0829,
-        0.0825,
-        0.0832,
-        0.082
+        0.0835,
+        0.0869,
+        0.0879,
+        0.089
       ],
-      "p50": 0.0825,
-      "p95": 0.097,
-      "max": 0.097,
+      "p50": 0.083,
+      "p95": 0.089,
+      "max": 0.089,
       "hits": [
         "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
       ],
       "concurrent_seconds": [
-        0.128,
-        0.1342
+        0.1317,
+        0.1337
       ],
       "retry": {
         "lost_error": "ExceptionGroup",
-        "retry_seconds": 0.7897,
+        "retry_seconds": 0.8027,
         "retry_error": false,
         "retry_hits": 1
       },
-      "correction_seconds": 0.1152,
+      "correction_of_existing_page": "M11Corrected-medium",
+      "correction_seconds": 0.0893,
       "correction_hits": [
-        "wiki/memory-f7bea627d0e5d10cf0829dbb27c162a89c8873defda755b962fb328cbdcc1f66"
-      ]
+        "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+      ],
+      "stale_needle_hits_after_correction": [],
+      "mcp_server_rss_kib": null
     },
     "large": {
       "pages": 300,
-      "root": "/var/tmp/sb-m11-large-qoskx43o",
+      "root": "/var/tmp/sb-m11-large-sikr_r95",
       "seconds": [
-        0.1714,
-        0.1647,
-        0.163,
-        0.1861,
-        0.1586,
-        0.1607,
-        0.1608,
-        0.1601,
-        0.1622,
-        0.1611,
-        0.1596
+        0.1797,
+        0.1667,
+        0.1795,
+        0.2137,
+        0.1644,
+        0.166,
+        0.1629,
+        0.1659,
+        0.1635,
+        0.1617,
+        0.1702
       ],
-      "p50": 0.1611,
-      "p95": 0.1861,
-      "max": 0.1861,
+      "p50": 0.166,
+      "p95": 0.2137,
+      "max": 0.2137,
       "hits": [
         "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
       ],
       "concurrent_seconds": [
-        0.2653,
-        0.2655
+        0.2694,
+        0.2701
       ],
       "retry": {
         "lost_error": "ExceptionGroup",
-        "retry_seconds": 0.8782,
+        "retry_seconds": 0.8786,
         "retry_error": false,
         "retry_hits": 1
       },
-      "correction_seconds": 0.1677,
+      "correction_of_existing_page": "M11Corrected-large",
+      "correction_seconds": 0.1684,
       "correction_hits": [
-        "wiki/memory-7f28bfeb53fb11f34e93322bc552596bbcb8338d3a5eefba4722201883817af1"
-      ]
+        "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+      ],
+      "stale_needle_hits_after_correction": [],
+      "mcp_server_rss_kib": null
     }
   },
   "live_model": false,
-  "peak_process_rss_kib": 84812
+  "client_peak_rss_kib": 85300
 }
