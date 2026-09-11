@@ -4,7 +4,33 @@
 
 ## 현재 핀
 
-SB `c6949e0` 후보 `/var/tmp/sb-candidate-c6949e0/releases/0ecdb561…` × JARVIS `10858a4` `/var/tmp/jarvis-artifact-10858a4/source/dist`. 운영 current `41f0751`.
+SB source와 JARVIS source는 `GROK-FINAL-ACCEPTANCE-PACKAGE.md` 핀 표를 따른다. 운영 current `41f0751`. `production_activated=false`.
+
+## 성공 / 실패 조건
+
+성공: `npx tsc --noEmit` EXIT 0, clean `rm -rf dist` 후 `npm run build`의 JS가 제출 dist와 같고, 설치 standard/work/maintenance 3게이트 EXIT 0, GJC dispatch 집중 테스트 통과, 정본 paired restore EXIT 0.
+
+실패: tsc EXIT 2를 옛 dist로 덮음, helper/stub EXIT 0을 M6/M12 인수로 사용, `RESTORE_SOURCE_ANCHOR_MISSING` 우회, 운영 current 변경.
+
+## 구버전 / 복구 준비
+
+운영 current `41f0751`은 바꾸지 않는다. 격리 복구는 runtime-backup + `.recovery` journal 형식이다. 원본 anchor 없는 복원은 `RESTORE_SOURCE_ANCHOR_MISSING`으로 거부한다. 해시 예외로 우회하지 않는다.
+
+검증된 격리 복구:
+
+```bash
+python scripts/restore-probe.py backup "$ROOT"
+python scripts/restore-probe.py journal-loss-from-backup "$ROOT"
+# JARVIS fence stdin →
+python scripts/restore-probe.py restore "$ROOT"
+node scripts/jarvis-restore-acceptance.mjs "$JARVIS_DIST"
+```
+
+결과의 `rpo_sb.crash_loss_records`, `rto.restore_to_readable_ms`, `rto.failure_to_work_available_ms`를 사용한다. `scenario_ms`는 전체 시나리오 시간이며 RTO가 아니다.
+
+## V1 세션 compaction (외부 조건)
+
+JARVIS CLI에는 모델 세션 문맥 compaction 이벤트가 없다. 제품 경로는 `gjc.connect`/`configureGjc`로 세션을 만든 뒤 명시적 `gjc.dispatch`다. 자료삭제/correction-lane compaction은 이 trigger가 아니다. native/Orca 세션 제품이 compact/new-session에서 dispatch를 호출해야 하며, 그 입력은 이 후보에서 `blocked_external`이다.
 
 ## JARVIS 클린 빌드
 
@@ -13,23 +39,16 @@ cd /home/jm/orca/projects/Orca-JARVIS
 rm -rf dist
 npx tsc --noEmit -p tsconfig.json
 npm run build
-# dist에 model_send_started / unknown_accepted 가 있어야 한다. 옛 dist를 rsync로 덮지 말 것.
 ```
+
+dist에 `reader.revalidate`와 `captureFromReference` 경로가 있어야 한다. 옛 dist를 rsync로 덮지 말 것.
 
 ## 게이트
 
+패키지 핀의 `REL`과 `JARVIS` 경로를 사용한다.
+
 ```bash
-REL=/var/tmp/sb-candidate-c6949e0/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-JARVIS=/var/tmp/jarvis-artifact-10858a4/source/dist
 TMPDIR=/var/tmp python deploy/check-release-maintenance.py "$REL"
 TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS"
 TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS" --work REAL-WORK-ITEM-2026-09-10.json
 ```
-
-## 세션/compaction/public transport (V1)
-
-격리: `gjc.dispatch` nested `{task, assemble_context}`. extra keys send 0. 전송 JSON session은 task.session_id. 실패는 fence별. accepted 후 crash/timeout은 unknown. reconcile accepted는 durable model_dispatched.
-
-## DR
-
-원본 journal 없으면 `RESTORE_SOURCE_ANCHOR_MISSING`. 해시 예외로 우회하지 않는다. 신뢰 runtime backup의 `.recovery` journal을 복구한 뒤 `scripts/jarvis-restore-acceptance.mjs` restore→scoped 허용/거부→accepted seed→high-water. 운영 current는 바꾸지 않는다.

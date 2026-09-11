@@ -32,11 +32,14 @@ if sys.argv[1] == 'journal-loss-from-backup':
     generation_journal.unlink(missing_ok=True)
     shutil.copy2(archive / '.recovery/requests/journal.db', request_journal)
     shutil.copy2(archive / '.recovery/state/generation-journal.db', generation_journal)
+    dropped_at = datetime.now(UTC).isoformat()
     print(json.dumps({
         'journals_dropped': True,
         'journals_restored_from_backup': True,
         'request_journal': str(request_journal),
         'generation_journal': str(generation_journal),
+        'dropped_at': dropped_at,
+        'restored_from_backup_at': datetime.now(UTC).isoformat(),
     }))
     raise SystemExit(0)
 executor = RequestExecutor(config)
@@ -68,8 +71,14 @@ try:
             source_tombstone_sequence=generation.manifest.tombstone_sequence,
             source_tombstone_set_root=generation.manifest.tombstone_set_root, created_at=now))
         manifest_path.write_text(manifest.model_dump_json())
-        print(json.dumps({'source_generation_id': generation.generation_id,
-                          'format': 'runtime-backup', 'control_journals_present': True}))
+        pages = list((generation.root / 'wiki').glob('*.md')) if (generation.root / 'wiki').is_dir() else []
+        print(json.dumps({
+            'source_generation_id': generation.generation_id,
+            'format': 'runtime-backup',
+            'control_journals_present': True,
+            'created_at': now.isoformat(),
+            'durable_page_count': len(pages),
+        }))
     elif sys.argv[1] == 'restore':
         request = RestoreRequest(archive=archive,
             archive_manifest=RestoreArchiveManifestV1.model_validate_json(manifest_path.read_text()),
@@ -81,10 +90,18 @@ try:
         pages = [path.relative_to(generation.root).with_suffix('').as_posix()
                  for path in (generation.root / 'wiki').glob('*.md') if 'KeepBeta' in path.read_text()]
         assert len(pages) <= 1
-        print(json.dumps({'generation_id': generation.generation_id, 'surviving_page_id': pages[0] if pages else None,
+        finished = datetime.now(UTC)
+        print(json.dumps({
+            'generation_id': generation.generation_id,
+            'surviving_page_id': pages[0] if pages else None,
             'tombstone_sequence': generation.manifest.tombstone_sequence,
             'tombstone_set_root': generation.manifest.tombstone_set_root,
-            'blocked_matches': proof.blocked_matches, 'scan_errors': proof.scan_errors}))
+            'blocked_matches': proof.blocked_matches,
+            'scan_errors': proof.scan_errors,
+            'restored_at': finished.isoformat(),
+            'restore_duration_ms': (finished - now).total_seconds() * 1000,
+            'surviving_keep_pages': len(pages),
+        }))
     else:
         raise ValueError('unknown probe mode')
 finally:

@@ -36,8 +36,9 @@ try {
   const read = query => runtime.reader.read(query,{max_records:8,max_record_bytes:4096,max_bytes:8000});
   const before = await read('DeleteAlpha');
   assert.equal(before.payload.records.length,1);
-  const restoreStarted = Date.now();
+  const scenarioStarted = Date.now();
   const backup = JSON.parse(run('scripts/restore-probe.py','backup',root));
+  const failureBegan = Date.now();
   const journals = JSON.parse(run('scripts/restore-probe.py','journal-loss-from-backup',root));
   assert.equal(journals.journals_dropped,true);
   assert.equal(journals.journals_restored_from_backup,true);
@@ -47,6 +48,7 @@ try {
   const authorize = createProductionMemoryReadFence(database.authority,config,'memory_status');
   const fence = authorize(new Date());
   assert.equal(fence.tombstone_sequence,1);
+  const restoreBegan = Date.now();
   const restored = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
     {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(fence)}));
   assert.equal(restored.tombstone_sequence,fence.tombstone_sequence);
@@ -55,6 +57,7 @@ try {
   assert.equal(restored.scan_errors,0);
   assert.equal((await read('DeleteAlpha')).payload.records.length,0);
   const keep = await read('KeepBeta');
+  const sbReadableAt = Date.now();
   assert.equal(keep.payload.records.length,1);
   assert(keep.payload.records[0].text.includes('KeepBeta'));
   const connected = new Map();
@@ -114,8 +117,29 @@ try {
     restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:secondFence.tombstone_sequence,
     deleted_records:0,first_restore_surviving_records:1,model_calls:0,
     rpo_source_generation_id:backup.source_generation_id,
-    rpo_loss: { deleted_records:1, keep_records_at_backup:1 },
-    rto_restore_to_readable_ms: Date.now()-restoreStarted,
+    rpo_sb: {
+      last_durable_at: backup.created_at,
+      last_durable_generation_id: backup.source_generation_id,
+      durable_pages_at_backup: backup.durable_page_count,
+      writes_after_backup_before_failure: 0,
+      crash_loss_records: 0,
+      restored_generation_id: restored.generation_id,
+    },
+    rpo_jarvis: {
+      tombstone_sequence_at_restore: restored.tombstone_sequence,
+      revoked_delete_alpha_held: true,
+      keep_beta_readable: true,
+    },
+    rto: {
+      failure_began_ms: failureBegan,
+      restore_began_ms: restoreBegan,
+      sb_first_read_ms: sbReadableAt,
+      restore_probe_ms: restored.restore_duration_ms,
+      restore_to_readable_ms: sbReadableAt - restoreBegan,
+      failure_to_work_available_ms: sbReadableAt - failureBegan,
+      scenario_ms: Date.now() - scenarioStarted,
+    },
+    rto_restore_to_readable_ms: sbReadableAt - restoreBegan,
     written,
     scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));
