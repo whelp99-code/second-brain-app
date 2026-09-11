@@ -1,31 +1,30 @@
-# Grok 최종 제출 — `0ecdb561` × JARVIS `69d8c9b`
+# Grok 최종 제출 — `0ecdb561` × JARVIS `86d3290`
 
-CODEX-NIGHT-REVIEW-f6ce2e9. **운영 전환 없음. 제품 인수 아님.**
+CODEX-NIGHT-REVIEW-6e5c379. **운영 전환 없음. 제품 인수 아님.**
 
 ## 핀
 
 | | |
 |---|---|
-| SB source | `2782f1ba5a079efa8a9a0922cf14fb0666f0dc27` (docs `f0df33b`) |
-| 후보 | `/var/tmp/sb-candidate-2782f1b/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1` |
+| SB source | `8a98324` `/var/tmp/sb-candidate-8a98324/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `69d8c9b` `/var/tmp/jarvis-artifact-69d8c9b/source/dist` |
-| JARVIS inventory | `f9072b9be6899837f9673c04951ed5583baae1fc56616773eae0bad719ccc92d` (34768) |
-| tsc | EXIT 0 |
+| JARVIS | `86d3290` `/var/tmp/jarvis-artifact-86d3290/source/dist` |
+| JARVIS inventory | `23a795e2d4a3aefa5d5c4408895f068074fdb05cc8d20d5327b5ae220c524e67` (34768) |
+| tsc | EXIT 0. dist `onKnownNegative` |
 | 운영 current | `41f0751` |
 | production_activated | false |
 
 ## 재현
 
-게이트 EXIT 0. pytest **1834 passed / 2 skipped** `/var/tmp/sb-full-pytest-2782f1b.log`. 런북 `GROK-PIN-RECOVERY-RUNBOOK.md`.
+게이트 EXIT 0. 복원 집중 **13 passed** `/var/tmp/sb-focused-restore-8a98324.log`. 동일 SB 제품 바이트라 전체 pytest 미반복(직전 1834/2782f1b). GJC+session **21 passed**. 런북 `GROK-PIN-RECOVERY-RUNBOOK.md`.
 
 ## N1 / M12 / V1
 
 | ID | 상태 | 증거 |
 |---|---|---|
-| N1 | verified 격리 | thrown disconnect는 unknown, 내부 재전송 없음. accepted:false만 1회 재시도. send_started는 authorize 이후. pre-send fence deny 정정 후 send1. GJC 20 passed |
-| M12 | implemented_unverified | journal 없으면 ANCHOR_MISSING. restore 후 같은 executor에 accepted remember. `applied_state=proved`. `M12-JOURNAL-RESTORE-WRITE-2026-09-12.json` |
-| V1 | implemented_unverified | task.session_id 보존. compaction/no_data는 잔여 |
+| N1 | verified 격리 | accepted:false를 retry authorize 전에 `model_send_failed`로 기록. 이후 fence deny 정정하면 send. thrown disconnect는 unknown |
+| M12 | implemented_unverified | live journal drop 후 backup `.recovery` 복구. ANCHOR_MISSING 유지. accepted remember proved. `journal-loss-from-backup` |
+| V1 | implemented_unverified | selected session/no_data/expired capture 보존. compaction 자동 트리거는 잔여 |
 
 ## M1–M14
 
