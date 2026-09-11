@@ -1,33 +1,32 @@
 {
   "pin": {
-    "sb_source": "bda08041771859e129ec59c325d7fe259560ed4d",
-    "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
-    "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
-    "candidate": "/var/tmp/sb-candidate-bda0804/releases/48686de7744355ac51fa7a91807ce3160860b4d5",
-    "jarvis_source": "635b4b5",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-635b4b5/source/dist",
-    "jarvis_inventory_sha256": "827217404a053390408d0284bbc76cef003997ef69dda223ce17e252cdedf17d",
+    "sb_source": "5b67bbad6d4c011e8bd6079242f3b1433e649a01",
+    "release_id": "e51b068d7601aa97279b96080faf20ae059c83a7",
+    "wheel_sha256": "646f0577070be044ae3412df56247cb307b4901ba72d3d7ba07e9288b7bb867e",
+    "candidate": "/var/tmp/sb-candidate-5b67bba/releases/e51b068d7601aa97279b96080faf20ae059c83a7",
+    "jarvis_source": "401f0c1",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-401f0c1/source/dist",
+    "jarvis_inventory_sha256": "f4f82237c2207534f32ffd7db05e859140eeed0828fa1ef1db7697ed334b55dd",
     "jarvis_inventory_entries": 34776,
     "operational_current": "41f0751",
     "production_activated": false,
-    "supersedes": ["c5b4308", "839f718", "87fc787", "d26dd7a"]
+    "preserves": ["d564688", "48686de", "635b4b5"]
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-bda0804-maint.log",
+    "maintenance_log": "/var/tmp/w3-5b67bba-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-bda0804-integ.log",
+    "integration_log": "/var/tmp/w3-5b67bba-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-bda0804-work.log",
+    "work_log": "/var/tmp/w3-5b67bba-work.log",
     "work_exit": 0
   },
   "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-bda0804.log",
-    "passed": 1823,
+    "log": "/var/tmp/sb-full-pytest-5b67bba.log",
+    "passed": 1825,
     "skipped": 2,
-    "seconds": 604.65,
+    "seconds": 599.98,
     "exit": 0
   },
-  "related_pytest_passed": 74,
   "codex_final_review_requested": true,
-  "old_failure_harness_preserved": "/var/tmp/codex-final-d26dd7a-uemozlpf"
+  "product_acceptance": false
 }
