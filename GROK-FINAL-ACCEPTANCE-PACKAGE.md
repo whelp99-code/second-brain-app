@@ -1,41 +1,40 @@
-# Grok 최종 제출 — `0ecdb561` × JARVIS `aee8f1f`
+# Grok 최종 제출 — `0ecdb561` × JARVIS `bcb47af`
 
-CODEX-NIGHT-REVIEW-399cc45. **운영 전환 없음. 제품 인수 아님.**
+CODEX-NIGHT-REVIEW-1d3d1d7. **운영 전환 없음. 제품 인수 아님.**
 
 ## 핀
 
 | | |
 |---|---|
-| SB source | `210226e1fe05bf1fae28f86238f0f4ecf3103f98` |
-| 후보 | `/var/tmp/sb-candidate-210226e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1` |
+| SB source | `8db46c59f249ff2da483336c0ec3318e2d317859` |
+| 후보 | `/var/tmp/sb-candidate-8db46c5/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `aee8f1f` `/var/tmp/jarvis-artifact-aee8f1f/source/dist` |
-| JARVIS inventory | `5e4de7e96fd435f2f988bca24fe267cfc30d4407c21e5b53569a2afb5e95ef32` (34780) |
-| tsc | EXIT 0. dist `cli-gjc-commands.js` has `preflightDispatchAssemble`. 37b034f와 바이트 다름 |
+| JARVIS | `bcb47af` `/var/tmp/jarvis-artifact-bcb47af/source/dist` |
+| JARVIS inventory | `964aeaa543b30c7bde6e2dfb988586261801979fd6669490052990dc5994d632` (34780) |
+| tsc | EXIT 0. dist has `gjcWorkerAlive` |
 | 운영 current | `41f0751` |
 | production_activated | false |
 
 ## 재현
 
 ```bash
-REL=/var/tmp/sb-candidate-210226e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-JARVIS=/var/tmp/jarvis-artifact-aee8f1f/source/dist
+REL=/var/tmp/sb-candidate-8db46c5/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+JARVIS=/var/tmp/jarvis-artifact-bcb47af/source/dist
 cd /home/jm/orca/projects/Orca-JARVIS && rm -rf dist && npx tsc --noEmit -p tsconfig.json && npm run build
 TMPDIR=/var/tmp python deploy/check-release-maintenance.py "$REL"
 TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS"
 TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS" --work REAL-WORK-ITEM-2026-09-10.json
 TMPDIR=/var/tmp uv run pytest -q --ignore=tests/test_embeddings.py
-# 1831 passed, 2 skipped  /var/tmp/sb-full-pytest-210226e.log
+# 1832 passed, 2 skipped  /var/tmp/sb-full-pytest-8db46c5.log
 ```
 
-## N1 / N3 / M6 / M12
+## N1 / M6 / M12
 
 | ID | 상태 | 증거 |
 |---|---|---|
-| N1 | verified 격리 | reserve는 intent store. preflight 후 예약. deny→allow send 1. transport 실패→정상 send 1. tsc 0. dist≠37b034f |
-| N3 | verified 격리 | 공통 lock 보존 |
-| M6 | implemented_unverified | 격리: store-blind previous `allowed:false`. stay_on_current allowed. cutover false. `/var/tmp/m6-rollback-cutover.json` |
-| M12 | implemented_unverified | `jarvis-restore-acceptance.mjs` RESTORE:0 동시 2클라이언트, 독립 철회 2, KeepBeta 생존. `/var/tmp/m12-aee8f1f-restore.out` |
+| N1 | verified 격리 | pending 예약에 `pid:` lease. 죽은 worker는 공개 `gjc.dispatch`가 다시 send. 살아 있는 동시 키는 send 1. deny/transport 재시도 보존 |
+| M6 | implemented_unverified | 두 프로세스: held 중 `already_running=true`, kill 후 lock 회수. store-blind rollback `allowed:false`. cutover false. `/var/tmp/m6-writer-cutover.json` |
+| M12 | implemented_unverified | sqlite 삭제 후 restore, 이후 `post-restore-needle` write. RTO 0.02s. `/var/tmp/m12-cold-restore-write.json` |
 
 ## M1–M14
 
@@ -43,10 +42,10 @@ TMPDIR=/var/tmp uv run pytest -q --ignore=tests/test_embeddings.py
 |---|---|
 | M1 | blocked_external 실로그인 |
 | M2 | implemented_unverified `--work` |
-| M3 | implemented_unverified N3 |
+| M3 | implemented_unverified |
 | M4 | implemented_unverified fixture |
 | M5 | blocked_external native. 인증 복사는 금지 |
-| M6 | implemented_unverified 위. 운영 전환 없음 |
+| M6 | implemented_unverified 위 |
 | M7 | implemented_unverified fixture |
 | M8 | blocked_external native |
 | M9 | implemented_unverified N1 |
