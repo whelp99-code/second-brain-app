@@ -1,0 +1,13 @@
+{
+  "live_llm_http": false,
+  "snapshot_has_excerpt": false,
+  "payload_has_excerpt": true,
+  "payload_has_source": true,
+  "bytes": 431,
+  "used_bytes": 80,
+  "remaining_bytes": 4016,
+  "max_total_bytes": 4096,
+  "under_budget": true,
+  "production_entry": "persistAssembledContext",
+  "command": "npx tsx /var/tmp/r4-transport-payload.mts"
+}

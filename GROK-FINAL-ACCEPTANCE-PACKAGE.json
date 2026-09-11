@@ -1,90 +1,52 @@
 {
-  "source_commit": "63bdaf68e7f2079f320ad4c63574ed291fa4d5a2",
-  "source_tree": "cd2babee91a3c896779b202cef507a8f0ec63b30",
-  "release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
-  "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc",
-  "working_tree_modified_at_prepare": true,
-  "maintenance_exit": 0,
-  "integration_exit": 0,
-  "work_exit": 0,
-  "production_activated": false,
-  "work_item": {
-    "path": "/home/jm/orca/projects/second-brain-app/REAL-WORK-ITEM-2026-09-10.json",
-    "sha256": "caa821aa1592a6c158d187c9e3b4dc0ecca97f4c749587543992fb715c7431bd"
-  },
-  "jarvis_build": "/var/tmp/jarvis-current-pair-_mq15nmd/source/dist",
-  "candidate_contents": {
-    "provider": {
-      "inventory_sha256": "6effab33cc9d2b66e2034a4dfed778cdf1d9f0766fa0bad0ceac622c38e895c2",
-      "entries": 18476
-    },
-    "jarvis": {
-      "inventory_sha256": "8b3ebc1901256636f33c6218adee47d6e294355afd64b569af343ea7676b8d10",
-      "entries": 19588
-    },
-    "node_executable": {
-      "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
-      "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
-      "size": 125989464,
-      "mode": 493
-    }
-  },
-  "integration_modes": [
-    {
-      "mode": "valid",
-      "provider_state": "proved",
-      "admission": "accepted"
-    },
-    {
-      "mode": "revoke_during_accept",
-      "provider_state": null,
-      "admission": "denied"
-    },
-    {
-      "mode": "revoke_before_execute",
-      "provider_state": "failed",
-      "admission": "accepted"
-    },
-    {
-      "mode": "expire_before_execute",
-      "provider_state": "failed",
-      "admission": "accepted"
-    }
-  ],
-  "full_pytest": {
-    "passed": 1813,
-    "skipped": 2,
-    "seconds": 546.76,
-    "ignore": "tests/test_embeddings.py"
-  },
-  "jarvis_isolated_artifact": {
-    "path": "/var/tmp/jarvis-artifact-eeac005/source/dist",
-    "source_commit": "eeac005",
-    "artifact_digest": "sha256:80e3c6a144c10958f2e0ddafc812b4d63978f5da9de66a1fb4a6aa1ef9c45c41",
-    "paired_release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
-    "maintenance_exit": 0,
-    "integration_exit": 0,
-    "work_exit": 0,
-    "production_activated": false,
-    "mcp_check_seconds": 3.535,
-    "mcp_check_exit": 0
-  },
-  "rollback_41f0751": {
-    "has_revoked_keys": false,
-    "has_scoped_read_policy": false,
-    "filename_refs": []
-  },
-  "sb_source_commit_docs": "159b611",
-  "r7_candidate": {
-    "source_commit": "edd2cb5cb547c72b169e86892a0ed07f5846b776",
+  "pin": {
+    "sb_source": "edd2cb5cb547c72b169e86892a0ed07f5846b776",
+    "sb_tree": "d292c0802bde3a389ae5522d744b261f370336b9",
     "release_id": "5b9687bf912b9de314a7d4308b7e091f88d8008b",
     "wheel_sha256": "cdcb402733993f698b138f5f5a59ccf24f035517932b93ff6144d7f505548e83",
+    "candidate": "/var/tmp/sb-candidate-edd2cb5/releases/5b9687bf912b9de314a7d4308b7e091f88d8008b",
     "jarvis_source": "6ce2356",
     "jarvis_dist": "/var/tmp/jarvis-artifact-6ce2356/source/dist",
     "jarvis_artifact_digest": "sha256:2ec1f72757522e6d36f99b549c7dae4b3b787bea717395782d03964a1f104e42",
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "supersedes": ["63bdaf6", "3d36c40", "eeac005"]
+  },
+  "gates": {
+    "maintenance_log": "/var/tmp/w3-5b9687b-maint.log",
     "maintenance_exit": 0,
+    "integration_log": "/var/tmp/w3-5b9687b-integ.log",
     "integration_exit": 0,
+    "work_log": "/var/tmp/w3-5b9687b-work2.log",
     "work_exit": 0,
-    "production_activated": false
-  }
+    "work_item": "REAL-WORK-ITEM-2026-09-10.json"
+  },
+  "related_pytest": {
+    "files": [
+      "tests/test_compiled_marker_recovery.py",
+      "tests/test_search.py",
+      "tests/test_rollback_compat.py",
+      "tests/test_revoked_keys.py"
+    ],
+    "passed": 41
+  },
+  "full_pytest": {
+    "log": "/var/tmp/sb-full-pytest-edd2cb5.log",
+    "passed": 1820,
+    "skipped": 2,
+    "seconds": 545.98,
+    "ignore": "tests/test_embeddings.py",
+    "exit": 0
+  },
+  "r4": {
+    "live_llm_http": false,
+    "payload_bytes": 431,
+    "under_budget": true,
+    "evidence": "R4-TRANSPORT-PAYLOAD-2026-09-11.json"
+  },
+  "r6": {
+    "browser": "R6-BROWSER-RETRY-2026-09-11.json",
+    "mcp_retry": "R6-MCP-RETRY-RESTORE-RETRIEVE-2026-09-11.json"
+  },
+  "old_failure_harness_preserved": "/var/tmp/codex-final-26cf158-ufpeOW"
 }

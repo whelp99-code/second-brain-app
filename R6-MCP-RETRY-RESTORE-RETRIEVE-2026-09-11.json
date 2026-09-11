@@ -1,0 +1,12 @@
+{
+  "mcp_attempts": [
+    {"attempt": 1, "seconds": 3.543, "exit": 0},
+    {"attempt": 2, "seconds": 3.422, "exit": 0}
+  ],
+  "restore_dest_remember_exit": 0,
+  "restore_dest_remember_seconds": 16.898,
+  "inbox_needle": "dr-genlayout-write unique-span",
+  "inbox_retrieved": true,
+  "compiled_search_hits": 0,
+  "compiled_search_note": "remember wrote inbox; sealed search has no compiled page for the needle"
+}
