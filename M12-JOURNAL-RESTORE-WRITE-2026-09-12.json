@@ -1,12 +1,12 @@
 {
-  "rpo_backup_at": "2026-09-11T18:44:32.744250+00:00",
-  "rto_seconds": 8.3259,
-  "anchor_missing_without_journal": true,
-  "trusted_digest": "sha256:613ed4dc9a55bed3dd28592ce66ec07d6c2b2851724336ef29e3ee073587f5ee",
-  "post_run_status": "ok",
-  "post_run_commit": "915bc2a9eaecdf69a5f88b08b7e682d050746cd1",
-  "post_hits": [
-    "wiki/inbox-post-d375747f"
+  "rpo_backup_at": "2026-09-11T19:13:58.942681+00:00",
+  "rto_seconds": 3.8358,
+  "restore_generation": "sbgen:v1:d48ec86cd04d52b363c483c2968a5c81ec3bd2641610613abb2f15efd858d6d8",
+  "write_generation": "sbgen:v1:3c8042dd326d7cabe1ae7ea88a469a46ed3369d76ce5bcee4f42f0bd2c98a12e",
+  "blocked_matches": 0,
+  "post_pages": [
+    "wiki/memory-37bb73feb3adc135ed6d2339aff32ba305f95d4a91d67aee51d987e500e9fe39.md"
   ],
+  "tombstone_sequence": 1,
   "cutover": false
 }
