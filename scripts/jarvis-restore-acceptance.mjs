@@ -2,7 +2,7 @@
 // All sources, keys and authority are isolated fixtures; no operational activation.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync, readFileSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {referenceEffectFixture} from './reference_effect_fixture.mjs';
@@ -27,7 +27,19 @@ const {createProductionMemoryReference} = await load('src/memory-reference-produ
 const {createProductionMemoryReadFence} = await load('src/memory-read-fence-production.js');
 const database = await memoryDatabase();
 const {config,key} = memoryReadFenceFixture(database,new Date(Date.now()+86400000).toISOString());
-const runtime = createProductionMemoryReference(database.authority,{
+const {backupSqlite, restoreSqlite} = await load('src/personal-os-backup.js');
+function countReceipts(authority) {
+  const count = table => {
+    try { return Number(authority.db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get()?.c ?? 0); }
+    catch { return 0; }
+  };
+  return {
+    tombstone_chain: count('memory_tombstone_chain'),
+    deletion_proofs: count('memory_deletion_proofs'),
+    gjc_intents: count('gjc_intents'),
+  };
+}
+let runtime = createProductionMemoryReference(database.authority,{
   read_fence_config:config,projection_key:Buffer.alloc(32,7),
   transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
 });
@@ -46,6 +58,51 @@ try {
   const deleted = await effects.apply('forget',before.payload.records.find(row=>row.text.includes('DeleteAlpha')).record);
   const jarvisDurableAt = Date.now();
   assert.equal(deleted.tombstone_sequence,1);
+  const receiptsAtBackup = countReceipts(database.authority);
+  mkdirSync(join(root,'jarvis-authority-backup'),{recursive:true});
+  const jarvisBackup = await backupSqlite({
+    sourcePath:database.path,
+    destPath:join(root,'jarvis-authority-backup','jarvis-rehearsal.sqlite'),
+  });
+  database.authority.configureGjc(root,'crash-session',true);
+  const extraIntent = database.authority.createGjcIntent(
+    'sync',{session_id:'crash-session',turn_id:'post-backup'},'post-backup-key',
+  );
+  const receiptsAfterExtra = countReceipts(database.authority);
+  assert.ok(receiptsAfterExtra.gjc_intents > receiptsAtBackup.gjc_intents);
+  await runtime.close();
+  await effects.close();
+  database.authority.close();
+  for (const suffix of ['','-wal','-shm']) {
+    try { unlinkSync(database.path + suffix); } catch { /* missing sidecar */ }
+  }
+  const jarvisRestored = restoreSqlite({
+    backupPath:jarvisBackup.destPath, destPath:database.path,
+  });
+  database.authority.reopen();
+  const receiptsAfterRestore = countReceipts(database.authority);
+  assert.equal(receiptsAfterRestore.gjc_intents, receiptsAtBackup.gjc_intents);
+  assert.equal(
+    database.authority.db.prepare('SELECT intent_id FROM gjc_intents WHERE intent_id=?').get(extraIntent),
+    undefined,
+  );
+  const junk = join(root,'jarvis-authority-backup','junk.sqlite');
+  writeFileSync(junk,'not-a-database');
+  let oldVersionRefused;
+  try {
+    restoreSqlite({
+      backupPath:junk,
+      destPath:join(root,'jarvis-authority-backup','bad-dest.sqlite'),
+    });
+  } catch (error) {
+    oldVersionRefused = error instanceof Error && 'code' in error ? error.code : String(error);
+  }
+  assert.equal(oldVersionRefused,'E_RESTORE_FAILED');
+  runtime = createProductionMemoryReference(database.authority,{
+    read_fence_config:config,projection_key:Buffer.alloc(32,7),
+    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
+  });
+  effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
   const authorize = createProductionMemoryReadFence(database.authority,config,'memory_status');
   const fence = authorize(new Date());
   assert.equal(fence.tombstone_sequence,1);
@@ -102,6 +159,11 @@ try {
   const written = JSON.parse(run('scripts/seed-distinct-remember.py',root));
   const newWriteAvailableAt = Date.now();
   assert.equal(written.state,'proved');
+  writeFileSync(join(root,'trusted-fence.json'),JSON.stringify(fence));
+  const writerLease = JSON.parse(run('scripts/writer-lease-on-root.py',root));
+  assert.equal(writerLease.writer_busy,true);
+  assert.ok(writerLease.queue_depth > 0);
+  assert.equal(writerLease.empty_queue,false);
   const deletedAfterRestore = await effects.apply('forget',(await read('KeepBeta')).payload.records[0].record);
   assert.equal(deletedAfterRestore.tombstone_sequence,2);
   assert.equal((await read('KeepBeta')).payload.records.length,0);
@@ -135,9 +197,18 @@ try {
       tombstone_sequence_before_restore: deleted.tombstone_sequence,
       restored_tombstone_sequence: restored.tombstone_sequence,
       revoked_records_held: 1,
-      crash_loss_after_last_durable: 0,
+      receipts_at_backup: receiptsAtBackup,
+      receipts_after_extra: receiptsAfterExtra,
+      receipts_after_restore: receiptsAfterRestore,
+      crash_loss_receipts: receiptsAfterExtra.gjc_intents - receiptsAfterRestore.gjc_intents,
+      lost_intent_id: extraIntent,
+      lost_intent_present_after_restore: false,
+      backup_sha256: jarvisBackup.sha256,
+      restore_sha256: jarvisRestored.sha256,
+      old_version_refused: oldVersionRefused,
       keep_beta_readable: true,
     },
+    writer_lease: writerLease,
     rto: {
       failure_began_ms: failureBegan,
       restore_began_ms: restoreBegan,

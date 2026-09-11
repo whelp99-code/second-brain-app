@@ -15,7 +15,7 @@ export async function referenceEffectFixture({load, database, key, config, launc
   const {parseMemoryLifecycleObservationManifest} = await load('src/memory-lifecycle-observation-manifest.js');
   const now = new Date();
   const publicKey = createPublicKey(key).export({format:'pem',type:'spki'}).toString();
-  database.authority.db.prepare(`INSERT INTO memory_provider_proof_keys VALUES
+  database.authority.db.prepare(`INSERT OR IGNORE INTO memory_provider_proof_keys VALUES
     (?, ?, ?, 'Ed25519', ?, ?, 'active', ?, ?, ?)`)
     .run('provider:key',config.provider_instance_id,'a'.repeat(40),publicKey,
       createHash('sha256').update(publicKey).digest('hex'), now.toISOString(),

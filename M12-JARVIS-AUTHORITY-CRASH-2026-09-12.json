@@ -1,0 +1,64 @@
+{
+  "root": "/var/tmp/sb-jarvis-restore-PdT941",
+  "rpo_jarvis": {
+    "last_durable_request_id": "memeff:req:v2:5c9aba7b88ba8db5cee69d8a722d885455cc9be60bf429170b447907bb843b11",
+    "last_durable_proof_id": "sbproof:v1:1d5816835ebed9da0df88c8ecfca4cdf1cc59935f28997cc7f8e2ab8cc3d2b64",
+    "last_durable_at_ms": 1789170634634,
+    "tombstone_sequence_before_restore": 1,
+    "restored_tombstone_sequence": 1,
+    "revoked_records_held": 1,
+    "receipts_at_backup": {
+      "tombstone_chain": 1,
+      "deletion_proofs": 0,
+      "gjc_intents": 0
+    },
+    "receipts_after_extra": {
+      "tombstone_chain": 1,
+      "deletion_proofs": 0,
+      "gjc_intents": 1
+    },
+    "receipts_after_restore": {
+      "tombstone_chain": 1,
+      "deletion_proofs": 0,
+      "gjc_intents": 0
+    },
+    "crash_loss_receipts": 1,
+    "lost_intent_id": "gjc_00022591b5407c5bd3192209f26b9ae7caea9a4187c700d0a4fad2fad8577d7c",
+    "lost_intent_present_after_restore": false,
+    "backup_sha256": "eb35bb6f27dc553793391ee1aed3b0f3ec3b147fd90a31168aa10ff080b89a67",
+    "restore_sha256": "eb35bb6f27dc553793391ee1aed3b0f3ec3b147fd90a31168aa10ff080b89a67",
+    "old_version_refused": "E_RESTORE_FAILED",
+    "keep_beta_readable": true
+  },
+  "rpo_sb": {
+    "last_durable_at": "2026-09-11T23:50:29.253638+00:00",
+    "last_durable_generation_id": "sbgen:v1:0a77f4206eba720522dd9c7075c437c52a048c993ea1ae27c98cc6684a844b1d",
+    "durable_pages_at_backup": 2,
+    "writes_after_backup_before_failure": 0,
+    "crash_loss_records": 0,
+    "restored_generation_id": "sbgen:v1:218364a01a31f4eba86e493cbaca1b1332f3501cfde2d22e512d6819e19a7d9a"
+  },
+  "rto": {
+    "failure_began_ms": 1789170629419,
+    "restore_began_ms": 1789170634717,
+    "sb_first_read_ms": 1789170636719,
+    "scoped_available_ms": 1789170637796,
+    "new_write_available_ms": 1789170639011,
+    "restore_probe_ms": 410.591,
+    "restore_to_readable_ms": 2002,
+    "failure_to_first_read_ms": 7300,
+    "failure_to_work_available_ms": 9592,
+    "scenario_ms": 17177
+  },
+  "writer_lease": {
+    "writer_busy": true,
+    "queue_depth": 1,
+    "empty_queue": false,
+    "lock": "/var/tmp/sb-jarvis-restore-PdT941/state/generation.lock",
+    "pid": 1407605
+  },
+  "old_version_refused": "E_RESTORE_FAILED",
+  "high_water": 2,
+  "written": "proved",
+  "production_activated": false
+}

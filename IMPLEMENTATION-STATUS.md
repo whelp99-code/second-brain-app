@@ -4,7 +4,32 @@
 
 > **6fb150b 재검토:** [수정 재확인 및 남은 작업](/home/jm/orca/projects/second-brain-app/CODEX-6FB150B-RECHECK-2026-09-11.md). 기존 4개 지적의 구체 사례는 개선됐고 관련 97개 테스트가 통과했다. 그러나 실제 관리형 `run_compile` staging에서 손편집 유실이 재현되며 Unicode 공백/casefold 검색 불일치도 남는다. `0eefce7`은 옛 코드이므로 전환 보류, 새 wheel 전에 두 잔여 결함을 해결한다. 아래 이전 검토는 해당 소스 시점의 이력이다.
 
-> **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀 `0ecdb561` × JARVIS `f9e0791`. [상태](GROK-RESUME-STATUS-2026-09-11.md) ready_for_final_review. 전환 없음.
+> **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀은 후속 M12/B/F 후보를 따른다. [상태](GROK-RESUME-STATUS-2026-09-11.md). 전환 없음.
+
+## A–F / M1–M14 상태 (713e453 후속)
+
+| ID | 상태 | 근거 / 정확한 외부 입력 |
+|---|---|---|
+| A 권한 | implemented_unverified | 격리 scoped 2 client. 운영 native 인증은 외부 |
+| B 복구 | implemented_unverified | 동일 fixture JARVIS sqlite backup→유실→restore, junk `E_RESTORE_FAILED`, [M12 JSON](M12-JARVIS-AUTHORITY-CRASH-2026-09-12.json) |
+| C 삭제 | implemented_unverified | high-water 2, 재복원 0 |
+| D 검색 | implemented_unverified | 이전 후보 경로 보존. 운영 한국어 GT는 외부 |
+| E 정정 | implemented_unverified | 이전 경로 보존 |
+| F 핀 | implemented_unverified | 런북 REL/JARVIS/ROOT/fence 파일 |
+| M1 | blocked_external | 운영 drain/전환 허가 |
+| M2 | implemented_unverified | 이전 철회 경로 |
+| M3 | implemented_unverified | revoked-jarvis-signing-key-ids |
+| M4 | implemented_unverified | V1 dispatch 계보 |
+| M5 | blocked_external | native 사본 수명. 제품/버전 입력 필요 |
+| M6 | implemented_unverified | writer lease busy≠queue empty. `scripts/writer-lease-on-root.py` |
+| M7 | implemented_unverified | 이전 경로 |
+| M8 | blocked_external | 실제 모델 세션 resolver/issuer |
+| M9 | blocked_external | 문맥 compaction 이벤트. JARVIS CLI에 없음 |
+| M10 | blocked_external | 실제 한국어 질의 GT |
+| M11 | blocked_external | 운영 규모 성능 |
+| M12 | implemented_unverified | JARVIS crash_loss_receipts=1, backup/restore sha 일치, scoped+new write proved |
+| M13 | blocked_external | 전체 GUI |
+| M14 | not_implemented | 운영 전환 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 
