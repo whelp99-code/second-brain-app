@@ -4,7 +4,7 @@
 
 ## 현재 핀
 
-SB source와 JARVIS source는 `GROK-FINAL-ACCEPTANCE-PACKAGE.md` 핀 표를 따른다. 운영 current `41f0751`. `production_activated=false`.
+SB `39ce670` 후보 `/var/tmp/sb-candidate-39ce670/releases/0ecdb561…` wheel `0e32b787…` × JARVIS `2a95f72` `/var/tmp/jarvis-artifact-2a95f72/source/dist` inventory `452bf352…` / 34768. dispatch JS `246bca54…`. 운영 current `41f0751`. `production_activated=false`.
 
 ## 성공 / 실패 조건
 
