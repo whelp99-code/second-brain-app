@@ -1,39 +1,32 @@
 {
   "pin": {
-    "sb_source": "55a2dfd85d59efa4fba5f3ac78c2a1d90d369877",
-    "harness": "7bf4fa3",
-    "release_id": "8a85e133340baf66e58cedc517108d4529d44ba8",
-    "wheel_sha256": "7f591736d7b17384eb6fc0f88700f33e136688cf539d6b5f07429d890e6a9e7b",
-    "candidate": "/var/tmp/sb-candidate-55a2dfd/releases/8a85e133340baf66e58cedc517108d4529d44ba8",
-    "jarvis_source": "e3ca935",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-e3ca935/source/dist",
-    "jarvis_inventory_sha256": "b4d80e7c81b1a63c14c6368a0a32f5dee2fdb969a8bab24a95594fcce6331fd1",
-    "jarvis_inventory_entries": 34778,
+    "sb_source": "f40291839792d6243996490e093dfdacd269c4cc",
+    "release_id": "0025ebe27ec7091c2a824d1594c51bc2537b1423",
+    "wheel_sha256": "ba7713566a93cea4bcee69a81d87e8560bb943efe897cc37269e1e2d7e3c860f",
+    "candidate": "/var/tmp/sb-candidate-missing-state/releases/0025ebe27ec7091c2a824d1594c51bc2537b1423",
+    "jarvis_source": "37b034f",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-37b034f/source/dist",
+    "jarvis_inventory_sha256": "020927977dce50e1f5dd98de59c2a5d70ae0ef7ec1ccbc0215b03f3c1ea0bc53",
+    "jarvis_inventory_entries": 34780,
     "operational_current": "41f0751",
     "production_activated": false
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-55a2dfd-maint.log",
+    "maintenance_log": "/var/tmp/w3-f402918-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-55a2dfd-integ.log",
+    "integration_log": "/var/tmp/w3-f402918-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-55a2dfd-work.log",
+    "work_log": "/var/tmp/w3-f402918-work.log",
     "work_exit": 0
   },
   "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-55a2dfd.log",
-    "passed": 1828,
+    "log": "/var/tmp/sb-full-pytest-f402918.log",
+    "passed": 1830,
     "skipped": 2,
-    "seconds": 605.57,
+    "seconds": 632.33,
     "exit": 0
   },
-  "mcp": {
-    "log": "/var/tmp/m11-55a2dfd-mcp2.out",
-    "existing_page_correction": true,
-    "stale_needle_hits_after_correction": [],
-    "mcp_server_rss_kib": null,
-    "client_peak_rss_kib": 85300
-  },
+  "codex_preserved_evidence": "CODEX-NIGHT-REVIEW-7d97af7.md",
   "codex_final_review_requested": true,
   "product_acceptance": false
 }
