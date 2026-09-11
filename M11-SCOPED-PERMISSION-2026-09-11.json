@@ -1,0 +1,50 @@
+{
+  "library_not_mcp": true,
+  "note": "unscoped MCP has no project filter; permission is search_scoped_records",
+  "runs": [
+    {
+      "pages": 30,
+      "summaries": [
+        {
+          "query": "ScaleProbe",
+          "samples": 3,
+          "p50_seconds": 0.01626130286604166,
+          "p95_seconds": 0.017924144864082336,
+          "min_seconds": 0.015822364017367363,
+          "max_seconds": 0.017924144864082336
+        },
+        {
+          "query": "forbidden",
+          "samples": 3,
+          "p50_seconds": 0.014324151910841465,
+          "p95_seconds": 0.014524022117257118,
+          "min_seconds": 0.014304381795227528,
+          "max_seconds": 0.014524022117257118
+        }
+      ],
+      "rss": 48280
+    },
+    {
+      "pages": 100,
+      "summaries": [
+        {
+          "query": "ScaleProbe",
+          "samples": 3,
+          "p50_seconds": 0.03869434632360935,
+          "p95_seconds": 0.03893311507999897,
+          "min_seconds": 0.03820799896493554,
+          "max_seconds": 0.03893311507999897
+        },
+        {
+          "query": "forbidden",
+          "samples": 3,
+          "p50_seconds": 0.03564860066398978,
+          "p95_seconds": 0.03760472219437361,
+          "min_seconds": 0.035134512931108475,
+          "max_seconds": 0.03760472219437361
+        }
+      ],
+      "rss": 49372
+    }
+  ]
+}

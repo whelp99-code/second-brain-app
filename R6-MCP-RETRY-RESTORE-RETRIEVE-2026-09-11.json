@@ -24,8 +24,10 @@
   "restore_dest_remember_seconds": 16.898,
   "inbox_retrieved": true,
   "inbox_needle": "dr-genlayout-write unique-span",
-  "sealed_search_hits": 0,
-  "unsealed_scope_all_hits": 1,
-  "unsealed_scope_all_page": "wiki/after-restore",
-  "compile_on_restore_dest_exit": 1
+  "sealed_search_hits_before_deny_local_compile": 0,
+  "unsealed_scope_all_hits_not_sealed_success": 1,
+  "compile_on_restore_dest_exit_before_fix": 1,
+  "sealed_search_hits": 1,
+  "sealed_search_page": "wiki/inbox-2026-09-11t070302501061-after-restore-d77cfc33",
+  "compile_after_fix_exit": 0
 }

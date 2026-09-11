@@ -1,0 +1,119 @@
+{
+  "candidate": "/var/tmp/sb-candidate-839f718/releases/c5b4308e7a4277d526c8d73e7332b0450b17021d",
+  "samples": 11,
+  "sizes": {
+    "small": {
+      "pages": 30,
+      "root": "/var/tmp/sb-m11-small-vhrardh7",
+      "seconds": [
+        0.0873,
+        0.0552,
+        0.0568,
+        0.0561,
+        0.0595,
+        0.064,
+        0.125,
+        0.2201,
+        0.0612,
+        0.0651,
+        0.0606
+      ],
+      "p50": 0.0612,
+      "p95": 0.2201,
+      "max": 0.2201,
+      "hits": [
+        "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+      ],
+      "concurrent_seconds": [
+        0.0834,
+        0.0905
+      ],
+      "retry": {
+        "lost_error": "ExceptionGroup",
+        "retry_seconds": 0.7744,
+        "retry_error": false,
+        "retry_hits": 1
+      },
+      "correction_seconds": 0.0625,
+      "correction_hits": [
+        "wiki/memory-dca543d88f5e11e1b9485ec045ba224b758ea5695e5251367dfaab94d5119773"
+      ]
+    },
+    "medium": {
+      "pages": 100,
+      "root": "/var/tmp/sb-m11-medium-mj3ju_xb",
+      "seconds": [
+        0.0971,
+        0.0847,
+        0.0902,
+        0.0833,
+        0.0872,
+        0.0827,
+        0.0833,
+        0.0821,
+        0.0833,
+        0.0812,
+        0.0832
+      ],
+      "p50": 0.0833,
+      "p95": 0.0971,
+      "max": 0.0971,
+      "hits": [
+        "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+      ],
+      "concurrent_seconds": [
+        0.1363,
+        0.1364
+      ],
+      "retry": {
+        "lost_error": "ExceptionGroup",
+        "retry_seconds": 0.794,
+        "retry_error": false,
+        "retry_hits": 1
+      },
+      "correction_seconds": 0.1172,
+      "correction_hits": [
+        "wiki/memory-f7bea627d0e5d10cf0829dbb27c162a89c8873defda755b962fb328cbdcc1f66"
+      ]
+    },
+    "large": {
+      "pages": 300,
+      "root": "/var/tmp/sb-m11-large-3z6qbefx",
+      "seconds": [
+        0.1783,
+        0.1652,
+        0.1598,
+        0.1888,
+        0.1592,
+        0.1644,
+        0.162,
+        0.1599,
+        0.1605,
+        0.1607,
+        0.1605
+      ],
+      "p50": 0.1607,
+      "p95": 0.1888,
+      "max": 0.1888,
+      "hits": [
+        "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+      ],
+      "concurrent_seconds": [
+        0.2658,
+        0.2661
+      ],
+      "retry": {
+        "lost_error": "ExceptionGroup",
+        "retry_seconds": 0.8876,
+        "retry_error": false,
+        "retry_hits": 1
+      },
+      "correction_seconds": 0.1728,
+      "correction_hits": [
+        "wiki/memory-7f28bfeb53fb11f34e93322bc552596bbcb8338d3a5eefba4722201883817af1"
+      ]
+    }
+  },
+  "live_model": false,
+  "peak_process_rss_kib": 84592
+}

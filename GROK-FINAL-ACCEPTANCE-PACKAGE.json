@@ -24,8 +24,10 @@
     "browser": "R6-BROWSER-RETRY-2026-09-11.json",
     "mcp_p50_retrieve": "R6-MCP-RETRY-RESTORE-RETRIEVE-2026-09-11.json",
     "tiny_remember_p50": 0.5589,
-    "unsealed_scope_all_hits": 1,
-    "sealed_search_hits": 0
+    "sealed_search_hits_before_deny_local_compile": 0,
+    "sealed_search_hits": 1,
+    "sealed_search_page": "wiki/inbox-2026-09-11t070302501061-after-restore-d77cfc33",
+    "m11": "M11-MCP-CORPUS-LATENCY-2026-09-11.json"
   },
   "old_failure_harness_preserved": "/var/tmp/codex-final-26cf158-ufpeOW"
 }

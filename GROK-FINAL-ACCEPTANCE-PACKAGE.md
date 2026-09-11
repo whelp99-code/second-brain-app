@@ -18,7 +18,7 @@
 
 `/var/tmp/w3-839f718-maint.log` MAINT:0. `/var/tmp/w3-839f718-integ.log` EXIT 0. `/var/tmp/w3-839f718-work.log` EXIT 0. `production_activated=false`.
 
-관련 테스트: `tests/test_web.py` 16 passed. 전체 회귀는 `edd2cb5`에서 1820 passed이며 이번 휠은 web.py 한 줄만 달라 반복하지 않았다.
+관련 테스트: `tests/test_security.py` `tests/test_compile.py` `tests/test_conflict.py` 45 passed (`839f718` compile/conflict 변경). `tests/test_web.py` 16 passed는 이전 `#run` 커밋. 전체 회귀 1820은 `edd2cb5` 트리이며 `839f718` 전체에 대해 반복하지 않았다.
 
 ## R1–R7
 
@@ -46,7 +46,7 @@
 | M8 | 제품별 공유연결 | blocked_external 실클라이언트 |
 | M9 | 문맥·compaction | implemented_unverified R4 JSON. live 세션 없음 |
 | M10 | 검색품질 | implemented_unverified 하드셋. user_curated 없음 |
-| M11 | 성능 | implemented_unverified tiny p50 0.56s. 큰 corpus p95 없음 |
+| M11 | 성능 | implemented_unverified 후보 MCP 소30 p50 0.061s p95 0.220s / 중100 p50 0.083s p95 0.097s / 대300 p50 0.161s p95 0.189s, RSS 84592KiB. 동시 조회·정정 후 최신·timeout 재시도 로그 `M11-MCP-CORPUS-LATENCY-2026-09-11.json`. 권한 불변은 scoped library (`M11-SCOPED-PERMISSION-2026-09-11.json`). 운영 17k p95 아님 |
 | M12 | DR | implemented_unverified 복원+deny compile+sealed 검색 1 |
 | M13 | GUI | implemented_unverified Chrome. 운영 timer 없음 |
 | M14 | 관계검색 | not_implemented |
