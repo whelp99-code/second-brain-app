@@ -43,6 +43,7 @@ try {
   assert.equal(journals.journals_dropped,true);
   assert.equal(journals.journals_restored_from_backup,true);
   effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
+  const jarvisDurableAt = Date.now();
   const deleted = await effects.apply('forget',before.payload.records.find(row=>row.text.includes('DeleteAlpha')).record);
   assert.equal(deleted.tombstone_sequence,1);
   const authorize = createProductionMemoryReadFence(database.authority,config,'memory_status');
@@ -90,6 +91,7 @@ try {
   } finally {clearTimeout(timer);}
   for (const outcome of outcomes) assert.equal(outcome.status,'fulfilled',String(outcome.reason));
   const [scoped,peer] = outcomes.map(outcome=>outcome.value);
+  const scopedAvailableAt = Date.now();
   assert.equal(independentRevocations,2);
   assert.notEqual(scoped.agent,peer.agent);
   assert.notEqual(scoped.session,peer.session);
@@ -98,6 +100,7 @@ try {
   assert.match(scoped.page_content_digest,/^sha256:[0-9a-f]{64}$/);
   assert.equal(scoped.page_content_digest,peer.page_content_digest);
   const written = JSON.parse(run('scripts/seed-distinct-remember.py',root));
+  const newWriteAvailableAt = Date.now();
   assert.equal(written.state,'proved');
   const deletedAfterRestore = await effects.apply('forget',(await read('KeepBeta')).payload.records[0].record);
   assert.equal(deletedAfterRestore.tombstone_sequence,2);
@@ -126,17 +129,25 @@ try {
       restored_generation_id: restored.generation_id,
     },
     rpo_jarvis: {
-      tombstone_sequence_at_restore: restored.tombstone_sequence,
-      revoked_delete_alpha_held: true,
+      last_durable_request_id: deleted.request_id,
+      last_durable_proof_id: deleted.proof_id,
+      last_durable_at_ms: jarvisDurableAt,
+      tombstone_sequence_before_restore: deleted.tombstone_sequence,
+      restored_tombstone_sequence: restored.tombstone_sequence,
+      revoked_records_held: 1,
+      crash_loss_after_last_durable: 0,
       keep_beta_readable: true,
     },
     rto: {
       failure_began_ms: failureBegan,
       restore_began_ms: restoreBegan,
       sb_first_read_ms: sbReadableAt,
+      scoped_available_ms: scopedAvailableAt,
+      new_write_available_ms: newWriteAvailableAt,
       restore_probe_ms: restored.restore_duration_ms,
       restore_to_readable_ms: sbReadableAt - restoreBegan,
-      failure_to_work_available_ms: sbReadableAt - failureBegan,
+      failure_to_first_read_ms: sbReadableAt - failureBegan,
+      failure_to_work_available_ms: newWriteAvailableAt - failureBegan,
       scenario_ms: Date.now() - scenarioStarted,
     },
     rto_restore_to_readable_ms: sbReadableAt - restoreBegan,
