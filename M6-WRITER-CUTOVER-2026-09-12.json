@@ -1,0 +1,13 @@
+{
+  "cutover": false,
+  "holder": "HELD",
+  "busy_while_held": true,
+  "after_sigkill_busy": false,
+  "after_sigkill_status": "ok",
+  "after_sigkill_exit": 0,
+  "after_sigkill_commit": "2cdc0dd1eb00a0198d96a390fbd128c644cf6811",
+  "denied_store_blind_allowed": false,
+  "revocation_keys": [
+    "key:test"
+  ]
+}

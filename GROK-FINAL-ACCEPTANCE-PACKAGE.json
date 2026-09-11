@@ -1,12 +1,12 @@
 {
   "pin": {
-    "sb_source": "8db46c59f249ff2da483336c0ec3318e2d317859",
+    "sb_source": "26b06ebaebfccfbb93b1366b5fb64376534777c2",
     "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
     "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
-    "candidate": "/var/tmp/sb-candidate-8db46c5/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
-    "jarvis_source": "bcb47af",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-bcb47af/source/dist",
-    "jarvis_inventory_sha256": "964aeaa543b30c7bde6e2dfb988586261801979fd6669490052990dc5994d632",
+    "candidate": "/var/tmp/sb-candidate-26b06eb/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "dcd54e9",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-dcd54e9/source/dist",
+    "jarvis_inventory_sha256": "9bd9006c92d31aab75b874d827d0dedde8a8a63c16a4feb7ad1cace6ca7533dc",
     "jarvis_inventory_entries": 34780,
     "operational_current": "41f0751",
     "production_activated": false,
@@ -18,14 +18,14 @@
     "work_exit": 0
   },
   "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-8db46c5.log",
+    "log": "/var/tmp/sb-full-pytest-26b06eb.log",
     "passed": 1832,
     "skipped": 2,
-    "seconds": 608.01,
+    "seconds": 660.98,
     "exit": 0
   },
-  "m6": "/var/tmp/m6-writer-cutover.json",
-  "m12": "/var/tmp/m12-cold-restore-write.json",
+  "m6": "M6-WRITER-CUTOVER-2026-09-12.json",
+  "m12": "M12-COLD-RESTORE-WRITE-2026-09-12.json",
   "codex_final_review_requested": true,
   "product_acceptance": false
 }

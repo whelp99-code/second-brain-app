@@ -1,0 +1,21 @@
+{
+  "rpo_backup_at": "2026-09-11T18:21:03.853705+00:00",
+  "rto_seconds": 0.0704,
+  "removed_sqlite": [
+    ".sb/search.db",
+    ".sb/ledger.db",
+    ".sb/runtime-state/reingress.db"
+  ],
+  "pre_hits": [
+    "wiki/inbox-pre-df5fe08e"
+  ],
+  "post_hits": [
+    "wiki/inbox-post-d375747f"
+  ],
+  "post_run_status": "ok",
+  "post_run_commit": "819d179787d7e82d751a78848f613b9654acbb4e",
+  "revocation_keys": [
+    "key:test"
+  ],
+  "cutover": false
+}
