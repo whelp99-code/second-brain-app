@@ -58,19 +58,21 @@
     "ignore": "tests/test_embeddings.py"
   },
   "jarvis_isolated_artifact": {
-    "path": "/var/tmp/jarvis-artifact-195b1a7/source/dist",
-    "source_commit": "195b1a7d4588a8386def5e7dce2067a141942708",
-    "artifact_digest": "sha256:07dc5b9b7daa4466c1f3ed25240322186cfd01f8494e2ddc1c4b0b440f879c24",
-    "lock_sha256": "0378edb0a0b3c2f8df1aab4d511d48df5c2101f3056586c2e6c61e20a9bdfc17",
-    "inventory_sha256": "9edc9dffdc45a4f29e8809e87bdc08cf6c3aa77d2e63e3ab52dd5d2af6183ce5",
-    "inventory_entries": 36316,
-    "paired_integration_exit": 0,
+    "path": "/var/tmp/jarvis-artifact-eeac005/source/dist",
+    "source_commit": "eeac005",
+    "artifact_digest": "sha256:80e3c6a144c10958f2e0ddafc812b4d63978f5da9de66a1fb4a6aa1ef9c45c41",
+    "paired_release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+    "maintenance_exit": 0,
+    "integration_exit": 0,
+    "work_exit": 0,
     "production_activated": false,
-    "not_operational_cc": true
+    "mcp_check_seconds": 3.535,
+    "mcp_check_exit": 0
   },
   "rollback_41f0751": {
     "has_revoked_keys": false,
     "has_scoped_read_policy": false,
     "filename_refs": []
-  }
+  },
+  "sb_source_commit_docs": "159b611"
 }

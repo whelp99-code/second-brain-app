@@ -10,7 +10,7 @@
 | 후보 | `/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1` |
 | wheel SHA-256 | `2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc` |
 | 준비 시 working_tree_modified | true (미추적 bak/2n/phone-history. git-archive는 HEAD) |
-| JARVIS | 격리 새 dist `/var/tmp/jarvis-artifact-195b1a7/source/dist` (소스 `195b1a7`, artifact `07dc5b9b…`). 운영 CC에 넣지 않음. 이전 페어 경로는 비교용 |
+| JARVIS | `/var/tmp/jarvis-artifact-eeac005/source/dist` (소스 `eeac005`, artifact `80e3c6a1…`). `3d36c40` 유지보수/연동/`--work` EXIT 0. 운영 CC 불변 |
 | 운영 current | `41f0751` 유지 |
 
 이전 실패 증거 `CODEX-6FB150B-RECHECK-2026-09-11.json`은 덮지 않았다.
@@ -24,7 +24,7 @@
 | C 검색·문맥 | **implemented_unverified** | SQL/record Unicode 일치. `assembleModelRequest`가 확정 기억 본문·출처·버전·잔여 예산을 넣음. live 모델 **없음**. user_curated **blocked_external** |
 | D native 수명 | **blocked_external** | 인증 복사 금지. 빈 프로필은 제품 미지원으로 일반화하지 않음 |
 | E 지연/DR/GUI | **implemented_unverified** | 21s 표본, 격리 restore, HTTP 23 passed. 브라우저·timeout 목표 아님 |
-| F 후보/런북 | **implemented_unverified** | `3d36c40` × 새 JARVIS dist fixture EXIT 0. 전환 미실행. `41f0751`은 철회 store 미참조 |
+| F 후보/런북 | **implemented_unverified** | `3d36c40` × JARVIS `eeac005` dist 게이트 EXIT 0. MCP 4프로필 3.535s. 전환 미실행 |
 | M1–M7 운영 종단 | **blocked_external** | drain_authorized=false |
 | M14 그래프 | **not_implemented** | 핵심 인수 아님. 채택 보류 |
 

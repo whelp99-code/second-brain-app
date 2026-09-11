@@ -2,7 +2,8 @@
 
 시각: 2026-09-11. **status=running**
 
-마지막: `pytest tests/test_rollback_compat.py` 2 passed. JARVIS `eeac005` `assembleModelRequest` 격리 프로브 delivered_excerpt=true, live 모델 없음.
+마지막: `3d36c40` × JARVIS `eeac005` dist 유지보수/연동/`--work` EXIT 0. MCP check 3.535s EXIT 0. rollback-compat 2 passed.
+다음: 격리 브라우저 실패→복구, 복원 dest에서 generation 레이아웃 맞춘 새 쓰기.
 
 인계 [GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md](GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md) 전체 A–F/M1–M14 유지. Grok이 구현·자체 검증, Codex는 최종 독립 검증. 운영 전환/인증 복사/원격 push 없음. W4 drain 차단은 전환만 막는다.
 
