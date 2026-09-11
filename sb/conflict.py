@@ -16,7 +16,7 @@ from sb.config import Config
 from sb.conflict_lexical import LEXICAL_FLOOR, LEXICAL_TOP, LexicalMatch, lexical_top
 from sb.contracts import ConflictVerdict, PageSpec, SourceCite, Unit
 from sb.llm import LLMBadJson, LLMClient, LLMUnavailable
-from sb.security import protect_units
+from sb.security import protect_units, source_llm_policy
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
 from sb.store.ledger import Ledger
 
@@ -70,7 +70,13 @@ def check(
     units: Sequence[Unit], pages: Sequence[PageSpec], ledger: Ledger, llm: LLMClient, config: Config,
     *, finalize: bool = True, on_capped: Callable[[], None] | None = None,
 ) -> list[ConflictFinding]:
-    units = protect_units(list(units), config)
+    allowed = [
+        unit for unit in units
+        if source_llm_policy(config, unit.origin.partition(":")[0] or "unknown") != "deny"
+    ]
+    if not allowed:
+        return []
+    units = protect_units(list(allowed), config)
     matches = lexical_top(units, pages)
     template = (files("sb") / "prompts" / "conflict.md").read_text(encoding="utf-8")
     version, model = config.llm.prompt_version, config.llm.model_id

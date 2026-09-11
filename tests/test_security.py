@@ -110,10 +110,13 @@ def test_external_source_without_explicit_permission_is_denied_before_llm(tmp_pa
     unit = _unit("외부 전송 금지 자료")
     llm = RecordingLLM("unused")
 
-    with Ledger(tmp_path) as ledger, pytest.raises(SecurityPolicyError, match="egress denied"):
-        _ = compile_pages([unit], ledger, llm, config)
+    with Ledger(tmp_path) as ledger:
+        pages = compile_pages([unit], ledger, llm, config)
 
     assert llm.prompts == []
+    assert pages
+    assert "외부 전송 금지 자료" in pages[0].body_md
+    assert pages[0].model_id == "local-deny"
 
 
 def test_local_only_source_rejects_external_model_and_allows_local_model(tmp_path: Path) -> None:

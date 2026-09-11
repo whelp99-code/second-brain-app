@@ -1,0 +1,17 @@
+{
+  "compile_before": {
+    "command": "run_compile(Config(llm_policy=deny), llm_mode=cli)",
+    "env": {"SB_CONFIG": "/var/tmp/sb-dr-genlayout/config.toml", "TMPDIR": "/var/tmp/sb-dr-genlayout"},
+    "failure": "SecurityPolicyError: source inbox: LLM egress denied by source policy",
+    "exit_code": 1
+  },
+  "compile_after_local_deny": {
+    "ingest_exit": 0,
+    "compile_exit": 0,
+    "pages": 2,
+    "written": 2
+  },
+  "sealed_search_default": ["wiki/inbox-2026-09-11t070302501061-after-restore-d77cfc33"],
+  "sealed_search_all": ["wiki/inbox-2026-09-11t070302501061-after-restore-d77cfc33"],
+  "not_scope_all_on_stripped_copy": true
+}

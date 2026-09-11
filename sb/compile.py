@@ -12,7 +12,7 @@ from typing import Final, Protocol
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite, Unit
 from sb.llm import LLMClient, LLMUnavailable
-from sb.security import protect_units
+from sb.security import protect_units, source_llm_policy
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
 
 COMPILE_STAGE: Final = "compile"
@@ -129,7 +129,6 @@ def compile_pending(
     on_error: Callable[[LLMUnavailable], None] | None = None,
 ) -> tuple[list[PendingCompile], bool]:
     """Generate pages but leave successful derivations running until the caller commits them."""
-    units = protect_units(units, config)
     cap = config.caps["max_llm_calls_compile"]
     prompt_version = config.llm.prompt_version
     model_id = config.llm.model_id
@@ -150,11 +149,21 @@ def compile_pending(
         key = compile_page_key(page_id, [unit.unit_id for unit in grouped], prompt_version, model_id)
         if not _prepare_compile(ledger, key):
             continue
-        if used >= cap:
-            remaining = True
-            break
+        policies = {
+            source_llm_policy(config, unit.origin.partition(":")[0] or "unknown")
+            for unit in grouped
+        }
+        job = _PageJob(page_id, key, grouped)
         try:
-            item = _compile_one(_PageJob(page_id, key, grouped), ctx)
+            if "deny" in policies:
+                item = _compile_without_llm(job, ctx)
+            else:
+                if used >= cap:
+                    remaining = True
+                    break
+                protected = protect_units(list(grouped), config)
+                item = _compile_one(_PageJob(page_id, key, tuple(protected)), ctx)
+                used += 1
             pending.append(item)
             if on_page is not None:
                 on_page(item)
@@ -162,7 +171,6 @@ def compile_pending(
             if on_error is None:
                 raise
             on_error(exc)
-        used += 1
     return pending, remaining
 
 
@@ -182,6 +190,34 @@ class _CompileCtx:
     existing_pages: Mapping[str, PageSpec]
     prompt_version: str
     model_id: str
+
+
+def _compile_without_llm(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
+    title = _title(job.units[0].origin)
+    previous = ctx.existing_pages.get(job.page_id)
+    body = "\n\n".join(unit.text for unit in job.units)
+    ctx.ledger.ensure_derivation(job.key, COMPILE_STAGE, COMPILE_RUN_ID)
+    ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
+    _BODIES.put(ctx.ledger, job.page_id, body)
+    sources = _sources(job.units)
+    page = PageSpec(
+        page_id=job.page_id,
+        title=title,
+        body_md=body,
+        sources=_merge_sources(() if previous is None else previous.sources, sources),
+        status="active",
+        prompt_version=ctx.prompt_version,
+        model_id="local-deny",
+        derivation_key=job.key,
+    )
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return PendingCompile(
+        page,
+        job.key,
+        DerivationOutput(digest, f"wiki/{job.page_id}.md"),
+        tuple(sorted({(unit.origin, unit.content_hash) for unit in job.units})),
+        bool(previous is None),
+    )
 
 
 def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:

@@ -29,24 +29,24 @@
 | R3 | verified 격리 | symlink rollback EXIT 2 |
 | R4 | implemented_unverified | 전송 직전 JSON 431B, 본문·출처·sha256, 예산 내. **live LLM HTTP 없음** |
 | R5 | verified 격리 | compact only, Latin case/newline |
-| R6 | implemented_unverified | Chrome fail+recover. tiny remember p50 0.56s n=5. MCP 3.54/3.42s. 복원 inbox 회수. sealed 검색 0, scope=all 1 (`wiki/after-restore`). 복원 dest compile exit 1 |
+| R6 | implemented_unverified | Chrome fail+recover. tiny p50 0.56s. MCP 재시도 EXIT 0. deny compile는 LLM 없이 로컬 페이지. 복원 dest ingest+compile 후 **sealed 기본 검색 1** (`wiki/inbox-…after-restore-d77cfc33`). 옛 scope=all 복사본은 sealed 성공이 아님 |
 | R7 | implemented_unverified | 이 핀 |
 
-## M1–M14 (W 연결)
+## M1–M14 (CURSOR-HANDOFF 7절 원문)
 
-| ID | 상태 |
-|---|---|
-| M1 세대 | implemented_unverified 격리. 운영 종단은 drain |
-| M2 컴파일 정정 | verified 격리 R1 |
-| M3 철회 | verified 격리 R2/R3 |
-| M4 검색 | verified 격리 R5. 자연어/의역 0 |
-| M5 native 수명 | blocked_external 인증 복사 금지 |
-| M6 문맥 payload | implemented_unverified R4 |
-| M7 `--work` | verified 격리 |
-| M8 native 삭제 수명 | blocked_external (W5) |
-| M9 DR 회수 | implemented_unverified scope=all 1, sealed 0 |
-| M10 GUI | implemented_unverified Chrome `#run` |
-| M11 쓰기 지연 | implemented_unverified p50 0.56s tiny, 16.9s restore dest |
-| M12 백업 | implemented_unverified 이전 격리 restore |
-| M13 설치 게이트 | verified MAINT/integ/work 0 |
-| M14 그래프 | not_implemented |
+| ID | 원문 | 상태 |
+|---|---|---|
+| M1 | 실제 신원/권한 | blocked_external 실로그인 |
+| M2 | 실제 업무 공유 계보 | implemented_unverified 격리 `--work`. 실사용자 업무 blocked_external |
+| M3 | 철회 수명 | implemented_unverified R2/R3 격리 |
+| M4 | 검증 결과 원계보 | implemented_unverified 격리. 실작업 계보 blocked_external |
+| M5 | native 사본 수명 | blocked_external 인증 복사 금지 |
+| M6 | 단일작성자·전환복구 | implemented_unverified 격리. 운영 writer 배제 drain |
+| M7 | 전체 읽기 범위 | implemented_unverified fixture 거부. 전 표면 운영 미검증 |
+| M8 | 제품별 공유연결 | blocked_external 실클라이언트 |
+| M9 | 문맥·compaction | implemented_unverified R4 JSON. live 세션 없음 |
+| M10 | 검색품질 | implemented_unverified 하드셋. user_curated 없음 |
+| M11 | 성능 | implemented_unverified tiny p50 0.56s. 큰 corpus p95 없음 |
+| M12 | DR | implemented_unverified 복원+deny compile+sealed 검색 1 |
+| M13 | GUI | implemented_unverified Chrome. 운영 timer 없음 |
+| M14 | 관계검색 | not_implemented |

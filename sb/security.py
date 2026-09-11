@@ -76,6 +76,10 @@ def _command_name(value: str) -> str:
     return value.replace("\\", "/").rsplit("/", 1)[-1]
 
 
+def source_llm_policy(config: Config, source_id: str) -> str:
+    return _policies(config, source_id)[0]
+
+
 def protect_unit(unit: Unit, config: Config) -> Unit:
     """Apply source egress and sensitive-data policy to one prompt-bound unit."""
     source_id = unit.origin.partition(":")[0] or "unknown"
