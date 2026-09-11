@@ -644,8 +644,10 @@ def _lexical(
         return ()
     predicate, query_params = parsed.predicate()
     ordering, order_params = parsed.ordering()
+    score_sql, score_params = parsed.relevance_sql()
     where = [predicate]
-    params: list[str | int] = list(query_params)
+    params: list[str | int] = list(score_params)
+    params.extend(query_params)
     metadata, metadata_params = SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope).predicate()
     where.append(metadata)
     params.extend(metadata_params)
@@ -660,7 +662,7 @@ def _lexical(
         + f" ORDER BY {ordering} LIMIT ? OFFSET ?"
     )
     if not parsed.uses_fts:
-        sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace("bm25(docs)", "0.0")
+        sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace("bm25(docs)", f"({score_sql})")
     try:
         with _connect(db_path) as conn:
             rows = cast(

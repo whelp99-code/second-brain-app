@@ -59,3 +59,10 @@ def test_dangling_initialized_marker_symlink_is_unsafe(tmp_path: Path) -> None:
     with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
         record_revoked_key_ids(tmp_path, ["key:mark"])
     assert not outside.exists()
+
+
+def test_truncated_initialized_store_is_unsafe(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:test"])
+    revoked_key_path(tmp_path).write_text("", encoding="utf-8")
+    with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
+        load_revoked_key_ids(tmp_path)

@@ -34,7 +34,11 @@ def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if not path.is_file():
         return frozenset()
-    return frozenset(line for line in path.read_text(encoding="utf-8").splitlines() if line)
+    text = path.read_text(encoding="utf-8")
+    keys = frozenset(line for line in text.splitlines() if line)
+    if marker.is_file() and not keys:
+        raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    return keys
 
 
 def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:

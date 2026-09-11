@@ -606,3 +606,27 @@ def test_focused_page_ranks_above_long_pages_that_mention_query_once(tmp_path: P
     hits = SearchIndex(vault_root=root).search("RankNeedle", limit=5)
     assert hits
     assert hits[0].page_id == "wiki/a-focused"
+
+
+def test_short_core_page_outranks_longer_pages_with_more_raw_mentions(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    padding = "padding " * 120
+    for number in range(30):
+        commit_page(
+            root,
+            f"wiki/z-long-{number:02}.md",
+            f"---\ntitle: Long{number:02}\nstatus: active\n---\n\n# Long{number:02}\n{padding}\nquartz quartz quartz quartz\n",
+            f"test: quartz long {number}",
+        )
+    commit_page(
+        root,
+        "wiki/a-core.md",
+        "---\ntitle: Core\nstatus: active\n---\n\n# Core\nquartz quartz quartz\n",
+        "test: quartz core",
+    )
+    stamp_knowledge(root)
+    hits = SearchIndex(vault_root=root).search("quartz", limit=5)
+    assert hits
+    assert hits[0].page_id == "wiki/a-core"
+    assert hits[0].score != 0

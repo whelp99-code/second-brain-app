@@ -1,4 +1,4 @@
-"""Headless Chrome: failed compile remains after a later browser-triggered success."""
+"""Headless Chrome: failed compile remains after a later successful batch."""
 from __future__ import annotations
 
 import json
@@ -6,8 +6,8 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from urllib.parse import quote
 
+from sb.config import Config
 from sb.pipeline import StageReport, _run_locked
 from sb.store.ledger import Ledger
 from sb.vault import Vault
@@ -41,6 +41,20 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir="/var/tmp") as raw:
         config, root = _ready(Path(raw))
+        inbox = root / "inbox"
+        inbox.mkdir(exist_ok=True)
+        config = Config(
+            raw={
+                **config.raw,
+                "sources": [{
+                    "id": "inbox",
+                    "adapter": "inbox-documents",
+                    "llm_policy": "deny",
+                    "root": str(inbox),
+                }],
+            },
+            base_dir=config.base_dir,
+        )
 
         def reject(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
             del ledger, vault, run_id
@@ -49,36 +63,30 @@ def main() -> None:
         failed = _run_locked(root, reject, "compile")
         with _running(config) as base:
             _chrome_dump(base + "/", out / "home-after-fail.html")
-            status, _before = _request(base + "/api/status")
-            _chrome_dump(base + "/#fix=" + quote("recovered-ok-needle"), out / "home-after-fix.html")
+            (inbox / "recovered.md").write_text("recovered-ok-needle\n", encoding="utf-8")
+            _chrome_dump(base + "/#run", out / "home-after-run.html")
             status_after, after = _request(base + "/api/status")
-    stages = (after.get("recent_stages") or []) if isinstance(after, dict) else []
+    payload = after if isinstance(after, dict) else {}
+    raw_batch = payload.get("last_batch")
+    last_batch: dict[str, object] = raw_batch if isinstance(raw_batch, dict) else {}
+    stages = payload.get("recent_stages") or []
     evidence = {
         "failed_run_id": failed.run_id,
-        "status_get": status,
         "status_after": status_after,
-        "run_body_status": next(
-            (row.get("status") for row in stages if isinstance(row, dict) and row.get("run_id") != failed.run_id),
-            None,
-        ),
+        "last_batch_run_id": last_batch.get("run_id"),
+        "last_batch_status": last_batch.get("status"),
+        "last_batch_errors": last_batch.get("errors"),
+        "success_is_new_batch": last_batch.get("run_id") not in {None, failed.run_id},
         "failure_row_after_run": any(
             isinstance(row, dict)
             and row.get("run_id") == failed.run_id
             and row.get("status") == "failed"
-            and "policy denied" in str(row.get("error", ""))
             and "private-value" not in str(row.get("error", ""))
-            for row in stages
-        ),
-        "success_row_present": any(
-            isinstance(row, dict)
-            and row.get("run_id") != failed.run_id
-            and row.get("status") != "failed"
-            for row in stages
+            for row in stages if isinstance(stages, list)
         ),
         "home_mentions_console": "Second Brain" in (out / "home-after-fail.html").read_text(encoding="utf-8"),
-        "fix_hash_used": True,
         "preinserted_success_stage": False,
-        "chrome": "google-chrome --headless=new --dump-dom #fix=",
+        "chrome": "google-chrome --headless=new --dump-dom / then /#run after inbox write",
     }
     (out / "evidence.json").write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(evidence, ensure_ascii=False))

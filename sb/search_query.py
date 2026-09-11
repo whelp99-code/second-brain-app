@@ -93,18 +93,23 @@ class LexicalQuery:
             params.extend((compact, compact, compact))
         return " AND ".join(clauses) if clauses else "0", tuple(params)
 
-    def ordering(self) -> tuple[str, tuple[str, ...]]:
+    def relevance_sql(self) -> tuple[str, tuple[str, ...]]:
         if not self.terms:
-            return "page_id,section,rowid", ()
+            return "0", ()
         scores: list[str] = []
         params: list[str] = []
         for term in self.terms:
             compact = normalize(term)
-            scores.append("(length(compact)-length(replace(compact,?,'')))/max(length(?),1)")
-            params.extend((compact, compact))
-        relevance = "+".join(scores)
+            scores.append("(1.0*(length(compact)-length(replace(compact,?,''))))/max(length(compact),1)")
+            params.append(compact)
+        return "+".join(scores), tuple(params)
+
+    def ordering(self) -> tuple[str, tuple[str, ...]]:
+        if not self.terms:
+            return "page_id,section,rowid", ()
+        relevance, params = self.relevance_sql()
         if len(self.terms) < 2:
-            return f"({relevance}) DESC,page_id,section,rowid", tuple(params)
+            return f"({relevance}) DESC,page_id,section,rowid", params
         return ("CASE WHEN instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 "
                 + f"OR instr(lower(section),lower(?))>0 THEN 0 ELSE 1 END,({relevance}) DESC,page_id,section,rowid",
                 (self.text, self.text, self.text, *params))
