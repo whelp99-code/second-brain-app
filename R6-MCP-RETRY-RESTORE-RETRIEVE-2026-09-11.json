@@ -1,12 +1,31 @@
 {
   "mcp_attempts": [
-    {"attempt": 1, "seconds": 3.543, "exit": 0},
-    {"attempt": 2, "seconds": 3.422, "exit": 0}
+    {
+      "attempt": 1,
+      "seconds": 3.543,
+      "exit": 0
+    },
+    {
+      "attempt": 2,
+      "seconds": 3.422,
+      "exit": 0
+    }
   ],
+  "tiny_remember_seconds": [
+    0.4619,
+    0.5589,
+    0.5658,
+    0.5604,
+    0.5564
+  ],
+  "tiny_remember_p50": 0.5589,
+  "tiny_remember_max": 0.5658,
   "restore_dest_remember_exit": 0,
   "restore_dest_remember_seconds": 16.898,
-  "inbox_needle": "dr-genlayout-write unique-span",
   "inbox_retrieved": true,
-  "compiled_search_hits": 0,
-  "compiled_search_note": "remember wrote inbox; sealed search has no compiled page for the needle"
+  "inbox_needle": "dr-genlayout-write unique-span",
+  "sealed_search_hits": 0,
+  "unsealed_scope_all_hits": 1,
+  "unsealed_scope_all_page": "wiki/after-restore",
+  "compile_on_restore_dest_exit": 1
 }
