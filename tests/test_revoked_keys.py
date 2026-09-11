@@ -124,6 +124,13 @@ def test_concurrent_journal_recover_does_not_raise_file_not_found(tmp_path: Path
     assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b"})
 
 
+def test_reader_uses_the_writer_lock_file(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:a"])
+    load_revoked_key_ids(tmp_path)
+    assert (tmp_path / "revoked-jarvis-signing-key-ids.lock").is_file()
+    assert not (tmp_path / ".revoked.lock").exists()
+
+
 def test_missing_state_root_is_empty_not_crash(tmp_path: Path) -> None:
     missing = tmp_path / "no-state"
     assert load_revoked_key_ids(missing) == frozenset()

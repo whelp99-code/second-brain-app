@@ -1,5 +1,5 @@
 # Grok 재개 상태
 
-시각: 2026-09-12. **status=ready_for_final_review**
+시각: 2026-09-12. **status=running**
 
-7d97af7 후속 후보 `0025ebe2` × JARVIS `37b034f`. 게이트 EXIT 0. 회귀 1830 passed. 전환 없음. 제품 인수 아님.
+CODEX-NIGHT-REVIEW-c3e1d9f 미통과. N1 production fence + intent 예약 후 전송. N3 공통 lock. M6/M12 통합 근거. 전환 없음.

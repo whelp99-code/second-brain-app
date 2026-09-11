@@ -102,11 +102,17 @@ def _read_keys(state_root: Path) -> frozenset[str]:
     return keys
 
 
+def _lock_path(state_root: Path) -> Path:
+    return revoked_key_path(state_root).with_name("revoked-jarvis-signing-key-ids.lock")
+
+
 def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
     if not state_root.is_dir():
         return frozenset()
-    lock_path = state_root / ".revoked.lock"
-    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    lock_path = _lock_path(state_root)
+    if lock_path.is_symlink():
+        raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
         _recover_journal(state_root)
@@ -120,7 +126,7 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
     if not incoming:
         return
     state_root.mkdir(parents=True, exist_ok=True)
-    lock_path = revoked_key_path(state_root).with_name("revoked-jarvis-signing-key-ids.lock")
+    lock_path = _lock_path(state_root)
     if lock_path.is_symlink():
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
