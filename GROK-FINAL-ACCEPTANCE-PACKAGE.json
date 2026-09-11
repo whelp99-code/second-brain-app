@@ -1,22 +1,22 @@
 {
   "pin": {
-    "sb_source": "512a4c7",
-    "release_id": "dc493f1fd1f14fb47bf3eaa6ac9c2c9449c099e5",
-    "wheel_sha256": "0c15d2dab603bce085f49dc7fd749236d079146bf68b3e59f950420bc8b9cb9d",
-    "candidate": "/var/tmp/sb-candidate-512a4c7/releases/dc493f1fd1f14fb47bf3eaa6ac9c2c9449c099e5",
+    "sb_source": "839f718",
+    "release_id": "c5b4308e7a4277d526c8d73e7332b0450b17021d",
+    "wheel_sha256": "69b9bab0a0dc4b4a86ccde91dd4656c213ec47c2499353353a7f93b3b0548d7f",
+    "candidate": "/var/tmp/sb-candidate-839f718/releases/c5b4308e7a4277d526c8d73e7332b0450b17021d",
     "jarvis_source": "6ce2356",
     "jarvis_dist": "/var/tmp/jarvis-artifact-6ce2356/source/dist",
     "jarvis_artifact_digest": "sha256:2ec1f72757522e6d36f99b549c7dae4b3b787bea717395782d03964a1f104e42",
     "operational_current": "41f0751",
     "production_activated": false,
-    "supersedes": ["5b9687b", "edd2cb5", "3d36c40", "63bdaf6"]
+    "supersedes": ["dc493f1", "512a4c7", "5b9687b", "edd2cb5"]
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-512a4c7-maint.log",
+    "maintenance_log": "/var/tmp/w3-839f718-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-512a4c7-integ.log",
+    "integration_log": "/var/tmp/w3-839f718-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-512a4c7-work.log",
+    "work_log": "/var/tmp/w3-839f718-work.log",
     "work_exit": 0
   },
   "r4": {"live_llm_http": false, "payload_bytes": 431, "under_budget": true, "evidence": "R4-TRANSPORT-PAYLOAD-2026-09-11.json"},

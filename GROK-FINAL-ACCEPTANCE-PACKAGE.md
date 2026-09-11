@@ -1,4 +1,4 @@
-# Grok 최종 제출 — `dc493f1` × JARVIS `6ce2356`
+# Grok 제출 — `c5b4308` × JARVIS `6ce2356` (running, 최종 아님)
 
 인계 A–F/M1–M14와 Codex R1–R7. **운영 전환 없음.** 옛 실패 `/var/tmp/codex-final-26cf158-ufpeOW` 보존.
 
@@ -6,17 +6,17 @@
 
 | | |
 |---|---|
-| SB source | `512a4c7` |
-| 후보 | `/var/tmp/sb-candidate-512a4c7/releases/dc493f1fd1f14fb47bf3eaa6ac9c2c9449c099e5` |
-| wheel | `0c15d2dab603bce085f49dc7fd749236d079146bf68b3e59f950420bc8b9cb9d` |
+| SB source | `839f718` |
+| 후보 | `/var/tmp/sb-candidate-839f718/releases/c5b4308e7a4277d526c8d73e7332b0450b17021d` |
+| wheel | `69b9bab0a0dc4b4a86ccde91dd4656c213ec47c2499353353a7f93b3b0548d7f` |
 | JARVIS | `6ce2356` `/var/tmp/jarvis-artifact-6ce2356/source/dist` `sha256:2ec1f727…` |
 | 운영 current | `41f0751` |
 
-`5b9687b`/`edd2cb5`는 직전 핀. 이번 휠은 `#run` 콘솔 부트를 포함한다.
+`dc493f1`은 직전 핀. 이번 휠은 deny 소스 로컬 compile을 포함한다.
 
 ## 게이트
 
-`/var/tmp/w3-512a4c7-maint.log` MAINT:0. `/var/tmp/w3-512a4c7-integ.log` EXIT 0. `/var/tmp/w3-512a4c7-work.log` EXIT 0 `--work REAL-WORK-ITEM-2026-09-10.json`. `production_activated=false`.
+`/var/tmp/w3-839f718-maint.log` MAINT:0. `/var/tmp/w3-839f718-integ.log` EXIT 0. `/var/tmp/w3-839f718-work.log` EXIT 0. `production_activated=false`.
 
 관련 테스트: `tests/test_web.py` 16 passed. 전체 회귀는 `edd2cb5`에서 1820 passed이며 이번 휠은 web.py 한 줄만 달라 반복하지 않았다.
 
