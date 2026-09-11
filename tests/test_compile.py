@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from sb.compile import CAPPED_PAGE_ID, CAPPED_STATUS, compile_pages
+from sb.compile import CAPPED_PAGE_ID, CAPPED_STATUS, compile_pages, compile_pending
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite, Unit
-from sb.llm import FakeLLM
+from sb.llm import FakeLLM, LLMUnavailable
 from sb.store import deriv_key
 from sb.store.ledger import Ledger
 from sb.vault import VaultLintError, init_vault
@@ -310,3 +310,30 @@ def test_pending_retains_all_inputs_even_when_citations_deduplicate(tmp_path: Pa
         # The body cache is prompt context too, even without a tracked previous page.
         cached = _compile_one(_PageJob("test", "test-key-2", units), ctx)
         assert cached.untracked_context
+
+
+class _FailingLLM:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def generate(self, prompt: str, **kwargs: object) -> str:
+        del prompt, kwargs
+        self.calls += 1
+        raise LLMUnavailable(1, "fixture-unavailable")
+
+
+def test_failed_llm_calls_count_toward_compile_cap(tmp_path: Path) -> None:
+    units = [
+        _unit("u1", HASH_A, "0-1", "one", ORIGIN_ONE),
+        _unit("u2", HASH_B, "0-1", "two", ORIGIN_TWO),
+        _unit("u3", HASH_C, "0-1", "three", ORIGIN_THREE),
+        _unit("u4", HASH_A, "0-1", "four", "me-wiki:d/four.md"),
+    ]
+    llm = _FailingLLM()
+    with Ledger(tmp_path) as ledger:
+        pending, remaining = compile_pending(
+            units, ledger, llm, _config(cap=1), on_error=lambda exc: None,
+        )
+    assert llm.calls == 1
+    assert pending == []
+    assert remaining is True

@@ -168,9 +168,14 @@ def compile_pending(
             if on_page is not None:
                 on_page(item)
         except LLMUnavailable as exc:
+            if "deny" not in policies:
+                used += 1
             if on_error is None:
                 raise
             on_error(exc)
+            if used >= cap:
+                remaining = True
+                break
     return pending, remaining
 
 

@@ -8,6 +8,7 @@ import pytest
 
 from sb.revoked_keys import (
     RevocationStoreError,
+    initialized_revocation_path,
     load_revoked_key_ids,
     record_revoked_key_ids,
     revoked_key_path,
@@ -50,3 +51,11 @@ def test_symlink_revocation_file_is_unsafe(tmp_path: Path) -> None:
         load_revoked_key_ids(tmp_path)
     with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
         record_revoked_key_ids(tmp_path, ["key:next"])
+
+
+def test_dangling_initialized_marker_symlink_is_unsafe(tmp_path: Path) -> None:
+    outside = tmp_path.parent / f"revoked-marker-{tmp_path.name}"
+    initialized_revocation_path(tmp_path).symlink_to(outside)
+    with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
+        record_revoked_key_ids(tmp_path, ["key:mark"])
+    assert not outside.exists()

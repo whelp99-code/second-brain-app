@@ -94,12 +94,20 @@ class LexicalQuery:
         return " AND ".join(clauses) if clauses else "0", tuple(params)
 
     def ordering(self) -> tuple[str, tuple[str, ...]]:
-        score = "bm25(docs)" if self.uses_fts else "0.0"
+        if not self.terms:
+            return "page_id,section,rowid", ()
+        scores: list[str] = []
+        params: list[str] = []
+        for term in self.terms:
+            compact = normalize(term)
+            scores.append("(length(compact)-length(replace(compact,?,'')))/max(length(?),1)")
+            params.extend((compact, compact))
+        relevance = "+".join(scores)
         if len(self.terms) < 2:
-            return f"{score},page_id,section,rowid", ()
+            return f"({relevance}) DESC,page_id,section,rowid", tuple(params)
         return ("CASE WHEN instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 "
-                + f"OR instr(lower(section),lower(?))>0 THEN 0 ELSE 1 END,{score},page_id,section,rowid",
-                (self.text, self.text, self.text))
+                + f"OR instr(lower(section),lower(?))>0 THEN 0 ELSE 1 END,({relevance}) DESC,page_id,section,rowid",
+                (self.text, self.text, self.text, *params))
 
     def record_priority(self, text: str) -> int:
         return 0 if self.text.casefold() in text.casefold() else 1

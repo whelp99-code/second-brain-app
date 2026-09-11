@@ -20,11 +20,17 @@ def initialized_revocation_path(state_root: Path) -> Path:
     return state_root / "revoked-jarvis-signing-key-ids.initialized"
 
 
-def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
-    path = revoked_key_path(state_root)
+def _reject_unsafe(path: Path) -> None:
     if path.is_symlink() or (path.exists() and not path.is_file()):
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
-    if initialized_revocation_path(state_root).is_file() and not path.is_file():
+
+
+def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
+    path = revoked_key_path(state_root)
+    marker = initialized_revocation_path(state_root)
+    _reject_unsafe(path)
+    _reject_unsafe(marker)
+    if marker.is_file() and not path.is_file():
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if not path.is_file():
         return frozenset()
@@ -56,8 +62,14 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
         os.replace(tmp_name, revoked_key_path(state_root))
         tmp_name = ""
         marker = initialized_revocation_path(state_root)
-        if not marker.exists():
-            marker.write_text("1\n", encoding="utf-8")
+        _reject_unsafe(marker)
+        if not marker.is_file():
+            marker_fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            try:
+                os.write(marker_fd, b"1\n")
+                os.fsync(marker_fd)
+            finally:
+                os.close(marker_fd)
         directory = os.open(state_root, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory)

@@ -583,3 +583,26 @@ def test_scope_reference_returns_unknown_pages_labeled_unverified(tmp_path: Path
     aliased = index.search("ReferenceScopeToken", scope="all")
     assert [row.page_id for row in aliased] == [hit.page_id]
     assert aliased[0].as_dict()["verification"] == "UNVERIFIED"
+
+
+def test_focused_page_ranks_above_long_pages_that_mention_query_once(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    filler = ("padding " * 80) + "RankNeedle once."
+    for number in range(30):
+        commit_page(
+            root,
+            f"wiki/z-long-{number:02}.md",
+            f"---\ntitle: Long{number:02}\nstatus: active\n---\n\n# Long{number:02}\n{filler}\n",
+            f"test: long {number}",
+        )
+    commit_page(
+        root,
+        "wiki/a-focused.md",
+        "---\ntitle: Focused\nstatus: active\n---\n\n# Focused\nRankNeedle RankNeedle RankNeedle\n",
+        "test: focused",
+    )
+    stamp_knowledge(root)
+    hits = SearchIndex(vault_root=root).search("RankNeedle", limit=5)
+    assert hits
+    assert hits[0].page_id == "wiki/a-focused"

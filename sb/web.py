@@ -161,7 +161,7 @@ async function resolveConflict(){try{const id=byId('conflictId').value;const dat
 async function loadChanges(){try{show('changeResult',await api('/api/changes?days=7'))}catch(error){show('changeResult',error.message)}}
 async function loadGovernance(){try{const sources=await api('/api/sources');const retention=await api('/api/retention');const metrics=await api('/api/metrics');show('governanceResult',{...sources,retention,metrics})}catch(error){show('governanceResult',error.message)}}
 const dropzone=byId('dropzone');dropzone.addEventListener('dragover',(event)=>{event.preventDefault();dropzone.classList.add('active')});dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('active'));dropzone.addEventListener('drop',(event)=>{event.preventDefault();dropzone.classList.remove('active');uploadFiles(event.dataTransfer.files)});dropzone.addEventListener('click',()=>byId('fileInput').click());byId('fileInput').addEventListener('change',(event)=>uploadFiles(event.target.files));
-byId('token').value=localStorage.getItem('sb_token')||'';loadStatus();loadConflicts();loadGovernance();if(location.hash==='#run')runPipeline();
+byId('token').value=localStorage.getItem('sb_token')||'';loadStatus();loadConflicts();loadGovernance();if(location.hash.startsWith('#fix=')){byId('content').value=decodeURIComponent(location.hash.slice(5));remember().then(()=>runPipeline());}else if(location.hash==='#run')runPipeline();
 </script>
 </body>
 </html>

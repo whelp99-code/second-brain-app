@@ -1,12 +1,12 @@
 {
-  "failed_run_id": "d9870cc5abd545fa8a5fd2d36a735544",
-  "recovered_run_id": "97620cc954f54dd489a592c8360b8138",
+  "failed_run_id": "408a7a2f7777491ab1a2448b7dd0ad32",
   "status_get": 200,
-  "run_post": 200,
-  "run_body_status": "failed",
   "status_after": 200,
+  "run_body_status": "ok",
   "failure_row_after_run": true,
   "success_row_present": true,
   "home_mentions_console": true,
-  "chrome": "google-chrome --headless=new --dump-dom"
+  "fix_hash_used": true,
+  "preinserted_success_stage": false,
+  "chrome": "google-chrome --headless=new --dump-dom #fix="
 }

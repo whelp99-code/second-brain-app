@@ -1,4 +1,4 @@
-"""Headless Chrome against an isolated console: failed compile remains after a later run."""
+"""Headless Chrome: failed compile remains after a later browser-triggered success."""
 from __future__ import annotations
 
 import json
@@ -6,6 +6,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 from sb.pipeline import StageReport, _run_locked
 from sb.store.ledger import Ledger
@@ -21,13 +22,13 @@ def _chrome_dump(url: str, dest: Path) -> None:
             "--disable-gpu",
             "--no-sandbox",
             "--disable-dev-shm-usage",
-            "--virtual-time-budget=8000",
+            "--virtual-time-budget=12000",
             "--dump-dom",
             url,
         ],
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=40,
         check=False,
     )
     dest.write_text(done.stdout + done.stderr, encoding="utf-8")
@@ -46,39 +47,38 @@ def main() -> None:
             raise RuntimeError("token=private-value policy denied")
 
         failed = _run_locked(root, reject, "compile")
-        def recover(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
-            del ledger, vault, run_id
-            return StageReport((), 0, 0, 0, False)
-        recovered = _run_locked(root, recover, "compile")
         with _running(config) as base:
             _chrome_dump(base + "/", out / "home-after-fail.html")
             status, _before = _request(base + "/api/status")
-            run_status, run_body = _request(base + "/api/run", method="POST", payload={})
-            _chrome_dump(base + "/", out / "home-after-run.html")
+            _chrome_dump(base + "/#fix=" + quote("recovered-ok-needle"), out / "home-after-fix.html")
             status_after, after = _request(base + "/api/status")
+    stages = (after.get("recent_stages") or []) if isinstance(after, dict) else []
     evidence = {
         "failed_run_id": failed.run_id,
-        "recovered_run_id": recovered.run_id,
         "status_get": status,
-        "run_post": run_status,
-        "run_body_status": run_body.get("status") if isinstance(run_body, dict) else None,
         "status_after": status_after,
+        "run_body_status": next(
+            (row.get("status") for row in stages if isinstance(row, dict) and row.get("run_id") != failed.run_id),
+            None,
+        ),
         "failure_row_after_run": any(
             isinstance(row, dict)
             and row.get("run_id") == failed.run_id
             and row.get("status") == "failed"
             and "policy denied" in str(row.get("error", ""))
             and "private-value" not in str(row.get("error", ""))
-            for row in ((after.get("recent_stages") or []) if isinstance(after, dict) else [])
+            for row in stages
         ),
         "success_row_present": any(
             isinstance(row, dict)
-            and row.get("run_id") == recovered.run_id
+            and row.get("run_id") != failed.run_id
             and row.get("status") != "failed"
-            for row in ((after.get("recent_stages") or []) if isinstance(after, dict) else [])
+            for row in stages
         ),
         "home_mentions_console": "Second Brain" in (out / "home-after-fail.html").read_text(encoding="utf-8"),
-        "chrome": "google-chrome --headless=new --dump-dom",
+        "fix_hash_used": True,
+        "preinserted_success_stage": False,
+        "chrome": "google-chrome --headless=new --dump-dom #fix=",
     }
     (out / "evidence.json").write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(evidence, ensure_ascii=False))
