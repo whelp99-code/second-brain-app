@@ -23,7 +23,7 @@
 | B 철회/복원 | **implemented_unverified** | flock·symlink·새 키. `check-rollback-compat.py`가 store가 있을 때 `41f0751` 자동 rollback을 EXIT 2로 거부. 복구는 새 바이너리+격리 restore |
 | C 검색·문맥 | **implemented_unverified** | SQL/record Unicode 일치. `assembleModelRequest`가 확정 기억 본문·출처·버전·잔여 예산을 넣음. live 모델 **없음**. user_curated **blocked_external** |
 | D native 수명 | **blocked_external** | 인증 복사 금지. 빈 프로필은 제품 미지원으로 일반화하지 않음 |
-| E 지연/DR/GUI | **implemented_unverified** | 21s 표본, 격리 restore, HTTP 23 passed. 브라우저·timeout 목표 아님 |
+| E 지연/DR/GUI | **implemented_unverified** | MCP 3.535s. 복원 dest `remember` 16.9s. Chrome dump-dom 후 실패 행 유지. timeout 목표 아님 |
 | F 후보/런북 | **implemented_unverified** | `3d36c40` × JARVIS `eeac005` dist 게이트 EXIT 0. MCP 4프로필 3.535s. 전환 미실행 |
 | M1–M7 운영 종단 | **blocked_external** | drain_authorized=false |
 | M14 그래프 | **not_implemented** | 핵심 인수 아님. 채택 보류 |

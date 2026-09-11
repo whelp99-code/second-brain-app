@@ -1,27 +1,17 @@
 # Grok 재개 상태
 
-시각: 2026-09-11. **status=running**
+시각: 2026-09-11. **status=ready_for_final_review**
 
-마지막: `3d36c40` × JARVIS `eeac005` dist 유지보수/연동/`--work` EXIT 0. MCP check 3.535s EXIT 0. rollback-compat 2 passed.
-다음: 격리 브라우저 실패→복구, 복원 dest에서 generation 레이아웃 맞춘 새 쓰기.
+인계 A–F 독립 구현은 격리 증거까지 넣었다. Codex 최종 검증 대상: SB `3b99eff`+이 커밋, 휠 `3d36c40`, JARVIS `eeac005` dist `80e3c6a1…`.
 
-인계 [GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md](GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md) 전체 A–F/M1–M14 유지. Grok이 구현·자체 검증, Codex는 최종 독립 검증. 운영 전환/인증 복사/원격 push 없음. W4 drain 차단은 전환만 막는다.
+마지막: 복원 dest를 `share/vault`로 맞춰 `remember` EXIT 0 (16.9s). Chrome `--headless=new --dump-dom` 후 `/api/run` 실패해도 이전 compile 실패 행 유지, 토큰 없음.
 
-## 바로 할 일
+## 외부 입력 (한 묶음, 지금 전환 아님)
 
-1. `41f0751` 자동 rollback을 배포 코드·런북에서 거부하고 검증된 복구 대안을 적는다.
-2. JARVIS 요청 조립 경계를 격리에서 본문·출처·버전·예산까지 재고, live 인증과 분리한다.
-3. 코드가 바뀌면 같은 HEAD에서 새 wheel·JARVIS dist로 표준/`--work`/유지보수를 다시 돌린다.
-
-## 아직 안 끝난 독립 작업
-
-- 철회 정본 수명·복원 후 새 키 경로를 배포 계약으로 고정
-- 격리 MCP 지연/재시도, DR 복원 후 새 쓰기, 브라우저 실패→복구
-- 업무 계보/재전송 격리 수명
-- 제출서의 옛 “artifact 없음”/이전 dist 경로 정정
-
-## 진짜 외부 조건 (지금 요청하지 않음)
-
-- drain 허가, 운영 중단 창
+- drain 허가와 운영 중단 창 (W4 / M1 종단만)
 - native 클라이언트 인증 (복사 금지)
-- 사용자 지정 검색 100–300문, 실사용자 종단 업무 ID
+- live 모델 호출
+- 사용자 지정 검색 100–300문
+- 실사용자 업무 ID 종단
+
+운영 `current`는 `41f0751`. 자동 rollback은 `check-rollback-compat.py`가 거부한다.

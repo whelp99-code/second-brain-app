@@ -1,0 +1,10 @@
+{
+  "exit": 0,
+  "seconds": 16.898,
+  "inbox": "/var/tmp/sb-dr-genlayout/share/vault/inbox/2026-09-11T070302501061-after-restore.md",
+  "inbox_exists": true,
+  "generation_json": true,
+  "vault_is_share_vault": true,
+  "candidate": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+  "production_touched": false
+}
