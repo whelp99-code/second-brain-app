@@ -4,33 +4,42 @@
 
 ## 현재 핀
 
-SB `39ce670` 후보 `/var/tmp/sb-candidate-39ce670/releases/0ecdb561…` wheel `0e32b787…` × JARVIS `2a95f72` `/var/tmp/jarvis-artifact-2a95f72/source/dist` inventory `452bf352…` / 34768. dispatch JS `246bca54…`. 운영 current `41f0751`. `production_activated=false`.
+SB `8d80a3a` 후보 `/var/tmp/sb-candidate-8d80a3a/releases/0ecdb561…` wheel `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` × JARVIS `f9e0791` `/var/tmp/jarvis-artifact-f9e0791/source/dist` inventory `650c79d62cba1c27c1db06cf403f8bd2ffa73dffd45f7290148dc86b655f826e` / 34768. dispatch JS `8d95e3d41880bdece0585a42242ccfa0ed82062c9e44577a63b523ff144d8456`. 운영 current `41f0751`. `production_activated=false`.
+
+## 서비스·설정·백업 해시 (소스, 운영 설치 아님)
+
+| 파일 | sha256 앞 16자 |
+|---|---|
+| deploy/systemd/second-brain.service | `40db7e1eb09a3aa7` |
+| deploy/systemd/second-brain-web.service | `e0de89ea1b3f386e` |
+| deploy/systemd/second-brain-backup.service | `7fa64a3f6505565b` |
+| deploy/systemd/second-brain.timer | `c00386c8aa07eed0` |
+| deploy/systemd/second-brain-backup.timer | `f55b568be19969bd` |
+| deploy/install-systemd-user.sh | `6b4bef87c5c140e3` |
+| deploy/check-rollback-compat.py | `7b1ec32bd66d34b2` |
+
+구버전 호환: 운영 `41f0751` 유지. 격리 복원은 runtime-backup + `.recovery` journal. 원본 anchor 없으면 `RESTORE_SOURCE_ANCHOR_MISSING`. 해시 예외로 우회하지 않음.
 
 ## 성공 / 실패 조건
 
-성공: `npx tsc --noEmit` EXIT 0, clean `rm -rf dist` 후 `npm run build`의 JS가 제출 dist와 같고, 설치 standard/work/maintenance 3게이트 EXIT 0, GJC dispatch 집중 테스트 통과, 정본 paired restore EXIT 0.
+성공: `npx tsc --noEmit` EXIT 0, clean `rm -rf dist` 후 `npm run build` JS가 제출 dist와 같고, 설치 3게이트 EXIT 0, GJC dispatch 집중 통과, same-content 2 evidence_id.
 
-실패: tsc EXIT 2를 옛 dist로 덮음, helper/stub EXIT 0을 M6/M12 인수로 사용, `RESTORE_SOURCE_ANCHOR_MISSING` 우회, 운영 current 변경.
+실패: tsc EXIT 2를 옛 dist로 덮음, helper EXIT 0을 인수, `RESTORE_SOURCE_ANCHOR_MISSING` 우회, 운영 current 변경.
 
-## 구버전 / 복구 준비
+## V1 세션 compaction (외부 조건)
 
-운영 current `41f0751`은 바꾸지 않는다. 격리 복구는 runtime-backup + `.recovery` journal 형식이다. 원본 anchor 없는 복원은 `RESTORE_SOURCE_ANCHOR_MISSING`으로 거부한다. 해시 예외로 우회하지 않는다.
+JARVIS CLI에는 모델 세션 문맥 compaction 이벤트가 없다. 제품 경로는 `gjc.connect`/`configureGjc` 후 명시적 `gjc.dispatch`. 자료삭제 compaction은 이 trigger가 아니다.
 
-검증된 격리 복구:
+## 격리 복구
 
 ```bash
 python scripts/restore-probe.py backup "$ROOT"
 python scripts/restore-probe.py journal-loss-from-backup "$ROOT"
-# JARVIS fence stdin →
 python scripts/restore-probe.py restore "$ROOT"
 node scripts/jarvis-restore-acceptance.mjs "$JARVIS_DIST"
 ```
 
-결과의 `rpo_sb.crash_loss_records`, `rto.restore_to_readable_ms`, `rto.failure_to_work_available_ms`를 사용한다. `scenario_ms`는 전체 시나리오 시간이며 RTO가 아니다.
-
-## V1 세션 compaction (외부 조건)
-
-JARVIS CLI에는 모델 세션 문맥 compaction 이벤트가 없다. 제품 경로는 `gjc.connect`/`configureGjc`로 세션을 만든 뒤 명시적 `gjc.dispatch`다. 자료삭제/correction-lane compaction은 이 trigger가 아니다. native/Orca 세션 제품이 compact/new-session에서 dispatch를 호출해야 하며, 그 입력은 이 후보에서 `blocked_external`이다.
+`rpo_jarvis.last_durable_at_ms`는 proved write 이후. `rto.failure_to_work_available_ms`는 scoped+new write. `scenario_ms`는 RTO가 아니다.
 
 ## JARVIS 클린 빌드
 
@@ -41,11 +50,9 @@ npx tsc --noEmit -p tsconfig.json
 npm run build
 ```
 
-dist에 `reader.revalidate`와 `captureFromReference` 경로가 있어야 한다. 옛 dist를 rsync로 덮지 말 것.
+dist에 `memoryEvidenceId`가 있어야 한다. 옛 dist를 덮지 말 것.
 
 ## 게이트
-
-패키지 핀의 `REL`과 `JARVIS` 경로를 사용한다.
 
 ```bash
 TMPDIR=/var/tmp python deploy/check-release-maintenance.py "$REL"
