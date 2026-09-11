@@ -1,52 +1,31 @@
 {
   "pin": {
-    "sb_source": "edd2cb5cb547c72b169e86892a0ed07f5846b776",
-    "sb_tree": "d292c0802bde3a389ae5522d744b261f370336b9",
-    "release_id": "5b9687bf912b9de314a7d4308b7e091f88d8008b",
-    "wheel_sha256": "cdcb402733993f698b138f5f5a59ccf24f035517932b93ff6144d7f505548e83",
-    "candidate": "/var/tmp/sb-candidate-edd2cb5/releases/5b9687bf912b9de314a7d4308b7e091f88d8008b",
+    "sb_source": "512a4c7",
+    "release_id": "dc493f1fd1f14fb47bf3eaa6ac9c2c9449c099e5",
+    "wheel_sha256": "0c15d2dab603bce085f49dc7fd749236d079146bf68b3e59f950420bc8b9cb9d",
+    "candidate": "/var/tmp/sb-candidate-512a4c7/releases/dc493f1fd1f14fb47bf3eaa6ac9c2c9449c099e5",
     "jarvis_source": "6ce2356",
     "jarvis_dist": "/var/tmp/jarvis-artifact-6ce2356/source/dist",
     "jarvis_artifact_digest": "sha256:2ec1f72757522e6d36f99b549c7dae4b3b787bea717395782d03964a1f104e42",
     "operational_current": "41f0751",
     "production_activated": false,
-    "supersedes": ["63bdaf6", "3d36c40", "eeac005"]
+    "supersedes": ["5b9687b", "edd2cb5", "3d36c40", "63bdaf6"]
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-5b9687b-maint.log",
+    "maintenance_log": "/var/tmp/w3-512a4c7-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-5b9687b-integ.log",
+    "integration_log": "/var/tmp/w3-512a4c7-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-5b9687b-work2.log",
-    "work_exit": 0,
-    "work_item": "REAL-WORK-ITEM-2026-09-10.json"
+    "work_log": "/var/tmp/w3-512a4c7-work.log",
+    "work_exit": 0
   },
-  "related_pytest": {
-    "files": [
-      "tests/test_compiled_marker_recovery.py",
-      "tests/test_search.py",
-      "tests/test_rollback_compat.py",
-      "tests/test_revoked_keys.py"
-    ],
-    "passed": 41
-  },
-  "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-edd2cb5.log",
-    "passed": 1820,
-    "skipped": 2,
-    "seconds": 545.98,
-    "ignore": "tests/test_embeddings.py",
-    "exit": 0
-  },
-  "r4": {
-    "live_llm_http": false,
-    "payload_bytes": 431,
-    "under_budget": true,
-    "evidence": "R4-TRANSPORT-PAYLOAD-2026-09-11.json"
-  },
+  "r4": {"live_llm_http": false, "payload_bytes": 431, "under_budget": true, "evidence": "R4-TRANSPORT-PAYLOAD-2026-09-11.json"},
   "r6": {
     "browser": "R6-BROWSER-RETRY-2026-09-11.json",
-    "mcp_retry": "R6-MCP-RETRY-RESTORE-RETRIEVE-2026-09-11.json"
+    "mcp_p50_retrieve": "R6-MCP-RETRY-RESTORE-RETRIEVE-2026-09-11.json",
+    "tiny_remember_p50": 0.5589,
+    "unsealed_scope_all_hits": 1,
+    "sealed_search_hits": 0
   },
   "old_failure_harness_preserved": "/var/tmp/codex-final-26cf158-ufpeOW"
 }
