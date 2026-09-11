@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import os
 import tempfile
 from collections.abc import Iterable
@@ -34,7 +35,15 @@ def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if not path.is_file():
         return frozenset()
-    text = path.read_text(encoding="utf-8")
+    payload = path.read_bytes()
+    if marker.is_file():
+        token = marker.read_text(encoding="utf-8").strip()
+        if token == "1":
+            if not payload.endswith(b"\n"):
+                raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+        elif token != hashlib.sha256(payload).hexdigest():
+            raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    text = payload.decode("utf-8")
     keys = frozenset(line for line in text.splitlines() if line)
     if marker.is_file() and not keys:
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
@@ -67,13 +76,19 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
         tmp_name = ""
         marker = initialized_revocation_path(state_root)
         _reject_unsafe(marker)
-        if not marker.is_file():
-            marker_fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            try:
-                os.write(marker_fd, b"1\n")
-                os.fsync(marker_fd)
-            finally:
-                os.close(marker_fd)
+        digest = hashlib.sha256(revoked_key_path(state_root).read_bytes()).hexdigest() + "\n"
+        marker_tmp = marker.with_name(marker.name + ".tmp")
+        if marker_tmp.exists() or marker_tmp.is_symlink():
+            marker_tmp.unlink(missing_ok=True)
+            if marker_tmp.is_symlink() or marker_tmp.exists():
+                raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+        marker_fd = os.open(marker_tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(marker_fd, digest.encode("ascii"))
+            os.fsync(marker_fd)
+        finally:
+            os.close(marker_fd)
+        os.replace(marker_tmp, marker)
         directory = os.open(state_root, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory)

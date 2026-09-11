@@ -8,6 +8,7 @@ import pytest
 
 from sb.revoked_keys import (
     RevocationStoreError,
+    effective_revoked_key_ids,
     initialized_revocation_path,
     load_revoked_key_ids,
     record_revoked_key_ids,
@@ -66,3 +67,13 @@ def test_truncated_initialized_store_is_unsafe(tmp_path: Path) -> None:
     revoked_key_path(tmp_path).write_text("", encoding="utf-8")
     with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
         load_revoked_key_ids(tmp_path)
+
+
+def test_partial_truncation_does_not_reactivate_revoked_key(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:other", "key:test"])
+    path = revoked_key_path(tmp_path)
+    path.write_bytes(path.read_bytes()[:-3])
+    with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
+        load_revoked_key_ids(tmp_path)
+    with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
+        effective_revoked_key_ids(tmp_path, ["key:new"])
