@@ -1,41 +1,33 @@
 {
   "pin": {
-    "sb_source": "839f718",
-    "release_id": "c5b4308e7a4277d526c8d73e7332b0450b17021d",
-    "wheel_sha256": "69b9bab0a0dc4b4a86ccde91dd4656c213ec47c2499353353a7f93b3b0548d7f",
-    "candidate": "/var/tmp/sb-candidate-839f718/releases/c5b4308e7a4277d526c8d73e7332b0450b17021d",
-    "jarvis_source": "87fc787",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-87fc787/source/dist",
-    "jarvis_inventory_sha256": "b1fed737e5b9ca91ae17326d4eefe06be55e815a1b336c12c1952419d10f5894",
-    "jarvis_inventory_entries": 34768,
+    "sb_source": "bda08041771859e129ec59c325d7fe259560ed4d",
+    "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
+    "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
+    "candidate": "/var/tmp/sb-candidate-bda0804/releases/48686de7744355ac51fa7a91807ce3160860b4d5",
+    "jarvis_source": "635b4b5",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-635b4b5/source/dist",
+    "jarvis_inventory_sha256": "827217404a053390408d0284bbc76cef003997ef69dda223ce17e252cdedf17d",
+    "jarvis_inventory_entries": 34776,
     "operational_current": "41f0751",
     "production_activated": false,
-    "supersedes": ["6ce2356", "dc493f1", "512a4c7", "5b9687b"]
+    "supersedes": ["c5b4308", "839f718", "87fc787", "d26dd7a"]
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-87fc787-maint.log",
+    "maintenance_log": "/var/tmp/w3-bda0804-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-87fc787-integ4.log",
+    "integration_log": "/var/tmp/w3-bda0804-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-87fc787-work4.log",
+    "work_log": "/var/tmp/w3-bda0804-work.log",
     "work_exit": 0
   },
   "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-e0143d4.log",
-    "passed": 1820,
+    "log": "/var/tmp/sb-full-pytest-bda0804.log",
+    "passed": 1823,
     "skipped": 2,
-    "seconds": 594.31,
+    "seconds": 604.65,
     "exit": 0
   },
-  "r4": {
-    "live_llm_http": false,
-    "evidence": "R4-TRANSPORT-SESSION-2026-09-11.json"
-  },
-  "r6": {
-    "sealed_search_hits": 1,
-    "evidence": "R6-SEALED-RETRIEVE-2026-09-11.json"
-  },
-  "m11": "M11-MCP-CORPUS-LATENCY-2026-09-11.json",
-  "old_failure_harness_preserved": "/var/tmp/codex-final-26cf158-ufpeOW",
-  "codex_final_review_requested": true
+  "related_pytest_passed": 74,
+  "codex_final_review_requested": true,
+  "old_failure_harness_preserved": "/var/tmp/codex-final-d26dd7a-uemozlpf"
 }
