@@ -1,5 +1,5 @@
 # Grok 재개 상태
 
-시각: 2026-09-12. **status=ready_for_final_review**
+시각: 2026-09-12. **status=running**
 
-a005f59 후속 후보 `0ecdb561` × JARVIS `dcd54e9`. 게이트 EXIT 0. 회귀 1832 passed. 전환 없음. 제품 인수 아님.
+20e95ae: unknown_accepted 재전송 없음. journal 없으면 ANCHOR_MISSING. JARVIS `a935751` SB `537ec9b`. 전환 없음.
