@@ -40,6 +40,20 @@ def test_human_page_without_frontmatter_still_goes_to_proposed(tmp_path: Path) -
     assert (tmp_path / "wiki" / "_proposed" / "daily-2026-09-10.md").is_file()
 
 
+def test_human_edit_of_compiled_page_without_marker_goes_to_proposed(tmp_path: Path) -> None:
+    root = ready(tmp_path)
+    dest = tmp_path / "daily" / "2026-09-10.md"
+    first = root.write_pages([_page("first")], "run-1", MemoryLedger())
+    assert first.pages == 1
+    original = dest.read_text(encoding="utf-8")
+    dest.write_text(original.replace("first", "first USER_EDIT", 1), encoding="utf-8")
+    result = root.write_pages([_page("corrected")], "run-2", MemoryLedger())
+    assert result.proposals == 1
+    assert result.pages == 0
+    assert "USER_EDIT" in dest.read_text(encoding="utf-8")
+    assert "corrected" not in dest.read_text(encoding="utf-8")
+
+
 def test_marked_human_edit_still_goes_to_proposed(tmp_path: Path) -> None:
     root = ready(tmp_path)
     dest = tmp_path / "daily" / "2026-09-10.md"

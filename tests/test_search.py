@@ -23,6 +23,12 @@ DAILY_TERM = "브리핑큐"
 KO_PATH_TERM = "한글파일명검색"
 SPACED_BODY = "은빛 나침반 절차"
 GLUED_QUERY = "은빛나침반"
+NEWLINE_BODY = "은빛\n나침반"
+NEWLINE_QUERY = "은빛나침반"
+MIXED_BODY = "alpha한글"
+MIXED_QUERY = "Alpha한글"
+SHORT_BODY = "쌀 밥"
+SHORT_QUERY = "쌀밥"
 
 
 def _put(root: Path, data: bytes) -> str:
@@ -45,6 +51,9 @@ def _seed(tmp_path: Path) -> Path:
         _page(digest, "wiki/계약-일정", "계약 일정", f"# 계약\n{KO_PATH_TERM} 가능.\n"),
         _page(digest, "daily/2026-08-26", "Brief", f"# 오늘\n{DAILY_TERM} 항목.\n"),
         _page(digest, "wiki/compass", "Compass", f"# 절차\n{SPACED_BODY}.\n"),
+        _page(digest, "wiki/newline", "Newline", f"# 줄\n{NEWLINE_BODY}.\n"),
+        _page(digest, "wiki/mixed", "Mixed", f"# 혼합\n{MIXED_BODY}.\n"),
+        _page(digest, "wiki/short", "Short", f"# 짧은\n{SHORT_BODY}.\n"),
     )
     _ = vault.write_pages(pages, "run-search", _HashLedger(root))
     stamp_knowledge(root)
@@ -86,6 +95,24 @@ def test_search_matches_glued_hangul_query_to_spaced_body(tmp_path: Path) -> Non
     index = SearchIndex(vault_root=_seed(tmp_path))
     hits = index.search(GLUED_QUERY)
     assert any(hit.page_id.endswith("compass") for hit in hits)
+
+
+def test_search_matches_hangul_across_newlines(tmp_path: Path) -> None:
+    index = SearchIndex(vault_root=_seed(tmp_path))
+    hits = index.search(NEWLINE_QUERY)
+    assert any(hit.page_id.endswith("newline") for hit in hits)
+
+
+def test_search_mixed_latin_hangul_is_casefold(tmp_path: Path) -> None:
+    index = SearchIndex(vault_root=_seed(tmp_path))
+    hits = index.search(MIXED_QUERY)
+    assert any(hit.page_id.endswith("mixed") for hit in hits)
+
+
+def test_search_short_hangul_ignores_spaces(tmp_path: Path) -> None:
+    index = SearchIndex(vault_root=_seed(tmp_path))
+    hits = index.search(SHORT_QUERY)
+    assert any(hit.page_id.endswith("short") for hit in hits)
 
 
 def test_search_returns_wiki_page_when_committed_path_contains_korean(tmp_path: Path) -> None:

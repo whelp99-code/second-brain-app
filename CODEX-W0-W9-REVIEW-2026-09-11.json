@@ -1,0 +1,53 @@
+{
+  "source_commit": "6c6bc1737d388e8fc36263297d72ab2f0f8fb74b",
+  "scope": "isolated characterization; no operational writes",
+  "marker_missing_human_edit": {
+    "preserved": false,
+    "proposals": 0,
+    "pages": 1
+  },
+  "concurrent_revocations": {
+    "persisted": [
+      "key:a"
+    ],
+    "expected": [
+      "key:a",
+      "key:b"
+    ],
+    "errors": []
+  },
+  "revocation_symlink": {
+    "regular_file_rejects_old_key": true,
+    "keys_after_symlink": [
+      "key:test"
+    ],
+    "limit": "policy key selection, not an end-to-end authorized read"
+  },
+  "search_parity": [
+    {
+      "query": "은빛나침반",
+      "body": "은빛\n나침반",
+      "sql_match": false,
+      "record_match": true
+    },
+    {
+      "query": "Alpha한글",
+      "body": "alpha한글",
+      "sql_match": false,
+      "record_match": true
+    },
+    {
+      "query": "쌀밥",
+      "body": "쌀 밥",
+      "sql_match": false,
+      "record_match": true
+    }
+  ],
+  "candidate_present": true,
+  "candidate_wheel_sha256": "dc705e8a058565fc6f98cc8d3a6ca9a62c47119b1ad8c51f9bdc7f2c6bbbb3dd",
+  "installed_equal_to_source": {
+    "vault.py": true,
+    "revoked_keys.py": true,
+    "search_query.py": true
+  }
+}

@@ -8,7 +8,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from sb.config import Config, load_config
-from sb.revoked_keys import effective_revoked_key_ids
+from sb.revoked_keys import RevocationStoreError, effective_revoked_key_ids
 from sb.source_access import SourceAccess
 
 
@@ -37,7 +37,10 @@ def scoped_policy(config: Config) -> ScopedReadPolicy:
     identity = (str(raw["principal"]), str(raw["agent"]),
                 str(raw["session"]) if "session" in raw else None, str(raw["policy_revision"]))
     _ = SourceAccess(identity[0], (), identity[3])
-    revoked = effective_revoked_key_ids(Path(config.state_root), config.revoked_jarvis_signing_key_ids)
+    try:
+        revoked = effective_revoked_key_ids(Path(config.state_root), config.revoked_jarvis_signing_key_ids)
+    except RevocationStoreError as exc:
+        raise ValueError("MEMORY_SCOPED_CONFIG_INVALID") from exc
     keys = tuple(sorted((name, value) for name, value in config.jarvis_public_keys.items()
                         if name not in revoked))
     if not keys:

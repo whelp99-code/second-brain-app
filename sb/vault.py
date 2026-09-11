@@ -18,7 +18,7 @@ from typing import Final, Protocol, cast, override
 import yaml
 
 from sb.contracts import PageSpec, SourceCite
-from sb.store import parse_compiled_by, parse_page_frontmatter
+from sb.store import parse_compiled_by
 
 BOT_NAME: Final = "second-brain-bot"
 BOT_EMAIL: Final = "sb@local"
@@ -376,10 +376,49 @@ def init_vault(root: str | Path) -> Vault:
     return Vault(root=root_path)
 
 
-def _divert_to_proposed(dest: Path, previous: str | None) -> bool:
+def _git_bytes(root: Path, *args: str) -> bytes:
+    env = os.environ.copy()
+    env.update(
+        {
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "GIT_AUTHOR_NAME": BOT_NAME,
+            "GIT_AUTHOR_EMAIL": BOT_EMAIL,
+            "GIT_COMMITTER_NAME": BOT_NAME,
+            "GIT_COMMITTER_EMAIL": BOT_EMAIL,
+        }
+    )
+    argv = (
+        "git",
+        "-c",
+        f"user.name={BOT_NAME}",
+        "-c",
+        f"user.email={BOT_EMAIL}",
+        "-c",
+        "commit.gpgsign=false",
+        *args,
+    )
+    completed = subprocess.run(argv, cwd=root, capture_output=True, check=False, env=env)
+    if completed.returncode != 0:
+        raise GitCommandError(argv=args, stderr=completed.stderr.decode(errors="replace"))
+    return completed.stdout
+
+
+def _committed_bytes_match(root: Path, dest: Path) -> bool:
+    try:
+        relative = dest.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return False
+    try:
+        return _git_bytes(root, "show", f"HEAD:{relative}") == dest.read_bytes()
+    except GitCommandError:
+        return False
+
+
+def _divert_to_proposed(root: Path, dest: Path, previous: str | None) -> bool:
     if previous is not None:
         return hashlib.sha256(dest.read_bytes()).hexdigest() != previous
-    return parse_page_frontmatter(dest.read_text(encoding="utf-8")) is None
+    return not _committed_bytes_match(root, dest)
 
 
 def _plan_writes(
@@ -404,7 +443,7 @@ def _plan_writes(
             compiled_by=f"{package_stamp}|{prompt_version}|{model_id}",
             updated=updated,
         )
-        if dest.is_file() and _divert_to_proposed(dest, ledger.last_compiled_hash(page.page_id)):
+        if dest.is_file() and _divert_to_proposed(root, dest, ledger.last_compiled_hash(page.page_id)):
             slug = page.page_id.replace("/", "-")
             proposed = _safe_rel(root, Path("wiki/_proposed") / f"{slug}.md")
             if not (proposed.is_file() and proposed.read_text(encoding="utf-8") == text):
