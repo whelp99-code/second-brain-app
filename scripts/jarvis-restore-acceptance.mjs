@@ -43,8 +43,8 @@ try {
   assert.equal(journals.journals_dropped,true);
   assert.equal(journals.journals_restored_from_backup,true);
   effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
-  const jarvisDurableAt = Date.now();
   const deleted = await effects.apply('forget',before.payload.records.find(row=>row.text.includes('DeleteAlpha')).record);
+  const jarvisDurableAt = Date.now();
   assert.equal(deleted.tombstone_sequence,1);
   const authorize = createProductionMemoryReadFence(database.authority,config,'memory_status');
   const fence = authorize(new Date());
