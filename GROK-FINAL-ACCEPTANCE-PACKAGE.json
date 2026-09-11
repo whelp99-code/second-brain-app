@@ -1,32 +1,30 @@
 {
   "pin": {
-    "sb_source": "f40291839792d6243996490e093dfdacd269c4cc",
-    "release_id": "0025ebe27ec7091c2a824d1594c51bc2537b1423",
-    "wheel_sha256": "ba7713566a93cea4bcee69a81d87e8560bb943efe897cc37269e1e2d7e3c860f",
-    "candidate": "/var/tmp/sb-candidate-missing-state/releases/0025ebe27ec7091c2a824d1594c51bc2537b1423",
-    "jarvis_source": "37b034f",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-37b034f/source/dist",
-    "jarvis_inventory_sha256": "020927977dce50e1f5dd98de59c2a5d70ae0ef7ec1ccbc0215b03f3c1ea0bc53",
-    "jarvis_inventory_entries": 34780,
+    "sb_source": "f94d0733f84b23db03a053b4be513a257211c938",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-f94d073/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "0b8ace5",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-0b8ace5/source/dist",
+    "jarvis_inventory_sha256": "501d5ba5f7677c980bd121f9a5573b5451e68a82926667b8904c22cd46a0bd24",
+    "jarvis_inventory_entries": 34779,
     "operational_current": "41f0751",
     "production_activated": false
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-f402918-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-f402918-integ.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-f402918-work.log",
-    "work_exit": 0
+    "work_exit": 0,
+    "rollback_compat_log": "/var/tmp/w3-f94d073-rollback.log",
+    "rollback_compat_exit": 0
   },
   "full_pytest": {
-    "log": "/var/tmp/sb-full-pytest-f402918.log",
-    "passed": 1830,
+    "log": "/var/tmp/sb-full-pytest-f94d073.log",
+    "passed": 1831,
     "skipped": 2,
-    "seconds": 632.33,
+    "seconds": 618.07,
     "exit": 0
   },
-  "codex_preserved_evidence": "CODEX-NIGHT-REVIEW-7d97af7.md",
   "codex_final_review_requested": true,
   "product_acceptance": false
 }
