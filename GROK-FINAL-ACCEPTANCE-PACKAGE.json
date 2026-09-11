@@ -4,30 +4,38 @@
     "release_id": "c5b4308e7a4277d526c8d73e7332b0450b17021d",
     "wheel_sha256": "69b9bab0a0dc4b4a86ccde91dd4656c213ec47c2499353353a7f93b3b0548d7f",
     "candidate": "/var/tmp/sb-candidate-839f718/releases/c5b4308e7a4277d526c8d73e7332b0450b17021d",
-    "jarvis_source": "6ce2356",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-6ce2356/source/dist",
-    "jarvis_artifact_digest": "sha256:2ec1f72757522e6d36f99b549c7dae4b3b787bea717395782d03964a1f104e42",
+    "jarvis_source": "87fc787",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-87fc787/source/dist",
+    "jarvis_inventory_sha256": "b1fed737e5b9ca91ae17326d4eefe06be55e815a1b336c12c1952419d10f5894",
+    "jarvis_inventory_entries": 34768,
     "operational_current": "41f0751",
     "production_activated": false,
-    "supersedes": ["dc493f1", "512a4c7", "5b9687b", "edd2cb5"]
+    "supersedes": ["6ce2356", "dc493f1", "512a4c7", "5b9687b"]
   },
   "gates": {
-    "maintenance_log": "/var/tmp/w3-839f718-maint.log",
+    "maintenance_log": "/var/tmp/w3-87fc787-maint.log",
     "maintenance_exit": 0,
-    "integration_log": "/var/tmp/w3-839f718-integ.log",
+    "integration_log": "/var/tmp/w3-87fc787-integ4.log",
     "integration_exit": 0,
-    "work_log": "/var/tmp/w3-839f718-work.log",
+    "work_log": "/var/tmp/w3-87fc787-work4.log",
     "work_exit": 0
   },
-  "r4": {"live_llm_http": false, "payload_bytes": 431, "under_budget": true, "evidence": "R4-TRANSPORT-PAYLOAD-2026-09-11.json"},
-  "r6": {
-    "browser": "R6-BROWSER-RETRY-2026-09-11.json",
-    "mcp_p50_retrieve": "R6-MCP-RETRY-RESTORE-RETRIEVE-2026-09-11.json",
-    "tiny_remember_p50": 0.5589,
-    "sealed_search_hits_before_deny_local_compile": 0,
-    "sealed_search_hits": 1,
-    "sealed_search_page": "wiki/inbox-2026-09-11t070302501061-after-restore-d77cfc33",
-    "m11": "M11-MCP-CORPUS-LATENCY-2026-09-11.json"
+  "full_pytest": {
+    "log": "/var/tmp/sb-full-pytest-e0143d4.log",
+    "passed": 1820,
+    "skipped": 2,
+    "seconds": 594.31,
+    "exit": 0
   },
-  "old_failure_harness_preserved": "/var/tmp/codex-final-26cf158-ufpeOW"
+  "r4": {
+    "live_llm_http": false,
+    "evidence": "R4-TRANSPORT-SESSION-2026-09-11.json"
+  },
+  "r6": {
+    "sealed_search_hits": 1,
+    "evidence": "R6-SEALED-RETRIEVE-2026-09-11.json"
+  },
+  "m11": "M11-MCP-CORPUS-LATENCY-2026-09-11.json",
+  "old_failure_harness_preserved": "/var/tmp/codex-final-26cf158-ufpeOW",
+  "codex_final_review_requested": true
 }
