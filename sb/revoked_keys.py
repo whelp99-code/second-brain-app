@@ -37,17 +37,25 @@ def _digest_hex(payload: bytes) -> str:
 def _write_marker(marker: Path, digest_hex: str) -> None:
     _reject_unsafe(marker)
     marker_tmp = marker.with_name(marker.name + ".tmp")
-    if marker_tmp.exists() or marker_tmp.is_symlink():
-        marker_tmp.unlink(missing_ok=True)
-        if marker_tmp.is_symlink() or marker_tmp.exists():
-            raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
-    marker_fd = os.open(marker_tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    try:
-        os.write(marker_fd, (digest_hex + "\n").encode("ascii"))
-        os.fsync(marker_fd)
-    finally:
-        os.close(marker_fd)
-    os.replace(marker_tmp, marker)
+    last_error: OSError | None = None
+    for _ in range(3):
+        try:
+            marker_tmp.unlink(missing_ok=True)
+        except FileNotFoundError:
+            pass
+        try:
+            marker_fd = os.open(marker_tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        except FileExistsError as exc:
+            last_error = exc
+            continue
+        try:
+            os.write(marker_fd, (digest_hex + "\n").encode("ascii"))
+            os.fsync(marker_fd)
+        finally:
+            os.close(marker_fd)
+        os.replace(marker_tmp, marker)
+        return
+    raise RevocationStoreError("REVOCATION_STORE_UNSAFE") from last_error
 
 
 def _recover_journal(state_root: Path) -> None:
@@ -67,15 +75,17 @@ def _recover_journal(state_root: Path) -> None:
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if path.is_file() and _digest_hex(path.read_bytes()) == jdigest:
         _write_marker(marker, jdigest)
-        journal.unlink()
+        try:
+            journal.unlink()
+        except FileNotFoundError:
+            pass
 
 
-def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
+def _read_keys(state_root: Path) -> frozenset[str]:
     path = revoked_key_path(state_root)
     marker = initialized_revocation_path(state_root)
     _reject_unsafe(path)
     _reject_unsafe(marker)
-    _recover_journal(state_root)
     if marker.is_file() and not path.is_file():
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if not path.is_file():
@@ -92,6 +102,17 @@ def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
     return keys
 
 
+def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
+    lock_path = state_root / ".revoked.lock"
+    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        _recover_journal(state_root)
+        return _read_keys(state_root)
+    finally:
+        os.close(lock_fd)
+
+
 def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
     incoming = {item for item in key_ids if item}
     if not incoming:
@@ -105,7 +126,7 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
         _recover_journal(state_root)
-        merged = sorted(load_revoked_key_ids(state_root) | incoming)
+        merged = sorted(_read_keys(state_root) | incoming)
         payload = ("\n".join(merged) + "\n").encode()
         digest = _digest_hex(payload)
         journal = revocation_journal_path(state_root)
@@ -127,7 +148,10 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
         os.replace(tmp_name, revoked_key_path(state_root))
         tmp_name = ""
         _write_marker(initialized_revocation_path(state_root), digest)
-        journal.unlink()
+        try:
+            journal.unlink()
+        except FileNotFoundError:
+            pass
         directory = os.open(state_root, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory)

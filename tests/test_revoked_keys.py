@@ -97,3 +97,28 @@ def test_interrupted_marker_update_recovers_then_retry_records(tmp_path: Path) -
     assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b"})
     record_revoked_key_ids(tmp_path, ["key:c"])
     assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b", "key:c"})
+
+
+def test_concurrent_journal_recover_does_not_raise_file_not_found(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:a"])
+    payload = b"key:a\nkey:b\n"
+    digest = __import__("hashlib").sha256(payload).hexdigest()
+    revocation_journal_path(tmp_path).write_bytes((digest + "\n").encode("ascii") + payload)
+    revoked_key_path(tmp_path).write_bytes(payload)
+    errors: list[str] = []
+    start = Barrier(2)
+
+    def reader() -> None:
+        start.wait()
+        try:
+            load_revoked_key_ids(tmp_path)
+        except (OSError, RevocationStoreError) as exc:
+            errors.append(type(exc).__name__)
+
+    threads = [Thread(target=reader), Thread(target=reader)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b"})
