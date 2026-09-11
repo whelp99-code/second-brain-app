@@ -2,6 +2,4 @@
 
 시각: 2026-09-11. **status=running**
 
-M11: 후보 `c5b4308` MCP 소/중/대 30/100/300 페이지 p50/p95 기록. 권한은 scoped library. JSON sealed_search_hits=1로 맞춤.
-
-다음: R4 인증 없는 transport 연결 보강(live LLM은 외부). 전환 없음.
+R4: JARVIS `87fc787` `sendAssembledModelRequest` + `RecordingModelTransport`. 전송 직전 JSON 431B, query/본문/출처/version, no_data 세션. persist 경로가 같은 prepare를 쓴다. live LLM 없음. 전환 없음.

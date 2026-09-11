@@ -27,7 +27,7 @@
 | R1 | verified 격리 | 커밋된 손편집 제안. HEAD seeding 없음 |
 | R2 | verified 격리 | 철회 store 유실 fail-closed. CLI/MCP/취소 |
 | R3 | verified 격리 | symlink rollback EXIT 2 |
-| R4 | implemented_unverified | 전송 직전 JSON 431B, 본문·출처·sha256, 예산 내. **live LLM HTTP 없음** |
+| R4 | implemented_unverified | 격리 `RecordingModelTransport` 전송 직전 JSON: query·본문·출처·version·omitted. 새 세션, untrusted/stale/no_data. persistAssembledContext가 prepareModelTransport 호출. live LLM HTTP 없음. JARVIS `87fc787` |
 | R5 | verified 격리 | compact only, Latin case/newline |
 | R6 | implemented_unverified | Chrome fail+recover. tiny p50 0.56s. MCP 재시도 EXIT 0. deny compile는 LLM 없이 로컬 페이지. 복원 dest ingest+compile 후 **sealed 기본 검색 1** (`wiki/inbox-…after-restore-d77cfc33`). 옛 scope=all 복사본은 sealed 성공이 아님 |
 | R7 | implemented_unverified | 이 핀 |

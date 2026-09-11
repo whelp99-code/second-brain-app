@@ -1,0 +1,15 @@
+{
+  "live_llm_http": false,
+  "sessions": [
+    "session:isolated",
+    "session:no-data"
+  ],
+  "bytes": 431,
+  "under_budget": true,
+  "json_has_query": true,
+  "json_has_excerpt": true,
+  "json_has_source": true,
+  "json_has_version": true,
+  "omitted": [],
+  "no_data_session": true
+}
