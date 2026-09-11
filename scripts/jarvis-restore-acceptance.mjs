@@ -113,7 +113,10 @@ try {
   const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
     restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:secondFence.tombstone_sequence,
     deleted_records:0,first_restore_surviving_records:1,model_calls:0,
-    rpo_source_generation_id:backup.source_generation_id,rto_ms:Date.now()-restoreStarted,written,
+    rpo_source_generation_id:backup.source_generation_id,
+    rpo_loss: { deleted_records:1, keep_records_at_backup:1 },
+    rto_restore_to_readable_ms: Date.now()-restoreStarted,
+    written,
     scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result));
