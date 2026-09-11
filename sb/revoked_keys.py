@@ -16,9 +16,15 @@ def revoked_key_path(state_root: Path) -> Path:
     return state_root / "revoked-jarvis-signing-key-ids"
 
 
+def initialized_revocation_path(state_root: Path) -> Path:
+    return state_root / "revoked-jarvis-signing-key-ids.initialized"
+
+
 def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
     path = revoked_key_path(state_root)
     if path.is_symlink() or (path.exists() and not path.is_file()):
+        raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    if initialized_revocation_path(state_root).is_file() and not path.is_file():
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if not path.is_file():
         return frozenset()
@@ -49,6 +55,9 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
             os.close(tmp_fd)
         os.replace(tmp_name, revoked_key_path(state_root))
         tmp_name = ""
+        marker = initialized_revocation_path(state_root)
+        if not marker.exists():
+            marker.write_text("1\n", encoding="utf-8")
         directory = os.open(state_root, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory)

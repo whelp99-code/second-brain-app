@@ -46,6 +46,10 @@ def main() -> None:
             raise RuntimeError("token=private-value policy denied")
 
         failed = _run_locked(root, reject, "compile")
+        def recover(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+            del ledger, vault, run_id
+            return StageReport((), 0, 0, 0, False)
+        recovered = _run_locked(root, recover, "compile")
         with _running(config) as base:
             _chrome_dump(base + "/", out / "home-after-fail.html")
             status, _before = _request(base + "/api/status")
@@ -54,6 +58,7 @@ def main() -> None:
             status_after, after = _request(base + "/api/status")
     evidence = {
         "failed_run_id": failed.run_id,
+        "recovered_run_id": recovered.run_id,
         "status_get": status,
         "run_post": run_status,
         "run_body_status": run_body.get("status") if isinstance(run_body, dict) else None,
@@ -64,6 +69,12 @@ def main() -> None:
             and row.get("status") == "failed"
             and "policy denied" in str(row.get("error", ""))
             and "private-value" not in str(row.get("error", ""))
+            for row in ((after.get("recent_stages") or []) if isinstance(after, dict) else [])
+        ),
+        "success_row_present": any(
+            isinstance(row, dict)
+            and row.get("run_id") == recovered.run_id
+            and row.get("status") != "failed"
             for row in ((after.get("recent_stages") or []) if isinstance(after, dict) else [])
         ),
         "home_mentions_console": "Second Brain" in (out / "home-after-fail.html").read_text(encoding="utf-8"),

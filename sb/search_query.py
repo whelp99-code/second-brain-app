@@ -78,17 +78,13 @@ class LexicalQuery:
 
     @property
     def uses_fts(self) -> bool:
-        return any(len(term) >= 3 and not _has_hangul(term) for term in self.terms)
+        return False
 
     def predicate(self) -> tuple[str, tuple[str, ...]]:
         if not self.terms:
             return "0", ()
         clauses: list[str] = []
         params: list[str] = []
-        latin = [term for term in self.terms if len(term) >= 3 and not _has_hangul(term)]
-        if latin:
-            clauses.append("docs MATCH ?")
-            params.append(" AND ".join('"' + term.replace('"', '""') + '"' for term in latin))
         for term in self.terms:
             compact = normalize(term)
             clauses.append(

@@ -1,17 +1,19 @@
 # Grok 재개 상태
 
-시각: 2026-09-11. **status=ready_for_final_review**
+시각: 2026-09-11. **status=running**
 
-인계 A–F 독립 구현은 격리 증거까지 넣었다. Codex 최종 검증 대상: SB `3b99eff`+이 커밋, 휠 `3d36c40`, JARVIS `eeac005` dist `80e3c6a1…`.
+CODEX-FINAL-REVIEW-26CF158 수신, 임시 동결 종료, R1–R7 통합 구현 재개.
 
-마지막: 복원 dest를 `share/vault`로 맞춰 `remember` EXIT 0 (16.9s). Chrome `--headless=new --dump-dom` 후 `/api/run` 실패해도 이전 compile 실패 행 유지, 토큰 없음.
+판정: `26cf158` 미통과. 구현은 Grok, 다음 고정 후보 검증은 Codex. 운영 전환/인증 복사/push 없음. 옛 실패 증거 `/var/tmp/codex-final-26cf158-ufpeOW` 보존.
 
-## 외부 입력 (한 묶음, 지금 전환 아님)
+| ID | 계획 |
+|---|---|
+| R1 | source HEAD로 marker를 만들지 않음. `.sb/compiled`만 마지막 compile. 커밋된 손편집은 제안. 무수정+marker는 정정 |
+| R2 | 모든 현재 권한 경로에 `effective_revoked_key_ids`. store 유실·비정상은 빈 목록이 아님 |
+| R3 | symlink/dir/empty도 rollback 거부. 검사 연결. 테스트는 운영 경로 비의존 |
+| R4 | `assembleModelRequest`를 실제 요청 생성에 연결. query 포함 직렬화 예산 |
+| R5 | Latin FTS MATCH와 compact를 AND로 묶지 않음 |
+| R6 | 브라우저 실패→수정→재실행 성공 + 이력. 복원 후 쓰기/회수 |
+| R7 | 한 소스·한 wheel·한 JARVIS. M1–M14 개별 상태 |
 
-- drain 허가와 운영 중단 창 (W4 / M1 종단만)
-- native 클라이언트 인증 (복사 금지)
-- live 모델 호출
-- 사용자 지정 검색 100–300문
-- 실사용자 업무 ID 종단
-
-운영 `current`는 `41f0751`. 자동 rollback은 `check-rollback-compat.py`가 거부한다.
+다음: R1 소스 HEAD seeding 제거.

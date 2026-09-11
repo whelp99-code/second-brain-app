@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 
 from sb.config import Config
 from sb.request_executor import ExecutorConfig, RequestExecutor
+from sb.revoked_keys import effective_revoked_key_ids
 from sb.scoped_provider_runtime import configured_scoped_provider_authority
 from sb.task30_barriers import UnixBarrierSink
 
@@ -27,10 +28,11 @@ def apply_requests_once(config: Config, control_path: str | None) -> int:
         print("REQUEST_EXECUTOR_KEY_CONFIG_INVALID", file=sys.stderr)
         return 1
     try:
+        revoked = effective_revoked_key_ids(Path(config.state_root), config.revoked_jarvis_signing_key_ids)
         jarvis_keys = {
             key_id: Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(encoded + "=="))
             for key_id, encoded in configured_jarvis_keys.items()
-            if key_id not in config.revoked_jarvis_signing_key_ids
+            if key_id not in revoked
         }
         external_keys = {
             key_id: Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(encoded + "=="))

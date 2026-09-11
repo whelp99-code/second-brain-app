@@ -325,11 +325,18 @@ def build_server(
     configured_keys = config.jarvis_public_keys
     if configured_keys:
         try:
-            public_keys = {
-                key_id: Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(encoded + "=="))
-                for key_id, encoded in configured_keys.items()
-                if key_id not in config.revoked_jarvis_signing_key_ids
-            }
+            from sb.revoked_keys import RevocationStoreError, effective_revoked_key_ids
+            try:
+                revoked = effective_revoked_key_ids(Path(config.state_root), config.revoked_jarvis_signing_key_ids)
+            except RevocationStoreError:
+                revoked = frozenset(config.revoked_jarvis_signing_key_ids)
+                public_keys = None
+            else:
+                public_keys = {
+                    key_id: Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(encoded + "=="))
+                    for key_id, encoded in configured_keys.items()
+                    if key_id not in revoked
+                }
         except ValueError:
             public_keys = None
 

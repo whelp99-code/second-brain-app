@@ -50,7 +50,8 @@ def release_reads_revocation_store(release: Path) -> bool:
 
 def revocation_store_present(state_root: Path) -> bool:
     path = state_root / "revoked-jarvis-signing-key-ids"
-    return path.is_file() and not path.is_symlink() and path.stat().st_size > 0
+    initialized = state_root / "revoked-jarvis-signing-key-ids.initialized"
+    return initialized.is_file() or path.exists() or path.is_symlink()
 
 
 def check_rollback(state_root: Path, previous_release: Path) -> dict[str, object]:

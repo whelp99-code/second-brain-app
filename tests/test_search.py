@@ -33,6 +33,12 @@ NBSP_BODY = "은빛\u00a0나침반"
 IDEO_BODY = "은빛\u3000나침반"
 CASEFOLD_BODY = "Straße한글"
 CASEFOLD_QUERY = "STRASSE한글"
+LATIN_CASE_BODY = "Straße"
+LATIN_CASE_QUERY = "STRASSE"
+LATIN_NL_BODY = "alpha\nbeta"
+LATIN_NL_QUERY = "alphabeta"
+QUOTE_BODY = "north\nstar"
+QUOTE_QUERY = '"north star"'
 
 
 def _put(root: Path, data: bytes) -> str:
@@ -61,6 +67,9 @@ def _seed(tmp_path: Path) -> Path:
         _page(digest, "wiki/nbsp", "Nbsp", f"# 공백\n{NBSP_BODY}.\n"),
         _page(digest, "wiki/ideo", "Ideo", f"# 전각\n{IDEO_BODY}.\n"),
         _page(digest, "wiki/casefold", "Case", f"# 접기\n{CASEFOLD_BODY}.\n"),
+        _page(digest, "wiki/latin-case", "LatinCase", f"# latin\n{LATIN_CASE_BODY}.\n"),
+        _page(digest, "wiki/latin-nl", "LatinNl", f"# nl\n{LATIN_NL_BODY}.\n"),
+        _page(digest, "wiki/quote", "Quote", f"# quote\n{QUOTE_BODY}.\n"),
     )
     _ = vault.write_pages(pages, "run-search", _HashLedger(root))
     stamp_knowledge(root)
@@ -133,6 +142,13 @@ def test_search_unicode_casefold_matches_eszett(tmp_path: Path) -> None:
     index = SearchIndex(vault_root=_seed(tmp_path))
     hits = index.search(CASEFOLD_QUERY)
     assert any(hit.page_id.endswith("casefold") for hit in hits)
+
+
+def test_search_latin_casefold_and_newline_without_fts_and(tmp_path: Path) -> None:
+    index = SearchIndex(vault_root=_seed(tmp_path))
+    assert any(hit.page_id.endswith("latin-case") for hit in index.search(LATIN_CASE_QUERY))
+    assert any(hit.page_id.endswith("latin-nl") for hit in index.search(LATIN_NL_QUERY))
+    assert any(hit.page_id.endswith("quote") for hit in index.search(QUOTE_QUERY))
 
 
 def test_search_returns_wiki_page_when_committed_path_contains_korean(tmp_path: Path) -> None:

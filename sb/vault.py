@@ -203,6 +203,8 @@ class Vault:
             for dest, text, kind, page_id in jobs:
                 _atomic_write(dest, text)
                 written.append(dest)
+                if kind != "proposal":
+                    _write_compiled_marker(self.root, page_id, dest)
                 if kind == "proposal":
                     slug = page_id.replace("/", "-")
                     self.append_log(f"human-edit: {page_id} -> wiki/_proposed/{slug}.md")
@@ -413,6 +415,14 @@ def _committed_bytes_match(root: Path, dest: Path) -> bool:
         return _git_bytes(root, "show", f"HEAD:{relative}") == dest.read_bytes()
     except GitCommandError:
         return False
+
+
+def _write_compiled_marker(root: Path, page_id: str, dest: Path) -> None:
+    compiled = root / ".sb" / "compiled"
+    compiled.mkdir(parents=True, exist_ok=True, mode=0o700)
+    marker = compiled / f"{page_id.replace('/', '_')}.sha"
+    marker.write_text(hashlib.sha256(dest.read_bytes()).hexdigest(), encoding="utf-8")
+    marker.chmod(0o600)
 
 
 def _divert_to_proposed(root: Path, dest: Path, previous: str | None) -> bool:

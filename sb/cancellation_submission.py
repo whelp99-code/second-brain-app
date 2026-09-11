@@ -13,6 +13,7 @@ from sb.correction_cancellation import parse_correction_cancellation_intent
 from sb.correction_cancellation_requests import accept_correction_cancellation
 from sb.effect_values import JsonObject, JsonValue, format_instant
 from sb.generation_runtime import GenerationMutationService
+from sb.revoked_keys import RevocationStoreError, effective_revoked_key_ids
 
 
 class CancellationSubmissionError(RuntimeError):
@@ -53,14 +54,15 @@ def cancellation_authority(config: Config, load_authority: Callable[[], Config])
             if not isinstance(keys, Mapping) or not keys or any(
                 not isinstance(encoded, str) for encoded in keys.values()):
                 raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE")
-        revoked = current.raw.get("revoked_jarvis_signing_key_ids", [])
-        if not isinstance(revoked, list) or any(not isinstance(key, str) for key in revoked):
-            raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE")
+        try:
+            revoked = effective_revoked_key_ids(Path(current.state_root), current.revoked_jarvis_signing_key_ids)
+        except RevocationStoreError as exc:
+            raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE") from exc
         historical = {key: Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True))
             for key, encoded in current.jarvis_public_keys.items()}
         active = {key: Ed25519PublicKey.from_public_bytes(base64.b64decode(encoded + "=" * (-len(encoded) % 4), altchars=b"-_", validate=True))
             for key, encoded in current.cancellation_public_keys.items()
-            if key not in current.revoked_jarvis_signing_key_ids}
+            if key not in revoked}
         return historical, active
     except (OSError, ValueError) as exc:
         raise CancellationSubmissionError("CANCELLATION_AUTHORITY_UNAVAILABLE") from exc

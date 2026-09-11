@@ -35,6 +35,13 @@ def test_concurrent_records_keep_both_keys(tmp_path: Path) -> None:
     assert load_revoked_key_ids(tmp_path) == frozenset({"key:one", "key:two"})
 
 
+def test_missing_store_after_init_is_unsafe(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:gone"])
+    revoked_key_path(tmp_path).unlink()
+    with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
+        load_revoked_key_ids(tmp_path)
+
+
 def test_symlink_revocation_file_is_unsafe(tmp_path: Path) -> None:
     target = tmp_path / "other"
     target.write_text("key:other\n", encoding="utf-8")
