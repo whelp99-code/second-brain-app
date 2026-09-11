@@ -1,56 +1,63 @@
 # 핀 복구 런북 (운영 전환 아님)
 
-후보를 재현하거나 실패 핀에서 되돌릴 때. **current를 바꾸지 않는다.**
+**current를 바꾸지 않는다.** 운영 current `41f0751` 유지는 구버전 호환 증거가 아니다.
 
-## 현재 핀
+## Full pin
 
-SB `8d80a3a` 후보 `/var/tmp/sb-candidate-8d80a3a/releases/0ecdb561…` wheel `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` × JARVIS `f9e0791` `/var/tmp/jarvis-artifact-f9e0791/source/dist` inventory `650c79d62cba1c27c1db06cf403f8bd2ffa73dffd45f7290148dc86b655f826e` / 34768. dispatch JS `8d95e3d41880bdece0585a42242ccfa0ed82062c9e44577a63b523ff144d8456`. 운영 current `41f0751`. `production_activated=false`.
+```bash
+REL=/var/tmp/sb-candidate-f921979/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+JARVIS=/var/tmp/jarvis-artifact-e7088b3/source/dist
+ROOT=/var/tmp/sb-jarvis-restore-PdT941
+FENCE=$ROOT/trusted-fence.json
+BACKUP=$ROOT/jarvis-authority-backup/jarvis-rehearsal.sqlite
+```
 
-## 서비스·설정·백업 해시 (소스, 운영 설치 아님)
-
-| 파일 | sha256 앞 16자 |
+| 항목 | 값 |
 |---|---|
-| deploy/systemd/second-brain.service | `40db7e1eb09a3aa7` |
-| deploy/systemd/second-brain-web.service | `e0de89ea1b3f386e` |
-| deploy/systemd/second-brain-backup.service | `7fa64a3f6505565b` |
-| deploy/systemd/second-brain.timer | `c00386c8aa07eed0` |
-| deploy/systemd/second-brain-backup.timer | `f55b568be19969bd` |
-| deploy/install-systemd-user.sh | `6b4bef87c5c140e3` |
-| deploy/check-rollback-compat.py | `7b1ec32bd66d34b2` |
+| SB source | `f921979d53b9bd14a1af6317d2e219c54723e541` |
+| wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
+| JARVIS | `e7088b3e220698d50c5a4bd8a52e6f9f9283e491` |
+| inventory | `a833c70b78560c24e237ba9627c29336cfd9ba14db2a453733322bae74ec371f` / 34768 |
+| backup.js | `8e85f8c648aff78f223412628c4507c1c012dd14b487273c8972bd135a714bdc` |
+| fixture config.toml | `f33d28b278a91dad8735c7ad8fe61e684e6522f343932c346453fc9806b0fd14` |
+| JARVIS authority backup | `eb35bb6f27dc553793391ee1aed3b0f3ec3b147fd90a31168aa10ff080b89a67` |
+| production_activated | false |
 
-구버전 호환: 운영 `41f0751` 유지. 격리 복원은 runtime-backup + `.recovery` journal. 원본 anchor 없으면 `RESTORE_SOURCE_ANCHOR_MISSING`. 해시 예외로 우회하지 않음.
+## 같은 fixture 복구 명령
 
-## 성공 / 실패 조건
-
-성공: `npx tsc --noEmit` EXIT 0, clean `rm -rf dist` 후 `npm run build` JS가 제출 dist와 같고, 설치 3게이트 EXIT 0, GJC dispatch 집중 통과, same-content 2 evidence_id.
-
-실패: tsc EXIT 2를 옛 dist로 덮음, helper EXIT 0을 인수, `RESTORE_SOURCE_ANCHOR_MISSING` 우회, 운영 current 변경.
-
-## V1 세션 compaction (외부 조건)
-
-JARVIS CLI에는 모델 세션 문맥 compaction 이벤트가 없다. 제품 경로는 `gjc.connect`/`configureGjc` 후 명시적 `gjc.dispatch`. 자료삭제 compaction은 이 trigger가 아니다.
-
-## 격리 복구
+신뢰 fence는 harness가 `$FENCE`에 쓴다. stdin으로 전달한다.
 
 ```bash
-python scripts/restore-probe.py backup "$ROOT"
-python scripts/restore-probe.py journal-loss-from-backup "$ROOT"
-python scripts/restore-probe.py restore "$ROOT"
-node scripts/jarvis-restore-acceptance.mjs "$JARVIS_DIST"
+# SB restore (anchor 있는 runtime-backup)
+python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
+
+# writer lease ≠ 빈 큐
+python scripts/writer-lease-on-root.py "$ROOT"
+
+# JARVIS sqlite restore (격리 backupSqlite 산출물)
+# dest는 운영 ~/.local 이 아닌 fixture 경로만
+node --input-type=module -e "
+import {restoreSqlite} from '$JARVIS/src/personal-os-backup.js';
+restoreSqlite({backupPath: process.env.BACKUP, destPath: process.env.DEST});
+"
 ```
 
-`rpo_jarvis.last_durable_at_ms`는 proved write 이후. `rto.failure_to_work_available_ms`는 scoped+new write. `scenario_ms`는 RTO가 아니다.
-
-## JARVIS 클린 빌드
+새 ROOT를 만들지 말고 위 `$ROOT`를 이어 쓴다. 재생성은:
 
 ```bash
-cd /home/jm/orca/projects/Orca-JARVIS
-rm -rf dist
-npx tsc --noEmit -p tsconfig.json
-npm run build
+TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs "$JARVIS"
 ```
 
-dist에 `memoryEvidenceId`가 있어야 한다. 옛 dist를 덮지 말 것.
+## 안전 거부
+
+- 원본 anchor 없음: `RESTORE_SOURCE_ANCHOR_MISSING`
+- 비 sqlite 백업: `E_RESTORE_FAILED`
+- 운영 경로 backup/restore: `E_BACKUP_PATH` / `E_PROTECTED_ROOT`
+- 구버전 rollback, revocation store를 못 읽는 대상: `check-rollback-compat.py` `allowed:false`
+
+## Writer lease
+
+`scripts/writer-lease-on-root.py`는 `generation.lock` exclusive를 잡은 뒤 두 번째 획득이 `GENERATION_WRITER_BUSY`인지 본다. `queue_depth>0`이고 `empty_queue=false`다. pipeline `.sb/run.lock` already_running/빈 큐와 구분한다.
 
 ## 게이트
 
