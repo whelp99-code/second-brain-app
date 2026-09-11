@@ -208,8 +208,20 @@ def main() -> None:
             concurrent = anyio.run(_concurrent, command, config, root, NEEDLE)
             retry = anyio.run(_retry, command, config, root, NEEDLE)
             new_needle = f"M11Corrected-{label}"
-            vault = (root / "share/vault").resolve()
-            corrected_page = _correct_existing_page(vault, new_needle)
+            def _rewrite(folder: Path, text: str = new_needle) -> None:
+                wiki = folder / "wiki"
+                for page in sorted(wiki.glob("*.md")):
+                    body = page.read_text(encoding="utf-8")
+                    if NEEDLE not in body:
+                        continue
+                    page.write_text(body.replace(NEEDLE, text), encoding="utf-8")
+                    return
+                raise RuntimeError("needle page missing")
+            service.mutate(GenerationMutation(
+                f"m11:{label}:correct", GenerationOperation.REMEMBER, datetime.now(UTC),
+                GenerationAuthority(None, None), _rewrite,
+            ))
+            corrected_page = new_needle
             after, after_last, _ = anyio.run(_search_times, command, config, root, new_needle, 1)
             _stale_times, stale_last, _ = anyio.run(_search_times, command, config, root, NEEDLE, 1)
             sizes[label] = {
