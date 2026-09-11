@@ -21,9 +21,53 @@ def initialized_revocation_path(state_root: Path) -> Path:
     return state_root / "revoked-jarvis-signing-key-ids.initialized"
 
 
+def revocation_journal_path(state_root: Path) -> Path:
+    return state_root / "revoked-jarvis-signing-key-ids.journal"
+
+
 def _reject_unsafe(path: Path) -> None:
     if path.is_symlink() or (path.exists() and not path.is_file()):
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+
+
+def _digest_hex(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _write_marker(marker: Path, digest_hex: str) -> None:
+    _reject_unsafe(marker)
+    marker_tmp = marker.with_name(marker.name + ".tmp")
+    if marker_tmp.exists() or marker_tmp.is_symlink():
+        marker_tmp.unlink(missing_ok=True)
+        if marker_tmp.is_symlink() or marker_tmp.exists():
+            raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    marker_fd = os.open(marker_tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        os.write(marker_fd, (digest_hex + "\n").encode("ascii"))
+        os.fsync(marker_fd)
+    finally:
+        os.close(marker_fd)
+    os.replace(marker_tmp, marker)
+
+
+def _recover_journal(state_root: Path) -> None:
+    journal = revocation_journal_path(state_root)
+    path = revoked_key_path(state_root)
+    marker = initialized_revocation_path(state_root)
+    _reject_unsafe(journal)
+    if not journal.is_file():
+        return
+    raw = journal.read_bytes()
+    split = raw.find(b"\n")
+    if split < 0:
+        raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    jdigest = raw[:split].decode("ascii").strip()
+    jpayload = raw[split + 1 :]
+    if _digest_hex(jpayload) != jdigest:
+        raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
+    if path.is_file() and _digest_hex(path.read_bytes()) == jdigest:
+        _write_marker(marker, jdigest)
+        journal.unlink()
 
 
 def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
@@ -31,6 +75,7 @@ def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
     marker = initialized_revocation_path(state_root)
     _reject_unsafe(path)
     _reject_unsafe(marker)
+    _recover_journal(state_root)
     if marker.is_file() and not path.is_file():
         raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     if not path.is_file():
@@ -38,10 +83,7 @@ def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
     payload = path.read_bytes()
     if marker.is_file():
         token = marker.read_text(encoding="utf-8").strip()
-        if token == "1":
-            if not payload.endswith(b"\n"):
-                raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
-        elif token != hashlib.sha256(payload).hexdigest():
+        if token == "1" or token != _digest_hex(payload):
             raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
     text = payload.decode("utf-8")
     keys = frozenset(line for line in text.splitlines() if line)
@@ -62,8 +104,18 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
     tmp_name = ""
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        _recover_journal(state_root)
         merged = sorted(load_revoked_key_ids(state_root) | incoming)
         payload = ("\n".join(merged) + "\n").encode()
+        digest = _digest_hex(payload)
+        journal = revocation_journal_path(state_root)
+        _reject_unsafe(journal)
+        journal_fd = os.open(journal, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        try:
+            os.write(journal_fd, (digest + "\n").encode("ascii") + payload)
+            os.fsync(journal_fd)
+        finally:
+            os.close(journal_fd)
         tmp_fd, tmp_name = tempfile.mkstemp(prefix=".revoked-", suffix=".tmp", dir=str(state_root))
         try:
             written = os.write(tmp_fd, payload)
@@ -74,21 +126,8 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
             os.close(tmp_fd)
         os.replace(tmp_name, revoked_key_path(state_root))
         tmp_name = ""
-        marker = initialized_revocation_path(state_root)
-        _reject_unsafe(marker)
-        digest = hashlib.sha256(revoked_key_path(state_root).read_bytes()).hexdigest() + "\n"
-        marker_tmp = marker.with_name(marker.name + ".tmp")
-        if marker_tmp.exists() or marker_tmp.is_symlink():
-            marker_tmp.unlink(missing_ok=True)
-            if marker_tmp.is_symlink() or marker_tmp.exists():
-                raise RevocationStoreError("REVOCATION_STORE_UNSAFE")
-        marker_fd = os.open(marker_tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-        try:
-            os.write(marker_fd, digest.encode("ascii"))
-            os.fsync(marker_fd)
-        finally:
-            os.close(marker_fd)
-        os.replace(marker_tmp, marker)
+        _write_marker(initialized_revocation_path(state_root), digest)
+        journal.unlink()
         directory = os.open(state_root, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory)

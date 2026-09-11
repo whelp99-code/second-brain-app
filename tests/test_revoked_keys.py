@@ -12,6 +12,7 @@ from sb.revoked_keys import (
     initialized_revocation_path,
     load_revoked_key_ids,
     record_revoked_key_ids,
+    revocation_journal_path,
     revoked_key_path,
 )
 
@@ -77,3 +78,22 @@ def test_partial_truncation_does_not_reactivate_revoked_key(tmp_path: Path) -> N
         load_revoked_key_ids(tmp_path)
     with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
         effective_revoked_key_ids(tmp_path, ["key:new"])
+
+
+def test_legacy_marker_missing_complete_line_is_unsafe(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:other", "key:test"])
+    initialized_revocation_path(tmp_path).write_text("1\n", encoding="utf-8")
+    revoked_key_path(tmp_path).write_text("key:other\n", encoding="utf-8")
+    with pytest.raises(RevocationStoreError, match="REVOCATION_STORE_UNSAFE"):
+        load_revoked_key_ids(tmp_path)
+
+
+def test_interrupted_marker_update_recovers_then_retry_records(tmp_path: Path) -> None:
+    record_revoked_key_ids(tmp_path, ["key:a"])
+    payload = b"key:a\nkey:b\n"
+    digest = __import__("hashlib").sha256(payload).hexdigest()
+    revocation_journal_path(tmp_path).write_bytes((digest + "\n").encode("ascii") + payload)
+    revoked_key_path(tmp_path).write_bytes(payload)
+    assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b"})
+    record_revoked_key_ids(tmp_path, ["key:c"])
+    assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b", "key:c"})

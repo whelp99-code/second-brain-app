@@ -7,6 +7,7 @@ import math
 import os
 import resource
 import statistics
+import subprocess
 import tempfile
 import time
 from datetime import UTC, datetime
@@ -62,14 +63,55 @@ def _seed(folder: Path, pages: int) -> None:
         )
 
 
-async def _search_times(command: str, config: Path, cwd: Path, query: str, samples: int) -> tuple[list[float], dict[str, object]]:
+def _server_rss_kib(client: object) -> int | None:
+    session = getattr(client, "_session", None)
+    proc = getattr(session, "_proc", None) or getattr(client, "_process", None)
+    pid = getattr(proc, "pid", None)
+    if not isinstance(pid, int):
+        return None
+    status = Path(f"/proc/{pid}/status")
+    if not status.is_file():
+        return None
+    for line in status.read_text(encoding="utf-8").splitlines():
+        if line.startswith("VmRSS:"):
+            return int(line.split()[1])
+    return None
+
+
+def _correct_existing_page(folder: Path, new_text: str) -> str:
+    wiki = folder / "wiki"
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "sb",
+        "GIT_AUTHOR_EMAIL": "sb@local",
+        "GIT_COMMITTER_NAME": "sb",
+        "GIT_COMMITTER_EMAIL": "sb@local",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_SYSTEM": os.devnull,
+    }
+    for page in sorted(wiki.glob("*.md")):
+        body = page.read_text(encoding="utf-8")
+        if NEEDLE not in body:
+            continue
+        page.write_text(body.replace(NEEDLE, new_text), encoding="utf-8")
+        rel = str(page.relative_to(folder))
+        subprocess.run(["git", "-C", str(folder), "add", "--", rel], check=True, env=env)
+        subprocess.run(["git", "-C", str(folder), "commit", "-m", "correct existing memory", "--no-gpg-sign"],
+                       check=True, env=env, capture_output=True, text=True)
+        return page.stem
+    raise RuntimeError("needle page missing")
+
+
+async def _search_times(command: str, config: Path, cwd: Path, query: str, samples: int) -> tuple[list[float], dict[str, object], int | None]:
     params = StdioServerParameters(
         command=command, args=[], cwd=str(cwd),
         env={**os.environ, "SB_CONFIG": str(config), "TMPDIR": "/var/tmp", "PYTHONDONTWRITEBYTECODE": "1"},
     )
     times: list[float] = []
     payload: dict[str, object] = {}
+    rss: int | None = None
     async with Client(params, mode="legacy", cache=None, read_timeout_seconds=30) as client:
+        rss = _server_rss_kib(client)
         for _ in range(samples):
             started = time.perf_counter()
             result = await client.call_tool("sb_search", {"query": query, "limit": 5})
@@ -78,7 +120,7 @@ async def _search_times(command: str, config: Path, cwd: Path, query: str, sampl
                 raise RuntimeError(str(result))
             times.append(elapsed)
             payload = dict(result.structured_content or {})
-    return times, payload
+    return times, payload, rss
 
 
 async def _concurrent(command: str, config: Path, cwd: Path, query: str) -> list[float]:
@@ -161,22 +203,15 @@ def main() -> None:
                 GenerationAuthority(None, None), lambda folder, count=pages: _seed(folder, count),
             ))
             config = _write_config(root)
-            times, last = anyio.run(_search_times, command, config, root, NEEDLE, SAMPLES)
+            times, last, server_rss = anyio.run(_search_times, command, config, root, NEEDLE, SAMPLES)
             hits = _page_ids(last)
             concurrent = anyio.run(_concurrent, command, config, root, NEEDLE)
             retry = anyio.run(_retry, command, config, root, NEEDLE)
-            # correction: add a new page then search
             new_needle = f"M11Corrected-{label}"
-            service.mutate(GenerationMutation(
-                f"m11:{label}:correct", GenerationOperation.REMEMBER, datetime.now(UTC),
-                GenerationAuthority(None, None),
-                lambda folder, text=new_needle: materialize_remember(
-                    folder, content=text, candidate_id="memcand:pos:v1:" + hashlib.sha256(text.encode()).hexdigest(),
-                    created_at=datetime.now(UTC).isoformat(), release_sha="a" * 40,
-                    source_access=SourceAccess("principal:owner", ("project:allowed",), "policy:1"),
-                ),
-            ))
-            after, after_last = anyio.run(_search_times, command, config, root, new_needle, 1)
+            vault = (root / "share/vault").resolve()
+            corrected_page = _correct_existing_page(vault, new_needle)
+            after, after_last, _ = anyio.run(_search_times, command, config, root, new_needle, 1)
+            _stale_times, stale_last, _ = anyio.run(_search_times, command, config, root, NEEDLE, 1)
             sizes[label] = {
                 "pages": pages,
                 "root": str(root),
@@ -187,12 +222,15 @@ def main() -> None:
                 "hits": hits,
                 "concurrent_seconds": [round(value, 4) for value in concurrent],
                 "retry": retry,
+                "correction_of_existing_page": corrected_page,
                 "correction_seconds": round(after[0], 4),
                 "correction_hits": _page_ids(after_last),
+                "stale_needle_hits_after_correction": _page_ids(stale_last),
+                "mcp_server_rss_kib": server_rss,
             }
         finally:
             service.close()
-    report["peak_process_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    report["client_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     out = Path("/var/tmp/m11-mcp-corpus-latency.json")
     out.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
