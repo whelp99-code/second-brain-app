@@ -1,0 +1,10 @@
+{
+  "live_model": false,
+  "snapshot_has_excerpt": false,
+  "delivered_excerpt": true,
+  "source_id": "src:pos:v1:second-brain:primary",
+  "version": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "remaining_bytes": 4025,
+  "used_bytes": 71,
+  "command": "npx tsx /var/tmp/model-request-probe.mts"
+}

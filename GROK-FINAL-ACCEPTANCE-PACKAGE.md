@@ -20,8 +20,8 @@
 | ID | 상태 | 증거 |
 |---|---|---|
 | A 편집/정정 | **verified** (격리) | 관리형 compile `USER_EDIT` 보존·무수정 정정. probe `edit_after=true`, proposals=1 |
-| B 철회/복원 | **implemented_unverified** | flock·symlink fail-closed·새 키 회수 테스트. `41f0751` 왕복 미증. 새 JARVIS artifact 없음 |
-| C 검색 계약 | **verified** (격리 SQL/record) | NBSP/전각/Straße 일치. JARVIS 실제 모델 payload **not_implemented**. user_curated **blocked_external**. 자연어/의역 0 |
+| B 철회/복원 | **implemented_unverified** | flock·symlink·새 키. `check-rollback-compat.py`가 store가 있을 때 `41f0751` 자동 rollback을 EXIT 2로 거부. 복구는 새 바이너리+격리 restore |
+| C 검색·문맥 | **implemented_unverified** | SQL/record Unicode 일치. `assembleModelRequest`가 확정 기억 본문·출처·버전·잔여 예산을 넣음. live 모델 **없음**. user_curated **blocked_external** |
 | D native 수명 | **blocked_external** | 인증 복사 금지. 빈 프로필은 제품 미지원으로 일반화하지 않음 |
 | E 지연/DR/GUI | **implemented_unverified** | 21s 표본, 격리 restore, HTTP 23 passed. 브라우저·timeout 목표 아님 |
 | F 후보/런북 | **implemented_unverified** | `3d36c40` × 새 JARVIS dist fixture EXIT 0. 전환 미실행. `41f0751`은 철회 store 미참조 |
