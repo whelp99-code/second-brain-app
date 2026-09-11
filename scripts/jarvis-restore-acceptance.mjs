@@ -90,6 +90,8 @@ try {
   assert.equal(scoped.generation.generation_id,restored.generation_id);
   assert.match(scoped.page_content_digest,/^sha256:[0-9a-f]{64}$/);
   assert.equal(scoped.page_content_digest,peer.page_content_digest);
+  const written = JSON.parse(run('-m','tests.fixtures.jarvis_memory_provider','seed',root,'--content','post-restore-product-write'));
+  assert.equal(written.state,'proved');
   const deletedAfterRestore = await effects.apply('forget',keep.payload.records[0].record);
   assert.equal(deletedAfterRestore.tombstone_sequence,2);
   assert.equal((await read('KeepBeta')).payload.records.length,0);

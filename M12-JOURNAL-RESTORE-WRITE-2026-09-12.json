@@ -1,11 +1,13 @@
 {
-  "rpo_backup_at": "2026-09-11T19:25:11.094377+00:00",
-  "rto_seconds": 3.7105,
+  "rpo_backup_at": "2026-09-11T19:43:59.043506+00:00",
+  "rto_seconds": 3.7378,
   "restore_generation": "sbgen:v1:d48ec86cd04d52b363c483c2968a5c81ec3bd2641610613abb2f15efd858d6d8",
-  "write_generation": "sbgen:v1:466129c98b2f1134145a35279a6ca9f8f89a6b42b1f6db6924191ceb897ce650",
+  "write_generation": "sbgen:v1:646982e840cef7467e9b8774c59dc1886f932e6892baf545d3acbcf397350ae6",
+  "applied_state": "proved",
+  "accepted_request_id": "memreq:pos:v1:e780e762e0c85216b84300e4724d4be6ded51f768d16e5c66544cda94ed89d64",
   "blocked_matches": 0,
   "post_pages": [
-    "wiki/memory-37bb73feb3adc135ed6d2339aff32ba305f95d4a91d67aee51d987e500e9fe39.md"
+    "wiki/memory-fe983941ad36347e8fb65d16833a9b6907f1b259db01691c7706df04eb7b574c.md"
   ],
   "tombstone_sequence": 1,
   "cutover": false
