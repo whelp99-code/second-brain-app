@@ -4,7 +4,7 @@
 
 > **6fb150b 재검토:** [수정 재확인 및 남은 작업](/home/jm/orca/projects/second-brain-app/CODEX-6FB150B-RECHECK-2026-09-11.md). 기존 4개 지적의 구체 사례는 개선됐고 관련 97개 테스트가 통과했다. 그러나 실제 관리형 `run_compile` staging에서 손편집 유실이 재현되며 Unicode 공백/casefold 검색 불일치도 남는다. `0eefce7`은 옛 코드이므로 전환 보류, 새 wheel 전에 두 잔여 결함을 해결한다. 아래 이전 검토는 해당 소스 시점의 이력이다.
 
-> **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀 `0ecdb561` × JARVIS `dcd54e9`. [상태](GROK-RESUME-STATUS-2026-09-11.md) ready_for_final_review. 전환 없음.
+> **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀 `0ecdb561` × JARVIS `a935751`. [상태](GROK-RESUME-STATUS-2026-09-11.md) ready_for_final_review. 전환 없음.
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 
