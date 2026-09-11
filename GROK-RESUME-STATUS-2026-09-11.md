@@ -1,5 +1,5 @@
 # Grok 재개 상태
 
-시각: 2026-09-12. **status=ready_for_final_review**
+시각: 2026-09-12. **status=running**
 
-1d3d1d7 후속 후보 `0ecdb561` × JARVIS `bcb47af`. 게이트 EXIT 0. 회귀 1832 passed. 전환 없음. 제품 인수 아님.
+CODEX-NIGHT-REVIEW-a005f59 미통과. lease owner shadow/CAS fence, M6 kill 후 성공 커밋, M12 runtime DB 유실 복원. 전환 없음.
