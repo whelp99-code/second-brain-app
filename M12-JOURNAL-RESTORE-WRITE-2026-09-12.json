@@ -1,8 +1,8 @@
 {
-  "rpo_backup_at": "2026-09-11T19:13:58.942681+00:00",
-  "rto_seconds": 3.8358,
+  "rpo_backup_at": "2026-09-11T19:25:11.094377+00:00",
+  "rto_seconds": 3.7105,
   "restore_generation": "sbgen:v1:d48ec86cd04d52b363c483c2968a5c81ec3bd2641610613abb2f15efd858d6d8",
-  "write_generation": "sbgen:v1:3c8042dd326d7cabe1ae7ea88a469a46ed3369d76ce5bcee4f42f0bd2c98a12e",
+  "write_generation": "sbgen:v1:466129c98b2f1134145a35279a6ca9f8f89a6b42b1f6db6924191ceb897ce650",
   "blocked_matches": 0,
   "post_pages": [
     "wiki/memory-37bb73feb3adc135ed6d2339aff32ba305f95d4a91d67aee51d987e500e9fe39.md"
