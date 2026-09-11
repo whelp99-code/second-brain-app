@@ -1,5 +1,5 @@
 # Grok 재개 상태
 
-시각: 2026-09-12. **status=ready_for_final_review**
+시각: 2026-09-12. **status=running**
 
-c3e1d9f 후속 후보 `0ecdb561` × JARVIS `0b8ace5`. 게이트 EXIT 0. 회귀 1831 passed. 전환 없음. 제품 인수 아님.
+CODEX-NIGHT-REVIEW-399cc45 미통과. tsc EXIT2와 옛 dist 덮어쓰기 금지. dispatch 실패 후 예약 복구, M6/M12 통합 근거. 전환 없음.
