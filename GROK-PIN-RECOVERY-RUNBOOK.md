@@ -32,4 +32,4 @@ TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS" --wo
 
 ## DR
 
-원본 journal 없으면 `RESTORE_SOURCE_ANCHOR_MISSING`. 해시 예외로 우회하지 않는다. 신뢰 journal로 `verified_restore_source` 후 제품 `run_all` write.
+원본 journal 없으면 `RESTORE_SOURCE_ANCHOR_MISSING`. 해시 예외로 우회하지 않는다. 신뢰 runtime backup의 `.recovery` journal을 복구한 뒤 `scripts/jarvis-restore-acceptance.mjs` restore→scoped 허용/거부→accepted seed→high-water. 운영 current는 바꾸지 않는다.

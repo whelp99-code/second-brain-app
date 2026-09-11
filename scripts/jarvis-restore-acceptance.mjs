@@ -36,7 +36,11 @@ try {
   const read = query => runtime.reader.read(query,{max_records:8,max_record_bytes:4096,max_bytes:8000});
   const before = await read('DeleteAlpha');
   assert.equal(before.payload.records.length,1);
+  const restoreStarted = Date.now();
   const backup = JSON.parse(run('scripts/restore-probe.py','backup',root));
+  const journals = JSON.parse(run('scripts/restore-probe.py','journal-loss-from-backup',root));
+  assert.equal(journals.journals_dropped,true);
+  assert.equal(journals.journals_restored_from_backup,true);
   effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
   const deleted = await effects.apply('forget',before.payload.records.find(row=>row.text.includes('DeleteAlpha')).record);
   assert.equal(deleted.tombstone_sequence,1);
@@ -106,9 +110,10 @@ try {
   assert.equal(restoredAgain.scan_errors,0);
   assert.equal((await read('DeleteAlpha')).payload.records.length,0);
   assert.equal((await read('KeepBeta')).payload.records.length,0);
-  const result = {root,backup,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
+  const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
     restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:secondFence.tombstone_sequence,
     deleted_records:0,first_restore_surviving_records:1,model_calls:0,
+    rpo_source_generation_id:backup.source_generation_id,rto_ms:Date.now()-restoreStarted,written,
     scope:'Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance'};
   writeFileSync(join(root,'result.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result));

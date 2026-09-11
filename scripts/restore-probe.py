@@ -1,5 +1,6 @@
 """Backup/restore only a marked, isolated cross-repository acceptance fixture."""
 import json
+import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,21 @@ root = Path(sys.argv[2]).resolve()
 if not (root / '.jarvis-memory-probe').is_file():
     raise ValueError('isolated probe marker required')
 config = executor_config(root)
+archive = root / 'restore-archive'
+if sys.argv[1] == 'journal-loss-from-backup':
+    request_journal = config.request_root / 'journal.db'
+    generation_journal = config.state_root / 'generation-journal.db'
+    request_journal.unlink(missing_ok=True)
+    generation_journal.unlink(missing_ok=True)
+    shutil.copy2(archive / '.recovery/requests/journal.db', request_journal)
+    shutil.copy2(archive / '.recovery/state/generation-journal.db', generation_journal)
+    print(json.dumps({
+        'journals_dropped': True,
+        'journals_restored_from_backup': True,
+        'request_journal': str(request_journal),
+        'generation_journal': str(generation_journal),
+    }))
+    raise SystemExit(0)
 executor = RequestExecutor(config)
 try:
     now = datetime.now(UTC)
