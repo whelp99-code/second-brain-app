@@ -1,0 +1,12 @@
+{
+  "rpo_backup_at": "2026-09-11T18:44:32.744250+00:00",
+  "rto_seconds": 8.3259,
+  "anchor_missing_without_journal": true,
+  "trusted_digest": "sha256:613ed4dc9a55bed3dd28592ce66ec07d6c2b2851724336ef29e3ee073587f5ee",
+  "post_run_status": "ok",
+  "post_run_commit": "915bc2a9eaecdf69a5f88b08b7e682d050746cd1",
+  "post_hits": [
+    "wiki/inbox-post-d375747f"
+  ],
+  "cutover": false
+}
