@@ -4,7 +4,7 @@
 
 ## 현재 핀
 
-SB `2782f1b` 후보 `/var/tmp/sb-candidate-2782f1b/releases/0ecdb561…` × JARVIS `69d8c9b` `/var/tmp/jarvis-artifact-69d8c9b/source/dist`. 운영 current `41f0751`.
+SB `bbab80b` 후보 `/var/tmp/sb-candidate-bbab80b/releases/0ecdb561…` × JARVIS `3e2b93b` `/var/tmp/jarvis-artifact-3e2b93b/source/dist`. 운영 current `41f0751`.
 
 ## JARVIS 클린 빌드
 
@@ -19,8 +19,8 @@ npm run build
 ## 게이트
 
 ```bash
-REL=/var/tmp/sb-candidate-2782f1b/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-JARVIS=/var/tmp/jarvis-artifact-69d8c9b/source/dist
+REL=/var/tmp/sb-candidate-bbab80b/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+JARVIS=/var/tmp/jarvis-artifact-3e2b93b/source/dist
 TMPDIR=/var/tmp python deploy/check-release-maintenance.py "$REL"
 TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS"
 TMPDIR=/var/tmp python deploy/check-release-integration.py "$REL" "$JARVIS" --work REAL-WORK-ITEM-2026-09-10.json

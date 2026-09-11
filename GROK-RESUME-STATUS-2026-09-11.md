@@ -2,4 +2,4 @@
 
 시각: 2026-09-12. **status=ready_for_final_review**
 
-6e5c379 후속 후보 `0ecdb561` × JARVIS `86d3290`. 게이트 EXIT 0. 전환 없음. 제품 인수 아님.
+5fa8cfd 후속 후보 `0ecdb561` × JARVIS `3e2b93b`. 게이트 EXIT 0. 전환 없음. 제품 인수 아님.
