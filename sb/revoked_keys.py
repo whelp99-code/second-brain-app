@@ -103,6 +103,8 @@ def _read_keys(state_root: Path) -> frozenset[str]:
 
 
 def load_revoked_key_ids(state_root: Path) -> frozenset[str]:
+    if not state_root.is_dir():
+        return frozenset()
     lock_path = state_root / ".revoked.lock"
     lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
     try:

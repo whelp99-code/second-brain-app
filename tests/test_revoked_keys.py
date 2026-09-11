@@ -122,3 +122,8 @@ def test_concurrent_journal_recover_does_not_raise_file_not_found(tmp_path: Path
         thread.join()
     assert errors == []
     assert load_revoked_key_ids(tmp_path) == frozenset({"key:a", "key:b"})
+
+
+def test_missing_state_root_is_empty_not_crash(tmp_path: Path) -> None:
+    missing = tmp_path / "no-state"
+    assert load_revoked_key_ids(missing) == frozenset()
