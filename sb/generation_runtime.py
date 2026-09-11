@@ -26,11 +26,13 @@ from sb.generation_runtime_models import (
     generation_runtime_paths,
 )
 from sb.generation_staging import (
+    copy_compiled_markers,
     copy_legacy_content,
     copy_operational_ledger,
     copy_pending_inbox,
     directory_fsync,
     remove_provisional_git,
+    seed_compiled_hashes_from_source,
 )
 from sb.generations import Generation, GenerationStore
 from sb.inbox import parse_remember, publish_inbox
@@ -225,6 +227,8 @@ class GenerationMutationService:
                         copy_legacy_content(source, root)
                     copy_pending_inbox(source, root, self.store.state_root)
                     copy_operational_ledger(source, root)
+                    copy_compiled_markers(source, root)
+                    seed_compiled_hashes_from_source(source, root)
                 # Genesis also needs the canonical log and gitignore; otherwise
                 # a first remember cannot pass the required export inventory.
                 _ = init_vault(root)

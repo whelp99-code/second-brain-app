@@ -36,6 +36,7 @@ from sb.generation_locks import GenerationWriteLease, generation_writer
 from sb.generation_vectors import VectorContent, prepare_vectors
 from sb.generation_walk import surface_files
 from sb.request_store import RequestStore
+from sb.search_query import normalize
 
 
 class GenerationError(RuntimeError):
@@ -398,11 +399,19 @@ def _build_derived_stores(
               tree TEXT NOT NULL,tombstone_sequence INTEGER NOT NULL,tombstone_set_root TEXT NOT NULL,
               manifest_digest TEXT NOT NULL,row_count INTEGER NOT NULL
             );
-            CREATE VIRTUAL TABLE docs USING fts5(page_id,section,text,tokenize='trigram');
+            CREATE VIRTUAL TABLE docs USING fts5(
+              page_id,section,text,compact UNINDEXED,normalize_id UNINDEXED,normalize_section UNINDEXED,
+              tokenize='trigram');
             """
         )
         with _derived_transaction(search):
-            _ = search.executemany("INSERT INTO docs(page_id,section,text) VALUES(?,?,?)", lexical_rows)
+            _ = search.executemany(
+                "INSERT INTO docs(page_id,section,text,compact,normalize_id,normalize_section) VALUES(?,?,?,?,?,?)",
+                [
+                    (page_id, section, body, normalize(body), normalize(page_id), normalize(section))
+                    for page_id, section, body in lexical_rows
+                ],
+            )
             _ = search.execute(
                 "INSERT INTO generation_meta VALUES(?,?,?,?,?,?,?,?)",
                 (*binding, manifest.lexical_manifest_digest, len(lexical_rows)),

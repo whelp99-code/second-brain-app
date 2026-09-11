@@ -1,5 +1,9 @@
 # 현재 인수 상태 — 2026-09-10
 
+> **작업 방식 변경 — Grok 통합 구현 / Codex 최종 검증:** [통합 인계서](/home/jm/orca/projects/second-brain-app/GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md)를 후속 실행 기준으로 사용한다. Grok은 A–F 통합 인수표와 M1–M14에 따라 구현·자체 검증·새 후보/증거 준비를 완료한 뒤 `GROK-FINAL-ACCEPTANCE-PACKAGE.md`/`.json`으로 제출한다. Codex는 중간 제품 수정을 병행하지 않고 고정된 최종 후보를 독립 검증한다.
+
+> **6fb150b 재검토:** [수정 재확인 및 남은 작업](/home/jm/orca/projects/second-brain-app/CODEX-6FB150B-RECHECK-2026-09-11.md). 기존 4개 지적의 구체 사례는 개선됐고 관련 97개 테스트가 통과했다. 그러나 실제 관리형 `run_compile` staging에서 손편집 유실이 재현되며 Unicode 공백/casefold 검색 불일치도 남는다. `0eefce7`은 옛 코드이므로 전환 보류, 새 wheel 전에 두 잔여 결함을 해결한다. 아래 이전 검토는 해당 소스 시점의 이력이다.
+
 > **2026-09-11 재작업:** [검토](CODEX-W0-W9-REVIEW-2026-09-11.md)의 W1 편집 유실·W2 동시 철회·symlink 재허용·W6 검색 불일치를 소스에서 고쳤다. 관련 92 passed. **`0eefce7` 전환은 새 wheel 전까지 보류.** 운영 변경 없음.
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).

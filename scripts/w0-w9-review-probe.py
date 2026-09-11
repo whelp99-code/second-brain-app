@@ -16,8 +16,11 @@ from threading import Barrier, Thread
 
 from sb import revoked_keys
 from sb.config import Config
+from sb.pipeline import StageReport, _Compiled, run_compile
 from sb.scoped_read_policy import scoped_policy
-from sb.search_query import LexicalQuery
+from sb.search_query import LexicalQuery, normalize
+from sb.store.cas import ContentAddressedStore
+from sb.vault import _committed_bytes_match
 from tests.test_access_claims import KEY
 from tests.vault_test_support import (
     CAS_SID,
@@ -26,6 +29,43 @@ from tests.vault_test_support import (
     cited_page,
     ready,
 )
+
+
+def managed_compile_edit_probe(root: Path) -> dict:
+    active = root / "share/vault"
+    vault = ready(active)
+    config = Config(raw={
+        "vault_root": str(active), "share_root": str(root / "share"),
+        "state_root": str(root / "state"), "request_root": str(root / "requests"),
+        "provider_instance_id": "provider:review", "provider_release_sha": "a" * 40,
+    })
+    page_id = "daily/2026-09-11"
+
+    def page(body):
+        return cited_page(CitedPageFixture(page_id=page_id, body_md=f"{body}[^{CAS_SID}]"))
+
+    vault.write_pages([page("Original")], "seed", MemoryLedger())
+    path = active / f"{page_id}.md"
+    path.write_text(path.read_text() + "\nUSER_EDIT_KEEP_THIS\n")
+    observed = {"compiler": "fixture; real run_compile generation staging and Vault writer"}
+
+    def stage(ledger, staged_vault, run_id):
+        del ledger
+        staged_page = staged_vault.root / f"{page_id}.md"
+        compiled = _Compiled(staged_vault.root, ContentAddressedStore(staged_vault.root))
+        observed["marker_before"] = compiled.last_compiled_hash(page_id)
+        observed["edit_before"] = "USER_EDIT_KEEP_THIS" in staged_page.read_text()
+        observed["staged_page_matches_head"] = _committed_bytes_match(staged_vault.root, staged_page)
+        written = staged_vault.write_pages([page("Corrected")], run_id, compiled)
+        observed["proposals"] = written.proposals
+        observed["pages"] = written.pages
+        return StageReport((), written.pages, written.conflicts, 0, False)
+
+    outcome = run_compile(config, compiler=stage)
+    observed["exit_code"] = outcome.exit_code
+    observed["edit_after"] = "USER_EDIT_KEEP_THIS" in path.read_text()
+    observed["active_is_symlink"] = active.is_symlink()
+    return observed
 
 
 def probe() -> dict:
@@ -48,6 +88,7 @@ def probe() -> dict:
             "preserved": "USER_EDIT_KEEP_THIS" in dest.read_text(),
             "proposals": outcome.proposals, "pages": outcome.pages,
         }
+        result["managed_compile_human_edit"] = managed_compile_edit_probe(root / "managed")
 
         state = root / "concurrent"
         start = Barrier(2)
@@ -106,11 +147,15 @@ def probe() -> dict:
         result["search_parity"] = []
         db = sqlite3.connect(":memory:")
         try:
-            db.execute("CREATE TABLE docs(text,page_id,section)")
+            db.execute("CREATE TABLE docs(text,page_id,section,compact,normalize_id,normalize_section)")
             for query, body in [("은빛나침반", "은빛\n나침반"),
-                                ("Alpha한글", "alpha한글"), ("쌀밥", "쌀 밥")]:
+                                ("Alpha한글", "alpha한글"), ("쌀밥", "쌀 밥"),
+                                ("은빛나침반", "은빛\u00a0나침반"),
+                                ("은빛나침반", "은빛\u3000나침반"),
+                                ("STRASSE한글", "Straße한글")]:
                 db.execute("DELETE FROM docs")
-                db.execute("INSERT INTO docs VALUES(?,?,?)", (body, "page", "section"))
+                db.execute("INSERT INTO docs VALUES(?,?,?,?,?,?)",
+                           (body, "page", "section", normalize(body), normalize("page"), normalize("section")))
                 plan = LexicalQuery.parse(query)
                 sql, args = plan.predicate()
                 matched = db.execute("SELECT count(*) FROM docs WHERE " + sql, args).fetchone()[0] > 0

@@ -29,6 +29,10 @@ MIXED_BODY = "alpha한글"
 MIXED_QUERY = "Alpha한글"
 SHORT_BODY = "쌀 밥"
 SHORT_QUERY = "쌀밥"
+NBSP_BODY = "은빛\u00a0나침반"
+IDEO_BODY = "은빛\u3000나침반"
+CASEFOLD_BODY = "Straße한글"
+CASEFOLD_QUERY = "STRASSE한글"
 
 
 def _put(root: Path, data: bytes) -> str:
@@ -54,6 +58,9 @@ def _seed(tmp_path: Path) -> Path:
         _page(digest, "wiki/newline", "Newline", f"# 줄\n{NEWLINE_BODY}.\n"),
         _page(digest, "wiki/mixed", "Mixed", f"# 혼합\n{MIXED_BODY}.\n"),
         _page(digest, "wiki/short", "Short", f"# 짧은\n{SHORT_BODY}.\n"),
+        _page(digest, "wiki/nbsp", "Nbsp", f"# 공백\n{NBSP_BODY}.\n"),
+        _page(digest, "wiki/ideo", "Ideo", f"# 전각\n{IDEO_BODY}.\n"),
+        _page(digest, "wiki/casefold", "Case", f"# 접기\n{CASEFOLD_BODY}.\n"),
     )
     _ = vault.write_pages(pages, "run-search", _HashLedger(root))
     stamp_knowledge(root)
@@ -113,6 +120,19 @@ def test_search_short_hangul_ignores_spaces(tmp_path: Path) -> None:
     index = SearchIndex(vault_root=_seed(tmp_path))
     hits = index.search(SHORT_QUERY)
     assert any(hit.page_id.endswith("short") for hit in hits)
+
+
+def test_search_matches_nbsp_and_ideographic_space(tmp_path: Path) -> None:
+    index = SearchIndex(vault_root=_seed(tmp_path))
+    hits = index.search("은빛나침반")
+    assert any(hit.page_id.endswith("nbsp") for hit in hits)
+    assert any(hit.page_id.endswith("ideo") for hit in hits)
+
+
+def test_search_unicode_casefold_matches_eszett(tmp_path: Path) -> None:
+    index = SearchIndex(vault_root=_seed(tmp_path))
+    hits = index.search(CASEFOLD_QUERY)
+    assert any(hit.page_id.endswith("casefold") for hit in hits)
 
 
 def test_search_returns_wiki_page_when_committed_path_contains_korean(tmp_path: Path) -> None:
@@ -294,6 +314,9 @@ def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path
         "approval_status",
         "canonical",
         "source_ref",
+        "compact",
+        "normalize_id",
+        "normalize_section",
     ]
     assert version is not None and str(version[0]) == _INDEX_SCHEMA_VERSION
 

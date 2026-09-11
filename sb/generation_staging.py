@@ -7,6 +7,7 @@ import os
 import shutil
 import sqlite3
 import stat
+import subprocess
 from pathlib import Path
 
 from sb.erasure import IngressIdentity, ReingressGate
@@ -33,6 +34,46 @@ def copy_legacy_content(source: Path, destination: Path) -> None:
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         _ = target.write_bytes(path.read_bytes())
         target.chmod(0o600)
+
+
+def copy_compiled_markers(source: Path, destination: Path) -> None:
+    src = source / ".sb" / "compiled"
+    if not src.is_dir() or src.is_symlink():
+        return
+    dest = destination / ".sb" / "compiled"
+    dest.mkdir(parents=True, exist_ok=True, mode=0o700)
+    for path in src.iterdir():
+        if not path.is_file() or path.is_symlink() or path.suffix != ".sha":
+            continue
+        target = dest / path.name
+        target.write_bytes(path.read_bytes())
+        target.chmod(0o600)
+
+
+def seed_compiled_hashes_from_source(source: Path, destination: Path) -> None:
+    if not (source / ".git").exists():
+        return
+    compiled = destination / ".sb" / "compiled"
+    compiled.mkdir(parents=True, exist_ok=True, mode=0o700)
+    env = os.environ.copy()
+    env.update({"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull})
+    for prefix in ("wiki", "daily", "conflicts"):
+        base = destination / prefix
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*.md"):
+            rel = path.relative_to(destination).as_posix()
+            marker = compiled / f"{rel.removesuffix('.md').replace('/', '_')}.sha"
+            if marker.is_file():
+                continue
+            shown = subprocess.run(
+                ["git", "-C", str(source), "show", f"HEAD:{rel}"],
+                capture_output=True, env=env, check=False,
+            )
+            if shown.returncode != 0:
+                continue
+            marker.write_text(hashlib.sha256(shown.stdout).hexdigest(), encoding="utf-8")
+            marker.chmod(0o600)
 
 
 def copy_pending_inbox(source: Path, destination: Path, state_root: Path) -> None:

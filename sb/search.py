@@ -28,13 +28,13 @@ from sb.knowledge_registry import (
 from sb.page_metadata import frontmatter_value as _frontmatter_value
 from sb.page_metadata import frontmatter_values
 from sb.search_filters import SearchFilters
-from sb.search_query import LexicalQuery
+from sb.search_query import LexicalQuery, normalize
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
 _INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
 # Version includes indexed text semantics, not only SQLite columns.
-_INDEX_SCHEMA_VERSION: Final = "3"
+_INDEX_SCHEMA_VERSION: Final = "4"
 _REQUIRED_DOCS_COLUMNS: Final = (
     "page_id",
     "section",
@@ -46,6 +46,9 @@ _REQUIRED_DOCS_COLUMNS: Final = (
     "approval_status",
     "canonical",
     "source_ref",
+    "compact",
+    "normalize_id",
+    "normalize_section",
 )
 _ACTIVE_SCOPE: Final = "active"
 _CANDIDATE_SCOPE: Final = "candidate"
@@ -433,7 +436,8 @@ def _create_schema(conn: sqlite3.Connection) -> None:
         "CREATE VIRTUAL TABLE IF NOT EXISTS docs USING fts5("
         + "page_id UNINDEXED, section, text, kind UNINDEXED, updated UNINDEXED, "
         + "status UNINDEXED, knowledge_status UNINDEXED, approval_status UNINDEXED, "
-        + "canonical UNINDEXED, source_ref UNINDEXED, tokenize='trigram')"
+        + "canonical UNINDEXED, source_ref UNINDEXED, compact UNINDEXED, "
+        + "normalize_id UNINDEXED, normalize_section UNINDEXED, tokenize='trigram')"
     )
     _set_meta(conn, "schema_version", _INDEX_SCHEMA_VERSION)
 
@@ -502,13 +506,17 @@ def _replace_path(
             state.approval_status,
             state.canonical,
             source_ref,
+            normalize(body),
+            normalize(page_id),
+            normalize(section),
         )
         for section, body in _sections(text)
     ]
     _ = conn.executemany(
         "INSERT INTO docs(page_id,section,text,kind,updated,status,"
-        + "knowledge_status,approval_status,canonical,source_ref) "
-        + "VALUES(?,?,?,?,?,?,?,?,?,?)",
+        + "knowledge_status,approval_status,canonical,source_ref,"
+        + "compact,normalize_id,normalize_section) "
+        + "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
         rows,
     )
 

@@ -1,0 +1,82 @@
+{
+  "source_commit": "6fb150b9261f209202931a0d997cb1c75c6c1cd7",
+  "scope": "isolated characterization; no operational writes",
+  "marker_missing_human_edit": {
+    "preserved": true,
+    "proposals": 1,
+    "pages": 0
+  },
+  "managed_compile_human_edit": {
+    "compiler": "fixture; real run_compile generation staging and Vault writer",
+    "marker_before": null,
+    "edit_before": true,
+    "staged_page_matches_head": true,
+    "proposals": 0,
+    "pages": 1,
+    "exit_code": 0,
+    "edit_after": false,
+    "active_is_symlink": true
+  },
+  "concurrent_revocations": {
+    "persisted": [
+      "key:a",
+      "key:b"
+    ],
+    "expected": [
+      "key:a",
+      "key:b"
+    ],
+    "errors": []
+  },
+  "revocation_symlink": {
+    "regular_file_rejects_old_key": true,
+    "fail_closed": true,
+    "keys_after_symlink": [],
+    "limit": "policy key selection, not an end-to-end authorized read"
+  },
+  "search_parity": [
+    {
+      "query": "은빛나침반",
+      "body": "은빛\n나침반",
+      "sql_match": true,
+      "record_match": true
+    },
+    {
+      "query": "Alpha한글",
+      "body": "alpha한글",
+      "sql_match": true,
+      "record_match": true
+    },
+    {
+      "query": "쌀밥",
+      "body": "쌀 밥",
+      "sql_match": true,
+      "record_match": true
+    },
+    {
+      "query": "은빛나침반",
+      "body": "은빛 나침반",
+      "sql_match": false,
+      "record_match": true
+    },
+    {
+      "query": "은빛나침반",
+      "body": "은빛　나침반",
+      "sql_match": false,
+      "record_match": true
+    },
+    {
+      "query": "STRASSE한글",
+      "body": "Straße한글",
+      "sql_match": false,
+      "record_match": true
+    }
+  ],
+  "candidate_present": true,
+  "candidate_wheel_sha256": "dc705e8a058565fc6f98cc8d3a6ca9a62c47119b1ad8c51f9bdc7f2c6bbbb3dd",
+  "installed_equal_to_source": {
+    "vault.py": false,
+    "revoked_keys.py": false,
+    "search_query.py": false
+  }
+}

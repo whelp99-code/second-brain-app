@@ -19,12 +19,8 @@ def _compact(text: str) -> str:
     return "".join(char for char in text if not char.isspace())
 
 
-def _compact_sql(column: str) -> str:
-    return (
-        "replace(replace(replace(replace(replace(lower("
-        + column
-        + "),' ',''), char(9), ''), char(10), ''), char(13), ''), char(12), '')"
-    )
+def normalize(text: str) -> str:
+    return _compact(text.casefold())
 
 
 def _groups(text: str) -> tuple[str, ...]:
@@ -85,31 +81,20 @@ class LexicalQuery:
         return any(len(term) >= 3 and not _has_hangul(term) for term in self.terms)
 
     def predicate(self) -> tuple[str, tuple[str, ...]]:
-        long = [term for term in self.terms if len(term) >= 3]
+        if not self.terms:
+            return "0", ()
         clauses: list[str] = []
         params: list[str] = []
-        if long:
-            latin = [term for term in long if not _has_hangul(term)]
-            hangul = [term for term in long if _has_hangul(term)]
-            if latin:
-                clauses.append("docs MATCH ?")
-                params.append(" AND ".join('"' + term.replace('"', '""') + '"' for term in latin))
-            for term in hangul:
-                clauses.append(f"instr({_compact_sql('text')}, ?) > 0")
-                params.append(_compact(term.casefold()))
+        latin = [term for term in self.terms if len(term) >= 3 and not _has_hangul(term)]
+        if latin:
+            clauses.append("docs MATCH ?")
+            params.append(" AND ".join('"' + term.replace('"', '""') + '"' for term in latin))
         for term in self.terms:
-            if len(term) < 3:
-                if _has_hangul(term):
-                    compact = _compact(term.casefold())
-                    clauses.append(
-                        f"(instr({_compact_sql('text')}, ?) > 0 OR instr({_compact_sql('page_id')}, ?) > 0 "
-                        + f"OR instr({_compact_sql('section')}, ?) > 0)"
-                    )
-                    params.extend((compact, compact, compact))
-                else:
-                    clauses.append("(instr(lower(text),lower(?))>0 OR instr(lower(page_id),lower(?))>0 "
-                                   + "OR instr(lower(section),lower(?))>0)")
-                    params.extend((term, term, term))
+            compact = normalize(term)
+            clauses.append(
+                "(instr(compact, ?) > 0 OR instr(normalize_id, ?) > 0 OR instr(normalize_section, ?) > 0)"
+            )
+            params.extend((compact, compact, compact))
         return " AND ".join(clauses) if clauses else "0", tuple(params)
 
     def ordering(self) -> tuple[str, tuple[str, ...]]:
@@ -124,10 +109,5 @@ class LexicalQuery:
         return 0 if self.text.casefold() in text.casefold() else 1
 
     def matches_record(self, text: str) -> bool:
-        folded = text.casefold()
-        compact = _compact(folded)
-        return bool(self.terms) and all(
-            term.casefold() in folded
-            or (_has_hangul(term) and _compact(term.casefold()) in compact)
-            for term in self.terms
-        )
+        compact = normalize(text)
+        return bool(self.terms) and all(normalize(term) in compact for term in self.terms)
