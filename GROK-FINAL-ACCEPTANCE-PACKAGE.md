@@ -8,14 +8,14 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 
 | | |
 |---|---|
-| SB frozen source | `32e58fe3031649221a8694ef967d036c2d2ece50` |
-| 후보 | `/var/tmp/sb-candidate-32e58fe/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726` |
+| SB frozen source | `034804ecfd8bb7d7aaa44bb56817cd5b83e0c3d1` |
+| 후보 | `/var/tmp/sb-candidate-034804e/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726` |
 | wheel | `c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f` (sb 제품 바이트는 a4b228f와 동일; 이번 차이는 git-archive 스크립트/테스트) |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` `/var/tmp/jarvis-artifact-1672626/source/dist` |
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` (34768) |
 | 운영 current | `41f0751` |
 | production_activated | false |
-| 소스 커밋 | `32e58fe` — seed-scoped-v4 archive + classified write after required restores |
+| 소스 커밋 | `034804e` — GUI lifetime tests + F pin unify; seed-scoped-v4 from 32e58fe |
 | git archive | `scripts/seed-scoped-v4.py` 포함 |
 | dispatch | 미변경 (V1-C–F / N1 보존) |
 
