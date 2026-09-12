@@ -107,7 +107,7 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <div><label for="searchStatus">상태</label><input id="searchStatus" placeholder="active / conflicted / resolved"></div>
 </div>
 <pre id="searchResult" class="muted"></pre>
-<label for="pageId">페이지 ID</label><div class="row"><input id="pageId" placeholder="검색 결과의 page_id"><button class="secondary" onclick="readPage()">전체 열기</button></div>
+<label for="pageId">페이지 ID</label><div class="row"><input id="pageId" placeholder="검색 결과의 page_id"><button class="secondary" onclick="readPage()">전체 열기</button><button class="secondary" id="forgetPageButton" onclick="forgetPage()">페이지 삭제</button></div>
 <pre id="pageResult" class="muted"></pre>
 </section>
 <section>
@@ -158,6 +158,7 @@ let searchRequestId=0;
 let pageRequestId=0;
 async function search(){const requestId=++searchRequestId;pageRequestId++;byId('pageId').value='';show('pageResult','');show('searchResult','검색 중…');try{const params=new URLSearchParams({q:byId('query').value});if(byId('kind').value)params.append('kind',byId('kind').value);if(byId('searchStatus').value)params.set('status',byId('searchStatus').value);const data=await api('/api/search?'+params.toString());if(requestId!==searchRequestId)return;show('searchResult',data);if(data.results&&data.results.length)byId('pageId').value=data.results[0].page_id}catch(error){if(requestId===searchRequestId)show('searchResult',error.message)}}
 async function readPage(){const requestId=++pageRequestId;const pageId=byId('pageId').value;show('pageResult','불러오는 중…');try{const data=await api('/api/pages/'+encodeURIComponent(pageId));if(requestId===pageRequestId&&byId('pageId').value===pageId)show('pageResult',data)}catch(error){if(requestId===pageRequestId&&byId('pageId').value===pageId)show('pageResult',error.message)}}
+async function forgetPage(){const pageId=byId('pageId').value;show('pageResult','삭제 중…');try{const data=await api('/api/pages/'+encodeURIComponent(pageId)+'/forget',{method:'POST',body:'{}'});show('pageResult',data)}catch(error){show('pageResult',error.message)}}
 byId('pageId').addEventListener('input',()=>{pageRequestId++;show('pageResult','')});
 async function loadConflicts(){try{const data=await api('/api/conflicts');show('conflictResult',data);if(data.conflicts&&data.conflicts.length)byId('conflictId').value=data.conflicts[0].conflict_id}catch(error){show('conflictResult',error.message)}}
 async function resolveConflict(){try{const id=byId('conflictId').value;const data=await api('/api/conflicts/'+encodeURIComponent(id)+'/resolve',{method:'POST',body:JSON.stringify({decision:byId('decision').value,note:byId('resolutionNote').value})});show('conflictResult',data);await loadConflicts()}catch(error){show('conflictResult',error.message)}}
@@ -497,6 +498,17 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         "failure": redact_credentials(outcome.failure)[:1000] if outcome.failure else None,
                     },
                 )
+                return
+            if parsed.path.startswith("/api/pages/") and parsed.path.endswith("/forget"):
+                page_id = unquote(parsed.path[len("/api/pages/") : -len("/forget")]).strip("/")
+                if not page_id:
+                    raise ValueError("page_id is required")
+                try:
+                    commit = mutate_root(
+                        context.config, GenerationOperation.EFFECT, lambda root: Vault(root).forget_page(page_id))
+                except FileNotFoundError as exc:
+                    raise ValueError("compiled page missing") from exc
+                self._json(HTTPStatus.OK, {"forgotten": page_id, "commit": commit})
                 return
             prefix = "/api/conflicts/"
             suffix = "/resolve"

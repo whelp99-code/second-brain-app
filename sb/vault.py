@@ -281,6 +281,26 @@ class Vault:
             [path],
         )
 
+    def forget_page(self, page_id: str) -> str | None:
+        """Remove one compiled page through the existing git commit boundary."""
+        rel = _rel_for(page_id)
+        if rel.parts[0] not in {"wiki", "daily", "conflicts"} or len(rel.parts) != 2:
+            raise PathEscapeError(page_id=page_id)
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+        root_fd = os.open(self.root, flags)
+        try:
+            folder_fd = os.open(rel.parts[0], flags, dir_fd=root_fd)
+            try:
+                file_fd = os.open(
+                    rel.parts[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=folder_fd)
+                os.close(file_fd)
+                os.unlink(rel.parts[1], dir_fd=folder_fd)
+            finally:
+                os.close(folder_fd)
+        finally:
+            os.close(root_fd)
+        return _commit_if_changed(self.root, f"sb: forget {page_id}", [self.root / rel])
+
 
 def read_page_spec(root: Path | str, page_id: str) -> PageSpec | None:
     """Read one current rendered page as a PageSpec for persistent merge input."""

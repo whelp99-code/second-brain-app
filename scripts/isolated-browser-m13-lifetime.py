@@ -148,7 +148,7 @@ def main() -> None:
                     "document.getElementById('conflictId').value='missing-conflict'; document.getElementById('decision').value='note'; document.querySelector('button[onclick=\"resolveConflict()\"]').click();",
                     "conflictResult", "",
                 )
-                good_conflict = _click_wait(
+                _click_wait(
                     ws_url,
                     "document.getElementById('conflictId').value='web-case'; document.getElementById('decision').value='note'; document.getElementById('resolutionNote').value='브라우저 정정'; document.querySelector('button[onclick=\"resolveConflict()\"]').click();",
                     "conflictResult", "",
@@ -159,6 +159,25 @@ def main() -> None:
                     "discardResult", "삭제 중…",
                 )
                 search_after = _click_wait(
+                    ws_url,
+                    f"document.getElementById('query').value={json.dumps(NEEDLE)}; document.querySelector('button[onclick=\"search()\"]').click();",
+                    "searchResult", "검색 중…",
+                )
+                forgotten = _eval(ws_url, """
+                  (async () => {
+                    const payload = JSON.parse(document.getElementById('searchResult').textContent);
+                    const pageId = payload.results[0].page_id;
+                    document.getElementById('pageId').value = pageId;
+                    document.getElementById('forgetPageButton').click();
+                    for (let i = 0; i < 80; i++) {
+                      const text = document.getElementById('pageResult').textContent;
+                      if (text && text !== '삭제 중…') return { pageId, text };
+                      await new Promise((resolve) => setTimeout(resolve, 250));
+                    }
+                    return { pageId, text: document.getElementById('pageResult').textContent };
+                  })()
+                """)
+                search_forgotten = _click_wait(
                     ws_url,
                     f"document.getElementById('query').value={json.dumps(NEEDLE)}; document.querySelector('button[onclick=\"search()\"]').click();",
                     "searchResult", "검색 중…",
@@ -192,6 +211,8 @@ def main() -> None:
                 "conflict_fail": "missing" in bad_conflict.lower() or "error" in bad_conflict.lower() or "not found" in bad_conflict.lower(),
                 "discard_after_run": "missing" in discarded.lower() or "invalid inbox path" in discarded.lower(),
                 "search_after_still_processed": NEEDLE in search_after,
+                "forgotten": forgotten,
+                "search_after_forget_empty": NEEDLE not in search_forgotten,
                 "resolved_conflict_file": "status: resolved" in (root / "conflicts" / "web-case.md").read_text(encoding="utf-8"),
                 "inbox_path": inbox_path,
             }
@@ -200,7 +221,7 @@ def main() -> None:
     required = (
         "remember_fail_has_content_required", "remember_ok_has_inbox", "run_ok",
         "search_has_processed_needle", "page_has_term", "discard_after_run",
-        "search_after_still_processed", "resolved_conflict_file",
+        "search_after_still_processed", "search_after_forget_empty", "resolved_conflict_file",
     )
     if not all(evidence[key] for key in required):
         raise SystemExit(1)
