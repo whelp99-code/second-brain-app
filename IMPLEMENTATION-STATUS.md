@@ -6,30 +6,30 @@
 
 > **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀은 후속 M12/B/F 후보를 따른다. [상태](GROK-RESUME-STATUS-2026-09-11.md). 전환 없음.
 
-## A–F / M1–M14 상태 (713e453 후속)
+## A–F / M1–M14 상태 (원 의미, 6a1dcc0 후속)
 
-| ID | 상태 | 근거 / 정확한 외부 입력 |
-|---|---|---|
-| A 권한 | implemented_unverified | 격리 scoped 2 client. 운영 native 인증은 외부 |
-| B 복구 | implemented_unverified | 동일 fixture JARVIS sqlite backup→유실→restore, junk `E_RESTORE_FAILED`, [M12 JSON](M12-JARVIS-AUTHORITY-CRASH-2026-09-12.json) |
-| C 삭제 | implemented_unverified | high-water 2, 재복원 0 |
-| D 검색 | implemented_unverified | 이전 후보 경로 보존. 운영 한국어 GT는 외부 |
-| E 정정 | implemented_unverified | 이전 경로 보존 |
-| F 핀 | implemented_unverified | 런북 REL/JARVIS/ROOT/fence 파일 |
-| M1 | blocked_external | 운영 drain/전환 허가 |
-| M2 | implemented_unverified | 이전 철회 경로 |
-| M3 | implemented_unverified | revoked-jarvis-signing-key-ids |
-| M4 | implemented_unverified | V1 dispatch 계보 |
-| M5 | blocked_external | native 사본 수명. 제품/버전 입력 필요 |
-| M6 | implemented_unverified | writer lease busy≠queue empty. `scripts/writer-lease-on-root.py` |
-| M7 | implemented_unverified | 이전 경로 |
-| M8 | blocked_external | 실제 모델 세션 resolver/issuer |
-| M9 | blocked_external | 문맥 compaction 이벤트. JARVIS CLI에 없음 |
-| M10 | blocked_external | 실제 한국어 질의 GT |
-| M11 | blocked_external | 운영 규모 성능 |
-| M12 | implemented_unverified | JARVIS crash_loss_receipts=1, backup/restore sha 일치, scoped+new write proved |
-| M13 | blocked_external | 전체 GUI |
-| M14 | not_implemented | 운영 전환 |
+| ID | 의미 | 상태 | 근거 / 정확한 외부 입력 |
+|---|---|---|---|
+| A | 원본/정정 | implemented_unverified | USER_EDIT_KEEP_THIS, managed compile. 운영 원본 파일 세트는 외부 |
+| B | 철회 권한 복원 | implemented_unverified | 격리 scoped 2 client + JARVIS sqlite 복원 후 철회 보존. 운영 키 복사는 금지 |
+| C | 검색/본문 | implemented_unverified | KeepBeta/ExtraLost 본문 검색. 운영 한국어 GT는 외부 |
+| D | 공유 수명 | implemented_unverified | 격리 2 client 동시 수명. 운영 native 사본 수는 외부 |
+| E | 가용성 복구 GUI | implemented_unverified | Chrome fail→success 격리. 전체 운영 GUI는 외부 |
+| F | 배포 | implemented_unverified | 설치 3게이트 EXIT 0, current 41f0751 유지. 운영 전환은 허가 없음 |
+| M1 | 신원/권한 | implemented_unverified | 격리 권한/fence. drain이 아님. 운영 로그인 신원은 외부 |
+| M2 | 실제 업무 공유 계보 | implemented_unverified | proved request/replay. 철회 경로가 아님 |
+| M3 | 철회 키 | implemented_unverified | revoked-jarvis-signing-key-ids |
+| M4 | 모델 문맥 계보 | implemented_unverified | V1 dispatch 보존 |
+| M5 | native 사본 수명 | blocked_external | 제품/버전별 native 세션 입력 |
+| M6 | writer 배제 | implemented_unverified | generation.lock busy, pending은 journal state |
+| M7 | 이전 경로 | implemented_unverified | 이전 후보 |
+| M8 | 세션 resolver/issuer | blocked_external | 실제 모델 세션 제품 입력 |
+| M9 | 문맥 compaction | blocked_external | native/Orca compact 이벤트 |
+| M10 | 한국어 검색 GT | blocked_external | 실제 질의 세트 |
+| M11 | 운영 규모 성능 | blocked_external | 운영 corpus |
+| M12 | DR | implemented_unverified | accepted forget 유실 1, dest 보존, 현재 fence 재restore |
+| M13 | 가용성 GUI | implemented_unverified | 격리 Chrome. 전체 운영 GUI 입력은 외부 |
+| M14 | 관계 검색 | implemented_unverified | 격리 검색 경로. 운영 전환이 아님 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 

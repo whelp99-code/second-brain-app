@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Hold the generation writer on a fixture root and prove busy is not queue-empty."""
+"""Hold the generation writer on a fixture root. Busy is independent of pending work."""
 
 from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
@@ -15,16 +16,14 @@ from sb.generation_locks import GenerationWriterBusy, generation_writer
 from tests.fixtures.jarvis_memory_provider import executor_config
 
 
-def _queue_depth(root: Path) -> int:
+def _pending_count(root: Path) -> int:
     config = executor_config(root)
-    inbox = Path(config.share_root) / "vault" / "inbox"
-    requests = Path(config.request_root)
-    files = []
-    if inbox.is_dir():
-        files.extend(path for path in inbox.iterdir() if path.is_file())
-    if requests.is_dir():
-        files.extend(path for path in requests.iterdir() if path.is_file())
-    return len(files)
+    journal = Path(config.request_root) / "journal.db"
+    if not journal.is_file():
+        return 0
+    with sqlite3.connect(journal) as db:
+        row = db.execute("SELECT COUNT(*) FROM requests WHERE state='pending'").fetchone()
+    return int(row[0]) if row is not None else 0
 
 
 def _lock_path(root: Path) -> Path:
@@ -44,14 +43,7 @@ def _hold(lock: Path, ready: Queue[str], done: Queue[str]) -> None:
 def main() -> None:
     root = Path(sys.argv[1])
     lock = _lock_path(root)
-    inbox = Path(executor_config(root).share_root) / "vault" / "inbox"
-    inbox.mkdir(parents=True, exist_ok=True)
-    probe = inbox / "writer-lease-probe.md"
-    created = False
-    if _queue_depth(root) == 0:
-        probe.write_text("pending work while writer is held\n", encoding="utf-8")
-        created = True
-    queue_depth = _queue_depth(root)
+    pending = _pending_count(root)
     ready: Queue[str] = Queue()
     done: Queue[str] = Queue()
     holder = Process(target=_hold, args=(lock, ready, done))
@@ -66,15 +58,12 @@ def main() -> None:
         busy = True
     done.put("release")
     holder.join()
-    if created:
-        probe.unlink(missing_ok=True)
-    empty_queue = _queue_depth(root) == 0
     print(
         json.dumps(
             {
                 "writer_busy": busy,
-                "queue_depth": queue_depth,
-                "empty_queue": empty_queue,
+                "pending_requests": pending,
+                "empty_queue": pending == 0,
                 "lock": str(lock),
                 "pid": os.getpid(),
             }

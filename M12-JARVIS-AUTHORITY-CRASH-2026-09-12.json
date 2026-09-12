@@ -1,9 +1,19 @@
 {
-  "root": "/var/tmp/sb-jarvis-restore-PdT941",
+  "root": "/var/tmp/sb-jarvis-restore-PbKSr3",
+  "rpo_sb": {
+    "last_durable_at": "2026-09-12T00:26:21.250349+00:00",
+    "last_durable_generation_id": "sbgen:v1:66858d350dd3399b44c20d69b9ad23f88199c8d5749d4918bfdc3ad8f57afa69",
+    "durable_pages_at_backup": 2,
+    "writes_after_backup_before_failure": 1,
+    "post_backup_accepted_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
+    "post_backup_remember_lost_on_generation_restore": true,
+    "crash_loss_records": 1,
+    "restored_generation_id": "sbgen:v1:d805f68a8bb12f2bb389036ac6ee5c495618811c24740d15c8ceb2bc494a7a31"
+  },
   "rpo_jarvis": {
-    "last_durable_request_id": "memeff:req:v2:5c9aba7b88ba8db5cee69d8a722d885455cc9be60bf429170b447907bb843b11",
-    "last_durable_proof_id": "sbproof:v1:1d5816835ebed9da0df88c8ecfca4cdf1cc59935f28997cc7f8e2ab8cc3d2b64",
-    "last_durable_at_ms": 1789170634634,
+    "last_durable_request_id": "memeff:req:v2:01833782c84bba6c5d8c6815fe57be98f817dec5b0b0da4846d518fc4ce8c775",
+    "last_durable_proof_id": "sbproof:v1:3d8dc44217f023e96abcf6480b8cbfb04ddcb6e4a8f7572277813e4ab528ca5e",
+    "last_durable_at_ms": 1789172786375,
     "tombstone_sequence_before_restore": 1,
     "restored_tombstone_sequence": 1,
     "revoked_records_held": 1,
@@ -15,50 +25,49 @@
     "receipts_after_extra": {
       "tombstone_chain": 1,
       "deletion_proofs": 0,
-      "gjc_intents": 1
+      "gjc_intents": 0
     },
     "receipts_after_restore": {
       "tombstone_chain": 1,
       "deletion_proofs": 0,
       "gjc_intents": 0
     },
-    "crash_loss_receipts": 1,
-    "lost_intent_id": "gjc_00022591b5407c5bd3192209f26b9ae7caea9a4187c700d0a4fad2fad8577d7c",
-    "lost_intent_present_after_restore": false,
-    "backup_sha256": "eb35bb6f27dc553793391ee1aed3b0f3ec3b147fd90a31168aa10ff080b89a67",
-    "restore_sha256": "eb35bb6f27dc553793391ee1aed3b0f3ec3b147fd90a31168aa10ff080b89a67",
-    "old_version_refused": "E_RESTORE_FAILED",
+    "crash_loss_accepted_receipts": 0,
+    "lost_accepted_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
+    "lost_accepted_proof_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
+    "lost_accepted_present_after_restore": false,
+    "loss_mode": "unclean_unlink_while_open",
+    "dest_preserved_on_missing_backup": "E_RESTORE_FAILED",
+    "dest_preserved_on_invalid_backup": "E_RESTORE_FAILED",
+    "backup_sha256": "01caf0512e62ffebd826d9c3940e78aab2bd73270aa54a4d0856e21a8bec1d66",
+    "restore_sha256": "01caf0512e62ffebd826d9c3940e78aab2bd73270aa54a4d0856e21a8bec1d66",
+    "invalid_backup_refused": "E_RESTORE_FAILED",
+    "old_schema_has_tombstone_chain": false,
     "keep_beta_readable": true
   },
-  "rpo_sb": {
-    "last_durable_at": "2026-09-11T23:50:29.253638+00:00",
-    "last_durable_generation_id": "sbgen:v1:0a77f4206eba720522dd9c7075c437c52a048c993ea1ae27c98cc6684a844b1d",
-    "durable_pages_at_backup": 2,
-    "writes_after_backup_before_failure": 0,
-    "crash_loss_records": 0,
-    "restored_generation_id": "sbgen:v1:218364a01a31f4eba86e493cbaca1b1332f3501cfde2d22e512d6819e19a7d9a"
-  },
   "rto": {
-    "failure_began_ms": 1789170629419,
-    "restore_began_ms": 1789170634717,
-    "sb_first_read_ms": 1789170636719,
-    "scoped_available_ms": 1789170637796,
-    "new_write_available_ms": 1789170639011,
-    "restore_probe_ms": 410.591,
-    "restore_to_readable_ms": 2002,
-    "failure_to_first_read_ms": 7300,
-    "failure_to_work_available_ms": 9592,
-    "scenario_ms": 17177
+    "failure_began_ms": 1789172781393,
+    "restore_began_ms": 1789172787729,
+    "sb_first_read_ms": 1789172789830,
+    "scoped_available_ms": 1789172790926,
+    "new_write_available_ms": 1789172792126,
+    "restore_probe_ms": 435.08299999999997,
+    "restore_to_readable_ms": 2101,
+    "failure_to_first_read_ms": 8437,
+    "failure_to_work_available_ms": 10733,
+    "jarvis_crash_to_reopen_ms": 30,
+    "scenario_ms": 19097
   },
   "writer_lease": {
     "writer_busy": true,
-    "queue_depth": 1,
-    "empty_queue": false,
-    "lock": "/var/tmp/sb-jarvis-restore-PdT941/state/generation.lock",
-    "pid": 1407605
+    "pending_requests": 0,
+    "empty_queue": true,
+    "lock": "/var/tmp/sb-jarvis-restore-PbKSr3/state/generation.lock",
+    "pid": 1521901
   },
-  "old_version_refused": "E_RESTORE_FAILED",
-  "high_water": 2,
-  "written": "proved",
+  "same_root_restore": {
+    "tombstone_sequence": 2,
+    "blocked_matches": 0
+  },
   "production_activated": false
 }
