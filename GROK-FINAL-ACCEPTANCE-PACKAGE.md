@@ -8,19 +8,18 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 
 | | |
 |---|---|
-| SB frozen source | `a4b228f326c275cf0aeb05b6ce01d9f224697a2f` |
-| 후보 | `/var/tmp/sb-candidate-a4b228f/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726` |
-| wheel | `c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f` |
+| SB frozen source | `32e58fe3031649221a8694ef967d036c2d2ece50` |
+| 후보 | `/var/tmp/sb-candidate-32e58fe/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726` |
+| wheel | `c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f` (sb 제품 바이트는 a4b228f와 동일; 이번 차이는 git-archive 스크립트/테스트) |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` `/var/tmp/jarvis-artifact-1672626/source/dist` |
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` (34768) |
 | 운영 current | `41f0751` |
 | production_activated | false |
-| 소스 커밋 | `a4b228f` — schema4 scoped recover + read-only v4 journals |
-| 설치 게이트 | maintenance/integration/`--work` **EXIT 0** `/var/tmp/sb-gates-a4b228f.log` |
-| hash 대조 | wheel `sb/mcp.py`·`sb/runtime_access.py` == `git show a4b228f` |
+| 소스 커밋 | `32e58fe` — seed-scoped-v4 archive + classified write after required restores |
+| git archive | `scripts/seed-scoped-v4.py` 포함 |
 | dispatch | 미변경 (V1-C–F / N1 보존) |
 
-이 패키지는 **Codex 독립 검증 인계**다. 제품 인수/운영 전환이 아니다. 게이트는 이 소스에서 다시 돌렸고 이전 `12db06e` 핀을 재사용하지 않는다.
+이 패키지는 **Codex 독립 검증 인계**다. 제품 인수/운영 전환이 아니다. 로컬 커밋은 승인된 구현 범위. 구핀 `12db06e`/`a4b228f` 게이트를 이번 소스 검증으로 재사용하지 않는다.
 
 ## 2. 요구별 상태 (원 의미)
 
@@ -52,29 +51,31 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction. 만료·철회 후 재사용 없음 | implemented_unverified | `gjc.dispatch` 예산/세대 재검증 (제품 경로). 세션 compaction 이벤트 없음 | native/Orca compaction 트리거 이벤트. 그 입력이 오기 전 dispatch 경로와 분리 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 고정 synthetic/KeepBeta만 | 사용자 큐레이션 정답집 |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신. p50/p95·RSS | implemented_unverified | `M11-MCP-CORPUS-LATENCY-2026-09-11.json` 후보 MCP 30/100/300 | 운영 corpus·동시 정정은 운영 자료 입력. 클라이언트 RSS≠서버 RSS |
-| M12 | 원장/원본 journal 소실 DR와 RPO/RTO. 신뢰 근거 복구·삭제 high-water·재유입 차단·시간 | implemented_unverified | 아래 §4. **이번:** high-water seq3 복구 후 schema4 classified write → recover-a/b/retry 동일 digest, generic reader 별도 | 운영 RPO/RTO는 운영 백업. 격리 측정은 이번 harness |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | R6 fail→success. web HTTP 10. `scripts/isolated-browser-correct-receipt.py` EXIT 0: Chrome dump 열린 충돌/기억 추가, remember inbox 영수증, conflict resolve commit, 이후 conflicts `[]`, 정정 메모 DOM 미노출. 콘솔에 삭제 버튼 없음 | **남은 격리:** GUI 삭제 컨트롤은 제품에 없음. 운영 timer는 전환 후 |
+| M12 | 원장/원본 journal 소실 DR와 RPO/RTO. 신뢰 근거 복구·삭제 high-water·재유입 차단·시간 | implemented_unverified | harness-36: 필수 restore+만료 fence 후 schema4 write, recover-a/b/retry, final_fresh `첫 결정`. generic ExtraLost 0 KeepBeta 0. cold restore cap0 1 passed (원 전체회귀 실패1은 별도) | 운영 RPO/RTO는 운영 백업 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | HTTP: `isolated-browser-correct-receipt.py` Python POST. **실제 UI(재실행 없음):** Codex `actual-ui-result.json` remember 400→201, conflict 400→200, inbox+git `e47bc81`. 콘솔 삭제 버튼 없음 | 전체 GUI 삭제/native/운영 timer는 미구현. 운영 timer는 전환 후 |
 | M14 | 관계 검색 추가 가치 측정 후 제한 채택. 운영 전환이 아님 | not_implemented | hybrid 무근거 후보 증가 | 고정 질문에서 비용 대비 효과·정정/삭제 일관성 입증 전 기본 활성화 보류 |
 
 ## 3. 테스트 증거
 
 | 무엇 | 명령/경로 | 결과 |
 |---|---|---|
-| c0b4fce 두 scoped 세션 | `TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs /home/jm/orca/projects/Orca-JARVIS/dist` | `/var/tmp/jarvis-crash-restore-35.log` **EXIT 0** |
-| 기계 JSON | `/var/tmp/sb-jarvis-restore-kJ4UcY/result.json` | generic_reader `{extra_lost:0,keep_beta:0}` |
+| c0b4fce 두 scoped 세션 | `TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs /home/jm/orca/projects/Orca-JARVIS/dist` | `/var/tmp/jarvis-crash-restore-36.log` **EXIT 0** |
+| 기계 JSON | `/var/tmp/sb-jarvis-restore-qku1N6/result.json` | generic_reader `{extra_lost:0,keep_beta:0}`, `classified_write_after_required_restores:true`, `second_restore_records:1` == final_fresh |
 | recover-a | agent `agent:recover-a` session `session:recover-a` | allowed_pages 1, withdrawal_denied, digest `sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6` |
 | recover-b | agent `agent:recover-b` session `session:recover-b` | 동일 digest, 다른 agent/session. **recoveredPeer ≠ recoveredScoped 복사** |
 | recover-retry | agent `agent:recover-retry` | 동일 digest |
 | schema4 write | `scripts/seed-scoped-v4.py` → `accept_scoped_request` + `RequestExecutor` schema4 `source_access` | `memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532` proved, page `wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0`, needle `첫 결정`. ledger 수동 INSERT 없음 |
 | 만료 fence | restore-probe restore + past fence | `TOMBSTONE_FENCE_REQUIRED` (harness 기대 실패) |
 | 종료 후 권한 | `kJ4UcY/recovery.env` AUTHORITY_ROOT 생존 | fence seq 3 |
-| frozen 3게이트 | 기존 `12db06e` | maintenance/integration/work EXIT 0 |
-| 전체 pytest | 이번 미반복 | 지시: 미변경 SB 전체회귀 재반복 불필요 |
+| 설치 3게이트 | `/var/tmp/sb-gates-32e58fe.log` (이 소스) | maintenance/integration/`--work` |
+| cold restore | `pytest tests/test_cold_restore_write.py` | 1 passed (briefing cap 0). 원 전체회귀 1 failed는 별도 기록 |
+| Codex 실제 UI | `/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json` | remember400→201, conflict400→200. 재실행 없음 |
+| 전체 pytest | 이번 미반복 | Codex 1837 passed / 1 failed / 2 skipped를 이번 집중 수정으로 전체 통과라 바꾸지 않음 |
 | fixture vs native vs operational | 이 harness는 **격리 fixture** | 운영/native 인증 종단 아님 |
 
 ## 4. 핵심 수명 증거 (M12 이번 계약)
 
-순서: runtime backup → ExtraLost accepted apply → JARVIS 파일 유실 → extra restore(tombstone 없음) → **high-water snapshot seq3 복구** → generic ExtraLost 0 KeepBeta 0 → **schema4 classified write** → **독립 scoped MCP 2 + retry** → 같은 ROOT restore seq3.
+순서: runtime backup → ExtraLost apply → JARVIS 유실 → extra restore → **high-water seq3** → generic ExtraLost 0 KeepBeta 0 → **필수 SB restore + 만료 fence 거부** → **그 다음** schema4 classified write → recover-a/b/retry → final_fresh `첫 결정`. 복원 전 카운터를 최종 성공으로 재사용하지 않음.
 
 | 측정 | 값 |
 |---|---|

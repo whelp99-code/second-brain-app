@@ -4,10 +4,10 @@
   "production_activated": false,
   "operational_current": "41f0751",
   "frozen_pin": {
-    "sb_source": "a4b228f326c275cf0aeb05b6ce01d9f224697a2f",
+    "sb_source": "32e58fe3031649221a8694ef967d036c2d2ece50",
     "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
     "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
-    "candidate": "/var/tmp/sb-candidate-a4b228f/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "candidate": "/var/tmp/sb-candidate-32e58fe/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726", "git_archive_includes_seed_scoped_v4": true,
     "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
     "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
     "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
@@ -15,12 +15,12 @@
   },
   "uncommitted_harness": [],
   "gates": {
-    "log": "/var/tmp/sb-gates-a4b228f.log",
+    "log": "/var/tmp/sb-gates-32e58fe.log",
     "maintenance": 0,
     "integration": 0,
     "work": 0,
     "production_activated": false,
-    "harness_commit": "a4b228f326c275cf0aeb05b6ce01d9f224697a2f"
+    "harness_commit": "32e58fe3031649221a8694ef967d036c2d2ece50"
   },
   "hash_contrast": {
     "sb/mcp.py": true,
@@ -30,10 +30,12 @@
   "dispatch_changed": false,
   "full_pytest_repeated": false,
   "c0b4fce": {
-    "log": "/var/tmp/jarvis-crash-restore-35.log",
+    "log": "/var/tmp/jarvis-crash-restore-36.log",
     "exit": 0,
-    "fixture_root": "/var/tmp/sb-jarvis-restore-kJ4UcY",
-    "result_json": "/var/tmp/sb-jarvis-restore-kJ4UcY/result.json",
+    "fixture_root": "/var/tmp/sb-jarvis-restore-qku1N6",
+    "result_json": "/var/tmp/sb-jarvis-restore-qku1N6/result.json",
+    "classified_write_after_required_restores": true,
+    "second_restore_records": 1,
     "generic_reader": {"extra_lost": 0, "keep_beta": 0},
     "schema4_request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
     "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
