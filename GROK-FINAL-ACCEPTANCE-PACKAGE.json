@@ -1,9 +1,9 @@
 {
   "pin": {
-    "sb_source": "4536718e68d8d65a24e1a459cb845d86f8c191f2",
+    "sb_source": "12db06edc6760f8478e2d7c866b10a8d06430eb3",
     "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
     "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
-    "candidate": "/var/tmp/sb-candidate-4536718/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "candidate": "/var/tmp/sb-candidate-12db06e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
     "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
     "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
     "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
@@ -12,14 +12,17 @@
     "production_activated": false,
     "tsc_exit": 0
   },
-  "fixture_root": "/var/tmp/sb-jarvis-restore-BXtuTK",
+  "fixture_root": "/var/tmp/sb-jarvis-restore-Ar1cuM",
   "gates": {
     "maintenance_exit": 0,
     "integration_exit": 0,
     "work_exit": 0
   },
-  "copyfile_excl": true,
-  "extra_tombstone_gone_after_jarvis_restore": true,
+  "jarvis_rpo_extra_gone": true,
+  "jarvis_recovered_highwater_seq": 3,
+  "after_harness_fence_seq": 3,
+  "after_harness_restore_exit": 0,
+  "post_recovery_write": 1,
   "codex_final_review_requested": true,
   "product_acceptance": false
 }
