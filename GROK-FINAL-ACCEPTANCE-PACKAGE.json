@@ -4,10 +4,10 @@
   "production_activated": false,
   "operational_current": "41f0751",
   "frozen_pin": {
-    "sb_source": "034804ecfd8bb7d7aaa44bb56817cd5b83e0c3d1",
-    "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
-    "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
-    "candidate": "/var/tmp/sb-candidate-034804e/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726", "git_archive_includes_seed_scoped_v4": true,
+    "sb_source": "c519f55fc47be8a4c2b32c234e2ac6fc898d570d",
+    "release_id": "55a8b68b7039a355a1562b1b0b0c551c9f3d2a56",
+    "wheel_sha256": "a3679d532fc3bd591017d7dbc39056703d73581292c97c1025c45c32c1d1dc19",
+    "candidate": "/var/tmp/sb-candidate-c519f55/releases/55a8b68b7039a355a1562b1b0b0c551c9f3d2a56", "git_archive_includes_seed_scoped_v4": true,
     "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
     "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
     "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
@@ -15,12 +15,12 @@
   },
   "uncommitted_harness": [],
   "gates": {
-    "log": "/var/tmp/sb-gates-32e58fe.log",
+    "log": "/var/tmp/sb-gates-c519f55.log",
     "maintenance": 0,
     "integration": 0,
     "work": 0,
     "production_activated": false,
-    "harness_commit": "034804ecfd8bb7d7aaa44bb56817cd5b83e0c3d1"
+    "harness_commit": "c519f55fc47be8a4c2b32c234e2ac6fc898d570d"
   },
   "hash_contrast": {
     "sb/mcp.py": true,

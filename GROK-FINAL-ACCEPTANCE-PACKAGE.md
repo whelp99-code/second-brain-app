@@ -8,14 +8,14 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 
 | | |
 |---|---|
-| SB frozen source | `034804ecfd8bb7d7aaa44bb56817cd5b83e0c3d1` |
-| 후보 | `/var/tmp/sb-candidate-034804e/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726` |
-| wheel | `c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f` (sb 제품 바이트는 a4b228f와 동일; 이번 차이는 git-archive 스크립트/테스트) |
+| SB frozen source | `c519f55fc47be8a4c2b32c234e2ac6fc898d570d` |
+| 후보 | `/var/tmp/sb-candidate-c519f55/releases/55a8b68b7039a355a1562b1b0b0c551c9f3d2a56` |
+| wheel | `a3679d532fc3bd591017d7dbc39056703d73581292c97c1025c45c32c1d1dc19` (sb 제품 바이트는 a4b228f와 동일; 이번 차이는 git-archive 스크립트/테스트) |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` `/var/tmp/jarvis-artifact-1672626/source/dist` |
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` (34768) |
 | 운영 current | `41f0751` |
 | production_activated | false |
-| 소스 커밋 | `034804e` — GUI lifetime tests + F pin unify; seed-scoped-v4 from 32e58fe |
+| 소스 커밋 | `c519f55` — GUI lifetime tests + F pin unify; seed-scoped-v4 from 32e58fe |
 | git archive | `scripts/seed-scoped-v4.py` 포함 |
 | dispatch | 미변경 (V1-C–F / N1 보존) |
 
@@ -67,7 +67,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | schema4 write | `scripts/seed-scoped-v4.py` → `accept_scoped_request` + `RequestExecutor` schema4 `source_access` | `memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532` proved, page `wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0`, needle `첫 결정`. ledger 수동 INSERT 없음 |
 | 만료 fence | restore-probe restore + past fence | `TOMBSTONE_FENCE_REQUIRED` (harness 기대 실패) |
 | 종료 후 권한 | `qku1N6/recovery.env` AUTHORITY_ROOT 생존 | fence seq 3 |
-| 설치 3게이트 | `/var/tmp/sb-gates-32e58fe.log` (이 소스) | maintenance/integration/`--work` |
+| 설치 3게이트 | `/var/tmp/sb-gates-c519f55.log` (이 소스) | maintenance/integration/`--work` |
 | cold restore | `pytest tests/test_cold_restore_write.py` | 1 passed (briefing cap 0). 원 전체회귀 1 failed는 별도 기록 |
 | Codex 실제 UI | `/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json` | remember400→201, conflict400→200. 재실행 없음 |
 | 전체 pytest | 이번 미반복 | Codex 1837 passed / 1 failed / 2 skipped를 이번 집중 수정으로 전체 통과라 바꾸지 않음 |
