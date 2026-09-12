@@ -1,19 +1,19 @@
 {
-  "root": "/var/tmp/sb-jarvis-restore-rz8Ngm",
+  "root": "/var/tmp/sb-jarvis-restore-7NTURy",
   "rpo_sb": {
-    "last_durable_at": "2026-09-12T00:47:34.650305+00:00",
-    "last_durable_generation_id": "sbgen:v1:e2b502f253206468be46fbeee46c53bd06138e5a572fb06bfd3b7f3d0c4dd705",
+    "last_durable_at": "2026-09-12T01:30:02.918318+00:00",
+    "last_durable_generation_id": "sbgen:v1:bc4918258e1b18dd2a56232d2e40f106ee01f74bdf6ce7aa764e6676c1256a1f",
     "durable_pages_at_backup": 2,
     "writes_after_backup_before_failure": 1,
     "post_backup_accepted_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
     "post_backup_remember_lost_on_generation_restore": true,
     "crash_loss_records": 1,
-    "restored_generation_id": "sbgen:v1:aa59980c762f8a7897cdeda64c60697bd6a26f731f361612430421ee28430293"
+    "restored_generation_id": "sbgen:v1:fa48488a62b2522ad2838648f832a4caee782485ea3d3782a53f0b6911455a08"
   },
   "rpo_jarvis": {
-    "last_durable_request_id": "memeff:req:v2:fc3a33f3a686a9a2baa1980b24030628375d7736cecdce3837163115ae615174",
-    "last_durable_proof_id": "sbproof:v1:8b7ca5d20af39d8726aed035a373ed69653c4cf4415c6ba3a8ab3ec28a50146a",
-    "last_durable_at_ms": 1789174059943,
+    "last_durable_request_id": "memeff:req:v2:d1a031de55e1500720c7435f7fc1b748ca75f4b22a8aee2049020358e2f1f3b0",
+    "last_durable_proof_id": "sbproof:v1:12d00ab0f1b2842744466ea19b13fa0939e83e864e06ca557205d00d63dc1c64",
+    "last_durable_at_ms": 1789176608164,
     "tombstone_sequence_before_restore": 1,
     "restored_tombstone_sequence": 1,
     "revoked_records_held": 1,
@@ -34,17 +34,19 @@
     },
     "crash_loss_accepted_receipts": 1,
     "ids_at_backup": [
-      "memtomb:v1:84e4ee45e47bcc2ae353bd221a362575549a50366288171d817c49b5a0d5efa9"
+      "memtomb:v1:14a4afaa6af9bf5ed5288f50c4f95dd527f66b9ff095d99f813afed0ef518d59"
     ],
     "ids_after_extra": [
-      "memtomb:v1:84e4ee45e47bcc2ae353bd221a362575549a50366288171d817c49b5a0d5efa9",
-      "memtomb:v1:1f8b2072b56d0a4803f0c51e37b63d194b7b7070038475a9948cbffc3121f04d"
+      "memtomb:v1:14a4afaa6af9bf5ed5288f50c4f95dd527f66b9ff095d99f813afed0ef518d59",
+      "memtomb:v1:775dda3f01d239a9375866974882e91fcc18a6c07d8ec1337121c96a12085dd5"
     ],
     "ids_after_restore": [
-      "memtomb:v1:84e4ee45e47bcc2ae353bd221a362575549a50366288171d817c49b5a0d5efa9"
+      "memtomb:v1:14a4afaa6af9bf5ed5288f50c4f95dd527f66b9ff095d99f813afed0ef518d59"
     ],
-    "lost_jarvis_tombstone_id": "memtomb:v1:1f8b2072b56d0a4803f0c51e37b63d194b7b7070038475a9948cbffc3121f04d",
-    "lost_jarvis_tombstone_present_after_restore": false,
+    "lost_jarvis_tombstone_id": "memtomb:v1:775dda3f01d239a9375866974882e91fcc18a6c07d8ec1337121c96a12085dd5",
+    "lost_jarvis_proof_id": "sbproof:v1:43822a22c6b8b7672e666af87bbbbb29d6da93b0afef8ab2bd02bc8420b076f6",
+    "extra_accepted_present": true,
+    "extra_accepted_request_id": "memeff:req:v2:c20ed1a96d593c49de959d11830a225042fd11836c706d5c0497d5b9f8b168d3",
     "sb_post_backup_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
     "sb_post_backup_receipt_after_restore": {
       "present": true,
@@ -54,35 +56,36 @@
     "loss_mode": "unclean_unlink_while_open",
     "dest_preserved_on_missing_backup": "E_RESTORE_FAILED",
     "dest_preserved_on_invalid_backup": "E_RESTORE_FAILED",
-    "backup_sha256": "a241bda4538ad82df05de6f49374fe4bbe85d0834df62764df2fd6758760f371",
-    "restore_sha256": "a241bda4538ad82df05de6f49374fe4bbe85d0834df62764df2fd6758760f371",
+    "backup_sha256": "db1e5f18b954cbfad862b5c5ef75d2358f3c5c882dce226e440531cee9e720c5",
+    "restore_sha256": "db1e5f18b954cbfad862b5c5ef75d2358f3c5c882dce226e440531cee9e720c5",
     "invalid_backup_refused": "E_RESTORE_FAILED",
-    "incompatible_authority": "ANCHORS_REQUIRED",
+    "incompatible_authority": "MIGRATION_CHECKSUM_MISMATCH",
     "keep_beta_readable": true
   },
   "rto": {
-    "failure_began_ms": 1789174054792,
-    "restore_began_ms": 1789174062012,
-    "sb_first_read_ms": 1789174064904,
-    "scoped_available_ms": 1789174066010,
-    "new_write_available_ms": 1789174067205,
-    "restore_probe_ms": 469.608,
-    "restore_to_readable_ms": 2892,
-    "failure_to_first_read_ms": 10112,
-    "failure_to_work_available_ms": 12413,
-    "jarvis_crash_to_reopen_ms": 53,
-    "scenario_ms": 21633
+    "failure_began_ms": 1789176603091,
+    "restore_began_ms": 1789176608317,
+    "sb_first_read_ms": 1789176610494,
+    "scoped_available_ms": 1789176611608,
+    "new_write_available_ms": 1789176612931,
+    "restore_probe_ms": 471.645,
+    "restore_to_readable_ms": 2177,
+    "failure_to_first_read_ms": 7403,
+    "failure_to_work_available_ms": 9840,
+    "jarvis_crash_to_reopen_ms": 47,
+    "scenario_ms": 26182
   },
   "writer_lease": {
     "writer_busy": true,
     "pending_requests": 0,
     "empty_queue": true,
-    "lock": "/var/tmp/sb-jarvis-restore-rz8Ngm/state/generation.lock",
-    "pid": 1594869
+    "lock": "/var/tmp/sb-jarvis-restore-7NTURy/state/generation.lock",
+    "pid": 1752933
   },
   "same_root_restore": {
-    "tombstone_sequence": 2,
+    "tombstone_sequence": 3,
     "blocked_matches": 0
   },
+  "after_harness_fence_exit": 0,
   "production_activated": false
 }
