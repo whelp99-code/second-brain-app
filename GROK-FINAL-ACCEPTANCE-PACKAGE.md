@@ -1,30 +1,26 @@
-# Grok 최종 제출 — `0ecdb561` × JARVIS `b9ccc54`
+# Grok 최종 제출 — `0ecdb561` × JARVIS `1672626`
 
-CODEX-NIGHT-REVIEW-cfe0b75. **운영 전환 없음. 제품 인수 아님.**
+CODEX-NIGHT-REVIEW-16d4db3. **운영 전환 없음. 제품 인수 아님.**
 
 ## 핀
 
 | | |
 |---|---|
-| SB source | `d4759bcf67749ada6b3bd354bf48429c8f08a0fb` |
-| 후보 | `/var/tmp/sb-candidate-d4759bc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1` |
+| SB source | `4536718e68d8d65a24e1a459cb845d86f8c191f2` |
+| 후보 | `/var/tmp/sb-candidate-4536718/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `b9ccc546ab9d4d537e17918a68eacf4ecb98f94c` `/var/tmp/jarvis-artifact-b9ccc54/source/dist` |
-| inventory | `1d041d0acd2bc10d24c2491dee9835d231a0f6e63dd14b75f8db886cc6a8721d` (34768) |
+| JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` `/var/tmp/jarvis-artifact-1672626/source/dist` |
+| inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` (34768) |
 | 운영 current | `41f0751` |
 | production_activated | false |
 
 ## 재현
 
-backup 테스트 7 passed. 게이트 EXIT 0. fixture `/var/tmp/sb-jarvis-restore-7NTURy`. after-harness `issue-restore-fence.mjs` EXIT 0. dispatch 미변경.
+backup 테스트 8 passed. 게이트 EXIT 0. fixture `/var/tmp/sb-jarvis-restore-BXtuTK`. ExtraLost apply 후 JARVIS restore에서 extra tombstone 없음. dispatch 미변경.
 
-## P1 / M12 / B·F
+## P1 / P2
 
 | ID | 상태 | 증거 |
 |---|---|---|
-| P1 dest exclusive | verified 격리 | clone into exclusive dest. busy writer COMMIT 보존. orphan WAL backup-approved |
-| after-harness fence | implemented_unverified | `$ROOT/recovery-authority` 복사. 종료 후 fence EXIT 0 |
-| ExtraLost apply | implemented_unverified | `memeff`/`sbproof` 실제 apply. ExtraLost 본문 0, SB receipt proved |
-| signed expiry | implemented_unverified | `authorize(now-120s)` 만료 거부 |
-| schema | implemented_unverified | 지원 sqlite open vs `MIGRATION_CHECKSUM_MISMATCH` |
-| A–F/M1–M14 | 원 §7 | M14 not_implemented 보류 |
+| P1 absent dest | verified 격리 | COPYFILE_EXCL. 늦은 dest는 EEXIST 거부 |
+| P2 RPO 순서 | implemented_unverified | backup → ExtraLost apply/proof → JARVIS crash restore → extra tombstone gone. 첫 SB restore는 별도 |

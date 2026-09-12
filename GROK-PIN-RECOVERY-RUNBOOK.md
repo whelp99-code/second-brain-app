@@ -5,24 +5,20 @@
 ## Full pin
 
 ```bash
-source /var/tmp/sb-jarvis-restore-7NTURy/recovery.env
-export REL=/var/tmp/sb-candidate-d4759bc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-# recovery.env: ROOT BACKUP DEST FENCE AUTHORITY AUTHORITY_ROOT JARVIS
-# AUTHORITY is a copy under ROOT/recovery-authority, not the harness tmp db
+source /var/tmp/sb-jarvis-restore-BXtuTK/recovery.env
+export REL=/var/tmp/sb-candidate-4536718/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
 ```
 
 | 항목 | 값 |
 |---|---|
-| SB source | `d4759bcf67749ada6b3bd354bf48429c8f08a0fb` |
+| SB source | `4536718e68d8d65a24e1a459cb845d86f8c191f2` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `b9ccc546ab9d4d537e17918a68eacf4ecb98f94c` |
-| inventory | `1d041d0acd2bc10d24c2491dee9835d231a0f6e63dd14b75f8db886cc6a8721d` / 34768 |
-| backup.js | `a357e2cb5cbeae98a8a6c2f3294f6c0be53a02543ad58b0e743a492f1261e042` |
+| JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` |
+| inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` / 34768 |
+| backup.js | `3137b3dece9363c69f3b0936fee8659e8e5f5c2e4d3d97457c3a77956e0fe3c4` |
 | production_activated | false |
 
 ## 종료 후 fresh fence
-
-harness `closeMemoryDatabase`는 tmp authority를 지운다. 런북 AUTHORITY는 `$ROOT/recovery-authority/` 복사본이다.
 
 ```bash
 source "$ROOT/recovery.env"
@@ -32,9 +28,7 @@ python scripts/writer-lease-on-root.py "$ROOT"
 node scripts/restore-jarvis-sqlite.mjs
 ```
 
-## dest exclusive restore
-
-기존 dest는 exclusive lock을 유지한 채 backup을 clone한다. checkpoint 후 close/park 공백이 없다. busy dest는 거부하고 writer COMMIT을 보존한다.
+없는 dest는 COPYFILE_EXCL로만 게시한다. 검사 후 생긴 DB는 덮지 않고 거부한다.
 
 ## 게이트
 
