@@ -120,6 +120,15 @@ def main() -> None:
                       return document.getElementById('searchResult').textContent;
                     }})()
                 """)
+                ran = _eval(ws_url, """
+                    (async () => {
+                      await runPipeline();
+                      return {
+                        summary: document.getElementById('runSummary').textContent,
+                        result: document.getElementById('runResult').textContent,
+                      };
+                    })()
+                """)
             finally:
                 chrome.terminate()
                 chrome.wait(timeout=10)
@@ -136,13 +145,14 @@ def main() -> None:
                 "inbox_file_gone": inbox_gone,
                 "search_after_still_compiled": TERM in str(search_after),
                 "resolved_conflict_file": "status: resolved" in (root / "conflicts" / "web-case.md").read_text(encoding="utf-8"),
+                "run_invoked": isinstance(ran, dict) and bool(str(ran.get("summary", "")).strip()),
             }
     (out / "evidence.json").write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps(evidence, ensure_ascii=False))
     required = (
         "remember_fail_has_content_required", "remember_ok_has_inbox", "search_has_term",
         "page_has_term", "conflict_fail", "discard_ok", "inbox_file_gone",
-        "search_after_still_compiled", "resolved_conflict_file",
+        "search_after_still_compiled", "resolved_conflict_file", "run_invoked",
     )
     if not all(evidence[key] for key in required):
         raise SystemExit(1)
