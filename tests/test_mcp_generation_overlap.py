@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import base64
+import json
+import re
+import threading
+import traceback
 from datetime import UTC, datetime
-from threading import Barrier, Thread
 
 import anyio
 from mcp.client import Client
@@ -16,7 +19,6 @@ from sb.mcp import build_server
 from sb.pipeline import run_compile, run_ingest
 from sb.targets import GenerationIdentityV1
 from tests.test_access_claims import KEY, signed
-from tests.test_memory_access import classified  # noqa: F401
 
 
 class FrozenDate(datetime):
@@ -53,112 +55,107 @@ def _fence(generation):
     )
 
 
-def test_mcp_overlap_then_new_generation_excludes_old(classified, monkeypatch):  # noqa: F811
-    root, _name, generation = classified
-    work = root.parents[2]
+def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
+    preparing = threading.Event()
+    read_done = threading.Event()
+    errors: list[str] = []
+
+    class Response:
+        def generate(self, prompt, **kwargs):
+            if kwargs.get("json_mode"):
+                return json.dumps({"relation": "unrelated", "confidence": 0, "rationale": "fixture", "cites": []})
+            match = re.search(r"sid=([0-9a-f]{8}) origin=[^\n]+\n((?:Alpha|Omega)[^\n]+)", prompt)
+            assert match is not None
+            if match.group(2).startswith("Omega"):
+                preparing.set()
+                assert read_done.wait(15), "normal reader did not finish"
+            return match.group(2) + "[^" + match.group(1) + "]"
+
+    monkeypatch.setattr("sb.pipeline._llm", lambda *_: Response())
+    source = tmp_path / "source"
+    source.mkdir()
+    page = source / "a.md"
+    page.write_text("Alpha original unique memory.")
+    config = Config(raw={
+        "vault_root": str(tmp_path / "share" / "vault"),
+        "share_root": str(tmp_path / "share"),
+        "state_root": str(tmp_path / "state"),
+        "request_root": str(tmp_path / "requests"),
+        "knowledge_registry": str(tmp_path / "registry.db"),
+        "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(source)}],
+        "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}},
+        "caps": {"max_llm_calls_briefing": 0},
+    })
+
+    def generation():
+        manifest = load_verified_manifest((tmp_path / "share" / "vault").resolve())
+        return GenerationIdentityV1(*(str(manifest[name]) for name in (
+            "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
+
+    assert run_ingest(config, ["docs"]).exit_code == 0
+    assert run_compile(config).exit_code == 0
+    current = generation()
     monkeypatch.setattr("sb.mcp.datetime", FrozenDate)
     monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v3")
-    config = _mcp_config(work, generation)
-    server = build_server(config=config)
-    fence = _fence(generation)
-    entered = Barrier(3)
-    from sb.scoped_search import search_scoped_records as orig_search
+    server = build_server(config=_mcp_config(tmp_path, current))
+    fence = _fence(current)
 
-    def wrapped(*args, **kwargs):
-        entered.wait(timeout=30)
-        return orig_search(*args, **kwargs)
+    async def query(needle: str):
+        claim = signed({
+            "schema_version": 1,
+            "provider_instance_id": current.provider_instance_id,
+            "principal_id": "principal:owner",
+            "agent_id": "agent:test",
+            "session_id": "session:test",
+            "projects": ["project:a"],
+            "policy_revision": "1",
+            "purpose": "memory_read",
+            "request_digest": access_request_digest("sb_search", {"query": needle, "limit": 5}),
+            "read_fence_digest": fence.fence_digest,
+            "issued_at": "2026-09-09T00:00:00.000Z",
+            "expires_at": "2026-09-09T00:00:30.000Z",
+            "nonce": "nonce:normal:" + needle,
+            "signing_key_id": "key:test",
+        })
+        async with Client(server, mode="legacy", cache=None) as client:
+            searched = await client.call_tool("sb_search", {
+                "query": needle, "limit": 5, "read_fence": model_object(fence), "access_claim": claim,
+            })
+            assert not searched.is_error, searched
+            return searched.structured_content
 
-    monkeypatch.setattr("sb.mcp.search_scoped_records", wrapped)
-    ingest_config = Config(raw={
-        "vault_root": str(work / "share" / "vault"),
-        "share_root": str(work / "share"),
-        "state_root": str(work / "state"),
-        "knowledge_registry": str(work / "registry.db"),
-        "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(work / "source")}],
-        "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}},
-    })
-    old_wiki = "\n".join(path.read_text(encoding="utf-8") for path in (root / "wiki").glob("*.md"))
-    assert "2527df6c" not in old_wiki
+    initial = anyio.run(query, "Alpha")
+    assert initial["results"][0]["record"]["record_text"] == "Alpha original unique memory."
+    initial_record_id = initial["results"][0]["record"]["record_id"]
+    initial_generation = initial["generation_id"]
 
     def writer() -> None:
-        entered.wait(timeout=30)
-        (work / "source" / "a.md").write_text("Omega replacement memory.", encoding="utf-8")
-        assert run_ingest(ingest_config, ["docs"]).exit_code == 0
-        assert run_compile(ingest_config, llm_mode="fake").exit_code == 0
+        try:
+            page.write_text("Omega corrected unique memory.")
+            assert run_ingest(config, ["docs"]).exit_code == 0
+            assert run_compile(config).exit_code == 0
+        except Exception:
+            errors.append(traceback.format_exc())
+            preparing.set()
 
-    thread = Thread(target=writer)
-    thread.start()
-
-    async def overlap():
-        async with Client(server, mode="legacy", cache=None) as client:
-            allowed_claim = signed({
-                "schema_version": 1, "provider_instance_id": generation.provider_instance_id,
-                "principal_id": "principal:owner", "agent_id": "agent:test", "session_id": "session:test",
-                "projects": ["project:a"], "policy_revision": "1", "purpose": "memory_read",
-                "request_digest": access_request_digest("sb_search", {"query": "Cited", "limit": 1}),
-                "read_fence_digest": fence.fence_digest, "issued_at": "2026-09-09T00:00:00.000Z",
-                "expires_at": "2026-09-09T00:00:30.000Z", "nonce": "nonce:claim", "signing_key_id": "key:test",
-            })
-            denied_claim = signed({**allowed_claim, "projects": ["project:b"], "nonce": "nonce:deny"})
-            results = {}
-
-            async def allowed() -> None:
-                searched = await client.call_tool("sb_search", {
-                    "query": "Cited", "limit": 1, "read_fence": model_object(fence), "access_claim": allowed_claim,
-                })
-                results["allowed"] = searched
-
-            async def denied() -> None:
-                searched = await client.call_tool("sb_search", {
-                    "query": "Cited", "limit": 1, "read_fence": model_object(fence), "access_claim": denied_claim,
-                })
-                results["denied"] = searched
-
-            async with anyio.create_task_group() as group:
-                group.start_soon(allowed)
-                group.start_soon(denied)
-            return results
-
-    overlapped = anyio.run(overlap)
-    thread.join(timeout=60)
-    assert not thread.is_alive()
-    monkeypatch.setattr("sb.mcp.search_scoped_records", orig_search)
-    allowed = overlapped["allowed"]
-    denied = overlapped["denied"]
-    assert allowed is not None
-    assert denied.is_error or (
-        denied.structured_content is not None and denied.structured_content["results"] == [])
-    refreshed = (work / "share" / "vault").resolve()
-    manifest = load_verified_manifest(refreshed)
-    new_generation = GenerationIdentityV1(*(str(manifest[name]) for name in (
-        "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
-    server = build_server(config=_mcp_config(work, new_generation))
-    fence = _fence(new_generation)
-
-    async def after():
-        async with Client(server, mode="legacy", cache=None) as client:
-            omega_claim = signed({
-                "schema_version": 1, "provider_instance_id": new_generation.provider_instance_id,
-                "principal_id": "principal:owner", "agent_id": "agent:test", "session_id": "session:test",
-                "projects": ["project:a"], "policy_revision": "1", "purpose": "memory_read",
-                "request_digest": access_request_digest("sb_search", {"query": "Cited", "limit": 1}),
-                "read_fence_digest": fence.fence_digest, "issued_at": "2026-09-09T00:00:00.000Z",
-                "expires_at": "2026-09-09T00:00:30.000Z", "nonce": "nonce:omega", "signing_key_id": "key:test",
-            })
-            deny_claim = signed({**omega_claim, "projects": ["project:b"], "nonce": "nonce:omega-deny"})
-            omega = await client.call_tool("sb_search", {
-                "query": "Cited", "limit": 1, "read_fence": model_object(fence), "access_claim": omega_claim,
-            })
-            denied_new = await client.call_tool("sb_search", {
-                "query": "Cited", "limit": 1, "read_fence": model_object(fence), "access_claim": deny_claim,
-            })
-            return omega, denied_new
-
-    omega, denied_new = anyio.run(after)
-    wiki = "\n".join(path.read_text(encoding="utf-8") for path in (refreshed / "wiki").glob("*.md"))
-    assert new_generation != generation
-    assert "2527df6c" in wiki
-    assert not omega.is_error, omega
-    assert omega.structured_content["results"]
-    assert denied_new.is_error or denied_new.structured_content["results"] == []
-    assert "2527df6c" not in str(denied_new)
+    worker = threading.Thread(target=writer)
+    worker.start()
+    try:
+        assert preparing.wait(15), "writer did not enter prepare"
+        assert errors == []
+        during = anyio.run(query, "Alpha")
+        assert during["results"][0]["record"]["record_text"] == "Alpha original unique memory."
+        read_done.set()
+        worker.join(20)
+        assert not worker.is_alive()
+        assert errors == []
+        latest = anyio.run(query, "Omega")
+        old_after = anyio.run(query, "Alpha")
+        assert latest["results"][0]["record"]["record_text"] == "Omega corrected unique memory."
+        assert old_after["results"] == []
+        assert latest["results"][0]["record"]["record_id"] != initial_record_id
+        published = generation().generation_id
+        assert latest["generation_id"] == published != initial_generation
+    finally:
+        read_done.set()
+        worker.join(20)
