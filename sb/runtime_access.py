@@ -24,7 +24,7 @@ def read_root(config: Config) -> Generator[Path, None, None]:
     if not root.is_symlink():
         yield root
         return
-    service = GenerationMutationService.from_config(config)
+    service = GenerationMutationService.from_config(config, maintenance_only=True)
     try:
         with service.store.pin(f"desktop-read:{uuid4().hex}", datetime.now(UTC)) as pin:
             yield pin.generation.root

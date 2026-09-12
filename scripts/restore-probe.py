@@ -1,6 +1,7 @@
 """Backup/restore only a marked, isolated cross-repository acceptance fixture."""
 import json
 import shutil
+import sqlite3
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,7 +43,24 @@ if sys.argv[1] == 'journal-loss-from-backup':
         'restored_from_backup_at': datetime.now(UTC).isoformat(),
     }))
     raise SystemExit(0)
-executor = RequestExecutor(config)
+
+def _existing_scoped_v4(request_root: Path) -> bool:
+    path = request_root / 'journal.db'
+    if not path.is_file():
+        return False
+    db = sqlite3.connect(path)
+    try:
+        row = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='requests'"
+        ).fetchone()
+        return bool(row and isinstance(row[0], str) and '1,2,3,4' in row[0].replace(' ', ''))
+    finally:
+        db.close()
+
+executor = RequestExecutor(
+    config,
+    scoped_authority=(lambda _: True) if _existing_scoped_v4(config.request_root) else None,
+)
 try:
     now = datetime.now(UTC)
     archive = root / 'restore-archive'

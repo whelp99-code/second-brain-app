@@ -27,6 +27,7 @@ from sb.store.ledger import Ledger
 from sb.vault import init_vault
 from sb.web import MAX_BODY_BYTES, SecondBrainHTTPServer, build_server
 from tests.knowledge import stamp_knowledge
+from tests.test_memory_access import classified  # noqa: F401
 
 TERM = "웹콘솔계약검색"
 
@@ -495,3 +496,30 @@ def test_status_summary_uses_same_ledger_run_as_details(tmp_path: Path) -> None:
     assert 'latest-failed' in payload['status']
     assert 'failed' in payload['status']
     assert 'old successful run' not in payload['status']
+
+
+def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> None:  # noqa: F811
+    from sb.scoped_search import search_scoped_records
+    from sb.source_access import SourceAccess
+
+    root, name, generation = classified
+    work = root.parent.parent
+    config = Config(raw={
+        "vault_root": str(root),
+        "share_root": str(work / "share"),
+        "state_root": str(work / "state"),
+        "knowledge_registry": str(work / "registry.db"),
+    })
+    with _running(config) as base:
+        status, searched = _request(f"{base}/api/search?q=Cited&kind=wiki")
+        page_status, page = _request(f"{base}/api/pages/" + urllib.parse.quote("wiki/" + name, safe=""))
+    assert status == 200 and page_status == 200
+    assert isinstance(searched, dict) and isinstance(page, dict)
+    results = cast(dict[str, object], searched).get("results")
+    assert isinstance(results, list) and results
+    assert "Cited" in json.dumps(searched, ensure_ascii=False)
+    assert "Cited" in str(cast(dict[str, object], page).get("body"))
+    denied = search_scoped_records(
+        root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10)
+    assert denied == []
+    assert "Cited" not in str(denied)

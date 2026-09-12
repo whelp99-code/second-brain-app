@@ -256,37 +256,39 @@ try {
   effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
   const recoveredFence = createProductionMemoryReadFence(database.authority,config,'memory_status')(new Date());
   assert.equal(recoveredFence.tombstone_sequence, extraDeleted.tombstone_sequence);
+  const extraLostAfterRecovery = (await read('ExtraLostAfterBackup')).payload.records.length;
+  const keepAfterRecovery = (await read('KeepBeta')).payload.records.length;
+  assert.equal(extraLostAfterRecovery, 0);
+  assert.equal(keepAfterRecovery, 0);
+  const genericReader = {extra_lost:extraLostAfterRecovery, keep_beta:keepAfterRecovery};
+  const scopedWritten = JSON.parse(run('scripts/seed-scoped-v4.py',root));
+  assert.equal(scopedWritten.state,'proved');
+  await runtime.close();
+  runtime = createProductionMemoryReference(database.authority,{
+    read_fence_config:config,projection_key:Buffer.alloc(32,7),
+    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
+  });
+  const recoveredScope = {
+    load,database,config,root,launcher,pageId:scopedWritten.page_id,
+    needle:scopedWritten.needle,projects:['project:shared-memory'],policyRevision:'policy:fixture',
+  };
+  const recoveredScoped = await checkRestoredScope({...recoveredScope,clientId:'recover-a'});
+  const recoveredPeer = await checkRestoredScope({...recoveredScope,clientId:'recover-b'});
+  assert.equal(recoveredScoped.allowed_pages,1);
+  assert.equal(recoveredPeer.allowed_pages,1);
+  assert.notEqual(recoveredScoped.agent,recoveredPeer.agent);
+  assert.notEqual(recoveredScoped.session,recoveredPeer.session);
+  assert.equal(recoveredScoped.page_content_digest,recoveredPeer.page_content_digest);
+  assert.equal(recoveredPeer.withdrawal_denied,true);
+  const recoveredRetry = await checkRestoredScope({...recoveredScope,clientId:'recover-retry'});
+  assert.equal(recoveredRetry.allowed_pages,1);
+  assert.equal(recoveredRetry.page_content_digest,recoveredScoped.page_content_digest);
   const restoredAgain = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
     {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(recoveredFence)}));
   assert.equal(restoredAgain.tombstone_sequence, recoveredFence.tombstone_sequence);
   assert.equal(restoredAgain.tombstone_set_root, recoveredFence.tombstone_set_root);
   assert.equal(restoredAgain.blocked_matches, 0);
   assert.equal(restoredAgain.scan_errors, 0);
-  await runtime.close();
-  runtime = createProductionMemoryReference(database.authority,{
-    read_fence_config:config,projection_key:Buffer.alloc(32,7),
-    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
-  });
-  const extraLostAfterRecovery = (await read('ExtraLostAfterBackup')).payload.records.length;
-  const keepAfterRecovery = (await read('KeepBeta')).payload.records.length;
-  assert.equal(extraLostAfterRecovery, 0);
-  assert.equal(keepAfterRecovery, 0);
-  const postRecoveryWritten = JSON.parse(run('scripts/seed-extra-lost.py',root,'PostRecoveryWrite'));
-  assert.equal(postRecoveryWritten.state,'proved');
-  await runtime.close();
-  runtime = createProductionMemoryReference(database.authority,{
-    read_fence_config:config,projection_key:Buffer.alloc(32,7),
-    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
-  });
-  const postRecovery = await read('PostRecoveryWrite');
-  assert.equal(postRecovery.payload.records.length, 1);
-  const recoveredScoped = {
-    extra_lost: extraLostAfterRecovery,
-    keep_beta: keepAfterRecovery,
-    post_recovery: postRecovery.payload.records.length,
-  };
-  const recoveredPeer = recoveredScoped;
-  assert.equal(recoveredScoped.post_recovery, 1);
   const recoveryAuthorityRoot = join(root,'recovery-authority');
   cpSync(database.root, recoveryAuthorityRoot, {recursive:true});
   writeFileSync(join(root,'trusted-fence.json'), JSON.stringify(recoveredFence));
@@ -314,8 +316,8 @@ try {
   assert.equal(freshFence.tombstone_sequence, recoveredFence.tombstone_sequence);
   const sameRootRestore = restoredAgain;
   const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
-    restored_again:restoredAgain,second_restore_records:extraLostAfterRecovery+keepAfterRecovery+postRecovery.payload.records.length,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:recoveredFence.tombstone_sequence,
-    deleted_records:0,first_restore_surviving_records:1,model_calls:0,recovered_scoped:recoveredScoped,recovered_peer:recoveredPeer,post_recovery_write:postRecoveryWritten,
+    restored_again:restoredAgain,second_restore_records:extraLostAfterRecovery+keepAfterRecovery+recoveredScoped.allowed_pages,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:recoveredFence.tombstone_sequence,
+    deleted_records:0,first_restore_surviving_records:1,model_calls:0,generic_reader:genericReader,recovered_scoped:recoveredScoped,recovered_peer:recoveredPeer,post_recovery_write:scopedWritten,recovered_retry:recoveredRetry,
     rpo_source_generation_id:backup.source_generation_id,
     rpo_sb: {
       last_durable_at: backup.created_at,

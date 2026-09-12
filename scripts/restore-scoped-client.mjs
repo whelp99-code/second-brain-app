@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 
-export async function checkRestoredScope({load,database,config,root,launcher,pageId,clientId='restore',coordinate,needle='KeepBeta'}) {
+export async function checkRestoredScope({load,database,config,root,launcher,pageId,clientId='restore',coordinate,needle='KeepBeta',projects=['project:a'],policyRevision='policy:1',profile='scoped-record-read-v3'}) {
   const {createProductionMemoryAccessClaim} = await load('src/memory-access-claim-production.js');
   const {createFileMemoryAccessScopeResolver} = await load('src/memory-access-policy.js');
   const {createMemoryScopedClient} = await load('src/memory-scoped-client.js');
@@ -12,20 +12,27 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
   const expires = new Date(now.getTime()+300000).toISOString();
   const session = {principal_id:'principal:owner',agent_id:`agent:${clientId}`,session_id:`session:${clientId}`,expires_at:expires};
   const policy = {schema_version:1,provider_instance_id:config.provider_instance_id,
-    principal_id:session.principal_id,policy_revision:'policy:1',valid_from:now.toISOString(),valid_until:expires,
-    sessions:[{agent_id:session.agent_id,session_id:session.session_id,projects:['project:a'],methods:['sb_read_page','sb_search']}]};
+    principal_id:session.principal_id,policy_revision:policyRevision,valid_from:now.toISOString(),valid_until:expires,
+    sessions:[{agent_id:session.agent_id,session_id:session.session_id,projects,methods:['sb_read_page','sb_search']}]};
   const policyPath = join(root,`${clientId}-policy.json`);
   writeFileSync(policyPath,JSON.stringify(policy),{mode:0o600});
   const scopedConfig = join(root,`${clientId}-scoped.toml`);
-  writeFileSync(scopedConfig,readFileSync(join(root,'config.toml'),'utf8')+`\n[mcp_scoped_read]\nprincipal = "principal:owner"\nagent = "${session.agent_id}"\nsession = "${session.session_id}"\npolicy_revision = "policy:1"\n`,{mode:0o600});
+  writeFileSync(scopedConfig,readFileSync(join(root,'config.toml'),'utf8')+`\n[mcp_scoped_read]\nprincipal = "principal:owner"\nagent = "${session.agent_id}"\nsession = "${session.session_id}"\npolicy_revision = "${policyRevision}"\n`,{mode:0o600});
   const resolve = createFileMemoryAccessScopeResolver(policyPath,config.provider_instance_id,()=>session);
   const issue = createProductionMemoryAccessClaim(database.authority,config,resolve);
-  const transport = createSecondBrainTransport({contractProfile:'scoped-record-read-v3',launcherPath:launcher,configPath:scopedConfig});
+  const errLog = join(root,`${clientId}-mcp.err`);
+  const wrappedLauncher = join(root,`${clientId}-mcp-wrap`);
+  writeFileSync(wrappedLauncher,`${readFileSync(launcher,'utf8').trim()} 2>>${JSON.stringify(errLog)}
+`,{mode:0o700});
+  const transport = createSecondBrainTransport({contractProfile:profile,launcherPath:wrappedLauncher,configPath:scopedConfig});
   let withdrawAfterResponse = false;
   let intercepted = 0;
   const monitored = {
     call: async (...args) => {
       const response = await transport.call(...args);
+      if (response.kind !== 'data') {
+        throw new Error(JSON.stringify({pageId, args: args[0], response}));
+      }
       if (withdrawAfterResponse) {
         assert.equal(response.kind,'data');
         assert(JSON.stringify(response.value).includes(needle));
@@ -36,11 +43,16 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
     },
     restart:()=>transport.restart(), close:()=>transport.close(), diagnostics:()=>transport.diagnostics(),
   };
-  const client = createMemoryScopedClient({issue,profile:'scoped-record-read-v3',transport:monitored,now:()=>new Date(),
+  const client = createMemoryScopedClient({issue,profile,transport:monitored,now:()=>new Date(),
     budgets:{max_hits:50,max_excerpt_bytes:8192,max_total_bytes:1000000,max_page_bytes:100000},
     max_age_ms:86400000,expiry_ms:172800000});
   try {
-    const allowed = await client.readPage(pageId);
+    let allowed;
+    try {
+      allowed = await client.readPage(pageId);
+    } catch (error) {
+      throw new Error(`${pageId} ${String(error)} ${JSON.stringify(transport.diagnostics())}`);
+    }
     assert.equal(allowed.pages.length,1);
     assert(JSON.stringify(allowed).includes(needle));
     if (coordinate) await coordinate(clientId, {

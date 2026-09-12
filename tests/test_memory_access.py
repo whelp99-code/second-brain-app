@@ -240,3 +240,23 @@ def test_scoped_search_does_not_publish_results_if_generation_changes(classified
     with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_UNAVAILABLE"):
         scoped_search.search_scoped_records(root, generation,
             SourceAccess("principal:owner", ("project:a",), "1"), "Cited", 10)
+
+
+def test_unscoped_owner_read_does_not_leak_through_scoped_deny(classified):
+    from sb.scoped_search import search_scoped_records
+
+    root, name, generation = classified
+    page_id = "wiki/" + name
+    owner_text = (root / "wiki" / f"{name}.md").read_text(encoding="utf-8")
+    assert "Cited" in owner_text
+    page = classified_page(root, page_id, generation)
+    require_scope(page, SourceAccess("principal:owner", ("project:a",), "1"))
+    with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_DENIED"):
+        require_scope(page, SourceAccess("principal:owner", ("project:b",), "1"))
+    allowed = search_scoped_records(
+        root, generation, SourceAccess("principal:owner", ("project:a",), "1"), "Cited", 10)
+    denied = search_scoped_records(
+        root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10)
+    assert allowed and "Cited" in str(allowed)
+    assert denied == []
+    assert "Cited" not in str(denied)

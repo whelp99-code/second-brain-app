@@ -1,8 +1,12 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
+from sb.config import load_config
+from sb.generation_runtime import GenerationMutationService
 from sb.request_store import RequestStore, RequestStoreError
+from sb.runtime_access import read_root
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 
@@ -42,3 +46,36 @@ def test_maintenance_and_writer_upgrade_are_mutually_exclusive(tmp_path):
     with pytest.raises(RequestStoreError, match='REQUEST_STORE_MODE_INVALID'):
         RequestStore(tmp_path / 'requests', scoped_v4=True, maintenance_only=True)
     assert not (tmp_path / 'requests').exists()
+
+
+def _v4_runtime_config(tmp_path):
+    share = tmp_path / 'share'
+    vault = share / 'vault'
+    share.mkdir()
+    vault.mkdir()
+    requests = tmp_path / 'requests'
+    RequestStore(requests, scoped_v4=True).close()
+    path = tmp_path / 'config.toml'
+    path.write_text(
+        '\n'.join((
+            f'vault_root = "{vault}"',
+            f'share_root = "{share}"',
+            f'state_root = "{tmp_path / "state"}"',
+            f'request_root = "{requests}"',
+            f'export_root = "{tmp_path / "exports"}"',
+            'provider_instance_id = "provider:fixture"',
+            f'provider_release_sha = "{"a" * 40}"',
+        ))
+        + '\n'
+    )
+    return load_config(path)
+
+
+def test_read_only_runtime_opens_existing_v4_journal(tmp_path):
+    config = _v4_runtime_config(tmp_path)
+    with pytest.raises(ValueError, match='REQUEST_SCHEMA_UNSUPPORTED'):
+        GenerationMutationService.from_config(config).close()
+    service = GenerationMutationService.from_config(config, maintenance_only=True)
+    service.close()
+    with read_root(config) as root:
+        assert root == Path(config.vault_root)

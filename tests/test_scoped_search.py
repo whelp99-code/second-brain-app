@@ -11,6 +11,7 @@ from sb.pipeline import run_compile, run_ingest
 from sb.scoped_search import search_scoped_records
 from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1
+from tests.test_memory_access import classified  # noqa: F401
 
 
 def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_path: Path, monkeypatch):
@@ -68,3 +69,26 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
     assert blob_reads == []
     with pytest.raises(ValueError):
         search_scoped_records(root, generation, scope, "Alpha", 51)
+
+
+def test_scoped_search_disables_hybrid_and_omits_scores(classified, monkeypatch):  # noqa: F811
+    import sb.scoped_search as module
+
+    root, _name, generation = classified
+    constructed: list[bool | None] = []
+    original = module.SearchIndex
+
+    class Observed(original):
+        def __init__(self, *args, **kwargs):
+            constructed.append(kwargs.get("hybrid"))
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(module, "SearchIndex", Observed)
+    rows = search_scoped_records(
+        root, generation, SourceAccess("principal:owner", ("project:a",), "1"), "Cited", 10)
+    assert constructed == [False]
+    assert rows and "Cited" in str(rows)
+    assert "score" not in rows[0] and "snippet" not in rows[0] and "relation" not in rows[0]
+    denied = search_scoped_records(
+        root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10)
+    assert denied == []
