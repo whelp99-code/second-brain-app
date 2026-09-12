@@ -6,15 +6,15 @@
 
 ```bash
 source /var/tmp/sb-jarvis-restore-qku1N6/recovery.env
-export REL=/var/tmp/sb-candidate-16f69cf/releases/55102423a63a02825b045b3352a7f9428db05cc4
+export REL=/var/tmp/sb-candidate-cf1c021/releases/9680e4fe7f1ea81ea81031bebbea8700346c12c3
 export JARVIS=/var/tmp/jarvis-artifact-1672626/source/dist
 ```
 
 | 항목 | 값 |
 |---|---|
-| SB source | `16f69cf511e9d5f9043c362892690fa67b358dba` |
+| SB source | `cf1c021dfa9fb15ac5dffbe619e42f6d3cdf4186` |
 | git archive | `scripts/seed-scoped-v4.py` 포함 |
-| wheel | `c037a9d6f2c11e6a1d9e96eba592496c48ccd6519284edfdaa66b066bec50367` |
+| wheel | `8f7a8420bb790ef52dec3d557eb5c5a5bdda4bd5df9b312c9c7f7a088bf88948` |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` |
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` / 34768 |
 | production_activated | false |
