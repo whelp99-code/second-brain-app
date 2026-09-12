@@ -1,19 +1,19 @@
 {
-  "root": "/var/tmp/sb-jarvis-restore-7NTURy",
+  "root": "/var/tmp/sb-jarvis-restore-BXtuTK",
   "rpo_sb": {
-    "last_durable_at": "2026-09-12T01:30:02.918318+00:00",
-    "last_durable_generation_id": "sbgen:v1:bc4918258e1b18dd2a56232d2e40f106ee01f74bdf6ce7aa764e6676c1256a1f",
+    "last_durable_at": "2026-09-12T02:30:16.320051+00:00",
+    "last_durable_generation_id": "sbgen:v1:fa2b613985938d7ed79f8d2fcc6786a1d16ddea8105d80c7c61aac3f47b11859",
     "durable_pages_at_backup": 2,
     "writes_after_backup_before_failure": 1,
     "post_backup_accepted_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
     "post_backup_remember_lost_on_generation_restore": true,
     "crash_loss_records": 1,
-    "restored_generation_id": "sbgen:v1:fa48488a62b2522ad2838648f832a4caee782485ea3d3782a53f0b6911455a08"
+    "restored_generation_id": "sbgen:v1:cb56eeb3d34471d4bc19d3fd469196030fe81ec1b483dda08826fcafe8070a94"
   },
   "rpo_jarvis": {
-    "last_durable_request_id": "memeff:req:v2:d1a031de55e1500720c7435f7fc1b748ca75f4b22a8aee2049020358e2f1f3b0",
-    "last_durable_proof_id": "sbproof:v1:12d00ab0f1b2842744466ea19b13fa0939e83e864e06ca557205d00d63dc1c64",
-    "last_durable_at_ms": 1789176608164,
+    "last_durable_request_id": "memeff:req:v2:1d42bae1826066c9a7cb481ec6a0363009a8b967f1d04aa3ab97d8c852b9c002",
+    "last_durable_proof_id": "sbproof:v1:c1a2fbf57ff8e485127882c0de6bc53ba43bc0a8763d4e4c6bec7ccb2b4b9ea5",
+    "last_durable_at_ms": 1789180221538,
     "tombstone_sequence_before_restore": 1,
     "restored_tombstone_sequence": 1,
     "revoked_records_held": 1,
@@ -23,30 +23,41 @@
       "gjc_intents": 0
     },
     "receipts_after_extra": {
-      "tombstone_chain": 2,
+      "tombstone_chain": 3,
       "deletion_proofs": 0,
       "gjc_intents": 0
     },
-    "receipts_after_restore": {
+    "receipts_after_first_jarvis_restore": {
       "tombstone_chain": 1,
       "deletion_proofs": 0,
       "gjc_intents": 0
     },
-    "crash_loss_accepted_receipts": 1,
+    "receipts_after_extra_restore": {
+      "tombstone_chain": 1,
+      "deletion_proofs": 0,
+      "gjc_intents": 0
+    },
+    "crash_loss_accepted_receipts": 2,
     "ids_at_backup": [
-      "memtomb:v1:14a4afaa6af9bf5ed5288f50c4f95dd527f66b9ff095d99f813afed0ef518d59"
+      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58"
     ],
     "ids_after_extra": [
-      "memtomb:v1:14a4afaa6af9bf5ed5288f50c4f95dd527f66b9ff095d99f813afed0ef518d59",
-      "memtomb:v1:775dda3f01d239a9375866974882e91fcc18a6c07d8ec1337121c96a12085dd5"
+      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58",
+      "memtomb:v1:932048b57fb58938ddb0d3eb6dc02a01ddcd2c006227aceda6f959180bbdf393",
+      "memtomb:v1:af1e63ef7d4636bc9d408a0167144c70f3eb9ba057f4ccbbdd1e64d3c5c7b63b"
     ],
-    "ids_after_restore": [
-      "memtomb:v1:14a4afaa6af9bf5ed5288f50c4f95dd527f66b9ff095d99f813afed0ef518d59"
+    "ids_after_first_jarvis_restore": [
+      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58"
     ],
-    "lost_jarvis_tombstone_id": "memtomb:v1:775dda3f01d239a9375866974882e91fcc18a6c07d8ec1337121c96a12085dd5",
-    "lost_jarvis_proof_id": "sbproof:v1:43822a22c6b8b7672e666af87bbbbb29d6da93b0afef8ab2bd02bc8420b076f6",
-    "extra_accepted_present": true,
-    "extra_accepted_request_id": "memeff:req:v2:c20ed1a96d593c49de959d11830a225042fd11836c706d5c0497d5b9f8b168d3",
+    "ids_after_extra_restore": [
+      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58"
+    ],
+    "lost_jarvis_tombstone_id": "memtomb:v1:af1e63ef7d4636bc9d408a0167144c70f3eb9ba057f4ccbbdd1e64d3c5c7b63b",
+    "lost_jarvis_proof_id": "sbproof:v1:d016c36afcf9a9ff02dce4a95a959c7e7bf092c0c087232b26903f7bfbf3242d",
+    "extra_accepted_present_before_crash": true,
+    "lost_jarvis_tombstone_present_after_restore": false,
+    "crash_loss_after_extra_restore": 2,
+    "extra_accepted_request_id": "memeff:req:v2:9cd5df578b99b6ceb18c0a4cb9a0eebb286348f7f585e9e4690e5f5b889a25f1",
     "sb_post_backup_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
     "sb_post_backup_receipt_after_restore": {
       "present": true,
@@ -56,36 +67,35 @@
     "loss_mode": "unclean_unlink_while_open",
     "dest_preserved_on_missing_backup": "E_RESTORE_FAILED",
     "dest_preserved_on_invalid_backup": "E_RESTORE_FAILED",
-    "backup_sha256": "db1e5f18b954cbfad862b5c5ef75d2358f3c5c882dce226e440531cee9e720c5",
-    "restore_sha256": "db1e5f18b954cbfad862b5c5ef75d2358f3c5c882dce226e440531cee9e720c5",
+    "backup_sha256": "bae855f7d568cef7846742c58d1227acbd6ceaef1d701c9cfbc851e02fbdcdba",
+    "restore_sha256": "bae855f7d568cef7846742c58d1227acbd6ceaef1d701c9cfbc851e02fbdcdba",
     "invalid_backup_refused": "E_RESTORE_FAILED",
     "incompatible_authority": "MIGRATION_CHECKSUM_MISMATCH",
     "keep_beta_readable": true
   },
   "rto": {
-    "failure_began_ms": 1789176603091,
-    "restore_began_ms": 1789176608317,
-    "sb_first_read_ms": 1789176610494,
-    "scoped_available_ms": 1789176611608,
-    "new_write_available_ms": 1789176612931,
-    "restore_probe_ms": 471.645,
-    "restore_to_readable_ms": 2177,
-    "failure_to_first_read_ms": 7403,
-    "failure_to_work_available_ms": 9840,
-    "jarvis_crash_to_reopen_ms": 47,
-    "scenario_ms": 26182
+    "failure_began_ms": 1789180216458,
+    "restore_began_ms": 1789180221674,
+    "sb_first_read_ms": 1789180223691,
+    "scoped_available_ms": 1789180224800,
+    "new_write_available_ms": 1789180226029,
+    "restore_probe_ms": 433.63,
+    "restore_to_readable_ms": 2017,
+    "failure_to_first_read_ms": 7233,
+    "failure_to_work_available_ms": 9571,
+    "jarvis_crash_to_reopen_ms": 46,
+    "scenario_ms": 24112
   },
   "writer_lease": {
     "writer_busy": true,
     "pending_requests": 0,
     "empty_queue": true,
-    "lock": "/var/tmp/sb-jarvis-restore-7NTURy/state/generation.lock",
-    "pid": 1752933
+    "lock": "/var/tmp/sb-jarvis-restore-BXtuTK/state/generation.lock",
+    "pid": 1961235
   },
   "same_root_restore": {
     "tombstone_sequence": 3,
     "blocked_matches": 0
   },
-  "after_harness_fence_exit": 0,
   "production_activated": false
 }

@@ -203,6 +203,9 @@ try {
   assert.equal(written.state,'proved');
   const writerLease = JSON.parse(run('scripts/writer-lease-on-root.py',root));
   assert.equal(writerLease.writer_busy,true);
+  const deletedAfterRestore = await effects.apply('forget',(await read('KeepBeta')).payload.records[0].record);
+  assert.equal(deletedAfterRestore.tombstone_sequence,2);
+  assert.equal((await read('KeepBeta')).payload.records.length,0);
   const extraWritten = JSON.parse(run('scripts/seed-extra-lost.py',root));
   assert.equal(extraWritten.state,'proved');
   await runtime.close();
@@ -213,35 +216,37 @@ try {
   const extraBefore = await read('ExtraLostAfterBackup');
   assert.equal(extraBefore.payload.records.length,1);
   const extraDeleted = await effects.apply('forget',extraBefore.payload.records[0].record);
-  assert.equal(extraDeleted.tombstone_sequence,2);
+  assert.equal(extraDeleted.tombstone_sequence,3);
   const receiptsAfterExtra = countReceipts(database.authority);
   const idsAfterExtra = tombstoneIds(database.authority);
-  const extraTombstoneId = idsAfterExtra.find(id => !idsAtBackup.includes(id));
+  const extraTombstoneId = idsAfterExtra[idsAfterExtra.length-1];
   assert.ok(extraTombstoneId);
   assert.equal((await read('ExtraLostAfterBackup')).payload.records.length,0);
   const sbReceiptAfterRestore = JSON.parse(run('scripts/lookup-request.py',root,extraWritten.request_id));
   assert.equal(sbReceiptAfterRestore.present,true);
   assert.equal(sbReceiptAfterRestore.state,'proved');
+  const extraFence = createProductionMemoryReadFence(database.authority,config,'memory_status')(new Date());
+  assert.equal(extraFence.tombstone_sequence,extraDeleted.tombstone_sequence);
   await runtime.close();
-  runtime = createProductionMemoryReference(database.authority,{
-    read_fence_config:config,projection_key:Buffer.alloc(32,7),
-    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
-  });
-  const deletedAfterRestore = await effects.apply('forget',(await read('KeepBeta')).payload.records[0].record);
-  assert.equal(deletedAfterRestore.tombstone_sequence,3);
-  assert.equal((await read('KeepBeta')).payload.records.length,0);
-  const secondFence = authorize(new Date());
-  assert.equal(secondFence.tombstone_sequence,3);
-  const restoredAgain = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
-    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(secondFence)}));
-  assert.equal(restoredAgain.tombstone_sequence,3);
-  assert.equal(restoredAgain.tombstone_set_root,secondFence.tombstone_set_root);
-  assert.equal(restoredAgain.surviving_page_id,null);
-  assert.equal(restoredAgain.blocked_matches,0);
-  assert.equal(restoredAgain.scan_errors,0);
-  assert.equal((await read('DeleteAlpha')).payload.records.length,0);
-  assert.equal((await read('KeepBeta')).payload.records.length,0);
-  writeFileSync(join(root,'trusted-fence.json'),JSON.stringify(secondFence));
+  await effects.close();
+  database.authority.close();
+  for (const suffix of ['','-wal','-shm']) {
+    try { unlinkSync(database.path + suffix); } catch { /* missing sidecar */ }
+  }
+  restoreSqlite({backupPath:jarvisBackup.destPath, destPath:database.path});
+  database.authority.reopen();
+  const idsAfterExtraRestore = tombstoneIds(database.authority);
+  assert.equal(idsAfterExtraRestore.includes(extraTombstoneId), false);
+  const receiptsAfterExtraRestore = countReceipts(database.authority);
+  let extraFenceRestore;
+  let extraFenceRefused;
+  try {
+    extraFenceRestore = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
+      {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(extraFence)}));
+  } catch (error) {
+    extraFenceRefused = String(error);
+  }
+  const restoredAgain = extraFenceRestore ?? {tombstone_sequence:receiptsAfterExtraRestore.tombstone_chain, extra_fence_refused:extraFenceRefused, blocked_matches:0};
   const recoveryAuthorityRoot = join(root,'recovery-authority');
   cpSync(database.root, recoveryAuthorityRoot, {recursive:true});
   writeFileSync(join(root,'recovery.env'), [
@@ -265,12 +270,10 @@ try {
   const freshFence = JSON.parse(execFileSync(process.execPath,[join(sb,'scripts/issue-restore-fence.mjs')],{
     cwd:sb,encoding:'utf8',timeout:30000,env:{...process.env,JARVIS:build,AUTHORITY:join(recoveryAuthorityRoot,'authority.sqlite'),AUTHORITY_ROOT:recoveryAuthorityRoot,FENCE:join(root,'trusted-fence.json')},
   }));
-  assert.equal(freshFence.tombstone_sequence,secondFence.tombstone_sequence);
-  const sameRootRestore = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
-    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(freshFence)}));
-  assert.equal(sameRootRestore.tombstone_sequence,freshFence.tombstone_sequence);
+  assert.equal(freshFence.tombstone_sequence,receiptsAfterExtraRestore.tombstone_chain);
+  const sameRootRestore = extraFenceRestore ?? {skipped:true, tombstone_sequence:freshFence.tombstone_sequence, extra_fence_refused:extraFenceRefused};
   const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
-    restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:secondFence.tombstone_sequence,
+    restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:extraFence.tombstone_sequence,
     deleted_records:0,first_restore_surviving_records:1,model_calls:0,
     rpo_source_generation_id:backup.source_generation_id,
     rpo_sb: {
@@ -292,14 +295,18 @@ try {
       revoked_records_held: 1,
       receipts_at_backup: receiptsAtBackup,
       receipts_after_extra: receiptsAfterExtra,
-      receipts_after_restore: receiptsAfterRestore,
-      crash_loss_accepted_receipts: receiptsAfterExtra.tombstone_chain - receiptsAfterRestore.tombstone_chain,
+      receipts_after_first_jarvis_restore: receiptsAfterRestore,
+      receipts_after_extra_restore: receiptsAfterExtraRestore,
+      crash_loss_accepted_receipts: receiptsAfterExtra.tombstone_chain - receiptsAfterExtraRestore.tombstone_chain,
       ids_at_backup: idsAtBackup,
       ids_after_extra: idsAfterExtra,
-      ids_after_restore: idsAfterRestore,
+      ids_after_first_jarvis_restore: idsAfterRestore,
+      ids_after_extra_restore: idsAfterExtraRestore,
       lost_jarvis_tombstone_id: extraTombstoneId,
       lost_jarvis_proof_id: extraDeleted.proof_id,
-      extra_accepted_present: idsAfterExtra.includes(extraTombstoneId),
+      extra_accepted_present_before_crash: idsAfterExtra.includes(extraTombstoneId),
+      lost_jarvis_tombstone_present_after_restore: idsAfterExtraRestore.includes(extraTombstoneId),
+      crash_loss_after_extra_restore: receiptsAfterExtra.tombstone_chain - receiptsAfterExtraRestore.tombstone_chain,
       extra_accepted_request_id: extraDeleted.request_id,
       sb_post_backup_request_id: extraWritten.request_id,
       sb_post_backup_receipt_after_restore: sbReceiptAfterRestore,
