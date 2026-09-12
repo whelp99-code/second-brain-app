@@ -8,7 +8,10 @@ import traceback
 from datetime import UTC, datetime
 
 import anyio
+import pytest
 from mcp.client import Client
+
+pytestmark = pytest.mark.filterwarnings("error::pytest.PytestUnhandledThreadExceptionWarning")
 
 from sb.access_claims import access_request_digest
 from sb.config import Config
@@ -134,9 +137,10 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
             page.write_text("Omega corrected unique memory.")
             assert run_ingest(config, ["docs"]).exit_code == 0
             assert run_compile(config).exit_code == 0
-        except (AssertionError, OSError, RuntimeError, ValueError):
+        except BaseException:
             errors.append(traceback.format_exc())
             preparing.set()
+            raise
 
     worker = threading.Thread(target=writer)
     worker.start()

@@ -50,7 +50,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입. 제품/버전별 새 세션 상호 회수 | blocked_external | 격리 MCP 세션만 | Codex/Claude/Orca 각 버전·프로필·자동주입 경로 명시 입력 |
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction. 만료·철회 후 재사용 없음 | implemented_unverified | `gjc.dispatch` 예산/세대 재검증 (제품 경로). 세션 compaction 이벤트 없음 | native/Orca compaction 트리거 이벤트. 그 입력이 오기 전 dispatch 경로와 분리 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 고정 synthetic/KeepBeta만 | 사용자 큐레이션 정답집 |
-| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신. p50/p95·RSS | implemented_unverified | 기존 M11-MCP-CORPUS-LATENCY(재실행 없음). 합성 동시 조회: `test_concurrent_scoped_search_keeps_deny_and_allowed` 1 passed | 운영 corpus는 입력. 클라이언트 RSS≠서버 RSS |
+| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신. p50/p95·RSS | implemented_unverified | 정상 Alpha→Omega: `test_normal_correction_and_reader_during_compile`. ingest 세대는 during read 전 변경·Alpha record 유지. Omega 준비중 reader 완료→게시. pinned-read 중 publish는 미검증 | 운영 corpus·강한 동시 게시는 미검증. 보류 분기는 검사특정불가 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. 신뢰 근거 복구·삭제 high-water·재유입 차단·시간 | implemented_unverified | harness-36: 필수 restore+만료 fence 후 schema4 write, recover-a/b/retry, final_fresh `첫 결정`. generic ExtraLost 0 KeepBeta 0. cold restore cap0 1 passed (원 전체회귀 실패1은 별도) | 운영 RPO/RTO는 운영 백업 |
 | M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | Chrome CDP `isolated-browser-m13-lifetime.py` EXIT 0: remember fail/success, search/원문, conflict fail/resolve, inbox 영수증 삭제, 검색 유지. Codex actual-ui remember/conflict 버튼 보존. 운영 timer/실사용자삭제는 외부 |
 | M14 | 관계 검색 추가 가치 측정 후 제한 채택. 운영 전환이 아님 | not_implemented | hybrid 무근거 후보 증가 | 고정 질문에서 비용 대비 효과·정정/삭제 일관성 입증 전 기본 활성화 보류 |
@@ -67,7 +67,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | schema4 write | `scripts/seed-scoped-v4.py` → `accept_scoped_request` + `RequestExecutor` schema4 `source_access` | `memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532` proved, page `wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0`, needle `첫 결정`. ledger 수동 INSERT 없음 |
 | 만료 fence | restore-probe restore + past fence | `TOMBSTONE_FENCE_REQUIRED` (harness 기대 실패) |
 | 종료 후 권한 | `qku1N6/recovery.env` AUTHORITY_ROOT 생존 | fence seq 3 |
-| 설치 3게이트 | `/var/tmp/sb-gates-f7c1945.log` (이 소스) | maintenance/integration/`--work` |
+| 설치 3게이트 | `/var/tmp/sb-gates-f7c1945.log` (실행 핀 `f7c1945`, 현재 아카이브 `8edb9d4`와 wheel 바이트 동일. 새 실행으로 바꾸지 않음) | maintenance/integration/`--work` |
 | cold restore | `pytest tests/test_cold_restore_write.py` | 1 passed (briefing cap 0). 원 전체회귀 1 failed는 별도 기록 |
 | Codex 실제 UI | `/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json` | remember400→201, conflict400→200. 재실행 없음 |
 | 전체 pytest | 이번 미반복 | Codex 1837 passed / 1 failed / 2 skipped를 이번 집중 수정으로 전체 통과라 바꾸지 않음 |
@@ -118,6 +118,6 @@ python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
 - 보류: M5/M8 제품별 native 경로, M10 정답집, M1 운영 로그인, 전환 허가.
 - recovered-retry = 세 번째 scoped 조회. 원장 retry와 구분.
 - M13 기존 HTTP 진입점: remember 400/201+inbox 영수증, pages 원문, conflict 400/200 정정, retention GET(삭제 컨트롤 없음), search 재조회. Chrome 버튼 수명은 Codex actual-ui만 인용.
-- M11 합성: `test_concurrent_scoped_search_keeps_deny_and_allowed` 허용/거부 동시 조회.
-- 외부만: 운영 timer, native 로그인, 실사용자 질문/원문, 운영 corpus, 전환 허가.
+- M11 정상: `test_normal_correction_and_reader_during_compile` Alpha 본문/record_id → Omega 본문/다른 record_id/새 generation, Alpha 검색 []. reader는 writer 준비 후 완료, 그 다음 게시.
+- 보류/미검증(검사특정불가): 보안 경계·삭제 경합·콘텐츠제한 연관 분기. 성공이나 운영입력 대기가 아님. 원 미완료를 외부만으로 지우지 않음.
 - 미전환을 운영 완료로 표현하지 않음.

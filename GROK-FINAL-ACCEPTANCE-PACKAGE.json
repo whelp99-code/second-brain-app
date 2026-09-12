@@ -20,7 +20,10 @@
     "integration": 0,
     "work": 0,
     "production_activated": false,
-    "harness_commit": "8edb9d4f8806a802d2c391e459fa7f5960a57a8d"
+    "executed_pin": "f7c194594e21728678b118e7c0029cd3e1deb30b",
+    "current_archive_pin": "8edb9d4f8806a802d2c391e459fa7f5960a57a8d",
+    "wheel_bytes_match_executed_pin": true,
+    "harness_commit": "f7c194594e21728678b118e7c0029cd3e1deb30b"
   },
   "hash_contrast": {
     "sb/mcp.py": true,
