@@ -10,26 +10,26 @@
 
 | ID | 원 요구 | 상태 | 근거 / 미구현 / 외부 입력 |
 |---|---|---|---|
-| A | 원본·사용자 편집·정정 보존 | implemented_unverified | USER_EDIT_KEEP_THIS, managed compile. 운영 원본 세트는 외부 |
-| B | 철회 정본·권한·복원 | implemented_unverified | 격리 철회 2 client. 운영 키 복사 금지 |
-| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact, KeepBeta 본문. 실제 사용자 질문 100–300은 외부 |
-| D | 실제 공유 기억의 수명 | implemented_unverified | 격리 2 client. 운영 native 사본 처분은 외부 |
-| E | 가용성·복구·GUI | implemented_unverified | 격리 Chrome fail→success, paired DR. 운영 GUI 전체 수명은 외부 |
-| F | 배포 재료와 운영 절차 | implemented_unverified | 설치 3게이트, 런북 REL/JARVIS/ROOT. 전환 허가 없음 |
-| M1 | 연결: 실제 HTTP/CLI→scoped MCP, 인증 세션·정책 resolver/issuer | implemented_unverified | 격리 scoped MCP. 운영 로그인 신원은 외부. drain이 아님 |
-| M2 | 기능: scoped 쓰기→proved→settled→새 로그인 재조회 | implemented_unverified | 격리 proved/replay. 실제 사용자 업무 원문은 외부 |
-| M3 | 정책: 철회·만료·복원, 기발급 claim | implemented_unverified | revoked-jarvis-signing-key-ids. 운영 rollback 전체 수명은 외부 |
-| M4 | 계보: task→검증 결과→candidate→provider record | implemented_unverified | 격리 request/proof. 실제 사용자 작업 원문 계보는 외부 |
-| M5 | 세션 수명: native session/compaction/log/WAL 보존·삭제 | blocked_external | 제품/버전별 native 세션 경로 입력 |
-| M6 | 동시성: writer 배제·전환 실패 복구·새 쓰기 권한 분리 | implemented_unverified | generation.lock busy≠pending 0. 운영 서비스 전환은 허가 없음 |
-| M7 | 접근 일관성: 모든 읽기 표면 같은 정책 | implemented_unverified | scoped 허용/거부. 모든 프로필/벡터/운영 원문 경로는 미완 |
-| M8 | 클라이언트: Codex·Claude 등 제품별 조회/주입 | blocked_external | 실제 제품·버전별 자동 수집·주입 입력 |
-| M9 | 문맥: 예산·출처·compaction 재선택 | blocked_external | native/Orca compact 이벤트 |
-| M10 | 검색 평가: 한글 개인/업무 gold 100–300 | blocked_external | 실제 질의 정답집 |
-| M11 | 용량·갱신: 운영 corpus p50/p95 | blocked_external | 운영 corpus |
-| M12 | 복구: archive→원장 결합→조회/거부/high-water→새 쓰기, SB/JARVIS RPO | implemented_unverified | WAL set restore, JARVIS tombstone 유실 vs SB receipt 잔존 |
-| M13 | 운영·화면: GUI 정정/삭제 수명 | implemented_unverified | 격리 Chrome. 운영 timer/GUI 전체는 외부 |
-| M14 | 관계 검색: 기준 대비 가치·비용·삭제 일관성 | not_implemented | hybrid는 무근거 후보 증가. 기본 활성화 보류. 운영 전환이 아님 |
+| A | 원본·사용자 편집·정정 보존 | implemented_unverified | USER_EDIT_KEEP_THIS, managed compile. 운영 원본 세트는 소유자 목록 입력 |
+| B | 철회 정본·권한·복원 | implemented_unverified | 격리 2 client 철회/회복. 운영 키 복사 금지 |
+| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact, gjc.dispatch V1-C–F. gold 100–300은 M10 |
+| D | 실제 공유 기억의 수명 | implemented_unverified | schema4 proved + recover-a/b 동일 digest. 실사용자 1건은 입력 |
+| E | 가용성·복구·GUI | implemented_unverified | paired DR, 격리 Chrome fail→success. GUI 전체 수명은 M13 격리 남음 |
+| F | 배포 재료와 운영 절차 | implemented_unverified | frozen a4b228f × 7d2fdedd 3게이트 EXIT0. 전환 미실행. 운영 current 41f0751 |
+| M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | implemented_unverified | 격리 scoped MCP. 운영 로그인 신원/세션 입력 |
+| M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | 격리 schema4 proved + 2 세션. 실사용자 task 원문 입력 |
+| M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | 세션 철회 후 거부, 만료 fence TOMBSTONE_FENCE_REQUIRED |
+| M4 | 원작업→검증 결과→기억 원문 계보. dispatch 본문 계보가 전부가 아님 | implemented_unverified | ExtraLost generic 0, schema4 본문 scoped 회수. 실사용자 원계보 입력 |
+| M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | 제품/버전별 native 세션 경로 입력 |
+| M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | writer_busy true. dest exclusive restore. 운영 서비스 전환 허가 없음 |
+| M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | scoped-v3 허용/거부. CLI v4 EXIT0. owner 본문 vs project:b deny. web owner vs scoped deny. scoped_search hybrid=False·score/snippet/relation 없음. 운영 원문 세트는 입력 |
+| M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | 제품/버전별 자동주입 경로 입력 |
+| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | gjc.dispatch 예산/세대 재검증. compaction 이벤트는 native/Orca 입력 |
+| M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
+| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | M11-MCP-CORPUS-LATENCY-2026-09-11.json. 운영 corpus는 입력 |
+| M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | harness-35 EXIT0. high-water seq3 후 schema4 write + recover-a/b/retry 동일 digest, generic reader 별도 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | R6 fail→success, web HTTP 10, isolated-browser-correct-receipt EXIT0. 콘솔 삭제 버튼 없음. 운영 timer는 전환 후 |
+| M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | not_implemented | hybrid 무근거 후보 증가. 기본 활성화 보류 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 

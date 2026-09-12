@@ -1,28 +1,72 @@
 {
-  "pin": {
-    "sb_source": "12db06edc6760f8478e2d7c866b10a8d06430eb3",
-    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
-    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
-    "candidate": "/var/tmp/sb-candidate-12db06e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+  "codex_final_review_requested": true,
+  "product_acceptance": false,
+  "production_activated": false,
+  "operational_current": "41f0751",
+  "frozen_pin": {
+    "sb_source": "a4b228f326c275cf0aeb05b6ce01d9f224697a2f",
+    "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
+    "candidate": "/var/tmp/sb-candidate-a4b228f/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
     "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
     "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
     "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
-    "jarvis_inventory_entries": 34768,
-    "operational_current": "41f0751",
-    "production_activated": false,
-    "tsc_exit": 0
+    "jarvis_inventory_entries": 34768
   },
-  "fixture_root": "/var/tmp/sb-jarvis-restore-Ar1cuM",
+  "uncommitted_harness": [],
   "gates": {
-    "maintenance_exit": 0,
-    "integration_exit": 0,
-    "work_exit": 0
+    "log": "/var/tmp/sb-gates-a4b228f.log",
+    "maintenance": 0,
+    "integration": 0,
+    "work": 0,
+    "production_activated": false,
+    "harness_commit": "a4b228f326c275cf0aeb05b6ce01d9f224697a2f"
   },
-  "jarvis_rpo_extra_gone": true,
-  "jarvis_recovered_highwater_seq": 3,
-  "after_harness_fence_seq": 3,
-  "after_harness_restore_exit": 0,
-  "post_recovery_write": 1,
-  "codex_final_review_requested": true,
-  "product_acceptance": false
+  "hash_contrast": {
+    "sb/mcp.py": true,
+    "sb/runtime_access.py": true
+  },
+  "focused_regression": {"command": "pytest tests/test_request_store_maintenance.py tests/test_memory_access.py::test_unscoped_owner_read_does_not_leak_through_scoped_deny tests/test_web.py::test_web_search_owner_surface_does_not_replace_scoped_deny tests/test_scoped_search.py::test_scoped_search_disables_hybrid_and_omits_scores", "passed": 7, "exit": 0},
+  "dispatch_changed": false,
+  "full_pytest_repeated": false,
+  "c0b4fce": {
+    "log": "/var/tmp/jarvis-crash-restore-35.log",
+    "exit": 0,
+    "fixture_root": "/var/tmp/sb-jarvis-restore-kJ4UcY",
+    "result_json": "/var/tmp/sb-jarvis-restore-kJ4UcY/result.json",
+    "generic_reader": {"extra_lost": 0, "keep_beta": 0},
+    "schema4_request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+    "page_id": "wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0",
+    "page_content_digest": "sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6",
+    "recovered_scoped_agent": "agent:recover-a",
+    "recovered_peer_agent": "agent:recover-b",
+    "recovered_retry_agent": "agent:recover-retry",
+    "aliased_peer_to_scoped": false,
+    "hand_granted_source_access": false,
+    "jarvis_owned_high_water": 3,
+    "rto_restore_to_readable_ms": 2092,
+    "failure_to_work_available_ms": 9740
+  },
+  "requirements": {
+    "A": {"meaning": "original/user-edit/correction preservation", "status": "implemented_unverified"},
+    "B": {"meaning": "revocation store/authority/restore", "status": "implemented_unverified"},
+    "C": {"meaning": "one search contract and model payload body/source/version/budget", "status": "implemented_unverified"},
+    "D": {"meaning": "shared-memory lifetime lineage", "status": "implemented_unverified"},
+    "E": {"meaning": "availability/recovery/GUI", "status": "implemented_unverified"},
+    "F": {"meaning": "release materials and ops runbook; cutover not done", "status": "implemented_unverified"},
+    "M1": {"meaning": "wire existing auth session/resolver/issuer/gateway to live entry; not drain", "status": "implemented_unverified", "blocked_external": "live login principal/session"},
+    "M2": {"meaning": "one real work item query→verified→store→receipt→other agent session; not revocation path", "status": "implemented_unverified", "blocked_external": "real user task/request/candidate"},
+    "M3": {"meaning": "policy revision/issued claim/backup rollback lifetime", "status": "implemented_unverified"},
+    "M4": {"meaning": "work→verified result→memory body lineage; dispatch body is not the whole", "status": "implemented_unverified"},
+    "M5": {"meaning": "native session/compaction/log/WAL/backup copy lifetime", "status": "blocked_external", "input": "per-product native session paths"},
+    "M6": {"meaning": "writer/lease exclusion and single-writer cutover recovery", "status": "implemented_unverified"},
+    "M7": {"meaning": "every supported read surface same scope; zero unauthorized title/snippet/score/body/vector/relation", "status": "implemented_unverified", "cli_search_v4_journal_exit": 0, "unscoped_vs_scoped_deny": "tests/test_memory_access.py::test_unscoped_owner_read_does_not_leak_through_scoped_deny", "web_owner_vs_scoped_deny": "tests/test_web.py::test_web_search_owner_surface_does_not_replace_scoped_deny", "scoped_search_hybrid_disabled": "tests/test_scoped_search.py::test_scoped_search_disables_hybrid_and_omits_scores", "remaining_isolated": []},
+    "M8": {"meaning": "per-client collect/read/write/auto-inject", "status": "blocked_external", "input": "product/version auto-inject paths"},
+    "M9": {"meaning": "live session context budget/dedupe/compaction", "status": "implemented_unverified", "blocked_external": "native/Orca compaction event"},
+    "M10": {"meaning": "100-300 real Korean questions with gold", "status": "blocked_external", "input": "curated gold set"},
+    "M11": {"meaning": "large-corpus MCP p50/p95 and concurrent refresh", "status": "implemented_unverified"},
+    "M12": {"meaning": "journal-loss DR with RPO/RTO, high-water, reingress block", "status": "implemented_unverified"},
+    "M13": {"meaning": "GUI correction/delete/body/receipt/failure recovery/timer", "status": "implemented_unverified", "web_http_tests_passed": 10, "browser_correct_receipt": {"script": "scripts/isolated-browser-correct-receipt.py", "evidence": "/var/tmp/sb-browser-correct/evidence.json", "exit": 0}, "remaining_isolated": ["no GUI delete control in product console", "ops timer after cutover"]},
+    "M14": {"meaning": "relation-search value vs cost; not ops cutover", "status": "not_implemented"}
+  }
 }
