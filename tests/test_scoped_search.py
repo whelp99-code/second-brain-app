@@ -92,3 +92,23 @@ def test_scoped_search_disables_hybrid_and_omits_scores(classified, monkeypatch)
     denied = search_scoped_records(
         root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10)
     assert denied == []
+
+
+def test_concurrent_scoped_search_keeps_deny_and_allowed(classified):  # noqa: F811
+    from concurrent.futures import ThreadPoolExecutor
+
+    root, _name, generation = classified
+    allowed_scope = SourceAccess("principal:owner", ("project:a",), "1")
+    denied_scope = SourceAccess("principal:owner", ("project:b",), "1")
+
+    def allowed() -> object:
+        return search_scoped_records(root, generation, allowed_scope, "Cited", 10)
+
+    def denied() -> object:
+        return search_scoped_records(root, generation, denied_scope, "Cited", 10)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        allowed_rows = list(pool.map(lambda _: allowed(), range(4)))
+        denied_rows = list(pool.map(lambda _: denied(), range(4)))
+    assert all(rows and "Cited" in str(rows) for rows in allowed_rows)
+    assert all(rows == [] for rows in denied_rows)

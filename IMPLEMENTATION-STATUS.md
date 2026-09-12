@@ -26,9 +26,9 @@
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | 제품/버전별 자동주입 경로 입력 |
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | gjc.dispatch 예산/세대 재검증. compaction 이벤트는 native/Orca 입력 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
-| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | M11-MCP-CORPUS-LATENCY-2026-09-11.json. 운영 corpus는 입력 |
+| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | M11-MCP-CORPUS-LATENCY(재실행 없음). 합성 동시 scoped 허용/거부 1 passed. 운영 corpus는 입력 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | harness-36: 필수 restore/만료fence 후 schema4 write + 2scope + final_fresh. cold restore cap0 1 passed |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | Python POST와 구분. Codex actual-ui remember400→201, conflict400→200. 콘솔 삭제 없음. 운영 timer는 전환 후 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | 기존 HTTP 진입점 수명 1 passed. Chrome 버튼은 Codex actual-ui. 삭제 컨트롤 없음. 운영 timer는 전환 후 |
 | M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | not_implemented | hybrid 무근거 후보 증가. 기본 활성화 보류 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).

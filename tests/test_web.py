@@ -523,3 +523,45 @@ def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> No
         root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10)
     assert denied == []
     assert "Cited" not in str(denied)
+
+
+def test_existing_gui_entrypoints_lifetime_and_concurrent_search(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    with _running(config) as base:
+        fail_status, fail_body = _request(base + "/api/remember", method="POST", payload={"title": "x"})
+        assert fail_status == 400
+        assert "content is required" in str(fail_body)
+        ok_status, remembered = _request(
+            base + "/api/remember",
+            method="POST",
+            payload={"title": "영수증", "content": "lifetime-receipt-needle"},
+        )
+        assert ok_status == 201
+        assert isinstance(remembered, dict)
+        inbox_path = remembered.get("inbox_path")
+        assert isinstance(inbox_path, str)
+        inbox = root / inbox_path
+        assert inbox.is_file() and "lifetime-receipt-needle" in inbox.read_text(encoding="utf-8")
+        page_status, page = _request(base + "/api/pages/" + urllib.parse.quote("wiki/계약-일정", safe=""))
+        assert page_status == 200 and TERM in str(cast(dict[str, object], page).get("body"))
+        bad_conflict, _ = _request(
+            base + "/api/conflicts/web-case/resolve",
+            method="POST",
+            payload={"decision": 1, "note": "x"},
+        )
+        assert bad_conflict == 400
+        ok_conflict, resolved = _request(
+            base + "/api/conflicts/" + urllib.parse.quote("web-case", safe="") + "/resolve",
+            method="POST",
+            payload={"decision": "note", "note": "정정"},
+        )
+        assert ok_conflict == 200 and isinstance(resolved, dict) and resolved.get("commit")
+        retention_status, retention = _request(base + "/api/retention")
+        assert retention_status == 200 and isinstance(retention, dict)
+        changes_status, _changes = _request(base + "/api/changes?days=7")
+        assert changes_status == 200
+        before_search, before_hits = _request(base + "/api/search?q=" + urllib.parse.quote(TERM) + "&kind=wiki")
+        assert before_search == 200 and TERM in json.dumps(before_hits, ensure_ascii=False)
+        after_search, after_hits = _request(base + "/api/search?q=" + urllib.parse.quote(TERM) + "&kind=wiki")
+        assert after_search == 200 and TERM in json.dumps(after_hits, ensure_ascii=False)
+    assert "status: resolved" in (root / "conflicts" / "web-case.md").read_text(encoding="utf-8")

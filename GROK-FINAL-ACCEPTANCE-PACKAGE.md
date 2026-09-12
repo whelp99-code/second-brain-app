@@ -50,23 +50,23 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입. 제품/버전별 새 세션 상호 회수 | blocked_external | 격리 MCP 세션만 | Codex/Claude/Orca 각 버전·프로필·자동주입 경로 명시 입력 |
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction. 만료·철회 후 재사용 없음 | implemented_unverified | `gjc.dispatch` 예산/세대 재검증 (제품 경로). 세션 compaction 이벤트 없음 | native/Orca compaction 트리거 이벤트. 그 입력이 오기 전 dispatch 경로와 분리 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 고정 synthetic/KeepBeta만 | 사용자 큐레이션 정답집 |
-| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신. p50/p95·RSS | implemented_unverified | `M11-MCP-CORPUS-LATENCY-2026-09-11.json` 후보 MCP 30/100/300 | 운영 corpus·동시 정정은 운영 자료 입력. 클라이언트 RSS≠서버 RSS |
+| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신. p50/p95·RSS | implemented_unverified | 기존 M11-MCP-CORPUS-LATENCY(재실행 없음). 합성 동시 조회: `test_concurrent_scoped_search_keeps_deny_and_allowed` 1 passed | 운영 corpus는 입력. 클라이언트 RSS≠서버 RSS |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. 신뢰 근거 복구·삭제 high-water·재유입 차단·시간 | implemented_unverified | harness-36: 필수 restore+만료 fence 후 schema4 write, recover-a/b/retry, final_fresh `첫 결정`. generic ExtraLost 0 KeepBeta 0. cold restore cap0 1 passed (원 전체회귀 실패1은 별도) | 운영 RPO/RTO는 운영 백업 |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | HTTP: `isolated-browser-correct-receipt.py` Python POST. **실제 UI(재실행 없음):** Codex `actual-ui-result.json` remember 400→201, conflict 400→200, inbox+git `e47bc81`. 콘솔 삭제 버튼 없음 | 전체 GUI 삭제/native/운영 timer는 미구현. 운영 timer는 전환 후 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | 기존 진입점 `test_existing_gui_entrypoints_lifetime_and_concurrent_search` 1 passed: remember400/201+inbox, pages 원문, conflict400/200, retention GET, search. 실패복구는 test_web_run_failure(재실행 없음). Chrome 버튼은 Codex actual-ui만. 삭제 버튼 없음 | 운영 timer·native 로그인·전체 GUI 삭제는 외부/미구현 |
 | M14 | 관계 검색 추가 가치 측정 후 제한 채택. 운영 전환이 아님 | not_implemented | hybrid 무근거 후보 증가 | 고정 질문에서 비용 대비 효과·정정/삭제 일관성 입증 전 기본 활성화 보류 |
 
 ## 3. 테스트 증거
 
 | 무엇 | 명령/경로 | 결과 |
 |---|---|---|
-| c0b4fce 두 scoped 세션 | `TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs /home/jm/orca/projects/Orca-JARVIS/dist` | `/var/tmp/jarvis-crash-restore-36.log` **EXIT 0** |
+| c0b4fce 두 scoped 세션 | `TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs /var/tmp/jarvis-artifact-1672626/source/dist` | `/var/tmp/jarvis-crash-restore-36.log` **EXIT 0** (재현은 고정 dist; 당시 실행은 workspace dist와 바이트 동일 범위) |
 | 기계 JSON | `/var/tmp/sb-jarvis-restore-qku1N6/result.json` | generic_reader `{extra_lost:0,keep_beta:0}`, `classified_write_after_required_restores:true`, `second_restore_records:1` == final_fresh |
 | recover-a | agent `agent:recover-a` session `session:recover-a` | allowed_pages 1, withdrawal_denied, digest `sha256:f3b73d4e44a9205673892efe803c304be08ff27ba713eef85ba847f5104261f6` |
 | recover-b | agent `agent:recover-b` session `session:recover-b` | 동일 digest, 다른 agent/session. **recoveredPeer ≠ recoveredScoped 복사** |
 | recover-retry | agent `agent:recover-retry` | 동일 digest |
 | schema4 write | `scripts/seed-scoped-v4.py` → `accept_scoped_request` + `RequestExecutor` schema4 `source_access` | `memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532` proved, page `wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0`, needle `첫 결정`. ledger 수동 INSERT 없음 |
 | 만료 fence | restore-probe restore + past fence | `TOMBSTONE_FENCE_REQUIRED` (harness 기대 실패) |
-| 종료 후 권한 | `kJ4UcY/recovery.env` AUTHORITY_ROOT 생존 | fence seq 3 |
+| 종료 후 권한 | `qku1N6/recovery.env` AUTHORITY_ROOT 생존 | fence seq 3 |
 | 설치 3게이트 | `/var/tmp/sb-gates-32e58fe.log` (이 소스) | maintenance/integration/`--work` |
 | cold restore | `pytest tests/test_cold_restore_write.py` | 1 passed (briefing cap 0). 원 전체회귀 1 failed는 별도 기록 |
 | Codex 실제 UI | `/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json` | remember400→201, conflict400→200. 재실행 없음 |
@@ -79,7 +79,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 
 | 측정 | 값 |
 |---|---|
-| fixture | `/var/tmp/sb-jarvis-restore-kJ4UcY` |
+| fixture | `/var/tmp/sb-jarvis-restore-qku1N6` |
 | jarvis_owned_high_water | 3 |
 | rto_restore_to_readable_ms | 2092 |
 | failure_to_work_available_ms | 9740 |
@@ -94,9 +94,11 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 
 ```bash
 cd /home/jm/orca/projects/second-brain-app
-TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs /home/jm/orca/projects/Orca-JARVIS/dist
-# 기대: EXIT 0, stdout JSON recovered_scoped.agent != recovered_peer.agent
-#       page_content_digest 동일, generic_reader.extra_lost==0
+TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs /var/tmp/jarvis-artifact-1672626/source/dist
+# 기대: EXIT 0, classified_write_after_required_restores true
+#       recovered_scoped.agent != recovered_peer.agent, digest 동일
+#       recovered_retry는 세 번째 조회이며 원장 retry가 아님
+#       generic_reader.extra_lost==0, final_fresh 첫 결정
 ```
 
 종료 후 (ROOT는 런마다 다름):
@@ -114,5 +116,8 @@ python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
 - 전환 없음. `production_activated=false`. current `41f0751`.
 - 실신원 종단 없음.
 - 보류: M5/M8 제품별 native 경로, M10 정답집, M1 운영 로그인, 전환 허가.
-- 다음 격리 실행 가능: M7 나머지 읽기 표면, M13 격리 브라우저 정정/삭제 수명, 미커밋 harness의 커밋+게이트(명시 요청 시).
+- recovered-retry = 세 번째 scoped 조회. 원장 retry와 구분.
+- M13 기존 HTTP 진입점: remember 400/201+inbox 영수증, pages 원문, conflict 400/200 정정, retention GET(삭제 컨트롤 없음), search 재조회. Chrome 버튼 수명은 Codex actual-ui만 인용.
+- M11 합성: `test_concurrent_scoped_search_keeps_deny_and_allowed` 허용/거부 동시 조회.
+- 외부만: 운영 timer, native 로그인, 실사용자 질문/원문, 운영 corpus, 전환 허가.
 - 미전환을 운영 완료로 표현하지 않음.
