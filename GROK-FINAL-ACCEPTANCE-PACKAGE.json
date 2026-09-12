@@ -4,7 +4,7 @@
   "production_activated": false,
   "operational_current": "41f0751",
   "frozen_pin": {
-    "sb_source": "27cb576eeeacb7a224a4f5d34d9b512ae036ba3b",
+    "sb_source": "bafb832dc0c86dc4c82be39d587f6356908d8ee5",
     "release_id": "55a8b68b7039a355a1562b1b0b0c551c9f3d2a56",
     "wheel_sha256": "a3679d532fc3bd591017d7dbc39056703d73581292c97c1025c45c32c1d1dc19",
     "candidate": "/var/tmp/sb-candidate-27cb576/releases/55a8b68b7039a355a1562b1b0b0c551c9f3d2a56", "git_archive_includes_seed_scoped_v4": true,
@@ -20,7 +20,7 @@
     "integration": 0,
     "work": 0,
     "production_activated": false,
-    "harness_commit": "27cb576eeeacb7a224a4f5d34d9b512ae036ba3b"
+    "harness_commit": "bafb832dc0c86dc4c82be39d587f6356908d8ee5"
   },
   "hash_contrast": {
     "sb/mcp.py": true,

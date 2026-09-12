@@ -12,7 +12,7 @@ export JARVIS=/var/tmp/jarvis-artifact-1672626/source/dist
 
 | 항목 | 값 |
 |---|---|
-| SB source | `27cb576eeeacb7a224a4f5d34d9b512ae036ba3b` |
+| SB source | `bafb832dc0c86dc4c82be39d587f6356908d8ee5` |
 | git archive | `scripts/seed-scoped-v4.py` 포함 |
 | wheel | `a3679d532fc3bd591017d7dbc39056703d73581292c97c1025c45c32c1d1dc19` |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` |
