@@ -5,38 +5,36 @@
 ## Full pin
 
 ```bash
-source /var/tmp/sb-jarvis-restore-rz8Ngm/recovery.env
-export REL=/var/tmp/sb-candidate-2927afc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-# recovery.env already exports ROOT BACKUP DEST FENCE AUTHORITY AUTHORITY_ROOT JARVIS
+source /var/tmp/sb-jarvis-restore-7NTURy/recovery.env
+export REL=/var/tmp/sb-candidate-d4759bc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+# recovery.env: ROOT BACKUP DEST FENCE AUTHORITY AUTHORITY_ROOT JARVIS
+# AUTHORITY is a copy under ROOT/recovery-authority, not the harness tmp db
 ```
 
 | 항목 | 값 |
 |---|---|
-| SB source | `2927afcb10290a180a66190048664bec48d340cd` |
+| SB source | `d4759bcf67749ada6b3bd354bf48429c8f08a0fb` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `dcf19bebf8863aeb17dd42e4b5a3da07416d89ee` |
-| inventory | `0e5267bf9d072d53726ee8b76e2665fa0dd46c48c385e83fe0c698158bb16af2` / 34768 |
-| backup.js | `da7ff61065ad67664486491ea3b2287c45362a785edee40f63dbaf991d69f00b` |
+| JARVIS | `b9ccc546ab9d4d537e17918a68eacf4ecb98f94c` |
+| inventory | `1d041d0acd2bc10d24c2491dee9835d231a0f6e63dd14b75f8db886cc6a8721d` / 34768 |
+| backup.js | `a357e2cb5cbeae98a8a6c2f3294f6c0be53a02543ad58b0e743a492f1261e042` |
 | production_activated | false |
 
-## 만료 후 fresh fence
+## 종료 후 fresh fence
 
-저장된 fence 파일은 최대 5분이다. 나중에 복원하려면 재발급한다. 키를 다시 등록하지 않는다.
+harness `closeMemoryDatabase`는 tmp authority를 지운다. 런북 AUTHORITY는 `$ROOT/recovery-authority/` 복사본이다.
 
 ```bash
 source "$ROOT/recovery.env"
-export REL
 node scripts/issue-restore-fence.mjs
 python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
 python scripts/writer-lease-on-root.py "$ROOT"
 node scripts/restore-jarvis-sqlite.mjs
 ```
 
-`issue-restore-fence.mjs`는 `JARVIS`, `AUTHORITY`, `AUTHORITY_ROOT`, `FENCE`가 없으면 EXIT 1이다.
+## dest exclusive restore
 
-## SQLite 세트
-
-`restoreSqlite`는 dest exclusive lock 후 main/WAL/SHM을 한 세트로 park하고 검증된 backup만 dest로 올린다. busy dest는 거부하고 원본 세트를 유지한다. WAL을 잠금 없이 지우지 않는다.
+기존 dest는 exclusive lock을 유지한 채 backup을 clone한다. checkpoint 후 close/park 공백이 없다. busy dest는 거부하고 writer COMMIT을 보존한다.
 
 ## 게이트
 
