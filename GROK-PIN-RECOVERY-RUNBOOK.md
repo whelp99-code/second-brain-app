@@ -1,54 +1,42 @@
 # 핀 복구 런북 (운영 전환 아님)
 
-**current를 바꾸지 않는다.** `41f0751` 유지는 구버전 호환 증거가 아니다.
+**current를 바꾸지 않는다.**
 
 ## Full pin
 
 ```bash
-source /var/tmp/sb-jarvis-restore-PbKSr3/recovery.env
-export REL=/var/tmp/sb-candidate-a1a5ae2/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-export JARVIS=/var/tmp/jarvis-artifact-22b4613/source/dist
-# recovery.env already sets ROOT BACKUP DEST FENCE
+source /var/tmp/sb-jarvis-restore-rz8Ngm/recovery.env
+export REL=/var/tmp/sb-candidate-2927afc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+# recovery.env already exports ROOT BACKUP DEST FENCE AUTHORITY AUTHORITY_ROOT JARVIS
 ```
 
 | 항목 | 값 |
 |---|---|
-| SB source | `a1a5ae2a7e0495117790bf03f14a42bbbe67760c` |
+| SB source | `2927afcb10290a180a66190048664bec48d340cd` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `22b46139e312979e6ac81b41ef4b8c64a4d2d71a` |
-| inventory | `6f30a34af67aec7587ef1bfdb046c29645cc0e5508030ce4be13d08711a7b868` / 34768 |
-| backup.js | `9012c592e904311959e38bfaa7368623af98fc84b3de5a98fbf8b2fa3385215a` |
+| JARVIS | `dcf19bebf8863aeb17dd42e4b5a3da07416d89ee` |
+| inventory | `0e5267bf9d072d53726ee8b76e2665fa0dd46c48c385e83fe0c698158bb16af2` / 34768 |
+| backup.js | `da7ff61065ad67664486491ea3b2287c45362a785edee40f63dbaf991d69f00b` |
 | production_activated | false |
 
-## 같은 ROOT
+## 만료 후 fresh fence
 
-`$FENCE`는 harness가 **마지막 high-water**에서 발급한 현재 fence다. 첫 restore의 fence1을 재사용하지 않는다.
+저장된 fence 파일은 최대 5분이다. 나중에 복원하려면 재발급한다. 키를 다시 등록하지 않는다.
 
 ```bash
 source "$ROOT/recovery.env"
-export REL JARVIS
+export REL
+node scripts/issue-restore-fence.mjs
 python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
 python scripts/writer-lease-on-root.py "$ROOT"
 node scripts/restore-jarvis-sqlite.mjs
 ```
 
-`restore-jarvis-sqlite.mjs`는 `BACKUP`, `DEST`, `JARVIS`가 없으면 EXIT 1이다.
+`issue-restore-fence.mjs`는 `JARVIS`, `AUTHORITY`, `AUTHORITY_ROOT`, `FENCE`가 없으면 EXIT 1이다.
 
-재생성:
+## SQLite 세트
 
-```bash
-TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs "$JARVIS"
-```
-
-## 실패 보존
-
-없는/junk backup은 기존 dest와 원본을 지우지 않는다. 검증된 staging만 dest로 rename한다. 같은 경로 restore는 거부. 정정 재시도는 유효 backup으로 dest를 교체한다.
-
-invalid sqlite는 `E_RESTORE_FAILED`다. 구버전 스키마는 tombstone_chain 없는 sqlite로 구분한다.
-
-## Writer lease
-
-`pending_requests`는 `requests.state='pending'`이다. `journal.db` 파일 개수가 아니다. pending 0이어도 `writer_busy`일 수 있다.
+`restoreSqlite`는 dest exclusive lock 후 main/WAL/SHM을 한 세트로 park하고 검증된 backup만 dest로 올린다. busy dest는 거부하고 원본 세트를 유지한다. WAL을 잠금 없이 지우지 않는다.
 
 ## 게이트
 
