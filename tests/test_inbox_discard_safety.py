@@ -34,3 +34,22 @@ def test_inbox_discard_refuses_outside_vault_parent_symlink(tmp_path: Path) -> N
         restored = _request(
             base + "/api/inbox-discard", method="POST", payload={"inbox_path": "inbox/pending.md"})
         assert restored[0] == 400
+
+
+def test_inbox_discard_refuses_fifo_without_blocking(tmp_path: Path) -> None:
+    import os
+    import time
+
+    config, vault = _ready(tmp_path)
+    inbox = vault / "inbox"
+    inbox.mkdir(exist_ok=True)
+    fifo = inbox / "pipe.md"
+    os.mkfifo(fifo)
+    with _running(config) as base:
+        started = time.monotonic()
+        status, _ = _request(
+            base + "/api/inbox-discard", method="POST", payload={"inbox_path": "inbox/pipe.md"})
+        elapsed = time.monotonic() - started
+        assert status == 400
+        assert elapsed < 1.5
+        assert fifo.exists()

@@ -208,7 +208,7 @@ def main() -> None:
                 "run_ok": run_ok,
                 "search_has_processed_needle": NEEDLE in search,
                 "page_has_term": TERM in page,
-                "conflict_fail": "missing" in bad_conflict.lower() or "error" in bad_conflict.lower() or "not found" in bad_conflict.lower(),
+                "conflict_fail": "conflict missing" in bad_conflict.lower() or "missing" in bad_conflict.lower(),
                 "discard_after_run": "missing" in discarded.lower() or "invalid inbox path" in discarded.lower(),
                 "search_after_still_processed": NEEDLE in search_after,
                 "forgotten": forgotten,
@@ -220,8 +220,9 @@ def main() -> None:
     print(json.dumps(evidence, ensure_ascii=False))
     required = (
         "remember_fail_has_content_required", "remember_ok_has_inbox", "run_ok",
-        "search_has_processed_needle", "page_has_term", "discard_after_run",
-        "search_after_still_processed", "search_after_forget_empty", "resolved_conflict_file",
+        "search_has_processed_needle", "page_has_term", "conflict_fail",
+        "discard_after_run", "search_after_still_processed", "search_after_forget_empty",
+        "resolved_conflict_file",
     )
     if not all(evidence[key] for key in required):
         raise SystemExit(1)

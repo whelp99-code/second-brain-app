@@ -86,12 +86,14 @@ def discard_inbox(root: Path, relative: str) -> str:
     try:
         vault_fd = os.open(root, flags)
         inbox_fd = os.open("inbox", flags, dir_fd=vault_fd)
-        file_fd = os.open(rel.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=inbox_fd)
+        file_fd = os.open(
+            rel.name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+            dir_fd=inbox_fd,
+        )
         info = os.fstat(file_fd)
         if not stat.S_ISREG(info.st_mode):
-            raise ValueError("inbox receipt missing")
-        os.close(file_fd)
-        file_fd = -1
+            raise ValueError("invalid inbox path")
         os.unlink(rel.name, dir_fd=inbox_fd)
     except OSError as exc:
         raise ValueError("invalid inbox path") from exc

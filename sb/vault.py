@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -292,9 +293,17 @@ class Vault:
             folder_fd = os.open(rel.parts[0], flags, dir_fd=root_fd)
             try:
                 file_fd = os.open(
-                    rel.parts[1], os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=folder_fd)
-                os.close(file_fd)
-                os.unlink(rel.parts[1], dir_fd=folder_fd)
+                    rel.parts[1],
+                    os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                    dir_fd=folder_fd,
+                )
+                try:
+                    info = os.fstat(file_fd)
+                    if not stat.S_ISREG(info.st_mode):
+                        raise FileNotFoundError(self.root / rel)
+                    os.unlink(rel.parts[1], dir_fd=folder_fd)
+                finally:
+                    os.close(file_fd)
             finally:
                 os.close(folder_fd)
         finally:

@@ -518,12 +518,15 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 note = data.get("note", "")
                 if not isinstance(decision, str) or not isinstance(note, str):
                     raise ValueError("decision and note must be strings")
-                commit = mutate_root(context.config, GenerationOperation.EFFECT, lambda root: Vault(root).resolve_conflict(
-                    conflict_id,
-                    decision,
-                    note,
-                    f"web-{conflict_id}",
-                ))
+                try:
+                    commit = mutate_root(context.config, GenerationOperation.EFFECT, lambda root: Vault(root).resolve_conflict(
+                        conflict_id,
+                        decision,
+                        note,
+                        f"web-{conflict_id}",
+                    ))
+                except FileNotFoundError as exc:
+                    raise ValueError("conflict missing") from exc
                 self._json(HTTPStatus.OK, {"commit": commit})
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})

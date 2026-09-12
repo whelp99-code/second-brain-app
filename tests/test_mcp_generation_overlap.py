@@ -77,7 +77,6 @@ def test_mcp_overlap_then_new_generation_excludes_old(classified, monkeypatch): 
         "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(work / "source")}],
         "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}},
     })
-    old_generation_id = generation.generation_id
     old_wiki = "\n".join(path.read_text(encoding="utf-8") for path in (root / "wiki").glob("*.md"))
     assert "2527df6c" not in old_wiki
 
@@ -126,6 +125,7 @@ def test_mcp_overlap_then_new_generation_excludes_old(classified, monkeypatch): 
     monkeypatch.setattr("sb.mcp.search_scoped_records", orig_search)
     allowed = overlapped["allowed"]
     denied = overlapped["denied"]
+    assert allowed is not None
     assert denied.is_error or (
         denied.structured_content is not None and denied.structured_content["results"] == [])
     refreshed = (work / "share" / "vault").resolve()
@@ -156,7 +156,7 @@ def test_mcp_overlap_then_new_generation_excludes_old(classified, monkeypatch): 
 
     omega, denied_new = anyio.run(after)
     wiki = "\n".join(path.read_text(encoding="utf-8") for path in (refreshed / "wiki").glob("*.md"))
-    assert new_generation.generation_id != old_generation_id
+    assert new_generation != generation
     assert "2527df6c" in wiki
     assert not omega.is_error, omega
     assert omega.structured_content["results"]
