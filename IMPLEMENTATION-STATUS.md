@@ -15,7 +15,7 @@
 | C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact, gjc.dispatch V1-C–F. gold 100–300은 M10 |
 | D | 실제 공유 기억의 수명 | implemented_unverified | schema4 proved + recover-a/b 동일 digest. 실사용자 1건은 입력 |
 | E | 가용성·복구·GUI | implemented_unverified | paired DR, 격리 Chrome fail→success. GUI 전체 수명은 M13 격리 남음 |
-| F | 배포 재료와 운영 절차 | implemented_unverified | frozen 32e58fe × 7d2fdedd 3게이트 EXIT0. seed-scoped-v4 in git-archive. 전환 미실행. current 41f0751 |
+| F | 배포 재료와 운영 절차 | implemented_unverified | archive 8edb9d4, wheel/gates f7c1945 EXIT0 (이름 바꾸지 않음). 전환 미실행. current 41f0751 |
 | M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | implemented_unverified | 격리 scoped MCP. 운영 로그인 신원/세션 입력 |
 | M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | 격리 schema4 proved + 2 세션. 실사용자 task 원문 입력 |
 | M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | 세션 철회 후 거부, 만료 fence TOMBSTONE_FENCE_REQUIRED |
@@ -26,9 +26,9 @@
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | 제품/버전별 자동주입 경로 입력 |
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | gjc.dispatch 예산/세대 재검증. compaction 이벤트는 native/Orca 입력 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
-| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | M11-MCP-CORPUS-LATENCY(재실행 없음). 합성 동시 scoped 허용/거부 1 passed. 운영 corpus는 입력 |
+| M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | 정상 Alpha→Omega compile MCP 최신/이전본문 제외 1 passed. pinned-read 중 publish는 미검증. 보류 분기는 검사특정불가 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | harness-36: 필수 restore/만료fence 후 schema4 write + 2scope + final_fresh. cold restore cap0 1 passed |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | 기존 HTTP 진입점 수명 1 passed. Chrome 버튼은 Codex actual-ui. 삭제 컨트롤 없음. 운영 timer는 전환 후 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | Chrome forget 후 검색 0. 운영 timer는 전환 후. 삭제경합/복원 재노출 분기는 이번 범위에서 미검증 |
 | M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | not_implemented | hybrid 무근거 후보 증가. 기본 활성화 보류 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
