@@ -134,7 +134,7 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
             page.write_text("Omega corrected unique memory.")
             assert run_ingest(config, ["docs"]).exit_code == 0
             assert run_compile(config).exit_code == 0
-        except Exception:
+        except (AssertionError, OSError, RuntimeError, ValueError):
             errors.append(traceback.format_exc())
             preparing.set()
 

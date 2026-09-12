@@ -66,9 +66,9 @@
     "M8": {"meaning": "per-client collect/read/write/auto-inject", "status": "blocked_external", "input": "product/version auto-inject paths"},
     "M9": {"meaning": "live session context budget/dedupe/compaction", "status": "implemented_unverified", "blocked_external": "native/Orca compaction event"},
     "M10": {"meaning": "100-300 real Korean questions with gold", "status": "blocked_external", "input": "curated gold set"},
-    "M11": {"meaning": "large-corpus MCP p50/p95 and concurrent refresh", "status": "implemented_unverified", "corpus_latency": "M11-MCP-CORPUS-LATENCY-2026-09-11.json", "synthetic_concurrent": "tests/test_scoped_search.py::test_concurrent_scoped_search_keeps_deny_and_allowed"},
+    "M11": {"meaning": "large-corpus MCP p50/p95 and concurrent refresh", "status": "implemented_unverified", "corpus_latency": "M11-MCP-CORPUS-LATENCY-2026-09-11.json", "ordinary_correction": "tests/test_mcp_generation_overlap.py::test_normal_correction_and_reader_during_compile"},
     "M12": {"meaning": "journal-loss DR with RPO/RTO, high-water, reingress block", "status": "implemented_unverified"},
-    "M13": {"meaning": "GUI correction/delete/body/receipt/failure recovery/timer", "status": "implemented_unverified", "http_lifetime": "tests/test_web.py::test_existing_gui_entrypoints_lifetime_and_concurrent_search", "chrome_buttons": "/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json", "failure_recovery": "tests/test_web_run_failure.py", "remaining_isolated": ["no GUI delete control", "ops timer after cutover"]},
+    "M13": {"meaning": "GUI correction/delete/body/receipt/failure recovery/timer", "status": "implemented_unverified", "http_lifetime": "tests/test_web.py::test_existing_gui_entrypoints_lifetime_and_concurrent_search", "chrome_buttons": "/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json", "failure_recovery": "tests/test_web_run_failure.py", "remaining_isolated": ["ops timer after cutover"], "gui_forget": "compiled page forget; strong concurrent publish unverified"},
     "M14": {"meaning": "relation-search value vs cost; not ops cutover", "status": "not_implemented"}
   }
 }

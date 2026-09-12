@@ -15,7 +15,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` (34768) |
 | 운영 current | `41f0751` |
 | production_activated | false |
-| 소스 커밋 | `c519f55` — GUI lifetime tests + F pin unify; seed-scoped-v4 from 32e58fe |
+| 소스 커밋 | `84e2c43` — ordinary Alpha→Omega compile MCP latest/exclude. 게이트는 f7c1945 동일 wheel |
 | git archive | `scripts/seed-scoped-v4.py` 포함 |
 | dispatch | 미변경 (V1-C–F / N1 보존) |
 
