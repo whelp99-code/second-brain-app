@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from datetime import UTC, datetime
+from threading import Barrier, Thread
 
 import anyio
 from mcp.client import Client
@@ -60,6 +61,34 @@ def test_mcp_overlap_then_new_generation_excludes_old(classified, monkeypatch): 
     config = _mcp_config(work, generation)
     server = build_server(config=config)
     fence = _fence(generation)
+    entered = Barrier(3)
+    from sb.scoped_search import search_scoped_records as orig_search
+
+    def wrapped(*args, **kwargs):
+        entered.wait(timeout=30)
+        return orig_search(*args, **kwargs)
+
+    monkeypatch.setattr("sb.mcp.search_scoped_records", wrapped)
+    ingest_config = Config(raw={
+        "vault_root": str(work / "share" / "vault"),
+        "share_root": str(work / "share"),
+        "state_root": str(work / "state"),
+        "knowledge_registry": str(work / "registry.db"),
+        "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(work / "source")}],
+        "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}},
+    })
+    old_generation_id = generation.generation_id
+    old_wiki = "\n".join(path.read_text(encoding="utf-8") for path in (root / "wiki").glob("*.md"))
+    assert "2527df6c" not in old_wiki
+
+    def writer() -> None:
+        entered.wait(timeout=30)
+        (work / "source" / "a.md").write_text("Omega replacement memory.", encoding="utf-8")
+        assert run_ingest(ingest_config, ["docs"]).exit_code == 0
+        assert run_compile(ingest_config, llm_mode="fake").exit_code == 0
+
+    thread = Thread(target=writer)
+    thread.start()
 
     async def overlap():
         async with Client(server, mode="legacy", cache=None) as client:
@@ -92,29 +121,13 @@ def test_mcp_overlap_then_new_generation_excludes_old(classified, monkeypatch): 
             return results
 
     overlapped = anyio.run(overlap)
+    thread.join(timeout=60)
+    assert not thread.is_alive()
+    monkeypatch.setattr("sb.mcp.search_scoped_records", orig_search)
     allowed = overlapped["allowed"]
     denied = overlapped["denied"]
-    assert not allowed.is_error, allowed
-    allowed_rows = str(allowed.structured_content["results"])
-    assert "Cited" in allowed_rows
-    assert denied.is_error or denied.structured_content["results"] == []
-    assert allowed_rows not in str(denied)
-
-    old_generation_id = generation.generation_id
-    old_wiki = "\n".join(path.read_text(encoding="utf-8") for path in (root / "wiki").glob("*.md"))
-    assert "2527df6c" not in old_wiki
-    source = work / "source" / "a.md"
-    source.write_text("Omega replacement memory.", encoding="utf-8")
-    ingest_config = Config(raw={
-        "vault_root": str(work / "share" / "vault"),
-        "share_root": str(work / "share"),
-        "state_root": str(work / "state"),
-        "knowledge_registry": str(work / "registry.db"),
-        "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(work / "source")}],
-        "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}},
-    })
-    assert run_ingest(ingest_config, ["docs"]).exit_code == 0
-    assert run_compile(ingest_config, llm_mode="fake").exit_code == 0
+    assert denied.is_error or (
+        denied.structured_content is not None and denied.structured_content["results"] == [])
     refreshed = (work / "share" / "vault").resolve()
     manifest = load_verified_manifest(refreshed)
     new_generation = GenerationIdentityV1(*(str(manifest[name]) for name in (

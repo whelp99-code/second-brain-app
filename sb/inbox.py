@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -68,15 +69,39 @@ def write_inbox(root: Path, content: str, title: str | None) -> Path:
 
 
 def discard_inbox(root: Path, relative: str) -> str:
-    """Withdraw an unused inbox receipt. Refuses paths outside `inbox/`."""
+    """Withdraw an unused inbox receipt. Refuses paths outside the vault inbox."""
     rel = Path(relative)
-    if rel.is_absolute() or ".." in rel.parts or rel.parts[:1] != ("inbox",):
+    if (
+        rel.is_absolute()
+        or ".." in rel.parts
+        or len(rel.parts) != 2
+        or rel.parts[0] != "inbox"
+        or rel.name in {".", "..", ""}
+    ):
         raise ValueError("invalid inbox path")
-    inbox = (root / "inbox").resolve()
-    dest = (root / rel).resolve()
-    if not dest.is_relative_to(inbox) or not dest.is_file():
-        raise ValueError("inbox receipt missing")
-    dest.unlink()
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    vault_fd = -1
+    inbox_fd = -1
+    file_fd = -1
+    try:
+        vault_fd = os.open(root, flags)
+        inbox_fd = os.open("inbox", flags, dir_fd=vault_fd)
+        file_fd = os.open(rel.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=inbox_fd)
+        info = os.fstat(file_fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("inbox receipt missing")
+        os.close(file_fd)
+        file_fd = -1
+        os.unlink(rel.name, dir_fd=inbox_fd)
+    except OSError as exc:
+        raise ValueError("invalid inbox path") from exc
+    finally:
+        if file_fd >= 0:
+            os.close(file_fd)
+        if inbox_fd >= 0:
+            os.close(inbox_fd)
+        if vault_fd >= 0:
+            os.close(vault_fd)
     return rel.as_posix()
 
 
