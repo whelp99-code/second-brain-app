@@ -1,63 +1,54 @@
 # 핀 복구 런북 (운영 전환 아님)
 
-**current를 바꾸지 않는다.** 운영 current `41f0751` 유지는 구버전 호환 증거가 아니다.
+**current를 바꾸지 않는다.** `41f0751` 유지는 구버전 호환 증거가 아니다.
 
 ## Full pin
 
 ```bash
-REL=/var/tmp/sb-candidate-f921979/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
-JARVIS=/var/tmp/jarvis-artifact-e7088b3/source/dist
-ROOT=/var/tmp/sb-jarvis-restore-PdT941
-FENCE=$ROOT/trusted-fence.json
-BACKUP=$ROOT/jarvis-authority-backup/jarvis-rehearsal.sqlite
+source /var/tmp/sb-jarvis-restore-PbKSr3/recovery.env
+export REL=/var/tmp/sb-candidate-a1a5ae2/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+export JARVIS=/var/tmp/jarvis-artifact-22b4613/source/dist
+# recovery.env already sets ROOT BACKUP DEST FENCE
 ```
 
 | 항목 | 값 |
 |---|---|
-| SB source | `f921979d53b9bd14a1af6317d2e219c54723e541` |
+| SB source | `a1a5ae2a7e0495117790bf03f14a42bbbe67760c` |
 | wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
-| JARVIS | `e7088b3e220698d50c5a4bd8a52e6f9f9283e491` |
-| inventory | `a833c70b78560c24e237ba9627c29336cfd9ba14db2a453733322bae74ec371f` / 34768 |
-| backup.js | `8e85f8c648aff78f223412628c4507c1c012dd14b487273c8972bd135a714bdc` |
-| fixture config.toml | `f33d28b278a91dad8735c7ad8fe61e684e6522f343932c346453fc9806b0fd14` |
-| JARVIS authority backup | `eb35bb6f27dc553793391ee1aed3b0f3ec3b147fd90a31168aa10ff080b89a67` |
+| JARVIS | `22b46139e312979e6ac81b41ef4b8c64a4d2d71a` |
+| inventory | `6f30a34af67aec7587ef1bfdb046c29645cc0e5508030ce4be13d08711a7b868` / 34768 |
+| backup.js | `9012c592e904311959e38bfaa7368623af98fc84b3de5a98fbf8b2fa3385215a` |
 | production_activated | false |
 
-## 같은 fixture 복구 명령
+## 같은 ROOT
 
-신뢰 fence는 harness가 `$FENCE`에 쓴다. stdin으로 전달한다.
+`$FENCE`는 harness가 **마지막 high-water**에서 발급한 현재 fence다. 첫 restore의 fence1을 재사용하지 않는다.
 
 ```bash
-# SB restore (anchor 있는 runtime-backup)
+source "$ROOT/recovery.env"
+export REL JARVIS
 python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
-
-# writer lease ≠ 빈 큐
 python scripts/writer-lease-on-root.py "$ROOT"
-
-# JARVIS sqlite restore (격리 backupSqlite 산출물)
-# dest는 운영 ~/.local 이 아닌 fixture 경로만
-node --input-type=module -e "
-import {restoreSqlite} from '$JARVIS/src/personal-os-backup.js';
-restoreSqlite({backupPath: process.env.BACKUP, destPath: process.env.DEST});
-"
+node scripts/restore-jarvis-sqlite.mjs
 ```
 
-새 ROOT를 만들지 말고 위 `$ROOT`를 이어 쓴다. 재생성은:
+`restore-jarvis-sqlite.mjs`는 `BACKUP`, `DEST`, `JARVIS`가 없으면 EXIT 1이다.
+
+재생성:
 
 ```bash
 TMPDIR=/var/tmp node scripts/jarvis-restore-acceptance.mjs "$JARVIS"
 ```
 
-## 안전 거부
+## 실패 보존
 
-- 원본 anchor 없음: `RESTORE_SOURCE_ANCHOR_MISSING`
-- 비 sqlite 백업: `E_RESTORE_FAILED`
-- 운영 경로 backup/restore: `E_BACKUP_PATH` / `E_PROTECTED_ROOT`
-- 구버전 rollback, revocation store를 못 읽는 대상: `check-rollback-compat.py` `allowed:false`
+없는/junk backup은 기존 dest와 원본을 지우지 않는다. 검증된 staging만 dest로 rename한다. 같은 경로 restore는 거부. 정정 재시도는 유효 backup으로 dest를 교체한다.
+
+invalid sqlite는 `E_RESTORE_FAILED`다. 구버전 스키마는 tombstone_chain 없는 sqlite로 구분한다.
 
 ## Writer lease
 
-`scripts/writer-lease-on-root.py`는 `generation.lock` exclusive를 잡은 뒤 두 번째 획득이 `GENERATION_WRITER_BUSY`인지 본다. `queue_depth>0`이고 `empty_queue=false`다. pipeline `.sb/run.lock` already_running/빈 큐와 구분한다.
+`pending_requests`는 `requests.state='pending'`이다. `journal.db` 파일 개수가 아니다. pending 0이어도 `writer_busy`일 수 있다.
 
 ## 게이트
 

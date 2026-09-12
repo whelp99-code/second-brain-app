@@ -1,30 +1,36 @@
 {
   "pin": {
-    "sb_source": "f921979d53b9bd14a1af6317d2e219c54723e541",
+    "sb_source": "a1a5ae2a7e0495117790bf03f14a42bbbe67760c",
     "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
     "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
-    "candidate": "/var/tmp/sb-candidate-f921979/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
-    "jarvis_source": "e7088b3e220698d50c5a4bd8a52e6f9f9283e491",
-    "jarvis_dist": "/var/tmp/jarvis-artifact-e7088b3/source/dist",
-    "jarvis_inventory_sha256": "a833c70b78560c24e237ba9627c29336cfd9ba14db2a453733322bae74ec371f",
+    "candidate": "/var/tmp/sb-candidate-a1a5ae2/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "22b46139e312979e6ac81b41ef4b8c64a4d2d71a",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-22b4613/source/dist",
+    "jarvis_inventory_sha256": "6f30a34af67aec7587ef1bfdb046c29645cc0e5508030ce4be13d08711a7b868",
     "jarvis_inventory_entries": 34768,
     "operational_current": "41f0751",
     "production_activated": false,
     "tsc_exit": 0
   },
-  "fixture_root": "/var/tmp/sb-jarvis-restore-PdT941",
+  "fixture_root": "/var/tmp/sb-jarvis-restore-PbKSr3",
   "gates": {
     "maintenance_exit": 0,
     "integration_exit": 0,
     "work_exit": 0
   },
-  "m12": {
-    "crash_loss_receipts": 1,
-    "old_version_refused": "E_RESTORE_FAILED",
-    "writer_busy": true,
-    "empty_queue": false
+  "p1": {
+    "dest_preserved_on_missing_backup": "E_RESTORE_FAILED",
+    "dest_preserved_on_invalid_backup": "E_RESTORE_FAILED"
   },
-  "v1_session_compaction": "blocked_external",
+  "same_root_restore": {
+    "tombstone_sequence": 2,
+    "blocked_matches": 0
+  },
+  "writer_lease": {
+    "writer_busy": true,
+    "pending_requests": 0,
+    "empty_queue": true
+  },
   "codex_final_review_requested": true,
   "product_acceptance": false
 }
