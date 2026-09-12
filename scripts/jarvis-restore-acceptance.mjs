@@ -261,28 +261,6 @@ try {
   assert.equal(extraLostAfterRecovery, 0);
   assert.equal(keepAfterRecovery, 0);
   const genericReader = {extra_lost:extraLostAfterRecovery, keep_beta:keepAfterRecovery};
-  const scopedWritten = JSON.parse(run('scripts/seed-scoped-v4.py',root));
-  assert.equal(scopedWritten.state,'proved');
-  await runtime.close();
-  runtime = createProductionMemoryReference(database.authority,{
-    read_fence_config:config,projection_key:Buffer.alloc(32,7),
-    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
-  });
-  const recoveredScope = {
-    load,database,config,root,launcher,pageId:scopedWritten.page_id,
-    needle:scopedWritten.needle,projects:['project:shared-memory'],policyRevision:'policy:fixture',
-  };
-  const recoveredScoped = await checkRestoredScope({...recoveredScope,clientId:'recover-a'});
-  const recoveredPeer = await checkRestoredScope({...recoveredScope,clientId:'recover-b'});
-  assert.equal(recoveredScoped.allowed_pages,1);
-  assert.equal(recoveredPeer.allowed_pages,1);
-  assert.notEqual(recoveredScoped.agent,recoveredPeer.agent);
-  assert.notEqual(recoveredScoped.session,recoveredPeer.session);
-  assert.equal(recoveredScoped.page_content_digest,recoveredPeer.page_content_digest);
-  assert.equal(recoveredPeer.withdrawal_denied,true);
-  const recoveredRetry = await checkRestoredScope({...recoveredScope,clientId:'recover-retry'});
-  assert.equal(recoveredRetry.allowed_pages,1);
-  assert.equal(recoveredRetry.page_content_digest,recoveredScoped.page_content_digest);
   const restoredAgain = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
     {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(recoveredFence)}));
   assert.equal(restoredAgain.tombstone_sequence, recoveredFence.tombstone_sequence);
@@ -315,8 +293,32 @@ try {
   }));
   assert.equal(freshFence.tombstone_sequence, recoveredFence.tombstone_sequence);
   const sameRootRestore = restoredAgain;
+  await runtime.close();
+  runtime = createProductionMemoryReference(database.authority,{
+    read_fence_config:config,projection_key:Buffer.alloc(32,7),
+    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
+  });
+  const scopedWritten = JSON.parse(run('scripts/seed-scoped-v4.py',root));
+  assert.equal(scopedWritten.state,'proved');
+  const recoveredScope = {
+    load,database,config,root,launcher,pageId:scopedWritten.page_id,
+    needle:scopedWritten.needle,projects:['project:shared-memory'],policyRevision:'policy:fixture',
+  };
+  const recoveredScoped = await checkRestoredScope({...recoveredScope,clientId:'recover-a'});
+  const recoveredPeer = await checkRestoredScope({...recoveredScope,clientId:'recover-b'});
+  assert.equal(recoveredScoped.allowed_pages,1);
+  assert.equal(recoveredPeer.allowed_pages,1);
+  assert.notEqual(recoveredScoped.agent,recoveredPeer.agent);
+  assert.notEqual(recoveredScoped.session,recoveredPeer.session);
+  assert.equal(recoveredScoped.page_content_digest,recoveredPeer.page_content_digest);
+  assert.equal(recoveredPeer.withdrawal_denied,true);
+  const recoveredRetry = await checkRestoredScope({...recoveredScope,clientId:'recover-retry'});
+  assert.equal(recoveredRetry.allowed_pages,1);
+  assert.equal(recoveredRetry.page_content_digest,recoveredScoped.page_content_digest);
+  const finalFresh = JSON.parse(run('scripts/find-wiki-needle.py',root,scopedWritten.needle));
+  assert.equal(finalFresh.page_id, scopedWritten.page_id);
   const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
-    restored_again:restoredAgain,second_restore_records:extraLostAfterRecovery+keepAfterRecovery+recoveredScoped.allowed_pages,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:recoveredFence.tombstone_sequence,
+    restored_again:restoredAgain,second_restore_records:1,final_fresh_read:finalFresh,classified_write_after_required_restores:true,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:recoveredFence.tombstone_sequence,
     deleted_records:0,first_restore_surviving_records:1,model_calls:0,generic_reader:genericReader,recovered_scoped:recoveredScoped,recovered_peer:recoveredPeer,post_recovery_write:scopedWritten,recovered_retry:recoveredRetry,
     rpo_source_generation_id:backup.source_generation_id,
     rpo_sb: {

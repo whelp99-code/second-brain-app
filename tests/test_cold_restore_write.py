@@ -25,6 +25,7 @@ def _cfg(vault: Path) -> Config:
     state.mkdir(parents=True, exist_ok=True)
     return Config(raw={
         "vault_root": str(vault),
+        "caps": {"max_llm_calls_briefing": 0},
         "state_root": str(state),
         "request_root": str(requests),
         "export_root": str(exports),
