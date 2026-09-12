@@ -8,8 +8,8 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 
 | | |
 |---|---|
-| SB frozen source | `8edb9d4f8806a802d2c391e459fa7f5960a57a8d` |
-| 후보 | `/var/tmp/sb-candidate-8edb9d4/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2` |
+| SB frozen source | `e13cd3b699695fa08fbde521f7a7866c9dfef6a0` |
+| 후보 | `/var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2` |
 | wheel | `1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb` (inbox discard 안전경계 포함; a4b228f와 동일하지 않음) |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` `/var/tmp/jarvis-artifact-1672626/source/dist` |
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` (34768) |
