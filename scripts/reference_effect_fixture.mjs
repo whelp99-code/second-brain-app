@@ -25,7 +25,12 @@ export async function referenceEffectFixture({load, database, key, config, launc
     writer:{write:async()=>{throw new Error('no implicit writer');}},
     provider_instance_id:config.provider_instance_id,signing_key_id:config.signing_key_id,private_key:key});
   const chain = new MemoryTombstoneChain(database.authority,Buffer.alloc(32,11));
-  return {close:()=>transport.close(), async apply(operation, record, content) {
+  return {close:()=>transport.close(), chain,
+    async resolve(record) {
+      return service.resolveTarget({record_id:record.record_id,record_digest:record.record_digest,
+        generation_id:record.generation.generation_id,generation_manifest_digest:record.generation.generation_manifest_digest});
+    },
+    async apply(operation, record, content) {
     assert(['correct','forget'].includes(operation));
     const resolved = await service.resolveTarget({record_id:record.record_id,record_digest:record.record_digest,
       generation_id:record.generation.generation_id,generation_manifest_digest:record.generation.generation_manifest_digest});

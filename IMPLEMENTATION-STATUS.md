@@ -6,30 +6,30 @@
 
 > **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀은 후속 M12/B/F 후보를 따른다. [상태](GROK-RESUME-STATUS-2026-09-11.md). 전환 없음.
 
-## A–F / M1–M14 상태 (원 의미, 6a1dcc0 후속)
+## A–F / M1–M14 상태 (CURSOR-HANDOFF §7 / 통합 인계 원 의미)
 
-| ID | 의미 | 상태 | 근거 / 정확한 외부 입력 |
+| ID | 원 요구 | 상태 | 근거 / 미구현 / 외부 입력 |
 |---|---|---|---|
-| A | 원본/정정 | implemented_unverified | USER_EDIT_KEEP_THIS, managed compile. 운영 원본 파일 세트는 외부 |
-| B | 철회 권한 복원 | implemented_unverified | 격리 scoped 2 client + JARVIS sqlite 복원 후 철회 보존. 운영 키 복사는 금지 |
-| C | 검색/본문 | implemented_unverified | KeepBeta/ExtraLost 본문 검색. 운영 한국어 GT는 외부 |
-| D | 공유 수명 | implemented_unverified | 격리 2 client 동시 수명. 운영 native 사본 수는 외부 |
-| E | 가용성 복구 GUI | implemented_unverified | Chrome fail→success 격리. 전체 운영 GUI는 외부 |
-| F | 배포 | implemented_unverified | 설치 3게이트 EXIT 0, current 41f0751 유지. 운영 전환은 허가 없음 |
-| M1 | 신원/권한 | implemented_unverified | 격리 권한/fence. drain이 아님. 운영 로그인 신원은 외부 |
-| M2 | 실제 업무 공유 계보 | implemented_unverified | proved request/replay. 철회 경로가 아님 |
-| M3 | 철회 키 | implemented_unverified | revoked-jarvis-signing-key-ids |
-| M4 | 모델 문맥 계보 | implemented_unverified | V1 dispatch 보존 |
-| M5 | native 사본 수명 | blocked_external | 제품/버전별 native 세션 입력 |
-| M6 | writer 배제 | implemented_unverified | generation.lock busy, pending은 journal state |
-| M7 | 이전 경로 | implemented_unverified | 이전 후보 |
-| M8 | 세션 resolver/issuer | blocked_external | 실제 모델 세션 제품 입력 |
-| M9 | 문맥 compaction | blocked_external | native/Orca compact 이벤트 |
-| M10 | 한국어 검색 GT | blocked_external | 실제 질의 세트 |
-| M11 | 운영 규모 성능 | blocked_external | 운영 corpus |
-| M12 | DR | implemented_unverified | accepted forget 유실 1, dest 보존, 현재 fence 재restore |
-| M13 | 가용성 GUI | implemented_unverified | 격리 Chrome. 전체 운영 GUI 입력은 외부 |
-| M14 | 관계 검색 | implemented_unverified | 격리 검색 경로. 운영 전환이 아님 |
+| A | 원본·사용자 편집·정정 보존 | implemented_unverified | USER_EDIT_KEEP_THIS, managed compile. 운영 원본 세트는 외부 |
+| B | 철회 정본·권한·복원 | implemented_unverified | 격리 철회 2 client. 운영 키 복사 금지 |
+| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact, KeepBeta 본문. 실제 사용자 질문 100–300은 외부 |
+| D | 실제 공유 기억의 수명 | implemented_unverified | 격리 2 client. 운영 native 사본 처분은 외부 |
+| E | 가용성·복구·GUI | implemented_unverified | 격리 Chrome fail→success, paired DR. 운영 GUI 전체 수명은 외부 |
+| F | 배포 재료와 운영 절차 | implemented_unverified | 설치 3게이트, 런북 REL/JARVIS/ROOT. 전환 허가 없음 |
+| M1 | 연결: 실제 HTTP/CLI→scoped MCP, 인증 세션·정책 resolver/issuer | implemented_unverified | 격리 scoped MCP. 운영 로그인 신원은 외부. drain이 아님 |
+| M2 | 기능: scoped 쓰기→proved→settled→새 로그인 재조회 | implemented_unverified | 격리 proved/replay. 실제 사용자 업무 원문은 외부 |
+| M3 | 정책: 철회·만료·복원, 기발급 claim | implemented_unverified | revoked-jarvis-signing-key-ids. 운영 rollback 전체 수명은 외부 |
+| M4 | 계보: task→검증 결과→candidate→provider record | implemented_unverified | 격리 request/proof. 실제 사용자 작업 원문 계보는 외부 |
+| M5 | 세션 수명: native session/compaction/log/WAL 보존·삭제 | blocked_external | 제품/버전별 native 세션 경로 입력 |
+| M6 | 동시성: writer 배제·전환 실패 복구·새 쓰기 권한 분리 | implemented_unverified | generation.lock busy≠pending 0. 운영 서비스 전환은 허가 없음 |
+| M7 | 접근 일관성: 모든 읽기 표면 같은 정책 | implemented_unverified | scoped 허용/거부. 모든 프로필/벡터/운영 원문 경로는 미완 |
+| M8 | 클라이언트: Codex·Claude 등 제품별 조회/주입 | blocked_external | 실제 제품·버전별 자동 수집·주입 입력 |
+| M9 | 문맥: 예산·출처·compaction 재선택 | blocked_external | native/Orca compact 이벤트 |
+| M10 | 검색 평가: 한글 개인/업무 gold 100–300 | blocked_external | 실제 질의 정답집 |
+| M11 | 용량·갱신: 운영 corpus p50/p95 | blocked_external | 운영 corpus |
+| M12 | 복구: archive→원장 결합→조회/거부/high-water→새 쓰기, SB/JARVIS RPO | implemented_unverified | WAL set restore, JARVIS tombstone 유실 vs SB receipt 잔존 |
+| M13 | 운영·화면: GUI 정정/삭제 수명 | implemented_unverified | 격리 Chrome. 운영 timer/GUI 전체는 외부 |
+| M14 | 관계 검색: 기준 대비 가치·비용·삭제 일관성 | not_implemented | hybrid는 무근거 후보 증가. 기본 활성화 보류. 운영 전환이 아님 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 

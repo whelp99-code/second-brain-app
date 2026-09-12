@@ -26,19 +26,25 @@ const {memoryDatabase,closeMemoryDatabase} = await load('tests/fixtures/memory-c
 const {memoryReadFenceFixture} = await load('tests/fixtures/memory-read-fence.js');
 const {createProductionMemoryReference} = await load('src/memory-reference-production.js');
 const {createProductionMemoryReadFence} = await load('src/memory-read-fence-production.js');
+const {memoryEffectDigest} = await load('src/second-brain-effect-v2.js');
+const {MEMORY_EFFECT_LANE_PREFIX} = await load('src/second-brain-effect-v2-contract.js');
 const database = await memoryDatabase();
 const {config,key} = memoryReadFenceFixture(database,new Date(Date.now()+86400000).toISOString());
 const {backupSqlite, restoreSqlite} = await load('src/personal-os-backup.js');
 function countReceipts(authority) {
   const count = table => {
-    try { return Number(authority.db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get()?.c ?? 0); }
-    catch { return 0; }
+    const row = authority.db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get();
+    return Number(row.c);
   };
   return {
     tombstone_chain: count('memory_tombstone_chain'),
     deletion_proofs: count('memory_deletion_proofs'),
     gjc_intents: count('gjc_intents'),
   };
+}
+function tombstoneIds(authority) {
+  return authority.db.prepare('SELECT tombstone_id FROM memory_tombstone_chain ORDER BY sequence').all()
+    .map(row => row.tombstone_id);
 }
 let runtime = createProductionMemoryReference(database.authority,{
   read_fence_config:config,projection_key:Buffer.alloc(32,7),
@@ -60,6 +66,7 @@ try {
   const jarvisDurableAt = Date.now();
   assert.equal(deleted.tombstone_sequence,1);
   const receiptsAtBackup = countReceipts(database.authority);
+  const idsAtBackup = tombstoneIds(database.authority);
   mkdirSync(join(root,'jarvis-authority-backup'),{recursive:true});
   const jarvisBackup = await backupSqlite({
     sourcePath:database.path,
@@ -69,12 +76,29 @@ try {
   assert.equal(extraWritten.state,'proved');
   const extraBeforeCrash = await read('ExtraLostAfterBackup');
   assert.equal(extraBeforeCrash.payload.records.length,1);
-  const extraDeleted = {
-    request_id: extraWritten.request_id,
-    proof_id: extraWritten.request_id,
-    tombstone_sequence: receiptsAtBackup.tombstone_chain,
-  };
+  const extraResolved = await effects.resolve(extraBeforeCrash.payload.records[0].record);
+  assert.equal(extraResolved.kind,'data',JSON.stringify(extraResolved));
+  const extraTarget = extraResolved.value;
+  const extraTargets = [extraTarget];
+  const extraTargetDigest = memoryEffectDigest('target_manifest',{targets:extraTargets});
+  const extraScope = {format:'none',sensitivity_classes:[extraTarget.sensitivity],valid_from:extraTarget.valid_from,
+    valid_until:extraTarget.valid_until,max_records:1,max_bytes:4096,source_owner_classes:[extraTarget.source_owner_class]};
+  const extraScopeDigest = memoryEffectDigest('target_scope',{target_digests:[extraTarget.target_digest],scope:extraScope});
+  const extraPayload = {disposition:'owner_requested',erasure_claim:'provider_local_suppression',external_receipts:[]};
+  const extraAppended = effects.chain.append({
+    operation:'forget',
+    lane_id: MEMORY_EFFECT_LANE_PREFIX.deletion + extraTargetDigest.slice(7),
+    targets: extraTargets,
+    target_manifest_digest: extraTargetDigest,
+    scope_digest: extraScopeDigest,
+    authority_receipt_digest: `sha256:${'d'.repeat(64)}`,
+    payload_digest: memoryEffectDigest('effect_payload',extraPayload),
+    effective_at: new Date().toISOString(),
+  });
+  assert.equal(extraAppended.entry.sequence,2);
   const receiptsAfterExtra = countReceipts(database.authority);
+  const idsAfterExtra = tombstoneIds(database.authority);
+  assert.ok(idsAfterExtra.includes(extraAppended.entry.tombstone_id));
   await runtime.close();
   await effects.close();
   const crashBegan = Date.now();
@@ -88,11 +112,10 @@ try {
   database.authority.reopen();
   const jarvisRestoredAt = Date.now();
   const receiptsAfterRestore = countReceipts(database.authority);
+  const idsAfterRestore = tombstoneIds(database.authority);
   assert.equal(receiptsAfterRestore.tombstone_chain, receiptsAtBackup.tombstone_chain);
-  assert.equal(
-    database.authority.db.prepare('SELECT sequence FROM memory_tombstone_chain WHERE sequence=2').get(),
-    undefined,
-  );
+  assert.deepEqual(idsAfterRestore, idsAtBackup);
+  assert.equal(idsAfterRestore.includes(extraAppended.entry.tombstone_id), false);
   const destKeep = join(root,'jarvis-authority-backup','existing-dest.sqlite');
   copyFileSync(jarvisBackup.destPath, destKeep);
   const destKeepHash = createHash('sha256').update(readFileSync(destKeep)).digest('hex');
@@ -121,8 +144,17 @@ try {
   const oldRestored = restoreSqlite({
     backupPath:oldSchema, destPath:join(root,'jarvis-authority-backup','old-restored.sqlite'),
   });
-  const schemaCheck = JSON.parse(execFileSync(python,['scripts/sqlite-schema-probe.py', oldRestored.destPath],{cwd:sb,encoding:'utf8'}));
-  assert.equal(schemaCheck.has_tombstone_chain,false);
+  const {AuthorityDb} = await load('src/db.js');
+  let incompatibleAuthority;
+  const incompatible = new AuthorityDb(oldRestored.destPath);
+  try {
+    await incompatible.initialize();
+  } catch (error) {
+    incompatibleAuthority = error instanceof Error && 'code' in error ? error.code : String(error);
+  } finally {
+    incompatible.close();
+  }
+  assert.ok(incompatibleAuthority);
   runtime = createProductionMemoryReference(database.authority,{
     read_fence_config:config,projection_key:Buffer.alloc(32,7),
     transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
@@ -140,6 +172,9 @@ try {
   assert.equal(restored.scan_errors,0);
   assert.equal((await read('DeleteAlpha')).payload.records.length,0);
   assert.equal((await read('ExtraLostAfterBackup')).payload.records.length,0);
+  const sbReceiptAfterRestore = JSON.parse(run('scripts/lookup-request.py',root,extraWritten.request_id));
+  assert.equal(sbReceiptAfterRestore.present,true);
+  assert.equal(sbReceiptAfterRestore.state,'proved');
   const keep = await read('KeepBeta');
   const sbReadableAt = Date.now();
   assert.equal(keep.payload.records.length,1);
@@ -207,10 +242,26 @@ try {
     `export BACKUP=${join(root,'jarvis-authority-backup','jarvis-rehearsal.sqlite')}`,
     `export DEST=${join(root,'jarvis-authority-backup','restored.sqlite')}`,
     `export FENCE=${join(root,'trusted-fence.json')}`,
+    `export AUTHORITY=${database.path}`,
+    `export AUTHORITY_ROOT=${database.root}`,
+    `export JARVIS=${build}`,
   ].join('\n')+'\n');
+  const expiredFence = {...secondFence, expires_at: new Date(Date.now()-1000).toISOString()};
+  let expiredFenceRefused;
+  try {
+    execFileSync(python,['scripts/restore-probe.py','restore',root],
+      {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(expiredFence)});
+  } catch (error) {
+    expiredFenceRefused = String(error);
+  }
+  assert.match(String(expiredFenceRefused), /TOMBSTONE_FENCE_REQUIRED|TOMBSTONE_SET_STALE/);
+  const freshFence = JSON.parse(execFileSync(process.execPath,[join(sb,'scripts/issue-restore-fence.mjs')],{
+    cwd:sb,encoding:'utf8',timeout:30000,env:{...process.env,JARVIS:build,AUTHORITY:database.path,AUTHORITY_ROOT:database.root,FENCE:join(root,'trusted-fence.json')},
+  }));
+  assert.equal(freshFence.tombstone_sequence,secondFence.tombstone_sequence);
   const sameRootRestore = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
-    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(secondFence)}));
-  assert.equal(sameRootRestore.tombstone_sequence,secondFence.tombstone_sequence);
+    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(freshFence)}));
+  assert.equal(sameRootRestore.tombstone_sequence,freshFence.tombstone_sequence);
   const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
     restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:secondFence.tombstone_sequence,
     deleted_records:0,first_restore_surviving_records:1,model_calls:0,
@@ -236,16 +287,20 @@ try {
       receipts_after_extra: receiptsAfterExtra,
       receipts_after_restore: receiptsAfterRestore,
       crash_loss_accepted_receipts: receiptsAfterExtra.tombstone_chain - receiptsAfterRestore.tombstone_chain,
-      lost_accepted_request_id: extraDeleted.request_id,
-      lost_accepted_proof_id: extraDeleted.proof_id,
-      lost_accepted_present_after_restore: false,
+      ids_at_backup: idsAtBackup,
+      ids_after_extra: idsAfterExtra,
+      ids_after_restore: idsAfterRestore,
+      lost_jarvis_tombstone_id: extraAppended.entry.tombstone_id,
+      lost_jarvis_tombstone_present_after_restore: idsAfterRestore.includes(extraAppended.entry.tombstone_id),
+      sb_post_backup_request_id: extraWritten.request_id,
+      sb_post_backup_receipt_after_restore: sbReceiptAfterRestore,
       loss_mode: 'unclean_unlink_while_open',
       dest_preserved_on_missing_backup: missingPreserved,
       dest_preserved_on_invalid_backup: invalidBackupRefused,
       backup_sha256: jarvisBackup.sha256,
       restore_sha256: jarvisRestored.sha256,
       invalid_backup_refused: invalidBackupRefused,
-      old_schema_has_tombstone_chain: schemaCheck.has_tombstone_chain,
+      incompatible_authority: incompatibleAuthority,
       keep_beta_readable: true,
     },
     same_root_restore: {tombstone_sequence:sameRootRestore.tombstone_sequence, blocked_matches:sameRootRestore.blocked_matches},
