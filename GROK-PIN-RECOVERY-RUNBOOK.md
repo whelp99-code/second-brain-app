@@ -1,34 +1,35 @@
 # 핀 복구 런북 (운영 전환 아님)
 
-**current를 바꾸지 않는다.**
+**current를 바꾸지 않는다.** 운영 current는 `41f0751`.
 
 ## Full pin
 
 ```bash
-source /var/tmp/sb-jarvis-restore-Ar1cuM/recovery.env
-export REL=/var/tmp/sb-candidate-12db06e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1
+source /var/tmp/sb-jarvis-restore-qku1N6/recovery.env
+export REL=/var/tmp/sb-candidate-32e58fe/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726
 export JARVIS=/var/tmp/jarvis-artifact-1672626/source/dist
 ```
 
 | 항목 | 값 |
 |---|---|
-| SB source | `12db06edc6760f8478e2d7c866b10a8d06430eb3` |
-| wheel | `0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57` |
+| SB source | `32e58fe3031649221a8694ef967d036c2d2ece50` |
+| git archive | `scripts/seed-scoped-v4.py` 포함 |
+| wheel | `c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f` |
 | JARVIS | `1672626c5f2b0b06f7fb93c900cf8771536b58cd` |
 | inventory | `e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd` / 34768 |
 | production_activated | false |
 
-BACKUP는 seq3 high-water `jarvis-highwater.sqlite`다. seq1 rehearsal는 RPO 측정용이다.
+BACKUP는 seq3 high-water `jarvis-highwater.sqlite`다. 필수 SB restore와 만료 fence 거부 뒤에만 schema4 classified write를 증명한다.
 
 ## 종료 후
 
 ```bash
 source "$ROOT/recovery.env"
-node scripts/issue-restore-fence.mjs   # seq 3
+node scripts/issue-restore-fence.mjs
 uv run python scripts/restore-probe.py restore "$ROOT" < "$FENCE"
 ```
 
-만료 fence는 TOMBSTONE_FENCE_REQUIRED가 정상 거부. 필수 restore 실패는 gate 실패.
+만료 fence는 `TOMBSTONE_FENCE_REQUIRED`가 정상 거부. 필수 restore 실패는 gate 실패.
 
 ## 게이트
 
