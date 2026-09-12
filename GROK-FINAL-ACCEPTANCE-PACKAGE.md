@@ -67,7 +67,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | schema4 write | `scripts/seed-scoped-v4.py` → `accept_scoped_request` + `RequestExecutor` schema4 `source_access` | `memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532` proved, page `wiki/memory-725c050a86a52a7ccfa65bd7a19025882e5851de95a428647107f214ebecb4d0`, needle `첫 결정`. ledger 수동 INSERT 없음 |
 | 만료 fence | restore-probe restore + past fence | `TOMBSTONE_FENCE_REQUIRED` (harness 기대 실패) |
 | 종료 후 권한 | `qku1N6/recovery.env` AUTHORITY_ROOT 생존 | fence seq 3 |
-| 설치 3게이트 | `/var/tmp/sb-gates-f7c1945.log` (실행 핀 `f7c1945`, 현재 아카이브 `8edb9d4`와 wheel 바이트 동일. 새 실행으로 바꾸지 않음) | maintenance/integration/`--work` |
+| 설치 3게이트 | `/var/tmp/sb-gates-f7c1945.log` (실행 핀 `f7c1945`, 현재 아카이브 `e13cd3b`와 wheel 바이트 동일. 새 실행으로 바꾸지 않음) | maintenance/integration/`--work` |
 | cold restore | `pytest tests/test_cold_restore_write.py` | 1 passed (briefing cap 0). 원 전체회귀 1 failed는 별도 기록 |
 | Codex 실제 UI | `/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json` | remember400→201, conflict400→200. 재실행 없음 |
 | 전체 pytest | 이번 미반복 | Codex 1837 passed / 1 failed / 2 skipped를 이번 집중 수정으로 전체 통과라 바꾸지 않음 |

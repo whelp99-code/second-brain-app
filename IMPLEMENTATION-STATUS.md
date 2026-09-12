@@ -15,7 +15,7 @@
 | C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact, gjc.dispatch V1-C–F. gold 100–300은 M10 |
 | D | 실제 공유 기억의 수명 | implemented_unverified | schema4 proved + recover-a/b 동일 digest. 실사용자 1건은 입력 |
 | E | 가용성·복구·GUI | implemented_unverified | paired DR, 격리 Chrome fail→success. GUI 전체 수명은 M13 격리 남음 |
-| F | 배포 재료와 운영 절차 | implemented_unverified | archive 8edb9d4, wheel/gates f7c1945 EXIT0 (이름 바꾸지 않음). 전환 미실행. current 41f0751 |
+| F | 배포 재료와 운영 절차 | implemented_unverified | archive e13cd3b, 실행 핀/gates f7c1945 EXIT0 (이름 바꾸지 않음). 전환 미실행. current 41f0751 |
 | M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | implemented_unverified | 격리 scoped MCP. 운영 로그인 신원/세션 입력 |
 | M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | 격리 schema4 proved + 2 세션. 실사용자 task 원문 입력 |
 | M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | 세션 철회 후 거부, 만료 fence TOMBSTONE_FENCE_REQUIRED |
