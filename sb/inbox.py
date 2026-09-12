@@ -67,6 +67,19 @@ def write_inbox(root: Path, content: str, title: str | None) -> Path:
     return publish_inbox(root, parse_remember(content, title))
 
 
+def discard_inbox(root: Path, relative: str) -> str:
+    """Withdraw an unused inbox receipt. Refuses paths outside `inbox/`."""
+    rel = Path(relative)
+    if rel.is_absolute() or ".." in rel.parts or rel.parts[:1] != ("inbox",):
+        raise ValueError("invalid inbox path")
+    inbox = (root / "inbox").resolve()
+    dest = (root / rel).resolve()
+    if not dest.is_relative_to(inbox) or not dest.is_file():
+        raise ValueError("inbox receipt missing")
+    dest.unlink()
+    return rel.as_posix()
+
+
 def _slug(title: str | None) -> str:
     raw = "" if title is None else title.strip()
     cleaned = _SLUG_RE.sub("-", raw).strip("-").lower()

@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from sb.config import Config, load_config
 from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
-from sb.inbox import RememberRejected, write_inbox
+from sb.inbox import RememberRejected, discard_inbox, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
 from sb.ops import status_snapshot
@@ -84,6 +84,8 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <label for="content">내용</label><textarea id="content" placeholder="기억할 내용을 입력하세요"></textarea>
 <p><button id="rememberButton" onclick="remember()">기억하기</button> <button class="secondary" data-run-button onclick="runPipeline()">지금 처리</button></p>
 <pre id="rememberResult" class="muted"></pre>
+<label for="inboxPath">영수증 경로</label><div class="row"><input id="inboxPath" placeholder="inbox/....md"><button class="secondary" id="discardButton" onclick="discardInbox()">영수증 삭제</button></div>
+<pre id="discardResult" class="muted"></pre>
 </section>
 <section>
 <h2>파일 업로드</h2>
@@ -134,7 +136,8 @@ function saveToken(){localStorage.setItem('sb_token',byId('token').value);show('
 async function loadReadiness(){try{const response=await fetch('/ready',{headers:authHeaders()});const data=await response.json();if(![200,503].includes(response.status)||!['ready','degraded'].includes(data.status))throw new Error('준비 상태 응답을 확인하지 못했습니다.');show('readinessSummary',data.status==='ready'?'운영 준비 점검 통과':'운영 준비 미완료 — 아래 항목을 확인하세요.');show('readinessDetails',data.reasons||[])}catch(error){show('readinessSummary','운영 준비 상태를 확인하지 못했습니다.');show('readinessDetails',error.message)}}
 async function loadStatus(){try{const data=await api('/api/status');byId('status').textContent=data.status;show('stageHistory',data.recent_stages||[]);const failures=data.failures;byId('failureSummary').textContent=failures.total?'미해결 실패 '+failures.total+'건 (단계별: '+Object.entries(failures.by_stage).map(([stage,count])=>stage+' '+count+'건').join(', ')+')':'원장에 기록된 미해결 실패 없음';byId('failureDetails').textContent=failures.items.map(item=>item.stage+' · '+item.key+' · 시도 '+item.attempts+'회\\n'+(item.error||'오류 상세 없음')+(item.retry_hold_reason?'\\n재시도 보류: 원래 브리핑 입력을 복구해야 합니다.':'')).join('\\n\\n')+(failures.omitted?'\\n추가 '+failures.omitted+'건은 상세 목록에서 생략됐습니다.':'')}catch(error){byId('status').textContent=error.message;byId('failureSummary').textContent='실패 상태를 확인하지 못했습니다.';byId('failureDetails').textContent='';show('stageHistory','단계 이력을 확인하지 못했습니다.')}finally{await loadReadiness()}}
 let remembering=false;
-async function remember(){if(remembering)return;remembering=true;byId('rememberButton').disabled=true;const draft={title:byId('title').value,content:byId('content').value};show('rememberResult','저장 중…');try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify(draft)});show('rememberResult',{message:'받은 편지함에 저장했습니다. 처리 대기 상태이며, 지금 처리 후 검색 결과를 확인하세요.',...data});if(byId('title').value===draft.title&&byId('content').value===draft.content)byId('content').value=''}catch(error){show('rememberResult',error.message)}finally{remembering=false;byId('rememberButton').disabled=false}}
+async function remember(){if(remembering)return;remembering=true;byId('rememberButton').disabled=true;const draft={title:byId('title').value,content:byId('content').value};show('rememberResult','저장 중…');try{const data=await api('/api/remember',{method:'POST',body:JSON.stringify(draft)});show('rememberResult',{message:'받은 편지함에 저장했습니다. 처리 대기 상태이며, 지금 처리 후 검색 결과를 확인하세요.',...data});if(data.inbox_path)byId('inboxPath').value=data.inbox_path;if(byId('title').value===draft.title&&byId('content').value===draft.content)byId('content').value=''}catch(error){show('rememberResult',error.message)}finally{remembering=false;byId('rememberButton').disabled=false}}
+async function discardInbox(){show('discardResult','삭제 중…');try{const data=await api('/api/inbox-discard',{method:'POST',body:JSON.stringify({inbox_path:byId('inboxPath').value})});show('discardResult',data)}catch(error){show('discardResult',error.message)}}
 let runningPipeline=false;
 async function runPipeline(){
  if(runningPipeline)return;
@@ -470,6 +473,14 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     raise ValueError("title must be a string")
                 rel = mutate_root(context.config, GenerationOperation.INBOX, lambda root: write_inbox(root, content, title))
                 self._json(HTTPStatus.CREATED, {"inbox_path": rel.as_posix()})
+                return
+            if parsed.path == "/api/inbox-discard":
+                inbox_path = data.get("inbox_path")
+                if not isinstance(inbox_path, str) or not inbox_path.strip():
+                    raise ValueError("inbox_path is required")
+                discarded = mutate_root(
+                    context.config, GenerationOperation.INBOX, lambda root: discard_inbox(root, inbox_path))
+                self._json(HTTPStatus.OK, {"discarded": discarded})
                 return
             if parsed.path == "/api/run":
                 outcome = run_all(context.config, context.config.configured_source_ids)

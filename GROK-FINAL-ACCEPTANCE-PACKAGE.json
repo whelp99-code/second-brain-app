@@ -46,8 +46,8 @@
     "aliased_peer_to_scoped": false,
     "hand_granted_source_access": false,
     "jarvis_owned_high_water": 3,
-    "rto_restore_to_readable_ms": 2092,
-    "failure_to_work_available_ms": 9740
+    "rto_restore_to_readable_ms": 1958,
+    "failure_to_work_available_ms": 9418
   },
   "requirements": {
     "A": {"meaning": "original/user-edit/correction preservation", "status": "implemented_unverified"},

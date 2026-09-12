@@ -95,20 +95,42 @@ def test_scoped_search_disables_hybrid_and_omits_scores(classified, monkeypatch)
 
 
 def test_concurrent_scoped_search_keeps_deny_and_allowed(classified):  # noqa: F811
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, wait
+    from threading import Barrier, Event
 
     root, _name, generation = classified
     allowed_scope = SourceAccess("principal:owner", ("project:a",), "1")
     denied_scope = SourceAccess("principal:owner", ("project:b",), "1")
+    started = Barrier(5)
+    writer_done = Event()
+    order: list[str] = []
 
     def allowed() -> object:
-        return search_scoped_records(root, generation, allowed_scope, "Cited", 10)
+        started.wait()
+        order.append("allow")
+        rows = search_scoped_records(root, generation, allowed_scope, "Cited", 10)
+        writer_done.wait(timeout=5)
+        return rows
 
     def denied() -> object:
+        started.wait()
+        order.append("deny")
         return search_scoped_records(root, generation, denied_scope, "Cited", 10)
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        allowed_rows = list(pool.map(lambda _: allowed(), range(4)))
-        denied_rows = list(pool.map(lambda _: denied(), range(4)))
+    def writer() -> str:
+        started.wait()
+        order.append("write")
+        writer_done.set()
+        return "overlap"
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = [pool.submit(allowed) for _ in range(2)]
+        futures += [pool.submit(denied) for _ in range(2)]
+        futures.append(pool.submit(writer))
+        wait(futures)
+        allowed_rows = [futures[0].result(), futures[1].result()]
+        denied_rows = [futures[2].result(), futures[3].result()]
+        assert futures[4].result() == "overlap"
+    assert {"allow", "deny", "write"} <= set(order)
     assert all(rows and "Cited" in str(rows) for rows in allowed_rows)
     assert all(rows == [] for rows in denied_rows)

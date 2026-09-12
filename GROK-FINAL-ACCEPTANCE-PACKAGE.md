@@ -52,7 +52,7 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 고정 synthetic/KeepBeta만 | 사용자 큐레이션 정답집 |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신. p50/p95·RSS | implemented_unverified | 기존 M11-MCP-CORPUS-LATENCY(재실행 없음). 합성 동시 조회: `test_concurrent_scoped_search_keeps_deny_and_allowed` 1 passed | 운영 corpus는 입력. 클라이언트 RSS≠서버 RSS |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. 신뢰 근거 복구·삭제 high-water·재유입 차단·시간 | implemented_unverified | harness-36: 필수 restore+만료 fence 후 schema4 write, recover-a/b/retry, final_fresh `첫 결정`. generic ExtraLost 0 KeepBeta 0. cold restore cap0 1 passed (원 전체회귀 실패1은 별도) | 운영 RPO/RTO는 운영 백업 |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | 기존 진입점 `test_existing_gui_entrypoints_lifetime_and_concurrent_search` 1 passed: remember400/201+inbox, pages 원문, conflict400/200, retention GET, search. 실패복구는 test_web_run_failure(재실행 없음). Chrome 버튼은 Codex actual-ui만. 삭제 버튼 없음 | 운영 timer·native 로그인·전체 GUI 삭제는 외부/미구현 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | Chrome CDP `isolated-browser-m13-lifetime.py` EXIT 0: remember fail/success, search/원문, conflict fail/resolve, inbox 영수증 삭제, 검색 유지. Codex actual-ui remember/conflict 버튼 보존. 운영 timer/실사용자삭제는 외부 |
 | M14 | 관계 검색 추가 가치 측정 후 제한 채택. 운영 전환이 아님 | not_implemented | hybrid 무근거 후보 증가 | 고정 질문에서 비용 대비 효과·정정/삭제 일관성 입증 전 기본 활성화 보류 |
 
 ## 3. 테스트 증거
@@ -81,9 +81,9 @@ CODEX-NIGHT-REVIEW-c0b4fce. **운영 전환 없음. 인증 복사 없음. 실사
 |---|---|
 | fixture | `/var/tmp/sb-jarvis-restore-qku1N6` |
 | jarvis_owned_high_water | 3 |
-| rto_restore_to_readable_ms | 2092 |
-| failure_to_work_available_ms | 9740 |
-| jarvis_crash_to_reopen_ms | 48 |
+| rto_restore_to_readable_ms | 1958 |
+| failure_to_work_available_ms | 9418 |
+| jarvis_crash_to_reopen_ms | 46 |
 | first-restore concurrent clients | 2 |
 | independent_revocations (KeepBeta) | 2 |
 | writer_lease.writer_busy | true |
