@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 
-export async function checkRestoredScope({load,database,config,root,launcher,pageId,clientId='restore',coordinate}) {
+export async function checkRestoredScope({load,database,config,root,launcher,pageId,clientId='restore',coordinate,needle='KeepBeta'}) {
   const {createProductionMemoryAccessClaim} = await load('src/memory-access-claim-production.js');
   const {createFileMemoryAccessScopeResolver} = await load('src/memory-access-policy.js');
   const {createMemoryScopedClient} = await load('src/memory-scoped-client.js');
@@ -28,7 +28,7 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
       const response = await transport.call(...args);
       if (withdrawAfterResponse) {
         assert.equal(response.kind,'data');
-        assert(JSON.stringify(response.value).includes('KeepBeta'));
+        assert(JSON.stringify(response.value).includes(needle));
         intercepted++;
         writeFileSync(policyPath,JSON.stringify({...policy,sessions:[]}));
       }
@@ -42,15 +42,15 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
   try {
     const allowed = await client.readPage(pageId);
     assert.equal(allowed.pages.length,1);
-    assert(JSON.stringify(allowed).includes('KeepBeta'));
+    assert(JSON.stringify(allowed).includes(needle));
     if (coordinate) await coordinate(clientId, {
       read:()=>client.readPage(pageId),
       revoke:()=>writeFileSync(policyPath,JSON.stringify({...policy,sessions:[]})),
       restore:()=>writeFileSync(policyPath,JSON.stringify(policy)),
     });
-    const searched = await client.search('KeepBeta',2);
+    const searched = await client.search(needle,2);
     assert.equal(searched.pages.length,1);
-    for (const action of [()=>client.readPage(pageId),()=>client.search('KeepBeta',2)]) {
+    for (const action of [()=>client.readPage(pageId),()=>client.search(needle,2)]) {
       withdrawAfterResponse = true;
       await assert.rejects(action, error=>error.code==='MEMORY_ACCESS_SCOPE_UNAVAILABLE');
       withdrawAfterResponse = false;
@@ -60,7 +60,7 @@ export async function checkRestoredScope({load,database,config,root,launcher,pag
     assert.equal(intercepted,2);
     writeFileSync(policyPath,JSON.stringify({...policy,sessions:[{...policy.sessions[0],projects:['project:b']}]}));
     await assert.rejects(()=>client.readPage(pageId));
-    const restricted = await client.search('KeepBeta',2);
+    const restricted = await client.search(needle,2);
     assert.equal(restricted.pages.length,0);
     writeFileSync(policyPath,JSON.stringify({...policy,sessions:[]}));
     await assert.rejects(()=>client.readPage(pageId), error=>error.code==='MEMORY_ACCESS_SCOPE_UNAVAILABLE');

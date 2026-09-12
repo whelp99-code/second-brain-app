@@ -1,19 +1,20 @@
 {
-  "root": "/var/tmp/sb-jarvis-restore-BXtuTK",
+  "root": "/var/tmp/sb-jarvis-restore-Ar1cuM",
   "rpo_sb": {
-    "last_durable_at": "2026-09-12T02:30:16.320051+00:00",
-    "last_durable_generation_id": "sbgen:v1:fa2b613985938d7ed79f8d2fcc6786a1d16ddea8105d80c7c61aac3f47b11859",
+    "last_durable_at": "2026-09-12T03:18:30.956756+00:00",
+    "last_durable_generation_id": "sbgen:v1:26dbc15ef512c6f8872aa9e2713ca090d728bb2b94727bafd9945e28cecf1575",
     "durable_pages_at_backup": 2,
-    "writes_after_backup_before_failure": 1,
+    "writes_after_backup_before_first_restore": 0,
+    "extra_after_first_sb_restore": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
     "post_backup_accepted_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
-    "post_backup_remember_lost_on_generation_restore": true,
-    "crash_loss_records": 1,
-    "restored_generation_id": "sbgen:v1:cb56eeb3d34471d4bc19d3fd469196030fe81ec1b483dda08826fcafe8070a94"
+    "post_backup_remember_lost_on_generation_restore": false,
+    "crash_loss_records": 0,
+    "restored_generation_id": "sbgen:v1:1838e4b3a601d16d3034327e7b61b839a1cce8d3f4ce73e692d7db515df32526"
   },
   "rpo_jarvis": {
-    "last_durable_request_id": "memeff:req:v2:1d42bae1826066c9a7cb481ec6a0363009a8b967f1d04aa3ab97d8c852b9c002",
-    "last_durable_proof_id": "sbproof:v1:c1a2fbf57ff8e485127882c0de6bc53ba43bc0a8763d4e4c6bec7ccb2b4b9ea5",
-    "last_durable_at_ms": 1789180221538,
+    "last_durable_request_id": "memeff:req:v2:1d1f58634d6aa37e8460773445caecbcee06d1b3eccd98b396e694978b2f073f",
+    "last_durable_proof_id": "sbproof:v1:6e209f3035993945f71d49ec7171b158203e293409e7a2550e4f665d4dde9782",
+    "last_durable_at_ms": 1789183116291,
     "tombstone_sequence_before_restore": 1,
     "restored_tombstone_sequence": 1,
     "revoked_records_held": 1,
@@ -39,25 +40,28 @@
     },
     "crash_loss_accepted_receipts": 2,
     "ids_at_backup": [
-      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58"
+      "memtomb:v1:d157e189b53ce6c31f40b20953d19b234678bfd1424747ee6f3b1ae923be7f21"
     ],
     "ids_after_extra": [
-      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58",
-      "memtomb:v1:932048b57fb58938ddb0d3eb6dc02a01ddcd2c006227aceda6f959180bbdf393",
-      "memtomb:v1:af1e63ef7d4636bc9d408a0167144c70f3eb9ba057f4ccbbdd1e64d3c5c7b63b"
+      "memtomb:v1:d157e189b53ce6c31f40b20953d19b234678bfd1424747ee6f3b1ae923be7f21",
+      "memtomb:v1:315a4e19e9796fd182da64d722897b34a9a90cc0d7b32b0652f2f3636a8bcd67",
+      "memtomb:v1:e202ee9ce45730b630207b7e066d656c28a95d0ff4df4ffb844c5ef30cc8acb4"
     ],
     "ids_after_first_jarvis_restore": [
-      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58"
+      "memtomb:v1:d157e189b53ce6c31f40b20953d19b234678bfd1424747ee6f3b1ae923be7f21"
     ],
     "ids_after_extra_restore": [
-      "memtomb:v1:5e43673d7ba587987e3c7472676bfeee390e2c7275e227b4d678b62b449f3d58"
+      "memtomb:v1:d157e189b53ce6c31f40b20953d19b234678bfd1424747ee6f3b1ae923be7f21"
     ],
-    "lost_jarvis_tombstone_id": "memtomb:v1:af1e63ef7d4636bc9d408a0167144c70f3eb9ba057f4ccbbdd1e64d3c5c7b63b",
-    "lost_jarvis_proof_id": "sbproof:v1:d016c36afcf9a9ff02dce4a95a959c7e7bf092c0c087232b26903f7bfbf3242d",
+    "lost_jarvis_tombstone_id": "memtomb:v1:e202ee9ce45730b630207b7e066d656c28a95d0ff4df4ffb844c5ef30cc8acb4",
+    "lost_jarvis_proof_id": "sbproof:v1:b9fd972fee1979fb219311391f5203c931eda9e5e96e24112d4b7fc9685bf92b",
     "extra_accepted_present_before_crash": true,
     "lost_jarvis_tombstone_present_after_restore": false,
     "crash_loss_after_extra_restore": 2,
-    "extra_accepted_request_id": "memeff:req:v2:9cd5df578b99b6ceb18c0a4cb9a0eebb286348f7f585e9e4690e5f5b889a25f1",
+    "recovered_highwater_seq": 3,
+    "extra_present_after_highwater": true,
+    "highwater_backup_sha256": "1792034c6ece55269230eb885043be88b119f82628918c10262a477f8387c521",
+    "extra_accepted_request_id": "memeff:req:v2:1f81219cba859b576455fbd442e81cee0bb006769529a1a6664da992e046d598",
     "sb_post_backup_request_id": "memreq:pos:v1:cbe58af8e35efbe2c6a20de819bf6ffd547534fc5ceda29411b3c4bed6fb6e56",
     "sb_post_backup_receipt_after_restore": {
       "present": true,
@@ -67,35 +71,36 @@
     "loss_mode": "unclean_unlink_while_open",
     "dest_preserved_on_missing_backup": "E_RESTORE_FAILED",
     "dest_preserved_on_invalid_backup": "E_RESTORE_FAILED",
-    "backup_sha256": "bae855f7d568cef7846742c58d1227acbd6ceaef1d701c9cfbc851e02fbdcdba",
-    "restore_sha256": "bae855f7d568cef7846742c58d1227acbd6ceaef1d701c9cfbc851e02fbdcdba",
+    "backup_sha256": "dc7aff5d884aa9e7f834f80ada7ce9360ee10831a419ddabe56d04f791d48536",
+    "restore_sha256": "dc7aff5d884aa9e7f834f80ada7ce9360ee10831a419ddabe56d04f791d48536",
     "invalid_backup_refused": "E_RESTORE_FAILED",
     "incompatible_authority": "MIGRATION_CHECKSUM_MISMATCH",
     "keep_beta_readable": true
   },
   "rto": {
-    "failure_began_ms": 1789180216458,
-    "restore_began_ms": 1789180221674,
-    "sb_first_read_ms": 1789180223691,
-    "scoped_available_ms": 1789180224800,
-    "new_write_available_ms": 1789180226029,
-    "restore_probe_ms": 433.63,
-    "restore_to_readable_ms": 2017,
-    "failure_to_first_read_ms": 7233,
-    "failure_to_work_available_ms": 9571,
-    "jarvis_crash_to_reopen_ms": 46,
-    "scenario_ms": 24112
+    "failure_began_ms": 1789183111111,
+    "restore_began_ms": 1789183116454,
+    "sb_first_read_ms": 1789183118503,
+    "scoped_available_ms": 1789183119595,
+    "new_write_available_ms": 1789183120825,
+    "restore_probe_ms": 472,
+    "restore_to_readable_ms": 2049,
+    "failure_to_first_read_ms": 7392,
+    "failure_to_work_available_ms": 9714,
+    "jarvis_crash_to_reopen_ms": 54,
+    "scenario_ms": 27449
   },
-  "writer_lease": {
-    "writer_busy": true,
-    "pending_requests": 0,
-    "empty_queue": true,
-    "lock": "/var/tmp/sb-jarvis-restore-BXtuTK/state/generation.lock",
-    "pid": 1961235
+  "second_restore_records": 1,
+  "recovered_scoped": {
+    "extra_lost": 0,
+    "keep_beta": 0,
+    "post_recovery": 1
   },
   "same_root_restore": {
     "tombstone_sequence": 3,
     "blocked_matches": 0
   },
+  "after_harness_fence_seq": 3,
+  "after_harness_restore_exit": 0,
   "production_activated": false
 }

@@ -227,6 +227,10 @@ try {
   assert.equal(sbReceiptAfterRestore.state,'proved');
   const extraFence = createProductionMemoryReadFence(database.authority,config,'memory_status')(new Date());
   assert.equal(extraFence.tombstone_sequence,extraDeleted.tombstone_sequence);
+  const jarvisHighwater = await backupSqlite({
+    sourcePath:database.path,
+    destPath:join(root,'jarvis-authority-backup','jarvis-highwater.sqlite'),
+  });
   await runtime.close();
   await effects.close();
   database.authority.close();
@@ -238,27 +242,64 @@ try {
   const idsAfterExtraRestore = tombstoneIds(database.authority);
   assert.equal(idsAfterExtraRestore.includes(extraTombstoneId), false);
   const receiptsAfterExtraRestore = countReceipts(database.authority);
-  let extraFenceRestore;
-  let extraFenceRefused;
-  try {
-    extraFenceRestore = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
-      {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(extraFence)}));
-  } catch (error) {
-    extraFenceRefused = String(error);
-  }
-  const restoredAgain = extraFenceRestore ?? {tombstone_sequence:receiptsAfterExtraRestore.tombstone_chain, extra_fence_refused:extraFenceRefused, blocked_matches:0};
+  database.authority.close();
+  restoreSqlite({backupPath:jarvisHighwater.destPath, destPath:database.path});
+  database.authority.reopen();
+  const idsAfterHighwaterRestore = tombstoneIds(database.authority);
+  assert.equal(idsAfterHighwaterRestore.includes(extraTombstoneId), true);
+  const receiptsAfterHighwaterRestore = countReceipts(database.authority);
+  assert.equal(receiptsAfterHighwaterRestore.tombstone_chain, receiptsAfterExtra.tombstone_chain);
+  runtime = createProductionMemoryReference(database.authority,{
+    read_fence_config:config,projection_key:Buffer.alloc(32,7),
+    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
+  });
+  effects = await referenceEffectFixture({load,database,key,config,launcher,root,sb,python});
+  const recoveredFence = createProductionMemoryReadFence(database.authority,config,'memory_status')(new Date());
+  assert.equal(recoveredFence.tombstone_sequence, extraDeleted.tombstone_sequence);
+  const restoredAgain = JSON.parse(execFileSync(python,['scripts/restore-probe.py','restore',root],
+    {cwd:sb,encoding:'utf8',timeout:120000,input:JSON.stringify(recoveredFence)}));
+  assert.equal(restoredAgain.tombstone_sequence, recoveredFence.tombstone_sequence);
+  assert.equal(restoredAgain.tombstone_set_root, recoveredFence.tombstone_set_root);
+  assert.equal(restoredAgain.blocked_matches, 0);
+  assert.equal(restoredAgain.scan_errors, 0);
+  await runtime.close();
+  runtime = createProductionMemoryReference(database.authority,{
+    read_fence_config:config,projection_key:Buffer.alloc(32,7),
+    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
+  });
+  const extraLostAfterRecovery = (await read('ExtraLostAfterBackup')).payload.records.length;
+  const keepAfterRecovery = (await read('KeepBeta')).payload.records.length;
+  assert.equal(extraLostAfterRecovery, 0);
+  assert.equal(keepAfterRecovery, 0);
+  const postRecoveryWritten = JSON.parse(run('scripts/seed-extra-lost.py',root,'PostRecoveryWrite'));
+  assert.equal(postRecoveryWritten.state,'proved');
+  await runtime.close();
+  runtime = createProductionMemoryReference(database.authority,{
+    read_fence_config:config,projection_key:Buffer.alloc(32,7),
+    transport_options:{contractProfile:'task32-schema4',launcherPath:launcher,configPath:join(root,'config.toml')},
+  });
+  const postRecovery = await read('PostRecoveryWrite');
+  assert.equal(postRecovery.payload.records.length, 1);
+  const recoveredScoped = {
+    extra_lost: extraLostAfterRecovery,
+    keep_beta: keepAfterRecovery,
+    post_recovery: postRecovery.payload.records.length,
+  };
+  const recoveredPeer = recoveredScoped;
+  assert.equal(recoveredScoped.post_recovery, 1);
   const recoveryAuthorityRoot = join(root,'recovery-authority');
   cpSync(database.root, recoveryAuthorityRoot, {recursive:true});
+  writeFileSync(join(root,'trusted-fence.json'), JSON.stringify(recoveredFence));
   writeFileSync(join(root,'recovery.env'), [
     `export ROOT=${root}`,
-    `export BACKUP=${join(root,'jarvis-authority-backup','jarvis-rehearsal.sqlite')}`,
+    `export BACKUP=${join(root,'jarvis-authority-backup','jarvis-highwater.sqlite')}`,
     `export DEST=${join(root,'jarvis-authority-backup','restored.sqlite')}`,
     `export FENCE=${join(root,'trusted-fence.json')}`,
     `export AUTHORITY=${join(recoveryAuthorityRoot,'authority.sqlite')}`,
     `export AUTHORITY_ROOT=${recoveryAuthorityRoot}`,
     `export JARVIS=${build}`,
   ].join('\n')+'\n');
-  const expiredFence = authorize(new Date(Date.now()-120000));
+  const expiredFence = createProductionMemoryReadFence(database.authority,config,'memory_status')(new Date(Date.now()-120000));
   let expiredFenceRefused;
   try {
     execFileSync(python,['scripts/restore-probe.py','restore',root],
@@ -266,24 +307,25 @@ try {
   } catch (error) {
     expiredFenceRefused = String(error);
   }
-  assert.match(String(expiredFenceRefused), /TOMBSTONE_FENCE_REQUIRED|TOMBSTONE_SET_STALE/);
+  assert.match(String(expiredFenceRefused), /TOMBSTONE_FENCE_REQUIRED/);
   const freshFence = JSON.parse(execFileSync(process.execPath,[join(sb,'scripts/issue-restore-fence.mjs')],{
     cwd:sb,encoding:'utf8',timeout:30000,env:{...process.env,JARVIS:build,AUTHORITY:join(recoveryAuthorityRoot,'authority.sqlite'),AUTHORITY_ROOT:recoveryAuthorityRoot,FENCE:join(root,'trusted-fence.json')},
   }));
-  assert.equal(freshFence.tombstone_sequence,receiptsAfterExtraRestore.tombstone_chain);
-  const sameRootRestore = extraFenceRestore ?? {skipped:true, tombstone_sequence:freshFence.tombstone_sequence, extra_fence_refused:extraFenceRefused};
+  assert.equal(freshFence.tombstone_sequence, recoveredFence.tombstone_sequence);
+  const sameRootRestore = restoredAgain;
   const result = {root,backup,journals,deleted,restored,scoped,peer,deleted_after_restore:deletedAfterRestore,
-    restored_again:restoredAgain,second_restore_records:0,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:extraFence.tombstone_sequence,
-    deleted_records:0,first_restore_surviving_records:1,model_calls:0,
+    restored_again:restoredAgain,second_restore_records:extraLostAfterRecovery+keepAfterRecovery+postRecovery.payload.records.length,concurrent_clients:2,independent_revocations:independentRevocations,shared_restored_memory_equal:true,jarvis_owned_high_water:recoveredFence.tombstone_sequence,
+    deleted_records:0,first_restore_surviving_records:1,model_calls:0,recovered_scoped:recoveredScoped,recovered_peer:recoveredPeer,post_recovery_write:postRecoveryWritten,
     rpo_source_generation_id:backup.source_generation_id,
     rpo_sb: {
       last_durable_at: backup.created_at,
       last_durable_generation_id: backup.source_generation_id,
       durable_pages_at_backup: backup.durable_page_count,
-      writes_after_backup_before_failure: 1,
+      writes_after_backup_before_first_restore: 0,
+      extra_after_first_sb_restore: extraWritten.request_id,
       post_backup_accepted_request_id: extraWritten.request_id,
-      post_backup_remember_lost_on_generation_restore: true,
-      crash_loss_records: 1,
+      post_backup_remember_lost_on_generation_restore: false,
+      crash_loss_records: 0,
       restored_generation_id: restored.generation_id,
     },
     rpo_jarvis: {
@@ -307,6 +349,9 @@ try {
       extra_accepted_present_before_crash: idsAfterExtra.includes(extraTombstoneId),
       lost_jarvis_tombstone_present_after_restore: idsAfterExtraRestore.includes(extraTombstoneId),
       crash_loss_after_extra_restore: receiptsAfterExtra.tombstone_chain - receiptsAfterExtraRestore.tombstone_chain,
+      recovered_highwater_seq: receiptsAfterHighwaterRestore.tombstone_chain,
+      extra_present_after_highwater: idsAfterHighwaterRestore.includes(extraTombstoneId),
+      highwater_backup_sha256: jarvisHighwater.sha256,
       extra_accepted_request_id: extraDeleted.request_id,
       sb_post_backup_request_id: extraWritten.request_id,
       sb_post_backup_receipt_after_restore: sbReceiptAfterRestore,

@@ -48,8 +48,9 @@ def _remember_request(content: str) -> JsonObject:
 
 
 root = Path(sys.argv[1])
+content = sys.argv[2] if len(sys.argv) > 2 else "ExtraLostAfterBackup"
 config = executor_config(root)
-accepted = accept_stable_v1_request(config.request_root, _remember_request("ExtraLostAfterBackup"), NOW)
+accepted = accept_stable_v1_request(config.request_root, _remember_request(content), NOW)
 executor = RequestExecutor(config)
 try:
     result = executor.apply_once(now=NOW)
