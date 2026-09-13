@@ -98,9 +98,12 @@ def select_search_query(summary: str) -> str:
     return LexicalQuery.parse(text).text
 
 
-def handle_postcompact(raw: bytes, index: SearchIndex) -> PostCompactResult:
+def handle_postcompact(
+    raw: bytes, index: SearchIndex, state_root: Path | None = None,
+) -> PostCompactResult:
     """PostCompact stages reselect; UserPromptSubmit emits documented additionalContext."""
     event = parse_postcompact_event(raw)
+    stage_root = state_root if state_root is not None else index.vault_root
     budgets = {
         "max_items": _MAX_ITEMS,
         "max_excerpt_bytes": _MAX_EXCERPT_BYTES,
@@ -110,13 +113,13 @@ def handle_postcompact(raw: bytes, index: SearchIndex) -> PostCompactResult:
         case "PostCompact":
             hits = index.search(event.query, _MAX_ITEMS * 4)
             records, context = _serialize(event, hits, index.vault_root)
-            prior = _read_stage(index.vault_root, event.session_id)
+            prior = _read_stage(stage_root, event.session_id)
             duplicate = prior is not None and str(prior.get("event_digest")) == event.event_digest
             if not duplicate:
-                _write_stage(index.vault_root, event, records, context)
+                _write_stage(stage_root, event, records, context)
             return PostCompactResult(event.session_id, {}, records, budgets, duplicate)
         case "UserPromptSubmit":
-            stage = _read_stage(index.vault_root, event.session_id)
+            stage = _read_stage(stage_root, event.session_id)
             if stage is None:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             if stage.get("delivered") is True:
@@ -171,59 +174,58 @@ def _event_digest(session_id: str, summary: str, payload: Mapping[str, Json]) ->
     return f"sha256:{hashlib.sha256(material).hexdigest()}"
 
 
-def _identity(root: Path, hit: SearchHit) -> tuple[str, str, str]:
+def _matching_records(root: Path, hit: SearchHit, query: LexicalQuery) -> tuple[dict[str, str], ...]:
     path = root / f"{hit.page_id}.md"
-    origin = hit.source_ref or hit.canonical
     spec = read_page_spec(root, hit.page_id)
-    if spec is not None and spec.sources:
-        origin = spec.sources[0].origin
-    if not path.is_file():
-        return origin, hit.record_id, hit.record_digest
-    try:
-        parsed = parse_page_records(path.read_bytes(), hit.page_id)
-    except MemoryRecordError:
-        return origin, hit.record_id, hit.record_digest
-    if not parsed:
-        return origin, hit.record_id, hit.record_digest
-    chosen = parsed[0]
-    for rec in parsed:
-        if rec.record_text in hit.snippet or hit.snippet in rec.record_text:
-            chosen = rec
-            break
-    if spec is not None:
-        for cite in spec.sources:
-            if cite.sid == chosen.sid:
-                origin = cite.origin
-                break
-    return origin, chosen.record_id, chosen.record_digest
+    parsed = ()
+    if path.is_file():
+        try:
+            parsed = parse_page_records(path.read_bytes(), hit.page_id)
+        except MemoryRecordError:
+            parsed = ()
+    selected = tuple(rec for rec in parsed if query.matches_record(rec.record_text))
+    rows: list[dict[str, str]] = []
+    for rec in selected:
+        origin = hit.source_ref or hit.canonical
+        if spec is not None:
+            for cite in spec.sources:
+                if cite.sid == rec.sid:
+                    origin = cite.origin
+                    break
+        rows.append({
+            "page_id": hit.page_id,
+            "source_ref": origin,
+            "record_id": rec.record_id,
+            "version": rec.record_digest,
+            "snippet": _clip(rec.record_text, _MAX_EXCERPT_BYTES),
+        })
+    return tuple(rows)
 
 
 def _serialize(
     event: PostCompactEvent, hits: tuple[SearchHit, ...], root: Path | None = None,
 ) -> tuple[tuple[dict[str, str], ...], str]:
+    query = LexicalQuery.parse(event.query)
     seen: set[str] = set()
-    chosen: list[SearchHit] = []
-    for hit in hits:
-        if hit.page_id in seen:
-            continue
-        seen.add(hit.page_id)
-        chosen.append(hit)
-        if len(chosen) >= _MAX_ITEMS:
-            break
     records: list[dict[str, str]] = []
-    for hit in chosen:
-        excerpt = _clip(hit.snippet, _MAX_EXCERPT_BYTES)
-        if root is not None:
-            source_ref, record_id, version = _identity(root, hit)
-        else:
-            source_ref, record_id, version = hit.source_ref, hit.record_id, hit.record_digest
-        records.append({
+    for hit in hits:
+        matched = _matching_records(root, hit, query) if root is not None else ({
             "page_id": hit.page_id,
-            "source_ref": source_ref,
-            "record_id": record_id,
-            "version": version,
-            "snippet": excerpt,
-        })
+            "source_ref": hit.source_ref,
+            "record_id": hit.record_id,
+            "version": hit.record_digest,
+            "snippet": _clip(hit.snippet, _MAX_EXCERPT_BYTES),
+        },)
+        for rec in matched:
+            key = rec["record_id"] or f"{rec['page_id']}:{rec['snippet']}"
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append(rec)
+            if len(records) >= _MAX_ITEMS:
+                break
+        if len(records) >= _MAX_ITEMS:
+            break
     while True:
         context = _context_text(event.session_id, records)
         payload = _prompt_payload(context)

@@ -300,6 +300,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
                     hybrid=config.search_hybrid,
                     min_similarity=config.search_min_similarity,
                 ),
+                Path(config.state_root),
             )
         except PostCompactHookError as exc:
             print(str(exc), file=sys.stderr)
@@ -310,7 +311,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         except BrokenPipeError:
             return 1
         if result.pending_confirm:
-            confirm_delivery(Path(config.vault_root), result.session_id)
+            confirm_delivery(Path(config.state_root), result.session_id)
         return 0
 
     def remember() -> int:

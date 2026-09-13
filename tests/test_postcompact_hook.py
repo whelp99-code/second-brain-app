@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -50,6 +52,17 @@ def _seed(tmp_path: Path) -> tuple[Path, str]:
     _ = vault.write_pages((page,), "run-postcompact", _HashLedger(root))
     stamp_knowledge(root)
     return root, digest
+
+
+def _write_config(tmp_path: Path, root: Path) -> Path:
+    state = tmp_path / "state"
+    state.mkdir(exist_ok=True)
+    config = tmp_path / "config.toml"
+    _ = config.write_text(
+        f"vault_root = {json.dumps(str(root))}\n"
+        + f"state_root = {json.dumps(str(state))}\n",
+    )
+    return config
 
 
 def _event(
@@ -192,8 +205,7 @@ def test_postcompact_cli_long_summary_recovers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     root, _digest = _seed(tmp_path)
-    config = tmp_path / "config.toml"
-    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
+    config = _write_config(tmp_path, root)
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(_event(summary=("OmegaCompiledBody " * 400).strip())))
     assert main(["postcompact-hook"]) == 0
@@ -209,8 +221,7 @@ def test_empty_search_is_not_context_delivery(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     root, _digest = _seed(tmp_path)
-    config = tmp_path / "config.toml"
-    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
+    config = _write_config(tmp_path, root)
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(_event(summary="zzzz-no-such-term")))
     assert main(["postcompact-hook"]) == 0
@@ -225,8 +236,7 @@ def test_syntax_failure_is_not_success(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     root, _digest = _seed(tmp_path)
-    config = tmp_path / "config.toml"
-    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
+    config = _write_config(tmp_path, root)
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(json.dumps({
         "hook_event_name": "PostCompact",
@@ -243,8 +253,7 @@ def test_broken_pipe_retry_still_delivers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     root, _digest = _seed(tmp_path)
-    config = tmp_path / "config.toml"
-    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
+    config = _write_config(tmp_path, root)
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(_event()))
     assert main(["postcompact-hook"]) == 0
@@ -267,3 +276,53 @@ def test_broken_pipe_retry_still_delivers(
     output = capsys.readouterr().out
     assert "OmegaCompiledBody" in output
     assert "UserPromptSubmit" in output
+
+
+def test_query_binds_omega_record_not_alpha_on_two_cite_page(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    vault = init_vault(root)
+    alpha_hash = ContentAddressedStore(root).put(b"alpha-body")
+    omega_hash = ContentAddressedStore(root).put(b"omega-body")
+    page = PageSpec(
+        "wiki/mixed",
+        "Mixed",
+        (
+            f"# Mixed\nAlphaUniqueMemory is old.\n[^{alpha_hash[:8]}]\n\n"
+            + f"OmegaUniqueTarget is current.\n[^{omega_hash[:8]}]"
+        ),
+        [
+            SourceCite(sid=alpha_hash[:8], origin="me-wiki:notes/alpha.md", hash=alpha_hash),
+            SourceCite(sid=omega_hash[:8], origin="me-wiki:notes/omega.md", hash=omega_hash),
+        ],
+        "active",
+    )
+    _ = vault.write_pages((page,), "run-mixed", _HashLedger(root))
+    stamp_knowledge(root)
+    index = SearchIndex(root, hybrid=False)
+    result = handle_postcompact(_event(summary="OmegaUniqueTarget"), index, tmp_path / "state")
+    parsed = parse_page_records((root / "wiki/mixed.md").read_bytes(), "wiki/mixed")
+    omega = next(rec for rec in parsed if "OmegaUniqueTarget" in rec.record_text)
+    alpha = next(rec for rec in parsed if "AlphaUniqueMemory" in rec.record_text)
+    assert len(result.records) == 1
+    assert result.records[0]["record_id"] == omega.record_id
+    assert result.records[0]["version"] == omega.record_digest
+    assert result.records[0]["source_ref"] == "me-wiki:notes/omega.md"
+    assert "OmegaUniqueTarget" in result.records[0]["snippet"]
+    assert alpha.record_id not in result.records[0]["record_id"]
+    assert "AlphaUniqueMemory" not in result.records[0]["snippet"]
+
+
+def test_session_state_uses_state_root_not_generation(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    state.mkdir()
+    mode = root.stat().st_mode
+    os.chmod(root, stat.S_IREAD | stat.S_IEXEC | stat.S_IRGRP | stat.S_IXGRP)
+    try:
+        index = SearchIndex(root, hybrid=False)
+        result = handle_postcompact(_event(), index, state)
+        assert result.hook_payload == {}
+        assert (state / ".sb" / "session-memory").is_dir()
+        assert not (root / ".sb" / "session-memory").exists()
+    finally:
+        os.chmod(root, mode)
