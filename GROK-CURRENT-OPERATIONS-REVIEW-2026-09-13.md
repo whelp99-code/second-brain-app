@@ -6,8 +6,8 @@
 
 | 역할 | 값 |
 |---|---|
-| 제품 | 이번 훅 커밋 |
-| SB 후보 | 이번 prepare-release 경로 |
+| 제품 | `5680155` |
+| SB 후보 | `/var/tmp/sb-candidate-5680155/releases/64274fd223c84bde58cde3c9029d3515062e4a40` |
 | J 런타임 | `/var/tmp/jarvis-artifact-64715ba` ≠ `J_CURRENT` |
 | 게이트 로그 | `/var/tmp/sb-gates-f7c1945.log` 이 후보 아님 |
 | 운영 current 인용 | SB `41f0751…`, J authority `a3cbbbe…` |

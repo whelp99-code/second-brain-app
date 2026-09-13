@@ -3,19 +3,17 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
-    "docs_d1_d3": "74c9877",
-    "product_session_start_compact": "cffaf9e",
-    "current_sb_candidate": "/var/tmp/sb-candidate-cffaf9e/releases/ba33e5e8b0d46585076352b78ac48e09902e159f",
-    "current_sb_wheel_sha256": "989da1a3b295635f5272eedcaa1d7ec7e58dd57bb0e18538a4bb49080f2a17d4",
-    "sessionstart_compact_evidence": "/var/tmp/claude-night-e53dd66-sessionstart-compact.json",
+    "product_source": "5680155",
+    "current_sb_candidate": "/var/tmp/sb-candidate-5680155/releases/64274fd223c84bde58cde3c9029d3515062e4a40",
+    "current_sb_wheel_sha256": "c79ebc0bbd5c0dbb2ed158c59d21f265c57bf1fc450755942100371e22c7223c",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "in_turn_public_hook": "SessionStart source=compact additionalContext",
-    "client": "Claude Code 2.1.270",
+    "session_start_compact": "uses staged last_query; missing query yields {}",
+    "other_session_start": "{} exit 0",
     "native_executed": false
   },
-  "not_complete": ["ops_cutover", "M5", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
+  "not_complete": ["ops_cutover", "M5", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
 }
