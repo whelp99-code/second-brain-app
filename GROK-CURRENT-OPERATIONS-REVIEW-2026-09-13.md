@@ -6,8 +6,8 @@
 
 | 역할 | 값 |
 |---|---|
-| 제품 | `bad60a6` |
-| SB 후보 | `/var/tmp/sb-candidate-bad60a6/releases/18725677f61d5f4f3a1fe4e2ad2d8829927aaf32` |
+| 제품 | `e02bc15` |
+| SB 후보 | `/var/tmp/sb-candidate-e02bc15/releases/34429e1eed029a3ac000daa561f26c2432c2d8a0` |
 | J 런타임 | `/var/tmp/jarvis-artifact-64715ba` ≠ `J_CURRENT` |
 | 게이트 로그 | `/var/tmp/sb-gates-f7c1945.log` 이 후보 아님 |
 | 운영 current 인용 | SB `41f0751…`, J authority `a3cbbbe…` |
