@@ -13,7 +13,7 @@ from typing import Final, Literal, override
 from sb.contracts import PageSpec
 from sb.memory_records import MemoryRecordError, parse_page_records
 from sb.search import SearchHit, SearchIndex
-from sb.search_query import MAX_QUERY_BYTES, MAX_QUERY_GROUPS, LexicalQuery
+from sb.search_query import MAX_QUERY_BYTES, MAX_QUERY_GROUPS, LexicalQuery, normalize
 from sb.vault import read_page_spec
 
 _POSTCOMPACT: Final = "PostCompact"
@@ -22,6 +22,15 @@ _SESSION: Final = "SessionStart"
 _MAX_ITEMS: Final = 8
 _MAX_EXCERPT_BYTES: Final = 4_096
 _MAX_TOTAL_BYTES: Final = 16_384
+_MAX_HOOK_TERMS: Final = 8
+_HOOK_STOP: Final = frozenset({
+    "a", "an", "and", "about", "after", "asked", "before", "been", "can",
+    "continue", "for", "from", "had", "has", "have", "in", "is", "it",
+    "me", "my", "next", "note", "notes", "of", "on", "or", "please",
+    "remind", "reviewed", "say", "session", "step", "summary", "that",
+    "the", "this", "to", "user", "was", "we", "were", "what", "with",
+    "write-up", "writeup", "you",
+})
 type Json = str | int | float | bool | None | list["Json"] | dict[str, "Json"]
 type Trigger = Literal["auto", "manual", ""]
 type HookName = Literal["PostCompact", "UserPromptSubmit", "SessionStart"]
@@ -80,13 +89,13 @@ def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
             return PostCompactEvent(name, session_id, query, trigger, digest)
         case "UserPromptSubmit":
             prompt = _str_field(loaded, "prompt", "content", "query")
-            query = select_search_query(prompt) if prompt else ""
+            query = _bound_query_text(prompt) if prompt else ""
             digest = _str_field(loaded, "event_digest")
             return PostCompactEvent(name, session_id, query, "", digest)
         case "SessionStart":
             source = _str_field(loaded, "source")
             summary = _str_field(loaded, "query", "compact_summary")
-            query = select_search_query(summary) if summary else ""
+            query = _bound_query_text(summary) if summary else ""
             trigger = _trigger(_str_field(loaded, "trigger", "matcher"))
             digest = _event_digest(session_id, summary, loaded)
             return PostCompactEvent(name, session_id, query, trigger, digest, source)
@@ -124,7 +133,7 @@ def handle_postcompact(
     }
     match event.name:
         case "PostCompact":
-            hits = index.search(event.query, _MAX_ITEMS * 4)
+            hits = _hook_search(index, event.query)
             records, context = _serialize(event, hits, index.vault_root)
             prior = _read_stage(stage_root, event.session_id)
             excluded = _exclude_delivered(records, prior)
@@ -167,22 +176,21 @@ def handle_postcompact(
             )
             if duplicate:
                 return PostCompactResult(event.session_id, {}, (), budgets, True)
-            hits = index.search(query, _MAX_ITEMS * 4)
+            hits = _hook_search(index, query)
             search_event = PostCompactEvent(
                 event.name, event.session_id, query, event.trigger, event.event_digest, event.source,
             )
             records, context = _serialize(search_event, hits, index.vault_root)
-            remaining = _exclude_delivered(records, prior)
-            if not remaining:
+            if not records:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
-            remainder_ctx = _context_text(event.session_id, list(remaining))
+            remainder_ctx = _context_text(event.session_id, list(records))
             _write_stage(
-                stage_root, event, remaining, remainder_ctx,
+                stage_root, event, records, remainder_ctx,
                 last_query=query,
-                delivered_in_turn=_delivered_in_turn(prior),
+                delivered_in_turn=None,
             )
             payload = _inject_payload(_SESSION, remainder_ctx)
-            return PostCompactResult(event.session_id, payload, remaining, budgets, False, True)
+            return PostCompactResult(event.session_id, payload, records, budgets, False, True)
 
 
 def confirm_delivery(root: Path, session_id: str) -> None:
@@ -278,6 +286,57 @@ def _event_digest(session_id: str, summary: str, payload: Mapping[str, Json]) ->
     return f"sha256:{hashlib.sha256(material).hexdigest()}"
 
 
+def _bound_query_text(text: str) -> str:
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    encoded = stripped.encode()
+    if len(encoded) <= MAX_QUERY_BYTES:
+        return stripped
+    return encoded[:MAX_QUERY_BYTES].decode("utf-8", errors="ignore")
+
+
+def _term_in(term: str, text: str) -> bool:
+    compact = normalize(term)
+    return bool(compact) and compact in normalize(text)
+
+
+def _hook_terms(text: str) -> tuple[str, ...]:
+    terms: list[str] = []
+    seen: set[str] = set()
+    for raw in text.split():
+        token = raw.strip(".,;:!?\"'()[]")
+        folded = token.casefold()
+        if len(folded) < 3 or folded in _HOOK_STOP or folded in seen:
+            continue
+        seen.add(folded)
+        terms.append(token)
+        if len(terms) >= _MAX_HOOK_TERMS:
+            break
+    if terms:
+        return tuple(terms)
+    fallback = max((part.strip(".,;:?") for part in text.split()), key=len, default="")
+    return (fallback,) if fallback else ()
+
+
+def _hook_search(index: SearchIndex, text: str) -> tuple[SearchHit, ...]:
+    terms = _hook_terms(text)
+    if not terms:
+        return ()
+    scored: dict[str, tuple[int, int, SearchHit]] = {}
+    for term in terms:
+        hits = index.search(term, _MAX_ITEMS * 4)
+        for rank, hit in enumerate(hits):
+            key = f"{hit.page_id}\0{hit.section}"
+            prior = scored.get(key)
+            if prior is None:
+                scored[key] = (1, rank, hit)
+            else:
+                scored[key] = (prior[0] + 1, min(prior[1], rank), prior[2])
+    ordered = sorted(scored.values(), key=lambda row: (-row[0], row[1]))
+    return tuple(row[2] for row in ordered)
+
+
 _CITATION_DEF = re.compile(r"^\[\^([0-9a-f]{8,64})\]:\s*(\S.*)$")
 
 
@@ -315,7 +374,7 @@ def _origin_for(spec: PageSpec | None, sid: str, raw: bytes) -> str:
     return ""
 
 
-def _matching_records(root: Path, hit: SearchHit, query: LexicalQuery) -> tuple[dict[str, str], ...]:
+def _matching_records(root: Path, hit: SearchHit, terms: tuple[str, ...]) -> tuple[dict[str, str], ...]:
     path = _page_file(root, hit.page_id)
     spec = _spec_for(root, hit.page_id)
     parsed = ()
@@ -326,7 +385,10 @@ def _matching_records(root: Path, hit: SearchHit, query: LexicalQuery) -> tuple[
             parsed = parse_page_records(raw, hit.page_id)
         except MemoryRecordError:
             parsed = ()
-    selected = tuple(rec for rec in parsed if query.matches_record(rec.record_text))
+    selected = tuple(
+        rec for rec in parsed
+        if any(_term_in(term, rec.record_text) for term in terms)
+    ) if terms else ()
     rows: list[dict[str, str]] = []
     for rec in selected:
         rows.append({
@@ -342,11 +404,11 @@ def _matching_records(root: Path, hit: SearchHit, query: LexicalQuery) -> tuple[
 def _serialize(
     event: PostCompactEvent, hits: tuple[SearchHit, ...], root: Path | None = None,
 ) -> tuple[tuple[dict[str, str], ...], str]:
-    query = LexicalQuery.parse(event.query)
+    terms = _hook_terms(event.query)
     seen: set[str] = set()
     records: list[dict[str, str]] = []
     for hit in hits:
-        matched = _matching_records(root, hit, query) if root is not None else ({
+        matched = _matching_records(root, hit, terms) if root is not None else ({
             "page_id": hit.page_id,
             "source_ref": hit.source_ref,
             "record_id": hit.record_id,

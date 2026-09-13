@@ -43,7 +43,7 @@ def _seed(tmp_path: Path) -> tuple[Path, str]:
     page = PageSpec(
         "wiki/omega",
         "Omega",
-        f"# Omega\nOmegaCompiledBody is the current record.\n[^{digest[:8]}]",
+        f"# Omega\nOmegaCompiledBody is the current record. OmegaInturnTarget lives here.\n[^{digest[:8]}]",
         [cite],
         "active",
     )
@@ -446,3 +446,45 @@ def test_postcompact_excludes_in_turn_delivered(tmp_path: Path) -> None:
     assert staged.records == ()
     follow = handle_postcompact(_prompt(), index, state)
     assert follow.hook_payload == {}
+
+
+_INTURN_SUMMARY = (
+    "Session summary: the user asked about OmegaInturnTarget in the notes "
+    "and we reviewed it. The next step is to continue the write-up."
+)
+
+
+def test_multiword_summary_finds_omega_inturn(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    result = handle_postcompact(_event(summary=_INTURN_SUMMARY), SearchIndex(root, hybrid=False), tmp_path / "state")
+    assert result.records
+    assert "OmegaInturnTarget" in result.records[0]["snippet"]
+    assert result.records[0]["source_ref"] == "me-wiki:notes/omega.md"
+
+
+def test_multiword_prompt_then_session_start_compact(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_prompt(prompt="OmegaInturnTarget please"), index, state)
+    result = handle_postcompact(json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "compact",
+        "session_id": "sess-omega",
+    }).encode(), index, state)
+    specific = cast(dict[str, object], result.hook_payload["hookSpecificOutput"])
+    assert "OmegaInturnTarget" in cast(str, specific["additionalContext"])
+
+
+def test_session_start_new_epoch_reinjects(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    index = SearchIndex(root, hybrid=False)
+    first = handle_postcompact(_session(compaction_id="c1"), index, state)
+    confirm_delivery(state, "sess-omega")
+    second = handle_postcompact(_session(compaction_id="c2"), index, state)
+    assert first.pending_confirm is True
+    assert second.pending_confirm is True
+    assert "OmegaCompiledBody" in cast(
+        str, cast(dict[str, object], second.hook_payload["hookSpecificOutput"])["additionalContext"],
+    )
