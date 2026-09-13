@@ -1,29 +1,38 @@
 {
   "kind": "client_connection_readiness",
   "written_at": "2026-09-13",
-  "product_bytes_changed": false,
+  "product_bytes_changed": true,
   "native_registration_executed": false,
   "ops_settings_changed": false,
   "pins": {
-    "archive": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
+    "current_sb_source": "f8c7bcd2c8f79e1f42d7eb7b5f6274edec7a02b8",
+    "current_sb_candidate": "/var/tmp/sb-candidate-f8c7bcd/releases/7e52e867e67215baa5ff10f29207eb914f849ae6",
+    "current_sb_wheel_sha256": "3264d2c6d4baed7cdc31d99992d57a4eebb1068dcbc4c616aa91210bb3dce675",
+    "current_jarvis_source": "a3c111cd0774eedfd6e2015cb6f0a1c5fff56cfe",
+    "current_jarvis_dist": "/var/tmp/jarvis-artifact-a3c111c/dist/src/cli.js",
+    "historical_archive": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
     "executed_wheel_pin": "f7c194594e21728678b118e7c0029cd3e1deb30b",
-    "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
-    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
-    "candidate_sb": "/var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb",
-    "executed_candidate_sb": "/var/tmp/sb-candidate-f7c1945/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb",
-    "jarvis": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "executed_wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "historical_jarvis": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd",
-    "gates_log": "/var/tmp/sb-gates-f7c1945.log"
+    "gates_log": "/var/tmp/sb-gates-f7c1945.log",
+    "do_not_reuse_historical_as_this_entry": true
   },
   "clients_observed": {
-    "codex": {"path": "/home/jm/.nvm/versions/node/v24.19.0/bin/codex", "version": "codex-cli 0.154.0", "config": "toml ~/.codex/config.toml", "mcp_add_help": "codex mcp add <NAME> -- <COMMAND>... --env KEY=VALUE"},
-    "claude": {"path": "/home/jm/.local/bin/claude", "version": "2.1.261 (Claude Code)"},
-    "omo": {"path": "/home/jm/.local/bin/omo", "version": "omo 5.0.0-0.beta.53 (engine: senpi 2026.9.10-2)"},
+    "codex": {"path": "/home/jm/.nvm/versions/node/v24.19.0/bin/codex", "version": "codex-cli 0.154.0", "config": "toml ~/.codex/config.toml", "mcp_add_help": "codex mcp add <NAME> -- <COMMAND>... --env KEY=VALUE", "compaction_hook": "not_found_in_package"},
+    "claude": {"path": "/home/jm/.local/bin/claude", "version": "2.1.261 (Claude Code)", "postcompact": "side_effect_no_decision_control", "user_prompt_submit": "documented_additionalContext"},
+    "omo": {"path": "/home/jm/.local/bin/omo", "version": "omo 5.0.0-0.beta.53 (engine: senpi 2026.9.10-2)", "compaction": "collect_skip_not_inject"},
     "orca": {"path": "/home/jm/.local/bin/orca", "version": "1.4.197", "note": "linux bare orca may be screen reader"},
     "orca_ide": {"path": "/home/jm/.local/bin/orca-ide", "appVersion": "1.4.197", "runtime_state": "ready"},
     "cursor": {"path": "/home/jm/.local/bin/cursor", "ide_installed": false},
     "opencode": {"on_path": false},
     "gemini": {"on_path": false}
+  },
+  "m9_ordinary_connection": {
+    "postcompact": "sb postcompact-hook stages .sb/session-memory; stdout {}",
+    "same_session_next_request": "UserPromptSubmit additionalContext from stage",
+    "jarvis_configured_transport": "JARVIS_MODEL_TRANSPORT_PATH FileModelTransport; missing path MEMORY_REFERENCE_OPTIONS_REQUIRED",
+    "native_executed": false
   },
   "sb_config_env": {"supported": true, "source": "sb/config.py:185"},
   "readme_mcp_servers_json": {"kind": "generic_or_ssh_example", "not_codex_0_154_config": true},
@@ -46,7 +55,7 @@
   },
   "next_integration_not_executed": {
     "kind": "isolated_codex_stdio_mcp",
-    "command_example": "codex mcp add second-brain --env SB_CONFIG=/var/tmp/sb-client-readiness/config.toml -- /var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb mcp"
+    "command_example": "codex mcp add second-brain --env SB_CONFIG=/var/tmp/sb-client-readiness/config.toml -- /var/tmp/sb-candidate-f8c7bcd/releases/7e52e867e67215baa5ff10f29207eb914f849ae6/bin/sb mcp"
   },
-  "not_complete": ["ops_cutover", "M5", "M9_session_compaction_event", "M13_deferred", "native_autoinject", "security_delete_race_branches"]
+  "not_complete": ["ops_cutover", "M5", "M9_native_session", "M13_deferred", "native_autoinject", "security_delete_race_branches", "A-F_full_acceptance"]
 }

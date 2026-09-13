@@ -15,8 +15,7 @@
 | 이전 SB 실행 핀 | `f7c1945` / wheel `1847b599…` / `/var/tmp/sb-gates-f7c1945.log` — 이번 훅 없음 |
 | 직전 SB 후보 | `6110830` / `2cc28b41…` / wheel `50417180…` — PostCompact additionalContext 오인 버전 |
 | 운영 current | 스냅샷 SB `41f0751`, authority `a3cbbbe` — 후보 아님 |
-
-SB 새 격리 후보는 이 커밋 후 `deploy/prepare-release.py /var/tmp/sb-candidate-<short>` 결과로 채운다.
+| 문서 HEAD | `13e5892` 핀 채움 후 이 JSON 정합 커밋 |
 
 ## 검사
 
