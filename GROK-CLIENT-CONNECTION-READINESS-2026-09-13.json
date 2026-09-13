@@ -2,25 +2,20 @@
   "kind": "client_connection_readiness",
   "written_at": "2026-09-13",
   "native_registration_executed": false,
-  "ops_settings_changed": false,
   "pins": {
-    "current_sb_source": "6b01c2e6d29b",
-    "current_sb_docs": "9a04dbb",
-    "current_sb_candidate": "/var/tmp/sb-candidate-6b01c2e/releases/fc2507ed0c4246da550fc2971516077c4ee66cd7",
-    "current_sb_wheel_sha256": "c6278e7ee26dcfb0823b0ef51dcf6c3d57521712f04a6dcab28888eedba08694",
+    "current_sb_source": "b9844efa06d0",
+    "current_sb_candidate": "/var/tmp/sb-candidate-b9844ef/releases/3ae0a9a4c6db8934a814298f2ee741acc15c8349",
+    "current_sb_wheel_sha256": "f9429a95ed68790c422a8e385aeff190ad49afb8b877c643c09f71e572f2e5fe",
     "current_jarvis_source": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
-    "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd",
-    "do_not_reuse": ["e02636e", "78e7307", "f7c1945", "1672626", "authority/current/*.sqlite"]
+    "session_memory": "config.state_root/.sb/session-memory",
+    "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "postcompact": "stage only, stdout {}",
-    "same_session_next_user_prompt": "UserPromptSubmit additionalContext after successful stdout",
+    "citation_binding": "query matches MemoryRecord.record_text; snippet is that body",
+    "session_state": "state_root not sealed generation",
     "auto_compaction_next_model_request": "not_documented_public_hook_remaining",
-    "jarvis_configured_transport": "JARVIS_MODEL_TRANSPORT_CMD consumer exit 0",
-    "record_identity": "schema4 record_id and record_digest",
-    "event_id": "session_id plus all host occurrence fields including compaction_id",
     "native_executed": false
   },
   "not_complete": ["ops_cutover", "M5", "M9_in_turn_model_request_after_autocompact", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
