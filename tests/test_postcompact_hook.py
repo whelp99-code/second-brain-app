@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import stat
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -348,13 +346,7 @@ def test_session_state_uses_state_root_not_generation(tmp_path: Path) -> None:
     root, _digest = _seed(tmp_path)
     state = tmp_path / "state"
     state.mkdir()
-    mode = root.stat().st_mode
-    os.chmod(root, stat.S_IREAD | stat.S_IEXEC | stat.S_IRGRP | stat.S_IXGRP)
-    try:
-        index = SearchIndex(root, hybrid=False)
-        result = handle_postcompact(_event(), index, state)
-        assert result.hook_payload == {}
-        assert (state / ".sb" / "session-memory").is_dir()
-        assert not (root / ".sb" / "session-memory").exists()
-    finally:
-        os.chmod(root, mode)
+    result = handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
+    assert result.hook_payload == {}
+    assert (state / ".sb" / "session-memory").is_dir()
+    assert not (root / ".sb" / "session-memory").exists()
