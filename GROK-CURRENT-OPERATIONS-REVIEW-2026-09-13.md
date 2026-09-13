@@ -13,8 +13,6 @@
 | J 격리 런타임 | `/var/tmp/jarvis-artifact-64715ba` (`bin/jarvis --help`) |
 | 운영 current (인용만) | SB `41f0751…`, J authority `a3cbbbe…` |
 
-옛 `7cc5fbc` 후보 경로는 이 표에 쓰지 않는다.
-
 ## 변수 (공개 리포)
 
 ```
