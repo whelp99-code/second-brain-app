@@ -3,15 +3,15 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
-    "product_source": "e02bc15",
-    "current_sb_candidate": "/var/tmp/sb-candidate-e02bc15/releases/34429e1eed029a3ac000daa561f26c2432c2d8a0",
-    "current_sb_wheel_sha256": "e715b968d4ca338d47d17b67151685f37f68351c808f9ca48caa51dcd3e4ae19",
+    "product_source": "8d1f8cc",
+    "current_sb_candidate": "/var/tmp/sb-candidate-8d1f8cc/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3",
+    "current_sb_wheel_sha256": "60d66ad6c3d488af843e7132eea2d7104528fb9b0c06ce732d110a2f4ca189f1",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "hook_search": "all distinct bounded tokens ranked by frequency, identifier, length; then 1/hit weight",
+    "hook_search": "short tokens (<6) word-boundary hits only; then 1/hit",
     "native_executed": false
   },
   "not_complete": ["ops_cutover", "M5", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
