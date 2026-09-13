@@ -9,7 +9,7 @@ JARVIS (`deploy/jm-jarvis.service`):
 - 바이너리: `WorkingDirectory=/home/jm/.local/state/orca-jarvis/authority/current`
 - DB: `--db /home/jm/.local/state/orca-jarvis/jarvis.sqlite` (**current 아래가 아님**)
 - start: `node …/authority/current/dist/src/cli.js service run --db /home/jm/.local/state/orca-jarvis/jarvis.sqlite`
-- 제출 런타임 확인만: `/var/tmp/jarvis-artifact-64715ba/bin/jarvis --help` (78e7307 구핀 아님)
+- 제출 런타임 확인만: `/var/tmp/jarvis-artifact-64715ba/bin/jarvis --help`
 
 SB:
 
