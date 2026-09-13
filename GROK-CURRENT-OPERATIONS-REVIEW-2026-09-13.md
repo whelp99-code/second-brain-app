@@ -1,52 +1,66 @@
 # 현재 후보 운영 판단 (읽기 전용, 미실행)
 
-전환·restore·rollback을 실행하지 않는다.
+전환·restore·rollback·경합 검사를 실행하지 않는다.
 
-## 변수
+## 알려진 피연산자
 
-```
-AUTH_DB=/home/jm/.local/state/orca-jarvis/jarvis.sqlite
-J_CURRENT=/home/jm/.local/state/orca-jarvis/authority/current
-SB_CURRENT=/home/jm/.local/state/second-brain/app/current
-SB_CONFIG=$HOME/.config/second-brain/config.toml
-J_START="node $J_CURRENT/dist/src/cli.js service run --db $AUTH_DB"
-```
+| 이름 | 값 |
+|---|---|
+| SB 후보 | `/var/tmp/sb-candidate-7cc5fbc/releases/99746496b854f6fb42b69466bebca58149bb9396` |
+| J 런타임 | `/var/tmp/jarvis-artifact-64715ba` |
+| SB_CURRENT | `/home/jm/.local/state/second-brain/app/current` |
+| J_CURRENT | `/home/jm/.local/state/orca-jarvis/authority/current` |
+| AUTH_DB | `/home/jm/.local/state/orca-jarvis/jarvis.sqlite` |
+| SB_CONFIG | `/home/jm/.config/second-brain/config.toml` |
+| request pending | `/home/jm/.local/state/second-brain/requests/pending` |
+| request-executor.enabled | `/home/jm/.config/second-brain/request-executor.enabled` |
+| refresh.env | `/home/jm/.config/jm-second-brain/refresh.env` |
 
-config.toml `state_root`를 바꿔도 **`request_root`는 자동으로 따라가지 않음**. 미설정 시 `request_root=$XDG_STATE_HOME/second-brain/requests` (기본). 격리 프로필은 `state_root`와 `request_root`를 둘 다 적는다.
+`state_root` ≠ `request_root`. `request_root` 미설정 시 `$XDG_STATE_HOME/second-brain/requests`.
 
-lock: `$state_root/generation.lock` 및 같은 디렉터리 `generation-writer.lock` (`generation_locks.py`). generation.json 옆이 아님.
+lock:
+- pipeline: **실행 root** `vault_root/.sb/run.lock` (`pipeline.py`; 스테이징 시 스테이징 root)
+- generation: `$state_root/generation.lock` + `$state_root/generation-writer.lock`
 
-session-memory: `$state_root/.sb/session-memory`
+## 공개 activator
 
-## 관측 (stop 전, 전환 조건 아님)
+| 유닛 | 역할 | 기동 조건 |
+|---|---|---|
+| `jm-second-brain-requests.path` | pending 비면 requests.service | `ConditionPathExists=request-executor.enabled`, `DirectoryNotEmpty=…/requests/pending` |
+| `jm-second-brain-requests.service` | oneshot `$SB_CURRENT/bin/sb apply-requests --once` | path가 기동 |
+| `jm-second-brain-refresh.timer` | 07:00 Asia/Seoul | `Unit=jm-second-brain-refresh.service` |
+| `jm-second-brain-refresh.service` | `${SECOND_BRAIN_REFRESH_ENTRYPOINT}` from refresh.env | timer |
+| `second-brain.timer` | hourly `second-brain.service` | `PATH sb run` — current/bin과 다를 수 있음 |
+| `jm-jarvis.service` | `node $J_CURRENT/dist/src/cli.js service run --db $AUTH_DB` | |
 
-`readlink -f $SB_CURRENT`; `readlink -f $J_CURRENT`; `which -a sb`
-`systemctl --user is-active jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service jm-second-brain-requests.service jm-second-brain-refresh.service jm-second-brain-refresh.timer`
+## 관측 (전환 조건 아님)
+
+`readlink -f $SB_CURRENT $J_CURRENT`; `which -a sb`
+`systemctl --user is-active` 위 유닛+dashboard+phone-gateway+refresh.timer
 `python3 deploy/check-jarvis-pending-state.py "$AUTH_DB"`
 `python3 deploy/check-database-handles.py "$AUTH_DB"`
 
 ## stop (승인 후)
 
-`systemctl --user stop jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service jm-second-brain-refresh.timer jm-second-brain-refresh.service jm-second-brain-requests.service second-brain.service`
+`systemctl --user stop jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service jm-second-brain-refresh.timer jm-second-brain-refresh.service jm-second-brain-requests.path jm-second-brain-requests.service second-brain.timer second-brain.service`
 
-**stop 후 사후조건 (하나라도 실패면 current 금지, 정지 유지):**
-- `check-database-handles.py "$AUTH_DB"` EXIT0
-- `check-jarvis-pending-state.py "$AUTH_DB"` 관측 (drain_authorized 항상 false)
-- `$state_root/generation-writer.lock` 홀더 없음
+**정지 사후조건 (실패 시 ln 금지, 정지 유지):**
+- handles `"$AUTH_DB"` EXIT0
+- pending-state 관측 (`drain_authorized` false)
+- `$state_root/generation-writer.lock` 및 **실행 root** `.sb/run.lock` 홀더 없음
+- requests.path inactive
 
-## current 교체
+## current
 
-`ln -sfn <SB후보절대경로> $SB_CURRENT`
-`ln -sfn <J후보절대경로> $J_CURRENT`
+`ln -sfn <SB후보> $SB_CURRENT`
+`ln -sfn <J후보/authority release> $J_CURRENT`
 
-PATH `sb` (`second-brain.service` PATH=`%h/.local/bin:...`)는 `$SB_CURRENT/bin/sb`와 다를 수 있음. 요청 유닛만 current/bin/sb.
+**부분 상태 (이전 current 유지가 아님):**
+- SB ln 성공·J 실패: SB=후보, J=옛 current. start 금지.
+- J ln 성공·SB 실패: 대칭. start 금지.
+- restore 후: `sb restore <archive> --to <격리>`만. 격리 config의 vault_root/state_root/request_root를 명시한 뒤에만 검증. 검증 전 writer 정지 유지. `--force` 당일 승인 없이 금지.
+- 구버전 바이너리/`41f0751` start 금지.
 
-**부분 전환:** SB ln 성공·J ln 실패는 “이전 current 유지”가 아님. SB는 새 후보, J는 옛 current. 이 상태에서 start 금지. J ln을 완료하거나, 당일 기록한 **SB 이전 절대 경로**로 SB만 되돌릴지는 별도 승인. 구버전 바이너리 start / revoked `41f0751` 복귀 금지.
+start는 새 current 절대 경로만. 성공: `$SB_CURRENT/bin/sb doctor`; `$SB_CURRENT/bin/sb search` 1건; `$J_CURRENT` 서비스 active; `/var/tmp/jarvis-artifact-64715ba/bin/jarvis --help` 0.
 
-## start
-
-새 `$SB_CURRENT/bin/sb` 및 `$J_START`만. 성공: `$SB_CURRENT/bin/sb doctor`; 합의 서비스 active; `$SB_CURRENT/bin/sb search` 1건; `/var/tmp/jarvis-artifact-64715ba/bin/jarvis --help` 0.
-
-실패: 정지 유지. `sb restore <archive> --to <격리경로>` 후 **같은 새 릴리스** start. `--force` 당일 승인 없이 금지.
-
-보류 수명 미검증. oneshot requests는 설계.
+보류 수명 미검증.

@@ -220,9 +220,8 @@ def _matching_records(root: Path, hit: SearchHit, query: LexicalQuery) -> tuple[
     raw = b""
     if path is not None:
         raw = path.read_bytes()
-        parse_id = spec.page_id if spec is not None else hit.page_id.removeprefix("wiki/")
         try:
-            parsed = parse_page_records(raw, parse_id)
+            parsed = parse_page_records(raw, hit.page_id)
         except MemoryRecordError:
             parsed = ()
     selected = tuple(rec for rec in parsed if query.matches_record(rec.record_text))

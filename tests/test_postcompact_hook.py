@@ -334,7 +334,7 @@ def test_compiled_page_id_keeps_docs_note_origin(tmp_path: Path) -> None:
     stamp_knowledge(root)
     index = SearchIndex(root, hybrid=False)
     result = handle_postcompact(_event(summary="OmegaUniqueTarget"), index, tmp_path / "state")
-    parsed = parse_page_records((root / "wiki/docs-note-87c681b2.md").read_bytes(), "docs-note-87c681b2")
+    parsed = parse_page_records((root / "wiki/docs-note-87c681b2.md").read_bytes(), "wiki/docs-note-87c681b2")
     omega = next(rec for rec in parsed if "OmegaUniqueTarget" in rec.record_text)
     assert result.records[0]["page_id"] == "wiki/docs-note-87c681b2"
     assert result.records[0]["source_ref"] == "docs:note.md"
