@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, override
 
+from sb.contracts import PageSpec
 from sb.memory_records import MemoryRecordError, parse_page_records
 from sb.search import SearchHit, SearchIndex
 from sb.search_query import MAX_QUERY_BYTES, MAX_QUERY_GROUPS, LexicalQuery
@@ -174,27 +176,61 @@ def _event_digest(session_id: str, summary: str, payload: Mapping[str, Json]) ->
     return f"sha256:{hashlib.sha256(material).hexdigest()}"
 
 
+_CITATION_DEF = re.compile(r"^\[\^([0-9a-f]{8,64})\]:\s*(\S.*)$")
+
+
+def _page_file(root: Path, page_id: str) -> Path | None:
+    names = [page_id]
+    if page_id.startswith("wiki/"):
+        names.append(page_id.removeprefix("wiki/"))
+    else:
+        names.append(f"wiki/{page_id}")
+    root_resolved = root.resolve()
+    for name in names:
+        path = root / f"{name}.md"
+        if path.is_file() and path.resolve().is_relative_to(root_resolved):
+            return path
+    return None
+
+
+def _spec_for(root: Path, page_id: str) -> PageSpec | None:
+    for candidate in (page_id, page_id.removeprefix("wiki/")):
+        spec = read_page_spec(root, candidate)
+        if spec is not None:
+            return spec
+    return None
+
+
+def _origin_for(spec: PageSpec | None, sid: str, raw: bytes) -> str:
+    if spec is not None:
+        for cite in spec.sources:
+            if cite.sid == sid:
+                return cite.origin
+    for line in raw.decode("utf-8").splitlines():
+        matched = _CITATION_DEF.fullmatch(line.strip())
+        if matched is not None and matched.group(1) == sid:
+            return matched.group(2)
+    return ""
+
+
 def _matching_records(root: Path, hit: SearchHit, query: LexicalQuery) -> tuple[dict[str, str], ...]:
-    path = root / f"{hit.page_id}.md"
-    spec = read_page_spec(root, hit.page_id)
+    path = _page_file(root, hit.page_id)
+    spec = _spec_for(root, hit.page_id)
     parsed = ()
-    if path.is_file():
+    raw = b""
+    if path is not None:
+        raw = path.read_bytes()
+        parse_id = spec.page_id if spec is not None else hit.page_id.removeprefix("wiki/")
         try:
-            parsed = parse_page_records(path.read_bytes(), hit.page_id)
+            parsed = parse_page_records(raw, parse_id)
         except MemoryRecordError:
             parsed = ()
     selected = tuple(rec for rec in parsed if query.matches_record(rec.record_text))
     rows: list[dict[str, str]] = []
     for rec in selected:
-        origin = hit.source_ref or hit.canonical
-        if spec is not None:
-            for cite in spec.sources:
-                if cite.sid == rec.sid:
-                    origin = cite.origin
-                    break
         rows.append({
             "page_id": hit.page_id,
-            "source_ref": origin,
+            "source_ref": _origin_for(spec, rec.sid, raw),
             "record_id": rec.record_id,
             "version": rec.record_digest,
             "snippet": _clip(rec.record_text, _MAX_EXCERPT_BYTES),

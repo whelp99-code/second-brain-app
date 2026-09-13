@@ -312,6 +312,38 @@ def test_query_binds_omega_record_not_alpha_on_two_cite_page(tmp_path: Path) -> 
     assert "AlphaUniqueMemory" not in result.records[0]["snippet"]
 
 
+def test_compiled_page_id_keeps_docs_note_origin(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    vault = init_vault(root)
+    alpha_hash = ContentAddressedStore(root).put(b"alpha-body")
+    omega_hash = ContentAddressedStore(root).put(b"omega-body")
+    page = PageSpec(
+        "docs-note-87c681b2",
+        "Note",
+        (
+            f"# Note\nAlphaUniqueMemory is old.\n[^{alpha_hash[:8]}]\n\n"
+            + f"OmegaUniqueTarget is current.\n[^{omega_hash[:8]}]"
+        ),
+        [
+            SourceCite(sid=alpha_hash[:8], origin="docs:note.md", hash=alpha_hash),
+            SourceCite(sid=omega_hash[:8], origin="docs:note.md", hash=omega_hash),
+        ],
+        "active",
+    )
+    _ = vault.write_pages((page,), "run-compiled", _HashLedger(root))
+    stamp_knowledge(root)
+    index = SearchIndex(root, hybrid=False)
+    result = handle_postcompact(_event(summary="OmegaUniqueTarget"), index, tmp_path / "state")
+    parsed = parse_page_records((root / "wiki/docs-note-87c681b2.md").read_bytes(), "docs-note-87c681b2")
+    omega = next(rec for rec in parsed if "OmegaUniqueTarget" in rec.record_text)
+    assert result.records[0]["page_id"] == "wiki/docs-note-87c681b2"
+    assert result.records[0]["source_ref"] == "docs:note.md"
+    assert result.records[0]["record_id"] == omega.record_id
+    assert result.records[0]["version"] == omega.record_digest
+    assert "OmegaUniqueTarget" in result.records[0]["snippet"]
+    assert "AlphaUniqueMemory" not in result.records[0]["snippet"]
+
+
 def test_session_state_uses_state_root_not_generation(tmp_path: Path) -> None:
     root, _digest = _seed(tmp_path)
     state = tmp_path / "state"
