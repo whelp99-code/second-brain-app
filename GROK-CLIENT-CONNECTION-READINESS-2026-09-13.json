@@ -3,16 +3,17 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
-    "product_source": "f475adb",
-    "current_sb_candidate": "/var/tmp/sb-candidate-f475adb/releases/b277adcc789a27aa4f69b8525acca9100d61763e",
-    "current_sb_wheel_sha256": "35ea42744ef7b05e02ec8a8f456c3fad90d96532b5fb5c58c57e37257844de02",
+    "product_source": "bad60a6",
+    "current_sb_candidate": "/var/tmp/sb-candidate-bad60a6/releases/18725677f61d5f4f3a1fe4e2ad2d8829927aaf32",
+    "current_sb_wheel_sha256": "6089244996f56a43e72a370b1a8843820c3f89677e7839ba588fbcc091787eb1",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "hook_search": "per-term rank inside hook; sb search AND unchanged",
-    "session_start_compact_epoch": "delivered_in_turn is this SessionStart only",
+    "last_query": "derived rare terms only; empty prompts do not clobber",
+    "session_start_compact": "injects in-turn; keeps PostCompact remainder",
+    "hook_search": "32 candidate tokens weighted by 1/hits",
     "native_executed": false
   },
   "not_complete": ["ops_cutover", "M5", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]

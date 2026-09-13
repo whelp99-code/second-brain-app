@@ -24,7 +24,7 @@
 | M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | writer_busy true. dest exclusive restore. 운영 서비스 전환 허가 없음 |
 | M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | scoped-v3 허용/거부. CLI v4 EXIT0. owner 본문 vs project:b deny. web owner vs scoped deny. scoped_search hybrid=False·score/snippet/relation 없음. 운영 원문 세트는 입력 |
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | 제품/버전별 자동주입 경로 입력 |
-| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | hook term 집계 재선택. SessionStart compact는 epoch 단위 제외. last_query. native 미실행 |
+| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | last_query는 희소 term. SessionStart가 PostCompact 잔여 유지. 32토큰 1/hit 가중. native 미실행 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | 정상 Alpha→Omega compile MCP 최신/이전본문 제외 1 passed. pinned-read 중 publish는 미검증. 보류 분기는 검사특정불가 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | harness-36: 필수 restore/만료fence 후 schema4 write + 2scope + final_fresh. cold restore cap0 1 passed |
