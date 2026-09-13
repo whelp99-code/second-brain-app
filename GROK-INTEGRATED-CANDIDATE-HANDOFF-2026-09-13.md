@@ -1,16 +1,16 @@
-# 통합 고정 후보 — 16a5a18 후속
+# 통합 고정 후보 — b279068 N2/N3/N4
 
-Codex `term_6bf51058-3b29-40e2-a25b-b751fab0c24e`. 운영전환/push 없음.
+Codex `term_6bf51058-3b29-40e2-a25b-b751fab0c24e`. 운영전환/push 없음. N1 native/auto-compact 다음 모델요청은 공개 계약 없음.
 
 | 역할 | 값 |
 |---|---|
-| SB 소스 | `e02636e0c1ad` |
-| SB 격리 후보 | `/var/tmp/sb-candidate-e02636e/releases/b0871a409d2505fbc8f294a2ff9502972661a708` wheel `b61a5b67…` |
-| JARVIS 소스 | `78e73077469d1d6067c46f9a7bb26966969fe570` |
-| JARVIS 실행 산출물 | `/var/tmp/jarvis-artifact-78e7307/` dist+`runtime/node_modules`+`bin/jarvis`. `--help` EXIT0. digest `sha256:b5155a53…` (1216 files). 예전 a3c111c 경로 단독 node는 better-sqlite3 없음 |
-| 이전 실행 핀 | f7c1945 / 1672626 / 16a5a18 FileModelTransport 성공 오인 — 재사용 금지 |
+| SB 소스 | 이번 훅 커밋 |
+| JARVIS 소스 | `64715bade176f5724bc4ebe8a40bc6f4c8f49a96` |
+| JARVIS 실행 | `/var/tmp/jarvis-artifact-64715ba/bin/jarvis` `--help` 0. runtime node_modules는 `78e7307` lock 재사용. dist digest `sha256:c64cfbf1…` 1216 files |
+| 이전 | b279068 / e02636e / FileModelTransport 성공 오인 / `current/jarvis-authority.sqlite` 금지 |
+| AUTH_DB | `/home/jm/.local/state/orca-jarvis/jarvis.sqlite` (유닛 `--db`) |
 | 운영 current | 41f0751 / a3cbbbe 인용만 |
 
-자체 검증: SB pytest 이번 훅 테스트; JARVIS 9 passed + dispatch 3; eslint 0; `bin/jarvis --help` 0.
+검증: SB pytest 이번 훅; JARVIS 10 + dispatch 3; eslint 0; jarvis --help 0.
 
-한계: UserPromptSubmit ≠ auto-compaction 다음 모델 요청. native 미실행. A–F 미인수.
+복구: 구버전 current/바이너리 start 금지. 새 릴리스 + restore --to.

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, override
 
+from sb.memory_records import MemoryRecordError, parse_page_records
 from sb.search import SearchHit, SearchIndex
 from sb.search_query import MAX_QUERY_BYTES, MAX_QUERY_GROUPS, LexicalQuery
 from sb.vault import read_page_spec
@@ -153,11 +154,15 @@ def _str_field(payload: Mapping[str, Json], *keys: str) -> str:
 
 
 def _occurrence_id(payload: Mapping[str, Json]) -> str:
-    return _str_field(
-        payload,
+    parts: list[str] = []
+    for key in (
         "prompt_id", "promptId", "compaction_id", "compactionId",
         "event_id", "eventId", "uuid",
-    )
+    ):
+        value = _str_field(payload, key)
+        if value:
+            parts.append(f"{key}={value}")
+    return "\0".join(parts)
 
 
 def _event_digest(session_id: str, summary: str, payload: Mapping[str, Json]) -> str:
@@ -166,16 +171,31 @@ def _event_digest(session_id: str, summary: str, payload: Mapping[str, Json]) ->
     return f"sha256:{hashlib.sha256(material).hexdigest()}"
 
 
-def _identity(root: Path, hit: SearchHit) -> tuple[str, str]:
+def _identity(root: Path, hit: SearchHit) -> tuple[str, str, str]:
+    path = root / f"{hit.page_id}.md"
+    origin = hit.source_ref or hit.canonical
     spec = read_page_spec(root, hit.page_id)
     if spec is not None and spec.sources:
-        cite = spec.sources[0]
-        return cite.origin, cite.hash
-    if hit.record_digest:
-        return hit.source_ref or hit.canonical, hit.record_digest
-    if hit.record_id:
-        return hit.source_ref or hit.canonical, hit.record_id
-    return hit.source_ref or hit.canonical, ""
+        origin = spec.sources[0].origin
+    if not path.is_file():
+        return origin, hit.record_id, hit.record_digest
+    try:
+        parsed = parse_page_records(path.read_bytes(), hit.page_id)
+    except MemoryRecordError:
+        return origin, hit.record_id, hit.record_digest
+    if not parsed:
+        return origin, hit.record_id, hit.record_digest
+    chosen = parsed[0]
+    for rec in parsed:
+        if rec.record_text in hit.snippet or hit.snippet in rec.record_text:
+            chosen = rec
+            break
+    if spec is not None:
+        for cite in spec.sources:
+            if cite.sid == chosen.sid:
+                origin = cite.origin
+                break
+    return origin, chosen.record_id, chosen.record_digest
 
 
 def _serialize(
@@ -193,10 +213,14 @@ def _serialize(
     records: list[dict[str, str]] = []
     for hit in chosen:
         excerpt = _clip(hit.snippet, _MAX_EXCERPT_BYTES)
-        source_ref, version = _identity(root, hit) if root is not None else (hit.source_ref, hit.record_digest)
+        if root is not None:
+            source_ref, record_id, version = _identity(root, hit)
+        else:
+            source_ref, record_id, version = hit.source_ref, hit.record_id, hit.record_digest
         records.append({
             "page_id": hit.page_id,
             "source_ref": source_ref,
+            "record_id": record_id,
             "version": version,
             "snippet": excerpt,
         })
@@ -222,7 +246,7 @@ def _context_text(session_id: str, records: list[dict[str, str]]) -> str:
     for record in records:
         lines.append(
             f"record page_id={record['page_id']} source_ref={record['source_ref']} "
-            + f"version={record['version']}\n{record['snippet']}",
+            + f"record_id={record['record_id']} version={record['version']}\n{record['snippet']}",
         )
     return "\n".join(lines)
 
@@ -260,6 +284,7 @@ def _write_stage(
         {
             "page_id": record["page_id"],
             "source_ref": record["source_ref"],
+            "record_id": record["record_id"],
             "version": record["version"],
             "snippet": record["snippet"],
         }
@@ -295,6 +320,7 @@ def _records_from_stage(stage: dict[str, Json]) -> tuple[dict[str, str], ...]:
         records.append({
             "page_id": str(item.get("page_id") or ""),
             "source_ref": str(item.get("source_ref") or ""),
+            "record_id": str(item.get("record_id") or ""),
             "version": str(item.get("version") or ""),
             "snippet": str(item.get("snippet") or ""),
         })

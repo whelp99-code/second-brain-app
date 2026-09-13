@@ -12,7 +12,7 @@ PostCompact는 stage만 (`{}`). 파일 기록만으로 전달 성공을 반환�
 
 ## 이벤트 수명
 
-digest = session_id + (prompt_id|compaction_id|event_id|uuid) + summary. 같은 요약·새 prompt_id는 새 compaction. 같은 digest 재전달은 중복. host가 occurrence id를 안 주면 같은 요약을 구분할 수 없다.
+digest = session_id + 제공된 모든 occurrence 필드(prompt_id·compaction_id·event_id·uuid) + summary. 같은 prompt_id에 compaction_id c1→c2는 새 compaction. 같은 전체 키 재전달은 중복.
 
 ## 출력 실패
 

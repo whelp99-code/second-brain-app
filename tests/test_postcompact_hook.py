@@ -12,6 +12,7 @@ import pytest
 
 from sb.cli import main
 from sb.contracts import PageSpec, SourceCite
+from sb.memory_records import parse_page_records
 from sb.postcompact_hook import (
     PostCompactHookError,
     confirm_delivery,
@@ -56,6 +57,7 @@ def _event(
     session_id: str = "sess-omega",
     summary: str = "OmegaCompiledBody",
     prompt_id: str = "p1",
+    compaction_id: str = "c1",
 ) -> bytes:
     return json.dumps({
         "hook_event_name": "PostCompact",
@@ -63,6 +65,7 @@ def _event(
         "compact_summary": summary,
         "trigger": "auto",
         "prompt_id": prompt_id,
+        "compaction_id": compaction_id,
     }).encode()
 
 
@@ -90,8 +93,12 @@ def test_postcompact_stages_without_additional_context(tmp_path: Path) -> None:
     result = handle_postcompact(_event(), index)
     assert result.hook_payload == {}
     assert result.records[0]["page_id"] == "wiki/omega"
+    parsed = parse_page_records((root / "wiki/omega.md").read_bytes(), "wiki/omega")
+    assert parsed
     assert result.records[0]["source_ref"] == "me-wiki:notes/omega.md"
-    assert result.records[0]["version"] == digest
+    assert result.records[0]["record_id"] == parsed[0].record_id
+    assert result.records[0]["version"] == parsed[0].record_digest
+    assert result.records[0]["version"] != digest
     assert "OmegaCompiledBody" in result.records[0]["snippet"]
     injected = handle_postcompact(_prompt(), index)
     specific = cast(dict[str, object], injected.hook_payload["hookSpecificOutput"])
@@ -131,6 +138,19 @@ def test_new_compaction_same_summary_new_prompt_id(tmp_path: Path) -> None:
     assert "OmegaCompiledBody" in cast(
         str, cast(dict[str, object], again.hook_payload["hookSpecificOutput"])["additionalContext"],
     )
+
+
+def test_new_compaction_same_prompt_new_compaction_id(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_event(prompt_id="p1", compaction_id="c1"), index)
+    first = handle_postcompact(_prompt(), index)
+    confirm_delivery(root, "sess-omega")
+    _ = handle_postcompact(_event(prompt_id="p1", compaction_id="c2"), index)
+    again = handle_postcompact(_prompt(), index)
+    assert first.pending_confirm is True
+    assert again.duplicate is False
+    assert again.pending_confirm is True
 
 
 def test_same_page_sections_dedupe_to_one_record() -> None:
