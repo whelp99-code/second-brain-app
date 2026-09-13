@@ -1,0 +1,52 @@
+{
+  "kind": "client_connection_readiness",
+  "written_at": "2026-09-13",
+  "product_bytes_changed": false,
+  "native_registration_executed": false,
+  "ops_settings_changed": false,
+  "pins": {
+    "archive": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
+    "executed_wheel_pin": "f7c194594e21728678b118e7c0029cd3e1deb30b",
+    "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "candidate_sb": "/var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb",
+    "executed_candidate_sb": "/var/tmp/sb-candidate-f7c1945/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb",
+    "jarvis": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd",
+    "gates_log": "/var/tmp/sb-gates-f7c1945.log"
+  },
+  "clients_observed": {
+    "codex": {"path": "/home/jm/.nvm/versions/node/v24.19.0/bin/codex", "version": "codex-cli 0.154.0", "config": "toml ~/.codex/config.toml", "mcp_add_help": "codex mcp add <NAME> -- <COMMAND>... --env KEY=VALUE"},
+    "claude": {"path": "/home/jm/.local/bin/claude", "version": "2.1.261 (Claude Code)"},
+    "omo": {"path": "/home/jm/.local/bin/omo", "version": "omo 5.0.0-0.beta.53 (engine: senpi 2026.9.10-2)"},
+    "orca": {"path": "/home/jm/.local/bin/orca", "version": "1.4.197", "note": "linux bare orca may be screen reader"},
+    "orca_ide": {"path": "/home/jm/.local/bin/orca-ide", "appVersion": "1.4.197", "runtime_state": "ready"},
+    "cursor": {"path": "/home/jm/.local/bin/cursor", "ide_installed": false},
+    "opencode": {"on_path": false},
+    "gemini": {"on_path": false}
+  },
+  "sb_config_env": {"supported": true, "source": "sb/config.py:185"},
+  "readme_mcp_servers_json": {"kind": "generic_or_ssh_example", "not_codex_0_154_config": true},
+  "proposed_work_material": {
+    "path": "/home/jm/orca/projects/Orca-JARVIS/docs/second-brain-oss-absorption-handoff-2026-09-07.md",
+    "user_context": "세컨드브레인·자비스 연동 완료 요청",
+    "sent_to_memory_or_native": false,
+    "equals_native_e2e_success": false
+  },
+  "operational_snapshot": {
+    "source": "/var/tmp/codex-completion-20260913-u7qerm73/operational-readonly-snapshot.json",
+    "observed_at": "2026-09-13T12:15:12.416610+09:00",
+    "read_only": true,
+    "sb_current": "41f0751aca8906d612961e704bc60dd0855fdabd",
+    "jarvis_authority_current": "a3cbbbe1604798052db6051a8751f039573eb126",
+    "jarvis_active": true,
+    "requests_service": "oneshot_inactive_last_success_2026-09-03T23:53:58+09:00",
+    "requests_timer": "not-found",
+    "do_not_infer_timer_required": true
+  },
+  "next_integration_not_executed": {
+    "kind": "isolated_codex_stdio_mcp",
+    "command_example": "codex mcp add second-brain --env SB_CONFIG=/var/tmp/sb-client-readiness/config.toml -- /var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb mcp"
+  },
+  "not_complete": ["ops_cutover", "M5", "M9_session_compaction_event", "M13_deferred", "native_autoinject", "security_delete_race_branches"]
+}
