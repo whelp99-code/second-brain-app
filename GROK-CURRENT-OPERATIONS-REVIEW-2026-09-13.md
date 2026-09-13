@@ -4,7 +4,7 @@
 
 ## 경로
 
-- SB 후보: 이 커밋 후 `/var/tmp/sb-candidate-<short>/releases/<id>/bin/sb`
+- SB 후보: `/var/tmp/sb-candidate-e02636e/releases/b0871a409d2505fbc8f294a2ff9502972661a708/bin/sb`
 - JARVIS 실행 산출물: `/var/tmp/jarvis-artifact-78e7307/bin/jarvis` (dist+runtime node_modules). `--help` EXIT0 확인됨. 예전 `node .../dist/src/cli.js`는 better-sqlite3 없이 실패한다.
 - 운영 current (인용): SB `/home/jm/.local/state/second-brain/app/current` → `41f0751…`; JARVIS authority `/home/jm/.local/state/orca-jarvis/authority/current` → `a3cbbbe…`
 

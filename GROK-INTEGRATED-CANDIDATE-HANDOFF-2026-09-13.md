@@ -4,7 +4,8 @@ Codex `term_6bf51058-3b29-40e2-a25b-b751fab0c24e`. 운영전환/push 없음.
 
 | 역할 | 값 |
 |---|---|
-| SB 소스 | 이 훅/문서 커밋 |
+| SB 소스 | `e02636e0c1ad` |
+| SB 격리 후보 | `/var/tmp/sb-candidate-e02636e/releases/b0871a409d2505fbc8f294a2ff9502972661a708` wheel `b61a5b67…` |
 | JARVIS 소스 | `78e73077469d1d6067c46f9a7bb26966969fe570` |
 | JARVIS 실행 산출물 | `/var/tmp/jarvis-artifact-78e7307/` dist+`runtime/node_modules`+`bin/jarvis`. `--help` EXIT0. digest `sha256:b5155a53…` (1216 files). 예전 a3c111c 경로 단독 node는 better-sqlite3 없음 |
 | 이전 실행 핀 | f7c1945 / 1672626 / 16a5a18 FileModelTransport 성공 오인 — 재사용 금지 |
