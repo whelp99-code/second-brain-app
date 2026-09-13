@@ -6,8 +6,8 @@
 
 | 역할 | 값 |
 |---|---|
-| 제품 | 이번 훅 커밋 |
-| SB 후보 | 이번 prepare-release 경로 |
+| 제품 | `f475adb` |
+| SB 후보 | `/var/tmp/sb-candidate-f475adb/releases/b277adcc789a27aa4f69b8525acca9100d61763e` |
 | J 런타임 | `/var/tmp/jarvis-artifact-64715ba` ≠ `J_CURRENT` |
 | 게이트 로그 | `/var/tmp/sb-gates-f7c1945.log` 이 후보 아님 |
 | 운영 current 인용 | SB `41f0751…`, J authority `a3cbbbe…` |

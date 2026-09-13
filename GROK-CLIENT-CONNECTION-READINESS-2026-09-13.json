@@ -3,16 +3,16 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
-    "product_source": "5680155",
-    "current_sb_candidate": "/var/tmp/sb-candidate-5680155/releases/64274fd223c84bde58cde3c9029d3515062e4a40",
-    "current_sb_wheel_sha256": "c79ebc0bbd5c0dbb2ed158c59d21f265c57bf1fc450755942100371e22c7223c",
+    "product_source": "f475adb",
+    "current_sb_candidate": "/var/tmp/sb-candidate-f475adb/releases/b277adcc789a27aa4f69b8525acca9100d61763e",
+    "current_sb_wheel_sha256": "35ea42744ef7b05e02ec8a8f456c3fad90d96532b5fb5c58c57e37257844de02",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "session_start_compact": "uses staged last_query; missing query yields {}",
-    "other_session_start": "{} exit 0",
+    "hook_search": "per-term rank inside hook; sb search AND unchanged",
+    "session_start_compact_epoch": "delivered_in_turn is this SessionStart only",
     "native_executed": false
   },
   "not_complete": ["ops_cutover", "M5", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
