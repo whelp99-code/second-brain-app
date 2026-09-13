@@ -71,7 +71,8 @@ native 세션·실모델 호출은 **unconfirmed**.
 | 격리 설정 (아직 만들지 않음) | `/var/tmp/sb-client-readiness/config.toml` |
 | 격리 vault (아직 만들지 않음) | `/var/tmp/sb-client-readiness/vault` |
 | MCP 엔트리 (절대 경로) | `/var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb` (동일 wheel: `.../sb-candidate-f7c1945/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2/bin/sb`). PATH의 bare `sb`를 후보라고 보장하지 않음 |
-| JARVIS dist | `/var/tmp/jarvis-artifact-1672626/source/dist` |
+| JARVIS dist (역사적 1672626) | `/var/tmp/jarvis-artifact-1672626/source/dist` — **memory postcompact 없음** |
+| JARVIS dist (이번 M9) | `/var/tmp/jarvis-artifact-a3c111c/dist/src/cli.js` |
 | Codex CLI | `/home/jm/.nvm/versions/node/v24.19.0/bin/codex` (`codex-cli 0.154.0`) |
 | Codex 설정 형식 | `~/.codex/config.toml` (TOML). `codex mcp add --help` observed 2026-09-13: `codex mcp add <NAME> -- <COMMAND>...` + `--env KEY=VALUE`. README `mcpServers` JSON은 일반/SSH 예시이며 Codex 0.154.0 설정이 아님 |
 | SB_CONFIG | `sb/config.py` 185행 documented 지원 |

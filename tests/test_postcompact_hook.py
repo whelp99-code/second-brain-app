@@ -1,4 +1,4 @@
-"""Claude Code PostCompact stdin → search reselect → same-session hook JSON."""
+"""PostCompact stages reselect; UserPromptSubmit is the documented inject event."""
 
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ from sb.postcompact_hook import (
     PostCompactHookError,
     handle_postcompact,
     parse_postcompact_event,
+    select_search_query,
 )
-from sb.search import SearchIndex
+from sb.search import SearchHit, SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 from tests.knowledge import stamp_knowledge
@@ -57,6 +58,13 @@ def _event(*, session_id: str = "sess-omega", summary: str = "OmegaCompiledBody"
     }).encode()
 
 
+def _prompt(*, session_id: str = "sess-omega") -> bytes:
+    return json.dumps({
+        "hook_event_name": "UserPromptSubmit",
+        "session_id": session_id,
+    }).encode()
+
+
 def test_parse_rejects_precompact_and_invalid_json() -> None:
     with pytest.raises(PostCompactHookError, match="HOOK_EVENT_UNSUPPORTED"):
         _ = parse_postcompact_event(json.dumps({
@@ -68,28 +76,118 @@ def test_parse_rejects_precompact_and_invalid_json() -> None:
         _ = parse_postcompact_event(b"{")
 
 
-def test_postcompact_reselects_body_source_and_budget(tmp_path: Path) -> None:
+def test_postcompact_stages_without_additional_context(tmp_path: Path) -> None:
     root = _seed(tmp_path)
     index = SearchIndex(root, hybrid=False)
     result = handle_postcompact(_event(), index)
-    output = result.hook_payload
-    specific = cast(dict[str, object], output["hookSpecificOutput"])
-    assert specific["hookEventName"] == "PostCompact"
+    assert result.hook_payload == {}
+    assert result.records[0]["page_id"] == "wiki/omega"
+    assert result.records[0]["version"].startswith("sha256:")
+    assert "OmegaCompiledBody" in result.records[0]["snippet"]
+    injected = handle_postcompact(_prompt(), index)
+    specific = cast(dict[str, object], injected.hook_payload["hookSpecificOutput"])
+    assert specific["hookEventName"] == "UserPromptSubmit"
     context = cast(str, specific["additionalContext"])
     assert "sess-omega" in context
     assert "OmegaCompiledBody" in context
     assert "wiki/omega" in context
-    assert result.session_id == "sess-omega"
-    assert result.budgets == {
-        "max_items": 8,
-        "max_excerpt_bytes": 4096,
-        "max_total_bytes": 16384,
-    }
-    assert result.records[0]["page_id"] == "wiki/omega"
-    assert result.records[0]["source_ref"]
+    encoded = json.dumps(injected.hook_payload, ensure_ascii=False).encode()
+    assert len(encoded) <= 16384
 
 
-def test_postcompact_cli_failure_is_not_success(
+def test_duplicate_prompt_does_not_reinject(tmp_path: Path) -> None:
+    root = _seed(tmp_path)
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_event(), index)
+    first = handle_postcompact(_prompt(), index)
+    second = handle_postcompact(_prompt(), index)
+    assert first.hook_payload["hookSpecificOutput"]
+    assert second.hook_payload == {}
+    assert second.duplicate is True
+
+
+def test_new_compaction_replaces_stage(tmp_path: Path) -> None:
+    root = _seed(tmp_path)
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_event(summary="OmegaCompiledBody"), index)
+    _ = handle_postcompact(_prompt(), index)
+    _ = handle_postcompact(_event(summary="Omega OmegaCompiledBody"), index)
+    again = handle_postcompact(_prompt(), index)
+    assert again.duplicate is False
+    assert "OmegaCompiledBody" in cast(
+        str, cast(dict[str, object], again.hook_payload["hookSpecificOutput"])["additionalContext"],
+    )
+
+
+def test_same_page_sections_dedupe_to_one_record() -> None:
+    hits = tuple(
+        SearchHit("wiki/omega", f"s{index}", "OmegaCompiledBody", 1.0 - index / 10)
+        for index in range(8)
+    )
+    from sb.postcompact_hook import _serialize, parse_postcompact_event
+
+    event = parse_postcompact_event(_event())
+    records, _context = _serialize(event, hits)
+    assert len(records) == 1
+    assert records[0]["page_id"] == "wiki/omega"
+
+
+def test_final_json_stays_within_budget() -> None:
+    hits = tuple(
+        SearchHit(f"wiki/p{index}", "body", "x" * 2048, 1.0)
+        for index in range(8)
+    )
+    from sb.postcompact_hook import _prompt_payload, _serialize, parse_postcompact_event
+
+    event = parse_postcompact_event(_event())
+    records, context = _serialize(event, hits)
+    payload = _prompt_payload(context)
+    assert len(json.dumps(payload, ensure_ascii=False).encode()) <= 16384
+    assert len(records) <= 8
+
+
+def test_long_summary_selects_a_bounded_query() -> None:
+    summary = ("OmegaCompiledBody " * 400).strip()
+    assert len(summary.encode()) > 4096
+    query = select_search_query(summary)
+    assert "OmegaCompiledBody" in query
+    assert len(query.encode()) <= 4096
+
+
+def test_postcompact_cli_long_summary_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = _seed(tmp_path)
+    config = tmp_path / "config.toml"
+    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
+    monkeypatch.setenv("SB_CONFIG", str(config))
+    monkeypatch.setattr("sys.stdin", BytesIO(_event(summary=("OmegaCompiledBody " * 400).strip())))
+    assert main(["postcompact-hook"]) == 0
+    assert json.loads(capsys.readouterr().out) == {}
+    monkeypatch.setattr("sys.stdin", BytesIO(_prompt()))
+    assert main(["postcompact-hook"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
+    assert "OmegaCompiledBody" in payload["hookSpecificOutput"]["additionalContext"]
+
+
+def test_empty_search_is_not_context_delivery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = _seed(tmp_path)
+    config = tmp_path / "config.toml"
+    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
+    monkeypatch.setenv("SB_CONFIG", str(config))
+    monkeypatch.setattr("sys.stdin", BytesIO(_event(summary="zzzz-no-such-term")))
+    assert main(["postcompact-hook"]) == 0
+    assert json.loads(capsys.readouterr().out) == {}
+    monkeypatch.setattr("sys.stdin", BytesIO(_prompt()))
+    assert main(["postcompact-hook"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "additionalContext" not in json.dumps(payload) or payload.get("hookSpecificOutput") is None or payload == {}
+
+
+def test_syntax_failure_is_not_success(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     root = _seed(tmp_path)
@@ -99,23 +197,9 @@ def test_postcompact_cli_failure_is_not_success(
     monkeypatch.setattr("sys.stdin", BytesIO(json.dumps({
         "hook_event_name": "PostCompact",
         "session_id": "sess-bad",
-        "compact_summary": "가" * 1366,
+        "compact_summary": '"미완성',
     }).encode()))
     assert main(["postcompact-hook"]) == 1
     captured = capsys.readouterr()
     assert "SEARCH_QUERY_" in captured.err
-    assert "additionalContext" not in captured.out
-
-
-def test_postcompact_cli_success_stdout_is_claude_hook(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
-) -> None:
-    root = _seed(tmp_path)
-    config = tmp_path / "config.toml"
-    _ = config.write_text(f"vault_root = {json.dumps(str(root))}\n")
-    monkeypatch.setenv("SB_CONFIG", str(config))
-    monkeypatch.setattr("sys.stdin", BytesIO(_event()))
-    assert main(["postcompact-hook"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["hookSpecificOutput"]["hookEventName"] == "PostCompact"
-    assert "OmegaCompiledBody" in payload["hookSpecificOutput"]["additionalContext"]
+    assert captured.out == ""
