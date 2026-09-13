@@ -3,20 +3,21 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
-    "current_sb_source": "b9844efa06d0",
-    "current_sb_candidate": "/var/tmp/sb-candidate-b9844ef/releases/3ae0a9a4c6db8934a814298f2ee741acc15c8349",
-    "current_sb_wheel_sha256": "f9429a95ed68790c422a8e385aeff190ad49afb8b877c643c09f71e572f2e5fe",
+    "current_sb_source": "7cc5fbc80345",
+    "current_sb_candidate": "/var/tmp/sb-candidate-7cc5fbc/releases/99746496b854f6fb42b69466bebca58149bb9396",
+    "current_sb_wheel_sha256": "b46f487973d11ca4cc8e80d749e0a50eac524a65972d22432f7d1da8682a5578",
     "current_jarvis_source": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
     "session_memory": "config.state_root/.sb/session-memory",
+    "request_root": "not implied by state_root",
+    "generation_locks": "state_root/generation.lock and generation-writer.lock",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "citation_binding": "query matches MemoryRecord.record_text; snippet is that body",
-    "session_state": "state_root not sealed generation",
-    "auto_compaction_next_model_request": "not_documented_public_hook_remaining",
-    "native_executed": false
+    "compiled_page_id": "wiki/<id> search vs yaml id <id> both resolve to citation origin",
+    "native_executed": false,
+    "auto_compaction_next_model_request": "not_documented_public_hook_remaining"
   },
   "not_complete": ["ops_cutover", "M5", "M9_in_turn_model_request_after_autocompact", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
 }
