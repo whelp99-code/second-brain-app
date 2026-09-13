@@ -46,6 +46,7 @@ class PostCompactEvent:
     query: str
     trigger: Trigger
     event_digest: str
+    source: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,16 +79,17 @@ def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
             digest = _event_digest(session_id, summary, loaded)
             return PostCompactEvent(name, session_id, query, trigger, digest)
         case "UserPromptSubmit":
+            prompt = _str_field(loaded, "prompt", "content", "query")
+            query = select_search_query(prompt) if prompt else ""
             digest = _str_field(loaded, "event_digest")
-            return PostCompactEvent(name, session_id, "", "", digest)
+            return PostCompactEvent(name, session_id, query, "", digest)
         case "SessionStart":
-            if _str_field(loaded, "source") != "compact":
-                raise PostCompactHookError("HOOK_EVENT_UNSUPPORTED")
+            source = _str_field(loaded, "source")
             summary = _str_field(loaded, "query", "compact_summary")
-            query = select_search_query(summary)
+            query = select_search_query(summary) if summary else ""
             trigger = _trigger(_str_field(loaded, "trigger", "matcher"))
             digest = _event_digest(session_id, summary, loaded)
-            return PostCompactEvent(name, session_id, query, trigger, digest)
+            return PostCompactEvent(name, session_id, query, trigger, digest, source)
         case _:
             raise PostCompactHookError("HOOK_EVENT_UNSUPPORTED")
 
@@ -125,12 +127,22 @@ def handle_postcompact(
             hits = index.search(event.query, _MAX_ITEMS * 4)
             records, context = _serialize(event, hits, index.vault_root)
             prior = _read_stage(stage_root, event.session_id)
+            excluded = _exclude_delivered(records, prior)
             duplicate = prior is not None and str(prior.get("event_digest")) == event.event_digest
             if not duplicate:
-                _write_stage(stage_root, event, records, context)
-            return PostCompactResult(event.session_id, {}, records, budgets, duplicate)
+                remainder_ctx = _context_text(event.session_id, list(excluded)) if excluded else context
+                _write_stage(
+                    stage_root, event, excluded, remainder_ctx if excluded else "",
+                    last_query=_stage_last_query(prior, event.query),
+                    delivered_in_turn=_delivered_in_turn(prior),
+                    delivered=not excluded,
+                )
+            return PostCompactResult(event.session_id, {}, excluded, budgets, duplicate)
         case "UserPromptSubmit":
             stage = _read_stage(stage_root, event.session_id)
+            last_query = event.query or _stage_last_query(stage, "")
+            if event.query:
+                _remember_last_query(stage_root, event.session_id, last_query, stage)
             if stage is None:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             if stage.get("delivered") is True:
@@ -142,9 +154,12 @@ def handle_postcompact(
             payload = _inject_payload(_PROMPT, context)
             return PostCompactResult(event.session_id, payload, records, budgets, False, True)
         case "SessionStart":
-            hits = index.search(event.query, _MAX_ITEMS * 4)
-            records, context = _serialize(event, hits, index.vault_root)
+            if event.source != "compact":
+                return PostCompactResult(event.session_id, {}, (), budgets, False)
             prior = _read_stage(stage_root, event.session_id)
+            query = event.query or _stage_last_query(prior, "")
+            if not query:
+                return PostCompactResult(event.session_id, {}, (), budgets, False)
             duplicate = (
                 prior is not None
                 and str(prior.get("event_digest")) == event.event_digest
@@ -152,11 +167,22 @@ def handle_postcompact(
             )
             if duplicate:
                 return PostCompactResult(event.session_id, {}, (), budgets, True)
-            if not records:
+            hits = index.search(query, _MAX_ITEMS * 4)
+            search_event = PostCompactEvent(
+                event.name, event.session_id, query, event.trigger, event.event_digest, event.source,
+            )
+            records, context = _serialize(search_event, hits, index.vault_root)
+            remaining = _exclude_delivered(records, prior)
+            if not remaining:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
-            _write_stage(stage_root, event, records, context)
-            payload = _inject_payload(_SESSION, context)
-            return PostCompactResult(event.session_id, payload, records, budgets, False, True)
+            remainder_ctx = _context_text(event.session_id, list(remaining))
+            _write_stage(
+                stage_root, event, remaining, remainder_ctx,
+                last_query=query,
+                delivered_in_turn=_delivered_in_turn(prior),
+            )
+            payload = _inject_payload(_SESSION, remainder_ctx)
+            return PostCompactResult(event.session_id, payload, remaining, budgets, False, True)
 
 
 def confirm_delivery(root: Path, session_id: str) -> None:
@@ -164,7 +190,58 @@ def confirm_delivery(root: Path, session_id: str) -> None:
     stage = _read_stage(root, session_id)
     if stage is None:
         return
+    seen = _delivered_in_turn(stage)
+    for rec in _records_from_stage(stage):
+        key = _record_key(rec)
+        if key and key not in seen:
+            seen.append(key)
+    stored_keys: list[Json] = list(seen)
+    stage["delivered_in_turn"] = stored_keys
     _mark_delivered(root, session_id, stage)
+
+
+def _record_key(record: dict[str, str]) -> str:
+    return f"{record.get('record_id', '')}\0{record.get('version', '')}"
+
+
+def _delivered_in_turn(stage: dict[str, Json] | None) -> list[str]:
+    if stage is None:
+        return []
+    raw = stage.get("delivered_in_turn")
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if isinstance(item, str)]
+
+
+def _exclude_delivered(
+    records: tuple[dict[str, str], ...], stage: dict[str, Json] | None,
+) -> tuple[dict[str, str], ...]:
+    blocked = set(_delivered_in_turn(stage))
+    if not blocked:
+        return records
+    return tuple(rec for rec in records if _record_key(rec) not in blocked)
+
+
+def _stage_last_query(stage: dict[str, Json] | None, fallback: str) -> str:
+    if stage is not None:
+        prior = stage.get("last_query")
+        if isinstance(prior, str) and prior.strip():
+            return prior.strip()
+    return fallback
+
+
+def _remember_last_query(
+    root: Path, session_id: str, last_query: str, stage: dict[str, Json] | None,
+) -> None:
+    payload: dict[str, Json] = dict(stage) if stage is not None else {
+        "session_id": session_id,
+        "delivered": False,
+        "records": [],
+    }
+    payload["last_query"] = last_query
+    _ = _stage_path(root, session_id).write_text(
+        json.dumps(payload, ensure_ascii=False), encoding="utf-8",
+    )
 
 
 def _trigger(value: str) -> Trigger:
@@ -342,6 +419,9 @@ def _read_stage(root: Path, session_id: str) -> dict[str, Json] | None:
 
 def _write_stage(
     root: Path, event: PostCompactEvent, records: tuple[dict[str, str], ...], context: str,
+    last_query: str = "",
+    delivered_in_turn: list[str] | None = None,
+    delivered: bool = False,
 ) -> None:
     stored: list[Json] = [
         {
@@ -356,9 +436,11 @@ def _write_stage(
     payload: dict[str, Json] = {
         "session_id": event.session_id,
         "event_digest": event.event_digest,
-        "delivered": False,
+        "delivered": delivered,
         "context": context,
         "records": stored,
+        "last_query": last_query,
+        "delivered_in_turn": [key for key in (delivered_in_turn or [])],
     }
     _ = _stage_path(root, event.session_id).write_text(
         json.dumps(payload, ensure_ascii=False), encoding="utf-8",

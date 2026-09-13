@@ -80,11 +80,14 @@ def _event(
     }).encode()
 
 
-def _prompt(*, session_id: str = "sess-omega") -> bytes:
-    return json.dumps({
+def _prompt(*, session_id: str = "sess-omega", prompt: str = "") -> bytes:
+    payload = {
         "hook_event_name": "UserPromptSubmit",
         "session_id": session_id,
-    }).encode()
+    }
+    if prompt:
+        payload["prompt"] = prompt
+    return json.dumps(payload).encode()
 
 
 def test_parse_rejects_precompact_and_invalid_json() -> None:
@@ -96,13 +99,6 @@ def test_parse_rejects_precompact_and_invalid_json() -> None:
         }).encode())
     with pytest.raises(PostCompactHookError, match="HOOK_JSON_INVALID"):
         _ = parse_postcompact_event(b"{")
-    with pytest.raises(PostCompactHookError, match="HOOK_EVENT_UNSUPPORTED"):
-        _ = parse_postcompact_event(json.dumps({
-            "hook_event_name": "SessionStart",
-            "session_id": "s1",
-            "source": "startup",
-            "compact_summary": "x",
-        }).encode())
 
 
 def test_postcompact_stages_without_additional_context(tmp_path: Path) -> None:
@@ -148,14 +144,11 @@ def test_new_compaction_same_summary_new_prompt_id(tmp_path: Path) -> None:
     _ = handle_postcompact(_event(summary="OmegaCompiledBody", prompt_id="p1"), index)
     first = handle_postcompact(_prompt(), index)
     confirm_delivery(root, "sess-omega")
-    _ = handle_postcompact(_event(summary="OmegaCompiledBody", prompt_id="p2"), index)
+    staged = handle_postcompact(_event(summary="OmegaCompiledBody", prompt_id="p2"), index)
     again = handle_postcompact(_prompt(), index)
     assert first.pending_confirm is True
-    assert again.duplicate is False
-    assert again.pending_confirm is True
-    assert "OmegaCompiledBody" in cast(
-        str, cast(dict[str, object], again.hook_payload["hookSpecificOutput"])["additionalContext"],
-    )
+    assert staged.records == ()
+    assert again.hook_payload == {}
 
 
 def test_new_compaction_same_prompt_new_compaction_id(tmp_path: Path) -> None:
@@ -164,11 +157,11 @@ def test_new_compaction_same_prompt_new_compaction_id(tmp_path: Path) -> None:
     _ = handle_postcompact(_event(prompt_id="p1", compaction_id="c1"), index)
     first = handle_postcompact(_prompt(), index)
     confirm_delivery(root, "sess-omega")
-    _ = handle_postcompact(_event(prompt_id="p1", compaction_id="c2"), index)
+    staged = handle_postcompact(_event(prompt_id="p1", compaction_id="c2"), index)
     again = handle_postcompact(_prompt(), index)
     assert first.pending_confirm is True
-    assert again.duplicate is False
-    assert again.pending_confirm is True
+    assert staged.records == ()
+    assert again.hook_payload == {}
 
 
 def test_same_page_sections_dedupe_to_one_record() -> None:
@@ -406,3 +399,50 @@ def test_session_start_compact_cli(
     payload = json.loads(capsys.readouterr().out)
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     assert "OmegaCompiledBody" in payload["hookSpecificOutput"]["additionalContext"]
+
+
+def test_session_start_compact_uses_last_query(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_prompt(prompt="OmegaCompiledBody"), index, state)
+    result = handle_postcompact(json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "compact",
+        "session_id": "sess-omega",
+    }).encode(), index, state)
+    specific = cast(dict[str, object], result.hook_payload["hookSpecificOutput"])
+    assert specific["hookEventName"] == "SessionStart"
+    assert "OmegaCompiledBody" in cast(str, specific["additionalContext"])
+
+
+def test_session_start_compact_without_query_is_empty(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    result = handle_postcompact(json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "compact",
+        "session_id": "sess-omega",
+    }).encode(), SearchIndex(root, hybrid=False), tmp_path / "state")
+    assert result.hook_payload == {}
+
+
+def test_session_start_other_source_empty(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    result = handle_postcompact(json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "session_id": "sess-omega",
+    }).encode(), SearchIndex(root, hybrid=False), tmp_path / "state")
+    assert result.hook_payload == {}
+
+
+def test_postcompact_excludes_in_turn_delivered(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_session(), index, state)
+    confirm_delivery(state, "sess-omega")
+    staged = handle_postcompact(_event(), index, state)
+    assert staged.records == ()
+    follow = handle_postcompact(_prompt(), index, state)
+    assert follow.hook_payload == {}
