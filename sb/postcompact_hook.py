@@ -1,4 +1,4 @@
-"""Claude hooks: PostCompact stages a reselect; UserPromptSubmit injects it."""
+"""Claude hooks: PostCompact stages; SessionStart source=compact injects."""
 
 from __future__ import annotations
 
@@ -18,12 +18,13 @@ from sb.vault import read_page_spec
 
 _POSTCOMPACT: Final = "PostCompact"
 _PROMPT: Final = "UserPromptSubmit"
+_SESSION: Final = "SessionStart"
 _MAX_ITEMS: Final = 8
 _MAX_EXCERPT_BYTES: Final = 4_096
 _MAX_TOTAL_BYTES: Final = 16_384
 type Json = str | int | float | bool | None | list["Json"] | dict[str, "Json"]
 type Trigger = Literal["auto", "manual", ""]
-type HookName = Literal["PostCompact", "UserPromptSubmit"]
+type HookName = Literal["PostCompact", "UserPromptSubmit", "SessionStart"]
 
 
 class PostCompactHookError(ValueError):
@@ -79,6 +80,14 @@ def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
         case "UserPromptSubmit":
             digest = _str_field(loaded, "event_digest")
             return PostCompactEvent(name, session_id, "", "", digest)
+        case "SessionStart":
+            if _str_field(loaded, "source") != "compact":
+                raise PostCompactHookError("HOOK_EVENT_UNSUPPORTED")
+            summary = _str_field(loaded, "query", "compact_summary")
+            query = select_search_query(summary)
+            trigger = _trigger(_str_field(loaded, "trigger", "matcher"))
+            digest = _event_digest(session_id, summary, loaded)
+            return PostCompactEvent(name, session_id, query, trigger, digest)
         case _:
             raise PostCompactHookError("HOOK_EVENT_UNSUPPORTED")
 
@@ -130,7 +139,23 @@ def handle_postcompact(
             if not records:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             context = str(stage.get("context") or "")
-            payload = _prompt_payload(context)
+            payload = _inject_payload(_PROMPT, context)
+            return PostCompactResult(event.session_id, payload, records, budgets, False, True)
+        case "SessionStart":
+            hits = index.search(event.query, _MAX_ITEMS * 4)
+            records, context = _serialize(event, hits, index.vault_root)
+            prior = _read_stage(stage_root, event.session_id)
+            duplicate = (
+                prior is not None
+                and str(prior.get("event_digest")) == event.event_digest
+                and prior.get("delivered") is True
+            )
+            if duplicate:
+                return PostCompactResult(event.session_id, {}, (), budgets, True)
+            if not records:
+                return PostCompactResult(event.session_id, {}, (), budgets, False)
+            _write_stage(stage_root, event, records, context)
+            payload = _inject_payload(_SESSION, context)
             return PostCompactResult(event.session_id, payload, records, budgets, False, True)
 
 
@@ -263,7 +288,8 @@ def _serialize(
             break
     while True:
         context = _context_text(event.session_id, records)
-        payload = _prompt_payload(context)
+        inject_name = _SESSION if event.name == "SessionStart" else _PROMPT
+        payload = _inject_payload(inject_name, context)
         encoded = json.dumps(payload, ensure_ascii=False).encode()
         if len(encoded) <= _MAX_TOTAL_BYTES:
             return tuple(records), context
@@ -288,10 +314,10 @@ def _context_text(session_id: str, records: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _prompt_payload(context: str) -> dict[str, Json]:
+def _inject_payload(event_name: str, context: str) -> dict[str, Json]:
     return {
         "hookSpecificOutput": {
-            "hookEventName": _PROMPT,
+            "hookEventName": event_name,
             "additionalContext": context,
         },
     }

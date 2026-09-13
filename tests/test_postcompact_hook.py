@@ -96,6 +96,13 @@ def test_parse_rejects_precompact_and_invalid_json() -> None:
         }).encode())
     with pytest.raises(PostCompactHookError, match="HOOK_JSON_INVALID"):
         _ = parse_postcompact_event(b"{")
+    with pytest.raises(PostCompactHookError, match="HOOK_EVENT_UNSUPPORTED"):
+        _ = parse_postcompact_event(json.dumps({
+            "hook_event_name": "SessionStart",
+            "session_id": "s1",
+            "source": "startup",
+            "compact_summary": "x",
+        }).encode())
 
 
 def test_postcompact_stages_without_additional_context(tmp_path: Path) -> None:
@@ -182,11 +189,11 @@ def test_final_json_stays_within_budget() -> None:
         SearchHit(f"wiki/p{index}", "body", "x" * 2048, 1.0)
         for index in range(8)
     )
-    from sb.postcompact_hook import _prompt_payload, _serialize, parse_postcompact_event
+    from sb.postcompact_hook import _inject_payload, _serialize, parse_postcompact_event
 
     event = parse_postcompact_event(_event())
     records, context = _serialize(event, hits)
-    payload = _prompt_payload(context)
+    payload = _inject_payload("UserPromptSubmit", context)
     assert len(json.dumps(payload, ensure_ascii=False).encode()) <= 16384
     assert len(records) <= 8
 
@@ -350,3 +357,52 @@ def test_session_state_uses_state_root_not_generation(tmp_path: Path) -> None:
     assert result.hook_payload == {}
     assert (state / ".sb" / "session-memory").is_dir()
     assert not (root / ".sb" / "session-memory").exists()
+
+
+def _session(
+    *,
+    session_id: str = "sess-omega",
+    summary: str = "OmegaCompiledBody",
+    prompt_id: str = "p1",
+    compaction_id: str = "c1",
+) -> bytes:
+    return json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "compact",
+        "session_id": session_id,
+        "compact_summary": summary,
+        "prompt_id": prompt_id,
+        "compaction_id": compaction_id,
+    }).encode()
+
+
+def test_session_start_compact_injects_omega_not_prompt_wait(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    index = SearchIndex(root, hybrid=False)
+    result = handle_postcompact(_session(), index, tmp_path / "state")
+    specific = cast(dict[str, object], result.hook_payload["hookSpecificOutput"])
+    assert specific["hookEventName"] == "SessionStart"
+    context = cast(str, specific["additionalContext"])
+    assert "sess-omega" in context
+    assert "OmegaCompiledBody" in context
+    assert result.records[0]["source_ref"] == "me-wiki:notes/omega.md"
+    assert result.pending_confirm is True
+    encoded = json.dumps(result.hook_payload, ensure_ascii=False).encode()
+    assert len(encoded) <= 16384
+    confirm_delivery(tmp_path / "state", "sess-omega")
+    again = handle_postcompact(_session(), index, tmp_path / "state")
+    assert again.hook_payload == {}
+    assert again.duplicate is True
+
+
+def test_session_start_compact_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, _digest = _seed(tmp_path)
+    config = _write_config(tmp_path, root)
+    monkeypatch.setenv("SB_CONFIG", str(config))
+    monkeypatch.setattr("sys.stdin", BytesIO(_session()))
+    assert main(["postcompact-hook"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    assert "OmegaCompiledBody" in payload["hookSpecificOutput"]["additionalContext"]
