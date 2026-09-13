@@ -3,8 +3,12 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
+    "product_source": "a41b70d",
+    "test_only": "e0b3445",
     "current_sb_source": "a41b70dd165d",
     "current_sb_candidate": "/var/tmp/sb-candidate-a41b70d/releases/c9bdc5dd520b0e3908207cf34f319799e48bb19a",
+    "gates_log_not_this_candidate": "/var/tmp/sb-gates-f7c1945.log",
+    "jarvis_runtime_not_authority_current": true,
     "current_sb_wheel_sha256": "dc1be265f1c4eee10bda26e960ec085d2e7f83c052fd6b405c9c8656926c5fb0",
     "current_jarvis_source": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
