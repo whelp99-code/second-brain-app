@@ -13,6 +13,7 @@ from typing import Final, Literal, override
 from sb.contracts import PageSpec
 from sb.memory_records import MemoryRecordError, parse_page_records
 from sb.search import SearchHit, SearchIndex
+from sb.search_errors import SearchQueryError
 from sb.search_query import MAX_QUERY_BYTES, MAX_QUERY_GROUPS, LexicalQuery, normalize
 from sb.vault import read_page_spec
 
@@ -83,7 +84,10 @@ def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
     match name:
         case "PostCompact":
             summary = _str_field(loaded, "query", "compact_summary")
-            query = select_search_query(summary)
+            if not summary:
+                raise PostCompactHookError("HOOK_QUERY_MISSING")
+            _assert_quoted_syntax(summary)
+            query = _bound_query_text(summary)
             trigger = _trigger(_str_field(loaded, "trigger", "matcher"))
             digest = _event_digest(session_id, summary, loaded)
             return PostCompactEvent(name, session_id, query, trigger, digest)
@@ -118,6 +122,18 @@ def select_search_query(summary: str) -> str:
     if len(tokens) > MAX_QUERY_GROUPS:
         text = " ".join(tokens[:MAX_QUERY_GROUPS])
     return LexicalQuery.parse(text).text
+
+
+def _assert_quoted_syntax(summary: str) -> None:
+    if '"' not in summary:
+        return
+    try:
+        _ = LexicalQuery.parse(summary)
+    except SearchQueryError as exc:
+        code = str(exc)
+        if "TOO_MANY_GROUPS" in code or "TOO_LARGE" in code:
+            return
+        raise
 
 
 def handle_postcompact(
@@ -324,19 +340,39 @@ def _term_in(term: str, text: str) -> bool:
     return bool(compact) and compact in normalize(text)
 
 
+def _identifier_rank(token: str) -> int:
+    upper = any("A" <= char <= "Z" for char in token)
+    lower = any("a" <= char <= "z" for char in token)
+    hangul = any(0xAC00 <= ord(char) <= 0xD7A3 for char in token)
+    if hangul or (upper and lower):
+        return 0
+    if any(char.isdigit() for char in token):
+        return 1
+    return 2
+
+
 def _candidate_tokens(text: str) -> tuple[str, ...]:
-    terms: list[str] = []
-    seen: set[str] = set()
+    counts: dict[str, tuple[int, str]] = {}
     for raw in text.split():
         token = raw.strip(".,;:!?\"'()[]")
         folded = token.casefold()
-        if len(folded) < 3 or folded in _HOOK_STOP or folded in seen:
+        if len(folded) < 3 or folded in _HOOK_STOP:
             continue
-        seen.add(folded)
-        terms.append(token)
-        if len(terms) >= _MAX_CANDIDATE_TOKENS:
-            break
-    return tuple(terms)
+        prior = counts.get(folded)
+        if prior is None:
+            counts[folded] = (1, token)
+        else:
+            counts[folded] = (prior[0] + 1, prior[1])
+    ranked = sorted(
+        counts,
+        key=lambda folded: (
+            -counts[folded][0],
+            _identifier_rank(counts[folded][1]),
+            -len(counts[folded][1]),
+            folded,
+        ),
+    )
+    return tuple(counts[key][1] for key in ranked[:_MAX_CANDIDATE_TOKENS])
 
 
 def _weighted_terms(

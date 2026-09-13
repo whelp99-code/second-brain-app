@@ -530,6 +530,21 @@ def test_late_target_token_in_long_summary(tmp_path: Path) -> None:
     assert "OmegaInturnTarget" in result.records[0]["snippet"]
 
 
+def test_target_after_forty_distinct_tokens(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    filler = " ".join(f"aaaaaaaaaaaaaaaaaaaaaaaa{index:02d}" for index in range(45))
+    from sb.postcompact_hook import _candidate_tokens
+    ranked = _candidate_tokens(f"{filler} OmegaInturnTarget")
+    assert "OmegaInturnTarget" in ranked
+    result = handle_postcompact(
+        _event(summary=f"{filler} OmegaInturnTarget"),
+        SearchIndex(root, hybrid=False),
+        tmp_path / "state",
+    )
+    assert result.records
+    assert "OmegaInturnTarget" in result.records[0]["snippet"]
+
+
 def test_session_start_keeps_postcompact_remainder(tmp_path: Path) -> None:
     root = tmp_path / "vault"
     vault = init_vault(root)
