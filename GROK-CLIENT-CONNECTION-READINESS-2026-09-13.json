@@ -3,26 +3,19 @@
   "written_at": "2026-09-13",
   "native_registration_executed": false,
   "pins": {
-    "product_source": "a41b70d",
-    "test_only": "e0b3445",
-    "current_sb_source": "a41b70dd165d",
-    "current_sb_candidate": "/var/tmp/sb-candidate-a41b70d/releases/c9bdc5dd520b0e3908207cf34f319799e48bb19a",
-    "gates_log_not_this_candidate": "/var/tmp/sb-gates-f7c1945.log",
-    "jarvis_runtime_not_authority_current": true,
-    "current_sb_wheel_sha256": "dc1be265f1c4eee10bda26e960ec085d2e7f83c052fd6b405c9c8656926c5fb0",
-    "current_jarvis_source": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+    "docs_d1_d3": "74c9877",
+    "product_session_start_compact": "cffaf9e",
+    "current_sb_candidate": "/var/tmp/sb-candidate-cffaf9e/releases/ba33e5e8b0d46585076352b78ac48e09902e159f",
+    "current_sb_wheel_sha256": "989da1a3b295635f5272eedcaa1d7ec7e58dd57bb0e18538a4bb49080f2a17d4",
+    "sessionstart_compact_evidence": "/var/tmp/claude-night-e53dd66-sessionstart-compact.json",
     "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
     "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
-    "run_lock": "execution_root/.sb/run.lock",
-    "generation_locks": "state_root/generation.lock and generation-writer.lock",
-    "request_root": "not implied by state_root",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd"
   },
   "m9_ordinary_connection": {
-    "record_parse_page_id": "search canonical wiki page_id",
-    "source_alias": "yaml id without wiki/ prefix for origin lookup only",
-    "native_executed": false,
-    "auto_compaction_next_model_request": "not_documented_public_hook_remaining"
+    "in_turn_public_hook": "SessionStart source=compact additionalContext",
+    "client": "Claude Code 2.1.270",
+    "native_executed": false
   },
-  "not_complete": ["ops_cutover", "M5", "M9_in_turn_model_request_after_autocompact", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
+  "not_complete": ["ops_cutover", "M5", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
 }
