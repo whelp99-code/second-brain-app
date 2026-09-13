@@ -34,6 +34,7 @@ from sb.ops import (
     doctor as run_doctor,
 )
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
+from sb.postcompact_hook import PostCompactHookError, handle_postcompact
 from sb.runtime_access import mutate_root, read_config
 from sb.search import SearchIndex
 from sb.search_errors import GenerationIndexError, SearchQueryError
@@ -67,6 +68,7 @@ class Command(StrEnum):
     APPLY_CANCELLATION = "apply-cancellation"
     APPLY_REQUESTS = "apply-requests"
     MAINTAIN = "maintain"
+    POSTCOMPACT_HOOK = "postcompact-hook"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -118,6 +120,7 @@ def _parser() -> argparse.ArgumentParser:
     _ = apply_requests.add_argument("--once", action="store_true")
     _ = apply_requests.add_argument("--test-control-socket")
     maintain = sub.add_parser(Command.MAINTAIN.value)
+    _ = sub.add_parser(Command.POSTCOMPACT_HOOK.value)
     _ = maintain.add_argument("--once", action="store_true")
     _ = maintain.add_argument("--restore-workspace", help="explicit private restore workspace to clean")
     retry = sub.add_parser(Command.RETRY.value)
@@ -283,6 +286,25 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         for hit in hits:
             print(f"{hit.page_id} — {hit.section}")
             print(f"  {hit.snippet}")
+        return 0
+
+    def postcompact_hook() -> int:
+        explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+        try:
+            raw = sys.stdin.buffer.read() if hasattr(sys.stdin, "buffer") else sys.stdin.read()
+            result = handle_postcompact(
+                raw if isinstance(raw, bytes) else raw.encode(),
+                SearchIndex(
+                    vault_root=Path(config.vault_root),
+                    registry_path=explicit,
+                    hybrid=config.search_hybrid,
+                    min_similarity=config.search_min_similarity,
+                ),
+            )
+        except PostCompactHookError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        print(json.dumps(result.hook_payload, ensure_ascii=False))
         return 0
 
     def remember() -> int:
@@ -513,6 +535,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.DOCTOR: doctor,
         Command.MCP: _mcp,
         Command.SEARCH: search,
+        Command.POSTCOMPACT_HOOK: postcompact_hook,
         Command.REMEMBER: remember,
         Command.RETRY: retry,
         Command.BACKUP: backup,
@@ -533,7 +556,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     exit_code = 1
     try:
         read_only = command in {
-            Command.STATUS, Command.SEARCH, Command.SOURCES, Command.RETENTION, Command.METRICS,
+            Command.STATUS, Command.SEARCH, Command.POSTCOMPACT_HOOK, Command.SOURCES,
+            Command.RETENTION, Command.METRICS,
         } or (
             command == Command.DOCTOR and not _opt_flag(ns, "rebuild_ledger")
         ) or (
@@ -571,7 +595,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _dispatch(Command(tokens[0]), ns)
     except (OperationError, VaultLintError, GovernanceError, SearchQueryError, ConfigValueError,
-            GenerationError, GenerationIndexError) as exc:
+            GenerationError, GenerationIndexError, PostCompactHookError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
