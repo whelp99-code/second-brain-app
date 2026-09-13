@@ -22,14 +22,14 @@ _SESSION: Final = "SessionStart"
 _MAX_ITEMS: Final = 8
 _MAX_EXCERPT_BYTES: Final = 4_096
 _MAX_TOTAL_BYTES: Final = 16_384
-_MAX_HOOK_TERMS: Final = 8
+_MAX_CANDIDATE_TOKENS: Final = 32
 _HOOK_STOP: Final = frozenset({
-    "a", "an", "and", "about", "after", "asked", "before", "been", "can",
-    "continue", "for", "from", "had", "has", "have", "in", "is", "it",
-    "me", "my", "next", "note", "notes", "of", "on", "or", "please",
-    "remind", "reviewed", "say", "session", "step", "summary", "that",
-    "the", "this", "to", "user", "was", "we", "were", "what", "with",
-    "write-up", "writeup", "you",
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
+    "from", "had", "has", "have", "he", "her", "his", "if", "in",
+    "into", "is", "it", "its", "of", "on", "or", "our", "out", "so",
+    "than", "that", "the", "their", "them", "then", "there", "these",
+    "they", "this", "to", "was", "we", "were", "what", "when", "which",
+    "who", "will", "with", "would", "you",
 })
 type Json = str | int | float | bool | None | list["Json"] | dict[str, "Json"]
 type Trigger = Literal["auto", "manual", ""]
@@ -133,25 +133,30 @@ def handle_postcompact(
     }
     match event.name:
         case "PostCompact":
-            hits = _hook_search(index, event.query)
-            records, context = _serialize(event, hits, index.vault_root)
+            hits, terms = _hook_search(index, event.query)
+            search_event = PostCompactEvent(
+                event.name, event.session_id, " ".join(terms), event.trigger,
+                event.event_digest, event.source,
+            )
+            records, context = _serialize(search_event, hits, index.vault_root)
             prior = _read_stage(stage_root, event.session_id)
             excluded = _exclude_delivered(records, prior)
             duplicate = prior is not None and str(prior.get("event_digest")) == event.event_digest
+            last_query = _stage_last_query(prior, " ".join(terms) if terms else "")
             if not duplicate:
                 remainder_ctx = _context_text(event.session_id, list(excluded)) if excluded else context
                 _write_stage(
                     stage_root, event, excluded, remainder_ctx if excluded else "",
-                    last_query=_stage_last_query(prior, event.query),
+                    last_query=last_query,
                     delivered_in_turn=_delivered_in_turn(prior),
                     delivered=not excluded,
                 )
             return PostCompactResult(event.session_id, {}, excluded, budgets, duplicate)
         case "UserPromptSubmit":
             stage = _read_stage(stage_root, event.session_id)
-            last_query = event.query or _stage_last_query(stage, "")
-            if event.query:
-                _remember_last_query(stage_root, event.session_id, last_query, stage)
+            _terms, useful = _hook_search(index, event.query) if event.query else ((), ())
+            if useful:
+                _remember_last_query(stage_root, event.session_id, " ".join(useful), stage)
             if stage is None:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             if stage.get("delivered") is True:
@@ -176,20 +181,26 @@ def handle_postcompact(
             )
             if duplicate:
                 return PostCompactResult(event.session_id, {}, (), budgets, True)
-            hits = _hook_search(index, query)
+            hits, terms = _hook_search(index, query)
             search_event = PostCompactEvent(
-                event.name, event.session_id, query, event.trigger, event.event_digest, event.source,
+                event.name, event.session_id, " ".join(terms) or query, event.trigger,
+                event.event_digest, event.source,
             )
             records, context = _serialize(search_event, hits, index.vault_root)
             if not records:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
-            remainder_ctx = _context_text(event.session_id, list(records))
+            prior_undelivered = () if prior is None or prior.get("delivered") is True else _records_from_stage(prior)
+            in_turn_keys = {_record_key(rec) for rec in records}
+            remainder = tuple(rec for rec in prior_undelivered if _record_key(rec) not in in_turn_keys)
+            remainder_ctx = _context_text(event.session_id, list(remainder))
             _write_stage(
-                stage_root, event, records, remainder_ctx,
-                last_query=query,
-                delivered_in_turn=None,
+                stage_root, event, remainder, remainder_ctx,
+                last_query=" ".join(terms) or query,
+                delivered_in_turn=list(in_turn_keys),
+                delivered=not remainder,
+                in_turn=records,
             )
-            payload = _inject_payload(_SESSION, remainder_ctx)
+            payload = _inject_payload(_SESSION, context)
             return PostCompactResult(event.session_id, payload, records, budgets, False, True)
 
 
@@ -199,13 +210,25 @@ def confirm_delivery(root: Path, session_id: str) -> None:
     if stage is None:
         return
     seen = _delivered_in_turn(stage)
-    for rec in _records_from_stage(stage):
-        key = _record_key(rec)
-        if key and key not in seen:
-            seen.append(key)
+    in_turn = _records_from_stage_field(stage, "in_turn")
+    if in_turn:
+        for rec in in_turn:
+            key = _record_key(rec)
+            if key and key not in seen:
+                seen.append(key)
+        stage["in_turn"] = []
+        stage["delivered"] = not _records_from_stage(stage)
+    else:
+        for rec in _records_from_stage(stage):
+            key = _record_key(rec)
+            if key and key not in seen:
+                seen.append(key)
+        stage["delivered"] = True
     stored_keys: list[Json] = list(seen)
     stage["delivered_in_turn"] = stored_keys
-    _mark_delivered(root, session_id, stage)
+    _ = _stage_path(root, session_id).write_text(
+        json.dumps(stage, ensure_ascii=False), encoding="utf-8",
+    )
 
 
 def _record_key(record: dict[str, str]) -> str:
@@ -301,7 +324,7 @@ def _term_in(term: str, text: str) -> bool:
     return bool(compact) and compact in normalize(text)
 
 
-def _hook_terms(text: str) -> tuple[str, ...]:
+def _candidate_tokens(text: str) -> tuple[str, ...]:
     terms: list[str] = []
     seen: set[str] = set()
     for raw in text.split():
@@ -311,30 +334,42 @@ def _hook_terms(text: str) -> tuple[str, ...]:
             continue
         seen.add(folded)
         terms.append(token)
-        if len(terms) >= _MAX_HOOK_TERMS:
+        if len(terms) >= _MAX_CANDIDATE_TOKENS:
             break
-    if terms:
-        return tuple(terms)
-    fallback = max((part.strip(".,;:?") for part in text.split()), key=len, default="")
-    return (fallback,) if fallback else ()
+    return tuple(terms)
 
 
-def _hook_search(index: SearchIndex, text: str) -> tuple[SearchHit, ...]:
-    terms = _hook_terms(text)
-    if not terms:
-        return ()
-    scored: dict[str, tuple[int, int, SearchHit]] = {}
-    for term in terms:
-        hits = index.search(term, _MAX_ITEMS * 4)
+def _weighted_terms(
+    index: SearchIndex, text: str,
+) -> tuple[tuple[str, float, tuple[SearchHit, ...]], ...]:
+    limit = _MAX_ITEMS * 4
+    weighted: list[tuple[str, float, tuple[SearchHit, ...]]] = []
+    for term in _candidate_tokens(text):
+        hits = index.search(term, limit)
+        count = len(hits)
+        if count == 0 or count >= limit:
+            continue
+        weighted.append((term, 1.0 / count, hits))
+    return tuple(weighted)
+
+
+def _hook_search(
+    index: SearchIndex, text: str,
+) -> tuple[tuple[SearchHit, ...], tuple[str, ...]]:
+    weighted = _weighted_terms(index, text)
+    if not weighted:
+        return (), ()
+    scored: dict[str, tuple[float, int, SearchHit]] = {}
+    for _term, weight, hits in weighted:
         for rank, hit in enumerate(hits):
             key = f"{hit.page_id}\0{hit.section}"
             prior = scored.get(key)
             if prior is None:
-                scored[key] = (1, rank, hit)
+                scored[key] = (weight, rank, hit)
             else:
-                scored[key] = (prior[0] + 1, min(prior[1], rank), prior[2])
+                scored[key] = (prior[0] + weight, min(prior[1], rank), prior[2])
     ordered = sorted(scored.values(), key=lambda row: (-row[0], row[1]))
-    return tuple(row[2] for row in ordered)
+    return tuple(row[2] for row in ordered), tuple(term for term, _weight, _hits in weighted)
 
 
 _CITATION_DEF = re.compile(r"^\[\^([0-9a-f]{8,64})\]:\s*(\S.*)$")
@@ -404,7 +439,7 @@ def _matching_records(root: Path, hit: SearchHit, terms: tuple[str, ...]) -> tup
 def _serialize(
     event: PostCompactEvent, hits: tuple[SearchHit, ...], root: Path | None = None,
 ) -> tuple[tuple[dict[str, str], ...], str]:
-    terms = _hook_terms(event.query)
+    terms = _candidate_tokens(event.query)
     seen: set[str] = set()
     records: list[dict[str, str]] = []
     for hit in hits:
@@ -479,22 +514,24 @@ def _read_stage(root: Path, session_id: str) -> dict[str, Json] | None:
     return loaded
 
 
+def _record_payload(record: dict[str, str]) -> dict[str, Json]:
+    return {
+        "page_id": record["page_id"],
+        "source_ref": record["source_ref"],
+        "record_id": record["record_id"],
+        "version": record["version"],
+        "snippet": record["snippet"],
+    }
+
+
 def _write_stage(
     root: Path, event: PostCompactEvent, records: tuple[dict[str, str], ...], context: str,
     last_query: str = "",
     delivered_in_turn: list[str] | None = None,
     delivered: bool = False,
+    in_turn: tuple[dict[str, str], ...] | None = None,
 ) -> None:
-    stored: list[Json] = [
-        {
-            "page_id": record["page_id"],
-            "source_ref": record["source_ref"],
-            "record_id": record["record_id"],
-            "version": record["version"],
-            "snippet": record["snippet"],
-        }
-        for record in records
-    ]
+    stored: list[Json] = [_record_payload(record) for record in records]
     payload: dict[str, Json] = {
         "session_id": event.session_id,
         "event_digest": event.event_digest,
@@ -503,6 +540,7 @@ def _write_stage(
         "records": stored,
         "last_query": last_query,
         "delivered_in_turn": [key for key in (delivered_in_turn or [])],
+        "in_turn": [_record_payload(record) for record in (in_turn or ())],
     }
     _ = _stage_path(root, event.session_id).write_text(
         json.dumps(payload, ensure_ascii=False), encoding="utf-8",
@@ -517,7 +555,11 @@ def _mark_delivered(root: Path, session_id: str, stage: dict[str, Json]) -> None
 
 
 def _records_from_stage(stage: dict[str, Json]) -> tuple[dict[str, str], ...]:
-    raw = stage.get("records")
+    return _records_from_stage_field(stage, "records")
+
+
+def _records_from_stage_field(stage: dict[str, Json], field: str) -> tuple[dict[str, str], ...]:
+    raw = stage.get(field)
     if not isinstance(raw, list):
         return ()
     records: list[dict[str, str]] = []

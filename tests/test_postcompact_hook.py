@@ -488,3 +488,88 @@ def test_session_start_new_epoch_reinjects(tmp_path: Path) -> None:
     assert "OmegaCompiledBody" in cast(
         str, cast(dict[str, object], second.hook_payload["hookSpecificOutput"])["additionalContext"],
     )
+
+
+def test_empty_prompt_does_not_clobber_last_query(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_prompt(prompt="OmegaInturnTarget please"), index, state)
+    _ = handle_postcompact(_prompt(prompt="continue"), index, state)
+    _ = handle_postcompact(_prompt(prompt="go on"), index, state)
+    stored = json.loads((state / ".sb" / "session-memory" / "sess-omega.json").read_text())
+    assert "OmegaInturnTarget" in str(stored.get("last_query"))
+    result = handle_postcompact(json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "compact",
+        "session_id": "sess-omega",
+    }).encode(), index, state)
+    specific = cast(dict[str, object], result.hook_payload["hookSpecificOutput"])
+    assert "OmegaInturnTarget" in cast(str, specific["additionalContext"])
+
+
+def test_last_query_stores_terms_not_prompt(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    state = tmp_path / "state"
+    prompt = "Can you remind me what the notes say about OmegaInturnTarget before I continue?"
+    _ = handle_postcompact(_prompt(prompt=prompt), SearchIndex(root, hybrid=False), state)
+    stored = json.loads((state / ".sb" / "session-memory" / "sess-omega.json").read_text())
+    assert stored.get("last_query") != prompt
+    assert "OmegaInturnTarget" in str(stored.get("last_query"))
+
+
+def test_late_target_token_in_long_summary(tmp_path: Path) -> None:
+    root, _digest = _seed(tmp_path)
+    filler = " ".join(f"NonceToken{index:02d}" for index in range(12))
+    result = handle_postcompact(
+        _event(summary=f"{filler} OmegaInturnTarget"),
+        SearchIndex(root, hybrid=False),
+        tmp_path / "state",
+    )
+    assert result.records
+    assert "OmegaInturnTarget" in result.records[0]["snippet"]
+
+
+def test_session_start_keeps_postcompact_remainder(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    vault = init_vault(root)
+    alpha_hash = ContentAddressedStore(root).put(b"alpha-body")
+    omega_hash = ContentAddressedStore(root).put(b"omega-body")
+    page = PageSpec(
+        "wiki/mixed",
+        "Mixed",
+        (
+            f"# Mixed\nAlphaUniqueMemory is old.\n[^{alpha_hash[:8]}]\n\n"
+            + f"OmegaUniqueTarget is current.\n[^{omega_hash[:8]}]"
+        ),
+        [
+            SourceCite(sid=alpha_hash[:8], origin="me-wiki:notes/alpha.md", hash=alpha_hash),
+            SourceCite(sid=omega_hash[:8], origin="me-wiki:notes/omega.md", hash=omega_hash),
+        ],
+        "active",
+    )
+    _ = vault.write_pages((page,), "run-mixed", _HashLedger(root))
+    stamp_knowledge(root)
+    state = tmp_path / "state"
+    index = SearchIndex(root, hybrid=False)
+    _ = handle_postcompact(_prompt(prompt="OmegaUniqueTarget"), index, state)
+    staged = handle_postcompact(_event(summary="AlphaUniqueMemory OmegaUniqueTarget"), index, state)
+    assert any("OmegaUniqueTarget" in rec["snippet"] for rec in staged.records)
+    assert any("AlphaUniqueMemory" in rec["snippet"] for rec in staged.records)
+    injected = handle_postcompact(json.dumps({
+        "hook_event_name": "SessionStart",
+        "source": "compact",
+        "session_id": "sess-omega",
+    }).encode(), index, state)
+    context = cast(
+        str, cast(dict[str, object], injected.hook_payload["hookSpecificOutput"])["additionalContext"],
+    )
+    assert "OmegaUniqueTarget" in context
+    assert "AlphaUniqueMemory" not in context
+    confirm_delivery(state, "sess-omega")
+    follow = handle_postcompact(_prompt(), index, state)
+    follow_ctx = cast(
+        str, cast(dict[str, object], follow.hook_payload["hookSpecificOutput"])["additionalContext"],
+    )
+    assert "AlphaUniqueMemory" in follow_ctx
+    assert "OmegaUniqueTarget" not in follow_ctx

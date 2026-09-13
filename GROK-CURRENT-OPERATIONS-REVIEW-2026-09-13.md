@@ -6,8 +6,8 @@
 
 | 역할 | 값 |
 |---|---|
-| 제품 | `f475adb` |
-| SB 후보 | `/var/tmp/sb-candidate-f475adb/releases/b277adcc789a27aa4f69b8525acca9100d61763e` |
+| 제품 | 이번 훅 커밋 |
+| SB 후보 | 이번 prepare-release 경로 |
 | J 런타임 | `/var/tmp/jarvis-artifact-64715ba` ≠ `J_CURRENT` |
 | 게이트 로그 | `/var/tmp/sb-gates-f7c1945.log` 이 후보 아님 |
 | 운영 current 인용 | SB `41f0751…`, J authority `a3cbbbe…` |
@@ -31,18 +31,28 @@ CLI `inspect(args.database)` 기본 `now=datetime.now(UTC)`. naive now 프로브
 
 **리포 예시** (`systemd/user/`): PathChanged pending; ConditionPathIsDirectory; `ExecStart=/usr/bin/env sb apply-requests --once`.
 
-**설치 파일 읽기** (2026-09-13, 활성 비주장): DirectoryNotEmpty; `$SB_CURRENT/bin/sb apply-requests --once`; drop-in PATH 앞에 current/bin. 슬롯 `installed_unit_active_state`.
+**설치 파일 읽기** (2026-09-13 파일 읽기, **활성 상태 비주장**):
+- `~/.config/systemd/user/jm-second-brain-requests.path`: `ConditionPathExists=/home/jm/.config/second-brain/request-executor.enabled`; `DirectoryNotEmpty=/home/jm/.local/state/second-brain/requests/pending`
+- `~/.config/systemd/user/jm-second-brain-requests.service`: `WorkingDirectory=/home/jm/.local/state/second-brain/app/current`; `ExecStart=/home/jm/.local/state/second-brain/app/current/bin/sb apply-requests --once`; `Environment=SB_CONFIG=/home/jm/.config/second-brain/config.toml`
+- drop-in `jm-second-brain-requests.service.d/20-runtime.conf`: `PATH` 앞에 `$SB_CURRENT/bin`
+- 슬롯 `installed_unit_active_state`
 
 **제안:** 없음.
 
-판정표 (`inspect()` 실제 키, 미실행):
+판정표 (`inspect()` 키, 미실행). `{table: []}`는 행 없음. `count>0`만 미해결로 본다.
 
-| 묶음 | 키 | current 금지 |
-|---|---|---|
-| `states` | `memory_outbox`, `memory_outbox_attempts`, `memory_candidate_dispatch_publications`, `collaboration_bridge_outbox`, `pre_gjc_report_outbox`, `outbox` | 해당 테이블 행이 있으면 |
-| `counts` | `cursor_rows`, `active_cursor_rows`, `gjc_lease_rows`, `microloop_lease_rows` | `active_cursor_rows`≠0 또는 lease_rows>0 또는 미관측 |
-| `leases` | `gjc_runtime_leases`, `microloop_leases` | unexpired/invalid >0 또는 미관측 |
-| | `drain_authorized` | 항상 false. 허가 아님 |
+| 테이블 | unresolved (정지·current 금지) | terminal (통과) | 미분류 |
+|---|---|---|---|
+| `memory_outbox` | `queued`, `delivering`, `accepted_unsettled`, `uncertain` | `settled`, `expired` | 그 외 값 → 정지 |
+| `memory_outbox_attempts` | 행 있음 | 빈 배열 | 미관측 → 정지 |
+| `memory_candidate_dispatch_publications` | 행 있음 | 빈 배열 | 미관측 → 정지 |
+| `collaboration_bridge_outbox` | 행 있음 | 빈 배열 | 미관측 → 정지 |
+| `pre_gjc_report_outbox` | 행 있음 | 빈 배열 | 미관측 → 정지 |
+| `outbox` | 행 있음 | 빈 배열 | 미관측 → 정지 |
+
+`counts`: `cursor_rows`, `active_cursor_rows`, `gjc_lease_rows`, `microloop_lease_rows`. `active_cursor_rows≠0` 또는 lease_rows>0 또는 미관측 → 정지.
+`leases`: `gjc_runtime_leases`, `microloop_leases`. unexpired/invalid >0 또는 미관측 → 정지.
+`drain_authorized` 항상 false. 허가 아님.
 
 ## D3 restore 슬롯
 
