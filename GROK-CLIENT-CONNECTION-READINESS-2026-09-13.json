@@ -1,37 +1,27 @@
 {
   "kind": "client_connection_readiness",
   "written_at": "2026-09-13",
-  "product_bytes_changed": true,
   "native_registration_executed": false,
   "ops_settings_changed": false,
   "pins": {
-    "current_sb_source": "e02636e0c1ad",
-    "current_sb_docs": "2393f71",
-    "current_sb_candidate": "/var/tmp/sb-candidate-e02636e/releases/b0871a409d2505fbc8f294a2ff9502972661a708",
-    "current_sb_wheel_sha256": "b61a5b67ebf6a47df3b2ccc0add16a6bbb802ca391fdb3cada72ce0dfc7ad70c",
-    "current_jarvis_source": "78e73077469d1d6067c46f9a7bb26966969fe570",
-    "current_jarvis_runtime": "/var/tmp/jarvis-artifact-78e7307/bin/jarvis",
-    "historical_archive": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
-    "executed_wheel_pin": "f7c194594e21728678b118e7c0029cd3e1deb30b",
-    "historical_jarvis_bare_dist": "/var/tmp/jarvis-artifact-a3c111c/dist/src/cli.js",
+    "current_sb_source": "6b01c2e6d29b",
+    "current_sb_docs": "9a04dbb",
+    "current_sb_candidate": "/var/tmp/sb-candidate-6b01c2e/releases/fc2507ed0c4246da550fc2971516077c4ee66cd7",
+    "current_sb_wheel_sha256": "c6278e7ee26dcfb0823b0ef51dcf6c3d57521712f04a6dcab28888eedba08694",
+    "current_jarvis_source": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+    "current_jarvis_runtime": "/var/tmp/jarvis-artifact-64715ba/bin/jarvis",
+    "auth_db": "/home/jm/.local/state/orca-jarvis/jarvis.sqlite",
     "ops_current": "41f0751aca8906d612961e704bc60dd0855fdabd",
-    "gates_log": "/var/tmp/sb-gates-f7c1945.log",
-    "do_not_reuse_historical_as_this_entry": true
-  },
-  "clients_observed": {
-    "codex": {"path": "/home/jm/.nvm/versions/node/v24.19.0/bin/codex", "version": "codex-cli 0.154.0", "config": "toml ~/.codex/config.toml", "compaction_hook": "not_found_in_package"},
-    "claude": {"path": "/home/jm/.local/bin/claude", "version": "2.1.261 (Claude Code)", "postcompact": "side_effect_no_decision_control", "user_prompt_submit": "documented_additionalContext_next_user_prompt_not_in_turn_model_request"},
-    "omo": {"path": "/home/jm/.local/bin/omo", "version": "omo 5.0.0-0.beta.53", "compaction": "collect_skip_not_inject"},
-    "orca_ide": {"path": "/home/jm/.local/bin/orca-ide", "appVersion": "1.4.197"}
+    "do_not_reuse": ["e02636e", "78e7307", "f7c1945", "1672626", "authority/current/*.sqlite"]
   },
   "m9_ordinary_connection": {
     "postcompact": "stage only, stdout {}",
     "same_session_next_user_prompt": "UserPromptSubmit additionalContext after successful stdout",
     "auto_compaction_next_model_request": "not_documented_public_hook_remaining",
-    "jarvis_configured_transport": "JARVIS_MODEL_TRANSPORT_CMD consumer exit 0; FileModelTransport FILE_TRANSPORT_NOT_CONSUMER",
-    "event_id": "session_id+prompt_id+summary",
+    "jarvis_configured_transport": "JARVIS_MODEL_TRANSPORT_CMD consumer exit 0",
+    "record_identity": "schema4 record_id and record_digest",
+    "event_id": "session_id plus all host occurrence fields including compaction_id",
     "native_executed": false
   },
-  "sb_config_env": {"supported": true, "source": "sb/config.py:185"},
-  "not_complete": ["ops_cutover", "M5", "M9_in_turn_model_request_after_autocompact", "M9_native_session", "M13_deferred", "native_autoinject", "security_delete_race_branches", "A-F_full_acceptance"]
+  "not_complete": ["ops_cutover", "M5", "M9_in_turn_model_request_after_autocompact", "M9_native_session", "M13_deferred", "security_delete_race_branches", "A-F_full_acceptance"]
 }
