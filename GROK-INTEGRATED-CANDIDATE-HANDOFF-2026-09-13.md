@@ -10,10 +10,15 @@ JARVIS 바이트: 변경 없음 (`1672626`).
 
 ## 핀 (섞지 말 것)
 
-- **새 소스/아카이브:** 이 커밋 이후 `git archive` 경로 (아래). 실행 핀 이름 재사용 금지
-- **변경 없는 실행 핀:** `f7c1945` / wheel `1847b599…` / `/var/tmp/sb-gates-f7c1945.log` — **이번 훅 없음**
+- **새 소스:** `611083036f342f3590627723693d729898c25a0c` (`git-archive`)
+- **새 격리 후보 (미활성):** `/var/tmp/sb-candidate-6110830/releases/2cc28b41fa0bb848cd551ed7b20e683857c05d85`
+  - `bin/sb` 절대 경로 위 디렉터리. `sb postcompact-hook -h` EXIT 0
+  - wheel SHA256 `50417180cd8f9a79d537b2f4774a8d96ff94c28c0370e7da8fce2b2df05be2c6` (**f7c1945 `1847b599…`와 다름**)
+  - manifest `working_tree_modified: true` — 워크트리 dirty는 아카이브에 없음 (모니터 JSON). 제품 훅은 커밋 트리
+- **변경 없는 실행 핀:** `f7c1945` / wheel `1847b599…` / `/var/tmp/sb-gates-f7c1945.log` — **이번 훅 없음**. 게이트 로그 이름 바꾸지 않음
 - **직전 아카이브:** `e13cd3b` / `d9c6825b…` — 훅 없음
-- **운영 current:** 스냅샷 `41f0751` — 후보 아님
+- **JARVIS:** `1672626` 변경 없음
+- **운영 current:** 스냅샷 `41f0751` — 후보 아님. `current` 미교체
 
 ## 자체 검증
 
