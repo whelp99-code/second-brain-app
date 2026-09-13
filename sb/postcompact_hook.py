@@ -11,6 +11,7 @@ from typing import Final, Literal, override
 
 from sb.search import SearchHit, SearchIndex
 from sb.search_query import MAX_QUERY_BYTES, MAX_QUERY_GROUPS, LexicalQuery
+from sb.vault import read_page_spec
 
 _POSTCOMPACT: Final = "PostCompact"
 _PROMPT: Final = "UserPromptSubmit"
@@ -50,6 +51,7 @@ class PostCompactResult:
     records: tuple[dict[str, str], ...]
     budgets: dict[str, int]
     duplicate: bool
+    pending_confirm: bool = False
 
 
 def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
@@ -69,7 +71,7 @@ def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
             summary = _str_field(loaded, "query", "compact_summary")
             query = select_search_query(summary)
             trigger = _trigger(_str_field(loaded, "trigger", "matcher"))
-            digest = _event_digest(session_id, summary)
+            digest = _event_digest(session_id, summary, loaded)
             return PostCompactEvent(name, session_id, query, trigger, digest)
         case "UserPromptSubmit":
             digest = _str_field(loaded, "event_digest")
@@ -106,7 +108,7 @@ def handle_postcompact(raw: bytes, index: SearchIndex) -> PostCompactResult:
     match event.name:
         case "PostCompact":
             hits = index.search(event.query, _MAX_ITEMS * 4)
-            records, context = _serialize(event, hits)
+            records, context = _serialize(event, hits, index.vault_root)
             prior = _read_stage(index.vault_root, event.session_id)
             duplicate = prior is not None and str(prior.get("event_digest")) == event.event_digest
             if not duplicate:
@@ -123,8 +125,15 @@ def handle_postcompact(raw: bytes, index: SearchIndex) -> PostCompactResult:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             context = str(stage.get("context") or "")
             payload = _prompt_payload(context)
-            _mark_delivered(index.vault_root, event.session_id, stage)
-            return PostCompactResult(event.session_id, payload, records, budgets, False)
+            return PostCompactResult(event.session_id, payload, records, budgets, False, True)
+
+
+def confirm_delivery(root: Path, session_id: str) -> None:
+    """Mark staged context delivered only after stdout succeeded."""
+    stage = _read_stage(root, session_id)
+    if stage is None:
+        return
+    _mark_delivered(root, session_id, stage)
 
 
 def _trigger(value: str) -> Trigger:
@@ -143,21 +152,35 @@ def _str_field(payload: Mapping[str, Json], *keys: str) -> str:
     return ""
 
 
-def _event_digest(session_id: str, summary: str) -> str:
-    payload = f"{session_id}\0{summary}".encode()
-    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+def _occurrence_id(payload: Mapping[str, Json]) -> str:
+    return _str_field(
+        payload,
+        "prompt_id", "promptId", "compaction_id", "compactionId",
+        "event_id", "eventId", "uuid",
+    )
 
 
-def _record_version(hit: SearchHit) -> str:
-    if hit.record_digest:
-        return hit.record_digest
-    if hit.record_id:
-        return hit.record_id
-    material = f"{hit.page_id}\0{hit.source_ref}\0{hit.snippet}".encode()
+def _event_digest(session_id: str, summary: str, payload: Mapping[str, Json]) -> str:
+    occurrence = _occurrence_id(payload)
+    material = f"{session_id}\0{occurrence}\0{summary}".encode()
     return f"sha256:{hashlib.sha256(material).hexdigest()}"
 
 
-def _serialize(event: PostCompactEvent, hits: tuple[SearchHit, ...]) -> tuple[tuple[dict[str, str], ...], str]:
+def _identity(root: Path, hit: SearchHit) -> tuple[str, str]:
+    spec = read_page_spec(root, hit.page_id)
+    if spec is not None and spec.sources:
+        cite = spec.sources[0]
+        return cite.origin, cite.hash
+    if hit.record_digest:
+        return hit.source_ref or hit.canonical, hit.record_digest
+    if hit.record_id:
+        return hit.source_ref or hit.canonical, hit.record_id
+    return hit.source_ref or hit.canonical, ""
+
+
+def _serialize(
+    event: PostCompactEvent, hits: tuple[SearchHit, ...], root: Path | None = None,
+) -> tuple[tuple[dict[str, str], ...], str]:
     seen: set[str] = set()
     chosen: list[SearchHit] = []
     for hit in hits:
@@ -170,10 +193,11 @@ def _serialize(event: PostCompactEvent, hits: tuple[SearchHit, ...]) -> tuple[tu
     records: list[dict[str, str]] = []
     for hit in chosen:
         excerpt = _clip(hit.snippet, _MAX_EXCERPT_BYTES)
+        source_ref, version = _identity(root, hit) if root is not None else (hit.source_ref, hit.record_digest)
         records.append({
             "page_id": hit.page_id,
-            "source_ref": hit.source_ref or hit.canonical,
-            "version": _record_version(hit),
+            "source_ref": source_ref,
+            "version": version,
             "snippet": excerpt,
         })
     while True:

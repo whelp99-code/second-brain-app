@@ -1,29 +1,15 @@
-# 통합 고정 후보 인계 — a48cd07 N1–N4 후속
+# 통합 고정 후보 — 16a5a18 후속
 
-지정 검토: Codex `term_6bf51058-3b29-40e2-a25b-b751fab0c24e`. 운영전환/push/인증복사/실사용자삭제 없음.
-
-## 핀 표 (섞지 말 것)
+Codex `term_6bf51058-3b29-40e2-a25b-b751fab0c24e`. 운영전환/push 없음.
 
 | 역할 | 값 |
 |---|---|
-| 이번 SB 소스 | `f8c7bcd2c8f79e1f42d7eb7b5f6274edec7a02b8` |
-| 이번 SB 격리 후보 | `/var/tmp/sb-candidate-f8c7bcd/releases/7e52e867e67215baa5ff10f29207eb914f849ae6` wheel `3264d2c6…`. `bin/sb postcompact-hook -h` EXIT0. manifest `working_tree_modified`는 커밋 제외 모니터 JSON |
-| 이번 JARVIS 소스 | `a3c111cd0774eedfd6e2015cb6f0a1c5fff56cfe` |
-| JARVIS dist | `/var/tmp/jarvis-artifact-a3c111c/dist` (`cli.js` 존재, `executeMemoryPostcompact` 포함). 빌드 metadata `source_head=a3c111c`, `source_dirty=true`는 커밋되지 않은 `AGENTS.md`뿐. 제품 트리에 없음 |
-| JARVIS source archive | `/var/tmp/jarvis-artifact-a3c111c/source` |
-| 이전 JARVIS dist | `1672626` / `f6757ce` — **이번 호스트 구성·event ledger 없음**. 게이트/실행 핀으로 재사용 금지 |
-| 이전 SB 실행 핀 | `f7c1945` / wheel `1847b599…` / `/var/tmp/sb-gates-f7c1945.log` — 이번 훅 없음 |
-| 직전 SB 후보 | `6110830` / `2cc28b41…` / wheel `50417180…` — PostCompact additionalContext 오인 버전 |
-| 운영 current | 스냅샷 SB `41f0751`, authority `a3cbbbe` — 후보 아님 |
-| 문서 HEAD | `13e5892` 핀 채움 후 이 JSON 정합 커밋 |
+| SB 소스 | 이 훅/문서 커밋 |
+| JARVIS 소스 | `78e73077469d1d6067c46f9a7bb26966969fe570` |
+| JARVIS 실행 산출물 | `/var/tmp/jarvis-artifact-78e7307/` dist+`runtime/node_modules`+`bin/jarvis`. `--help` EXIT0. digest `sha256:b5155a53…` (1216 files). 예전 a3c111c 경로 단독 node는 better-sqlite3 없음 |
+| 이전 실행 핀 | f7c1945 / 1672626 / 16a5a18 FileModelTransport 성공 오인 — 재사용 금지 |
+| 운영 current | 41f0751 / a3cbbbe 인용만 |
 
-## 검사
+자체 검증: SB pytest 이번 훅 테스트; JARVIS 9 passed + dispatch 3; eslint 0; `bin/jarvis --help` 0.
 
-- `uv run pytest -q tests/test_postcompact_hook.py` → 10 passed
-- `uv run ruff check sb/postcompact_hook.py tests/test_postcompact_hook.py` → EXIT0
-- basedpyright 해당 파일: 0 errors, 테스트 private/Any **경고 남음** (완전 통과 아님)
-- `npx vitest run tests/integration/memory-postcompact.test.ts --no-file-parallelism` → 8 passed
-- dispatch `-t 'sends once from a nested envelope|does not send a duplicate idempotency key|sends once when two nested dispatches'` → 3 passed / 21 skipped
-- eslint 변경 파일 `--max-warnings=0` → EXIT0 (`_ignoredFence` void 처리)
-
-native Claude/실모델 없음. 전체 A–F 인수 아님.
+한계: UserPromptSubmit ≠ auto-compaction 다음 모델 요청. native 미실행. A–F 미인수.

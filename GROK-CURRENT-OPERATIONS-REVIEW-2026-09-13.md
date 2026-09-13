@@ -1,45 +1,40 @@
-# 현재 후보 운영 판단 (미실행, a48cd07 N4)
+# 현재 후보 운영 판단 (미실행)
 
-전환·재시작·백업을 실행하지 않는다. 당일 current/hash는 점검 대기.
+당일 PID/current/백업 hash는 점검 대기. 구버전 링크만의 rollback을 안전하다고 하지 않음. 보류 검증 통과 전제 없음.
 
-## 대상 (이번 제출)
+## 경로
 
-- SB: `/var/tmp/sb-candidate-f8c7bcd/releases/7e52e867e67215baa5ff10f29207eb914f849ae6/bin/sb`
-- JARVIS dist: `/var/tmp/jarvis-artifact-a3c111c/dist/src/cli.js`
-- 운영 current (인용만): SB `41f0751`, JARVIS authority `a3cbbbe`, `production_activated=false`
-
-## 비밀 없는 설정 변경안 (미적용)
-
-Claude **격리** settings 예시 (운영 `~/.claude` 금지):
-
-```json
-{
-  "hooks": {
-    "PostCompact": [{ "hooks": [{ "type": "command", "command": "env SB_CONFIG=/var/tmp/sb-client-readiness/config.toml /ABS/bin/sb postcompact-hook" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "env SB_CONFIG=/var/tmp/sb-client-readiness/config.toml /ABS/bin/sb postcompact-hook" }] }]
-  }
-}
-```
-
-JARVIS 호스트:
+- SB 후보: 이 커밋 후 `/var/tmp/sb-candidate-<short>/releases/<id>/bin/sb`
+- JARVIS 실행 산출물: `/var/tmp/jarvis-artifact-78e7307/bin/jarvis` (dist+runtime node_modules). `--help` EXIT0 확인됨. 예전 `node .../dist/src/cli.js`는 better-sqlite3 없이 실패한다.
+- 운영 current (인용): SB `/home/jm/.local/state/second-brain/app/current` → `41f0751…`; JARVIS authority `/home/jm/.local/state/orca-jarvis/authority/current` → `a3cbbbe…`
 
 ```
-export JARVIS_MODEL_TRANSPORT_PATH=/var/tmp/sb-client-readiness/model-capture.jsonl
-export JARVIS_SECOND_BRAIN_LAUNCHER=/ABS/bin/sb
-export JARVIS_SECOND_BRAIN_CONFIG=/var/tmp/sb-client-readiness/config.toml
-node /var/tmp/jarvis-artifact-a3c111c/dist/src/cli.js memory postcompact --db /ABS/authority.sqlite
+SB_APP=/home/jm/.local/state/second-brain/app
+AUTH=/home/jm/.local/state/orca-jarvis/authority
+SB_DB 당일: readlink -f $SB_APP/current 아래 sqlite (이름 당일 확인)
+AUTH_DB=$AUTH/current/jarvis-authority.sqlite
 ```
 
-`MEMORY_REFERENCE_OPTIONS_REQUIRED`는 transport 경로 없음이지 로그인 부족이 아니다.
+`AUTH_DB` 파일명이 다르면 당일 `find "$(readlink -f $AUTH/current)" -name '*.sqlite'`로 확인 (실행은 전환 승인 후).
 
-## 전환 순서 (승인 후, 지금 실행 금지)
+## 중단 → writer 배제 → 전환 → 기동 (승인 후)
 
-1. 당일: `readlink` SB `/home/jm/.local/state/second-brain/app/current`, JARVIS `/home/jm/.local/state/orca-jarvis/authority/current`; `systemctl --user is-active jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service`; 백업 파일 hash.
-2. writer/lease: `python3 deploy/check-jarvis-pending-state.py`; `python3 deploy/check-database-handles.py`. 큐 0으로 대체하지 않음.
-3. 중단: `systemctl --user stop jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service` (requests.service는 oneshot; timer not-found를 장애로 단정하지 않음).
-4. current를 **새 후보 절대 경로**로 교체. 구버전 링크만 되돌리지 않음.
-5. 기동: 위 서비스 start.
-6. 성공: `SB_CONFIG=… sb doctor` EXIT0, 서비스 active, `sb search` 1건, PostCompact `{}` 후 UserPromptSubmit additionalContext.
-7. 실패 단계별 복구: 기동 실패→ stop 후 **백업 집합**(DB+vault+authority) 복원 후 start. 보류 보안/삭제 검증을 통과로 전제하지 않음.
+1. 기록: `readlink -f $SB_APP/current`; `readlink -f $AUTH/current`; `systemctl --user is-active jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service`; 백업 경로/hash.
+2. stop 전 writer: `python3 deploy/check-jarvis-pending-state.py "$AUTH_DB"`; `python3 deploy/check-database-handles.py "$AUTH_DB"`. EXIT0만 진행. 큐0으로 대체하지 않음. `drain_authorized`는 항상 false.
+3. `systemctl --user stop jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service`
+4. stop 후 재확인: 같은 두 명령을 다시 실행. handles EXIT0(홀더 없음)이 아니면 전환하지 않음.
+5. current를 새 후보 **절대 경로**로 교체 (`ln -sfn` 대상은 당일 후보 release dir). 설정 diff: 격리 `SB_CONFIG`, `JARVIS_MODEL_TRANSPORT_CMD`, Claude UserPromptSubmit/PostCompact 훅은 운영 `~/.claude`가 아닌 격리 settings.
+6. `systemctl --user start jm-jarvis.service jm-jarvis-dashboard.service jm-jarvis-phone-gateway.service`
 
-과거 RSS/DR 시간은 7d97af7/c04dee1/b9fc3d4 핀 한계. 현재 운영 크기·RPO/RTO 미확정.
+성공: `SB_CONFIG=… /ABS/bin/sb doctor` 0; 세 서비스 active; `sb search` 1건; PostCompact `{}` 후 UserPromptSubmit 문맥; `/var/tmp/jarvis-artifact-78e7307/bin/jarvis --help` 0.
+
+## 실패 단계별 복구 (실행 금지, 명령만)
+
+| 단계 | 대상 | 복원 | 검증 | 중단 |
+|---|---|---|---|---|
+| 3 stop 후 handles 잔여 | 프로세스 | start 하지 않음. 원인 확인 | handles EXIT0 | 전환 중지 |
+| 5 current 교체 실패 | symlink | `ln -sfn` 이전 current 절대 경로 | readlink가 이전 값 | start 금지 |
+| 6 start 실패 | 세 유닛 | `systemctl --user stop` 후 이전 current로 ln, 이전 바이너리 start | is-active | 새 current 유지 금지 |
+| doctor/search 실패 | vault+authority sqlite 백업 집합 | 백업 아카이브를 vault와 `$AUTH_DB`(+wal/shm)에 복원 후 start | doctor0/search1 | 부분 파일만 되돌리지 않음 |
+
+요청 oneshot/timer not-found는 설계. 보류 수명 미검증.

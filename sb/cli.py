@@ -34,7 +34,7 @@ from sb.ops import (
     doctor as run_doctor,
 )
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
-from sb.postcompact_hook import PostCompactHookError, handle_postcompact
+from sb.postcompact_hook import PostCompactHookError, confirm_delivery, handle_postcompact
 from sb.runtime_access import mutate_root, read_config
 from sb.search import SearchIndex
 from sb.search_errors import GenerationIndexError, SearchQueryError
@@ -304,7 +304,13 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         except PostCompactHookError as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        print(json.dumps(result.hook_payload, ensure_ascii=False))
+        try:
+            sys.stdout.write(json.dumps(result.hook_payload, ensure_ascii=False) + "\n")
+            sys.stdout.flush()
+        except BrokenPipeError:
+            return 1
+        if result.pending_confirm:
+            confirm_delivery(Path(config.vault_root), result.session_id)
         return 0
 
     def remember() -> int:
