@@ -4,7 +4,7 @@
 
 ## 대상 (이번 제출)
 
-- SB: 아래 격리 후보 `bin/sb` (커밋 후 prepare-release 경로)
+- SB: `/var/tmp/sb-candidate-f8c7bcd/releases/7e52e867e67215baa5ff10f29207eb914f849ae6/bin/sb`
 - JARVIS dist: `/var/tmp/jarvis-artifact-a3c111c/dist/src/cli.js`
 - 운영 current (인용만): SB `41f0751`, JARVIS authority `a3cbbbe`, `production_activated=false`
 

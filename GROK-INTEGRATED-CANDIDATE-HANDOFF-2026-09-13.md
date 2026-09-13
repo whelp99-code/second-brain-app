@@ -6,7 +6,8 @@
 
 | 역할 | 값 |
 |---|---|
-| 이번 SB 소스 | 이 커밋 (postcompact stage + UserPromptSubmit) |
+| 이번 SB 소스 | `f8c7bcd2c8f79e1f42d7eb7b5f6274edec7a02b8` |
+| 이번 SB 격리 후보 | `/var/tmp/sb-candidate-f8c7bcd/releases/7e52e867e67215baa5ff10f29207eb914f849ae6` wheel `3264d2c6…`. `bin/sb postcompact-hook -h` EXIT0. manifest `working_tree_modified`는 커밋 제외 모니터 JSON |
 | 이번 JARVIS 소스 | `a3c111cd0774eedfd6e2015cb6f0a1c5fff56cfe` |
 | JARVIS dist | `/var/tmp/jarvis-artifact-a3c111c/dist` (`cli.js` 존재, `executeMemoryPostcompact` 포함). 빌드 metadata `source_head=a3c111c`, `source_dirty=true`는 커밋되지 않은 `AGENTS.md`뿐. 제품 트리에 없음 |
 | JARVIS source archive | `/var/tmp/jarvis-artifact-a3c111c/source` |
