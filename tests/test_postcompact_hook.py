@@ -588,3 +588,36 @@ def test_session_start_keeps_postcompact_remainder(tmp_path: Path) -> None:
     )
     assert "AlphaUniqueMemory" in follow_ctx
     assert "OmegaUniqueTarget" not in follow_ctx
+
+
+def test_short_token_does_not_outrank_identifier(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    vault = init_vault(root)
+    omega_hash = ContentAddressedStore(root).put(b"omega-body")
+    theta_hash = ContentAddressedStore(root).put(b"theta-body")
+    pages = (
+        PageSpec(
+            "wiki/omega",
+            "Omega",
+            f"# Omega\nOmegaInturnTarget lives here.\n[^{omega_hash[:8]}]",
+            [SourceCite(sid=omega_hash[:8], origin="me-wiki:notes/omega.md", hash=omega_hash)],
+            "active",
+        ),
+        PageSpec(
+            "wiki/theta",
+            "Theta",
+            f"# Theta\nThetaLaterTarget is noise.\n[^{theta_hash[:8]}]",
+            [SourceCite(sid=theta_hash[:8], origin="me-wiki:notes/theta.md", hash=theta_hash)],
+            "active",
+        ),
+    )
+    _ = vault.write_pages(pages, "run-q1", _HashLedger(root))
+    stamp_knowledge(root)
+    result = handle_postcompact(
+        _event(summary="Later OmegaInturnTarget"),
+        SearchIndex(root, hybrid=False),
+        tmp_path / "state",
+    )
+    assert result.records
+    assert "OmegaInturnTarget" in result.records[0]["snippet"]
+    assert "ThetaLaterTarget" not in result.records[0]["snippet"]

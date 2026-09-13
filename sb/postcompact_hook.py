@@ -24,6 +24,8 @@ _MAX_ITEMS: Final = 8
 _MAX_EXCERPT_BYTES: Final = 4_096
 _MAX_TOTAL_BYTES: Final = 16_384
 _MAX_CANDIDATE_TOKENS: Final = 32
+_SHORT_TERM: Final = 6
+_WORD_TOKEN: Final = re.compile(r"[0-9A-Za-z\uAC00-\uD7A3]+")
 _HOOK_STOP: Final = frozenset({
     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
     "from", "had", "has", "have", "he", "her", "his", "if", "in",
@@ -335,7 +337,14 @@ def _bound_query_text(text: str) -> str:
     return encoded[:MAX_QUERY_BYTES].decode("utf-8", errors="ignore")
 
 
+def _standalone_term(term: str, text: str) -> bool:
+    folded = term.casefold()
+    return any(part.casefold() == folded for part in _WORD_TOKEN.findall(text))
+
+
 def _term_in(term: str, text: str) -> bool:
+    if len(term) < _SHORT_TERM:
+        return _standalone_term(term, text)
     compact = normalize(term)
     return bool(compact) and compact in normalize(text)
 
@@ -382,6 +391,8 @@ def _weighted_terms(
     weighted: list[tuple[str, float, tuple[SearchHit, ...]]] = []
     for term in _candidate_tokens(text):
         hits = index.search(term, limit)
+        if len(term) < _SHORT_TERM:
+            hits = tuple(hit for hit in hits if _standalone_term(term, hit.snippet))
         count = len(hits)
         if count == 0 or count >= limit:
             continue
