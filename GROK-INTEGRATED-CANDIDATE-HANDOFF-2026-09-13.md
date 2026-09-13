@@ -6,7 +6,7 @@
 
 SB: `sb postcompact-hook` + `tests/test_postcompact_hook.py` (Claude 2.1.261 `PostCompact` → `SearchIndex` → `additionalContext`).
 
-JARVIS 바이트: 변경 없음 (`1672626`).
+JARVIS 소스: `f6757ce` (`memory postcompact` + 합성 5 passed). 격리 `git archive`: `/var/tmp/jarvis-artifact-f6757ce/source`. 이전 dist `1672626`은 **이 진입점 없음**. 새 dist 빌드/운영 current 없음.
 
 ## 핀 (섞지 말 것)
 

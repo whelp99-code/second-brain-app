@@ -9,7 +9,7 @@
 | 실행 제품 핀 | `f7c1945` / wheel `1847b599…` / release `d9c6825b…` | 과거 게이트 실행. 로그 `/var/tmp/sb-gates-f7c1945.log`. 이번 M9 훅 소스와 **바이트가 다름** |
 | 직전 문서 아카이브 | `e13cd3b` | 20eff3c 정합 아카이브. 이번 훅 없음 |
 | 이번 소스 | `6110830` `postcompact-hook` | 격리 후보 `/var/tmp/sb-candidate-6110830/releases/2cc28b41…` wheel `50417180…`. 실행 핀 이름 재사용 금지 |
-| JARVIS artifact | `1672626` dist `/var/tmp/jarvis-artifact-1672626/source/dist` | 이번 변경 없음 |
+| JARVIS artifact | 이전 dist `1672626` / 이번 소스 `f6757ce` archive `/var/tmp/jarvis-artifact-f6757ce/source` | dist 재빌드·current 교체 없음 |
 | 운영 current (스냅샷) | SB `41f0751…`, authority `a3cbbbe…` | 후보가 아님 |
 | 활성화 | `production_activated=false` | 유지 |
 
