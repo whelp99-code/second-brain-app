@@ -13,6 +13,7 @@ from pytest import MonkeyPatch
 
 import sb.mcp as mcp_module
 from sb.effect_values import JsonValue, digest
+from sb.generation_locks import GenerationWriterBusy
 from sb.generations import GenerationStore
 from sb.mcp import K5_TOOLS, build_server
 from sb.request_store import RequestIdentity, RequestStore
@@ -207,3 +208,61 @@ def test_post_forget_reads_status_and_resolve_require_latest_fence(tmp_path: Pat
         result = call(server, name, arguments)
         assert result.is_error is True
         assert "TOMBSTONE_FENCE_REQUIRED" in result.model_dump_json()
+
+
+def test_held_pin_blocks_publish_then_omega_is_current(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    share = tmp_path / "share"
+    store = GenerationStore(
+        state,
+        share,
+        provider_instance_id="provider:pinned",
+        provider_release_sha="a" * 40,
+    )
+    tomb = "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+    now = datetime(2026, 8, 31, tzinfo=UTC)
+
+    def alpha(root: Path) -> None:
+        page = root / "wiki" / "page.md"
+        page.parent.mkdir(parents=True)
+        _ = page.write_text("Alpha unique memory\n", encoding="utf-8")
+
+    first = store.build(
+        request_id="alpha",
+        parent=None,
+        tombstone_sequence=0,
+        tombstone_set_root=tomb,
+        created_at=now,
+        allowed=lambda _path: True,
+        mutate=alpha,
+    )
+    store.activate(first, None, now)
+    with store.pin() as pin:
+        pinned = Path(pin.generation.root) / "wiki" / "page.md"
+        assert "Alpha unique memory" in pinned.read_text(encoding="utf-8")
+        try:
+            with store.try_exclusive():
+                raise AssertionError("exclusive publish started while a reader pin is held")
+        except GenerationWriterBusy as exc:
+            assert str(exc) == "GENERATION_WRITER_BUSY"
+
+    def omega(root: Path) -> None:
+        page = root / "wiki" / "page.md"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        _ = page.write_text("Omega unique memory\n", encoding="utf-8")
+
+    second = store.build(
+        request_id="omega",
+        parent=first,
+        tombstone_sequence=0,
+        tombstone_set_root=tomb,
+        created_at=now,
+        allowed=lambda _path: True,
+        mutate=omega,
+    )
+    store.activate(second, first, now)
+    with store.pin() as pin:
+        text = (Path(pin.generation.root) / "wiki" / "page.md").read_text(encoding="utf-8")
+        assert "Omega unique memory" in text
+        assert "Alpha unique memory" not in text
+    store.close()
