@@ -73,6 +73,7 @@ def main() -> None:
                 "llm_policy": "deny",
                 "root": str(inbox),
             }],
+            "caps": {"max_llm_calls_briefing": 0},
         }, base_dir=config.base_dir)
         with _running(config) as base:
             profile = Path(raw) / "chrome-profile"
@@ -145,8 +146,8 @@ def main() -> None:
                 )
                 bad_conflict = _click_wait(
                     ws_url,
-                    "document.getElementById('conflictId').value='missing-conflict'; document.getElementById('decision').value='note'; document.querySelector('button[onclick=\"resolveConflict()\"]').click();",
-                    "conflictResult", "",
+                    "document.getElementById('conflictResult').textContent='정정 중…'; document.getElementById('conflictId').value='missing-conflict'; document.getElementById('decision').value='note'; document.querySelector('button[onclick=\"resolveConflict()\"]').click();",
+                    "conflictResult", "정정 중…",
                 )
                 _click_wait(
                     ws_url,

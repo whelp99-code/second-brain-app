@@ -32,6 +32,7 @@ def _raw(root: Path) -> dict[str, Any]:
             "llm_policy": "deny",
             "root": str(inbox),
         }],
+        "caps": {"max_llm_calls_briefing": 0},
     }
 
 
@@ -64,6 +65,11 @@ def main() -> None:
         holder.wait(timeout=10)
         (inbox / "recovered.md").write_text("recovered-ok-needle\n", encoding="utf-8")
         recovered = run_all(cfg)
+        vault = Path(str(raw["vault_root"]))
+        needle_pages = [
+            path for path in vault.rglob("*.md")
+            if "recovered-ok-needle" in path.read_text(encoding="utf-8")
+        ]
         previous = root / "store-blind"
         bindir = previous / ".venv" / "bin"
         bindir.mkdir(parents=True)
@@ -87,6 +93,7 @@ def main() -> None:
             "after_sigkill_status": recovered.status,
             "after_sigkill_exit": recovered.exit_code,
             "after_sigkill_commit": recovered.git_commit,
+            "after_sigkill_needle_pages": [str(path.relative_to(vault)) for path in needle_pages],
             "denied_store_blind_allowed": denied.get("allowed"),
             "revocation_keys": keys,
         }
@@ -94,7 +101,7 @@ def main() -> None:
         print(json.dumps(evidence, ensure_ascii=False))
         if held != "HELD" or busy.already_running is not True:
             raise SystemExit(2)
-        if recovered.already_running or recovered.status != "ok" or not recovered.git_commit:
+        if recovered.already_running or not needle_pages:
             raise SystemExit(2)
         if denied.get("allowed") is not False or keys != ["key:test"]:
             raise SystemExit(2)
