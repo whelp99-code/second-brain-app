@@ -35,6 +35,7 @@ from sb.ops import (
 )
 from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
 from sb.postcompact_hook import PostCompactHookError, confirm_delivery, handle_postcompact
+from sb.refresh_receipt import RefreshReceiptError, publish_refresh_receipt
 from sb.runtime_access import mutate_root, read_config
 from sb.search import SearchIndex
 from sb.search_errors import GenerationIndexError, SearchQueryError
@@ -227,6 +228,17 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         outcome = run_all(config, config.configured_source_ids)
         if outcome.failure is not None:
             print(outcome.failure, file=sys.stderr)
+        if not outcome.already_running:
+            # A refresh that did not happen publishes nothing; one that did
+            # publishes its state, success or failure. Publication never decides
+            # the run's exit code - the refresh already succeeded or failed.
+            try:
+                _ = publish_refresh_receipt(
+                    config, run_id=outcome.run_id, status=outcome.status,
+                    exit_code=outcome.exit_code,
+                )
+            except (RefreshReceiptError, OSError) as exc:
+                print(f"REFRESH_RECEIPT_NOT_PUBLISHED {exc}", file=sys.stderr)
         return _print_outcome(outcome.already_running, outcome.exit_code)
 
     def status() -> int:

@@ -280,6 +280,13 @@ class Config:
         return DEFAULT_STATE_ROOT if text is None else text
 
     @property
+    def refresh_receipt_path(self) -> str:
+        """Where `sb run` publishes the JARVIS refresh receipt."""
+        default = Path(self.state_root) / "refresh-receipt.json"
+        text = _as_str(self.raw.get("refresh_receipt_path"))
+        return str(default) if text is None else self._path(text, default)
+
+    @property
     def share_root(self) -> str:
         text = _as_str(self.raw.get("share_root"))
         if text is not None:
