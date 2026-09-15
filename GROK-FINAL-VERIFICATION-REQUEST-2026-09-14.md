@@ -1,6 +1,6 @@
 # Codex/Claude 최종 검증 요청 — 2026-09-14
 
-**제품 인수 아님. 운영 전환 없음. 인증 복사 없음. 실사용자 삭제 없음. 신규 push 없음.**  
+**제품 인수 아님. SB 운영 전환은 2026-09-15 완료. JARVIS 미전환. 인증 복사 없음. 실사용자 삭제 없음. 신규 push 없음.**  
 Ready는 핸드오프다. Composer 적대검증은 중간 참고이며 이 요청을 대체하지 않는다.
 
 정본: `GROK-REVISED-DEV-PLAN-2026-09-14.md`, `CURSOR-HANDOFF-2026-09-10.md` §7, `GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md`.
@@ -19,9 +19,9 @@ Codex/Claude는 **이 문서의 핀과 로그**만 검증한다. `f7c1945`/`e13c
 | JARVIS N1 git | `4d76572` `fix: classify model transport failures on public dispatch` (**로컬, origin 미푸시**) |
 | JARVIS N1 dist | `/var/tmp/jarvis-artifact-n1-20260914` |
 | JARVIS 원 핀 dist | `/var/tmp/jarvis-artifact-64715ba` (N1 없음. M12 DR는 이 dist) |
-| 운영 SB current | `41f0751aca8906d612961e704bc60dd0855fdabd` **불변** |
-| 운영 JARVIS authority | `a3cbbbe1604798052db6051a8751f039573eb126` **불변** |
-| production_activated | false |
+| 운영 SB current | `2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3` (2026-09-15 전환, 제품 `8d1f8cc`). 이전 `41f0751…` 보존 |
+| 운영 JARVIS authority | `a3cbbbe1604798052db6051a8751f039573eb126` **미전환** |
+| production_activated | SB `true`, JARVIS `false` |
 | Claude Code | 2.1.270 |
 
 게이트:
@@ -77,13 +77,13 @@ SB leftover 커밋(푸시 없음): `4eff746` pin test, `6c97168` M6/M13 harness,
 | C | implemented_unverified | 검색 계약 기존. N1은 `4d76572`+N1 dist. JARVIS F2 잔여 |
 | D | implemented_unverified | 실사용자 1건은 입력 |
 | E | implemented_unverified | M12 DR 0, M13 Chrome 0. 운영 GUI timer는 전환 후 |
-| F | implemented_unverified | 후보 8d1f8cc. maintenance+integration+`--work` 0. 전환 미실행 |
+| F | implemented_unverified | 운영 SB current `2ccf0267…` (2026-09-15). `production_activated(SB)=true`. JARVIS 미전환. `CLAUDE-CUTOVER-2026-09-15.md` |
 | M1 | implemented_unverified | 운영 로그인 `blocked_external` |
 | M2 | implemented_unverified | 실무 원문 `blocked_external`. `GROK-M2-M4-LINEAGE-CHECKLIST-2026-09-14.md` |
 | M3 | implemented_unverified | 열린연결·옛백업 `blocked_deferred` |
 | M4 | implemented_unverified | 실무 계보 입력. 항목표 동일 |
 | M5 | blocked_external | `GROK-M5-COPY-POLICY-2026-09-14.md` |
-| M6 | implemented_unverified | writer 배제+SIGKILL 복구 EXIT 0. 운영 전환 허가 없음 |
+| M6 | implemented_unverified | SB 유닛 전환 완료(`2ccf0267…`, 세대 `c58f6026…`). JARVIS 미전환. `CLAUDE-CUTOVER-2026-09-15.md` |
 | M7 | implemented_unverified | 36 passed. 운영 원문 세트 입력 |
 | M8 | blocked_external | `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`. 수집기 ≠ 주입기 |
 | M9 | implemented_unverified | SB 훅 `verified_isolated_native (manual compact, 1 session)` `CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md`. auto-compaction 미관측. JARVIS 이벤트 없음. 운영 미전환 |

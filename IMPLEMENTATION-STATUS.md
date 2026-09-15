@@ -17,13 +17,13 @@
 | C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact. N1 `4d76572`. JARVIS F2 4 failed는 잔여(테스트 기대 vs `sbrecord:v1:` 계약, 미수정). gold는 M10 |
 | D | 실제 공유 기억의 수명 | implemented_unverified | 실사용자 1건은 입력 |
 | E | 가용성·복구·GUI | implemented_unverified | M11/M12/M13 잔여. 이번 GUI 미재실행 |
-| F | 배포 재료와 운영 절차 | implemented_unverified | 후보 8d1f8cc. 게이트 로그 `/var/tmp/sb-gates-8d1f8cc-2026-09-14.log`. 전환 미실행. current 41f0751 |
+| F | 배포 재료와 운영 절차 | implemented_unverified | 운영 SB current `2ccf0267…` (2026-09-15 전환, 제품 `8d1f8cc`). `production_activated(SB)=true`. JARVIS `a3cbbbe` 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
 | M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | implemented_unverified | 격리 scoped MCP. 운영 로그인 입력 |
 | M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | 항목표 `GROK-M2-M4-LINEAGE-CHECKLIST-2026-09-14.md`. 실사용자 원문 입력 |
 | M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | 열린연결·옛백업 `blocked_deferred` |
 | M4 | 원작업→검증 결과→기억 원문 계보. dispatch 본문 계보가 전부가 아님 | implemented_unverified | 항목표 동일. 실사용자 원계보 입력 |
 | M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | `GROK-M5-COPY-POLICY-2026-09-14.md` |
-| M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | 2026-09-14 busy_while_held true. 복구 brief failed. 운영 전환 허가 없음 |
+| M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | 2026-09-15 SB 유닛만 전환 (`2ccf0267…`, 세대 `c58f6026…`). JARVIS 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
 | M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | 2026-09-14 memory_access+web+scoped_read_policy 36 passed |
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`. 수집기≠주입기 |
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | SB 훅 `verified_isolated_native (manual compact, 1 session)` [CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md](CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md). auto-compaction 미관측. JARVIS 이벤트 없음. 운영 미전환 |

@@ -1,16 +1,17 @@
-# 현재 후보 운영 판단 (읽기 전용, 미실행)
+# 현재 후보 운영 판단
 
-전환·restore·rollback·lock/보류 검사를 실행하지 않는다.
+2026-09-15 SB 전환 기록: [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md). JARVIS 전환·restore·rollback은 이 문서에서 실행하지 않는다.
 
 ## 핀
 
 | 역할 | 값 |
 |---|---|
 | 제품 | `8d1f8cc` |
-| SB 후보 | `/var/tmp/sb-candidate-8d1f8cc/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3` |
-| J 런타임 | `/var/tmp/jarvis-artifact-64715ba` ≠ `J_CURRENT` |
+| 운영 SB current | `~/.local/state/second-brain/app/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3` (2026-09-15 전환) |
+| `production_activated(SB)` | true |
+| 세대 | `sbgen:v1:c58f6026…` |
+| J 런타임 / authority | `/var/tmp/jarvis-artifact-64715ba` ≠ `J_CURRENT`; 운영 `a3cbbbe` **미전환** |
 | 게이트 로그 | `/var/tmp/sb-gates-f7c1945.log` 이 후보 아님 |
-| 운영 current 인용 | SB `41f0751…`, J authority `a3cbbbe…` |
 
 ```
 AUTH_DB=/home/jm/.local/state/orca-jarvis/jarvis.sqlite
