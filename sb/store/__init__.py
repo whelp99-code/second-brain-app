@@ -28,8 +28,8 @@ _ALLOWED: Final[dict[DerivStatus, frozenset[DerivStatus]]] = {
     DerivStatus.PENDING: frozenset({DerivStatus.RUNNING}),
     DerivStatus.RUNNING: frozenset({DerivStatus.DONE, DerivStatus.FAILED}),
     DerivStatus.DONE: frozenset(),
-    DerivStatus.FAILED: frozenset({DerivStatus.SUPERSEDED}),
-    DerivStatus.SUPERSEDED: frozenset(),
+    DerivStatus.FAILED: frozenset({DerivStatus.SUPERSEDED, DerivStatus.PENDING}),
+    DerivStatus.SUPERSEDED: frozenset({DerivStatus.PENDING}),
 }
 
 

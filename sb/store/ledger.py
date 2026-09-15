@@ -14,6 +14,7 @@ from types import TracebackType
 from typing import Final, Self, cast
 
 from sb.bound_knowledge import BoundKnowledge
+from sb.effect_values import parse_instant
 from sb.page_access import PageAccess
 from sb.source_access import (
     SourceAccess,
@@ -43,6 +44,35 @@ from . import (
 
 _HEX: Final = frozenset("0123456789abcdef")
 CURRENT_SCHEMA_VERSION: Final = 5
+
+
+def _transient_llm_error(error: str | None) -> bool:
+    return bool(error) and error.casefold().startswith("llm unavailable")
+
+
+def _stamp(value: str | None) -> datetime | None:
+    if value is None or value == "":
+        return None
+    try:
+        return parse_instant(value)
+    except ValueError:
+        pass
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC)
+
+
+def _has_later_done_brief(failed: Derivation, done: tuple[Derivation, ...]) -> bool:
+    failed_at = _stamp(failed.finished_at)
+    if failed_at is None:
+        return False
+    return any(
+        (done_at := _stamp(row.finished_at)) is not None and done_at > failed_at for row in done
+    )
 _SCHEMA: Final = (
     "CREATE TABLE IF NOT EXISTS bound_knowledge ("
     "page_id TEXT NOT NULL,content_digest TEXT NOT NULL,"
@@ -517,6 +547,8 @@ class Ledger:
             return 0
         closed = 0
         for row in self.list_derivations(status=DerivStatus.FAILED.value, stage="brief"):
+            if _transient_llm_error(row.error) or not _has_later_done_brief(row, done):
+                continue
             require_transition(row.deriv_key, DerivStatus.FAILED, DerivStatus.SUPERSEDED)
             _ = self._exec(
                 "UPDATE derivation SET status=? WHERE deriv_key=?",
@@ -531,8 +563,9 @@ class Ledger:
     def requeue_failed(self, key: str, *, reset_attempts: bool = False) -> bool:
         """Move a failed derivation back to pending for an explicit retry."""
         row = self._need(key)
-        if row.status != DerivStatus.FAILED.value:
+        if row.status not in {DerivStatus.FAILED.value, DerivStatus.SUPERSEDED.value}:
             return False
+        require_transition(row.deriv_key, DerivStatus(row.status), DerivStatus.PENDING)
         attempts = 0 if reset_attempts else row.attempts
         _ = self._exec(
             "UPDATE derivation SET status=?, attempts=?, error=NULL, finished_at=NULL "

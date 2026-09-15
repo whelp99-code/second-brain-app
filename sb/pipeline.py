@@ -499,9 +499,11 @@ def _fail_pending(
 
 
 def _reopen_failed(ledger: Ledger, key: str) -> None:
-    """Return a failed brief key to pending so the same key can mark_running again."""
+    """Return a failed or superseded brief key to pending so mark_running can run."""
     row = ledger.get_derivation(key)
-    if row is None or row.status != DerivStatus.FAILED.value:
+    if row is None or row.status not in {
+        DerivStatus.FAILED.value, DerivStatus.SUPERSEDED.value,
+    }:
         return
     _ = ledger.requeue_failed(key)
 
@@ -1019,7 +1021,9 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
         existing = ledger.get_derivation(key)
         if existing is not None and existing.status == DerivStatus.DONE.value:
             return StageReport((), 0, 0, 0, False)
-        if existing is not None and existing.status == DerivStatus.FAILED.value:
+        if existing is not None and existing.status in {
+            DerivStatus.FAILED.value, DerivStatus.SUPERSEDED.value,
+        }:
             _reopen_failed(ledger, key)
         ledger.ensure_derivation(key, "brief", run_id)
         try:
