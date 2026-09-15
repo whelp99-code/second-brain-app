@@ -116,7 +116,12 @@ def _cli(argv: list[str]) -> tuple[int, str, str]:
 
 def _cli_with_config(tmp_path: Path, vault: Path, argv: list[str]) -> tuple[int, str, str]:
     cfg = tmp_path / "config.toml"
-    _ = cfg.write_text(f'vault_root = "{vault}"\n', encoding="utf-8")
+    # state_root is pinned into the temporary tree so a CLI command that writes
+    # runtime state - `run` publishes its refresh receipt there - can never
+    # reach the operational state root.
+    _ = cfg.write_text(
+        f'vault_root = "{vault}"\nstate_root = "{tmp_path / "state"}"\n', encoding="utf-8"
+    )
     previous = os.environ.get("SB_CONFIG")
     os.environ["SB_CONFIG"] = str(cfg)
     try:
