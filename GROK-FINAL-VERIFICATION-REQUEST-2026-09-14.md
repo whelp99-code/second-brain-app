@@ -86,7 +86,7 @@ SB leftover 커밋(푸시 없음): `4eff746` pin test, `6c97168` M6/M13 harness,
 | M6 | implemented_unverified | writer 배제+SIGKILL 복구 EXIT 0. 운영 전환 허가 없음 |
 | M7 | implemented_unverified | 36 passed. 운영 원문 세트 입력 |
 | M8 | blocked_external | `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`. 수집기 ≠ 주입기 |
-| M9 | implemented_unverified | SB 훅 9d2041f 한정 인수. JARVIS 이벤트 없음 `GROK-M9-JARVIS-NO-EVENT-2026-09-14.md`. native `/compact` 외부 |
+| M9 | implemented_unverified | SB 훅 `verified_isolated_native (manual compact, 1 session)` `CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md`. auto-compaction 미관측. JARVIS 이벤트 없음. 운영 미전환 |
 | M10 | blocked_external | 한글 gold |
 | M11 | implemented_unverified | p50/p95 측정 + pin-blocks-publish 1 passed. 서버 RSS 미계측. 운영 규모 아님 |
 | M12 | implemented_unverified | 격리 DR EXIT 0. 운영 RPO 승인 없음 |

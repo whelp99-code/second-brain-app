@@ -26,7 +26,7 @@
 | M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | 2026-09-14 busy_while_held true. 복구 brief failed. 운영 전환 허가 없음 |
 | M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | 2026-09-14 memory_access+web+scoped_read_policy 36 passed |
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`. 수집기≠주입기 |
-| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | SB 훅 9d2041f 한정 인수. JARVIS 이벤트 없음 `GROK-M9-JARVIS-NO-EVENT-2026-09-14.md`. native 미실행 |
+| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | SB 훅 `verified_isolated_native (manual compact, 1 session)` [CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md](CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md). auto-compaction 미관측. JARVIS 이벤트 없음. 운영 미전환 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | during-compile 재실행. pinned-read 중 publish·현재핀 p50/p95 미측정 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | 2026-09-14 cold restore 1 passed. 현재핀 전체 DR 미실행 |

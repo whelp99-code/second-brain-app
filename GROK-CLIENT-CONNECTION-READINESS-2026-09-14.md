@@ -8,7 +8,7 @@
 
 | 클라이언트 | 수집 adapter | 자동 주입 | 상태 |
 |---|---|---|---|
-| Claude Code 2.1.270 | `claude-sessions` | SessionStart compact 훅 (격리 한정 인수) | 주입 경로 있음. native `/compact` 미실행 |
+| Claude Code 2.1.270 | `claude-sessions` | SessionStart compact 훅 | `verified_isolated_native (manual compact, 1 session)`. [CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md](CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md). auto-compaction 미관측. 운영 미전환 |
 | Codex 0.154.0 | `codex-sessions` | 공개 compact 이벤트 없음. `codex mcp add`만 | 주입 미지원으로 고정 |
 | OmO | `omo-sessions` | 공개 이벤트 미확인 | 미지원 |
 | OpenCode | `opencode-sessions` | PATH 없음 | 미설치 |
