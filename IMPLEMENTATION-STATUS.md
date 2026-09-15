@@ -4,7 +4,7 @@
 
 > **6fb150b 재검토:** [수정 재확인 및 남은 작업](/home/jm/orca/projects/second-brain-app/CODEX-6FB150B-RECHECK-2026-09-11.md). 기존 4개 지적의 구체 사례는 개선됐고 관련 97개 테스트가 통과했다. 그러나 실제 관리형 `run_compile` staging에서 손편집 유실이 재현되며 Unicode 공백/casefold 검색 불일치도 남는다. `0eefce7`은 옛 코드이므로 전환 보류, 새 wheel 전에 두 잔여 결함을 해결한다. 아래 이전 검토는 해당 소스 시점의 이력이다.
 
-> **2026-09-15:** 운영 SB current `2ccf0267…`. JARVIS F2 해소 `8745ce7`(계약 정본). N1 `4d76572` 미푸시. 진입점 [최종 검증 요청](GROK-FINAL-VERIFICATION-REQUEST-2026-09-14.md).
+> **2026-09-15 14:32 KST:** 운영 SB current `8ea65a7d968fdcf99560f449b2a1ad656a99a2e9` (제품 `83a7aba`, HEAD `b239c0b`). JARVIS authority current `387c7c95509153a49dfac7d1c93c43881e74274e` / control-center `artifact-7e8ddde923c2afb1d290e00c2a73d1cc585fe94b6982ae1f8d44f78e83273e5f` (source `65bfd64`). jarvis.sqlite migrations 81. `production_activated` SB=true JARVIS=true. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md). 진입점 [최종 검증 요청](GROK-FINAL-VERIFICATION-REQUEST-2026-09-14.md).
 
 > **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀은 후속 M12/B/F 후보를 따른다. [상태](GROK-RESUME-STATUS-2026-09-11.md). 전환 없음.
 
@@ -14,24 +14,24 @@
 |---|---|---|---|
 | A | 원본·사용자 편집·정정 보존 | implemented_unverified | 2026-09-14 `test_compiled_marker_recovery.py` 8 passed. 운영 원본 세트는 입력 |
 | B | 철회 정본·권한·복원 | implemented_unverified | 2026-09-14 `test_revoked_keys.py` 11 passed. 운영 키 복사 금지 |
-| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact. N1 `4d76572`. F2 해소 JARVIS `8745ce7`(계약 `sbrecord:v1:` 정본, 테스트 갱신). gold는 M10 |
+| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact. F2 해소 JARVIS `65bfd64`. gold는 M10 |
 | D | 실제 공유 기억의 수명 | implemented_unverified | 실사용자 1건은 입력 |
 | E | 가용성·복구·GUI | implemented_unverified | M11/M12/M13 잔여. 이번 GUI 미재실행 |
-| F | 배포 재료와 운영 절차 | implemented_unverified | 운영 SB current `2ccf0267…` (2026-09-15 전환, 제품 `8d1f8cc`). `production_activated(SB)=true`. JARVIS `a3cbbbe` 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
-| M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | implemented_unverified | 격리 scoped MCP. 운영 로그인 입력 |
-| M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | 항목표 `GROK-M2-M4-LINEAGE-CHECKLIST-2026-09-14.md`. 실사용자 원문 입력 |
-| M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | H1 `e929774` 열린 MCP 철회·옛 config·rollback allowed=false. 운영 키 회전 없음 |
-| M4 | 원작업→검증 결과→기억 원문 계보. dispatch 본문 계보가 전부가 아님 | implemented_unverified | 항목표 동일. 실사용자 원계보 입력 |
-| M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | H2 stage O_NOFOLLOW `0f0dd84`. native `--resume` 수명은 외부 |
-| M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | 2026-09-15 SB 유닛만 전환 (`2ccf0267…`, 세대 `c58f6026…`). JARVIS 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
+| F | 배포 재료와 운영 절차 | verified | 2026-09-15 14:32 KST ops. SB `8ea65a7d…` / JARVIS `387c7c95…`. `production_activated` SB=true JARVIS=true. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
+| M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | blocked_external | 운영 로그인 |
+| M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | `REAL-WORK-ITEM-2026-09-15.json` 라이브 authority `--work` EXIT0(격리 identity/clock). 운영 gjc 종단은 코디네이터 미구성 |
+| M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | verified | H1–H4 격리 완료 `b239c0b`(회귀 1924 passed) · 운영 `8ea65a7d…`. 운영 키 회전 없음 |
+| M4 | 원작업→검증 결과→기억 원문 계보. dispatch 본문 계보가 전부가 아님 | implemented_unverified | `REAL-WORK-ITEM-2026-09-15.json` `--work` EXIT0. 운영 gjc 종단은 코디네이터 미구성 |
+| M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | 실사용자 native 처분. H2 stage는 배포됨 |
+| M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | verified | 2026-09-15 14:32 KST writer 배제·복구 실행. SB `8ea65a7d…` JARVIS `387c7c95…`. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
 | M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | 2026-09-14 memory_access+web+scoped_read_policy 36 passed |
-| M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`. 수집기≠주입기 |
-| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | SB 훅 `verified_isolated_native (manual compact, 1 session)` [CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md](CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md). auto-compaction 미관측. JARVIS 이벤트 없음. 운영 미전환 |
+| M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | Claude 외 타 클라이언트. `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md` |
+| M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | SB hook `verified_isolated_native (manual)`. auto 트리거 미관측(코드 경로 동일). JARVIS 이벤트 없음 |
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | during-compile 재실행. pinned-read 중 publish·현재핀 p50/p95 미측정 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | 2026-09-14 cold restore 1 passed. 현재핀 전체 DR 미실행 |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | H3 `758f862` writer BUSY. H4 `83a7aba` post-forget restore empty. 운영 timer 없음 |
-| M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | not_implemented | hybrid 무근거 후보 증가. 기본 활성화 보류 |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | blocked_external | 실사용자 처분. H3/H4 격리는 배포됨 |
+| M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | decided_off | [CLAUDE-M14-DECISION-2026-09-15.md](CLAUDE-M14-DECISION-2026-09-15.md) |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 
