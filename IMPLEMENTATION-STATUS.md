@@ -20,9 +20,9 @@
 | F | 배포 재료와 운영 절차 | implemented_unverified | 운영 SB current `2ccf0267…` (2026-09-15 전환, 제품 `8d1f8cc`). `production_activated(SB)=true`. JARVIS `a3cbbbe` 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
 | M1 | 기존 인증 세션·resolver·issuer·gateway를 실제 운영 진입점에 연결. drain 아님 | implemented_unverified | 격리 scoped MCP. 운영 로그인 입력 |
 | M2 | 실제 업무 1건 조회→검증→저장→영수증→다른 에이전트 새 세션 회수. 철회 경로 아님 | implemented_unverified | 항목표 `GROK-M2-M4-LINEAGE-CHECKLIST-2026-09-14.md`. 실사용자 원문 입력 |
-| M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | 열린연결·옛백업 `blocked_deferred` |
+| M3 | 정책 revision/기발급 claim/백업 rollback 전체 수명 | implemented_unverified | H1 `e929774` 열린 MCP 철회·옛 config·rollback allowed=false. 운영 키 회전 없음 |
 | M4 | 원작업→검증 결과→기억 원문 계보. dispatch 본문 계보가 전부가 아님 | implemented_unverified | 항목표 동일. 실사용자 원계보 입력 |
-| M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | `GROK-M5-COPY-POLICY-2026-09-14.md` |
+| M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | H2 stage O_NOFOLLOW `0f0dd84`. native `--resume` 수명은 외부 |
 | M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | implemented_unverified | 2026-09-15 SB 유닛만 전환 (`2ccf0267…`, 세대 `c58f6026…`). JARVIS 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
 | M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | 2026-09-14 memory_access+web+scoped_read_policy 36 passed |
 | M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`. 수집기≠주입기 |
@@ -30,7 +30,7 @@
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | during-compile 재실행. pinned-read 중 publish·현재핀 p50/p95 미측정 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | 2026-09-14 cold restore 1 passed. 현재핀 전체 DR 미실행 |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | 이번 Chrome 미재실행. 삭제경합 deferred |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | H3 `758f862` writer BUSY. H4 `83a7aba` post-forget restore empty. 운영 timer 없음 |
 | M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | not_implemented | hybrid 무근거 후보 증가. 기본 활성화 보류 |
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
