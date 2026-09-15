@@ -4,7 +4,7 @@
 
 > **6fb150b 재검토:** [수정 재확인 및 남은 작업](/home/jm/orca/projects/second-brain-app/CODEX-6FB150B-RECHECK-2026-09-11.md). 기존 4개 지적의 구체 사례는 개선됐고 관련 97개 테스트가 통과했다. 그러나 실제 관리형 `run_compile` staging에서 손편집 유실이 재현되며 Unicode 공백/casefold 검색 불일치도 남는다. `0eefce7`은 옛 코드이므로 전환 보류, 새 wheel 전에 두 잔여 결함을 해결한다. 아래 이전 검토는 해당 소스 시점의 이력이다.
 
-> **2026-09-14:** 현재 핀 SB `8d1f8cc` / leftover docs 베이스 `365f8e4`+요청서 작업본 / 후보 `2ccf0267…` / JARVIS N1 `4d76572`(미푸시) · 원 dist `64715ba`. 진입점 [최종 검증 요청](GROK-FINAL-VERIFICATION-REQUEST-2026-09-14.md). JARVIS F2: `gjc-dispatch-assemble.test.ts` 4 failed (`memory_ref` 8-hex vs `sbrecord:v1:`), 64715ba부터 사전 존재, N1 탓 아님, 별도 항목. 전환 없음.
+> **2026-09-15:** 운영 SB current `2ccf0267…`. JARVIS F2 해소 `8745ce7`(계약 정본). N1 `4d76572` 미푸시. 진입점 [최종 검증 요청](GROK-FINAL-VERIFICATION-REQUEST-2026-09-14.md).
 
 > **2026-09-12:** [패키지](GROK-FINAL-ACCEPTANCE-PACKAGE.md) 핀은 후속 M12/B/F 후보를 따른다. [상태](GROK-RESUME-STATUS-2026-09-11.md). 전환 없음.
 
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | A | 원본·사용자 편집·정정 보존 | implemented_unverified | 2026-09-14 `test_compiled_marker_recovery.py` 8 passed. 운영 원본 세트는 입력 |
 | B | 철회 정본·권한·복원 | implemented_unverified | 2026-09-14 `test_revoked_keys.py` 11 passed. 운영 키 복사 금지 |
-| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact. N1 `4d76572`. JARVIS F2 4 failed는 잔여(테스트 기대 vs `sbrecord:v1:` 계약, 미수정). gold는 M10 |
+| C | 하나의 검색 계약·품질·실제 본문 전달 | implemented_unverified | Unicode compact. N1 `4d76572`. F2 해소 JARVIS `8745ce7`(계약 `sbrecord:v1:` 정본, 테스트 갱신). gold는 M10 |
 | D | 실제 공유 기억의 수명 | implemented_unverified | 실사용자 1건은 입력 |
 | E | 가용성·복구·GUI | implemented_unverified | M11/M12/M13 잔여. 이번 GUI 미재실행 |
 | F | 배포 재료와 운영 절차 | implemented_unverified | 운영 SB current `2ccf0267…` (2026-09-15 전환, 제품 `8d1f8cc`). `production_activated(SB)=true`. JARVIS `a3cbbbe` 미전환. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |

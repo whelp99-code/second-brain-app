@@ -57,16 +57,11 @@ SB leftover 커밋(푸시 없음): `4eff746` pin test, `6c97168` M6/M13 harness,
 | R5 M7 | memory_access+web+scoped_read_policy 36 passed |
 | R6 M11 latency | `/var/tmp/m11-latency-8d1f8cc-2026-09-14.log` 30p p50=0.0566 p95=0.0968; 100p 0.0867/0.0977; 300p 0.1628/0.1974. 서버 RSS null. 정정 후 stale 0 |
 
-## 3b. JARVIS 잔여 F2 (미해결, N1 탓 아님)
+## 3b. JARVIS F2 해소
 
-`tests/integration/gjc-dispatch-assemble.test.ts` **4 failed** at both `64715ba` and `4d76572` (40 passed / 4 failed). 기대 `memory_ref` 8-hex (`12345678`, `87654321`), 실제 `sbrecord:v1:…` (`64715ba` `record_digest` 이후). 기각하지 않음. 수정은 테스트 기대 vs 계약 판단 후 **별도 일반 항목**.
+**결정: 계약이 정본, 테스트가 낡음.** SB `memory_records.record_id` = `sbrecord:v1:`+digest64. JARVIS `second-brain-evidence-parser`가 같은 정규식을 요구. `CODEX-NIGHT-REVIEW-069aeaa.md`는 consumer `memory_ref`가 원 `record_id`와 같다고 확인. 8-hex sid는 64715ba 이전 기대값.
 
-| 테스트 |
-|---|
-| binds each selected record to its own memory_ref |
-| binds distinct records that share body and source to different evidence |
-| keeps same-source different-body records on separate lineages |
-| persists the same selected memories that the transport sends |
+해소: JARVIS `8745ce7` (테스트만). 세 파일 **44 passed / 0 failed**. typecheck 0 errors. lint는 파일 기존 unused 경고 유지(이번 변경이 만든 실패 아님). N1 dist 불변. 운영 authority 미변경.
 
 ## 4. A–F / M1–M14
 
@@ -74,7 +69,7 @@ SB leftover 커밋(푸시 없음): `4eff746` pin test, `6c97168` M6/M13 harness,
 |---|---|---|
 | A | implemented_unverified | R1 8 passed. 운영 원본 세트는 입력 |
 | B | implemented_unverified | R2 11 passed. 운영 키 복사 금지 |
-| C | implemented_unverified | 검색 계약 기존. N1은 `4d76572`+N1 dist. JARVIS F2 잔여 |
+| C | implemented_unverified | 검색 계약 기존. N1은 `4d76572`+N1 dist. F2 해소 `8745ce7` |
 | D | implemented_unverified | 실사용자 1건은 입력 |
 | E | implemented_unverified | M12 DR 0, M13 Chrome 0. 운영 GUI timer는 전환 후 |
 | F | implemented_unverified | 운영 SB current `2ccf0267…` (2026-09-15). `production_activated(SB)=true`. JARVIS 미전환. `CLAUDE-CUTOVER-2026-09-15.md` |
