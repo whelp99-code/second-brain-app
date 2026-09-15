@@ -1,0 +1,62 @@
+{
+ "author": "Claude Fable 5.1",
+ "created_at": "2026-09-15T00:50:03.833109+00:00",
+ "kind": "native_compact_probe",
+ "executed_by": "user (logged-in Claude Code 2.1.270 session, isolated project /var/tmp/sb-native-probe-8d1f8cc/project)",
+ "candidate": "/var/tmp/sb-candidate-8d1f8cc/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3",
+ "session_id": "23bab67c-7a6f-4799-9bb9-92c684a78bd3",
+ "hook_sequence": [
+  [
+   "UserPromptSubmit",
+   ""
+  ],
+  [
+   "SessionStart",
+   "compact"
+  ],
+  [
+   "PostCompact",
+   "manual"
+  ],
+  [
+   "UserPromptSubmit",
+   ""
+  ]
+ ],
+ "all_hook_rc0": true,
+ "observed": {
+  "1_userpromptsubmit": "prompt 'nativeprobetarget 배포일정 알려줘.' -> {} and last_query='nativeprobetarget' stored",
+  "2_sessionstart_compact": "real input had no summary; hook reselected from last_query and returned hookSpecificOutput.additionalContext with record wiki/native-probe (record_id sbrecord:v1:2d62784c…, version, source_ref me-wiki:notes/native-probe.md, body 'NativeProbeTarget rollout window for the gateway is Tuesday evening.')",
+  "3_postcompact": "trigger=manual with compact_summary; hook staged {} ; stage delivered=true, delivered_in_turn=[that record], remainder=[] (no duplicate for next prompt)",
+  "4_transcript": "row 110 isCompactSummary; row 122 attachment type=hook_additional_context hookName=SessionStart carrying the injected record; row 130 user '방금 배포 일정이 언제라고 했지?'; row 137 assistant answered '화요일 저녁 … NativeProbeTarget 게이트웨이 롤아웃 창은 화요일 저녁' citing vault/wiki/native-probe.md",
+  "5_next_prompt": "UserPromptSubmit after compaction -> {} (in-turn delivered set excluded; no re-injection)"
+ },
+ "order_confirmed": "SessionStart(source=compact) fired before PostCompact, matching the 2.1.270 binary analysis; injected context present in the post-compaction message set before the next model request",
+ "limits": [
+  "single session, manual /compact (trigger=manual); auto-compaction trigger not exercised in this run",
+  "hook commands were wrapped with an I/O tee for evidence (same candidate binary, same SB_CONFIG)",
+  "isolated vault/config/state under /var/tmp; operational ~/.config/second-brain untouched",
+  "the model's answer also had the original conversation summary available (row 110 mentions the target); the injected attachment is proven present, exclusive attribution of the answer to the injection is not claimed"
+ ],
+ "stage": {
+  "session_id": "23bab67c-7a6f-4799-9bb9-92c684a78bd3",
+  "event_digest": "sha256:43753015981d45a9bffc2ed527ceb1c08306f38950fd7705a43fc6966950a21b",
+  "delivered": true,
+  "context": "",
+  "records": [],
+  "last_query": "nativeprobetarget",
+  "delivered_in_turn": [
+   "sbrecord:v1:2d62784cb4ee17c8a062fa63c6bbeeb5c1ef2e8e2d815e92ea886d2d97349632\u0000sha256:2d62784cb4ee17c8a062fa63c6bbeeb5c1ef2e8e2d815e92ea886d2d97349632"
+  ],
+  "in_turn": []
+ },
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la/native-probe",
+ "auto_compaction": {
+  "observed": true,
+  "session": "e29b1721-bd89-46b2-b777-9df5c1ecff41",
+  "env": "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=4",
+  "events": "3x [SessionStart source=compact -> additionalContext] then [PostCompact trigger=auto -> {}]",
+  "log": "/var/tmp/claude-night-e53dd66-GBr0la/native-probe/hook-io-auto.log",
+  "at_utc": "2026-09-15T05:57:44.954376+00:00"
+ }
+}

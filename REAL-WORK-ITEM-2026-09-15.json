@@ -1,0 +1,23 @@
+{
+ "authority_id": "sb-b239c0b",
+ "idempotency_key": "candidate:sb-real-work:2026-09-15",
+ "subject": "second-brain 운영 전환 8ea65a7 인수 검증",
+ "statement": "2026-09-15 second-brain-app 운영 전환 결과. 운영 current는 릴리스 8ea65a7d968fdcf99560f449b2a1ad656a99a2e9(제품 소스 83a7aba, wheel 6bc94e226c0158ab2ee517a344efc3d0c07faddcf75eb27868dafd46d1f965ba)로 교체됐고 JARVIS authority는 a3cbbbe 그대로다. 고정 archive 전체 회귀는 1924 passed / 3 skipped, 670.32초, exit 0이며 검색·web·doctor 검증을 통과했다. 이전 후보 2ccf0267에서 발견된 검색 인덱스 스키마 불일치는 새 세대 게시로 해소했고, compile LLM 실패는 격리 CODEX_HOME으로 해결했다.",
+ "assert_substring": "8ea65a7d968fdcf99560f449b2a1ad656a99a2e9",
+ "evidence": {
+  "repo": "second-brain-app",
+  "branch": "codex/shared-memory-completion-20260907",
+  "head_at_capture": "b239c0b25d4f6b5caa3a9cbe6a0c39f764c59423",
+  "verification_commit": "b239c0b",
+  "candidate_source_commit": "83a7abab630a81c0c3b3d3565e533f26ad6caa62",
+  "release_id": "8ea65a7d968fdcf99560f449b2a1ad656a99a2e9",
+  "wheel_sha256": "6bc94e226c0158ab2ee517a344efc3d0c07faddcf75eb27868dafd46d1f965ba",
+  "jarvis_build_commit": "a3cbbbe (operational authority, unchanged); target 6934abe+lint fix",
+  "reports": {
+   "CLAUDE-CUTOVER-2026-09-15.md": "add1ebac53591fe5fd89540a83959a26d44cec811be717d962d7969890167778",
+   "CLAUDE-FINAL-VERIFICATION-365f8e4.md": "680447cb4b32f4159f9ec7d50e9f01645800a2e425446f943c38abb6f49f13bf",
+   "CLAUDE-NIGHT-REVIEW-b239c0b.md": "54a04969a696b3ae3ba2111d98733f12243b38a6bfe5184972b8be4e4241cd63"
+  }
+ },
+ "query": "운영 전환"
+}

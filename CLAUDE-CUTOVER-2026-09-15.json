@@ -1,0 +1,59 @@
+{
+  "kind": "sb_operational_cutover",
+  "executed_at_utc": "2026-09-15T02:02:43.415353+00:00",
+  "executed_by": "Claude Fable 5.1 with user approval (2026-09-15 KST)",
+  "scope": "SB only; JARVIS authority current a3cbbbe untouched",
+  "release": {
+    "dir": "/home/jm/.local/state/second-brain/app/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3",
+    "release_id": "2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3",
+    "source_commit": "b9039d2 (sb/ bytes == 8d1f8cc, 183 files verified)",
+    "wheel_sha256": "60d66ad6c3d488af843e7132eea2d7104528fb9b0c06ce732d110a2f4ca189f1"
+  },
+  "previous_current": "41f0751aca8906d612961e704bc60dd0855fdabd (release dir retained; rollback compat allowed=true at check time)",
+  "pre_checks": "gates/precutover-observation.{json,md}: pending queues empty, active_cursor_rows 0, SB writer locks unheld, DB handles only jm-jarvis units, backup present, disk ok; one unexpired gjc_runtime lease belongs to the live jm-jarvis.service (JARVIS not switched)",
+  "backup": "second-brain-20260915T100736+0900.tar.gz (15,343,407 bytes) sha256 7ea9a452… verified against sidecar",
+  "steps": [
+    "10:32 stop jm-second-brain-requests.path, refresh.timer, maintenance.timer, second-brain-web.service (JARVIS untouched)",
+    "10:32 ln -sfn + mv -T current -> releases/2ccf0267…; ~/.local/bin/sb resolves to new release",
+    "10:32 start web/requests.path/timers; web HTTP 200; apply-requests oneshot NO_PENDING_REQUEST exit 0",
+    "10:33 sb search -> GENERATION_INDEX_INVALID: old generation search.db docs(page_id,section,text) lacks compact/normalize_* columns required by the new lexical plan; generation identity/derived digests verified OK under new code; timers held",
+    "10:57 sb doctor --rebuild-ledger failed (InvalidDerivationTransition done->running) and did not activate anything; current generation unchanged",
+    "10:58-11:01 jm-second-brain-refresh.service (sb run under new release) published generation sbgen:v1:c58f6026…; 3m40s, 643MB peak",
+    "11:01 verify: sb search hits, web /api/search hits, doctor ledger 5/5 (was 2/5), status schema 5/5, last_run status=capped (LLM cap), timers re-enabled"
+  ],
+  "residuals": [
+    "18 sb mcp server processes from the old release path remain (client-owned MCP servers; they switch when client sessions restart)",
+    "last_run status 'capped' (LLM call cap during brief) - check next scheduled run",
+    "scheduler-assets doctor warn (release-local assets path) - see doctor output",
+    "JARVIS still a3cbbbe: scoped v4 / postcompact consumer / N1 dormant until JARVIS cutover"
+  ],
+  "rollback": "cd ~/.local/state/second-brain/app && ln -sfn releases/41f0751… current.new && mv -T current.new current && systemctl --user restart second-brain-web.service (old release reads the pre-cutover generation febe7de2…; the new generation c58f6026… was produced by the new code)",
+  "followup_compile_capped": {
+    "cause": "service codex (/usr/bin/codex 0.144.6) read user ~/.codex/config.toml (gpt-6-astra via local proxy 127.0.0.1:10100) -> every LLM call failed",
+    "fix": "isolated CODEX_HOME=/home/jm/.local/state/second-brain/codex-home (empty config, auth.json symlink) prefixed via env in llm.argv_template of jarvis-provider.toml and config.toml; backups *.bak-20260915T111901",
+    "result": "run 762c5f43 ok: compile 40 pages (cap 40), brief 1; failed_by_stage {'brief':5} pre-existing held (BRIEF_REPLAY_INPUTS_UNAVAILABLE)",
+    "at_utc": "2026-09-15T02:29:30.610957+00:00"
+  },
+  "third_cutover": {
+    "executed_at": "2026-09-15T18:41+09:00",
+    "release": "62ffbc9d8267f142c2f86dd2c38af6dc5efd2028",
+    "source": "a5c4159",
+    "product": "45f5b72",
+    "previous_current": "8ea65a7d968fdcf99560f449b2a1ad656a99a2e9",
+    "backup": "second-brain-20260915T184120+0900.tar.gz",
+    "maintenance": {
+      "first": "exit1 GENERATION_READER_DRAIN_REQUIRED (concurrent sb status read)",
+      "second": "finished; activations all proved (247); briefs superseded 6"
+    },
+    "ready_after": [
+      "LAST_RUN_UNSUCCESSFUL",
+      "DERIVATIONS_FAILED(compile x2, codex quota)"
+    ]
+  },
+  "client_hooks_m8": {
+    "wrapper": "~/.config/second-brain/hooks/sb-memory-hook.sh",
+    "claude": "~/.claude/settings.json (+3 hooks)",
+    "codex": "~/.codex/hooks.json (+3 hooks; needs one-time TUI trust)",
+    "omo": "~/.omo/agent/extensions/sb-memory.js"
+  }
+}

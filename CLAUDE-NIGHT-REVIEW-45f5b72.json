@@ -1,0 +1,15 @@
+{
+  "candidate": "45f5b72",
+  "pin": "a5c4159",
+  "verdict": "accept",
+  "regression": {
+    "full": "1863 passed/50 skipped/20 failed(env: embeddings extra missing)",
+    "embeddings_with_extra": "30 passed/1 skipped"
+  },
+  "lint": {
+    "ruff": "pass",
+    "basedpyright_errors": 0
+  },
+  "accepted_deviation": "H6 supersedes when any done brief exists (not per target date)",
+  "reviewed_at": "2026-09-15T18:45+09:00"
+}
