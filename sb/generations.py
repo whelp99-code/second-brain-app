@@ -628,6 +628,43 @@ class GenerationStore:
         with self.writer():
             yield
 
+    def sweep_orphan_activations(self, now: datetime, current_id: str | None) -> int:
+        pinned: set[str] = set()
+        if self.requests is not None:
+            rows = self.requests.db.execute(
+                "SELECT DISTINCT generation_id FROM reader_leases",
+            ).fetchall()
+            pinned = {str(row[0]) for row in rows if row[0]}
+        changed = 0
+        rows = self.journal.execute(
+            "SELECT generation_id, pointer_target FROM activations WHERE phase='activated'",
+        ).fetchall()
+        for generation_id, pointer in rows:
+            if not isinstance(generation_id, str):
+                continue
+            if current_id is not None and generation_id == current_id:
+                continue
+            if generation_id in pinned:
+                continue
+            present = (self.generations / generation_id).is_dir()
+            if isinstance(pointer, str) and pointer and Path(pointer).exists():
+                present = True
+            if present:
+                continue
+            disposal = digest(
+                "generation",
+                {"reason": "orphan-missing-directory", "generation_id": generation_id},
+            )
+            updated = self.journal.execute(
+                "UPDATE activations SET phase='proved',disposal_digest=?,updated_at=? "
+                + "WHERE generation_id=? AND phase='activated'",
+                (disposal, format_instant(now), generation_id),
+            ).rowcount
+            changed += int(updated)
+        if changed:
+            self.journal.commit()
+        return changed
+
     @contextmanager
     def try_exclusive(self) -> Generator[None, None, None]:
         with generation_writer(self.lock_path, blocking=False):

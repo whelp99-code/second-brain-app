@@ -336,7 +336,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             return 2
         mutations = GenerationMutationService.from_config(config)
         try:
-            result = mutations.maintain(datetime.now(UTC))
+            now = datetime.now(UTC)
+            result = mutations.maintain(now)
+            _ = mutations.settle_superseded_briefs(now)
         finally:
             mutations.close()
         workspace = _opt_str(ns, "restore_workspace")

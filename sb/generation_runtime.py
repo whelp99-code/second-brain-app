@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,8 +38,13 @@ from sb.generations import Generation, GenerationStore
 from sb.inbox import parse_remember, publish_inbox
 from sb.provider_lifecycle import MaintenanceResult, ProviderLifecycle
 from sb.request_store import RequestStore
-from sb.store.ledger import migrate_ledger
+from sb.store.ledger import Ledger, migrate_ledger
 from sb.vault import init_vault
+
+
+def _supersede_briefs(root: Path) -> int:
+    with Ledger(root) as ledger:
+        return ledger.supersede_historical_brief_failures()
 
 __all__ = (
     "GenerationAuthority",
@@ -100,6 +106,34 @@ class GenerationMutationService:
         )
         return result.value
 
+    def settle_superseded_briefs(self, now: datetime) -> int:
+        parent, _legacy = self._current_or_legacy()
+        if parent is None:
+            return 0
+        db = parent.root / ".sb" / "ledger.db"
+        if not db.is_file():
+            return 0
+        uri = db.resolve().as_uri() + "?mode=ro"
+        with sqlite3.connect(uri, uri=True) as connection:
+            failed = connection.execute(
+                "SELECT count(*) FROM derivation WHERE stage='brief' AND status='failed'",
+            ).fetchone()
+            done = connection.execute(
+                "SELECT count(*) FROM derivation WHERE stage='brief' AND status='done'",
+            ).fetchone()
+        if failed is None or done is None or failed[0] == 0 or done[0] == 0:
+            return 0
+        result = self.mutate(
+            GenerationMutation(
+                mutation_id=f"maintain:supersede-brief:{uuid4().hex}",
+                operation=GenerationOperation.EFFECT,
+                now=now,
+                authority=GenerationAuthority(None, None),
+                apply=_supersede_briefs,
+            )
+        )
+        return int(result.value)
+
     def maintain(self, now: datetime) -> MaintenanceResult:
         with self.store.exclusive():
             return self._maintain_locked(now)
@@ -121,6 +155,8 @@ class GenerationMutationService:
         disposed = self.store.discard_abandoned_staging()
         if parent is not None:
             self.store.activate(parent, None, now, lock_held=True)
+        current_id = None if parent is None else parent.generation_id
+        _ = self.store.sweep_orphan_activations(now, current_id)
         result = self.lifecycle.maintain(now)
         return MaintenanceResult(result.disposed_export_digests, disposed)
 

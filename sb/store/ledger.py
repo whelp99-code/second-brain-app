@@ -510,6 +510,24 @@ class Ledger:
             self._tables.derivations[key], row.status, DerivStatus.FAILED.value, error
         )
 
+    def supersede_historical_brief_failures(self) -> int:
+        """Close unreplayable failed brief rows when a later brief succeeded."""
+        done = self.list_derivations(status=DerivStatus.DONE.value, stage="brief")
+        if not done:
+            return 0
+        closed = 0
+        for row in self.list_derivations(status=DerivStatus.FAILED.value, stage="brief"):
+            require_transition(row.deriv_key, DerivStatus.FAILED, DerivStatus.SUPERSEDED)
+            _ = self._exec(
+                "UPDATE derivation SET status=? WHERE deriv_key=?",
+                (DerivStatus.SUPERSEDED.value, row.deriv_key),
+            )
+            updated = replace(row, status=DerivStatus.SUPERSEDED.value)
+            self._tables.derivations[row.deriv_key] = updated
+            self._record_event(updated, row.status, DerivStatus.SUPERSEDED.value, row.error)
+            closed += 1
+        return closed
+
     def requeue_failed(self, key: str, *, reset_attempts: bool = False) -> bool:
         """Move a failed derivation back to pending for an explicit retry."""
         row = self._need(key)
