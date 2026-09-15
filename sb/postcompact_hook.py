@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -244,9 +246,7 @@ def confirm_delivery(root: Path, session_id: str) -> None:
         stage["delivered"] = True
     stored_keys: list[Json] = list(seen)
     stage["delivered_in_turn"] = stored_keys
-    _ = _stage_path(root, session_id).write_text(
-        json.dumps(stage, ensure_ascii=False), encoding="utf-8",
-    )
+    _write_stage_file(_stage_path(root, session_id), json.dumps(stage, ensure_ascii=False))
 
 
 def _record_key(record: dict[str, str]) -> str:
@@ -288,9 +288,7 @@ def _remember_last_query(
         "records": [],
     }
     payload["last_query"] = last_query
-    _ = _stage_path(root, session_id).write_text(
-        json.dumps(payload, ensure_ascii=False), encoding="utf-8",
-    )
+    _write_stage_file(_stage_path(root, session_id), json.dumps(payload, ensure_ascii=False))
 
 
 def _trigger(value: str) -> Trigger:
@@ -546,9 +544,37 @@ def _inject_payload(event_name: str, context: str) -> dict[str, Json]:
 
 def _stage_path(root: Path, session_id: str) -> Path:
     folder = root / ".sb" / "session-memory"
-    folder.mkdir(parents=True, exist_ok=True)
+    folder.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.mkdir(folder, 0o700)
+    except FileExistsError:
+        pass
+    try:
+        dir_fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as exc:
+        raise PostCompactHookError("HOOK_STAGE_UNSAFE") from exc
+    os.close(dir_fd)
     safe = "".join(char if char.isalnum() or char in "-_" else "_" for char in session_id)[:128]
     return folder / f"{safe}.json"
+
+
+def _write_stage_file(path: Path, text: str) -> None:
+    encoded = text.encode()
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
+    try:
+        fd = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise PostCompactHookError("HOOK_STAGE_UNSAFE") from exc
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise PostCompactHookError("HOOK_STAGE_UNSAFE")
+        os.ftruncate(fd, 0)
+        written = os.write(fd, encoded)
+        if written != len(encoded):
+            raise PostCompactHookError("HOOK_STAGE_UNSAFE")
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def _read_stage(root: Path, session_id: str) -> dict[str, Json] | None:
@@ -589,16 +615,12 @@ def _write_stage(
         "delivered_in_turn": [key for key in (delivered_in_turn or [])],
         "in_turn": [_record_payload(record) for record in (in_turn or ())],
     }
-    _ = _stage_path(root, event.session_id).write_text(
-        json.dumps(payload, ensure_ascii=False), encoding="utf-8",
-    )
+    _write_stage_file(_stage_path(root, event.session_id), json.dumps(payload, ensure_ascii=False))
 
 
 def _mark_delivered(root: Path, session_id: str, stage: dict[str, Json]) -> None:
     stage["delivered"] = True
-    _ = _stage_path(root, session_id).write_text(
-        json.dumps(stage, ensure_ascii=False), encoding="utf-8",
-    )
+    _write_stage_file(_stage_path(root, session_id), json.dumps(stage, ensure_ascii=False))
 
 
 def _records_from_stage(stage: dict[str, Json]) -> tuple[dict[str, str], ...]:
