@@ -1,0 +1,2389 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Second Brain 사용 설명서</title>
+<style>
+/* ── 색·크기 토큰 (라이트 기본) ───────────────────────────── */
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f0efeb;
+  --text: #1f2328;
+  --text-dim: #5a6169;
+  --border: #dcdad3;
+  --border-strong: #c3c0b6;
+  --accent: #2f6f4f;
+  --accent-soft: #e6f1ea;
+  --warn: #8a5a12;
+  --warn-soft: #fbf1de;
+  --danger: #9a3126;
+  --danger-soft: #fbe9e6;
+  --info: #23557d;
+  --info-soft: #e5eff7;
+  --code-bg: #f3f2ee;
+  --code-text: #1f2328;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+  --radius: 10px;
+  --maxw: 880px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1c1f24;
+    --surface-2: #23272d;
+    --text: #e6e6e3;
+    --text-dim: #a2a8b0;
+    --border: #2f343b;
+    --border-strong: #454c55;
+    --accent: #7fc9a2;
+    --accent-soft: #1b2b23;
+    --warn: #e0b86a;
+    --warn-soft: #2b2416;
+    --danger: #f0938a;
+    --danger-soft: #2d1a18;
+    --info: #8fc0e8;
+    --info-soft: #172530;
+    --code-bg: #15181c;
+    --code-text: #e6e6e3;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR",
+               "Apple SD Gothic Neo", "Malgun Gothic", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+}
+code, pre, kbd {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+               "D2Coding", "Noto Sans Mono CJK KR", monospace;
+}
+/* ── 상단 바 ─────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.brand {
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+}
+.switch {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.switch button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.switch button[aria-selected="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .switch button[aria-selected="true"] { color: #10221a; }
+}
+.toc-toggle {
+  display: none;
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+/* ── 레이아웃 ────────────────────────────────────────────── */
+.shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px 80px;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.sidebar {
+  position: sticky;
+  top: 62px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding: 20px 0 30px;
+  font-size: 0.9rem;
+}
+.sidebar h2 {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+.sidebar ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+.sidebar li { margin: 0; }
+.sidebar a {
+  display: block;
+  padding: 5px 10px 5px 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 6px 6px 0;
+  line-height: 1.45;
+}
+.sidebar a:hover { color: var(--text); background: var(--surface-2); }
+.sidebar a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.sidebar .top-link {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.sidebar .top-link a { color: var(--accent); font-weight: 600; }
+main { min-width: 0; padding: 26px 0 0; }
+.layer[hidden] { display: none; }
+/* ── 타이포 ──────────────────────────────────────────────── */
+h1 {
+  font-size: 1.85rem;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+h2 {
+  font-size: 1.32rem;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  margin: 46px 0 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  scroll-margin-top: 74px;
+}
+h3 {
+  font-size: 1.05rem;
+  margin: 28px 0 10px;
+  scroll-margin-top: 74px;
+}
+h4 { font-size: 0.97rem; margin: 20px 0 8px; color: var(--text-dim); }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 16px; padding-left: 1.35em; }
+li { margin: 0 0 6px; }
+a { color: var(--accent); }
+strong { font-weight: 700; }
+.lede {
+  font-size: 1.05rem;
+  color: var(--text-dim);
+  margin-bottom: 22px;
+}
+.section-note { color: var(--text-dim); font-size: 0.93rem; }
+/* ── 코드 ────────────────────────────────────────────────── */
+code {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.08em 0.36em;
+  font-size: 0.87em;
+  word-break: break-word;
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 0.84rem;
+  color: var(--code-text);
+  white-space: pre;
+}
+/* ── 표 ──────────────────────────────────────────────────── */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 0 0 20px;
+  background: var(--surface);
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.6;
+}
+th {
+  background: var(--surface-2);
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 0.83rem;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { font-size: 0.85em; }
+/* ── 콜아웃 ──────────────────────────────────────────────── */
+.callout {
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 0 0 20px;
+  background: var(--surface);
+}
+.callout .label {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.callout p:last-child, .callout ul:last-child, .callout ol:last-child { margin-bottom: 0; }
+.callout.sum { border-left-color: var(--accent); background: var(--accent-soft); }
+.callout.sum .label { color: var(--accent); }
+.callout.when { border-left-color: var(--info); background: var(--info-soft); }
+.callout.when .label { color: var(--info); }
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout.warn .label { color: var(--warn); }
+.callout.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+.callout.danger .label { color: var(--danger); }
+/* ── 카드·기타 ───────────────────────────────────────────── */
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); margin-bottom: 20px; }
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.card h4 { margin: 0 0 8px; color: var(--text); font-size: 1rem; }
+.card p { margin: 0; font-size: 0.92rem; color: var(--text-dim); }
+.emoji { font-size: 1.15rem; margin-right: 6px; }
+.steps { list-style: none; padding: 0; counter-reset: step; margin: 0 0 20px; }
+.steps > li {
+  counter-increment: step;
+  position: relative;
+  padding: 0 0 0 42px;
+  margin-bottom: 18px;
+}
+.steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0; top: 2px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid; place-items: center;
+  font-size: 0.85rem; font-weight: 700;
+}
+@media (prefers-color-scheme: dark) { .steps > li::before { color: #10221a; } }
+.steps > li b { display: block; margin-bottom: 2px; }
+.faq { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; margin-bottom: 20px; }
+.faq details { border-bottom: 1px solid var(--border); }
+.faq details:last-child { border-bottom: 0; }
+.faq summary {
+  cursor: pointer;
+  padding: 13px 16px;
+  font-weight: 600;
+  font-size: 0.97rem;
+  list-style: none;
+  position: relative;
+  padding-right: 42px;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: "+";
+  position: absolute;
+  right: 16px; top: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+}
+.faq details[open] summary::after { content: "\2212"; }
+.faq .answer { padding: 0 16px 14px; color: var(--text-dim); font-size: 0.94rem; }
+.faq .answer p:last-child { margin-bottom: 0; }
+.lights { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 20px; }
+.light { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; background: var(--surface); }
+.light .bulb { font-size: 1.4rem; line-height: 1; display: block; margin-bottom: 6px; }
+.light b { display: block; margin-bottom: 4px; }
+.light p { margin: 0; font-size: 0.9rem; color: var(--text-dim); }
+.flow {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.flow span.node {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+.flow span.arrow { color: var(--text-dim); font-weight: 700; }
+.backtop {
+  display: inline-block;
+  margin-top: 18px;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.backtop:hover { color: var(--accent); }
+footer.page-foot {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+/* ── 좁은 화면 ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .toc-toggle { display: inline-block; }
+  .sidebar {
+    display: none;
+    position: static;
+    max-height: 55vh;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  body.toc-open .sidebar { display: block; }
+  .brand { font-size: 0.95rem; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.18rem; }
+  main { padding-top: 18px; }
+}
+@media (max-width: 420px) {
+  .switch button { padding: 6px 10px; font-size: 0.86rem; }
+  body { font-size: 15.5px; }
+}
+/* ── 인쇄 ────────────────────────────────────────────────── */
+@media print {
+  .topbar, .sidebar, .backtop, .toc-toggle, .switch { display: none !important; }
+  .shell { display: block; max-width: none; padding: 0; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .card, .callout, .table-wrap, pre { box-shadow: none; break-inside: avoid; }
+  h2, h3 { break-after: avoid; }
+  a { color: #000; text-decoration: none; }
+}
+</style>
+</head>
+<body class="layer-easy">
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="brand"><span class="dot"></span>Second Brain 사용 설명서</span>
+    <button class="toc-toggle" id="tocToggle" type="button" aria-expanded="false">목차 ☰</button>
+    <div class="switch" role="tablist" aria-label="설명 수준 선택">
+      <button type="button" role="tab" id="tab-easy" aria-selected="true" aria-controls="layer-easy">🙂 쉽게 보기</button>
+      <button type="button" role="tab" id="tab-tech" aria-selected="false" aria-controls="layer-tech">🛠 자세히 보기</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- ══════════════════ 사이드바 ══════════════════ -->
+  <aside class="sidebar">
+    <nav id="toc-easy" aria-label="쉽게 보기 목차">
+      <h2>쉽게 보기</h2>
+      <ol>
+        <li><a href="#e-what">1. 이게 대체 뭔가요</a></li>
+        <li><a href="#e-problem">2. 어떤 문제를 풀어 주나요</a></li>
+        <li><a href="#e-day">3. 하루가 이렇게 흘러갑니다</a></li>
+        <li><a href="#e-5min">4. 5분이면 쓸 수 있습니다</a></li>
+        <li><a href="#e-search">5. 검색을 잘하는 법</a></li>
+        <li><a href="#e-ai">6. AI 비서가 기억을 꺼내 쓰는 법</a></li>
+        <li><a href="#e-ready">7. 신호등(준비 상태) 읽는 법</a></li>
+        <li><a href="#e-backup">8. 백업과 되돌리기</a></li>
+        <li><a href="#e-dont">9. 절대 하지 말 것</a></li>
+        <li><a href="#e-limits">10. 아직 못 하는 것</a></li>
+        <li><a href="#e-faq">11. 자주 묻는 질문</a></li>
+        <li><a href="#e-glossary">12. 용어 한눈에</a></li>
+      </ol>
+      <div class="top-link"><a href="#top">↑ 맨 위로</a></div>
+    </nav>
+
+    <nav id="toc-tech" aria-label="자세히 보기 목차" hidden>
+      <h2>자세히 보기</h2>
+      <ol>
+        <li><a href="#t1">1 개요와 설계 목표</a></li>
+        <li><a href="#t2">2 아키텍처</a></li>
+        <li><a href="#t3">3 설치와 릴리스 준비</a></li>
+        <li><a href="#t4">4 설정 파일 레퍼런스</a></li>
+        <li><a href="#t5">5 CLI 레퍼런스</a></li>
+        <li><a href="#t6">6 파이프라인과 세대 수명주기</a></li>
+        <li><a href="#t7">7 검색과 한계</a></li>
+        <li><a href="#t8">8 AI 클라이언트 기억 훅</a></li>
+        <li><a href="#t9">9 JARVIS 연동</a></li>
+        <li><a href="#t10">10 운영</a></li>
+        <li><a href="#t11">11 문제 해결</a></li>
+        <li><a href="#t12">12 평가 (M10 gold set)</a></li>
+        <li><a href="#t13">13 알려진 한계와 로드맵</a></li>
+        <li><a href="#t14">14 용어집</a></li>
+      </ol>
+      <div class="top-link"><a href="#top">↑ 맨 위로</a></div>
+    </nav>
+  </aside>
+
+  <main id="top">
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ══════════════ 레이어 1 · 쉽게 보기 ═══════════════════ -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section class="layer" id="layer-easy" role="tabpanel" aria-labelledby="tab-easy">
+
+    <h1>Second Brain, 쉽게 읽는 설명서</h1>
+    <p class="lede">
+      이 페이지는 개발을 모르는 사람도 읽을 수 있게 쓴 부분입니다.
+      명령어·설정·오류 코드 같은 기술적인 내용은 위쪽 <strong>“🛠 자세히 보기”</strong> 탭에 따로 모아 두었습니다.
+    </p>
+
+    <!-- ───────── 1 ───────── -->
+    <h2 id="e-what">1. 이게 대체 뭔가요</h2>
+
+    <div class="callout sum"><span class="label">한 줄 요약</span>
+      <p><strong>내 컴퓨터 안에만 사는 개인 서재</strong>입니다. 내가 넣은 자료의 원본은 절대 지우지 않고 보관하고, 그 원본을 근거로 정리된 “지식 페이지”를 만들어 줍니다.</p>
+    </div>
+
+    <p>서재에 비유하면 이렇습니다.</p>
+
+    <div class="cards">
+      <div class="card">
+        <h4><span class="emoji">📦</span>원본 보관함</h4>
+        <p>내가 넣은 메모·파일의 <b>원본 그대로</b>를 창고에 넣어 둡니다. 한 번 들어간 원본은 사람이 명시적으로 승인하지 않는 한 지워지지 않습니다.</p>
+      </div>
+      <div class="card">
+        <h4><span class="emoji">📚</span>정리된 서가</h4>
+        <p>창고의 자료를 주제별로 묶어 읽기 좋은 페이지로 만들어 서가에 꽂아 둡니다. 이 페이지가 평소에 읽고 검색하는 대상입니다.</p>
+      </div>
+      <div class="card">
+        <h4><span class="emoji">🧑‍🏫</span>사서</h4>
+        <p>어느 페이지의 어느 문장이 <b>창고의 어느 원본</b>에서 왔는지 각주로 기록합니다. “이거 어디서 나온 말이야?”에 항상 답할 수 있습니다.</p>
+      </div>
+      <div class="card">
+        <h4><span class="emoji">🗒️</span>아침 브리핑</h4>
+        <p>새로 들어온 게 있으면 그날의 요약 페이지를 하나 만들어 둡니다. 변화가 없는 날에는 만들지 않습니다.</p>
+      </div>
+    </div>
+
+    <p>중요한 점 하나. <strong>이 서재는 내 컴퓨터(Ubuntu) 안에서만 열립니다.</strong> 웹 화면은 그 컴퓨터 자신(<code>127.0.0.1</code>, “나 자신”을 뜻하는 주소)에만 열려 있어서, 같은 네트워크의 다른 사람이 주소를 안다고 해서 들어올 수 있는 구조가 아닙니다.</p>
+
+    <div class="callout when"><span class="label">이럴 때 씁니다</span>
+      <ul>
+        <li>회의·계약·결정 사항을 적어 두고 몇 달 뒤에 “그때 뭐라고 했더라”를 찾고 싶을 때</li>
+        <li>AI 비서(Claude Code·Codex·OmO)가 긴 대화 중에 앞부분을 잊어버려도, 중요한 사실은 계속 기억하게 하고 싶을 때</li>
+        <li>정리본이 틀렸을 때 <b>원본까지 거슬러 올라가서</b> 확인하고 싶을 때</li>
+      </ul>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 2 ───────── -->
+    <h2 id="e-problem">2. 어떤 문제를 풀어 주나요</h2>
+
+    <p>메모 앱은 많습니다. 이 제품이 신경 쓰는 것은 딱 네 가지입니다.</p>
+
+    <h3 id="e-problem-1">① 원본 보존 — “요약본만 남고 원본이 사라지는 일”이 없게</h3>
+    <p>보통의 자동 정리 도구는 요약을 만들고 나면 원본을 어딘가에 흘려버립니다. Second Brain은 넣은 자료의 바이트를 그대로 창고에 넣고, 내용으로 이름을 붙여 보관합니다(같은 내용이면 한 번만 저장됩니다). 청소 명령조차도 <strong>사람이 두 번 확인해야만</strong> 실제로 지웁니다.</p>
+
+    <h3 id="e-problem-2">② 출처 각주 — “근거 없는 문장”을 만들지 않게</h3>
+    <p>정리된 페이지의 문장에는 각주가 붙습니다. 각주는 창고에 있는 원본을 가리킵니다. 각주가 가리키는 원본이 없어졌거나 각주가 깨져 있으면, 점검 명령(<code>sb doctor</code>)이 그것을 <b>실패</b>로 알려 줍니다. 즉 “출처 없는 문장이 조용히 섞여 있는 상태”가 유지될 수 없습니다.</p>
+
+    <h3 id="e-problem-3">③ 충돌 표시 — “어느 게 맞는지 몰래 고르지 않게”</h3>
+    <p>“계약서는 수요일에 보낸다”와 “계약서는 금요일에 보낸다”가 둘 다 들어오면, 시스템은 몰래 하나를 고르지 않습니다. <strong>충돌로 표시해 두고 사람에게 물어봅니다.</strong> 사람이 왼쪽/오른쪽 중 하나를 고르거나 메모를 남기면, 그 결정이 기록으로 남습니다.</p>
+
+    <h3 id="e-problem-4">④ 복구 가능성 — “되돌릴 수 있게”</h3>
+    <p>매일 자동으로 백업을 만들고, 만든 직후에 <b>그 백업을 실제로 풀어서 검사</b>합니다. 검사에 통과하면 영수증 파일이 함께 남습니다. “백업은 돌고 있는데 정작 복구가 안 되는” 상황을 막기 위한 설계입니다.</p>
+
+    <div class="callout warn"><span class="label">주의</span>
+      <p>복구는 <strong>항상 새 폴더로</strong> 풉니다. 운영 중인 서재 위에 덮어쓰는 동작은 아예 거부됩니다. 덮어쓰기로 인한 사고가 원천적으로 불가능하도록 막아 둔 것입니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 3 ───────── -->
+    <h2 id="e-day">3. 하루가 이렇게 흘러갑니다</h2>
+
+    <div class="flow">
+      <span class="node">📝 메모를 넣는다</span><span class="arrow">→</span>
+      <span class="node">📦 원본 보관</span><span class="arrow">→</span>
+      <span class="node">📚 페이지로 정리</span><span class="arrow">→</span>
+      <span class="node">🗒️ 아침 브리핑</span><span class="arrow">→</span>
+      <span class="node">🤖 AI 비서가 꺼내 씀</span>
+    </div>
+
+    <ol class="steps">
+      <li><b>넣는다</b> 웹 화면의 “기억하기”에 한 줄 적거나, 파일을 끌어다 놓습니다. 이 순간에는 아직 정리되지 않습니다. 대기함(inbox)에 들어갑니다.</li>
+      <li><b>정리된다</b> 1시간마다 자동으로 도는 작업이 대기함을 비우고, 원본을 창고에 넣고, 정리된 페이지를 만듭니다. 기다리기 싫으면 웹 화면의 “지금 처리” 버튼을 누르면 됩니다.</li>
+      <li><b>브리핑이 생긴다</b> 새로 들어온 게 있거나 페이지가 새로 만들어진 날에만 그날의 브리핑이 만들어집니다. 조용한 날에는 브리핑이 없는 게 정상입니다. (아무 변화 없이 AI를 호출하지 않으려는 설계입니다.)</li>
+      <li><b>AI가 꺼내 쓴다</b> Claude Code·Codex CLI·OmO에서 대화가 길어져 앞부분이 압축되는 순간, Second Brain이 “압축되면서 사라질 뻔한 사실”을 서재에서 찾아 다음 요청 앞에 붙여 줍니다.</li>
+      <li><b>백업된다</b> 매일 새벽에 백업이 만들어지고, 만들자마자 검증됩니다.</li>
+    </ol>
+
+    <div class="callout sum"><span class="label">한 줄 요약</span>
+      <p>넣기만 하면 나머지는 자동입니다. 사람이 직접 할 일은 <strong>충돌 해결</strong>과 <strong>신호등이 빨간불일 때의 조치</strong> 정도입니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 4 ───────── -->
+    <h2 id="e-5min">4. 5분이면 쓸 수 있습니다</h2>
+
+    <p>웹 브라우저에서 <code>http://127.0.0.1:8765/</code> 를 엽니다. (이 주소는 “지금 이 컴퓨터”를 뜻합니다. 다른 컴퓨터에서는 열리지 않습니다.)</p>
+
+    <h3 id="e-5min-remember">기억하기 — 한 줄 넣어 보기</h3>
+    <ol>
+      <li>화면의 <b>기억하기</b> 칸에 내용을 적습니다. 예: <code>계약서는 수요일에 발송한다.</code></li>
+      <li>제목은 선택입니다. 적어 두면 나중에 찾기 쉽습니다.</li>
+      <li>저장하면 “대기함에 들어갔다”는 응답이 옵니다. <strong>아직 검색에는 안 잡힙니다.</strong></li>
+      <li>바로 반영하고 싶으면 <b>지금 처리</b>을 누릅니다. 정리 작업이 한 번 돕니다.</li>
+    </ol>
+
+    <div class="callout warn"><span class="label">주의</span>
+      <p>“저장했는데 검색이 안 돼요”의 거의 모든 원인이 이것입니다. 저장 = 대기함 접수, 검색 반영 = 정리 작업이 한 번 돈 뒤입니다.</p>
+    </div>
+
+    <h3 id="e-5min-upload">파일 올리기</h3>
+    <ul>
+      <li>웹 화면에 파일을 끌어다 놓으면 올라갑니다.</li>
+      <li>파일 하나당 <strong>10MiB(약 1천만 바이트)</strong>까지입니다. 허용된 확장자만 받습니다.</li>
+      <li>올라간 파일도 메모와 똑같이 대기함에 들어가고, 정리 작업이 돌 때 처리됩니다.</li>
+      <li>맥을 쓴다면 별도의 메뉴바 앱으로 Finder에서 파일을 끌어다 놓거나, 지정한 폴더를 자동으로 서버에 동기화할 수 있습니다. (맥 폴더 동기화는 <b>서버 방향 한쪽</b>으로만 가고, 삭제는 전달하지 않습니다.)</li>
+    </ul>
+
+    <h3 id="e-5min-search">검색하기</h3>
+    <ul>
+      <li>검색창에 <b>핵심 단어</b>를 공백으로 띄워 적습니다. 예: <code>백업 검증 절차</code></li>
+      <li>단어 순서는 상관없지만, <strong>적은 단어가 전부 들어 있는</strong> 자료만 나옵니다.</li>
+      <li>정확히 이 문구가 붙어 있어야 한다면 큰따옴표로 묶습니다. 예: <code>릴리스 "reader drain"</code></li>
+      <li>자세한 요령은 <a href="#e-search">5장</a>에 따로 적었습니다. 이 부분은 꼭 읽어 두시는 편이 좋습니다.</li>
+    </ul>
+
+    <h3 id="e-5min-conflict">충돌 해결하기</h3>
+    <ol>
+      <li>화면의 <b>충돌</b> 목록에 “서로 어긋나는 두 진술”이 올라옵니다.</li>
+      <li>둘 중 맞는 쪽을 고릅니다 — 왼쪽 유지(<code>keep-left</code>), 오른쪽 유지(<code>keep-right</code>), 또는 판단 보류하고 메모만 남기기(<code>note</code>).</li>
+      <li>메모를 함께 남길 수 있습니다. “계약 담당자가 금요일로 변경 통보” 같은 이유를 적어 두면 나중에 근거가 됩니다.</li>
+      <li>결정하면 그 자체가 기록으로 남습니다. 지워지는 것은 없습니다.</li>
+    </ol>
+
+    <div class="callout when"><span class="label">이럴 때</span>
+      <p><b>충돌을 방치해도 시스템이 임의로 고르지 않습니다.</b> 서두를 필요는 없습니다. 다만 해결하지 않으면 두 진술이 모두 “미확정”으로 남아, 검색 결과에서 어느 쪽도 확정된 사실로 표시되지 않습니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 5 ───────── -->
+    <h2 id="e-search">5. 검색을 잘하는 법 (가장 중요한 장)</h2>
+
+    <div class="callout danger"><span class="label">먼저 알아 두실 것</span>
+      <p>지금의 검색은 <strong>내가 적은 단어가 문서 안에 글자 그대로 들어 있어야</strong> 찾습니다. “~는”, “~에서”, “~인가요?” 같은 조사·어미·물음표가 붙으면 그 덩어리가 문서에 그대로 있을 수 없으므로, <b>자연스러운 한국어 질문은 대부분 결과가 0건으로 나옵니다.</b> 이것은 고장이 아니라 현재 구현의 한계이고, 저희도 측정해서 알고 있습니다(자세히 보기 7·12장).</p>
+    </div>
+
+    <h3 id="e-search-tip">요령 하나: 조사를 빼고, 명사만 띄어서</h3>
+
+    <div class="table-wrap"><table><thead><tr><th>이렇게 적으면 0건</th><th>이렇게 바꾸면 찾습니다</th></tr></thead><tbody>
+          <tr><td><code>백업은 어떻게 검증하나요?</code></td><td><code>백업 검증</code></td></tr>
+          <tr><td><code>계약서를 언제 보내기로 했죠?</code></td><td><code>계약서 발송</code></td></tr>
+          <tr><td><code>unified-db의 포트가 뭐였더라</code></td><td><code>unified-db 포트</code></td></tr>
+          <tr><td><code>릴리스 전환 절차가 궁금해요</code></td><td><code>릴리스 전환 절차</code></td></tr>
+        </tbody></table></div>
+
+    <h3 id="e-search-tip2">요령 둘: 붙어 있는 문구는 큰따옴표로</h3>
+    <p><code>노을 "세 번 실패"</code> 라고 적으면, <b>노을</b>이라는 단어가 있고 <b>세 번 실패</b>라는 문구가 그대로 붙어 있는 자료만 찾습니다. 따옴표를 열고 닫지 않으면 오류가 납니다.</p>
+
+    <h3 id="e-search-tip3">요령 셋: 단어를 너무 많이 넣지 않기</h3>
+    <p>단어를 넣을수록 조건이 좁아집니다(전부 들어 있어야 함). 2~3개가 대체로 가장 잘 맞습니다. 안 나오면 <b>단어를 빼면서</b> 넓히세요. 단어를 더하는 건 좁히는 방향입니다.</p>
+
+    <div class="callout sum"><span class="label">한 줄 요약</span>
+      <p>검색은 <strong>문서에 있는 단어 그대로, 조사 빼고, 2~3개</strong>. 문장으로 묻지 마세요.</p>
+    </div>
+
+    <div class="callout when"><span class="label">이럴 때</span>
+      <p>기억이 흐릿해서 단어가 안 떠오를 때는, 날짜로 좁힌 “최근 변경” 목록을 보거나 그날의 브리핑 페이지를 펼쳐 보는 편이 빠릅니다. 검색은 단어가 떠오를 때 쓰는 도구입니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 6 ───────── -->
+    <h2 id="e-ai">6. AI 비서가 기억을 꺼내 쓰는 법</h2>
+
+    <p>AI와 길게 대화하면, 대화가 너무 길어진 시점에 앞부분이 <b>요약으로 압축</b>됩니다(컴팩션). 이때 구체적인 숫자·날짜·결정이 뭉개지기 쉽습니다. Second Brain은 그 순간에 끼어들어, 압축된 요약에서 핵심 단어를 뽑아 서재를 검색하고, 찾은 사실을 <b>다음 요청 바로 앞에 붙여</b> 줍니다. 이 연결 장치를 “훅(hook)”이라고 부릅니다. 세 클라이언트 모두 같은 장치를 씁니다. 한 번에 최대 8개 기록, 전체 16KB 정도까지만 붙입니다(대화를 밀어내지 않기 위한 한도입니다).</p>
+
+    <h3 id="e-ai-claude">Claude Code</h3>
+    <p>Claude Code 설정에 세 가지 시점(프롬프트 제출, 압축 직후 세션 시작, 압축 완료)을 등록해 둡니다. 실제로 문맥이 <b>그 턴 안에서 주입되는 시점은 “압축 직후 세션 시작” 하나뿐</b>이고, “압축 완료” 시점에 붙이려 하면 Claude Code가 무시합니다(2.1.270 기준으로 실제 세션에서 확인된 동작). 그래서 Second Brain은 압축 완료 시점에는 조용히 <b>다음에 쓸 재료만 챙겨 두고</b>, 실제 주입은 세션 시작 쪽에서 합니다. 압축 요약이 비어 있는 경우도 있는데, 그때는 직전에 기억해 둔 “마지막으로 쓸모 있었던 검색어”로 대신 검색합니다.</p>
+
+    <h3 id="e-ai-codex">Codex CLI</h3>
+    <p>설정 파일 모양만 조금 다를 뿐, Claude Code와 <b>똑같은 세 시점·같은 명령·같은 제한 시간(20초)</b>을 씁니다. 다만 Codex에는 함정이 하나 있습니다. 훅 설정을 바꾼 뒤 처음 Codex 화면을 띄우면 <strong>“Hooks need review”가 뜨고, 사용자가 한 번 “Trust all and continue”를 눌러 줘야</strong> 훅이 켜집니다. 그전까지는 오류도 없이 <b>그냥 조용히 아무 일도 일어나지 않습니다.</b> “왜 기억을 못 꺼내지?” 싶으면 이걸 먼저 확인하세요.</p>
+
+    <h3 id="e-ai-omo">OmO (senpi)</h3>
+    <p>OmO에는 작은 확장 파일을 하나 설치합니다. 걸리는 시점은 두 개입니다 — 매 요청 직전(여기서 “마지막 검색어”를 갱신하고, 남겨 둔 문맥이 있으면 조용히 끼워 넣습니다)과 대화 압축이 실제로 수락된 순간(먼저 재료를 챙기고, 이어서 이번 턴에 바로 문맥을 밀어 넣습니다). 주입되는 메시지는 화면에 보이지 않게 처리됩니다. 이미 켜져 있는 OmO 세션은 <b>다시 불러오거나 재시작해야</b> 확장이 적용됩니다. 훅이 실패하거나 아무것도 못 찾으면 <b>그냥 아무것도 붙이지 않습니다.</b> 어떤 경우에도 AI 쪽이 죽지 않게 설계돼 있습니다.</p>
+
+    <div class="callout sum"><span class="label">한 줄 요약</span>
+      <p>훅은 <strong>“대화가 압축되는 순간, 서재에서 관련 사실을 꺼내 붙여 주는 장치”</strong>입니다. 잘 되면 티가 안 나고, 안 돼도 AI가 멈추지 않습니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 7 ───────── -->
+    <h2 id="e-ready">7. 신호등(준비 상태) 읽는 법</h2>
+
+    <p>시스템에는 두 종류의 상태 등이 있습니다. 하나는 <b>맥박</b>(<code>/health</code>) — 프로그램이 살아 있느냐만 봅니다. 다른 하나는 <b>신호등</b>(<code>/ready</code>) — “지금 믿고 써도 되느냐”를 봅니다. 우리가 봐야 할 것은 신호등 쪽입니다.</p>
+
+    <div class="lights">
+      <div class="light">
+        <span class="bulb">🟢</span>
+        <b>초록불 — ready</b>
+        <p>최근에 정리 작업이 성공했고, 검증된 백업이 있고, 밀린 요청이 없습니다. 그냥 쓰면 됩니다.</p>
+      </div>
+      <div class="light">
+        <span class="bulb">🟡</span>
+        <b>노란 기운 — 경고</b>
+        <p>점검 명령에서 “warn”이 몇 개 보이는 상태. 대체로 기능에는 영향이 없습니다. 예: 설치 방식 차이로 생기는 스케줄러 파일 경고.</p>
+      </div>
+      <div class="light">
+        <span class="bulb">🔴</span>
+        <b>빨간불 — 이유가 붙습니다</b>
+        <p>신호등이 빨간불이면 <b>반드시 “왜”에 해당하는 코드가 함께 나옵니다.</b> 코드를 보고 아래 표대로 대응하면 됩니다.</p>
+      </div>
+    </div>
+
+    <h3 id="e-ready-what">빨간불일 때, 사람이 할 수 있는 다섯 가지</h3>
+
+    <div class="table-wrap"><table><thead><tr><th>화면에 보이는 말</th><th>쉽게 말하면</th><th>할 일</th></tr></thead><tbody>
+          <tr>
+            <td><code>VERIFIED_BACKUP_UNAVAILABLE</code><br><code>LATEST_BACKUP_UNVERIFIED</code></td>
+            <td>검증까지 통과한 최근 백업이 없습니다.</td>
+            <td>백업을 한 번 새로 만듭니다. 만들면 검증까지 자동으로 합니다.</td>
+          </tr>
+          <tr>
+            <td><code>LAST_RUN_UNSUCCESSFUL</code><br><code>LAST_RUN_STALE_OR_INVALID</code></td>
+            <td>최근 정리 작업이 실패했거나, 너무 오래 안 돌았습니다(기본 48시간 기준).</td>
+            <td>상태 화면에서 어느 단계가 실패했는지 보고, 원인을 없앤 뒤 한 번 더 돌립니다.</td>
+          </tr>
+          <tr>
+            <td><code>DERIVATIONS_FAILED</code></td>
+            <td>정리하다 실패한 항목이 남아 있습니다.</td>
+            <td>대부분 AI 백엔드 문제입니다. 회복된 뒤 “다시 시도”를 걸면 됩니다. 단 <b>지난 브리핑은 일부러 다시 만들지 않습니다.</b></td>
+          </tr>
+          <tr>
+            <td><code>GENERATION_CLEANUP_STALLED</code></td>
+            <td>지난 판본을 치우다 만 흔적이 남아 있습니다.</td>
+            <td>유지보수를 한 번 돌립니다. <b>이때 다른 조회는 같이 돌리지 마세요</b>(아래 주의).</td>
+          </tr>
+          <tr>
+            <td><code>GENERATION_INDEX_INVALID</code></td>
+            <td>검색 색인이 옛날 형식이라 못 읽습니다.</td>
+            <td>정리 작업을 한 번 돌려 <b>새 판본을 발행</b>하면 해결됩니다. 색인만 고치는 방법은 없습니다.</td>
+          </tr>
+          <tr>
+            <td><code>REQUESTS_STALLED</code></td>
+            <td>다른 시스템에서 보낸 요청이 처리되지 않고 쌓였습니다.</td>
+            <td>요청 처리를 한 번 수동으로 돌리고, 요청 처리 스위치 파일이 있는지 확인합니다.</td>
+          </tr>
+        </tbody></table></div>
+
+    <div class="callout danger"><span class="label">주의 — 이것만은 지켜 주세요</span>
+      <p><strong>유지보수가 도는 동안에는 상태 조회나 검색을 같이 돌리지 마세요.</strong> 유지보수는 “지난 판본을 아무도 안 보고 있는지” 확인한 뒤에야 치우는데, 그 순간 누군가 파일을 열고 있으면 치우기가 실패합니다. 실제로 운영 중에 이 사고가 한 번 났고, 1분 뒤 <b>혼자만 돌렸더니</b> 정상적으로 끝났습니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 8 ───────── -->
+    <h2 id="e-backup">8. 백업과 되돌리기</h2>
+
+    <h3 id="e-backup-make">백업은 자동입니다</h3>
+    <p>매일 새벽에 백업이 만들어집니다. 만들어진 직후에 <b>실제로 임시 공간에 풀어서</b> 체크섬·기록·각주를 검사하고, 통과하면 “검증됨” 영수증 파일을 남깁니다. 그래서 백업 파일 옆에는 늘 검증 기록이 하나 더 있습니다.</p>
+    <ul>
+      <li>백업에는 <b>정리된 페이지와 원본 창고, 내부 기록</b>이 들어갑니다.</li>
+      <li>예전 프로그램 버전, 예전 백업, 관계없는 다른 파일은 <b>들어가지 않습니다</b>.</li>
+      <li>검증에는 임시로 풀어 볼 <b>디스크 여유 공간</b>이 필요합니다.</li>
+    </ul>
+
+    <h3 id="e-backup-restore">되돌리기는 항상 “새 폴더로”</h3>
+    <p>복구는 반드시 <strong>비어 있는 새 폴더</strong>로 풉니다. 운영 중인 서재를 가리키면 시스템이 거부합니다. 풀어 놓은 뒤 내용을 비교해 보고, 필요한 부분만 다시 넣는 방식이 안전합니다.</p>
+
+    <div class="callout warn"><span class="label">주의</span>
+      <p>다른 컴퓨터(다른 설치본)에서 만든 백업을 가져오면 “출처가 다르다”며 검증에 실패합니다. 이건 고장이 아니라, <b>남의 백업을 내 정상 상태의 근거로 쓰지 못하게</b> 막는 장치입니다. 그런 백업도 <b>새 폴더로 풀어 보는 것은</b> 가능합니다.</p>
+    </div>
+
+    <h3 id="e-backup-rollback">프로그램 버전 되돌리기</h3>
+    <p>프로그램은 버전별 폴더에 하나씩 쌓이고, <b>“현재”라는 이름표 하나</b>가 그중 하나를 가리킵니다. 새 버전으로 바꾸는 것도, 예전 버전으로 되돌리는 것도 <b>이 이름표를 옮기는 것</b>이 전부입니다. 예전 버전 폴더는 지우지 않으므로 되돌릴 자리가 늘 남아 있습니다.</p>
+    <p class="section-note">
+      참고: “저장된 지식”을 통째로 되돌리는 명령은 일부러 만들어 두지 않았습니다.
+      되돌리기는 ① 프로그램 이름표를 옮기거나 ② 백업을 새 폴더로 풀어 대조하는 두 가지 방법으로만 합니다.
+    </p>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 9 ───────── -->
+    <h2 id="e-dont">9. 절대 하지 말 것</h2>
+
+    <div class="table-wrap"><table><thead><tr><th>하지 말 것</th><th>왜</th></tr></thead><tbody>
+          <tr><td>유지보수가 도는 중에 검색·상태 조회를 같이 돌리기</td><td>지난 판본 정리가 실패합니다. 유지보수는 혼자 돌려야 합니다.</td></tr>
+          <tr><td>운영 중인 서재 폴더 위로 백업 풀기</td><td>시스템이 거부합니다. 반드시 새 폴더로 푸세요.</td></tr>
+          <tr><td>내부 기록 파일(데이터베이스)을 직접 열어 고치기</td><td>“무엇이 언제 어떻게 바뀌었는지”를 증명하는 구조가 깨집니다. 실패 기록조차 감사 목적으로 보존합니다.</td></tr>
+          <tr><td>봉인된 판본 폴더의 권한을 임의로 바꾸기</td><td>“읽기 전용으로 봉인됨”이 무결성 약속의 일부입니다.</td></tr>
+          <tr><td>설정 파일에 든 개인키 값을 복사하거나 화면에 출력하기</td><td>비밀 자료입니다. 어디에도 붙여넣지 마세요.</td></tr>
+          <tr><td>충돌을 시스템이 알아서 고르게 하려고 시도하기</td><td>그런 기능이 없습니다. 제품 원칙상 사람이 고릅니다.</td></tr>
+          <tr><td>승인 없이 원본 지우기</td><td>청소 명령도 두 단계 확인이 있어야만 실제로 지웁니다.</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 10 ───────── -->
+    <h2 id="e-limits">10. 아직 못 하는 것 (정직하게)</h2>
+
+    <ul>
+      <li><strong>자연스러운 문장으로 검색하기.</strong> 측정해 보니 자연어 질문 66건, 의역 13건 모두 <b>회수율 0</b>이었습니다. 핵심 단어를 띄어서 넣는 방식만 잘 동작합니다(키워드 기준 0.74~0.82).</li>
+      <li><strong>의미 기반(비슷한 뜻) 검색.</strong> 기능 자체는 있지만 기본은 꺼져 있고, 켜더라도 <b>다음 판본부터</b> 적용됩니다. 이미 봉인된 판본은 설정만 바꿔서 다시 색인되지 않습니다.</li>
+      <li><strong>지난 브리핑 다시 만들기.</strong> 그날의 입력과 날짜를 고정해 재생할 수 없기 때문에 일부러 막아 두었습니다.</li>
+      <li><strong>조용한 날의 브리핑.</strong> 새로 들어온 게 없으면 브리핑을 만들지 않습니다.</li>
+      <li><strong>AI 없이 동작하기.</strong> 페이지 정리·충돌 판정·브리핑은 모두 외부 AI 백엔드가 필요합니다. 그쪽 계정 한도나 설정 문제가 그대로 실패로 나타납니다.</li>
+      <li><strong>여러 사람이 나눠 쓰기.</strong> 한 사람·한 서재·한 명의 쓰기 담당자를 전제로 만들어졌습니다. 자료에 붙는 소유자/프로젝트 표시는 <b>분류 기록일 뿐 접근 차단 장치가 아닙니다.</b></li>
+      <li><strong>개인정보 가리기.</strong> 가려지는 것은 자격증명 형태의 문자열(액세스 키, 토큰, 비밀번호, 인증서 등)뿐입니다. <b>이메일 주소나 전화번호는 그대로 남습니다.</b></li>
+    </ul>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 11 ───────── -->
+    <h2 id="e-faq">11. 자주 묻는 질문</h2>
+
+    <div class="faq">
+      <details open>
+        <summary>인터넷에 내 메모가 올라가나요?</summary>
+        <div class="answer">
+          <p>웹 화면과 API는 그 컴퓨터 자신에게만 열려 있어서 외부에서 접속할 수 없습니다. 맥에서 쓸 때도 안전한 터널을 통해 “그 컴퓨터 안”으로 들어가는 방식을 권장합니다.</p>
+          <p>다만 <b>페이지 정리·브리핑을 만들 때는 외부 AI 서비스를 호출합니다.</b> 현재 운영 백엔드는 OmO를 거친 Grok입니다. 외부에 보내면 안 되는 자료는 그 자료원의 정책을 <code>deny</code> 또는 로컬 전용으로 설정해야 합니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>저장했는데 검색에 안 나와요.</summary>
+        <div class="answer">
+          <p>저장은 “대기함에 접수”까지입니다. 정리 작업이 한 번 돌아야 검색에 들어갑니다. 1시간마다 자동으로 돌지만, 급하면 웹 화면의 “지금 처리”을 누르세요.</p>
+          <p>그래도 안 나오면 검색어 문제일 가능성이 높습니다. 조사를 빼고 명사만 넣어 다시 시도해 보세요.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>왜 질문처럼 검색하면 아무것도 안 나오죠?</summary>
+        <div class="answer">
+          <p>현재 검색은 적은 단어가 문서에 <b>글자 그대로</b> 들어 있어야 찾습니다. “계약서를”은 문서에 “계약서”로만 있으므로 안 맞습니다. 조사·어미·물음표를 떼고 명사만 남기세요.</p>
+          <p>이건 알려진 한계이고, 고치려면 한국어 형태소 처리나 의미 검색을 붙여야 합니다. 로드맵 1순위입니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>오늘 브리핑이 없어요. 고장인가요?</summary>
+        <div class="answer">
+          <p>아닙니다. 새로 들어온 자료가 없고 새로 만들어진 페이지도 없는 날에는 브리핑을 만들지 않습니다. AI를 헛되이 호출하지 않으려는 설계입니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>같은 내용을 두 번 넣으면 두 번 저장되나요?</summary>
+        <div class="answer">
+          <p>원본 창고는 내용으로 이름을 붙이기 때문에, 완전히 같은 내용은 한 번만 저장됩니다. 또 이미 처리한 자료는 다시 처리하지 않도록 표시해 둡니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>잘못 넣은 메모를 지울 수 있나요?</summary>
+        <div class="answer">
+          <p>아직 정리되지 않은 대기함 항목은 화면에서 버릴 수 있습니다. 이미 정리된 페이지도 화면에서 “잊기”로 없앨 수 있고, 그 사실이 기록으로 남습니다.</p>
+          <p>다만 <b>원본 창고의 바이트</b>는 청소 명령을 사람이 두 단계로 승인해야만 실제로 사라집니다. 실수로 지워지지 않게 하려는 의도입니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>“충돌”이 계속 쌓이는데 그냥 둬도 되나요?</summary>
+        <div class="answer">
+          <p>둬도 시스템이 임의로 고르지 않으니 위험하지는 않습니다. 다만 해결되지 않은 동안 두 진술 모두 확정된 사실로 취급되지 않습니다. 시간 날 때 한 번에 정리하시면 됩니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>AI 비서가 옛날 얘기를 반복해서 꺼내요.</summary>
+        <div class="answer">
+          <p>훅은 이미 전달한 기록을 세션별 파일에 적어 두고 중복을 피합니다. 반복된다면 그 세션 파일이 사라졌거나 세션이 새로 시작된 경우입니다. 보통은 세션을 새로 시작하면 정리됩니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Codex에서 기억이 전혀 안 붙습니다.</summary>
+        <div class="answer">
+          <p>거의 항상 신뢰 승인 문제입니다. Codex 화면을 한 번 띄우면 “Hooks need review”가 뜨는데, 여기서 <b>“Trust all and continue”</b>를 한 번 눌러 줘야 훅이 켜집니다. 그 전에는 오류도 없이 조용히 아무 일도 하지 않습니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>웹 화면이 안 열려요.</summary>
+        <div class="answer">
+          <p>웹 서비스가 떠 있는지 먼저 확인합니다. 주소가 이미 다른 프로그램에 점유돼 있으면 시작에 실패합니다. 살아 있는지만 보려면 <code>/health</code>, 믿고 써도 되는지 보려면 <code>/ready</code>를 확인합니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>디스크가 얼마나 필요하죠?</summary>
+        <div class="answer">
+          <p>원본 창고 + 정리된 페이지 + 백업 아카이브만큼입니다. 여기에 <b>백업 검증용 임시 공간</b>이 추가로 필요합니다. 검증은 실제로 풀어 보기 때문입니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>업로드 크기 제한은요?</summary>
+        <div class="answer">
+          <p>파일 하나당 10MiB입니다. 허용된 확장자만 받고, 경로를 조작하는 형태의 파일 이름은 거부합니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>맥에서도 쓸 수 있나요?</summary>
+        <div class="answer">
+          <p>네. macOS 14 이상용 메뉴바 앱이 있습니다. Finder에서 파일 드롭, 선택 폴더 자동 동기화, 알림 센터 브리핑, 검색을 제공합니다. 실제 동작은 Ubuntu 쪽 엔진이 하고, 맥 앱은 안전한 터널로 연결합니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>“이거 어디서 나온 말이야?”를 어떻게 확인하죠?</summary>
+        <div class="answer">
+          <p>정리된 페이지의 문장 끝에 각주 번호가 붙어 있습니다. 그 각주는 원본 창고의 특정 파일을 가리킵니다. 각주가 깨져 있으면 점검 명령이 실패로 알려 주기 때문에, 근거 없는 문장이 오래 남아 있을 수 없습니다.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>실수로 뭔가 망가뜨렸을 때 제일 먼저 뭘 보면 되나요?</summary>
+        <div class="answer">
+          <p>① 신호등(<code>/ready</code>)의 이유 코드, ② 점검 명령(<code>sb doctor</code>)의 실패 항목, ③ 상태 화면의 최근 단계 기록. 이 세 가지면 대부분 원인이 드러납니다. 자세한 대응표는 “자세히 보기 → 11 문제 해결”에 있습니다.</p>
+        </div>
+      </details>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ───────── 12 ───────── -->
+    <h2 id="e-glossary">12. 용어 한눈에</h2>
+
+    <div class="table-wrap"><table><thead><tr><th>용어</th><th>쉽게 말하면</th></tr></thead><tbody>
+          <tr><td>Vault(볼트)</td><td>지식이 사는 폴더 하나. 서재 건물 전체라고 보면 됩니다.</td></tr>
+          <tr><td>inbox(대기함)</td><td>아직 정리되지 않은 메모·파일이 잠깐 머무는 곳.</td></tr>
+          <tr><td>raw / CAS(원본 창고)</td><td>원본 바이트를 내용으로 이름 붙여 보관하는 창고. 같은 내용은 한 번만 들어갑니다.</td></tr>
+          <tr><td>wiki(지식 페이지)</td><td>원본을 근거로 정리된 읽기용 페이지.</td></tr>
+          <tr><td>daily(브리핑)</td><td>변화가 있던 날에만 만들어지는 그날의 요약.</td></tr>
+          <tr><td>conflicts(충돌)</td><td>서로 어긋나는 두 진술이 올라오는 목록. 사람이 고릅니다.</td></tr>
+          <tr><td>ledger(원장)</td><td>“무엇이 언제 어떻게 처리됐는지”를 적어 두는 내부 장부.</td></tr>
+          <tr><td>각주 / sid</td><td>페이지의 문장이 어느 원본에서 왔는지 가리키는 표시.</td></tr>
+          <tr><td>generation(판본/세대)</td><td>어느 시점의 서재 전체를 통째로 봉인한 스냅숏. “현재”라는 이름표가 가리키는 것이 지금 쓰는 판본입니다.</td></tr>
+          <tr><td>reader drain</td><td>지난 판본을 치우기 전에 “아무도 안 보고 있는지” 확인하는 절차.</td></tr>
+          <tr><td>readiness(신호등)</td><td>“지금 믿고 써도 되는가”를 알려 주는 상태. 살아 있는지만 보는 맥박과 다릅니다.</td></tr>
+          <tr><td>release / current</td><td>프로그램 버전별 폴더와, 그중 하나를 가리키는 “현재” 이름표.</td></tr>
+          <tr><td>훅(hook)</td><td>AI 대화가 압축되는 순간에 끼어들어 기억을 붙여 주는 연결 장치.</td></tr>
+          <tr><td>compaction(컴팩션)</td><td>대화가 길어졌을 때 앞부분을 요약으로 압축하는 것.</td></tr>
+          <tr><td>MCP</td><td>AI 도구가 이 서재를 직접 검색·읽기 할 수 있게 해 주는 연결 규격.</td></tr>
+          <tr><td>JARVIS</td><td>별도의 비서 시스템. 직접 쓰지 않고 <b>서명된 요청</b>을 보내면 Second Brain이 대신 실행합니다.</td></tr>
+          <tr><td>capped(예산 걸림)</td><td>한 번에 처리할 양의 상한에 걸려 일부만 처리된 상태. 실패가 아니라 “다음 번에 이어서”입니다.</td></tr>
+          <tr><td>superseded(종결됨)</td><td>나중에 성공한 결과가 있어 더 이상 재시도하지 않기로 닫아 둔 실패 기록. 지워지지는 않습니다.</td></tr>
+          <tr><td>단일 writer</td><td>같은 순간에 쓰기를 하는 주체가 하나뿐이라는 원칙. 그래서 다른 작업이 돌고 있으면 “이미 실행 중”이라고 조용히 비켜 줍니다.</td></tr>
+        </tbody></table></div>
+
+    <div class="callout sum"><span class="label">한 줄 요약</span>
+      <p>더 깊이 알고 싶으면 위쪽 <strong>“🛠 자세히 보기”</strong> 탭을 누르세요. 설정 키, 명령어, 오류 코드, 전환 절차가 전부 정리돼 있습니다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- ═════════════ 레이어 2 · 자세히 보기 ══════════════════ -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section class="layer" id="layer-tech" role="tabpanel" aria-labelledby="tab-tech" hidden>
+
+    <h1>Second Brain 제품 매뉴얼 (기술 레퍼런스)</h1>
+    <p class="lede">
+      <code>second-brain</code> 엔진(패키지 <code>second-brain</code>, 버전 <code>1.0.0</code>, 콘솔 스크립트 <code>sb</code>)의 정본 운영 매뉴얼입니다.
+      모든 서술은 리포의 코드(<code>sb/</code>, <code>deploy/</code>)와 커밋된 운영 기록에서 확인한 내용만 담습니다.
+      코드에 없는 옵션·설정 키는 적지 않습니다.
+    </p>
+
+    <ul>
+      <li>대상 리포: <code>/home/jm/orca/projects/second-brain-app</code></li>
+      <li>패키지 메타: <code>pyproject.toml</code> (<code>name = "second-brain"</code>, <code>version = "1.0.0"</code>,
+          <code>requires-python = "&gt;=3.12"</code>, <code>[project.scripts] sb = "sb.cli:main"</code>)</li>
+      <li>참고 문서: <code>README.md</code>, <code>AGENTS.md</code>, 운영 기록
+          <code>CLAUDE-CUTOVER-2026-09-15.md</code>, <code>CLAUDE-COMPLETION-REPORT-2026-09-15.md</code>,
+          <code>CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md</code>, <code>M10-GOLD-CURATED-2026-09-15.md</code>,
+          <code>GROK-INTEGRATED-CANDIDATE-HANDOFF-2026-09-13.md</code></li>
+    </ul>
+
+    <!-- ══════════ 1 ══════════ -->
+    <h2 id="t1">1 개요와 설계 목표</h2>
+
+    <h3 id="t1-1">1.1 한 문장 정의</h3>
+    <p>Second Brain은 <strong>원본을 지우지 않고 출처를 추적하며, 모든 쓰기를 원장(ledger)과 세대(generation)로 증명 가능하게 만드는 단일 사용자·단일 Vault·단일 writer 로컬 지식 엔진</strong>이다.</p>
+
+    <h3 id="t1-2">1.2 설계 목표 (코드에서 강제되는 것들)</h3>
+    <div class="table-wrap"><table><thead><tr><th>목표</th><th>코드상 강제 지점</th></tr></thead><tbody>
+          <tr><td>원본 보존</td><td><code>raw/</code>는 SHA-256 CAS. <code>sb gc</code>는 <code>--apply --confirm</code> 둘 다 없으면 삭제하지 않는다(<code>sb/governance.py: collect_orphans</code>).</td></tr>
+          <tr><td>출처 추적</td><td>컴파일된 페이지는 각주 <code>[^&lt;sid&gt;]</code>와 프론트매터 <code>sources</code>를 가지며, <code>sb doctor</code>의 <code>citations</code> 검사가 미해결 각주와 누락 CAS를 fail로 만든다(<code>sb/pipeline.py: audit_citations</code>).</td></tr>
+          <tr><td>단일 writer</td><td>파이프라인은 <code>.sb/run.lock</code>을 <code>flock(LOCK_EX|LOCK_NB)</code>으로 잡고, 잡히지 않으면 <code>already running</code>을 출력하고 종료 코드 0으로 끝낸다(<code>sb/pipeline.py: _try_lock</code>, <code>_print_outcome</code>).</td></tr>
+          <tr><td>세대 불변성</td><td>게시된 세대 디렉터리는 파일 <code>0400</code>/디렉터리 <code>0500</code>으로 봉인된다(<code>sb/generations.py: _seal_modes</code>).</td></tr>
+          <tr><td>복구 가능성</td><td><code>sb backup</code>은 생성 직후 검증까지 수행하고 <code>*.tar.gz.verified.json</code> 영수증을 남긴다(<code>sb/cli.py: backup</code>, <code>sb/runtime_backup.py</code>).</td></tr>
+          <tr><td>자동 파괴 금지</td><td><code>sb rollback</code>은 항상 <code>ROLLBACK_REQUIRES_GENERATION_AUTHORITY</code>로 거절한다(<code>sb/cli.py: rollback</code>). 충돌 자동 해결·무승인 삭제 경로는 없다.</td></tr>
+          <tr><td>루프백 한정</td><td>웹 API 기본 바인딩은 <code>127.0.0.1:8765</code> (<code>sb/cli.py</code> web 기본값, <code>deploy/systemd/second-brain-web.service</code>).</td></tr>
+        </tbody></table></div>
+
+    <h3 id="t1-3">1.3 제공 표면</h3>
+    <div class="table-wrap"><table><thead><tr><th>표면</th><th>진입점</th><th>용도</th></tr></thead><tbody>
+          <tr><td>CLI</td><td><code>sb</code> (<code>sb/cli.py</code>)</td><td>수집·컴파일·브리핑·진단·백업·복원·유지보수</td></tr>
+          <tr><td>MCP (stdio)</td><td><code>sb mcp</code> / <code>python -m sb.mcp</code> (<code>sb/mcp.py</code>)</td><td>AI 클라이언트의 검색·페이지 읽기·기억 기록</td></tr>
+          <tr><td>Web</td><td><code>sb web</code> (<code>sb/web.py</code>)</td><td>기억·업로드·검색·충돌 해결·상태/메트릭·<code>/ready</code></td></tr>
+          <tr><td>기억 훅</td><td><code>sb postcompact-hook</code> (<code>sb/postcompact_hook.py</code>)</td><td>Claude Code / Codex CLI / OmO의 컴팩션 시점 문맥 주입</td></tr>
+          <tr><td>macOS 앱</td><td><code>clients/macos/SecondBrainMac</code></td><td>메뉴바·Finder 드롭·폴더 동기화(별도 문서 <code>MACOS-DESKTOP.md</code>)</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 2 ══════════ -->
+    <h2 id="t2">2 아키텍처</h2>
+
+    <h3 id="t2-1">2.1 레이어</h3>
+    <p><code>AGENTS.md</code>가 정의한 계층이 그대로 모듈 경계다.</p>
+<pre><code>L7  sb/cli.py      sb/mcp.py      sb/web.py          ← 사용자 표면
+L6  sb/pipeline.py                                    ← 락, 원장, 로그, 디스패치
+L5  sb/vault.py                                       ← wiki/ daily/ conflicts/ log.md 의 유일한 writer, 유일한 git committer
+L4  sb/llm.py  sb/compile.py  sb/conflict.py  sb/briefing.py   ← 순수 변환(파일시스템 접근 금지)
+L3  sb/normalize.py
+L2  sb/connectors/*  sb/parsers/*
+L1  sb/store/cas.py  sb/store/ledger.py
+L0  sb/contracts.py  sb/config.py</code></pre>
+    <p>L7 옆에 <code>sb/search.py</code>, <code>sb/embeddings.py</code>, <code>sb/hybrid_search.py</code>가 놓인다. 검색은 <strong>커밋된 git blob</strong>을 읽는다.</p>
+    <p>금지된 결합(<code>AGENTS.md</code> 정본): 커넥터는 <code>sb.normalize</code>/<code>sb.llm</code>/<code>sb.vault</code>를 import 하지 않는다. <code>sb.compile</code>·<code>sb.briefing</code>은 파일시스템을 만지지 않고 <code>PageSpec</code>만 반환한다. <code>sb.pipeline</code>을 import 하는 것은 <code>sb.cli</code>, <code>sb.web</code>, 명시적 MCP <code>sb_run</code> 표면뿐이다. unified-db 커넥터는 읽기 전용 트랜잭션임을 확인한 뒤에만 SELECT 한다. 서버에는 파일 워처·큐·이벤트 버스가 없고 <code>inbox/</code>에서만 수집한다.</p>
+
+    <h3 id="t2-2">2.2 Vault 레이아웃</h3>
+<pre><code>vault/
+├── wiki/                 컴파일된 지식 페이지 (.md)
+├── wiki/_proposed/       사람 편집을 보호한 AI 제안본
+├── daily/                일일 브리핑
+├── conflicts/            충돌과 사람의 해결 기록
+├── inbox/                기억·업로드 대기 자료
+├── raw/                  SHA-256 CAS 원본 (raw/&lt;hh&gt;/&lt;sha256&gt;)
+├── log.md                실행 로그
+└── .sb/                  SQLite 원장 · 검색 인덱스 · 메트릭 · 락
+    ├── ledger.db
+    ├── search.db
+    ├── compiled/         페이지별 마지막 컴파일 해시
+    ├── run.lock
+    └── session-memory/   훅 스테이지 파일(state_root 아래에 놓일 수도 있음)</code></pre>
+    <p><code>raw/</code>와 <code>.sb/</code>는 Vault git에서 제외되지만 백업에는 포함된다(<code>README.md</code>). Vault 루트 모드는 <code>0700</code> (<code>sb/vault.py: init_vault</code>).</p>
+
+    <h3 id="t2-3">2.3 관리형(세대) 배치 vs 단순 배치</h3>
+    <p>코드는 두 배치를 구분한다. 판정식은 여러 곳에서 동일하다:</p>
+<pre><code>managed = Path(config.vault_root).is_symlink() or "share_root" in config.raw</code></pre>
+    <p class="section-note">(<code>sb/readiness.py</code>, <code>sb/pipeline.py: _execute</code>, <code>sb/runtime_backup.py</code> 등)</p>
+    <div class="table-wrap"><table><thead><tr><th></th><th>단순 배치</th><th>관리형 배치(운영)</th></tr></thead><tbody>
+          <tr><td><code>vault_root</code></td><td>실제 디렉터리</td><td><code>share/vault</code> <strong>심볼릭 링크</strong></td></tr>
+          <tr><td>쓰기</td><td>Vault에 직접 커밋</td><td>스테이징 트리 → 봉인 → 링크 전환</td></tr>
+          <tr><td>락 위치</td><td><code>vault/.sb/run.lock</code></td><td><code>state_root/.sb/run.lock</code></td></tr>
+          <tr><td>세대 저널</td><td>없음</td><td><code>state_root/generation-journal.db</code></td></tr>
+          <tr><td>요청 저널</td><td>선택</td><td><code>request_root/journal.db</code></td></tr>
+        </tbody></table></div>
+    <p>운영 설치(<code>~/.config/second-brain/config.toml</code>)는 <code>share_root</code>, <code>state_root</code>, <code>generation_root</code>를 모두 명시하므로 관리형이다.</p>
+
+    <h3 id="t2-4">2.4 텍스트 다이어그램 — 전체 데이터 흐름</h3>
+<pre><code> [소스]                    [수집]              [원장/CAS]            [파생]                [Vault]
+ inbox/*.md ────┐
+ markdown-vault ┼─ sb ingest ─► source_item ─► raw/&lt;sha256&gt;  ─► unit ─► derivation ─► PageSpec ─► wiki/*.md
+ unified-db(RO) ┘                  │                                  │  (compile)        │        daily/*.md
+                                   │                                  │  (conflict)       │        conflicts/*.md
+                                   └────── cursor(어댑터별) ──────────┘  (brief)          └── git commit</code></pre>
+
+<pre><code> [세대 수명주기 — 관리형 배치]
+
+  writer mutex(generation-writer.lock)
+        │
+        ▼
+  base = current 세대 ──copy──► staging/&lt;64hex&gt;  ──apply(ingest|compile|brief|run|inbox|effect|restore)──►
+        │                                                  │
+        │                                             seal(0400/0500) + manifest
+        │                                                  │
+        │                                       activations: claimed → staging → sealed
+        │                                                  │
+        │                                            switch_intent
+        │                                                  │
+        │                                    share/vault 심링크 원자 교체 (activated)
+        │                                                  │
+        │                          reader drain 검사(/proc fd + reader_leases)
+        │                                                  │
+        │                                     predecessor → .retired → 삭제 (disposing)
+        │                                                  │
+        └──────────────────────────────────────────────► proved</code></pre>
+
+    <div class="callout danger"><span class="label">핵심</span>
+      <p><strong>선행 세대를 폐기하려면 그 디렉터리를 연 fd가 0이어야 한다.</strong> 하나라도 남아 있으면 <code>GENERATION_READER_DRAIN_REQUIRED</code>가 발생한다(<code>sb/generations.py: _complete_disposal</code>, <code>_proc_descriptors</code>). <code>/proc</code>을 읽을 수 없으면 <code>GENERATION_READER_DRAIN_UNVERIFIABLE</code>.</p>
+    </div>
+
+    <h3 id="t2-5">2.5 요청 저널 (JARVIS memreq)</h3>
+<pre><code> JARVIS ──(서명된 요청)──► request_root/pending/&lt;file&gt;
+                                    │
+                    jm-second-brain-requests.path (DirectoryNotEmpty)
+                                    │
+                            sb apply-requests --once
+                                    │
+             journal.db: requests(state, phase, fence, owner, lease_expires_at, …)
+                                    │
+     pending ─claim─► processing ─(세대 mutation)─► proved
+                          │
+                          ├─► failed
+                          ├─► expired
+                          └─► reapproval_required
+                                    │
+                            request_root/receipts/</code></pre>
+    <p><code>requests.state</code>의 CHECK 제약은 정확히 다음 6개다(<code>sb/request_store.py</code>): <code>'pending','processing','proved','failed','expired','reapproval_required'</code>.</p>
+    <p><code>requests.phase</code>(세대 진행 단계)는 다음 7개다: <code>'claimed','staging','sealed','switch_intent','activated','disposing','proved'</code>.</p>
+
+    <h3 id="t2-6">2.6 검색 인덱스</h3>
+<pre><code> committed git blob (wiki/, daily/, conflicts/)
+        │  (SearchIndex.project)
+        ▼
+ .sb/search.db  ─ docs(page_id, section, text, compact, normalize_id, normalize_section,
+        │          kind, status, updated, knowledge_status, approval_status, canonical, …)
+        │
+        ├─ lexical: 모든 검색어가 compact/normalize_id/normalize_section의 부분 문자열일 것 (AND)
+        └─ semantic: [search] hybrid=true 이고 봉인 벡터가 있을 때만</code></pre>
+    <p>인덱스 스키마 버전은 <code>sb/search.py</code>의 <code>_INDEX_SCHEMA_VERSION = "4"</code>이고, 필수 컬럼 집합이 맞지 않는 구세대 <code>search.db</code>를 읽으면 <code>GENERATION_INDEX_INVALID</code>가 난다(<code>sb/search_errors.py</code>).</p>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 3 ══════════ -->
+    <h2 id="t3">3 설치와 릴리스 준비</h2>
+
+    <h3 id="t3-1">3.1 개발용 설치(단순 배치)</h3>
+    <p><code>README.md</code>의 Ubuntu 빠른 설치:</p>
+<pre><code>cd /home/jm/orca/projects/second-brain-app
+uv tool install --force .
+
+mkdir -p ~/.config/second-brain
+install -m 0600 config.example.toml ~/.config/second-brain/config.toml
+
+SB_CONFIG=~/.config/second-brain/config.toml sb init
+SB_CONFIG=~/.config/second-brain/config.toml sb doctor
+
+./deploy/install-systemd-user.sh</code></pre>
+    <p><code>deploy/install-systemd-user.sh</code>가 설치하는 유닛은 리포에 있는 5개뿐이다: <code>second-brain.service</code>, <code>second-brain.timer</code>, <code>second-brain-backup.service</code>, <code>second-brain-backup.timer</code>, <code>second-brain-web.service</code>. 그리고 <code>second-brain-web.service second-brain.timer second-brain-backup.timer</code>를 <code>enable --now</code> 한다. <code>--dry-run</code>을 주면 실행 대신 명령을 출력한다. <code>SB_BIN</code>(기본 <code>$HOME/.local/bin/sb</code>)이 실행 가능하지 않으면 종료 코드 1로 중단한다.</p>
+
+    <h3 id="t3-2">3.2 운영 릴리스 준비(<code>deploy/prepare-release.py</code>)</h3>
+    <p>운영 배치는 <code>uv tool install</code>이 아니라 <strong>커밋된 HEAD를 봉인된 릴리스 디렉터리로 빌드</strong>해서 쓴다.</p>
+<pre><code>cd /home/jm/orca/projects/second-brain-app
+python deploy/prepare-release.py              # 기본 app root: ~/.local/state/second-brain/app
+python deploy/prepare-release.py --offline    # UV_OFFLINE=1, 네트워크 없이 로컬 캐시만 사용</code></pre>
+    <p>동작(스크립트 본문 기준):</p>
+    <ol>
+      <li><code>git rev-parse HEAD</code>로 소스 커밋을 고정하고 <code>git archive</code>로 <strong>커밋된 트리만</strong> 임시 디렉터리에 푼다. 작업 트리의 미커밋·미추적 파일은 릴리스에 들어가지 않는다(<code>working_tree_modified</code>는 매니페스트에 기록만 된다).</li>
+      <li><code>SOURCE_DATE_EPOCH</code>를 커밋 시각으로 고정하고 <code>uv build --wheel</code>, <code>uv export --frozen --no-dev</code>로 휠과 <code>requirements.txt</code>를 만든다.</li>
+      <li><code>uv python find --managed-python --no-python-downloads --system 3.12</code>로 찾은 런타임을 <code>deploy/bundle_python_runtime.py</code>가 릴리스 안으로 번들한다.</li>
+      <li>릴리스 ID는 휠 바이트 + requirements + 런타임 다이제스트 + 준비 레시피 해시로 계산한다(<code>release_id_scheme: "sb-release-inputs-v3"</code>). 같은 ID가 이미 있으면 <strong>에러로 중단</strong>한다.</li>
+      <li><code>releases/&lt;release_id&gt;/</code> 아래에 <code>.venv/</code>, <code>runtime/python/</code>, 휠, <code>requirements.txt</code>, <code>bin/{sb,second-brain-mcp,second-brain-agent-mcp}</code>, <code>release-manifest.json</code>을 만든다. 디렉터리 모드 <code>0700</code>, 래퍼 스크립트 <code>0700</code>.</li>
+      <li>마지막 줄로 릴리스 디렉터리 경로를 출력한다.</li>
+    </ol>
+    <p>생성된 래퍼의 공통 프리앰블은 다음과 같다(스크립트 본문):</p>
+<pre><code>#!/bin/sh
+set -eu
+export HOME="${HOME:-/home/jm}"
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+export SB_CONFIG="${SB_CONFIG:-$HOME/.config/second-brain/config.toml}"
+cd &lt;release&gt;</code></pre>
+    <ul>
+      <li><code>bin/sb</code> → <code>&lt;release&gt;/.venv/bin/python -m sb.cli "$@"</code></li>
+      <li><code>bin/second-brain-mcp</code> → <code>SB_MCP_CONTRACT_PROFILE</code> 기본값 <code>task32-schema4</code>로 <code>python -m sb.mcp</code></li>
+      <li><code>bin/second-brain-agent-mcp</code> → <code>anyio.run(build_server(config=load_config()).run_stdio_async)</code></li>
+    </ul>
+
+    <h3 id="t3-3">3.3 앱 루트 구조</h3>
+<pre><code>~/.local/state/second-brain/app/
+├── current -> releases/&lt;release_id&gt;     (원자적으로 교체되는 심볼릭 링크)
+├── releases/
+│   ├── &lt;release_id&gt;/…
+│   └── … (이전 릴리스 보존 = 롤백 대상)
+└── staging/</code></pre>
+    <p><code>current</code>는 활성 릴리스를 가리키는 <strong>유일한 전환 지점</strong>이다. 전환/롤백 절차는 §10.5를 본다.</p>
+
+    <h3 id="t3-4">3.4 릴리스 검증 스크립트</h3>
+    <div class="table-wrap"><table><thead><tr><th>스크립트</th><th>목적</th></tr></thead><tbody>
+          <tr><td><code>deploy/check-release-contents.py</code></td><td>설치된 릴리스의 전체 인벤토리(모드·크기·sha256, 심링크 대상)를 기록/대조한다. 외부 디렉터리 링크·특수 파일은 거부. 활성화하지 않는다.</td></tr>
+          <tr><td><code>deploy/check-release-mcp.py &lt;release&gt;</code></td><td>임시 fixture로 <code>scoped-record-read-v2 / -v5 / scoped-request-status-v1 / scoped-request-write-v1</code> 네 프로필의 MCP 도구 목록을 실제로 확인한다.</td></tr>
+          <tr><td><code>deploy/check-release-maintenance.py &lt;release&gt;</code></td><td>격리된 SIGKILL 작업공간에 대해 설치된 릴리스의 복원 유지보수를 실행한다.</td></tr>
+          <tr><td><code>deploy/check-release-integration.py</code></td><td>SB 릴리스 × 격리 JARVIS 빌드로 공유 기억 인수 시나리오를 돌린다. 실행 전후 인벤토리가 바뀌면 <code>ACCEPTANCE_CANDIDATE_CHANGED</code>로 실패한다.</td></tr>
+          <tr><td><code>deploy/check-rollback-compat.py</code>, <code>deploy/check-transition-units.py</code>, <code>deploy/check-database-handles.py</code>, <code>deploy/check-jarvis-pending-state.py</code>, <code>deploy/check-omo-memory-startup.py</code>, <code>deploy/check-compile-key-upgrade.py</code>, <code>deploy/estimate-compile-key-upgrade.py</code></td><td>전환 전 개별 게이트.</td></tr>
+        </tbody></table></div>
+
+    <h3 id="t3-5">3.5 개발 검증 게이트</h3>
+    <p><code>README.md</code>가 정의한 Ubuntu 기본 게이트: <code>uv run ruff check sb tests</code>, <code>uv run basedpyright sb tests</code>, <code>uv run pytest -q --ignore=tests/test_embeddings.py</code>, <code>uv build</code>. <code>tests/test_embeddings.py</code>는 선택 의존성 <code>embeddings</code> extra가 있어야 돌고, 통합 게이트는 <code>tests/integration/test_walking_skeleton.py</code>다.</p>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 4 ══════════ -->
+    <h2 id="t4">4 설정 파일 레퍼런스</h2>
+
+    <h3 id="t4-1">4.1 설정 파일 탐색 순서</h3>
+    <p><code>sb/config.py: _config_search_path()</code></p>
+    <ol>
+      <li>환경변수 <code>SB_CONFIG</code> (환경변수 확장 + <code>~</code> 확장)</li>
+      <li><code>${XDG_CONFIG_HOME:-~/.config}/second-brain/config.toml</code></li>
+      <li>리포 루트의 <code>config.toml</code> (있을 때만)</li>
+    </ol>
+    <p>파일이 없으면 빈 매핑으로 간주하고 모든 접근자가 기본값을 쓴다. 상대 경로는 <strong>설정 파일이 있는 디렉터리</strong> 기준으로 절대화된다(<code>Config._path</code>).</p>
+    <p>운영 설치에는 두 개의 설정이 있고 <code>SB_CONFIG</code>로 고른다:</p>
+    <div class="table-wrap"><table><thead><tr><th>파일</th><th>쓰는 곳</th></tr></thead><tbody>
+          <tr><td><code>~/.config/second-brain/config.toml</code></td><td>web / maintenance / requests 유닛, 대화형 CLI</td></tr>
+          <tr><td><code>~/.config/second-brain/jarvis-provider.toml</code></td><td>refresh 경로(주기 실행)</td></tr>
+        </tbody></table></div>
+    <p>두 파일은 경로·키·provider 신원을 공유하고 <code>caps</code> 값만 다르다(운영 확인: <code>config.toml</code>은 <code>max_llm_calls_compile = 120</code>, <code>jarvis-provider.toml</code>은 <code>40</code>).</p>
+
+    <h3 id="t4-2">4.2 최상위 키</h3>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>타입</th><th>기본값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>vault_root</code></td><td>문자열 경로</td><td><code>${XDG_DATA_HOME:-~/.local/share}/second-brain/vault</code></td><td>활성 Vault. 관리형 배치에서는 <code>share_root/vault</code> 심링크여야 한다.</td></tr>
+          <tr><td><code>knowledge_registry</code></td><td>문자열 경로</td><td><code>…/second-brain/knowledge-registry.sqlite</code></td><td>지식 상태(active/candidate, 승인) 레지스트리. <strong>키가 명시된 경우에만</strong> CLI/MCP/web이 명시 경로로 전달한다.</td></tr>
+          <tr><td><code>state_root</code></td><td>문자열 경로</td><td><code>${XDG_STATE_HOME:-~/.local/state}/second-brain</code></td><td>세대 저널·락·훅 스테이지의 뿌리.</td></tr>
+          <tr><td><code>share_root</code></td><td>문자열 경로</td><td>활성 Vault의 부모</td><td>세대 저장소가 놓이는 공유 루트. 이 키의 존재 자체가 “관리형 배치” 판정에 쓰인다.</td></tr>
+          <tr><td><code>generation_root</code></td><td>문자열 경로</td><td><code>…/second-brain/vault-generations</code></td><td>세대 디렉터리 루트.</td></tr>
+          <tr><td><code>request_root</code></td><td>문자열 경로</td><td><code>&lt;state_root&gt;/requests</code></td><td>요청 저널(<code>journal.db</code>)과 <code>pending/</code>, <code>processing/</code>, <code>receipts/</code>.</td></tr>
+          <tr><td><code>export_root</code></td><td>문자열 경로</td><td><code>&lt;state_root&gt;/exports</code></td><td>내보내기 산출물.</td></tr>
+          <tr><td><code>backup_root</code></td><td>문자열 경로</td><td><code>&lt;state_root&gt;/backups</code></td><td><code>sb backup</code>의 기본 목적지이자 <code>/ready</code>가 훑는 디렉터리.</td></tr>
+          <tr><td><code>provider_instance_id</code></td><td>문자열</td><td><code>provider:second-brain:linux</code></td><td>이 provider 인스턴스의 신원. 백업 origin·요청 증명에 들어간다.</td></tr>
+          <tr><td><code>provider_release_sha</code></td><td>문자열</td><td><code>development</code></td><td>릴리스 표식. <code>/ready</code> 응답의 <code>provider_release</code>.</td></tr>
+          <tr><td><code>provider_signing_key_id</code></td><td>문자열</td><td>없음</td><td>provider 서명키 ID. <code>apply-requests</code>에 필수.</td></tr>
+          <tr><td><code>provider_private_key</code></td><td>문자열(base64url)</td><td>없음</td><td>Ed25519 개인키. <strong>절대 외부로 노출하지 않는다.</strong></td></tr>
+          <tr><td><code>provider_result_public_keys</code></td><td>테이블</td><td><code>{}</code></td><td>결과 서명 검증용 공개키.</td></tr>
+          <tr><td><code>revoked_provider_result_key_ids</code></td><td>문자열 배열</td><td><code>[]</code></td><td>철회된 결과 키 ID.</td></tr>
+          <tr><td><code>jarvis_signing_key_id</code></td><td>문자열</td><td>없음</td><td>단일 JARVIS 키 ID(구형 표기).</td></tr>
+          <tr><td><code>jarvis_public_key</code></td><td>문자열</td><td>없음</td><td>단일 JARVIS 공개키(구형 표기). 위 ID와 함께 있으면 <code>jarvis_public_keys</code>에 합쳐진다.</td></tr>
+          <tr><td><code>jarvis_public_keys</code></td><td>테이블(ID→공개키)</td><td><code>{}</code></td><td>신뢰 JARVIS 서명키 집합.</td></tr>
+          <tr><td><code>cancellation_public_keys</code></td><td>테이블</td><td><code>{}</code></td><td>취소 의도 제출 전용 공개키.</td></tr>
+          <tr><td><code>revoked_jarvis_signing_key_ids</code></td><td>문자열 배열</td><td><code>[]</code></td><td>철회된 JARVIS 키 ID. 런타임 철회 파일과 합쳐진다(<code>sb/revoked_keys.py</code>).</td></tr>
+          <tr><td><code>revoked_delegation_ids</code></td><td>문자열 배열</td><td><code>[]</code></td><td>철회된 위임 ID.</td></tr>
+          <tr><td><code>external_erasure_public_keys</code></td><td>테이블</td><td><code>{}</code></td><td>외부 삭제 요청 검증 공개키.</td></tr>
+          <tr><td><code>legacy_request_roots</code></td><td>문자열 배열</td><td><code>()</code></td><td>구형 요청 루트(이관용).</td></tr>
+        </tbody></table></div>
+
+    <h3 id="t4-3">4.3 <code>[llm]</code></h3>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>기본값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>argv_template</code></td><td><code>["claude", "-p", "{prompt}"]</code></td><td>LLM CLI 호출 argv. <code>{prompt}</code> / <code>{system}</code> 자리표시자를 치환한다.</td></tr>
+          <tr><td><code>prompt_version</code></td><td><code>"v1"</code></td><td>파생 키에 들어가는 프롬프트 버전. 값이 바뀌면 파생이 다시 계산된다.</td></tr>
+          <tr><td><code>model_id</code></td><td><code>"unknown"</code></td><td>파생 키에 들어가는 모델 식별자.</td></tr>
+        </tbody></table></div>
+    <p>호출 규칙(<code>sb/llm.py: _render_invocation</code>, <code>CliLLM.generate</code>):</p>
+    <ul>
+      <li>argv 어느 조각에도 <code>{prompt}</code>가 없으면 <strong>프롬프트는 stdin으로 전달</strong>되고, 있으면 argv에 치환된다.</li>
+      <li><code>{system}</code> 자리표시자가 없고 system 프롬프트가 있으면 <code>"{system}\n\n{prompt}"</code>로 합쳐 하나의 페이로드로 만든다.</li>
+      <li>시도 상한은 <code>ATTEMPT_LIMIT = 2</code>. 실패하면 <code>LLM unavailable after 2 attempts: &lt;이유&gt;</code> 메시지의 <code>LLMUnavailable</code>이 난다.</li>
+      <li><code>json_mode=True</code>일 때는 stdout에서 <strong>첫 번째 JSON 객체</strong>를 직접 파싱해 뽑는다(<code>_extract_first_json_object</code>). 못 찾으면 <code>LLMBadJson</code>.</li>
+    </ul>
+    <div class="callout warn"><span class="label">주의</span>
+      <p><code>README.md</code>의 예시에는 <code>[llm] external = true</code>가 나오지만 <code>sb/config.py</code>의 <code>LlmConfig</code>는 <code>argv_template</code>, <code>prompt_version</code>, <code>model_id</code> 세 키만 읽는다. <code>external</code>은 로더가 무시한다.</p>
+    </div>
+
+    <h3 id="t4-4">4.4 <code>[caps]</code></h3>
+    <p><code>DEFAULT_CAPS</code> (<code>sb/config.py</code>):</p>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>기본값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>max_llm_calls_compile</code></td><td>200</td><td>한 컴파일 실행의 LLM 호출 상한</td></tr>
+          <tr><td><code>max_llm_calls_conflict</code></td><td>200</td><td>충돌 판정 LLM 호출 상한</td></tr>
+          <tr><td><code>max_llm_calls_briefing</code></td><td>10</td><td>브리핑 LLM 호출 상한</td></tr>
+          <tr><td><code>max_briefing_validation_attempts</code></td><td>1</td><td>브리핑 검증 재시도 횟수</td></tr>
+          <tr><td><code>max_new_units_per_run</code></td><td>500</td><td>한 실행에서 새로 만들 수 있는 <strong>고유 unit</strong> 수</td></tr>
+          <tr><td><code>max_source_items_per_run</code></td><td>500</td><td>한 실행에서 시도하는 <strong>원본 버전 처리</strong> 수. 이 키를 생략하면 <code>max_new_units_per_run</code> 값을 그대로 계승한다.</td></tr>
+          <tr><td><code>max_db_rows_per_run</code></td><td>5000</td><td>DB 커넥터 행 상한</td></tr>
+          <tr><td><code>max_derivation_attempts</code></td><td>3</td><td>파생 재시도 상한. <code>[retry] max_attempts</code>의 기본값이기도 하다.</td></tr>
+        </tbody></table></div>
+    <p>예산 초과 동작(<code>README.md</code>, <code>sb/pipeline.py</code>): 한 원본이 전체 unit 예산을 넘으면 <code>INGEST_UNIT_BUDGET_EXCEEDED</code>와 종료 코드 1로 실패하고 원본을 보존한다. 잔여 예산에만 맞지 않는 원본은 <code>capped</code>로 남고 다음 실행에서 처리된다. <code>sb ingest --limit N</code>은 <strong>파일 수만</strong> 조정하며 unit 예산은 그대로 적용된다.</p>
+
+    <h3 id="t4-5">4.5 <code>[[sources]]</code></h3>
+    <p>각 원소는 문자열 값만 허용된다(<code>_as_source_roots</code>). 하나라도 문자열이 아니면 목록 전체가 비게 된다.</p>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>id</code></td><td>원본 인스턴스 ID. 같은 어댑터로 여러 원본을 쓸 때 반드시 서로 다르게 준다. 중복 ID는 거부된다.</td></tr>
+          <tr><td><code>adapter</code></td><td>커넥터 ID (<code>inbox-documents</code>, <code>markdown-vault</code>, <code>unified-db</code>, <code>sessions_*</code>, <code>records_*</code>, <code>*_documents</code>)</td></tr>
+          <tr><td><code>root</code></td><td>원본 루트 경로. 설정 파일 기준으로 절대화된다.</td></tr>
+          <tr><td><code>llm_policy</code></td><td><code>allow</code> / <code>deny</code> / <code>local-only</code> (README)</td></tr>
+          <tr><td><code>sensitive</code></td><td>예: <code>mask</code> (README)</td></tr>
+        </tbody></table></div>
+    <p>선택 실행에 쓰이는 이름은 <code>id</code> → <code>adapter</code> → <code>type</code> 순으로 고른다(<code>configured_source_ids</code>). 명시 선택한 이름 중 해석되지 않는 것이 있으면 <code>SOURCE_NOT_FOUND</code>로 전체가 실패하고, 나머지만 부분 수집하지 않는다(README).</p>
+    <p>운영 설정의 실제 값:</p>
+<pre><code>"sources" = [
+  {"id" = "inbox",  "adapter" = "inbox-documents", "llm_policy" = "allow", "sensitive" = "mask"},
+  {"id" = "hermes", "adapter" = "markdown-vault",  "root" = "/home/jm/.hermes"}
+]</code></pre>
+
+    <h3 id="t4-6">4.6 <code>[source_access.&lt;source id&gt;]</code></h3>
+    <p><code>sb/config.py: Config.source_access</code>는 <strong>정확히 세 키</strong>만 허용한다. 하나라도 빠지거나 더 있으면 <code>SOURCE_ACCESS_CONFIG_INVALID</code>(<code>ConfigValueError</code>)로 설정 로드가 실패한다.</p>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>타입</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>owner</code></td><td>문자열</td><td>소유 주체 (예: <code>"principal:owner"</code>)</td></tr>
+          <tr><td><code>projects</code></td><td>문자열 배열</td><td>프로젝트 분류. 중복 없이 정렬, 최대 64개. 빈 목록은 owner 전용.</td></tr>
+          <tr><td><code>policy_revision</code></td><td>문자열</td><td>정책 리비전 (예: <code>"policy:1"</code>)</td></tr>
+        </tbody></table></div>
+    <p>이 설정은 <strong>분류 기록</strong>이며 MCP/API 접근 제어가 아니다(README가 명시). 기존 분류를 바꾸면 <code>SOURCE_ACCESS_RECLASSIFICATION_REQUIRED</code>로 수집을 거부한다.</p>
+
+    <h3 id="t4-7">4.7 <code>[search]</code></h3>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>기본값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>hybrid</code></td><td><code>false</code></td><td><code>true</code>이고 임베딩 모델이 있을 때만 다음 관리형 세대부터 인용 가능한 기억 레코드의 벡터를 함께 봉인한다. 이미 봉인된 세대는 설정 변경만으로 재색인되지 않는다.</td></tr>
+          <tr><td><code>min_similarity</code></td><td><code>-1.0</code></td><td>의미 후보의 최소 cosine 점수. <code>-1 ≤ x ≤ 1</code>의 유한한 수여야 하며 아니면 <code>[search].min_similarity must be a finite number between -1 and 1</code>. 일반(lexical) 결과에는 적용되지 않는다.</td></tr>
+        </tbody></table></div>
+    <p><code>hybrid</code>는 값이 정확히 <code>true</code>(불리언)일 때만 켜진다(<code>section.get("hybrid") is True</code>).</p>
+
+    <h3 id="t4-8">4.8 <code>[readiness]</code></h3>
+    <p><code>sb/readiness_checks.py: ReadinessPolicy.from_config</code>. 네 값 모두 <strong>정수</strong>여야 하고 범위는 <code>1..8760</code>. 벗어나면 <code>/ready</code>가 <code>READINESS_POLICY_INVALID</code> 하나만 담은 degraded 응답을 돌려준다.</p>
+    <div class="table-wrap"><table><thead><tr><th>키</th><th>기본값</th><th>곱</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>max_run_age_hours</code></td><td>48</td><td>×3600</td><td>마지막 실행이 이보다 오래되면 <code>LAST_RUN_STALE_OR_INVALID</code></td></tr>
+          <tr><td><code>max_backup_age_hours</code></td><td>48</td><td>×3600</td><td>검증 백업 신선도 한계</td></tr>
+          <tr><td><code>max_request_age_minutes</code></td><td>15</td><td>×60</td><td>가장 오래된 pending/processing 요청 허용 나이. 세대 activation 정체 판정에도 같은 값을 쓴다.</td></tr>
+          <tr><td><code>failure_window_hours</code></td><td>48</td><td>×3600</td><td>최근 실패 요청을 세는 창</td></tr>
+        </tbody></table></div>
+
+    <h3 id="t4-9">4.9 <code>[web]</code>, <code>[security]</code>, <code>[retry]</code>, <code>[filesystem]</code>, <code>[unified_db]</code></h3>
+    <div class="table-wrap"><table><thead><tr><th>섹션.키</th><th>기본값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>web.host</code></td><td><code>"127.0.0.1"</code></td><td>웹 바인드 호스트</td></tr>
+          <tr><td><code>web.port</code></td><td><code>8765</code></td><td>웹 바인드 포트</td></tr>
+          <tr><td><code>web.token</code></td><td>없음</td><td>설정하면 <code>/api/*</code> 요청에 <code>Authorization: Bearer &lt;token&gt;</code> 필요. <code>/</code>, <code>/health</code>, <code>/ready</code>는 토큰 없이 열려 있다.</td></tr>
+          <tr><td><code>security.allow_external_llm</code></td><td><code>false</code></td><td>설정 로더가 읽는 보안 플래그</td></tr>
+          <tr><td><code>security.redact_pii</code></td><td><code>false</code></td><td>설정 로더가 읽는 보안 플래그</td></tr>
+          <tr><td><code>retry.max_attempts</code></td><td><code>caps.max_derivation_attempts</code></td><td>최소 1로 클램프</td></tr>
+          <tr><td><code>retry.base_delay_seconds</code></td><td>1</td><td>최소 0으로 클램프</td></tr>
+          <tr><td><code>retry.max_delay_seconds</code></td><td>60</td><td>최소 0으로 클램프</td></tr>
+          <tr><td><code>filesystem.mode</code></td><td><code>"trusted-root"</code></td><td><code>strict</code> / <code>trusted-root</code> / <code>audit-only</code> 중 하나. 값이 그 셋이 아니면 조용히 <code>trusted-root</code>로 떨어진다.</td></tr>
+          <tr><td><code>unified_db.dsn</code></td><td><code>postgresql://localhost:5433/unified</code></td><td>읽기 전용 unified DB 연결 문자열</td></tr>
+        </tbody></table></div>
+    <div class="callout warn"><span class="label">주의</span>
+      <p><code>sb web --host/--port</code> CLI 인자가 <code>[web]</code> 섹션보다 먼저 적용된다. <code>sb/cli.py: web()</code>은 <code>config.web</code>을 읽지 않고 argparse 기본값 <code>127.0.0.1:8765</code>를 쓴다.</p>
+    </div>
+
+    <h3 id="t4-10">4.10 MCP 전용 섹션</h3>
+    <div class="table-wrap"><table><thead><tr><th>섹션</th><th>키</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>[mcp_scoped_read]</code></td><td><code>principal</code>, <code>agent</code>, <code>session</code>, <code>policy_revision</code></td><td>범위 제한 record 조회 연결(<code>scoped-record-read-v*</code>)이 신뢰하는 서버측 연결 문맥. 사용자 요청에서 복사하면 안 된다.</td></tr>
+          <tr><td><code>[scoped_provider_verifier]</code></td><td><code>credentials_path</code></td><td>scoped V4 요청 실행에 필요한 검증기 자격증명 JSON의 절대 경로. 파일은 서버 소유 비공개(0600) canonical JSON이며 <code>origin</code>, <code>cookie_id</code>, <code>csrf_token</code>(선택 <code>ca_file</code>)을 담는다. CA는 최대 256KiB PEM.</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 5 ══════════ -->
+    <h2 id="t5">5 CLI 레퍼런스</h2>
+
+    <h3 id="t5-1">5.1 공통 규칙</h3>
+    <ul>
+      <li>진입점은 <code>sb.cli:main</code>. 인자가 하나도 없으면 도움말을 출력하고 <strong>종료 코드 2</strong>.</li>
+      <li>모든 명령은 실행 후 Vault 루트가 디렉터리이면 메트릭(<code>command</code>, <code>exit_code</code>, 소요 ms)을 기록한다(<code>sb/metrics.py: record_command</code>). 기록 실패는 무시된다.</li>
+      <li><code>main()</code>이 잡는 예외 — <code>OperationError</code>, <code>VaultLintError</code>, <code>GovernanceError</code>, <code>SearchQueryError</code>, <code>ConfigValueError</code>, <code>GenerationError</code>, <code>GenerationIndexError</code>, <code>PostCompactHookError</code> — 는 메시지를 stderr로 내고 <strong>종료 코드 1</strong>로 끝난다.</li>
+      <li>아래 명령은 <strong>읽기 전용 스냅샷</strong>(<code>read_config</code>)에서 실행된다:
+        <code>status</code>, <code>search</code>, <code>postcompact-hook</code>, <code>sources</code>, <code>retention</code>, <code>metrics</code>,
+        <code>doctor</code>(단 <code>--rebuild-ledger</code> 없을 때), <code>gc</code>/<code>migrate</code>(<code>--apply</code> 없을 때),
+        <code>compile</code>(<code>--dry-run</code> 또는 <code>--state-report</code>일 때).</li>
+      <li>파이프라인 계열 명령은 락을 못 잡으면 <code>already running</code>을 출력하고 <strong>종료 코드 0</strong>으로 끝난다.</li>
+    </ul>
+    <p>전체 명령 목록(<code>sb --help</code>):</p>
+<pre><code>init, ingest, compile, brief, run, status, rollback, doctor, mcp, search, remember,
+apply-cancellation, apply-requests, maintain, postcompact-hook, retry, backup,
+verify-backup, restore, migrate, resolve, web, sources, retention, gc, metrics</code></pre>
+
+    <h3 id="t5-2">5.2 명령별 표</h3>
+    <div class="table-wrap"><table><thead><tr><th>명령</th><th>목적</th><th>옵션</th><th>종료 코드 / 오류 코드</th></tr></thead><tbody>
+          <tr><td><code>sb init</code></td><td>Vault 디렉터리 생성, <code>log.md</code>/<code>.gitignore</code> 작성, 모드 <code>0700</code>, <code>git init -b main</code> + 최초 커밋</td><td>없음</td><td>0</td></tr>
+          <tr><td><code>sb ingest</code></td><td>설정된 원본을 스캔해 CAS 저장 + <code>source_item</code>/<code>unit</code> 원장 기록</td><td><code>--source &lt;id&gt;</code> (하나만 선택), <code>--limit &lt;int&gt;</code> (원본 항목 시도 수 상한; unit 예산은 별도로 계속 적용)</td><td>0 / 1. 실패 사유는 stderr. 예: <code>INGEST_UNIT_BUDGET_EXCEEDED</code>, <code>SOURCE_ROOTS_AMBIGUOUS</code>, <code>SOURCE_READ_INCOMPLETE: &lt;source&gt;: &lt;reason&gt;</code>, <code>REINGRESS_VERIFICATION_FAILED</code>, <code>SOURCE_NOT_FOUND</code></td></tr>
+          <tr><td><code>sb compile</code></td><td>수집된 unit에서 wiki 페이지 파생</td><td><code>--llm &lt;mode&gt;</code> (기본 <code>cli</code>), <code>--dry-run</code>, <code>--state-report</code></td><td>0 / 1. <code>--dry-run</code>/<code>--state-report</code>는 JSON을 출력하고 항상 0.</td></tr>
+          <tr><td><code>sb brief</code></td><td>오늘자 일일 브리핑 생성</td><td><code>--llm &lt;mode&gt;</code> (기본 <code>cli</code>)</td><td>0 / 1</td></tr>
+          <tr><td><code>sb run</code></td><td>ingest → compile → (조건부) brief 배치</td><td>없음</td><td>0 / 1. 배치 결과 선택 규칙은 §6.3.</td></tr>
+          <tr><td><code>sb status</code></td><td>마지막 실행 한 줄 또는 전체 스냅샷</td><td><code>--json</code></td><td>0</td></tr>
+          <tr><td><code>sb rollback &lt;run_id&gt;</code></td><td><strong>구현되지 않음.</strong> 항상 거절</td><td>위치 인자 <code>run_id</code></td><td>항상 1, stderr <code>ROLLBACK_REQUIRES_GENERATION_AUTHORITY</code></td></tr>
+          <tr><td><code>sb doctor</code></td><td>진단 체크 목록</td><td><code>--json</code>, <code>--rebuild-ledger</code></td><td>체크 중 하나라도 <code>fail</code>이면 1, 아니면 0</td></tr>
+          <tr><td><code>sb mcp</code></td><td>stdio MCP 서버를 하위 프로세스(<code>python -m sb.mcp</code>)로 기동</td><td>없음</td><td>하위 프로세스의 반환 코드. 모듈이 없으면 <code>mcp not available</code> + 1</td></tr>
+          <tr><td><code>sb search &lt;query&gt;</code></td><td>커밋된 페이지 검색</td><td><code>--limit &lt;int&gt;</code> (기본 10), <code>--json</code>, <code>--kind {wiki,daily,conflicts}</code> (반복 가능), <code>--status &lt;s&gt;</code>, <code>--updated-from &lt;d&gt;</code>, <code>--updated-to &lt;d&gt;</code>, <code>--scope {active,candidate,reference}</code></td><td>0. 빈 질의는 <code>search requires a query</code> + 2. 질의 문법 오류는 <code>SEARCH_QUERY_*</code> + 1. 구세대 인덱스는 <code>GENERATION_INDEX_INVALID</code> + 1</td></tr>
+          <tr><td><code>sb remember &lt;content&gt;</code></td><td>inbox에 기억 노트 기록</td><td><code>--title &lt;text&gt;</code></td><td>0(경로 출력) / 빈 내용 2 / <code>RememberRejected</code> 1</td></tr>
+          <tr><td><code>sb retry</code></td><td>실패한 파생을 pending으로 되돌림</td><td><code>--stage {compile,conflict,brief}</code>, <code>--limit &lt;int&gt;</code></td><td>0 (<code>requeued=&lt;n&gt;</code> 출력). 선택에 <code>brief</code> 행이 섞이면 <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE</code>로 <strong>전체 거절</strong> + 1</td></tr>
+          <tr><td><code>sb backup [destination]</code></td><td>백업 생성 후 즉시 검증</td><td>위치 인자 <code>destination</code>(생략 시 <code>&lt;backup_root&gt;/second-brain-&lt;타임스탬프&gt;.tar.gz</code>)</td><td>0. 검증 실패는 1</td></tr>
+          <tr><td><code>sb verify-backup &lt;archive&gt;</code></td><td>기존 아카이브 검증</td><td>위치 인자 <code>archive</code></td><td>0 / 1 (<code>BACKUP_CHANGED</code>, <code>BACKUP_ORIGIN_MISMATCH</code>, <code>BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH</code>, <code>BACKUP_TIME_INVALID</code>, <code>BACKUP_STALE</code>)</td></tr>
+          <tr><td><code>sb restore &lt;archive&gt;</code></td><td>백업을 <strong>격리 목적지</strong>로 복원</td><td><code>--to &lt;dir&gt;</code>, <code>--force</code></td><td>0 / 1. 목적지가 심링크이거나 관리형 배치의 활성 Vault면 <code>RESTORE_REQUIRES_ISOLATED_DESTINATION: use --to with a new directory</code> + 1</td></tr>
+          <tr><td><code>sb migrate</code></td><td>원장 스키마 상태 조회/적용</td><td><code>--check</code> | <code>--apply</code> (상호 배타)</td><td>0. JSON(<code>before</code>, <code>after</code>, <code>current</code>, <code>pending</code>, <code>backup</code>) 출력</td></tr>
+          <tr><td><code>sb resolve &lt;conflict_id&gt;</code></td><td>충돌을 사람이 해결</td><td><code>--decision {keep-left,keep-right,note}</code> (필수), <code>--note &lt;text&gt;</code></td><td>0(커밋 해시 또는 <code>unchanged</code>) / 1</td></tr>
+          <tr><td><code>sb web</code></td><td>루프백 HTTP 서버 실행</td><td><code>--host</code> (기본 <code>127.0.0.1</code>), <code>--port</code> (기본 <code>8765</code>)</td><td>0 (Ctrl-C) / 바인드 실패 1</td></tr>
+          <tr><td><code>sb sources</code></td><td>설정된 원본 정책 상태</td><td><code>--json</code></td><td>0</td></tr>
+          <tr><td><code>sb retention</code></td><td>CAS 보존 리포트(변경 없음)</td><td><code>--json</code></td><td>0</td></tr>
+          <tr><td><code>sb gc</code></td><td>미참조 CAS blob 정리</td><td><code>--apply</code>, <code>--confirm</code>, <code>--json</code></td><td>0. <code>--apply</code>만 주고 <code>--confirm</code>이 없으면 <code>orphan deletion requires --apply --confirm</code> + 1</td></tr>
+          <tr><td><code>sb metrics</code></td><td>명령 실행 메트릭 요약</td><td><code>--limit &lt;int&gt;</code> (기본 1000), <code>--json</code></td><td>0</td></tr>
+          <tr><td><code>sb maintain --once</code></td><td>세대 정리 + 만료 내보내기 정리 + 고아 activation 스윕 + 실패 brief supersede</td><td><code>--once</code> (필수), <code>--restore-workspace &lt;abs dir&gt;</code></td><td>0. <code>--once</code> 없으면 <code>maintain requires --once</code> + 2. 복원 작업공간 정리 실패 1. 선행 세대를 여는 fd가 남아 있으면 <code>GENERATION_READER_DRAIN_REQUIRED</code> + 1</td></tr>
+          <tr><td><code>sb apply-requests --once</code></td><td>요청 저널에서 최대 1건 처리</td><td><code>--once</code> (필수), <code>--test-control-socket &lt;path&gt;</code></td><td><code>--once</code> 없으면 2. 결과 <code>state</code>가 <code>idle</code>/<code>proved</code>/<code>reconciling</code>이면 0, <code>failed</code>면 1. 키 설정 문제는 <code>REQUEST_EXECUTOR_KEY_CONFIG_INVALID</code> / <code>SCOPED_PROVIDER_RUNTIME_CONFIG_INVALID</code> + 1</td></tr>
+          <tr><td><code>sb apply-cancellation --intent-id &lt;id&gt;</code></td><td>로컬 취소 의도 실행</td><td><code>--intent-id</code> (필수)</td><td>0(JSON) / 1(대문자 스네이크 오류 코드, 정규화 실패 시 <code>CANCELLATION_EXECUTION_FAILED</code>)</td></tr>
+          <tr><td><code>sb postcompact-hook</code></td><td>AI 클라이언트 훅 이벤트를 stdin JSON으로 받아 처리</td><td>없음</td><td>0. stdin 파싱 실패 2(<code>HOOK_JSON_INVALID</code>, <code>HOOK_SESSION_MISSING</code>, <code>HOOK_QUERY_MISSING</code>, <code>HOOK_EVENT_UNSUPPORTED</code>, <code>HOOK_STAGE_UNSAFE</code>). stdout 파이프가 끊기면 1</td></tr>
+        </tbody></table></div>
+
+    <h3 id="t5-3">5.3 자주 쓰는 형태</h3>
+<pre><code>export SB_CONFIG="$HOME/.config/second-brain/config.toml"
+
+sb remember "계약서는 수요일에 발송한다." --title "계약 일정"
+sb run
+sb search "계약서"
+sb status --json
+sb doctor --json
+sb sources --json ; sb retention --json ; sb metrics --json
+sb backup
+sb verify-backup /path/to/second-brain-backup.tar.gz
+sb restore /path/to/backup.tar.gz --to /absolute/new/restore-dir   # 격리 목적지 필수
+sb maintain --once
+sb retry --stage compile --limit 5                                  # brief 는 거절된다</code></pre>
+
+    <h3 id="t5-4">5.4 <code>sb doctor</code> 체크 항목</h3>
+    <p><code>sb/ops.py: doctor()</code>가 만드는 체크 이름과 판정:</p>
+    <div class="table-wrap"><table><thead><tr><th>체크</th><th>pass 조건</th><th>비고</th></tr></thead><tbody>
+          <tr><td><code>python</code></td><td>항상 pass</td><td>앱 버전 표시</td></tr>
+          <tr><td><code>git</code></td><td><code>git</code> 실행 파일 존재</td><td>없으면 fail</td></tr>
+          <tr><td><code>vault</code></td><td>Vault 디렉터리 존재. 모드에 group/other 비트가 없으면 pass, 있으면 warn</td><td>없으면 fail 후 즉시 반환</td></tr>
+          <tr><td><code>git-repository</code></td><td><code>&lt;vault&gt;/.git</code> 디렉터리 존재</td><td></td></tr>
+          <tr><td><code>ledger</code></td><td><code>ledger.db</code> 무결성 통과 + 스키마 버전 == 현재</td><td>버전 불일치는 warn, 파일 없음은 warn, 예외는 fail</td></tr>
+          <tr><td><code>citations</code></td><td><code>audit_citations()</code>가 빈 튜플</td><td>미해결 <code>[^sid]</code>나 누락 CAS가 있으면 fail(최대 5건 표시)</td></tr>
+          <tr><td><code>source:&lt;id&gt;</code></td><td>원본 <code>root</code>가 심링크가 아닌 디렉터리</td><td></td></tr>
+          <tr><td><code>generation</code></td><td>(관리형만) Vault git HEAD/tree가 세대 매니페스트와 일치</td><td>불일치 fail</td></tr>
+          <tr><td><code>activation-orphans</code></td><td>(관리형만) 현재 세대가 아닌 <code>activated</code> 행이 0</td><td>있으면 warn</td></tr>
+          <tr><td><code>llm-cli</code></td><td><code>argv_template[0]</code>이 PATH에서 찾아짐</td><td>없으면 warn</td></tr>
+          <tr><td><code>scheduler-assets</code></td><td>리포의 <code>deploy/systemd</code> 디렉터리 존재</td><td>휠 설치본에는 없으므로 운영에서는 warn이 정상</td></tr>
+        </tbody></table></div>
+    <p><code>--rebuild-ledger</code>는 <code>rebuild_from_vault</code>를 <code>GenerationOperation.EFFECT</code> mutation으로 실행한 뒤 체크를 돌린다. <strong>이미 채워진 원장에서는 유효한 복구 수단이 아니다</strong> — 2026-09-15 전환 기록에 따르면 <code>done → running</code> 전이 오류로 실패했다(§11).</p>
+
+    <h3 id="t5-5">5.5 <code>sb status --json</code> 스냅샷</h3>
+    <p><code>sb/ops.py: status_snapshot</code>이 만드는 키(원장이 있을 때):</p>
+    <ul>
+      <li><code>last_batch</code> — <code>run_stage</code>에서 <code>stage='batch'</code>인 최신 행 (<code>run_id</code>, <code>status</code>, <code>started_at</code>, <code>finished_at</code>, <code>stages_attempted</code>, <code>written</code>, <code>errors</code>)</li>
+      <li><code>recent_stages</code> — 최근 10개 단계 행 (<code>run_id</code>, <code>stage</code>, <code>status</code>, <code>errors</code>, <code>error</code>, <code>detail</code>)</li>
+      <li><code>last_run</code>, <code>runs</code>(상태별 집계), <code>derivations</code>(상태별 집계), <code>failed</code>/<code>failed_by_stage</code></li>
+    </ul>
+    <p><code>derivations</code>의 상태는 <code>DerivStatus</code> 5개다: <code>pending</code>, <code>running</code>, <code>done</code>, <code>failed</code>, <code>superseded</code>.</p>
+    <p>허용 전이(<code>sb/store/__init__.py: _ALLOWED</code>):</p>
+<pre><code>pending    → running
+running    → done | failed
+done       → (없음)
+failed     → superseded | pending
+superseded → pending</code></pre>
+    <p><code>done</code>에서 나가는 전이가 없다는 점이 <code>doctor --rebuild-ledger</code>가 채워진 원장에서 실패하는 이유다.</p>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 6 ══════════ -->
+    <h2 id="t6">6 파이프라인과 세대 수명주기</h2>
+
+    <h3 id="t6-1">6.1 단계 정의</h3>
+    <div class="table-wrap"><table><thead><tr><th>단계</th><th>하는 일</th><th>산출</th></tr></thead><tbody>
+          <tr><td><code>ingest</code></td><td>어댑터별 커서로 스캔 → 중복 제거 → 재유입(tombstone) 검사 → CAS 저장 → <code>source_item</code>/<code>unit</code> 기록</td><td><code>written</code> (새 unit 수)</td></tr>
+          <tr><td><code>compile</code></td><td>pending 파생을 LLM으로 페이지화</td><td><code>wiki/*.md</code> <code>PageSpec</code></td></tr>
+          <tr><td><code>conflict</code></td><td>모순 후보 판정</td><td><code>conflicts/*.md</code></td></tr>
+          <tr><td><code>brief</code></td><td>오늘자 브리핑</td><td><code>daily/&lt;date&gt;.md</code></td></tr>
+        </tbody></table></div>
+    <p>각 단계는 <code>_execute()</code>를 통해 실행되고, 관리형 배치에서는 같은 이름의 <code>GenerationOperation</code> (<code>ingest</code>, <code>compile</code>, <code>brief</code>, <code>run</code>, <code>inbox</code>, <code>remember</code>, <code>effect</code>, <code>restore</code>) mutation으로 감싸진다.</p>
+
+    <h3 id="t6-2">6.2 수집 세부</h3>
+    <p><code>sb/pipeline.py: _prepare_adapter_ingest</code></p>
+    <ul>
+      <li><code>meta["skip_reason"] == "ambiguous-session-roots"</code> → 즉시 중단, <code>SOURCE_ROOTS_AMBIGUOUS</code>.</li>
+      <li>재시도 가능한 읽기 실패 집합 <code>_RETRYABLE_READ_FAILURES</code> = <code>{"size-limit", "database-limit", "unstable-session-file", "unreadable-session-file"}</code> → 항목을 건너뛰고 <code>SOURCE_READ_INCOMPLETE: &lt;source_id&gt;: &lt;reason&gt;</code>을 실패 사유로 남긴다.</li>
+      <li>이미 본 <code>(source_id, source_uri, source_version)</code>는 건너뛴다.</li>
+      <li><code>attempted &gt;= remaining</code>이면 <code>capped = True</code>로 중단.</li>
+      <li>재유입 게이트(<code>ReingressGate</code>)에 걸리면 <code>TOMBSTONE_REINGRESS_BLOCKED</code>(오류 카운트 없음) 또는 <code>REINGRESS_VERIFICATION_FAILED</code>(오류 카운트 증가).</li>
+      <li>새 unit 수가 <code>caps.max_new_units_per_run</code>을 넘으면 <code>INGEST_UNIT_BUDGET_EXCEEDED: source requires N new units; caps.max_new_units_per_run=M. Source retained; increase the configured budget or split the source before retrying.</code></li>
+    </ul>
+
+    <h3 id="t6-3">6.3 <code>sb run</code> 배치 규칙 (중요)</h3>
+    <p><code>sb/pipeline.py: _run_all_mutable</code></p>
+<pre><code>1. 정체된 배치 정리(interrupt_stale_batches) + batch 행 'running' 기록
+2. ingest 실행           → outcomes에 기록 → batch 진행 상황 갱신
+3. compile 실행          → outcomes에 기록 → batch 진행 상황 갱신
+4. if ingest.written == 0 and compiled.pages == 0:
+       brief 를 실행하지 않는다
+       (대신 compile 결과 또는 ingest 결과를 배치 결과로 재사용)
+   else:
+       brief 실행       → outcomes에 기록 → batch 진행 상황 갱신
+5. _choose_batch_outcome(ingest, compiled, brief)</code></pre>
+    <p>즉 <strong>brief는 수집이 무언가를 썼거나 컴파일이 페이지를 만들었을 때만 돈다.</strong> 아무 변화가 없는 시간당 실행은 LLM 호출 없이 끝난다.</p>
+    <p><code>_choose_batch_outcome</code>의 우선순위:</p>
+    <ol>
+      <li><code>exit_code != 0</code>인 첫 단계가 있으면 그 단계를 반환(가장 먼저 실패한 단계가 이긴다).</li>
+      <li><code>status == "capped"</code>인 단계가 있으면 그 단계를 후보로 잡는다.</li>
+      <li><code>status == "partial"</code>인 첫 단계가 있으면 그 단계를 반환. (나중 단계가 성공해도 앞 단계의 오류를 지우지 않는다.)</li>
+      <li>그렇지 않으면 brief 결과.</li>
+    </ol>
+    <p>배치 도중 예외가 나면 <code>run_stage</code>에 <code>failed</code> 배치 행 (<code>{"failure": "batch interrupted by an exception", "stages": …}</code>)을 남기고 예외를 다시 던진다.</p>
+
+    <h3 id="t6-4">6.4 실행 결과 상태</h3>
+    <p><code>RunOutcome.status</code>로 나타나는 값: <code>ok</code>, <code>capped</code>, <code>partial</code>, <code>failed</code>. <code>ledger_checks</code>는 <code>last_run_success</code>를 <code>status in {"ok", "capped"}</code>로 판정한다. 즉 <code>capped</code>는 readiness상 성공으로 친다.</p>
+
+    <h3 id="t6-5">6.5 세대 수명주기</h3>
+    <p>관리형 배치에서 모든 내용 변경은 <code>GenerationMutationService.mutate()</code>를 통과한다.</p>
+<pre><code>current(세대 A)            staging/&lt;64hex&gt;             새 세대 B              .retired/
+     │  copy ─────────────────► │                          │                     │
+     │                     apply(fn)                       │                     │
+     │                          │ seal(0400/0500) + manifest                     │
+     │                          └──────────────────────────► activations 행 기록  │
+     │                                                     │                     │
+     │◄──── share/vault 심링크 원자 교체 (phase=activated) ─┘                     │
+     │                                                                            │
+     └──── reader drain 확인(0 fd, 0 lease) ─► phase=disposing ─► 디렉터리 이동 ──┘
+                                                                     │
+                                                              삭제 후 phase=proved</code></pre>
+    <ul>
+      <li>봉인 모드: 파일 <code>0400</code>, 디렉터리 <code>0500</code> (<code>_seal_modes</code>). 되돌릴 때는 <code>0600</code>/<code>0700</code>(<code>_make_writable</code>).</li>
+      <li><code>activations</code> 테이블 <code>phase</code>: <code>claimed → staging → sealed → switch_intent → activated → disposing → proved</code>.</li>
+      <li>선행 세대 디렉터리를 연 fd가 하나라도 있으면 <code>GENERATION_READER_DRAIN_REQUIRED</code>.</li>
+      <li><code>/proc</code>이 없으면 <code>GENERATION_READER_DRAIN_UNVERIFIABLE</code>.</li>
+      <li>활성 링크와 <code>.retired/.legacy-active</code>가 모순되면 <code>GENERATION_SPLIT_BRAIN</code>.</li>
+      <li><code>share_root/vault</code>가 <code>vault_root</code>와 다르면 <code>GENERATION_ACTIVE_PATH_INVALID</code>.</li>
+      <li>스테이징 디렉터리 이름은 반드시 64자리 hex여야 하며, 아니면 <code>GENERATION_STAGING_UNSAFE</code>(<code>sb/generation_cleanup.py</code>).</li>
+    </ul>
+
+    <h3 id="t6-6">6.6 <code>sb maintain --once</code>가 실제로 하는 일</h3>
+    <p><code>sb/cli.py: maintain()</code> → <code>GenerationMutationService.maintain(now)</code> → <code>_maintain_locked</code>:</p>
+    <ol>
+      <li><code>discard_abandoned_staging()</code> — 게시되지 않은 스테이징 트리를 디스크립터 기준으로 안전 삭제.</li>
+      <li><code>store.activate(parent, None, now, lock_held=True)</code> — 중단된 활성화 복구.</li>
+      <li><code>sweep_orphan_activations(now, current_id)</code> — <strong>현재 세대가 아니고, reader lease로 고정돼 있지도 않고, 디렉터리도 pointer 대상도 존재하지 않는</strong> <code>activated</code> 행을 <code>proved</code> + <code>disposal_digest = digest("generation", {"reason": "orphan-missing-directory", …})</code>로 전이한다.</li>
+      <li><code>lifecycle.maintain(now)</code> — 만료된 export 처분.</li>
+    </ol>
+    <p>그 다음 CLI가 별도로 <code>settle_superseded_briefs(now)</code>를 호출한다:</p>
+    <ul>
+      <li>현재 세대의 <code>ledger.db</code>에서 <code>stage='brief'</code>인 <code>failed</code> 개수와 <code>done</code> 개수를 읽는다.</li>
+      <li><strong>둘 다 1건 이상일 때만</strong> EFFECT mutation으로 <code>supersede_historical_brief_failures()</code>를 실행한다.</li>
+      <li>그 안에서 실패 brief 행은 다음 두 조건을 모두 만족할 때만 <code>superseded</code>로 바뀐다(<code>sb/store/ledger.py</code>):
+        <ul>
+          <li>오류 문자열이 <strong>일시적 LLM 오류가 아닐 것</strong> (<code>error.casefold().startswith("llm unavailable")</code>이면 제외)</li>
+          <li>그 행의 <code>finished_at</code>보다 <strong>나중에 끝난 <code>done</code> brief 행이 존재</strong>할 것 (<code>_has_later_done_brief</code>)</li>
+        </ul>
+      </li>
+      <li>행은 삭제되지 않는다. 상태만 바뀌고 전이 이벤트가 기록된다.</li>
+    </ul>
+    <p>출력은 한 줄 JSON이다:</p>
+<pre><code>{"disposed_exports":0,"disposed_staging":0}</code></pre>
+    <p><code>--restore-workspace</code>를 주면 <code>disposed_restore_workspaces</code>와 <code>restore_workspace_busy</code>가 추가된다. 진행 중인 복원은 기다리지 않고 <code>restore_workspace_busy: true</code>로 보고한다. 옵션을 생략하면 해당 폴더를 찾지도, 정리하지도 않는다.</p>
+
+    <h3 id="t6-7">6.7 금기: 유지보수와 읽기 CLI 동시 실행</h3>
+    <div class="callout danger"><span class="label">금기</span>
+      <p><code>sb maintain</code>이 선행 세대를 폐기할 때 <code>/proc</code>의 모든 fd를 훑는다. 같은 순간에 <code>sb status</code>나 <code>sb search</code>가 선행 세대 파일을 열고 있으면 폐기가 <code>GENERATION_READER_DRAIN_REQUIRED</code>로 실패하고 종료 코드 1이 된다. 2026-09-15 18:41 전환 기록에 이 사고가 그대로 남아 있고, 1분 뒤 단독 재실행에서 <code>activations 247 전부 proved</code>로 정상 종료했다.</p>
+    </div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 7 ══════════ -->
+    <h2 id="t7">7 검색 (CLI / MCP / Web)과 한계</h2>
+
+    <h3 id="t7-1">7.1 질의 문법</h3>
+    <p><code>sb/search_query.py: LexicalQuery.parse</code></p>
+    <ul>
+      <li>입력 한도: <strong>4,096 UTF-8 바이트</strong>(<code>SEARCH_QUERY_TOO_LARGE: maximum 4096 UTF-8 bytes</code>)</li>
+      <li>그룹 한도: <strong>32개</strong>(<code>SEARCH_QUERY_TOO_MANY_GROUPS: maximum 32</code>)</li>
+      <li>제어 문자(탭/CR/LF 제외, DEL 포함) 금지: <code>SEARCH_QUERY_CONTROL_CHARACTER</code></li>
+      <li>큰따옴표로 정확 문구 그룹을 만든다. 닫히지 않으면 <code>SEARCH_QUERY_SYNTAX: unclosed quoted phrase</code>, 그룹 뒤에 공백 없이 문자가 붙으면 <code>SEARCH_QUERY_SYNTAX: separate quoted groups with whitespace</code>, 빈 문구는 <code>SEARCH_QUERY_SYNTAX: empty quoted phrase</code>.</li>
+      <li>인용 그룹 안에서 <code>\"</code>는 따옴표 문자, <code>\\</code>는 역슬래시 문자다.</li>
+      <li>중복 그룹은 제거된다(<code>dict.fromkeys</code>).</li>
+    </ul>
+<pre><code>sb search "배포 오로라"                 # 두 단어가 모두 들어간 자료 (어순 무관)
+sb search '노을 "세 번 실패"'           # '노을' + 정확 문구 '세 번 실패'</code></pre>
+
+    <h3 id="t7-2">7.2 매칭 규칙 (이것이 한계의 근원이다)</h3>
+    <p><code>LexicalQuery.predicate()</code>:</p>
+<pre><code>(instr(compact, ?) &gt; 0 OR instr(normalize_id, ?) &gt; 0 OR instr(normalize_section, ?) &gt; 0)
+AND … (모든 검색어에 대해 반복)</code></pre>
+    <p><code>normalize(text)</code> = <code>casefold()</code> 후 <strong>모든 공백 제거</strong>. 즉:</p>
+    <ul>
+      <li>질의는 <strong>공백으로 토큰 분리</strong>된다.</li>
+      <li>각 토큰은 문서 본문/페이지 ID/섹션명에 <strong>그대로 부분 문자열로 들어 있어야</strong> 한다.</li>
+      <li>모든 토큰이 만족해야 한다(AND).</li>
+      <li>형태소 분석·어간 추출·불용어 제거·동의어 확장은 <strong>없다</strong>.</li>
+    </ul>
+    <p>순위(<code>ordering()</code>):</p>
+    <ul>
+      <li>토큰이 1개면 상대 빈도 기반 점수 내림차순.</li>
+      <li>2개 이상이면 <strong>입력 문구 전체가 연속으로 들어간 결과를 먼저</strong>(CASE 0), 그다음 점수 순.</li>
+      <li>동점은 <code>page_id, section, rowid</code>.</li>
+    </ul>
+
+    <h3 id="t7-3">7.3 범위(scope)와 필터</h3>
+    <p><code>sb/search_filters.py: SearchFilters.predicate</code></p>
+    <div class="table-wrap"><table><thead><tr><th><code>--scope</code></th><th>동작</th></tr></thead><tbody>
+          <tr><td><code>active</code> (기본, 그리고 인식되지 않는 값의 fallback)</td><td><code>knowledge_status = ACTIVE AND approval_status = APPROVED</code></td></tr>
+          <tr><td><code>candidate</code></td><td><code>knowledge_status = CANDIDATE</code></td></tr>
+          <tr><td><code>reference</code> (또는 내부적으로 <code>all</code>)</td><td>지식 상태 필터 없음</td></tr>
+        </tbody></table></div>
+    <p>CLI의 기본값은 조건부다(<code>sb/cli.py: search()</code>): <code>--scope</code>를 주지 않았고 <code>&lt;vault_root&gt;/generation.json</code>이 파일로 존재하면 <code>reference</code>, 아니면 <code>active</code>. 관리형 세대 Vault에는 <code>generation.json</code>이 있으므로 운영 CLI 검색의 기본은 <code>reference</code>다.</p>
+    <p>그 외 필터: <code>--kind</code>(<code>wiki</code>/<code>daily</code>/<code>conflicts</code>, 반복 가능), <code>--status</code>, <code>--updated-from</code>, <code>--updated-to</code>.</p>
+
+    <h3 id="t7-4">7.4 결과 필드</h3>
+    <p><code>SearchHit.as_dict()</code>가 내보내는 키: <code>page_id</code>, <code>section</code>, <code>snippet</code>, <code>score</code>, <code>kind</code>, <code>index_status</code>, <code>knowledge_status</code>, <code>approval_status</code>, <code>canonical</code>, <code>source_ref</code>, <code>updated_at</code>, <code>role</code>, <code>verification</code>.</p>
+    <p><code>role</code>/<code>verification</code> 라벨은 파생값이다(<code>_labels</code>): <code>knowledge_status == ACTIVE and approval_status == APPROVED</code> → <code>("CANONICAL", "VERIFIED")</code>, 그 외 전부 → <code>("REFERENCE", "UNVERIFIED")</code>.</p>
+
+    <h3 id="t7-5">7.5 MCP 검색</h3>
+    <p><code>sb/mcp.py: sb_search(query, limit=10, read_fence=None)</code></p>
+    <ul>
+      <li>세대를 핀으로 고정한 뒤(<code>pin_generation</code>) 검색한다. 응답에는 세대 바인딩 정보가 붙는다.</li>
+      <li><code>limit &lt;= 0</code>이거나 빈 질의는 빈 결과.</li>
+      <li>계약 스키마 4 이상에서는 페이지당 1회만 훑고, 그 페이지의 <strong>기억 레코드</strong> 중 <code>parsed.matches_record(record.record_text)</code>를 통과한 것만 반환한다. 즉 <strong>모든 검색어가 같은 인용 레코드 안에</strong> 있어야 한다(README도 같은 말을 한다). snippet은 레코드 본문 400자로 자른다.</li>
+      <li><code>hybrid</code>가 켜져 있으면 <code>semantic_hits</code>를 <code>merge_semantic_records</code>로 합친다.</li>
+      <li>반환 필드: <code>page_id</code>, <code>section</code>, <code>snippet</code>, <code>score</code> (+스키마 4↑에서 <code>record_id</code>, <code>record_digest</code>).</li>
+    </ul>
+    <p>기본 stdio 프로필의 도구 구성:</p>
+    <div class="table-wrap"><table><thead><tr><th>프로필(<code>SB_MCP_CONTRACT_PROFILE</code>)</th><th>스키마</th><th>도구</th></tr></thead><tbody>
+          <tr><td>(미설정, 레거시)</td><td>3</td><td><code>sb_search</code>, <code>sb_read_page</code>, <code>sb_recent_changes</code>, <code>sb_open_conflicts</code>, <code>sb_remember</code>, <code>sb_write_request</code> (6개)</td></tr>
+          <tr><td><code>task30-schema3</code></td><td>3</td><td>위 6개 + <code>sb_generation_status</code>, <code>sb_request_status</code>, <code>sb_resolve_memory_target</code></td></tr>
+          <tr><td><code>task32-schema4</code></td><td>4</td><td>9개 (릴리스 래퍼 <code>second-brain-mcp</code>의 기본값)</td></tr>
+          <tr><td><code>remember-schema5</code></td><td>5</td><td>9개, <code>sb_write_request</code>가 <code>remember-schema5</code> 계약</td></tr>
+          <tr><td><code>cancellation-schema6</code></td><td>6</td><td>위 + <code>sb_cancellation_status</code></td></tr>
+          <tr><td><code>cancellation-submit-schema7</code></td><td>7</td><td>위 + <code>sb_submit_cancellation</code></td></tr>
+          <tr><td><code>scoped-record-read-v1…v5</code></td><td>4</td><td><code>sb_read_page</code>, <code>sb_search</code> (+v2↑ <code>sb_generation_status</code>, +v5 <code>sb_request_status</code>). <code>[mcp_scoped_read]</code> 필수</td></tr>
+          <tr><td><code>scoped-request-status-v1</code></td><td>—</td><td><code>sb_request_status</code> 하나</td></tr>
+          <tr><td><code>scoped-request-write-v1</code></td><td>—</td><td><code>sb_write_request</code> 하나. <code>[scoped_provider_verifier]</code> 필수</td></tr>
+        </tbody></table></div>
+    <p>알 수 없는 프로필 값은 <code>SECOND_BRAIN_CONTRACT_PROFILE_INVALID</code>로 기동을 거절한다. <code>sb_run</code>은 <strong>desktop 서버 표면에만</strong> 있고 일반 stdio 목록에는 없다.</p>
+
+    <h3 id="t7-6">7.6 Web 검색과 그 외 엔드포인트</h3>
+    <p><code>sb/web.py</code>. <code>/api/*</code>는 <code>[web] token</code>이 설정돼 있으면 <code>Authorization: Bearer &lt;token&gt;</code>을 요구한다.</p>
+    <div class="table-wrap"><table><thead><tr><th>메서드</th><th>경로</th><th>설명</th></tr></thead><tbody>
+          <tr><td>GET</td><td><code>/</code></td><td>내장 HTML 콘솔</td></tr>
+          <tr><td>GET</td><td><code>/health</code></td><td><code>{"status":"ok"}</code> — 프로세스 생존만</td></tr>
+          <tr><td>GET</td><td><code>/ready</code></td><td>readiness 판정. <code>ready</code>면 200, 아니면 <strong>503</strong> + <code>reasons</code> 배열</td></tr>
+          <tr><td>GET</td><td><code>/api/status</code></td><td>실행 상태 요약(한국어 요약 문자열 포함)</td></tr>
+          <tr><td>GET</td><td><code>/api/capabilities</code></td><td><code>supported_suffixes</code>, <code>max_upload_bytes</code> 등</td></tr>
+          <tr><td>GET</td><td><code>/api/briefing/latest</code></td><td>최신 브리핑</td></tr>
+          <tr><td>GET</td><td><code>/api/search?q=&amp;limit=&amp;kind=&amp;status=&amp;updated_from=&amp;updated_to=&amp;scope=</code></td><td>검색(limit 상한 100)</td></tr>
+          <tr><td>GET</td><td><code>/api/pages/&lt;page_id&gt;</code></td><td>페이지 읽기</td></tr>
+          <tr><td>GET</td><td><code>/api/changes?days=</code></td><td>최근 변경(days 상한 3650)</td></tr>
+          <tr><td>GET</td><td><code>/api/conflicts</code></td><td>미해결 충돌</td></tr>
+          <tr><td>GET</td><td><code>/api/sources</code></td><td>원본 정책 상태</td></tr>
+          <tr><td>GET</td><td><code>/api/retention</code></td><td>보존 리포트</td></tr>
+          <tr><td>GET</td><td><code>/api/metrics?limit=</code></td><td>메트릭(limit 상한 10000)</td></tr>
+          <tr><td>POST</td><td><code>/api/uploads</code></td><td>파일 업로드(base64). 성공 시 <code>queued</code>면 201, 아니면 200</td></tr>
+          <tr><td>POST</td><td><code>/api/remember</code></td><td><code>{content, title?}</code> → 201 <code>{inbox_path}</code></td></tr>
+          <tr><td>POST</td><td><code>/api/inbox-discard</code></td><td><code>{inbox_path}</code> → <code>{discarded}</code></td></tr>
+          <tr><td>POST</td><td><code>/api/run</code></td><td><code>sb run</code> 실행. 실패 사유는 자격증명 마스킹 후 1000자로 잘라 반환</td></tr>
+          <tr><td>POST</td><td><code>/api/pages/&lt;page_id&gt;/forget</code></td><td>컴파일된 페이지 삭제 → <code>{forgotten, commit}</code></td></tr>
+          <tr><td>POST</td><td><code>/api/conflicts/&lt;id&gt;/resolve</code></td><td><code>{decision, note}</code></td></tr>
+        </tbody></table></div>
+    <p>업로드 한도: <code>MAX_UPLOAD_BYTES = MAX_INBOX_BYTES = 10 MiB</code>. 일반 JSON 본문 한도: <code>MAX_BODY_BYTES = 1 MiB</code>. 업로드 요청은 base64 오버헤드를 감안해 <code>((10MiB+2)//3)*4 + 64KiB</code>까지 허용한다.</p>
+
+    <h3 id="t7-7">7.7 한국어 검색의 알려진 한계 (정직한 서술)</h3>
+    <p><code>sb/search_query.py</code>가 질의를 공백으로 쪼개고 <strong>모든 토큰을 부분 문자열로 AND 요구</strong>하기 때문에, 조사·어미가 붙은 자연어 질문은 구조적으로 0점이 된다. <code>unified-db의</code>, <code>며칠인가요?</code> 같은 토큰은 문서에 그대로 존재할 수 없다.</p>
+    <p><code>M10-GOLD-CURATED-2026-09-15.md</code> §3.1이 보고한 측정값(격리 fixture, 문서 40 / 케이스 131, limit 5):</p>
+    <div class="table-wrap"><table><thead><tr><th>지표</th><th>CLI</th><th>MCP</th></tr></thead><tbody>
+          <tr><td>hit@1</td><td>0.226</td><td>0.217</td></tr>
+          <tr><td>recall@5</td><td>0.226</td><td>0.217</td></tr>
+          <tr><td>MRR@5</td><td>0.226</td><td>0.217</td></tr>
+          <tr><td>negative_empty_rate (no_answer 정밀도)</td><td>1.0</td><td>1.0</td></tr>
+          <tr><td>forbidden_exposure@5</td><td>0.0</td><td>0.0</td></tr>
+        </tbody></table></div>
+    <p>kind별 recall@5:</p>
+    <div class="table-wrap"><table><thead><tr><th>kind</th><th>건수</th><th>CLI</th><th>MCP</th></tr></thead><tbody>
+          <tr><td>exact_phrase</td><td>9</td><td>0.667</td><td>0.667</td></tr>
+          <tr><td>keyword</td><td>23</td><td>0.783</td><td>0.739</td></tr>
+          <tr><td>reordered_terms</td><td>2</td><td>1.0</td><td>1.0</td></tr>
+          <tr><td><strong>natural_question</strong></td><td>66</td><td><strong>0.0</strong></td><td><strong>0.0</strong></td></tr>
+          <tr><td><strong>paraphrase</strong></td><td>13</td><td><strong>0.0</strong></td><td><strong>0.0</strong></td></tr>
+          <tr><td>stale_decision</td><td>2</td><td>0.0</td><td>0.0</td></tr>
+        </tbody></table></div>
+    <p>운영 릴리스 CLI에 같은 131개 질의를 던진 보조 프로브(§3.2)도 거의 같은 값이다: hit@1 0.209, recall@5 0.241, exact_phrase 0.778 / keyword 0.815, natural_question·paraphrase 0.0.</p>
+    <p>결론(§3.3 그대로):</p>
+    <ul>
+      <li><strong>자연어 질문·패러프레이즈 회수율은 정확히 0이다(79건).</strong> 형태소 분석·n-gram·의미 검색 중 하나가 붙기 전에는 데이터셋을 어떻게 고쳐도 0이다.</li>
+      <li><strong>키워드/정확 구절은 0.67–0.82로 이미 쓸 만하다.</strong> 문제는 색인이 아니라 질의 정규화다.</li>
+      <li><code>no_answer</code> 정밀도 1.0, forbidden 노출 0.0 — 없는 것을 지어내지는 않는다. 다만 <code>stale_decision</code> 2건의 0.0은 “잘 배제했다”가 아니라 “둘 다 안 나왔다”에 가깝다.</li>
+      <li>격리 실행에서 <code>hit@1 == recall@5 == MRR@5</code>인 것은 우연이 아니다. 맞힌 케이스는 전부 1위로 맞혔고, 1위에 없으면 2–5위에도 없었다.</li>
+    </ul>
+    <div class="callout warn"><span class="label">실무 지침</span>
+      <p><strong>핵심 명사를 공백으로 나열하라. 조사·어미·물음표를 빼라.</strong></p>
+    </div>
+<pre><code># 잘 되는 형태
+sb search "백업 검증 절차"
+sb search '릴리스 "reader drain"'
+
+# 0점이 나오는 형태
+sb search "백업은 어떻게 검증하나요?"</code></pre>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 8 ══════════ -->
+    <h2 id="t8">8 AI 클라이언트 기억 훅 (Claude Code / Codex CLI / OmO)</h2>
+
+    <h3 id="t8-1">8.1 목적</h3>
+    <p>대화가 컴팩션될 때 <strong>손실되는 사실을 Second Brain에서 되찾아 다음 모델 요청 앞에 붙인다.</strong> 세 클라이언트 모두 같은 명령(<code>sb postcompact-hook</code>)을 쓰며, 이벤트 JSON을 stdin으로 받고 훅 페이로드 JSON을 stdout으로 낸다.</p>
+
+    <h3 id="t8-2">8.2 공통 래퍼</h3>
+    <p><code>~/.config/second-brain/hooks/sb-memory-hook.sh</code> (설치본 그대로):</p>
+<pre><code>#!/bin/sh
+# second-brain memory hook bridge (Claude Code / Codex CLI / OmO).
+# Reads the client's hook event JSON on stdin and forwards it to the current
+# second-brain release. Never fails the client: any error prints nothing.
+SB_BIN="${SB_MEMORY_BIN:-$HOME/.local/state/second-brain/app/current/bin/sb}"
+[ -x "$SB_BIN" ] || { cat &gt;/dev/null 2&gt;&amp;1; exit 0; }
+exec "$SB_BIN" postcompact-hook</code></pre>
+    <p>설계 요점:</p>
+    <ul>
+      <li><code>app/current/bin/sb</code>를 쓰므로 릴리스를 전환하면 훅도 자동으로 새 릴리스를 탄다.</li>
+      <li>릴리스가 없거나 실행 불가면 <strong>stdin을 비우고 조용히 0으로 종료</strong>한다. 클라이언트를 절대 실패시키지 않는다.</li>
+      <li>래퍼가 쓰는 설정은 릴리스 래퍼의 기본값, 즉 <code>$HOME/.config/second-brain/config.toml</code>이다. 다른 설정을 쓰려면 <code>SB_CONFIG</code>를, 다른 바이너리를 쓰려면 <code>SB_MEMORY_BIN</code>을 환경에 준다.</li>
+    </ul>
+
+    <h3 id="t8-3">8.3 훅 계약 (<code>sb/postcompact_hook.py</code>)</h3>
+    <p>세 이벤트만 받는다. 그 외에는 <code>HOOK_EVENT_UNSUPPORTED</code>.</p>
+    <div class="table-wrap"><table><thead><tr><th>이벤트</th><th>읽는 필드</th><th>하는 일</th><th>stdout</th></tr></thead><tbody>
+          <tr><td><code>PostCompact</code></td><td><code>query</code> 또는 <code>compact_summary</code>(필수), <code>trigger</code>/<code>matcher</code></td><td>검색 → 레코드 선별 → <strong>스테이지 파일에 저장</strong>. 주입하지 않는다.</td><td><code>{}</code></td></tr>
+          <tr><td><code>UserPromptSubmit</code></td><td><code>prompt</code> / <code>content</code> / <code>query</code></td><td>프롬프트로 검색해 <code>last_query</code>를 갱신. 스테이지에 미전달 레코드가 있으면 그것을 주입.</td><td><code>{}</code> 또는 <code>hookSpecificOutput</code></td></tr>
+          <tr><td><code>SessionStart</code></td><td><code>source</code>(=<code>compact</code>일 때만 동작), <code>query</code>/<code>compact_summary</code></td><td>이번 턴에 바로 주입할 문맥을 만든다. 남는 레코드는 스테이지에 남긴다.</td><td><code>hookSpecificOutput</code></td></tr>
+        </tbody></table></div>
+    <p>공통 필드: <code>session_id</code>(없으면 <code>HOOK_SESSION_MISSING</code>). JSON이 아니면 <code>HOOK_JSON_INVALID</code>.</p>
+    <p>주입 페이로드 형태:</p>
+<pre><code>{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "&lt;본문&gt;"}}</code></pre>
+    <p><code>additionalContext</code> 본문 형식(<code>_context_text</code>):</p>
+<pre><code>session_id: &lt;id&gt;
+budget: items&lt;=8 excerpt&lt;=4096 total&lt;=16384
+record page_id=&lt;id&gt; source_ref=&lt;origin&gt; record_id=&lt;id&gt; version=&lt;digest&gt;
+&lt;레코드 본문&gt;
+record …</code></pre>
+    <p>예산 상수:</p>
+    <div class="table-wrap"><table><thead><tr><th>상수</th><th>값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>_MAX_ITEMS</code></td><td>8</td><td>최대 레코드 수</td></tr>
+          <tr><td><code>_MAX_EXCERPT_BYTES</code></td><td>4,096</td><td>레코드 본문 바이트 상한</td></tr>
+          <tr><td><code>_MAX_TOTAL_BYTES</code></td><td>16,384</td><td>페이로드 JSON 전체 바이트 상한. 넘으면 뒤에서부터 레코드를 하나씩 버린다.</td></tr>
+          <tr><td><code>_MAX_CANDIDATE_TOKENS</code></td><td>32</td><td>요약에서 뽑는 후보 검색어 수</td></tr>
+          <tr><td><code>_SHORT_TERM</code></td><td>6</td><td>이보다 짧은 검색어는 단어 경계 일치만 인정</td></tr>
+        </tbody></table></div>
+
+    <h3 id="t8-4">8.4 stage / last_query / 중복 억제 설계</h3>
+    <p>스테이지 파일: <code>&lt;state_root&gt;/.sb/session-memory/&lt;sanitized session_id&gt;.json</code> (<code>_stage_path</code>). 디렉터리는 <code>0700</code>으로 만들고 <code>O_NOFOLLOW|O_DIRECTORY</code>로 열어 심링크 공격을 막는다. 파일은 <code>O_NOFOLLOW|O_CREAT</code>로 <code>0600</code>으로 열고 일반 파일인지 <code>fstat</code>으로 확인한 뒤 <code>ftruncate</code>+<code>write</code>+<code>fsync</code>한다. 어긋나면 <code>HOOK_STAGE_UNSAFE</code>.</p>
+    <p>스테이지 스키마(<code>_write_stage</code>):</p>
+    <div class="table-wrap"><table><thead><tr><th>필드</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>session_id</code></td><td>세션 식별자</td></tr>
+          <tr><td><code>event_digest</code></td><td><code>sha256(session_id \0 occurrence_id \0 summary)</code>. <code>occurrence_id</code>는 <code>prompt_id</code>/<code>compaction_id</code>/<code>event_id</code>/<code>uuid</code> 등으로 구성</td></tr>
+          <tr><td><code>delivered</code></td><td>남은 레코드가 없어 전달이 끝났는지</td></tr>
+          <tr><td><code>context</code></td><td>다음 <code>UserPromptSubmit</code>에서 쓸 잔여 문맥 문자열</td></tr>
+          <tr><td><code>records</code></td><td>아직 전달하지 않은 레코드 배열</td></tr>
+          <tr><td><code>last_query</code></td><td>마지막으로 유용했던 검색어들(공백 결합)</td></tr>
+          <tr><td><code>delivered_in_turn</code></td><td>이미 전달한 레코드 키(<code>record_id \0 version</code>) 목록</td></tr>
+          <tr><td><code>in_turn</code></td><td>이번 턴에 주입한 레코드(확정 대기)</td></tr>
+        </tbody></table></div>
+    <p>동작 흐름:</p>
+    <ol>
+      <li><strong><code>UserPromptSubmit</code></strong> — 프롬프트로 <code>_hook_search</code>를 돌려 결과가 있으면 <code>last_query</code>를 그 검색어들로 갱신한다(<code>_remember_last_query</code>). 스테이지가 없거나 <code>delivered: true</code>면 아무것도 주입하지 않는다. 미전달 레코드가 있으면 <code>context</code>를 그대로 주입하고 <code>pending_confirm</code>을 세운다.</li>
+      <li><strong><code>PostCompact</code></strong> — 요약으로 검색해 레코드를 만든 뒤, <code>delivered_in_turn</code>에 이미 있는 것을 제외한다(<code>_exclude_delivered</code>). <code>event_digest</code>가 직전과 같으면 <code>duplicate</code>로 보고 스테이지를 다시 쓰지 않는다. <strong>주입은 하지 않고</strong> <code>{}</code>만 출력한다.</li>
+      <li><strong><code>SessionStart(source=compact)</code></strong> — 질의는 이벤트의 요약, 없으면 스테이지의 <code>last_query</code>를 쓴다. 둘 다 없으면 아무것도 하지 않는다. <code>event_digest</code>가 같고 이미 <code>delivered</code>면 중복으로 보고 건너뛴다. 검색 결과를 <strong>이번 턴에 바로 주입</strong>하고, 직전에 남아 있던 미전달 레코드 중 이번 턴 키와 겹치지 않는 것만 <code>records</code>(잔여)로 남긴다.</li>
+      <li><strong><code>confirm_delivery</code></strong> — CLI가 stdout 쓰기에 성공한 뒤에만 호출된다(<code>sb/cli.py: postcompact_hook</code>). <code>in_turn</code>에 있던 레코드 키를 <code>delivered_in_turn</code>에 합치고 <code>in_turn</code>을 비운다. 잔여가 없으면 <code>delivered = true</code>. <strong>stdout이 끊기면(BrokenPipe, 종료 코드 1) 전달로 기록하지 않는다.</strong></li>
+    </ol>
+    <p>검색 방식(<code>_hook_search</code>, <code>_weighted_terms</code>):</p>
+    <ul>
+      <li>요약에서 3자 이상, 불용어가 아닌 토큰을 빈도·식별자 성격(한글/CamelCase 우선)으로 정렬해 최대 32개 뽑는다(<code>_candidate_tokens</code>).</li>
+      <li>각 토큰으로 <code>limit = 8*4 = 32</code>까지 검색한다. 결과가 <strong>0건이거나 32건 이상인 토큰은 버린다</strong>(너무 흔한 토큰 제거).</li>
+      <li>남은 토큰의 가중치는 <code>1/결과수</code>. 페이지·섹션 단위로 가중치를 합산해 내림차순 정렬한다.</li>
+      <li>6자 미만 토큰은 snippet에서 단어 경계로 정확히 일치할 때만 인정한다(<code>_standalone_term</code>).</li>
+    </ul>
+    <p>레코드 선별(<code>_matching_records</code>): 히트 페이지의 <code>.md</code>를 읽어 <code>parse_page_records</code>로 기억 레코드를 쪼갠 뒤, 후보 검색어 중 하나라도 포함한 레코드만 고른다. 각 레코드에는 <code>page_id</code>, <code>source_ref</code> (프론트매터 <code>sources</code> 또는 각주 정의 <code>[^sid]: origin</code>에서 복원), <code>record_id</code>, <code>version</code>(레코드 다이제스트), <code>snippet</code>이 붙는다.</p>
+
+    <h3 id="t8-5">8.5 Claude Code 설치</h3>
+    <p><code>~/.claude/settings.json</code>의 <code>hooks</code>에 세 항목을 추가한다(설치된 실제 값):</p>
+    <div class="table-wrap"><table><thead><tr><th>이벤트</th><th>matcher</th><th>command</th><th>timeout</th></tr></thead><tbody>
+          <tr><td><code>UserPromptSubmit</code></td><td>(없음)</td><td><code>/bin/sh /home/jm/.config/second-brain/hooks/sb-memory-hook.sh</code></td><td>20</td></tr>
+          <tr><td><code>SessionStart</code></td><td><code>compact</code></td><td>같음</td><td>20</td></tr>
+          <tr><td><code>PostCompact</code></td><td>(없음)</td><td>같음</td><td>20</td></tr>
+        </tbody></table></div>
+    <p>JSON 형태:</p>
+<pre><code>{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "/bin/sh /home/jm/.config/second-brain/hooks/sb-memory-hook.sh", "timeout": 20 } ] }
+    ],
+    "SessionStart": [
+      { "matcher": "compact",
+        "hooks": [ { "type": "command", "command": "/bin/sh /home/jm/.config/second-brain/hooks/sb-memory-hook.sh", "timeout": 20 } ] }
+    ],
+    "PostCompact": [
+      { "hooks": [ { "type": "command", "command": "/bin/sh /home/jm/.config/second-brain/hooks/sb-memory-hook.sh", "timeout": 20 } ] }
+    ]
+  }
+}</code></pre>
+    <p><strong>Claude Code 2.1.270의 실제 계약</strong> (<code>CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md</code>, 실세션 관측):</p>
+    <ul>
+      <li>컴팩션 시 호출 순서는 <strong><code>SessionStart(source=compact)</code> → <code>PostCompact</code></strong>다.</li>
+      <li><code>SessionStart(compact)</code>의 <code>additionalContext</code>는 <strong>그 턴 안에서 주입된다.</strong> transcript에서 <code>attachment.type = hook_additional_context</code>, <code>hookName = SessionStart</code>로 확인됐고, 다음 모델 요청 이전에 존재했다.</li>
+      <li><strong><code>PostCompact</code>의 <code>additionalContext</code>는 무시된다.</strong> 그래서 SB의 <code>PostCompact</code> 처리는 주입을 시도하지 않고 스테이지만 만든다.</li>
+      <li>수동 <code>/compact</code>와 자동 compaction 모두 같은 코드 경로이며, <code>trigger</code> 값만 <code>manual</code>/<code>auto</code>로 다르다. 자동 트리거도 <code>CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=4</code>로 임계값을 낮춘 실세션에서 3회 실관측됐다.</li>
+      <li>관측된 실제 입력에는 <code>SessionStart</code>에 summary가 없었고, 그때 SB는 스테이지의 <code>last_query</code>로 검색해 올바른 레코드를 주입했다. <code>last_query</code> 설계가 여기서 결정적이다.</li>
+    </ul>
+
+    <h3 id="t8-6">8.6 Codex CLI 설치</h3>
+    <p><code>~/.codex/hooks.json</code>은 Claude Code와 <strong>같은 세 이벤트·같은 command·같은 timeout 20</strong>을 쓴다. 다만 최상위에 <code>{"hooks": { … }}</code> 한 겹이 더 있다(§8.5의 JSON에서 <code>hooks</code> 객체만 그대로 옮기면 된다).</p>
+    <div class="callout danger"><span class="label">주의 (운영 기록에 남은 함정)</span>
+      <p>Codex는 <code>hooks.json</code>을 바꾼 뒤 TUI 첫 실행에서 “Hooks need review” → <strong>“Trust all and continue”</strong> 를 사용자가 한 번 선택해야 훅이 켜진다. 신뢰 이전에는 <strong>조용히 실행되지 않는다</strong>(오류도 안 난다). 자동화 실행에는 <code>--dangerously-bypass-hook-trust</code>를 쓴다.</p>
+    </div>
+    <p>컴파일용 격리 <code>CODEX_HOME</code>에는 <code>hooks.json</code>이 없으므로 LLM 백엔드 실행에는 영향이 없다.</p>
+
+    <h3 id="t8-7">8.7 OmO / senpi 설치</h3>
+    <p><code>~/.omo/agent/extensions/sb-memory.js</code>. 확장은 두 이벤트만 건다.</p>
+    <div class="table-wrap"><table><thead><tr><th>OmO 이벤트</th><th>매핑</th><th>동작</th></tr></thead><tbody>
+          <tr><td><code>before_agent_start</code></td><td><code>UserPromptSubmit</code></td><td><code>prompt</code>를 넘겨 <code>last_query</code>를 갱신하고, 반환된 문맥이 있으면 <code>{ message: { customType: "sb-memory", content, display: false } }</code>로 조용히 주입</td></tr>
+          <tr><td><code>session_compact</code> (<code>event.accepted</code>일 때만)</td><td><code>PostCompact</code> → <code>SessionStart(compact)</code></td><td>먼저 <code>PostCompact</code>(<code>trigger</code>는 <code>reason === "manual" ? "manual" : "auto"</code>, <code>compact_summary</code>)로 스테이징, 그다음 <code>SessionStart(source: "compact")</code>로 문맥을 받아 <code>pi.sendMessage(..., { deliverAs: "steer" })</code>로 이번 턴에 주입</td></tr>
+        </tbody></table></div>
+    <p>환경 변수:</p>
+    <div class="table-wrap"><table><thead><tr><th>변수</th><th>기본값</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>SB_MEMORY_BIN</code></td><td><code>$HOME/.local/state/second-brain/app/current/bin/sb</code></td><td>호출할 바이너리</td></tr>
+          <tr><td><code>SB_MEMORY_CONFIG</code></td><td>(없음)</td><td>설정하면 <code>SB_CONFIG</code>로 전달</td></tr>
+          <tr><td><code>SB_MEMORY_LOG</code></td><td>(없음)</td><td>설정하면 IN/OUT 라인을 그 파일에 append</td></tr>
+        </tbody></table></div>
+    <p>타임아웃은 코드 상수 <code>TIMEOUT_MS = 20000</code>. 훅 종료 코드가 0이 아니거나 stdout이 비면 <code>null</code>을 반환해 아무것도 주입하지 않는다.</p>
+    <p>실행 중인 OmO 세션은 <code>/reload</code> 또는 재시작해야 확장이 적용된다.</p>
+
+    <h3 id="t8-8">8.8 훅 동작 확인</h3>
+<pre><code>SB=~/.local/state/second-brain/app/current/bin/sb
+printf '{"hook_event_name":"UserPromptSubmit","session_id":"probe-1","prompt":"배포 일정"}' | "$SB" postcompact-hook
+printf '{"hook_event_name":"SessionStart","session_id":"probe-1","source":"compact"}'      | "$SB" postcompact-hook
+cat "$HOME/.local/state/second-brain/.sb/session-memory/probe-1.json"</code></pre>
+    <p>세 명령 모두 종료 코드 0이어야 하고, 두 번째가 <code>hookSpecificOutput</code>을 내면 주입 경로가 살아 있다.</p>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 9 ══════════ -->
+    <h2 id="t9">9 JARVIS 연동</h2>
+
+    <h3 id="t9-1">9.1 역할 분담</h3>
+<pre><code> JARVIS (Orca-JARVIS)                    Second Brain (provider)
+ ───────────────────────                 ────────────────────────
+  memreq 작성 + Ed25519 서명  ──────►  request_root/pending/&lt;file&gt;
+                                                │
+                                   jm-second-brain-requests.path 감지
+                                                │
+                                        sb apply-requests --once
+                                                │
+                                        세대 mutation 실행 + 증명 서명
+                                                │
+                              journal.db 상태 전이 · receipts/ 영수증
+                                                │
+  sb_request_status / scoped 읽기  ◄────────────┘</code></pre>
+    <p>JARVIS는 SB 안에서 쓰기를 직접 하지 않는다. <strong>요청을 저널에 넣고, SB의 executor가 단일 writer로 실행</strong>한다.</p>
+
+    <h3 id="t9-2">9.2 요청 상태 기계</h3>
+    <p><code>requests.state</code> (CHECK 제약, <code>sb/request_store.py</code>):</p>
+    <div class="table-wrap"><table><thead><tr><th>상태</th><th>의미</th></tr></thead><tbody>
+          <tr><td><code>pending</code></td><td>수락됐고 아직 claim 되지 않음</td></tr>
+          <tr><td><code>processing</code></td><td>executor가 lease(<code>owner</code>, <code>owner_process_id</code>, <code>owner_process_start</code>, <code>lease_expires_at</code>, <code>fence&gt;0</code>)를 잡고 진행 중</td></tr>
+          <tr><td><code>proved</code></td><td>증명까지 끝난 최종 성공</td></tr>
+          <tr><td><code>failed</code></td><td>실패</td></tr>
+          <tr><td><code>expired</code></td><td>만료</td></tr>
+          <tr><td><code>reapproval_required</code></td><td>재승인 필요</td></tr>
+        </tbody></table></div>
+    <p><code>requests.phase</code> (세대 진행 단계, NULL 허용): <code>claimed</code> → <code>staging</code> → <code>sealed</code> → <code>switch_intent</code> → <code>activated</code> → <code>disposing</code> → <code>proved</code>.</p>
+    <p>lease 무결성은 스키마 CHECK로 강제된다: <code>owner</code>가 있으면 <code>owner_process_id</code>, <code>owner_process_start</code>, <code>lease_expires_at</code>이 모두 있어야 하고 <code>fence &gt; 0</code>이어야 한다. 넷 다 NULL이거나 넷 다 채워져 있거나 둘 중 하나만 유효하다.</p>
+    <p>관련 테이블: <code>request_aliases</code>(멱등 별칭), <code>delegation_uses</code>(위임 1회 소비), <code>phase_events</code>(단계 이벤트, <code>event_digest</code> UNIQUE), <code>tombstone_replica</code> / <code>tombstone_target_identities</code>(삭제 이력 복제본, UPDATE/DELETE 트리거로 불변), <code>legacy_imports</code>, <code>reader_leases</code>, <code>reader_process_identities</code>.</p>
+
+    <h3 id="t9-3">9.3 <code>sb apply-requests --once</code></h3>
+    <p>전제 조건(<code>sb/cli_requests.py</code>):</p>
+    <ul>
+      <li><code>jarvis_public_keys</code>가 비어 있지 않을 것</li>
+      <li><code>provider_signing_key_id</code>와 <code>provider_private_key</code>가 설정돼 있을 것</li>
+      <li>키가 base64url로 파싱될 것</li>
+      <li>철회된 키(<code>revoked_jarvis_signing_key_ids</code> + <code>&lt;state_root&gt;</code>의 런타임 철회 파일)를 제외하고도 신뢰 키가 남아 있을 것</li>
+    </ul>
+    <p>하나라도 어긋나면 <code>REQUEST_EXECUTOR_KEY_CONFIG_INVALID</code> + 종료 코드 1. scoped provider 설정이 잘못되면 <code>SCOPED_PROVIDER_RUNTIME_CONFIG_INVALID</code> + 1.</p>
+    <p>실행(<code>RequestExecutor.apply_once</code>, 기본 <code>worker = "sb-apply-once"</code>, <code>lease_ms = 60_000</code>):</p>
+    <ol>
+      <li><code>mutations.maintain(observed)</code> — 유지보수를 먼저 돌린다.</li>
+      <li><code>_finalize_proved()</code> — 이미 증명된 건 마무리.</li>
+      <li><code>store.claim(...)</code> — claim 실패 시 즉시 <code>ApplyResult(None, "idle", None, "NO_PENDING_REQUEST", 0)</code>.</li>
+      <li>스키마 버전별 분기: 1/3(그리고 scoped authority가 있는 4)은 remember 경로, 2는 effect 경로.</li>
+      <li>결과를 <code>prove</code>로 확정.</li>
+    </ol>
+    <p>출력은 정렬된 한 줄 JSON이다:</p>
+<pre><code>{"code":"NO_PENDING_REQUEST","fence":0,"phase":null,"request_id":null,"state":"idle"}</code></pre>
+    <p>종료 코드: <code>state</code>가 <code>idle</code> / <code>proved</code> / <code>reconciling</code>이면 <strong>0</strong>, <code>failed</code>면 <strong>1</strong>.</p>
+<pre><code>SB_CONFIG=/home/jm/.config/second-brain/config.toml sb apply-requests --once</code></pre>
+
+    <h3 id="t9-4">9.4 <code>sb retry</code></h3>
+    <p>실패한 <strong>파생</strong>(derivation)을 pending으로 되돌린다. 요청 저널과는 별개다.</p>
+<pre><code>sb retry                      # 모든 단계의 failed
+sb retry --stage compile
+sb retry --stage conflict --limit 10</code></pre>
+    <ul>
+      <li><code>reset_attempts=True</code>로 되돌리므로 시도 횟수가 0이 된다.</li>
+      <li>선택된 집합에 <code>brief</code> 행이 <strong>하나라도</strong> 있으면 아무것도 바꾸지 않고 <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE: historical brief retry is held; failed rows and attempts are preserved</code> 로 실패한다. 과거 브리핑은 고정된 입력과 대상 날짜 없이 재생할 수 없기 때문이다.</li>
+      <li>출력은 <code>requeued=&lt;n&gt;</code>.</li>
+    </ul>
+
+    <h3 id="t9-5">9.5 <code>sb apply-cancellation</code></h3>
+<pre><code>sb apply-cancellation --intent-id &lt;intent id&gt;</code></pre>
+    <p><code>sb/cli_cancellation.py</code>: <code>execute_cancellation(intent_id, config, load_authority=load_config, clock=…)</code>을 호출하고 결과를 정렬된 한 줄 JSON으로 출력한다. 스케줄러도, 암묵적 일괄 정리도 없다 — <strong>명시적 1건 실행</strong>이다.</p>
+    <p>실패 시 stderr에 대문자 스네이크 코드 하나만 낸다. 코드가 비었거나 96자를 넘거나 <code>A-Z0-9_</code>가 아닌 문자를 포함하면 <code>CANCELLATION_EXECUTION_FAILED</code>로 정규화한다. 종료 코드 1.</p>
+    <p>취소 의도를 제출할 수 있는 키는 <code>cancellation_public_keys</code>에 따로 등록된 것뿐이다. MCP 쪽에서는 <code>cancellation-schema6</code>가 <code>sb_cancellation_status</code>를, <code>cancellation-submit-schema7</code>이 <code>sb_submit_cancellation</code>을 추가로 제공한다.</p>
+
+    <h3 id="t9-6">9.6 scoped 쓰기 프로필</h3>
+    <p>JARVIS가 MCP로 쓰기 요청만 보내는 전용 연결:</p>
+<pre><code>SB_CONFIG=/home/jm/.config/second-brain/write-config.toml \
+SB_MCP_CONTRACT_PROFILE=scoped-request-write-v1 sb mcp</code></pre>
+    <ul>
+      <li>이 설정에는 <code>[mcp_scoped_read]</code>를 넣지 않는다. <code>[scoped_provider_verifier]</code>가 필요하다.</li>
+      <li>제공 도구는 <code>sb_write_request(request)</code> 하나다.</li>
+      <li>응답은 <strong>수락 영수증</strong>이다. 실제 처리는 <code>apply-requests --once</code>가 하고, 완료 확인은 별도 <code>scoped-record-read-v5</code> 연결로 한다.</li>
+      <li><strong>오류나 연결 종료만으로 미수락을 단정하고 재전송하면 안 된다</strong>(README 경고).</li>
+    </ul>
+    <p>읽기 전용 scoped 연결은 <code>[mcp_scoped_read]</code>의 <code>principal</code>/<code>agent</code>/<code>session</code>/<code>policy_revision</code>을 쓰며, 서명된 <code>read_fence</code>와 <code>access_claim</code>을 요구한다. 파일 기반 정책·키 철회를 매 조회 전후로 다시 읽고, 누락·손상·조회 중 변경·만료는 거부한다. 세션·provider·저장소 경로가 바뀌면 새 연결이 필요하다.</p>
+
+    <h3 id="t9-7">9.7 운영 연동 지점 요약</h3>
+    <div class="table-wrap"><table><thead><tr><th>요소</th><th>값</th></tr></thead><tbody>
+          <tr><td>요청 디렉터리</td><td><code>~/.local/state/second-brain/requests/{pending,processing,receipts}</code> + <code>journal.db</code></td></tr>
+          <tr><td>트리거</td><td><code>jm-second-brain-requests.path</code> (<code>DirectoryNotEmpty=…/requests/pending</code>)</td></tr>
+          <tr><td>게이트 파일</td><td><code>~/.config/second-brain/request-executor.enabled</code> (<code>ConditionPathExists</code>) — 이 파일이 없으면 path 유닛이 아예 활성화되지 않는다</td></tr>
+          <tr><td>실행 유닛</td><td><code>jm-second-brain-requests.service</code> → <code>app/current/bin/sb apply-requests --once</code></td></tr>
+          <tr><td>provider 설정</td><td><code>SB_CONFIG=~/.config/second-brain/config.toml</code> (drop-in <code>20-runtime.conf</code>)</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 10 ══════════ -->
+    <h2 id="t10">10 운영</h2>
+
+    <h3 id="t10-1">10.1 systemd 사용자 유닛</h3>
+    <p>리포가 제공하는 유닛(<code>deploy/systemd/</code>)과 실제 운영 유닛이 다르다. 운영에서 <strong>실제로 도는 것</strong>은 다음 표의 아래쪽 네 개다.</p>
+    <div class="table-wrap"><table><thead><tr><th>유닛</th><th>출처</th><th>ExecStart</th><th>스케줄</th></tr></thead><tbody>
+          <tr><td><code>second-brain-web.service</code></td><td>리포</td><td><code>sb web --host 127.0.0.1 --port 8765</code></td><td>상시(<code>Restart=on-failure</code>, <code>RestartSec=3s</code>)</td></tr>
+          <tr><td><code>second-brain.service</code> / <code>.timer</code></td><td>리포</td><td><code>sb run</code> / <code>OnCalendar=hourly</code></td><td>운영에서는 inactive. drop-in으로 <code>jm-second-brain-hourly</code> 래퍼와 <code>TimeoutStartSec=3h</code>가 덮여 있다</td></tr>
+          <tr><td><code>second-brain-backup.service</code> / <code>.timer</code></td><td>리포</td><td><code>sb backup</code> / <code>OnCalendar=*-*-* 03:15:00</code>, <code>Persistent=true</code>, <code>RandomizedDelaySec=15min</code></td><td>매일</td></tr>
+          <tr><td><code>jm-second-brain-refresh.service</code> / <code>.timer</code></td><td>JARVIS 배포</td><td><code>${SECOND_BRAIN_REFRESH_ENTRYPOINT}</code> (= <code>~/.local/state/second-brain/bin/jm-second-brain-refresh</code>, 내부적으로 <code>sb run</code>) / <code>OnCalendar=hourly</code></td><td>매시간</td></tr>
+          <tr><td><code>jm-second-brain-maintenance.service</code> / <code>.timer</code></td><td>JARVIS 배포</td><td><code>sb maintain --once</code> / <code>OnCalendar=hourly</code></td><td>매시간</td></tr>
+          <tr><td><code>jm-second-brain-requests.path</code> / <code>.service</code></td><td>JARVIS 배포</td><td><code>app/current/bin/sb apply-requests --once</code></td><td><code>requests/pending</code>이 비지 않을 때</td></tr>
+        </tbody></table></div>
+    <p>공통 보안 설정(리포 유닛): <code>NoNewPrivileges=true</code>, <code>PrivateTmp=true</code>, <code>ProtectSystem=strict</code>, <code>UMask=0077</code>, <code>ReadWritePaths=-%h/.local/share/second-brain -%h/.local/state/second-brain -%h/.config/second-brain</code>. refresh/maintenance 유닛은 추가로 <code>ProtectHome=read-only</code>, <code>RestrictSUIDSGID</code>, <code>LockPersonality</code>, <code>MemoryDenyWriteExecute</code>를 건다.</p>
+    <p>알려진 drop-in:</p>
+    <div class="table-wrap"><table><thead><tr><th>drop-in</th><th>내용</th><th>이유</th></tr></thead><tbody>
+          <tr><td><code>second-brain.service.d/10-unseal-live.conf</code></td><td><code>ExecStartPre=/usr/bin/chmod -R u+w …/vault</code></td><td>봉인 세대는 <code>0500</code>이라 <code>.sb/run.lock</code> 생성을 위해 쓰기 권한이 필요</td></tr>
+          <tr><td><code>jm-second-brain-refresh.service.d/10-share-write.conf</code></td><td><code>ReadWritePaths=%h/.local/share/second-brain</code> 추가</td><td>세대 저장소가 share 아래에 있음</td></tr>
+          <tr><td><code>jm-second-brain-refresh.service.d/20-llm-runtime.conf</code></td><td><code>MemoryDenyWriteExecute=false</code>, <code>ReadWritePaths=%h/.codex</code>, <code>TMPDIR=/var/tmp</code></td><td>Node 기반 LLM 런처가 JIT 실행 메모리를 요구</td></tr>
+          <tr><td><code>jm-second-brain-{maintenance,requests}.service.d/20-runtime.conf</code></td><td><code>SB_CONFIG</code>, <code>PATH</code>에 <code>app/current/bin</code> 선행</td><td>활성 릴리스 바이너리 사용</td></tr>
+        </tbody></table></div>
+    <p>상태 확인:</p>
+<pre><code>systemctl --user status second-brain-web.service
+systemctl --user list-timers --all 'second-brain*' 'jm-second-brain*'
+curl -s http://127.0.0.1:8765/health
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/ready
+journalctl --user -u jm-second-brain-refresh.service -n 50</code></pre>
+
+    <h3 id="t10-2">10.2 LLM 백엔드</h3>
+    <p>현재 운영 백엔드는 CLI argv 템플릿 하나다:</p>
+<pre><code>"llm" = {"argv_template" = ["/home/jm/.config/second-brain/llm/omo-grok.sh"]}</code></pre>
+    <p><code>~/.config/second-brain/llm/omo-grok.sh</code>:</p>
+<pre><code>#!/bin/sh
+# second-brain LLM backend: Grok via OmO print mode (xAI OAuth held by OmO).
+# Prompt arrives on stdin; the reply is printed on stdout (sb extracts the first JSON object).
+export PATH="/home/jm/.nvm/versions/node/v24.19.0/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
+cd "$HOME/.local/state/second-brain/llm-cwd" || exit 1
+MODEL="${SB_LLM_MODEL:-xai/grok-4.6}"
+THINK="${SB_LLM_THINKING:-low}"
+exec omo -p -nt -ne --no-session --model "$MODEL" --thinking "$THINK" \
+  --system-prompt "…precise text-processing backend… output only the JSON object…" \
+  2&gt;/dev/null</code></pre>
+    <p>동작 요점:</p>
+    <ul>
+      <li>템플릿에 <code>{prompt}</code>가 없으므로 <strong>프롬프트는 stdin으로 들어간다</strong>(§4.3).</li>
+      <li>stderr는 버리고 stdout만 쓴다. <code>json_mode</code>에서는 SB가 <strong>첫 JSON 객체</strong>를 뽑는다.</li>
+      <li><code>SB_LLM_MODEL</code>, <code>SB_LLM_THINKING</code> 환경변수로 모델·추론 강도를 바꿀 수 있다(스크립트 자체 규약).</li>
+    </ul>
+    <p>이전 백엔드는 격리된 <code>CODEX_HOME</code>을 쓰는 <code>codex exec</code>였다. 2026-09-15 기록에 따르면 사용자 <code>~/.codex/config.toml</code>(로컬 프록시를 가리키는 <code>openai_base_url</code>)을 서비스가 상속해 모든 compile 호출이 실패했고, <code>/home/jm/.local/state/second-brain/codex-home</code>(0700, 빈 config + <code>auth.json</code> 심링크)을 만들고 <code>argv_template</code> 앞에 <code>env CODEX_HOME=&lt;그 경로&gt;</code>를 붙여 해결했다.</p>
+    <p><strong>백엔드 교체 절차:</strong></p>
+<pre><code># 1) 새 백엔드 스크립트를 만든다 (stdin으로 프롬프트, stdout으로 답, 종료 코드 0)
+install -m 0700 /dev/stdin ~/.config/second-brain/llm/my-backend.sh &lt;&lt;'EOF'
+#!/bin/sh
+exec my-llm-cli --quiet
+EOF
+
+# 2) 백업 후 두 설정 파일의 [llm].argv_template 를 바꾼다
+cp ~/.config/second-brain/config.toml          ~/.config/second-brain/config.toml.bak-$(date +%Y%m%dT%H%M%S)
+cp ~/.config/second-brain/jarvis-provider.toml ~/.config/second-brain/jarvis-provider.toml.bak-$(date +%Y%m%dT%H%M%S)
+# "llm" = {"argv_template" = ["/home/me/.config/second-brain/llm/my-backend.sh"]}
+
+# 3) 확인
+sb doctor            # llm-cli 체크가 pass 인지
+sb compile --dry-run # 상태만 읽는다(쓰기 없음)</code></pre>
+    <p>교체 시 확인할 것:</p>
+    <ul>
+      <li><code>argv_template[0]</code>이 PATH 또는 절대 경로로 <strong>실행 가능</strong>해야 한다. 아니면 <code>sb doctor</code>의 <code>llm-cli</code>가 warn이고, 실제 호출은 <code>command not found: &lt;argv0&gt;</code>로 <code>LLMUnavailable</code>이 된다.</li>
+      <li><code>{prompt}</code>를 argv에 넣으면 stdin 전달이 아니라 argv 치환 방식이 된다. 긴 프롬프트에는 stdin 방식이 안전하다.</li>
+      <li><code>model_id</code> / <code>prompt_version</code>을 바꾸면 <strong>파생 키가 달라져 기존 페이지가 다시 컴파일된다.</strong> 비용과 LLM 호출 상한(<code>caps.max_llm_calls_compile</code>)을 함께 검토한다.</li>
+      <li>백엔드가 외부 제공자로 바뀌면 데이터 제공자가 바뀌는 것이므로 사용자 승인 사안이다.</li>
+      <li>두 설정 파일(<code>config.toml</code>, <code>jarvis-provider.toml</code>) 모두 바꿔야 한다. refresh 경로는 후자를 쓴다.</li>
+    </ul>
+
+    <h3 id="t10-3">10.3 readiness 코드 표</h3>
+    <p><code>/ready</code>(GET)는 <code>sb/readiness.py: readiness()</code>를 그대로 돌려준다. <code>status</code>가 <code>ready</code>면 HTTP 200, 아니면 <strong>503</strong> + <code>reasons</code> 배열.</p>
+    <div class="table-wrap"><table><thead><tr><th>코드</th><th>체크 이름</th><th>발생 조건</th><th>조치</th></tr></thead><tbody>
+          <tr><td><code>READINESS_POLICY_INVALID</code></td><td><code>policy</code></td><td><code>[readiness]</code> 값이 정수가 아니거나 1..8760 밖 / 시계에 timezone 없음</td><td>설정을 고친다. 이 코드가 나오면 다른 체크는 아예 돌지 않는다</td></tr>
+          <tr><td><code>VAULT_UNREADABLE</code></td><td><code>readable</code></td><td>Vault/원장 읽기 중 예외</td><td><code>details.error</code>의 예외 타입 확인, <code>sb doctor</code></td></tr>
+          <tr><td><code>VAULT_UNINITIALIZED</code></td><td><code>initialized</code></td><td><code>&lt;vault&gt;/.git</code>이 디렉터리가 아님</td><td><code>sb init</code></td></tr>
+          <tr><td><code>LEDGER_SCHEMA_INVALID</code></td><td><code>ledger_schema</code></td><td><code>schema_meta.schema_version</code> ≠ 현재</td><td><code>sb migrate --check</code> → <code>sb migrate --apply</code></td></tr>
+          <tr><td><code>GENERATION_INDEX_INVALID</code></td><td><code>generation_index</code></td><td>활성 세대의 <code>search.db</code>가 현재 질의 계획이 요구하는 컬럼을 갖추지 못함</td><td><strong>새 세대를 게시한다</strong> — refresh(<code>sb run</code>) 1회</td></tr>
+          <tr><td><code>LAST_RUN_UNSUCCESSFUL</code></td><td><code>last_run_success</code></td><td>최신 <code>run</code> 행의 status가 <code>ok</code>/<code>capped</code>가 아님</td><td><code>sb status --json</code>으로 실패 단계 확인 → 원인 제거 후 재실행</td></tr>
+          <tr><td><code>LAST_RUN_STALE_OR_INVALID</code></td><td><code>last_run_recent</code></td><td>마지막 실행이 <code>max_run_age_hours</code>보다 오래됐거나 시간 필드가 부정합</td><td>타이머 상태 확인, 1회 수동 실행</td></tr>
+          <tr><td><code>DERIVATIONS_FAILED</code></td><td><code>derivations_healthy</code></td><td><code>derivation</code> 테이블에 <code>status='failed'</code> 행이 1개 이상</td><td>원인 해소 후 <code>sb retry --stage &lt;stage&gt;</code>. brief는 <code>sb maintain --once</code>가 조건 충족 시 <code>superseded</code>로 종결</td></tr>
+          <tr><td><code>VERIFIED_BACKUP_UNAVAILABLE</code></td><td><code>recent_backup</code></td><td><code>backup_root</code>에 정책 시간 안의 <strong>검증된</strong> 백업이 하나도 없음</td><td><code>sb backup</code> 실행. <code>details.backup_error</code> 확인</td></tr>
+          <tr><td><code>LATEST_BACKUP_UNVERIFIED</code></td><td><code>latest_backup_verified</code></td><td>가장 최신 아카이브가 검증을 통과하지 못함</td><td><code>sb verify-backup &lt;최신 아카이브&gt;</code>로 코드 확인</td></tr>
+          <tr><td><code>REQUEST_JOURNAL_UNREADABLE</code></td><td><code>request_journal</code></td><td><code>request_root/journal.db</code> 읽기 실패</td><td>파일 권한/손상 확인</td></tr>
+          <tr><td><code>REQUEST_TIME_INVALID</code></td><td><code>request_times</code></td><td><code>accepted_at</code>/<code>updated_at</code>이 NULL이거나 순서가 뒤집혔거나 미래</td><td>저널 조사(직접 편집 금지)</td></tr>
+          <tr><td><code>REQUESTS_STALLED</code></td><td><code>requests_progressing</code></td><td>가장 오래된 <code>pending</code>/<code>processing</code> 요청이 <code>max_request_age_minutes</code> 초과</td><td><code>sb apply-requests --once</code>, path 유닛/게이트 파일 확인</td></tr>
+          <tr><td><code>RECENT_REQUEST_FAILURES</code></td><td><code>requests_healthy</code></td><td><code>failure_window_hours</code> 안에 <code>failed</code>/<code>expired</code>/<code>reapproval_required</code> 요청 존재</td><td>요청별 원인 조사</td></tr>
+          <tr><td><code>GENERATION_JOURNAL_UNREADABLE</code></td><td><code>generation_journal</code></td><td><code>state_root/generation-journal.db</code> 읽기 실패</td><td>권한/손상 확인</td></tr>
+          <tr><td><code>GENERATION_CLEANUP_STALLED</code></td><td><code>generation_cleanup</code></td><td><code>activations</code>에 <code>phase &lt;&gt; 'proved'</code>이고 <code>updated_at</code>이 정책 창 밖인 행 존재(고아 activated 행 포함)</td><td><strong><code>sb maintain --once</code></strong> 1회. 다른 읽기 CLI를 동시에 돌리지 않는다</td></tr>
+        </tbody></table></div>
+    <p>응답의 참고 필드: <code>provider_release</code>, <code>last_run</code>, <code>last_run_age_seconds</code>, <code>failed_derivations</code>, <code>requests</code>(상태별 집계), <code>oldest_request_at</code>, <code>oldest_request_age_seconds</code>, <code>recent_failed_requests</code>, <code>tombstone_high_water</code>, <code>latest_backup</code>, <code>last_verified_backup</code>, <code>backup_verification</code>, <code>backup_error</code>, <code>generation</code>.</p>
+    <p><code>backup_error</code>로 올 수 있는 값: <code>BACKUP_MISSING</code>, <code>BACKUP_VERIFICATION_MISSING</code>, <code>BACKUP_VERIFICATION_INVALID</code>, <code>BACKUP_DIRECTORY_UNREADABLE</code>, 그리고 검증 코드 <code>BACKUP_CHANGED</code> / <code>BACKUP_ORIGIN_MISMATCH</code> / <code>BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH</code> / <code>BACKUP_TIME_INVALID</code> / <code>BACKUP_STALE</code>.</p>
+
+    <h3 id="t10-4">10.4 백업과 복원</h3>
+    <h4>백업 생성</h4>
+<pre><code>sb backup                                   # &lt;backup_root&gt;/second-brain-&lt;YYYYmmddTHHMMSS±ZZZZ&gt;.tar.gz
+sb backup /path/to/explicit-name.tar.gz</code></pre>
+    <p>관리형 배치에서 <code>backup_runtime</code>은 세 겹의 락을 동시에 잡는다:</p>
+    <ol>
+      <li><code>request_root/pending</code> 디렉터리 <code>flock(LOCK_EX)</code></li>
+      <li>세대 저장소 <code>exclusive()</code> writer mutex</li>
+      <li>요청 저널의 <code>BEGIN IMMEDIATE</code> (끝나면 rollback)</li>
+    </ol>
+    <p>그 상태에서 활성 세대 트리를 복사하고, 복사본 안의 <code>.recovery/</code>에 <strong>제어 저널만</strong> 담는다:</p>
+    <ul>
+      <li><code>state</code>: <code>state_root</code>의 1단계 <code>*.db</code> 파일</li>
+      <li><code>requests</code>: <code>request_root</code> 전체 트리의 파일 (단 <code>-wal</code>, <code>-shm</code>, <code>.lock</code>, <code>.tmp</code> 제외)</li>
+      <li><code>.db</code>/<code>.sqlite</code>는 SQLite <code>backup()</code> API로 복사한다(WAL 포함). 그 외는 바이트 복사.</li>
+      <li>오래된 릴리스, 과거 백업, 무관한 호스트 파일은 <strong>들어가지 않는다.</strong></li>
+    </ul>
+    <p>출력 JSON: <code>archive</code>, <code>checksum</code>, <code>verification</code>, <code>files</code>, <code>bytes</code>.</p>
+
+    <h4>검증</h4>
+    <p><code>sb backup</code>은 생성 직후 <code>verify_runtime_backup</code>을 호출한다. 검증은 임시 저장소로 복원해 체크섬·원장·인용을 검사하고 <code>*.tar.gz.verified.json</code> 영수증을 남긴다. 임시 저장소는 검사 후 제거되지만 <strong>복원용 추가 디스크 공간이 필요하다.</strong></p>
+    <p>관리형 검증은 <code>origin</code>이 <code>provider:&lt;provider_instance_id&gt;</code>인지, tombstone high-water가 현재와 같은지 확인한다. 다르면 <code>BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH</code>. 제어 저널이 초기화돼 있지 않으면 <code>backup verification requires initialized control journals</code>.</p>
+    <p>출처가 없는 옛 백업은 준비 상태의 정상 근거로 쓰이지 않는다 — 새 백업을 만들어 검증한다.</p>
+<pre><code>sb verify-backup ~/.local/state/second-brain/backups/second-brain-20260915T184120+0900.tar.gz</code></pre>
+
+    <h4>복원</h4>
+<pre><code>sb restore &lt;archive&gt; --to /absolute/new/restore-dir
+sb restore &lt;archive&gt; --to /absolute/new/restore-dir --force</code></pre>
+    <ul>
+      <li>목적지가 심링크이거나, 목적지가 활성 <code>vault_root</code>와 같고 설정에 <code>share_root</code>가 있으면 <code>RESTORE_REQUIRES_ISOLATED_DESTINATION: use --to with a new directory</code>로 거절한다. <strong>운영 Vault 위에 덮어쓸 수 없다.</strong></li>
+      <li>복원은 사이드카 검증 → 배타 락 → 임시 디렉터리에 매니페스트 기준 전수 검증(경로 정규화, 중복 경로 거부, 파일 수 상한) → 원자 교체 순서다.</li>
+      <li>복원 예산 상수(<code>sb/restore.py</code>): 멤버 100,000개, 파일당 64 MiB, 합계 10 GiB. 넘으면 <code>RESTORE_ARCHIVE_BUDGET_EXCEEDED</code>.</li>
+      <li>출력 JSON: <code>destination</code>, <code>files</code>, <code>bytes</code>, <code>previous</code>.</li>
+    </ul>
+
+    <h4>복원 작업공간 정리</h4>
+<pre><code>sb maintain --once --restore-workspace /absolute/private/restore-work</code></pre>
+    <p>sanitizer에 넘긴 것과 <strong>같은 0700 폴더</strong>를 명시해야 한다. 진행 중인 복원은 기다리지 않고 <code>restore_workspace_busy: true</code>로 보고한다. 잠금을 쓰지 않는 구버전 복원 writer가 종료된 것을 확인한 뒤에만 쓴다. 기본 운영 타이머에 이 경로를 자동으로 추가하지 않는다.</p>
+
+    <h3 id="t10-5">10.5 릴리스 전환(cutover)과 롤백</h3>
+    <p><strong>전환 절차</strong> (2026-09-15 기록에서 3회 반복된 순서):</p>
+<pre><code># 0) 사전 점검
+sb doctor
+curl -s http://127.0.0.1:8765/ready | head -c 400
+ls ~/.local/state/second-brain/requests/pending      # 비어 있어야 한다
+sb backup                                            # 검증까지 통과할 것
+
+# 1) 릴리스 빌드 (커밋된 HEAD만 들어간다)
+python deploy/prepare-release.py                     # 출력: &lt;app&gt;/releases/&lt;release_id&gt;
+
+# 2) SB 유닛 정지
+systemctl --user stop jm-second-brain-requests.path \
+                      jm-second-brain-refresh.timer \
+                      jm-second-brain-maintenance.timer \
+                      second-brain-web.service
+
+# 3) current 원자 교체
+ln -sfn ~/.local/state/second-brain/app/releases/&lt;new_release_id&gt; \
+        ~/.local/state/second-brain/app/current.new
+mv -Tf ~/.local/state/second-brain/app/current.new \
+       ~/.local/state/second-brain/app/current
+
+# 4) 유닛 재시작
+systemctl --user start second-brain-web.service \
+                       jm-second-brain-refresh.timer \
+                       jm-second-brain-maintenance.timer \
+                       jm-second-brain-requests.path
+
+# 5) 검증
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/     # 200
+sb doctor
+sb search "아무 키워드"
+
+# 6) 유지보수 또는 refresh 1회 (단독으로!)
+systemctl --user start jm-second-brain-maintenance.service
+# 또는 세대 재게시가 필요하면
+systemctl --user start jm-second-brain-refresh.service</code></pre>
+    <p><strong>롤백</strong>: 이전 릴리스 디렉터리는 지우지 않으므로, 같은 방식으로 <code>current</code>를 이전 <code>release_id</code>로 되돌리고 유닛을 재시작하면 된다. 단 구 릴리스는 전환 전 세대를 읽는다는 점을 감안한다.</p>
+    <p>위 3)의 <code>ln -sfn</code> + <code>mv -Tf</code>를 이전 <code>release_id</code>로 반복하고 4)의 유닛 재시작만 다시 하면 된다.</p>
+    <p>전환 후 남는 것들(기록된 실제 현상):</p>
+    <ul>
+      <li>구 릴리스 경로의 <code>sb mcp</code> 프로세스가 남는다. 클라이언트 세션을 재시작하면 교체되고, 필요하면 SIGTERM으로 정리한다.</li>
+      <li><code>doctor</code>의 <code>scheduler-assets</code> warn은 휠에 <code>deploy/systemd</code>가 없어서 생기는 안내로 기능 영향이 없다.</li>
+    </ul>
+
+    <h3 id="t10-6">10.6 금기 사항</h3>
+    <div class="table-wrap"><table><thead><tr><th>하지 말 것</th><th>이유</th></tr></thead><tbody>
+          <tr><td><code>sb maintain</code> 실행 중에 <code>sb status</code> / <code>sb search</code> 등 읽기 CLI를 동시에 돌리기</td><td>선행 세대 fd가 잡혀 <code>GENERATION_READER_DRAIN_REQUIRED</code>로 폐기 실패</td></tr>
+          <tr><td>채워진 원장에 <code>sb doctor --rebuild-ledger</code></td><td><code>done → running</code> 전이가 허용되지 않아 실패한다. 유효한 복구 수단이 아니다</td></tr>
+          <tr><td>운영 Vault 경로로 <code>sb restore</code></td><td><code>RESTORE_REQUIRES_ISOLATED_DESTINATION</code>. 반드시 <code>--to &lt;새 디렉터리&gt;</code></td></tr>
+          <tr><td><code>ledger.db</code> / <code>journal.db</code> / <code>generation-journal.db</code> 직접 편집</td><td>세대·증명 무결성 설계를 깬다. 실패 brief 행도 감사 기록으로 보존한다</td></tr>
+          <tr><td>세대 디렉터리의 파일 모드를 임의로 바꾸기</td><td>봉인(0400/0500)은 무결성 계약의 일부</td></tr>
+          <tr><td><code>git push</code> (앱 리포·Vault 리포 모두)</td><td>명시적 요청 없이 push 금지(운영 원칙). Vault는 원격이 없다</td></tr>
+          <tr><td>스테이징 디렉터리에 64자리 hex가 아닌 이름 만들기</td><td><code>GENERATION_STAGING_UNSAFE</code>로 유지보수가 멈춘다</td></tr>
+          <tr><td>충돌 자동 해결 / 무승인 원본 삭제</td><td>제품 원칙상 금지. <code>sb gc</code>도 <code>--apply --confirm</code> 둘 다 필요</td></tr>
+          <tr><td><code>provider_private_key</code> 등 설정 파일 값 복사·출력</td><td>비밀 자료</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 11 ══════════ -->
+    <h2 id="t11">11 문제 해결 (증상 → 원인 → 조치)</h2>
+    <div class="table-wrap"><table><thead><tr><th>증상</th><th>원인</th><th>조치</th></tr></thead><tbody>
+          <tr><td>CLI가 <code>already running</code>만 출력하고 0으로 끝난다</td><td>다른 프로세스가 <code>.sb/run.lock</code>(관리형이면 <code>state_root/.sb/run.lock</code>)을 잡고 있다</td><td>정상 동작이다. 타이머 실행이 끝나기를 기다린다. <code>systemctl --user list-timers</code>로 확인</td></tr>
+          <tr><td><code>sb search</code>가 <code>GENERATION_INDEX_INVALID</code></td><td>활성 세대의 <code>search.db</code>가 구 스키마(현재 질의 계획이 요구하는 컬럼 없음)</td><td><strong>새 세대를 게시한다</strong>: <code>systemctl --user start jm-second-brain-refresh.service</code> (= <code>sb run</code>). 인덱스만 고치는 명령은 없다</td></tr>
+          <tr><td><code>sb doctor --rebuild-ledger</code>가 전이 오류로 실패</td><td>이미 <code>done</code> 행이 있는 원장에서 <code>done → running</code> 전이를 시도</td><td>이 명령을 쓰지 않는다. 원장 스키마 문제라면 <code>sb migrate --check</code> → <code>--apply</code></td></tr>
+          <tr><td><code>sb maintain --once</code>가 <code>GENERATION_READER_DRAIN_REQUIRED</code> + exit 1</td><td>선행 세대 디렉터리를 연 fd가 남아 있다(동시 실행한 <code>sb status</code>/<code>sb search</code>, 구 릴리스의 <code>sb mcp</code> 프로세스 등)</td><td>읽기 CLI를 모두 끝내고 단독으로 재실행. 구 릴리스 MCP 프로세스가 있으면 SIGTERM</td></tr>
+          <tr><td>유지보수가 <code>GENERATION_READER_DRAIN_UNVERIFIABLE</code></td><td><code>/proc</code>을 읽을 수 없는 환경</td><td><code>ProtectProc</code>/컨테이너 설정을 확인한다. 이 검사는 우회할 수 없다</td></tr>
+          <tr><td><code>/ready</code>가 <code>GENERATION_CLEANUP_STALLED</code></td><td>현재 세대가 아닌 <code>activated</code> 행이 남았고 디렉터리·핀이 없다(고아)</td><td><code>sb maintain --once</code> 1회. 2026-09-15 운영에서 <code>activated 3 → proved</code>로 해소</td></tr>
+          <tr><td><code>/ready</code>가 <code>DERIVATIONS_FAILED</code></td><td><code>derivation</code>에 <code>failed</code> 행 존재</td><td><code>sb status --json</code>의 <code>failed_by_stage</code> 확인. compile/conflict는 원인 해소 후 <code>sb retry --stage &lt;stage&gt;</code>. brief는 <code>maintain</code>이 조건(이후 성공 brief 존재 + 일시적 LLM 오류 아님)을 만족할 때 <code>superseded</code>로 종결</td></tr>
+          <tr><td><code>sb retry</code>가 <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE</code></td><td>선택 집합에 <code>brief</code> 행이 섞였다</td><td><code>--stage compile</code> 등으로 단계를 좁힌다. 과거 브리핑은 의도적으로 재생하지 않는다</td></tr>
+          <tr><td><code>/ready</code>가 <code>LAST_RUN_UNSUCCESSFUL</code></td><td>최신 run status가 <code>ok</code>/<code>capped</code>가 아님</td><td><code>sb status --json</code>의 <code>recent_stages</code>에서 실패 단계와 사유 확인</td></tr>
+          <tr><td>compile이 전부 <code>LLM unavailable after 2 attempts</code></td><td>백엔드 CLI가 없거나(<code>command not found</code>), 설정을 잘못 상속했거나, 계정 한도</td><td><code>sb doctor</code>의 <code>llm-cli</code> 확인. 백엔드를 stdin으로 직접 실행해 재현. 계정 한도면 회복 후 <code>sb retry --stage compile</code> + 실행 1회</td></tr>
+          <tr><td>compile 호출이 사용자 개인 CLI 설정을 타서 실패</td><td>서비스가 <code>~/.codex/config.toml</code> 같은 사용자 설정을 상속</td><td>격리 홈을 만들고 <code>argv_template</code> 앞에 <code>env &lt;HOME 변수&gt;=&lt;격리 경로&gt;</code>를 붙인다(2026-09-15 조치 그대로)</td></tr>
+          <tr><td><code>sb run</code>이 <code>INGEST_UNIT_BUDGET_EXCEEDED</code> + exit 1</td><td>한 원본의 새 unit 수가 <code>caps.max_new_units_per_run</code>을 초과</td><td>원본 규모를 확인해 예산을 올리거나 원본을 나눈다. 원본은 보존돼 있다</td></tr>
+          <tr><td>ingest 결과가 계속 <code>capped</code></td><td>잔여 예산에 맞지 않는 원본</td><td>정상 동작. 다음 실행에서 이어 처리된다. 급하면 <code>caps</code>를 올린다</td></tr>
+          <tr><td><code>SOURCE_NOT_FOUND</code></td><td>명시 선택한 source/adapter ID가 설정에 없다</td><td><code>sb sources --json</code>으로 실제 ID 확인. 부분 수집으로 넘어가지 않는다</td></tr>
+          <tr><td><code>SOURCE_ROOTS_AMBIGUOUS</code></td><td>세션 어댑터의 루트가 모호</td><td>해당 <code>[[sources]]</code>의 <code>root</code>를 명확히 지정</td></tr>
+          <tr><td><code>SOURCE_ACCESS_CONFIG_INVALID</code></td><td><code>[source_access.&lt;id&gt;]</code>에 <code>owner</code>/<code>projects</code>/<code>policy_revision</code> 외의 키가 있거나 빠졌다</td><td>정확히 세 키만 둔다</td></tr>
+          <tr><td><code>[search].min_similarity must be a finite number between -1 and 1</code></td><td>값이 수가 아니거나 범위 밖</td><td><code>-1 ≤ x ≤ 1</code>의 유한한 수로 고친다</td></tr>
+          <tr><td><code>/ready</code>가 <code>READINESS_POLICY_INVALID</code> 하나만 반환</td><td><code>[readiness]</code> 값이 정수가 아니거나 1..8760 밖</td><td>네 키를 정수로 고친다. 이 상태에서는 다른 체크가 실행되지 않는다</td></tr>
+          <tr><td><code>/ready</code>가 <code>VERIFIED_BACKUP_UNAVAILABLE</code></td><td>정책 시간 안의 검증된 백업이 없다</td><td><code>sb backup</code>. <code>details.backup_error</code>로 사유 확인</td></tr>
+          <tr><td><code>sb verify-backup</code>이 <code>BACKUP_ORIGIN_MISMATCH</code></td><td>아카이브 origin이 현재 provider와 다름</td><td>다른 인스턴스에서 만든 백업이다. 격리 목적지로만 복원한다</td></tr>
+          <tr><td><code>sb verify-backup</code>이 <code>BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH</code></td><td>삭제 이력(tombstone high-water)이 현재와 다름</td><td>이 백업은 현재 상태의 정상 근거가 아니다. 새 백업을 만든다</td></tr>
+          <tr><td><code>sb restore</code>가 <code>RESTORE_REQUIRES_ISOLATED_DESTINATION</code></td><td>목적지가 심링크이거나 운영 활성 Vault</td><td><code>--to /absolute/new/dir</code></td></tr>
+          <tr><td><code>sb apply-requests</code>가 <code>REQUEST_EXECUTOR_KEY_CONFIG_INVALID</code></td><td>JARVIS 공개키 없음 / provider 키 ID·개인키 없음 / base64 파싱 실패 / 모든 키가 철회됨</td><td>설정과 철회 목록을 점검한다</td></tr>
+          <tr><td>요청이 <code>pending</code>에 쌓이는데 처리되지 않는다</td><td><code>~/.config/second-brain/request-executor.enabled</code>가 없어 path 유닛이 비활성</td><td>게이트 파일과 <code>systemctl --user status jm-second-brain-requests.path</code> 확인</td></tr>
+          <tr><td><code>/ready</code>가 <code>REQUESTS_STALLED</code></td><td>가장 오래된 pending/processing이 <code>max_request_age_minutes</code> 초과</td><td><code>sb apply-requests --once</code> 수동 실행 후 결과 JSON 확인</td></tr>
+          <tr><td>MCP 서버가 <code>SECOND_BRAIN_CONTRACT_PROFILE_INVALID</code>로 죽는다</td><td><code>SB_MCP_CONTRACT_PROFILE</code> 값이 알려진 프로필이 아니다</td><td>§7.5의 목록 중 하나로 고친다</td></tr>
+          <tr><td>scoped 프로필이 기동하지 않는다</td><td><code>scoped-record-read-*</code>인데 <code>[mcp_scoped_read]</code>가 없거나, <code>scoped-request-write-v1</code>인데 <code>[scoped_provider_verifier]</code>가 없다</td><td>해당 섹션을 설정에 넣는다</td></tr>
+          <tr><td>Codex에서 훅이 조용히 안 돈다</td><td><code>hooks.json</code> 변경 후 TUI에서 “Trust all and continue”를 아직 승인하지 않았다</td><td>TUI를 한 번 띄워 승인한다. 자동화는 <code>--dangerously-bypass-hook-trust</code></td></tr>
+          <tr><td>Claude Code에서 컴팩션 후 문맥이 안 붙는다</td><td><code>PostCompact</code>의 <code>additionalContext</code>를 기대하고 있다</td><td>2.1.270은 <code>PostCompact</code> 주입을 무시한다. <code>SessionStart</code> matcher <code>compact</code> 항목이 설정돼 있는지 확인</td></tr>
+          <tr><td>훅이 같은 레코드를 반복 주입한다</td><td>스테이지의 <code>delivered_in_turn</code>이 유실됐다</td><td>스테이지 파일(<code>&lt;state_root&gt;/.sb/session-memory/&lt;session&gt;.json</code>)을 확인. 정상 경로에서는 <code>confirm_delivery</code>가 stdout 성공 후에만 기록한다</td></tr>
+          <tr><td>훅이 <code>HOOK_STAGE_UNSAFE</code></td><td>스테이지 경로가 심링크이거나 일반 파일이 아님, 또는 권한 문제</td><td><code>&lt;state_root&gt;/.sb/session-memory</code>를 점검한다(0700, 일반 파일 0600)</td></tr>
+          <tr><td>훅이 <code>HOOK_QUERY_MISSING</code></td><td><code>PostCompact</code>에 <code>query</code>/<code>compact_summary</code>가 둘 다 비었다</td><td>클라이언트가 요약을 주지 않는 경우다. <code>SessionStart(compact)</code> 경로가 <code>last_query</code>로 보완한다</td></tr>
+          <tr><td><code>sb doctor</code>의 <code>citations</code>가 fail</td><td>페이지에 미해결 <code>[^sid]</code>가 있거나 참조 CAS blob이 없다</td><td>해당 페이지를 재컴파일하거나, CAS 손실이면 백업에서 격리 복원해 대조한다. <code>sb gc</code>를 함부로 돌리지 않는다</td></tr>
+          <tr><td><code>sb doctor</code>의 <code>generation</code>이 fail</td><td>Vault git HEAD/tree가 세대 매니페스트와 불일치</td><td>세대 링크가 잘못됐거나 수동 편집이 있었다. 전환 절차를 다시 검증한다</td></tr>
+          <tr><td><code>sb doctor</code>의 <code>scheduler-assets</code> warn</td><td>휠 설치본에 <code>deploy/systemd</code>가 없다</td><td>정상. 기능 영향 없음</td></tr>
+          <tr><td><code>sb web</code>이 바인드 실패로 1</td><td>포트 점유</td><td><code>ss -ltnp | grep 8765</code>, 기존 유닛 정지</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 12 ══════════ -->
+    <h2 id="t12">12 평가 (M10 gold set)</h2>
+
+    <h3 id="t12-1">12.1 구성</h3>
+    <div class="table-wrap"><table><thead><tr><th>파일</th><th>역할</th></tr></thead><tbody>
+          <tr><td><code>M10-GOLD-CURATED-2026-09-15.json</code></td><td>평가 데이터셋(문서 40 / 케이스 131). <code>dataset_origin</code>은 enum상 정직한 값 <code>synthetic</code>을 유지하고 <code>curation_note</code>로 출처를 밝힌다</td></tr>
+          <tr><td><code>M10-GOLD-CURATED-2026-09-15.md</code></td><td>큐레이션 근거·결과·한계 보고서</td></tr>
+          <tr><td><code>scripts/korean_search_evaluation.py</code></td><td><strong>라이브러리 모듈.</strong> CLI 진입점이 없어 <code>--help</code>가 아무것도 출력하지 않는다(정상, exit 0)</td></tr>
+          <tr><td><code>scripts/korean-search-acceptance.py</code></td><td>실행 진입점. 데이터셋의 <code>documents</code>로 <strong>격리 fixture vault/레지스트리를 <code>mkdtemp</code>로 새로 만들어</strong> CLI(<code>python -m sb.cli search</code>)와 stdio MCP(<code>sb_search</code>/<code>sb_read_page</code>) 두 표면을 측정한다. 운영 vault·레지스트리는 건드리지 않는다</td></tr>
+        </tbody></table></div>
+    <p>케이스 분류: <code>fact</code> 26, <code>date</code> 22, <code>decision</code> 22, <code>procedure</code> 24, <code>comparison</code> 21, <code>no_data</code> 16 (합계 131). 정답 있는 케이스 115, <code>no_answer</code> 16.</p>
+
+    <h3 id="t12-2">12.2 실행 방법</h3>
+<pre><code>cd /home/jm/orca/projects/second-brain-app
+
+# 스키마 검증
+TMPDIR=/var/tmp PYTHONPATH=scripts .venv/bin/python -c \
+  "import json;from korean_search_evaluation import load_dataset;print(load_dataset(json.load(open('M10-GOLD-CURATED-2026-09-15.json'))).id)"
+
+# 본 평가 (격리 fixture, CLI + MCP 두 표면)
+TMPDIR=/var/tmp .venv/bin/python scripts/korean-search-acceptance.py \
+  --dataset M10-GOLD-CURATED-2026-09-15.json</code></pre>
+    <p>실행하지 않은 선택지와 이유:</p>
+    <ul>
+      <li><code>--hybrid</code> — 모든 문서에 대해 활성화된 생성 벡터를 요구한다. fixture vault에는 임베딩이 없어 <code>real hybrid evaluation requires enabled cited vectors for every document</code>로 실패한다.</li>
+      <li><code>--min-similarity</code> — 의미 후보의 cosine 하한.</li>
+    </ul>
+
+    <h3 id="t12-3">12.3 현재 수치</h3>
+    <p>§7.7의 표가 현재 수치다. 요약하면:</p>
+    <ul>
+      <li>전체 hit@1 ≈ 0.22 (CLI 0.226 / MCP 0.217), 운영 릴리스 프로브 0.209.</li>
+      <li>keyword recall@5 0.78 (CLI) / 0.74 (MCP) / 0.815 (운영 프로브).</li>
+      <li>exact_phrase recall@5 0.67–0.78, reordered_terms 1.0.</li>
+      <li><strong>natural_question(66건)과 paraphrase(13건)는 0.0.</strong></li>
+      <li>negative_empty_rate 1.0, forbidden_exposure@5 0.0.</li>
+      <li>지연(진단용): CLI search p50 270.5 ms / p95 286.7 ms, MCP search p50 42.0 ms / p95 55.1 ms.</li>
+    </ul>
+
+    <h3 id="t12-4">12.4 데이터셋 자체의 제약 (보고서 §6 그대로)</h3>
+    <ol>
+      <li><code>dataset_origin</code>은 여전히 <code>synthetic</code>이다. 본문은 실제 vault 원문이지만 사용자가 검토하지 않았다.</li>
+      <li>세대는 계속 회전한다. 작성 시점 세대와 프로브 시점 세대가 달랐다. <code>source_generation_root</code>는 스냅샷 값으로 봐야 한다.</li>
+      <li><code>page_id</code>는 fixture 슬러그다. 스키마 정규식 <code>wiki/[a-z0-9][a-z0-9-]*</code>가 한글 파일명을 허용하지 않는다. 운영 page_id 매핑은 <code>documents_origin_map</code>에 있다.</li>
+      <li>본문은 <strong>한 줄 발췌본</strong>이다. 하네스가 각주 마커를 본문 끝에 하나만 붙이고, <code>sb/memory_records.py</code>의 분할 규칙상 생성되는 레코드가 마지막 줄 하나뿐이기 때문이다.</li>
+      <li>distractor 6개 중 5개는 여전히 빈 템플릿이다. 강한 오답 유인이 부족하다.</li>
+      <li>운영 릴리스 프로브는 vault를 쓰지 않지만 <code>sb</code> CLI 호출만으로 <code>requests/journal.db</code>의 mtime이 갱신된다(크기 불변).</li>
+      <li><strong>이 평가는 실사용 인수를 대신하지 못한다.</strong> 수집·추출·LLM 답변 평가 없음, 단일 소유자 genesis, 소규모 코퍼스 1회 측정.</li>
+    </ol>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 13 ══════════ -->
+    <h2 id="t13">13 알려진 한계와 로드맵</h2>
+
+    <h3 id="t13-1">13.1 검색</h3>
+    <ul>
+      <li><strong>자연어 질의 0.0</strong> — §7.7. 형태소 분석·n-gram 색인·의미 검색 중 하나가 필요하다. 데이터셋 수정으로는 해결되지 않는다.</li>
+      <li><strong>의미 검색은 기본 꺼짐</strong> — <code>[search] hybrid = true</code>로 켜도 <strong>다음 관리형 세대부터</strong> 벡터가 봉인된다. 이미 봉인된 세대는 설정 변경만으로 재색인되지 않는다. 모델이 없거나 맞지 않으면 일반 검색을 유지한다.</li>
+      <li><strong>MCP 검색은 레코드 AND</strong> — 모든 검색어가 같은 인용 레코드 안에 있어야 한다. CLI보다 좁다.</li>
+      <li><strong><code>stale_decision</code> 배제는 증명되지 않았다</strong> — 해당 2건은 정답도 못 찾았으므로 0.0을 “잘 배제했다”로 읽으면 안 된다.</li>
+    </ul>
+
+    <h3 id="t13-2">13.2 파이프라인</h3>
+    <ul>
+      <li><strong>과거 브리핑 재시도 불가</strong> — <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE</code>. 실패 행과 attempts는 감사 기록으로 보존된다. <code>maintain</code>의 supersede는 “이후 성공 brief 존재 + 일시적 LLM 오류 아님”일 때만 상태를 닫는다.</li>
+      <li><strong><code>sb rollback</code> 미구현</strong> — 항상 <code>ROLLBACK_REQUIRES_GENERATION_AUTHORITY</code>. 실질 롤백은 릴리스 <code>current</code> 되돌리기 또는 백업 격리 복원이다.</li>
+      <li><strong>brief는 변화가 있을 때만 실행</strong> — 조용한 날에는 일일 브리핑이 생기지 않는다(§6.3).</li>
+      <li><strong>LLM 의존</strong> — compile/conflict/brief 모두 외부 CLI 백엔드가 필요하다. 백엔드 계정 한도·프록시 설정 같은 외부 조건이 그대로 실패로 나타난다.</li>
+    </ul>
+
+    <h3 id="t13-3">13.3 접근 제어</h3>
+    <ul>
+      <li><code>[source_access]</code>는 <strong>분류 기록</strong>이며 MCP/API 접근 제어가 아니다. 접근 claim·record/page 분류 결합과 범위 검사가 연결되기 전까지 기존 owner 프로필의 조회 범위는 그대로다(README).</li>
+      <li>scoped 연결은 semantic/hybrid 검색·쓰기·status·export·restore, 운영 권한 공급자, 다중 사용자 인증에 아직 연결돼 있지 않다.</li>
+      <li>비밀 마스킹은 <strong>자격증명 정규식만</strong>이다(AWS 키, <code>ghp_</code>/<code>gho_</code>, <code>sk-</code>, PEM, <code>password=</code>/<code>token=</code>). 연락처 이메일·전화번호는 그대로 남는다(<code>AGENTS.md</code>).</li>
+    </ul>
+
+    <h3 id="t13-4">13.4 운영</h3>
+    <ul>
+      <li>리포 유닛과 실제 운영 유닛이 분리돼 있다. <code>deploy/install-systemd-user.sh</code>는 <code>jm-second-brain-*</code> 유닛을 다루지 않는다.</li>
+      <li><code>sb web</code>의 CLI 인자가 <code>[web] host/port</code>보다 우선한다. 설정만 바꿔서는 바인딩이 바뀌지 않는다.</li>
+      <li>macOS 앱의 AppKit/SwiftUI/Notification Center/Keychain/ServiceManagement 실런타임 인수는 Xcode가 설치된 macOS에서만 완료할 수 있다. Ubuntu 자동 검증은 소스·API·보안 계약만 본다.</li>
+    </ul>
+
+    <h3 id="t13-5">13.5 남은 작업 (<code>CLAUDE-COMPLETION-REPORT-2026-09-15.md</code> “남은 것”)</h3>
+    <ul>
+      <li>M1 운영 로그인 진입점</li>
+      <li>M10 한글 gold 100–300 (사용자 승인 전 <code>synthetic</code> 상태)</li>
+      <li>M5/M13 실사용자 사본·삭제 처분</li>
+      <li>M8 타 클라이언트(공개 compaction 이벤트가 없는 클라이언트)</li>
+      <li>M2/M4 운영 종단: JARVIS 코디네이터 연결 + 실제 검증 태스크 필요</li>
+    </ul>
+
+    <h3 id="t13-6">13.6 로드맵 제안(우선순위 순, 근거 기반)</h3>
+    <ol>
+      <li><strong>질의 정규화 개선</strong> — 한국어 조사/어미 처리. 79건의 0.0을 움직일 수 있는 유일한 레버다.</li>
+      <li><strong>세대 인덱스 마이그레이션 경로</strong> — 현재는 <code>GENERATION_INDEX_INVALID</code>를 새 세대 게시로만 해소한다.</li>
+      <li><strong>brief 재생 입력 보존</strong> — 과거 브리핑 재시도를 가능하게 하면 <code>DERIVATIONS_FAILED</code> 잔여가 줄어든다.</li>
+      <li><strong><code>source_access</code> → 실제 접근 검사 연결</strong> — 현재는 기록만 한다.</li>
+      <li><strong>LLM 백엔드 헬스체크</strong> — <code>doctor</code>가 실행 가능 여부만 보고 실제 호출을 시험하지 않는다.</li>
+    </ol>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+    <!-- ══════════ 14 ══════════ -->
+    <h2 id="t14">14 용어집</h2>
+    <div class="table-wrap"><table><thead><tr><th>용어</th><th>뜻</th></tr></thead><tbody>
+          <tr><td><strong>Vault</strong></td><td>지식이 사는 디렉터리. <code>wiki/</code>, <code>daily/</code>, <code>conflicts/</code>, <code>inbox/</code>, <code>raw/</code>, <code>.sb/</code>, <code>log.md</code>. git 저장소이며 원격이 없다</td></tr>
+          <tr><td><strong>CAS</strong></td><td>Content-Addressed Store. <code>raw/&lt;앞2자&gt;/&lt;sha256&gt;</code>에 원본 바이트를 그대로 보관</td></tr>
+          <tr><td><strong>ledger (원장)</strong></td><td><code>.sb/ledger.db</code>. <code>source_item</code>, <code>unit</code>, <code>derivation</code>, <code>run</code>, <code>run_stage</code>, <code>source_access</code>, <code>bound_knowledge</code> 등을 담는 SQLite</td></tr>
+          <tr><td><strong>unit</strong></td><td>원본 바이트에서 잘라낸 처리 단위. 예산 <code>caps.max_new_units_per_run</code>의 대상</td></tr>
+          <tr><td><strong>derivation (파생)</strong></td><td>unit → 페이지 변환 작업 1건. 상태는 <code>pending</code>/<code>running</code>/<code>done</code>/<code>failed</code>/<code>superseded</code></td></tr>
+          <tr><td><strong>deriv_key</strong></td><td>입력·프롬프트 버전·모델 ID로 결정되는 파생 식별자. 이 값이 바뀌면 다시 계산된다</td></tr>
+          <tr><td><strong>PageSpec</strong></td><td>파일시스템을 모르는 순수 페이지 명세. <code>sb.vault</code>만 이것을 디스크에 쓴다</td></tr>
+          <tr><td><strong>sid</strong></td><td>각주 인용 식별자. CAS 다이제스트의 앞 8자</td></tr>
+          <tr><td><strong>generation (세대)</strong></td><td>봉인된 Vault 스냅샷 하나. <code>share/vault</code> 심링크가 가리키는 대상이 활성 세대</td></tr>
+          <tr><td><strong>activation</strong></td><td>세대 전환 1건의 저널 행. <code>claimed → staging → sealed → switch_intent → activated → disposing → proved</code></td></tr>
+          <tr><td><strong>reader drain</strong></td><td>선행 세대를 폐기하기 전에 그 디렉터리를 연 fd와 reader lease가 0인지 확인하는 절차</td></tr>
+          <tr><td><strong>staging</strong></td><td>아직 게시되지 않은 세대 작업 트리. 디렉터리 이름은 64자리 hex</td></tr>
+          <tr><td><strong>retired</strong></td><td>폐기 중인 세대를 잠시 옮겨 두는 위치</td></tr>
+          <tr><td><strong>tombstone</strong></td><td>삭제 이력 레코드. <code>set_root</code>/<code>sequence</code>가 high-water를 이룬다. 재유입 차단과 백업 검증에 쓰인다</td></tr>
+          <tr><td><strong>request journal (요청 저널)</strong></td><td><code>request_root/journal.db</code>. JARVIS memreq의 상태 기계</td></tr>
+          <tr><td><strong>memreq</strong></td><td>JARVIS가 SB에 보내는 서명된 기억 요청</td></tr>
+          <tr><td><strong>fence</strong></td><td>요청 lease의 단조 증가 토큰. 오래된 소유자의 쓰기를 막는다</td></tr>
+          <tr><td><strong>read_fence / access_claim</strong></td><td>scoped MCP 조회에 요구되는 서명된 범위 증명</td></tr>
+          <tr><td><strong>release</strong></td><td><code>app/releases/&lt;release_id&gt;</code>. 커밋된 HEAD를 번들 런타임과 함께 봉인한 배포 단위</td></tr>
+          <tr><td><strong>current</strong></td><td><code>app/current</code> 심링크. 활성 릴리스를 가리키는 유일한 전환 지점</td></tr>
+          <tr><td><strong>provider</strong></td><td>SB 인스턴스의 대외 신원(<code>provider_instance_id</code>, <code>provider_release_sha</code>, 서명키)</td></tr>
+          <tr><td><strong>readiness</strong></td><td><code>/ready</code>가 반환하는 운영 준비도. <code>/health</code>(프로세스 생존)와 다르다</td></tr>
+          <tr><td><strong>stage 파일</strong></td><td>기억 훅의 세션별 상태 파일. <code>&lt;state_root&gt;/.sb/session-memory/&lt;session&gt;.json</code></td></tr>
+          <tr><td><strong>last_query</strong></td><td>훅이 기억해 두는 마지막 유용한 검색어. <code>SessionStart(compact)</code>에 요약이 없을 때 쓰인다</td></tr>
+          <tr><td><strong>in-turn 주입</strong></td><td>같은 턴 안에서 모델 요청 앞에 문맥을 붙이는 것. Claude Code 2.1.270에서는 <code>SessionStart(compact)</code>만 가능하다</td></tr>
+          <tr><td><strong>knowledge_status / approval_status</strong></td><td>지식 레지스트리의 상태. <code>ACTIVE</code>+<code>APPROVED</code>면 <code>CANONICAL</code>/<code>VERIFIED</code>, 그 외는 <code>REFERENCE</code>/<code>UNVERIFIED</code></td></tr>
+          <tr><td><strong>scope</strong></td><td>검색 범위. <code>active</code>(승인된 활성만), <code>candidate</code>, <code>reference</code>(=<code>all</code>, 상태 필터 없음)</td></tr>
+          <tr><td><strong>capped</strong></td><td>예산 상한에 걸려 일부만 처리한 실행 상태. readiness상 성공으로 친다</td></tr>
+          <tr><td><strong>superseded</strong></td><td>이후 성공한 파생이 있어 더 이상 재생할 수 없는 실패 파생의 종결 상태. 행은 지워지지 않는다</td></tr>
+        </tbody></table></div>
+
+    <a class="backtop" href="#top">↑ 맨 위로</a>
+
+  </section>
+
+  </main>
+</div>
+
+<footer class="page-foot">
+  Second Brain 사용 설명서 · 원본: <code>docs/MANUAL.md</code>, <code>README.md</code> ·
+  이 문서는 오프라인 단일 HTML 파일이며 외부 리소스를 전혀 불러오지 않습니다.
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var body = document.body;
+  var tabEasy = document.getElementById("tab-easy");
+  var tabTech = document.getElementById("tab-tech");
+  var layerEasy = document.getElementById("layer-easy");
+  var layerTech = document.getElementById("layer-tech");
+  var tocEasy = document.getElementById("toc-easy");
+  var tocTech = document.getElementById("toc-tech");
+  var tocToggle = document.getElementById("tocToggle");
+
+  function activate(which, focusTop) {
+    var easy = which === "easy";
+    tabEasy.setAttribute("aria-selected", easy ? "true" : "false");
+    tabTech.setAttribute("aria-selected", easy ? "false" : "true");
+    layerEasy.hidden = !easy;
+    layerTech.hidden = easy;
+    tocEasy.hidden = !easy;
+    tocTech.hidden = easy;
+    body.classList.toggle("layer-easy", easy);
+    body.classList.toggle("layer-tech", !easy);
+    body.classList.remove("toc-open");
+    if (tocToggle) { tocToggle.setAttribute("aria-expanded", "false"); }
+    try { history.replaceState(null, "", easy ? "#top" : "#t1"); } catch (e) {}
+    if (focusTop) { window.scrollTo(0, 0); }
+    updateActiveLink();
+  }
+
+  tabEasy.addEventListener("click", function () { activate("easy", true); });
+  tabTech.addEventListener("click", function () { activate("tech", true); });
+
+  if (tocToggle) {
+    tocToggle.addEventListener("click", function () {
+      var open = body.classList.toggle("toc-open");
+      tocToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
+
+  // 사이드바 링크를 누르면 좁은 화면에서 목차를 닫는다.
+  var allTocLinks = document.querySelectorAll(".sidebar a");
+  for (var i = 0; i < allTocLinks.length; i++) {
+    allTocLinks[i].addEventListener("click", function () {
+      body.classList.remove("toc-open");
+      if (tocToggle) { tocToggle.setAttribute("aria-expanded", "false"); }
+    });
+  }
+
+  // 딥링크로 들어온 경우 해당 레이어를 자동으로 연다.
+  function layerForHash(hash) {
+    if (!hash || hash === "#top") { return null; }
+    var id = hash.slice(1);
+    var el = document.getElementById(id);
+    if (!el) { return null; }
+    return layerTech.contains(el) ? "tech" : (layerEasy.contains(el) ? "easy" : null);
+  }
+
+  var initial = layerForHash(window.location.hash);
+  if (initial) {
+    activate(initial, false);
+    var target = document.getElementById(window.location.hash.slice(1));
+    if (target) { setTimeout(function () { target.scrollIntoView(); }, 0); }
+  }
+
+  window.addEventListener("hashchange", function () {
+    var want = layerForHash(window.location.hash);
+    if (want && ((want === "tech") === layerTech.hidden)) { activate(want, false); }
+  });
+
+  // 스크롤 위치에 따라 현재 섹션 목차를 강조한다.
+  var ticking = false;
+  function updateActiveLink() {
+    var nav = layerTech.hidden ? tocEasy : tocTech;
+    var links = nav.querySelectorAll("a[href^='#']");
+    var best = null;
+    var bestTop = -Infinity;
+    for (var i = 0; i < links.length; i++) {
+      var href = links[i].getAttribute("href");
+      if (href === "#top") { continue; }
+      var sec = document.getElementById(href.slice(1));
+      if (!sec) { continue; }
+      var top = sec.getBoundingClientRect().top - 90;
+      if (top <= 0 && top > bestTop) { bestTop = top; best = links[i]; }
+    }
+    for (var j = 0; j < links.length; j++) { links[j].classList.remove("active"); }
+    if (best) { best.classList.add("active"); }
+  }
+
+  window.addEventListener("scroll", function () {
+    if (ticking) { return; }
+    ticking = true;
+    window.requestAnimationFrame(function () {
+      updateActiveLink();
+      ticking = false;
+    });
+  }, { passive: true });
+
+  updateActiveLink();
+})();
+</script>
+
+</body>
+</html>
