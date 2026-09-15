@@ -48,7 +48,7 @@ SB leftover 커밋(푸시 없음): `4eff746` pin test, `6c97168` M6/M13 harness,
 | 항목 | 결과 |
 |---|---|
 | JARVIS 64715ba runtime 정합 | lockfile=git 64715ba, `bin/jarvis --help` 0 |
-| N1 테스트 | unit+postcompact+dispatch 40 passed. F2 4 failed는 아래 잔여. N1이 만든 실패 아님 |
+| N1 테스트 | unit+postcompact+dispatch. F2는 `8745ce7`로 해소(계약 정본). N1이 만든 실패 아님 |
 | §10 | 31 passed. 상위 디렉터리 교체 반례 미추가 |
 | R1 A | `test_compiled_marker_recovery.py` 8 passed |
 | R2 B | `test_revoked_keys.py` 11 passed |
@@ -100,6 +100,6 @@ SB leftover 커밋(푸시 없음): `4eff746` pin test, `6c97168` M6/M13 harness,
 6. M14 측정을 hybrid 채택으로 읽지 마라.
 7. 보류 분기를 재실행하지 마라.
 8. maintenance/integration/`--work`가 실패면 이 후보를 합격으로 쓰지 마라.
-9. JARVIS F2 4 failed를 N1 회귀로 읽지 마라. 잔여로 유지하라.
+9. JARVIS F2는 `8745ce7`로 해소. N1 회귀로 읽지 마라.
 
 부록: `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md`, `GROK-M5-COPY-POLICY-2026-09-14.md`, `GROK-M2-M4-LINEAGE-CHECKLIST-2026-09-14.md`, `GROK-M9-JARVIS-NO-EVENT-2026-09-14.md`, `COMPOSER-ADVERSARIAL-REVIEW-2026-09-14.md`.
