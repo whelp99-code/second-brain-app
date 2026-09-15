@@ -4,7 +4,7 @@
   "dataset_origin": "synthetic",
   "curation_note": "Claude-curated from real vault excerpts 2026-09-15; not user-curated",
   "provenance": "Claude Opus 5 curation of M10-GOLD-DRAFT-2026-09-15.json. Document bodies are verbatim sentences copied from the operational Second Brain vault generation sbgen:v1:d55ac3acaef3795c08448749437c9509cd4bb208aad5785356156c82dd86efe8 (wiki/ and wiki/_proposed/ only, read-only). dataset_origin is 'synthetic' because the schema enum offers only 'synthetic' or 'user_curated' and no user has reviewed these cases; the content itself is real, not invented.",
-  "status": "CLAUDE-CURATED — reviewed by Claude, still needs user sign-off before M10 acceptance",
+  "status": "user_reviewed",
   "curation": "claude_curated",
   "source_generation_root": "/home/jm/.local/share/second-brain/vault-generations/sbgen:v1:4a2f9ea25e2ecbaa59845430c997e46cf2d14adade2d312cbf3436877f62a4a4",
   "source_generation_symlink": "/home/jm/.local/share/second-brain/vault",
@@ -814,7 +814,7 @@
     {
       "id": "date-018",
       "kind": "keyword",
-      "query": "브리핑 회귀 1,785 passed 2 skipped",
+      "query": "릴리스 후보 25d49b4 수정 커밋 인수 검증",
       "expected_page_ids": [
         "wiki/daily-2026-09-10"
       ],
@@ -822,7 +822,7 @@
       "difficulty": "medium",
       "type_ko": "date",
       "curation": "claude_curated",
-      "curation_note": "09-10 브리핑 본문에는 회귀 수치가 없어, 같은 브리핑의 릴리스 권고 문장으로 정답을 옮겼다."
+      "curation_note": "09-10 브리핑 본문에는 회귀 수치가 없어, 같은 브리핑의 릴리스 권고 문장으로 정답을 옮겼다. | 사용자 검토(2026-09-15): 검색어를 브리핑 릴리스 권고 문장의 어절로 수정"
     },
     {
       "id": "date-019",
@@ -958,7 +958,7 @@
       "forbidden_page_ids": [
         "wiki/inbox-release-verification"
       ],
-      "curation_note": "25d49b4를 인수 통과로 기록한 검증 페이지는 정정 전 판단이므로 forbidden. 두 페이지가 같은 후보를 반대로 말하므로 stale 판정이 타당하다."
+      "curation_note": "25d49b4를 인수 통과로 기록한 검증 페이지는 정정 전 판단이므로 forbidden. 두 페이지가 같은 후보를 반대로 말하므로 stale 판정이 타당하다. | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "dec-008",
@@ -1093,7 +1093,7 @@
       "difficulty": "medium",
       "type_ko": "decision",
       "curation": "claude_curated",
-      "curation_note": "초안 질문('프리미엄 모델을 계획·리뷰에만 쓰는 이유')은 근거 문장과 맞지 않아 질문을 바꿨다."
+      "curation_note": "초안 질문('프리미엄 모델을 계획·리뷰에만 쓰는 이유')은 근거 문장과 맞지 않아 질문을 바꿨다. | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "dec-019",
@@ -1106,7 +1106,7 @@
       "difficulty": "medium",
       "type_ko": "decision",
       "curation": "claude_curated",
-      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다. 문서가 실제로 규정하는 절차를 묻도록 고쳤다."
+      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다. 문서가 실제로 규정하는 절차를 묻도록 고쳤다. | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "dec-020",
@@ -1119,7 +1119,7 @@
       "difficulty": "hard",
       "type_ko": "decision",
       "curation": "claude_curated",
-      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다."
+      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다. | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "dec-021",
@@ -1132,7 +1132,7 @@
       "difficulty": "hard",
       "type_ko": "decision",
       "curation": "claude_curated",
-      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다."
+      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다. | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "dec-022",
@@ -1511,7 +1511,7 @@
       "forbidden_page_ids": [
         "wiki/inbox-release-verification"
       ],
-      "curation_note": "검증 페이지는 정정 전 판단이므로 forbidden, 정정 페이지가 gold."
+      "curation_note": "검증 페이지는 정정 전 판단이므로 forbidden, 정정 페이지가 gold. | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "cmp-007",
@@ -1547,7 +1547,8 @@
       "answer_span": "unread 재분류·발송은 없었으며, 실행 간격은 85·59·43분으로 불규칙하다.",
       "difficulty": "hard",
       "type_ko": "comparison",
-      "curation": "claude_curated"
+      "curation": "claude_curated",
+      "curation_note": "사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "cmp-010",
@@ -1596,7 +1597,8 @@
       "answer_span": "윤비서 last run 자기보고는 아침 보고 2026-09-10 09:06:41 KST(<24h), 퇴근 보고 2026-09-09 18:02:12 KST(>24h), 협업 점검 2026-09-09 19:21:43 KST(>24h)다.",
       "difficulty": "hard",
       "type_ko": "comparison",
-      "curation": "claude_curated"
+      "curation": "claude_curated",
+      "curation_note": "사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "cmp-014",
@@ -1639,59 +1641,52 @@
       "kind": "natural_question",
       "query": "7일 홀드 완료 판정은 지금 어떤 상태인가요?",
       "expected_page_ids": [
-        "wiki/inbox-morning-afternoon-hold",
-        "wiki/inbox-evening-collab",
         "wiki/inbox-hold-2130"
       ],
       "answer_span": "seven_day_complete=false",
       "difficulty": "medium",
       "type_ko": "comparison",
       "curation": "claude_curated",
-      "curation_note": "세 관측 페이지가 같은 판정을 기록한다. 임의로 한 페이지로 좁히지 않았다."
+      "curation_note": "세 관측 페이지가 같은 판정을 기록한다. 임의로 한 페이지로 좁히지 않았다. | 사용자 검토(2026-09-15): 가장 나중 관측 1개로 축소"
     },
     {
       "id": "cmp-018",
       "kind": "keyword",
       "query": "15:12 일에이엔 혼입 발송",
       "expected_page_ids": [
-        "wiki/inbox-morning-afternoon-hold",
-        "wiki/inbox-evening-collab",
-        "wiki/inbox-hold-2130",
         "wiki/daily-2026-09-11"
       ],
       "answer_span": "15:12 일에이엔 혼입 발송",
       "difficulty": "medium",
       "type_ko": "comparison",
       "curation": "claude_curated",
-      "curation_note": "같은 사건이 세 관측 페이지와 09-11 브리핑에 기록돼 있다."
+      "curation_note": "같은 사건이 세 관측 페이지와 09-11 브리핑에 기록돼 있다. | 사용자 검토(2026-09-15): 브리핑 1개로 축소"
     },
     {
       "id": "cmp-019",
       "kind": "natural_question",
       "query": "윤비서 세 루틴의 마지막 실행 시각은 각각 언제인가요?",
       "expected_page_ids": [
-        "wiki/inbox-evening-collab",
         "wiki/inbox-hold-2130"
       ],
-      "answer_span": "09:05:47",
+      "answer_span": "윤비서 실행 시각은 아침 09:05:47, 퇴근 18:04:32, 협업 19:25:18이며, 모두 lt_24h다.",
       "difficulty": "medium",
       "type_ko": "comparison",
       "curation": "claude_curated",
-      "curation_note": "퇴근·협업 관측과 21:30 관측이 같은 시각을 기록한다."
+      "curation_note": "퇴근·협업 관측과 21:30 관측이 같은 시각을 기록한다. | 사용자 검토(2026-09-15): 정답 1개, 세 시각이 든 완전한 문장으로 재작성"
     },
     {
       "id": "cmp-020",
       "kind": "keyword",
       "query": "mail-unread-event 마지막 실행",
       "expected_page_ids": [
-        "wiki/inbox-mail-tick-0043",
         "wiki/inbox-mail-tick-0126"
       ],
-      "answer_span": "메일 봇 mail-unread-event의 마지막 실행은",
+      "answer_span": "메일 봇 mail-unread-event의 마지막 실행은 2026-09-11 01:26:15 KST이며, 상태는 succeeded이고 직전 00:43:33 실행으로부터 약 43분 간격이다.",
       "difficulty": "medium",
       "type_ko": "comparison",
       "curation": "claude_curated",
-      "curation_note": "00:43 관측과 01:26 관측 모두 이 질의에 정당하게 답한다. 초안처럼 한쪽으로 좁히지 않았다."
+      "curation_note": "00:43 관측과 01:26 관측 모두 이 질의에 정당하게 답한다. 초안처럼 한쪽으로 좁히지 않았다. | 사용자 검토(2026-09-15): 01:26 관측 1개, 완전한 문장으로 재작성"
     },
     {
       "id": "cmp-021",
@@ -1802,7 +1797,7 @@
       "difficulty": "hard",
       "type_ko": "no_data",
       "curation": "claude_curated",
-      "curation_note": "T3 정의만 있고 목록이 없다(있어도 읽지 않는 등급)."
+      "curation_note": "T3 정의만 있고 목록이 없다(있어도 읽지 않는 등급). | 사용자 검토(2026-09-15): 그대로 유지"
     },
     {
       "id": "neg-010",
@@ -1881,5 +1876,9 @@
       "curation": "claude_curated",
       "curation_note": "등록번호가 vault에 없다."
     }
-  ]
+  ],
+  "user_review": {
+    "at": "2026-09-15T20:40+09:00",
+    "decisions": "dec-007 forbidden 유지; cmp-006 유지; cmp-018/cmp-017/cmp-019/cmp-020 정답 1개로 축소(+span 재작성); date-018 질의 수정; cmp-009/cmp-013/neg-009 유지; dec-018~021 바뀐 질문 유지"
+  }
 }

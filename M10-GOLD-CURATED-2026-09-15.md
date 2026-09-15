@@ -237,3 +237,30 @@ TMPDIR=/var/tmp .venv/bin/python /var/tmp/claude-night-e53dd66-GBr0la/m10/ops_pr
    (`~/.local/share/second-brain`)와 지식 레지스트리 내용은 실행 전후 바이트 단위로 동일했다.
 7. **이 평가는 실사용 인수를 대신하지 못한다.** 하네스 스스로 증거에 기록하는 한계다:
    수집·추출·LLM 답변 평가 없음, 단일 소유자 genesis, 소규모 코퍼스 1회 측정.
+
+## 7. 사용자 검토 반영 (2026-09-15 20:40 KST)
+
+§4의 10건을 사용자가 한 건씩 결정했다(Claude가 선택지 제시). JSON `status`는 `user_reviewed`, 검토 전 사본은 `M10-GOLD-CURATED-2026-09-15.pre-user-review.json`.
+
+| case | 결정 | 반영 |
+|---|---|---|
+| dec-007 | forbidden 유지 | 변경 없음 |
+| cmp-006 | 유지 | 변경 없음 |
+| cmp-018 | 브리핑 1개로 축소 | expected = `wiki/daily-2026-09-11` |
+| cmp-017 | 가장 나중 관측 1개로 축소 | expected = `wiki/inbox-hold-2130` |
+| cmp-019 | 정답 1개 + 완전한 문장 | expected = `wiki/inbox-hold-2130`, span = 세 시각이 든 원문 문장 |
+| cmp-020 | 01:26 관측 1개 + 완전한 문장 | expected = `wiki/inbox-mail-tick-0126`, span = 시각·상태·간격이 든 원문 문장 |
+| date-018 | 검색어 수정 | query = `릴리스 후보 25d49b4 수정 커밋 인수 검증` (정답 문장의 어절) |
+| cmp-009, cmp-013, neg-009 | 유지 | 변경 없음 |
+| dec-018~021 | 바뀐 질문 유지 | 변경 없음 |
+
+재평가(131/131, 격리 fixture `korean-search-acceptance.py`, 증거 `/var/tmp/sb-korean-search-4dwlnhc1`):
+
+| 표면 | hit@1 | recall@5 | MRR@5 | negative_empty | forbidden_exposure@5 |
+|---|---|---|---|---|---|
+| CLI (검토 전) | 0.2261 | 0.2261 | 0.2261 | 1.0 | 0.0 |
+| CLI (검토 후) | 0.2087 | 0.2348 | 0.2217 | 1.0 | 0.0 |
+| MCP (검토 후) | 0.2000 | 0.2261 | 0.2130 | 1.0 | 0.0 |
+| 운영 릴리스 CLI 프로브 (검토 후) | 0.2000 | 0.2348 | 0.2130 | 1.0 | 0.0 |
+
+읽는 법: 정답을 1개로 좁힌 cmp-018·cmp-020은 정답 페이지가 **2위**에 있어 hit@1은 잃고 recall@5는 유지한다(관측 원본이 브리핑보다 먼저 뜬다). date-018은 새 검색어로 09-11 브리핑이 1위, 09-10 브리핑이 2위로 잡혀 recall@5만 얻는다. cmp-017·cmp-019는 자연어 질문이라 여전히 0(§3.3 제품 한계). 결론은 §3.3과 같다: 데이터셋은 확정됐고, 남은 격차는 한국어 조사 처리(형태소/n-gram/의미 검색)라는 제품 항목이다.

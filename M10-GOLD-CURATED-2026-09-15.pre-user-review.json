@@ -1,0 +1,1885 @@
+{
+  "schema_version": 1,
+  "dataset_id": "m10-gold-curated-2026-09-15",
+  "dataset_origin": "synthetic",
+  "curation_note": "Claude-curated from real vault excerpts 2026-09-15; not user-curated",
+  "provenance": "Claude Opus 5 curation of M10-GOLD-DRAFT-2026-09-15.json. Document bodies are verbatim sentences copied from the operational Second Brain vault generation sbgen:v1:d55ac3acaef3795c08448749437c9509cd4bb208aad5785356156c82dd86efe8 (wiki/ and wiki/_proposed/ only, read-only). dataset_origin is 'synthetic' because the schema enum offers only 'synthetic' or 'user_curated' and no user has reviewed these cases; the content itself is real, not invented.",
+  "status": "CLAUDE-CURATED — reviewed by Claude, still needs user sign-off before M10 acceptance",
+  "curation": "claude_curated",
+  "source_generation_root": "/home/jm/.local/share/second-brain/vault-generations/sbgen:v1:4a2f9ea25e2ecbaa59845430c997e46cf2d14adade2d312cbf3436877f62a4a4",
+  "source_generation_symlink": "/home/jm/.local/share/second-brain/vault",
+  "documents_origin_map": {
+    "wiki/me-identity-profile": "wiki/me-wiki-identity-profile-4608de4a.md",
+    "wiki/me-agent-rules": "wiki/me-wiki-agent-rules-45e1e808.md",
+    "wiki/me-index": "wiki/me-wiki-index-82f72009.md",
+    "wiki/me-ops-repo-cleanup": "wiki/me-wiki-ops-repo-cleanup-a0e4d1b7.md",
+    "wiki/me-principles-pricing": "wiki/me-wiki-principles-pricing-4ce93858.md",
+    "wiki/me-principles-prioritization": "wiki/me-wiki-principles-prioritization-727e78f9.md",
+    "wiki/me-principles-work-acceptance": "wiki/me-wiki-principles-work-acceptance-91e6b364.md",
+    "wiki/me-projects-agentgauge": "wiki/me-wiki-projects-agentgauge-e292b59a.md",
+    "wiki/me-projects-blro-os": "wiki/me-wiki-projects-blro-os-94626e1a.md",
+    "wiki/me-projects-jarvis-ai": "wiki/me-wiki-projects-jarvis-ai-3a885574.md",
+    "wiki/me-projects-unified-db": "wiki/me-wiki-projects-unified-db-e7a53076.md",
+    "wiki/me-voice-customer-email": "wiki/me-wiki-voice-customer-email-aa85ef64.md",
+    "wiki/inbox-ops-contract-full": "wiki/inbox-2026-09-09t131544152980-grok-bot-운영-10점-계약-f8c074a8.md",
+    "wiki/inbox-release-verification": "wiki/inbox-2026-09-10t031904232122-세컨드브레인-d4cbdda-검증과-릴리스-후보-25d49b4-인수-df9d6669.md",
+    "wiki/inbox-release-defect-fix": "wiki/inbox-2026-09-10t033812527292-정정-릴리스-후보-25d49b4의-각주-중복-결함과-수정-9d8505e1.md",
+    "wiki/inbox-mail-routine-measure": "wiki/inbox-2026-09-10t121126046118-grok-bot-10점-메일-루틴-갩-2026-09-10-d399afa9.md",
+    "wiki/inbox-mail-hourly-routine": "wiki/inbox-2026-09-10t122547507489-grok-bot-mail-unread-event-every-hour-20-4fc507f9.md",
+    "wiki/inbox-skill-tests": "wiki/inbox-2026-09-10t123539832949-grok-bot-skill-tests-a-pass-b-pass-c-pen-18c71563.md",
+    "wiki/inbox-hold-launchagent": "wiki/inbox-2026-09-10t131734177003-grok-bot-7일-홀드-launchagent-6402fafe.md",
+    "wiki/inbox-hold-matrix": "wiki/inbox-2026-09-10t135653859542-grok-bot-p3-hold-matrix-2026-09-10-f2d6cf49.md",
+    "wiki/inbox-yun-last-run": "wiki/inbox-2026-09-10t134255777384-grok-bot-윤비서-last-run-2026-09-10-b77f3c52.md",
+    "wiki/inbox-kakao-order": "wiki/inbox-2026-09-10t131006847689-카톡-시작-순서-바탕화면-카톡-작업-2ffcb795.md",
+    "wiki/inbox-contract-ack-askwatch": "wiki/inbox-2026-09-10t153137091991-grok-bot-d1-contract-ack-askwatch-87dd0cbd.md",
+    "wiki/inbox-mail-tick-0043": "wiki/inbox-2026-09-10t155223000817-grok-bot-d1-mail-unread-00-43-tick-fc0b30cf.md",
+    "wiki/inbox-kakao-session-unknown": "wiki/inbox-2026-09-10t155905569469-grok-bot-d1-kakao-session-unknown-withou-ead3d35d.md",
+    "wiki/inbox-kim-completion-ack": "wiki/inbox-2026-09-10t160403098260-grok-bot-d1-김비서-완료이-계약-복창-db575bd8.md",
+    "wiki/inbox-mail-tick-0126": "wiki/inbox-2026-09-10t164814779522-grok-bot-d1-mail-unread-01-26-tick-3deddd64.md",
+    "wiki/inbox-mail-self-log-0234": "wiki/inbox-2026-09-10t174511021564-grok-bot-mail-unread-self-log-02-34-bfd25c17.md",
+    "wiki/inbox-kakao-approval-change": "wiki/inbox-2026-09-11t073526362561-grok-bot-카톡-분석-단계-승인-해제-93a9b68c.md",
+    "wiki/inbox-morning-afternoon-hold": "wiki/inbox-2026-09-11t074250039614-grok-bot-d1-아침-09-07-오후-홀드-a83b4b45.md",
+    "wiki/inbox-evening-collab": "wiki/inbox-2026-09-11t103354146581-grok-bot-d1-퇴근-18-04-협업-19-25-e259b368.md",
+    "wiki/inbox-hold-2130": "wiki/inbox-2026-09-11t123442646435-grok-bot-d1-hold-21-30-01e41b56.md",
+    "wiki/inbox-ops-recovery": "wiki/inbox-2026-09-07t122456959096-second-brain-운영-복구-검증-7b227772.md",
+    "wiki/daily-2026-09-10": "wiki/_proposed/daily-2026-09-10.md",
+    "wiki/daily-2026-09-11": "wiki/_proposed/daily-2026-09-11.md",
+    "wiki/me-principles-template": "wiki/me-wiki-principles-template-afed8932.md",
+    "wiki/me-voice-template": "wiki/me-wiki-voice-template-353d2299.md",
+    "wiki/me-ops-template": "wiki/me-wiki-ops-template-c3c967c1.md",
+    "wiki/me-people-template": "wiki/me-wiki-people-template-0c0192a6.md",
+    "wiki/me-faq-template": "wiki/me-wiki-faq-template-2fde6d19.md"
+  },
+  "documents": [
+    {
+      "page_id": "wiki/me-identity-profile",
+      "title": "프로필 — 박재민/베를로",
+      "body": "이름: 박재민 회사: 베를로(BLRO)이며, BLRO는 사명의 로마자 표기이자 BLRO OS 이름의 유래다. 역할: 개발자·엔지니어로서 일지테크 파일서버 등 고객사 인프라 이관과 BLRO OS·jarvis-ai 등 자체 앱 개발을 병행한다. 사업 구조: 총판-파트너-고객 구조의 IT 솔루션 유통·구축 사업을 수행한다. 근무 환경: macOS 기반의 멀티 에이전트 환경을 사용한다. 에이전트 역할: Claude Code는 계획·설계·리뷰, opencode는 코딩, Hermes는 오케스트레이션·업무, GJC는 멀티에이전트 개발에 활용한다. 언어: 한국어를 사용하며 코드·커밋·설정은 영어로 작성한다. 결론을 먼저 제시하고, 검증 없이 완료를 선언하지 않으며, 파괴적 작업은 승인 후 수행한다. 프리미엄 모델은 계획·리뷰에만 사용하고, 구현은 DeepSeek, 잡무는 Sonnet에 맡긴다. MCP보다 CLI를 선호하고, 기능 추가보다 기존 요소의 교체·삭제를 우선한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-agent-rules",
+      "title": "AGENT_RULES — 민감도 게이트와 쓰기 규칙",
+      "body": "T0는 공개 가능한 정보이며 모든 모델과 모든 용도에서 사용할 수 있다. T1은 일반 업무 정보이며 클라우드 LLM 컨텍스트에서 사용할 수 있는 기본 등급이다. T2는 관계·재무·건강과 관련된 민감 정보이며 로컬 모델만 읽을 수 있다. 클라우드 모델 세션에서는 T2 파일을 열지 않는다. 클라우드 모델 세션에서 T2 페이지가 필요하면 파일을 읽지 않고 사용자에게 “T2 페이지 필요”라고 알린다. T3는 어떤 에이전트도 읽지 않는 금지 정보이며 암호화 대상이다. 프론트매터가 없는 파일은 안전을 위해 T2로 간주한다. people/ 디렉터리는 기본적으로 T2로 간주한다. 에이전트는 위키를 직접 수정하지 않는다. 에이전트는 수정안을 diff 또는 PR 형태로 제안하고 사용자의 승인을 받는다. 예외적으로 증류기 크론은 projects/의 현황 갱신을 위한 제안 커밋을 만들 수 있지만, 머지는 사용자가 수행한다. 판단 원칙은 일반 규칙이 아니라 실제 상황, 실제 결정, 그 이유를 담은 판례로 기록한다. 프론트매터에는 title, type, sensitivity, updated를 기록한다. type에는 identity, principle, voice, person, project, ops, faq 중 하나를 사용한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-ops-repo-cleanup",
+      "title": "레포·파일 정리 절차",
+      "body": "작업 공간에 쌓인 실험 잔재와 중복 시스템을 정리할 때 적용한다. 정리 전에 대상이 스텁·템플릿인지 실제 코드·데이터인지 먼저 판정하며, 실제 내용은 보존을 기본값으로 삼는다. 저널이나 위키에 남길 가치가 있는 내용은 먼저 흡수한 뒤 정리한다. 제거 대상은 ~/unified-db/archive/에 백업하고 byte-diff로 검증한 뒤 삭제해 복원 가능성을 유지한다. Git 레포 안에서 삭제했다면 이를 커밋으로 남기되 푸시하지 않는다. 2026년 7월 2일부터 3일까지 14개 레포에 설치된 구형 파일 기반 에이전트 메모리 스텁을 unified-db 저널로 대체했다. 레포 자체는 삭제하지 않고 레포 내부의 스텁 구조물만 제거 대상으로 삼았다. 11개 레포에서는 스텁 디렉터리와 래퍼 스크립트를 ~/unified-db/archive/에 백업한 뒤 제거했다. aios-jarvis와 ragflow의 memory/에는 실제 앱 코드가 섞여 있어 스텁만 선별 제거하고 앱 모듈은 보존했다. sangfor-os에서는 실운영 데이터인 mail-learning과 실제 핸드오프를 발견해 파일을 모두 보존하고 핸드오프 내용만 저널에 흡수했다. 이 결정의 목적은 파편화된 기억 시스템을 일원화하면서 실데이터를 보존하는 것이며, 정리 방식은 삭제가 아니라 백업 후 회수이다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-principles-pricing",
+      "title": "견적·가격 산정",
+      "body": "대외비: 이 마진 구조는 파트너·고객에게 절대 노출하지 않으며, 견적서에는 최종 금액만 기재한다. 총판사 가격을 기준으로 상대 유형에 따라 마진을 다르게 적용한다. 파트너사: 총판가에 10% 마진을 적용한다. 최종 고객: 총판가에 40% 마진을 적용한다. 총판가를 확인한다. 상대가 파트너사인지 최종 고객인지 판별한다. 상대 유형이 불명확하면 사용자에게 확인한다. 해당 마진을 적용한다. 견적 초안은 항상 사용자 승인을 받은 후 발송한다. 2026년 7월 3일 인터뷰에서 총판가를 기준으로 파트너사에는 10%, 최종 고객에게는 40%의 마진을 적용하기로 결정했다. 파트너사는 물량과 관계를 기반으로 박리 구조를 적용하고, 최종 고객 가격에는 구축과 지원의 가치를 포함한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-principles-prioritization",
+      "title": "우선순위 판단",
+      "body": "고객사 업무와 자체 개발(BLRO OS, jarvis-ai 등)이 충돌하면 고객사 업무를 항상 우선한다. 자체 개발은 고객 업무의 공백 시간에 진행한다. 일정과 작업을 배치할 때 고객사 마감을 상수로 두고 자체 개발 일정을 조정한다. 고객사 요청이 들어오면 자체 개발 작업의 중단 비용이 크더라도 원칙적으로 고객사 업무에 양보한다. 판례 1 — 2026-07-03 인터뷰 상황: 고객사 업무와 자체 개발이 충돌할 때의 우선순위를 판단했다. 결정: 조건 없이 고객사 업무를 선택했다. 교훈: 고객 업무는 매출과 신뢰의 기반이며, 예외가 생기면 판례를 추가한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-principles-work-acceptance",
+      "title": "업무 수임·거절 기준",
+      "body": "업무 관련 요청은 비용 지급이 확보되면 진행한다. 2026년 7월 기준 거절 판례는 없으며, 사실상 유일한 거절 사유는 무보수 여부다. 새 업무 요청을 받으면 거절 여부보다 보상 조건을 먼저 확인한다. 무보수이거나 비용이 확정되지 않은 요청은 바로 거절하지 않고 비용 조건을 묻는 회신 초안을 제안한다. 2026년 7월 3일 인터뷰 거절 기준에 관한 질문에 “현재는 없다. 비용 지급만 되면 진행한다”고 답했다. 향후 거절 판례가 생기면 이 기준을 갱신해야 한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-projects-agentgauge",
+      "title": "agentgauge",
+      "body": "2026년 7월 2일 MVP가 완성되었으며, git 히스토리 채굴을 통해 에이전트의 작업 품질을 평가한다. opencode의 deepseek-v4-flash 모델을 활용해 12개 태스크를 TDD 방식으로 개발했다. Sonnet 감사 3회를 통과했고 테스트 74개가 모두 성공했으며, init → mine → run → report 전체 과정의 e2e 스모크 테스트도 통과했다. Python 기반 CLI 도구이며 init → mine → run → report 파이프라인으로 구성된다. 현재 MVP 개발을 완료하고 추가 개발과 통합을 기다리는 상태다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-projects-blro-os",
+      "title": "BLRO OS",
+      "body": "BLRO OS는 베를로 회사 운영을 위한 에이전틱 OS이며 현재 MVP를 개발하고 있다. 현재 개발 위치는 ~/Playground/sangfor-os이며, 디렉터리명과 달리 이곳이 BLRO OS 본체다. 이전 스타터는 ~/Downloads/01.Pilot_Coding/blro_company_ops_agentic_os_bundle/starter에 있지만 현재 기준은 아니다. 기술 스택은 Next.js의 apps/web, Prisma, TypeScript로 구성된다. 원격 저장소는 whelp99-code/BLRO-OS다. 주요 화면에는 mail, proposal, runs, settings/connections 등이 있다. 개발은 W1–W12 주간 계획 체계로 운영된다. memory/mail-learning/에는 실제 CRM 수치를 포함한 메일 학습 데이터셋 1,237개 메시지가 있으며, Phase 4에서 통합 DB의 raw.*에 적재할 1순위 후보다. Phase 4b에서는 BLRO OS 작업 세션의 앱 이벤트를 개발 흐름 안에서 통합 DB에 연결하며, 이 방식은 2026년 7월 3일 승인됐다. 접속 문자열은 postgresql://unified:unified@localhost:5433/unified이며 UNIFIED_DB_URL 환경 변수 사용이 권장된다. 이벤트는 raw.events(source, kind, payload, dedup_key)에 기록한다. source는 blro-os/<모듈> 형식을 사용하며 예시는 blro-os/mail과 blro-os/proposal이다. dedup_key는 <source>/<자연키> 규약을 따른다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-projects-jarvis-ai",
+      "title": "jarvis-ai",
+      "body": "위치: ~/Playground/aios-jarvis 원격: https://github.com/whelp99-code/aios-jarvis 실행에 .env가 필요함. 상태: 개발 중. 통합 DB 연결: Phase 4 대상.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-projects-unified-db",
+      "title": "unified-db",
+      "body": "위치는 ~/unified-db이며, Postgres(pgvector)를 Docker로 운영하고 호스트 포트는 5433을 사용한다. 5434 포트는 sangfor-postgres가 사용한다. 접속 주소는 postgresql://unified:unified@localhost:5433/unified이다. 스키마는 append-only 원본을 저장하는 raw.*, 에이전트 일지와 임베딩을 저장하는 journal.*, 앱별 변환층으로 구성된다. CLI는 ~/unified-db/bin/memlog이며 write, raw, digest, recall, rollup을 지원하고 날짜는 Asia/Seoul 기준이다. ~/unified-db/bin/ingest-blro-mail은 BLRO 메일 학습 데이터를 dedup_key로 멱등 적재한다. 적재 데이터는 blro.mail_candidates와 blro.mail_review_queue 뷰에서 조회한다. 기록은 훅으로 자동화하고, 회수는 다이제스트와 온디맨드 검색의 2단계로 수행한다. 에이전트 저널의 사건은 주 1회 증류기를 거쳐 me-wiki의 정체성 수정안으로 제안된다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-voice-customer-email",
+      "title": "고객 메일 문체",
+      "body": "인사를 포함해 4~6문장으로 짧게 작성하며, 군더더기·수식어·이모지는 사용하지 않는다. 표준 비즈니스 합니다체를 사용하고 과도한 문어체는 피한다. 지연이나 실수가 있으면 본문 첫 문장에서 사과한다. 인사와 소속·이름을 각각 별도 줄에 작성한 뒤, 용건 한두 문장과 확인 요청으로 마무리한다. 자주 쓰는 표현은 “전달 드립니다”, “확인 부탁드립니다”, “회신이 늦어져서 죄송합니다”이다. 실제 예문이 3개 미만인 동안에는 초안마다 “문체 확인 필요” 표시를 붙인다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-ops-contract-full",
+      "title": "Grok Bot 운영 10점 계약",
+      "body": "Mac 로컬 정본 경로는 /Users/jmpark/.grokbot/ops/이며, 모든 Live 봇은 작업 시작 시 이 계약 파일을 읽는다. SQLite(jm-business.db)는 은행·WEHAGO·메일 원문 해시를 포함한 관측 패킷의 정본이다. Notion은 승인함 투영만 담당하며, 금액·단계·결제의 정본이 아니다. Second Brain에는 확정된 결정만 남기며, 숫자 사실은 원문을 재조회한다. 봇 학습 메모리에 잔고·CRM 단계·다음 액션 날짜를 넣지 않는다. Windows 슬롯은 하나다. 국세청 홈택스 Chrome이 전면에 있으면 카톡 스캔을 시작하지 않는다. 카톡 스캔 중에는 김비서가 홈택스를 전면으로 가져오지 않는다. SESSION_BUSY이면 창을 뺏지 않고 실패로 보고한다. 연결됨·등록됨·명령 전송·초안은 완료가 아니다. 완료이만 화면이나 로그를 재조회해 VERIFIED를 부여할 수 있다. 기록이는 VERIFIED만 RECORDED로 세컨드브레인에 넘긴다. 메일 발송·회신, WEHAGO 세금계산서 발행, 카톡 발송, 송금에는 재민 승인 카드가 필수다. CRM 보호필드 쓰기, Drive 휴지통, 배포·DNS·장비 변경에도 재민 승인 카드가 필수다. 핸드오프 본문에는 TASK-ID와 패킷 경로만 넣는다. Live 봇은 윤비서, 카톡, 김비서, 노션이, 영업, 메일, 장부, 문서다. vault 경로를 하드코딩하지 않는다. jm-acloud에서 readlink -f /home/jm/.local/share/second-brain/vault를 실행해 심링크를 해석한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-release-verification",
+      "title": "d4cbdda 검증과 릴리스 후보 25d49b4 인수",
+      "body": "세컨드브레인 앱의 소스 HEAD d4cbdda 기준 전체 회귀 검사는 1,785 passed / 2 skipped, 569.06초, exit 0으로 완료됐으며, ruff --no-cache와 basedpyright도 통과했다. 같은 커밋으로 오프라인 준비한 릴리스 후보는 25d49b4367945c8fa01ea71f2d83932d8da934d8이며, wheel SHA-256은 aa6fad5fc76ebda509ad3ac616b4e94b538bad2ae2161c83b86158a09a886dcf다. 이 후보는 JARVIS 195b1a7 빌드와의 paired 연동 검사 및 유지보수 검사를 모두 exit 0으로 통과했으며, 운영 current는 전환하지 않았다. 근거 문서는 CONTINUATION-FULL-REGRESSION-2026-09-10.md와 CONTINUATION-INSTALLED-PAIR-2026-09-10.md이며, 커밋은 1c203ed다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-release-defect-fix",
+      "title": "릴리스 후보 25d49b4의 각주 중복 결함과 수정",
+      "body": "2026-09-10 릴리스 후보 25d49b4367945c8fa01ea71f2d83932d8da934d8은 소스 커밋 d4cbdda 기준이며, 해당 커밋에는 컴파일된 wiki 페이지에 같은 출처의 각주 정의가 두 줄 남는 결함이 있다. 모델이 origin, span=0-480처럼 쉼표로 span을 붙이면 sb/vault.py의 각주 dedup이 이를 소유 정의로 인식하지 못하는 것이 원인이다. sb/vault.py의 SPAN_SUFFIX_RE에서 쉼표를 선택적으로 허용하도록 수정했다. tests/test_vault.py의 쉼표 변형 8건은 수정 전 실패했고, 수정 후에는 16건 모두 통과했으며, vault/compile 관련 49건도 통과했다. 따라서 후보 25d49b4는 최신 인수 후보가 아니며, 수정 커밋으로 후보를 다시 준비해야 한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-mail-routine-measure",
+      "title": "Grok Bot 메일 루틴 실측 2026-09-10",
+      "body": "실측 환경은 Grok Bot 0.44.0이며, 실측 시각은 2026-09-10 20:50 KST다. 봇 전환은 Option+Down/Up으로 가능하며, 사이드바 클릭으로는 전환에 실패했다. 메일 봇 details는 Cmd+Shift+, 후 Back to details로 접근한다. Add trigger 메뉴에는 On a schedule, Slack, GitHub, Teams, Linear, Sentry, PagerDuty, Webhook이 있으며, Outlook unread 트리거는 없다(asar sand-trigger-card). 루틴 이름 mail-unread-event는 트리거 없이 Back하면 버려진다. 대안은 Add trigger → On a schedule → Hourly와 스킬 mail-unread-event의 조합이며, 발송은 금지한다. 설정은 mcpBoxServers=[57302029,404], localToolPermission=ask이며, 데몬은 1개다. 윤비서 09:00/18:00/19:13는 스킬 3회 전 pause 상태다. 7일간 SESSION_BUSY=0·승인 없는 발송 0건 조건은 미충족이며, 09-10 새벽 always 구간에 Outlook 새 발송 1건이 있었다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-mail-hourly-routine",
+      "title": "Grok Bot 메일 봇의 시간별 루틴",
+      "body": "2026-09-10 21:24 KST, Grok Bot 메일 봇이 인앱 루틴 mail-unread-event를 만들었으며, 트리거는 Every hour (@every 1h)이고 켜진 상태다. Conversation details AX에서 mail-unread-event와 Every hour를 확인했다. 0.44.0에는 Outlook unread 네이티브 트리거가 없다. 작업 범위는 분류·패킷만이며, 발송은 금지다. 윤비서 09:00/18:00/19:13는 스킬 3회 전 pause 상태다. P0 ask+mcp+데몬1을 유지한다. 7일 SESSION_BUSY=0과 09-10 새벽 무승인 발송 1건을 감안하면 운영 10점은 아직 아니다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-skill-tests",
+      "title": "2026-09-10 스킬 테스트 A/B/C",
+      "body": "A · completion-gate — PASS: 완료이 UNKNOWN이며, 재조회 전에는 VERIFIED가 아니다. B · mail-unread-event — PASS: Outlook 57302029의 읽지 않은 메일 5건은 DROP 4건, WORK 1건(이재윤 부라더)이며, 발송은 없었다. C · wehago-lookup — IN_PROGRESS: 장부 WEHAGO 화면을 여는 중이다. 윤비서는 인앱 Skill 5개를 저장했다고 주장했으나, Skills UI는 미실측 상태다. 09:00·18:00·19:13은 활성화하지 않았으며, 메일 루틴 mail-unread-event의 Every hour는 유지했다. 7일 게이트는 미충족 상태다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-hold-launchagent",
+      "title": "P3 홀드 LaunchAgent 기록",
+      "body": "LaunchAgent com.jmpark.grokbot-hold는 매일 09:05·18:05·21:30 KST에 apply-settings.py(ask 유지)와 record-evidence.py를 실행한다. 홀드 시작은 2026-09-11 00:00이다. 2026-09-10은 무승인 발송·SESSION_BUSY 5건으로 제외한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-hold-matrix",
+      "title": "P3 홀드 매트릭스 2026-09-10",
+      "body": "P3 항목별 판정 정본은 /Users/jmpark/.grokbot/ops/HOLD_MATRIX.md이다. record-evidence의 p3.hold.active는 2026-09-11 00:00 KST부터 true이며, 로그 시점에는 false, day_n=0이다. 18:02 ask 재적용 이후 replica 성공 발송·발행·휴지통 문장은 0건이며, post_ask_mutation_n=0이다. 점수는 작업 9, 런타임 6, 연계 9, 기억 7, 권한 8이며, 10점은 7일 홀드 후에만 가능하다. sb_search 'Grok Bot' 결과는 daily/2026-09-10과 계약 wiki이며, 페이지는 UNVERIFIED 상태다. Restart to Update는 금지되어 있다. 이재윤 회신은 미발송 상태다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-yun-last-run",
+      "title": "윤비서 last run 2026-09-10",
+      "body": "기록 시점은 2026-09-10 22:38 KST다. 윤비서 last run 자기보고는 아침 보고 2026-09-10 09:06:41 KST(<24h), 퇴근 보고 2026-09-09 18:02:12 KST(>24h), 협업 점검 2026-09-09 19:21:43 KST(>24h)다. 2026-09-10 18:08 disable, 21:37 enable이 있었으며, 같은 날 18:00·19:13 발화는 last run에 없다. 7일 <24h 게이트는 2026-09-11 00:00 KST부터다. 메일 mail-unread-event의 last run은 22:19:27 succeeded로 유지한다. Windows SSH는 여전히 publickey 거부 상태이며, 재민 게이트는 ~/.grokbot/ops/bin/windows-add-mac-key.ps1이다. 정본 역할은 SQLite=관측, Notion=승인함, Second Brain=결정 로그이며, 숫자 사실은 원문을 재조회한다. 이재윤 부라더 회신은 미발송 상태이며, Restart to Update는 금지한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-kakao-order",
+      "title": "카톡 시작 순서 결정",
+      "body": "재민의 2026-09-10 결정에 따라 Windows 카톡 작업은 바탕화면 보기(Win+D) → 카톡 선택 → 작업 순서로 진행한다. TeamViewer가 전면에 있는 것은 SESSION_BUSY가 아니다. 김비서 lock(홈택스 OTP) 중에는 Win+D를 사용하지 않는다. 김비서도 같은 순서로 진행하되, 두 번째 단계에서 홈택스 Chrome을 선택한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-contract-ack-askwatch",
+      "title": "계약 복창·ask 유지·홀드 D1",
+      "body": "2026-09-11 00:29–00:30 KST 결정은 홀드 D1이다. 노션이 복창: Notion은 정본이 아닌 승인함 투영만, SQLite는 관측, SB는 결정 로그이며, 보호필드·금액·단계·결제 쓰기는 0이다. 장부 복창: SQLite는 관측 정본, Notion은 승인함만이며, WEHAGO 발행은 재민 승인 카드로 한다. LOGIN_NEEDED면 한 줄만 남기고 비밀번호를 묻지 않으며, 이 턴에는 조회·발행·로그인이 없었다. ask 유지: apply-settings.py는 설정이 이미 맞으면 파일을 쓰지 않으며, LaunchAgent com.jmpark.grokbot-askwatch가 settings.json의 WatchPaths로 회귀를 되돌린다. hold 스냅샷 시각에 12:05·15:05를 추가했으며, 7일 실사용은 아직 미증이다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-mail-tick-0043",
+      "title": "메일 미열람 이벤트 관측 00:43",
+      "body": "Grok Bot의 2026-09-11 00:51 KST 관측은 홀드 D1이다. 메일 봇 mail-unread-event의 마지막 실행은 2026-09-11 00:43:33 KST이며 성공했다. 직전 실행 시각은 23:44:31이며, 실행 간격은 약 59분이다. unread 재분류·발송은 없었다. 7일간 매시간 실행 간격이 2시간 미만이라는 조건은 아직 입증되지 않았다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-kakao-session-unknown",
+      "title": "카톡 세션 상태 미상 관측",
+      "body": "2026-09-11 00:55–00:57 KST 관측 상태는 홀드 D1이다. 카톡 PC 로그인 여부는 윈도우 화면이 보이지 않아 알 수 없다. 김비서 홈택스 lock은 없고 Mac win-gui.lock은 free이며, 스캔·Win+D·CU 전면은 없다. Windows SSH는 여전히 publickey 거부 상태다. 세컨드브레인은 sb ingest pages=4 errors=0이며, sb_search에 daily/2026-09-11이 보인다. 위키 페이지는 여전히 UNVERIFIED다. Skills 라이브러리 UI 확인에서 Cmd+Shift+,와 Cmd+Shift+M의 AX에 Skills 문자열이 없었다. Cmd+Shift+W는 Cursor Close All이므로 사용하지 않았다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-kim-completion-ack",
+      "title": "김비서·완료이 계약 복창",
+      "body": "Grok Bot 홀드 D1 시간은 01:02–01:03 KST다. 김비서 복창: 홈택스 시작 순서는 바탕화면 보기 → 홈택스 Chrome → 재민 대기이며, 카톡 lock이면 Win+D를 하지 않는다. 비번·OTP는 채팅에 쓰지 않으며, 지금은 열기·로그인을 시도하지 않는다. 완료이 복창: 재조회 전에는 VERIFIED가 아니며, 연결·등록·명령·초안은 VERIFIED가 아니다. VERIFIED만 기록/세브하며, 지금은 재조회·VERIFIED를 하지 않는다. P3 증거: record-evidence.py의 seven_day_complete는 7일 창, 일별 evidence JSON, 게이트가 모두 참일 때만 true이며, D1은 window_lt_7d다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-mail-tick-0126",
+      "title": "메일 미읽음 이벤트 관측 01:26",
+      "body": "Grok Bot의 2026-09-11 01:47 KST 관측은 홀드 D1이다. 메일 봇 mail-unread-event의 마지막 실행은 2026-09-11 01:26:15 KST이며, 상태는 succeeded이고 직전 00:43:33 실행으로부터 약 43분 간격이다. unread 재분류·발송은 없었으며, 실행 간격은 85·59·43분으로 불규칙하다. 7일 동안 매시간 실행 간격이 2시간 미만이었는지는 입증되지 않았다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-mail-self-log-0234",
+      "title": "홀드 D1 메일 자기보고 02:34",
+      "body": "홀드 기록 구간은 2026-09-11 02:35–02:43 KST다. mail-unread-event가 프롬프트 없이 채팅에 last run: 2026-09-11 02:34:39 KST (succeeded)를 남겼으며, 이전 실행 01:26:15와의 간격은 약 68분이다. automation-changed는 01:50에 updated로 기록됐다. 같은 틱에 unread 재분류와 윤비서 DM이 있었으며, 발송은 없었고 WORK 이재윤 후보도 미발송 상태였다. 02:43에 지시문을 last run 한 줄만 남기도록 재수정했다. hold LaunchAgent에 03:05·06:05를 추가했다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-kakao-approval-change",
+      "title": "카톡 분석 단계 승인 해제",
+      "body": "재민은 2026-09-11 16:30 KST에 카톡 분석에서 10회 이상 승인을 요청하는 불편을 줄이기 위해 로컬 실행을 Always allow로, Auto Review의 카톡 CU 분석을 AUTO-APPROVE로 변경했다. 분석 부작용으로 발생하는 읽음 표시는 허용한다. 발송·친구추가·메일 발송·WEHAGO 발행·Drive 휴지통·OTP·송금은 계속 승인 카드를 사용한다. apply-settings.py는 always를 유지하며, askwatch는 이를 ask로 되돌리지 않는다. 권한 점수는 8에서 6으로 변경됐다. 현재 스캔은 하지 않는다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-morning-afternoon-hold",
+      "title": "D1 아침·오후 홀드 관측",
+      "body": "아침 보고의 last run은 2026-09-11 09:07:30이며, 한 줄 self-log로 기록됐다. 구 파서는 세 루틴이 동시에 있는 경우만 확인해 12:05까지 09-10으로 남아 있었다. record-evidence는 이제 한 줄 병합과 replica 롤오버 carry를 적용한다. 메일 hourly는 06:38~16:23에 11회 실행됐으며, 간격은 2시간 미만이었다. 카톡은 16:32 LOGIN_OK였고, 로컬은 always로 기록됐다(재민 16:30). 15:12 일에이엔 혼입 발송이 있었으며, 15:28 수정됐다. 퇴근 18:00은 미실측이며, seven_day_complete=false 상태다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-evening-collab",
+      "title": "D1 퇴근·협업 점검 관측",
+      "body": "19:32 KST 기준 Grok Bot 홀드 D1 기록이다. 아침 기록은 09:05:47, 퇴근 보고는 18:04:32, 협업 점검은 19:25:18이다. D1 목표는 3루틴의 마지막 실행이 모두 24시간 이내인 것이다. LaunchAgent는 18:05 기준 runs=2이며, 메일 마지막 실행은 19:24:05이다. 로컬은 always로 기록되어 있다(재민 16:30). seven_day_complete=false, window_lt_7d로 기록되어 있다. 15:12 일에이엔 혼입 발송은 홀드 기록이다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-hold-2130",
+      "title": "D1 홀드 21:30 관측",
+      "body": "증거 시각은 2026-09-11T21:30:05+09:00이며, LaunchAgent com.jmpark.grokbot-hold는 runs=3, exit 0으로 기록됐다. always는 allow3/block8이며, askwatch가 always를 ask로 되돌리지 않았다. daemon은 1개(pid 86143), live는 12이며, lock은 free 상태다. 메일 last run은 20:20:09로 lt_2h다. 윤비서 실행 시각은 아침 09:05:47, 퇴근 18:04:32, 협업 19:25:18이며, 모두 lt_24h다. seven_day_complete=false, window_lt_7d로 기록됐다. 15:12 일에이엔 혼입 발송은 홀드 기록이다. 점수는 9·6·9·7·6이다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/inbox-ops-recovery",
+      "title": "2026-09-07 세컨드브레인 운영 복구 검증",
+      "body": "2026-09-07 Second Brain의 MCP 계약 호환성, 세대 기반 저장·검색, 한국어 두 글자 검색, 실패 작업 오류 보고, 백업을 수정했다. 자비스 통신 코드로 MCP 연결과 검색을 검증했고, 매시간 자동 갱신을 설정했다. 이 기록은 저장부터 재검색까지의 운영 검증에도 사용한다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/daily-2026-09-10",
+      "title": "2026-09-10 브리핑",
+      "body": "각주 중복 결함이 있는 릴리스 후보 25d49b4 대신, 수정 커밋으로 새 후보를 준비하고 인수 검증을 진행하세요. 7일 홀드는 9월 11일 00:00 KST부터 집계하고, 00:05 스냅샷에서 p3.hold.active 전환을 확인하세요. 9월 10일은 집계에서 제외하세요. 윤비서 퇴근 보고·협업 점검의 last run을 재조회해 자기보고를 검증하고, 홀드 시작 후 24시간 이내 실행 조건을 점검하세요. 메일 루틴은 매시간 분류·패킷 생성과 발송 금지를 유지하고, 진행 중인 WEHAGO 조회 테스트와 Skills UI 실측을 마무리하세요. Windows 카톡 작업은 Win+D → 카톡 선택 → 작업 순서를 따르세요. 홈택스 OTP로 김비서가 잠근 동안에는 Win+D를 사용하지 말고, TeamViewer 전면만으로 SESSION_BUSY로 판단하지 마세요.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/daily-2026-09-11",
+      "title": "2026-09-11 브리핑",
+      "body": "이전 브리핑의 릴리스 인수 추천을 정정하고, 각주 중복 결함을 수정한 커밋으로 후보를 다시 준비하세요. 25d49b4는 최신 인수 후보가 아닙니다. 21:30 기준 메일 <2h·윤비서 3루틴 <24h 충족 기록을 이어서 관측하되, 7일 홀드 완료 판정은 보류하세요. 아직 seven_day_complete=false입니다. 15:12 일에이엔 혼입 발송과 15:28 수정 기록을 검토하고, 해당 사건을 홀드 평가에 반영하세요. 카톡 분석 자동 승인 설정은 유지하되, 발송·친구추가·WEHAGO 발행·Drive 휴지통·OTP·송금에는 승인 카드가 계속 적용되는지 확인하세요. 세컨드브레인 위키 페이지를 직접 검증하세요. 수집 성공과 검색 노출은 확인됐지만, 위키 페이지는 여전히 UNVERIFIED로 기록돼 있습니다.",
+      "role": "gold"
+    },
+    {
+      "page_id": "wiki/me-index",
+      "title": "me-wiki INDEX",
+      "body": "에이전트 진입점으로, 세션 시작 시 이 파일만 로드하고 상세 내용은 필요한 페이지를 경로로 읽는다. 지인 대상 문체와 추가 예문은 다음 인터뷰 또는 증류기에서 추가한다. 관계 컨텍스트는 기본 T2로 로컬 모델에서만 사용하며, 필요할 때 추가한다. FAQ는 인터뷰와 메일 채굴을 통해 채운다. 이 INDEX에는 페이지당 한 줄만 두며 상세 내용을 쓰지 않는다. 주 1회 증류기가 저널을 바탕으로 위키 제안 PR을 만들고, 사용자가 승인하여 갱신한다.",
+      "role": "distractor"
+    },
+    {
+      "page_id": "wiki/me-principles-template",
+      "title": "_template (principles)",
+      "body": "(원칙 이름) 원칙 요약 한두 문장으로 작성하며, 규칙이 아니라 성향으로 서술한다. 판례 판례 1 — (상황 한 줄) 판례가 3개 이상 쌓이면 원칙 요약을 갱신한다. 판례 없는 원칙은 신뢰하지 않는다.",
+      "role": "distractor"
+    },
+    {
+      "page_id": "wiki/me-voice-template",
+      "title": "_template (voice)",
+      "body": "문체 템플릿 톤 요약 격식 수준, 길이 성향, 자주 쓰는 표현, 절대 안 쓰는 표현. 실제 예문 (내가 쓴 원문 그대로, 최소 3개)",
+      "role": "distractor"
+    },
+    {
+      "page_id": "wiki/me-ops-template",
+      "title": "_template (ops)",
+      "body": "업무 이름 주기: 절차 체크리스트: 자동화 상태: 수동 | 에이전트 보조 | 완전 자동",
+      "role": "distractor"
+    },
+    {
+      "page_id": "wiki/me-people-template",
+      "title": "_template (people)",
+      "body": "(이름) 관계/호칭: 히스토리 요약: 주의점:",
+      "role": "distractor"
+    },
+    {
+      "page_id": "wiki/me-faq-template",
+      "title": "_template (faq)",
+      "body": "질문 한 줄 Q: 자주 받는 질문 A: 내가 실제로 하는 답변 — 실제 답장에서 발췌",
+      "role": "distractor"
+    }
+  ],
+  "cases": [
+    {
+      "id": "fact-001",
+      "kind": "natural_question",
+      "query": "베를로는 어떤 사업 구조로 일하나요?",
+      "expected_page_ids": [
+        "wiki/me-identity-profile"
+      ],
+      "answer_span": "사업 구조: 총판-파트너-고객 구조의 IT 솔루션 유통·구축 사업을 수행한다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-002",
+      "kind": "natural_question",
+      "query": "구현 작업은 어떤 모델에 맡기나요?",
+      "expected_page_ids": [
+        "wiki/me-identity-profile"
+      ],
+      "answer_span": "프리미엄 모델은 계획·리뷰에만 사용하고, 구현은 DeepSeek, 잡무는 Sonnet에 맡긴다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-003",
+      "kind": "keyword",
+      "query": "T2 민감 정보 로컬 모델",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "T2는 관계·재무·건강과 관련된 민감 정보이며 로컬 모델만 읽을 수 있다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-004",
+      "kind": "natural_question",
+      "query": "people 디렉터리는 기본적으로 어떤 등급인가요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "people/ 디렉터리는 기본적으로 T2로 간주한다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-005",
+      "kind": "paraphrase",
+      "query": "프론트매터가 빠진 파일은 어떤 등급으로 취급하나요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "프론트매터가 없는 파일은 안전을 위해 T2로 간주한다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-006",
+      "kind": "keyword",
+      "query": "unified-db 호스트 포트",
+      "expected_page_ids": [
+        "wiki/me-projects-unified-db"
+      ],
+      "answer_span": "위치는 ~/unified-db이며, Postgres(pgvector)를 Docker로 운영하고 호스트 포트는 5433을 사용한다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-007",
+      "kind": "natural_question",
+      "query": "sangfor-postgres는 몇 번 포트를 쓰나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-unified-db"
+      ],
+      "answer_span": "5434 포트는 sangfor-postgres가 사용한다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-008",
+      "kind": "natural_question",
+      "query": "memlog CLI는 어떤 명령을 지원하나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-unified-db"
+      ],
+      "answer_span": "CLI는 ~/unified-db/bin/memlog이며 write, raw, digest, recall, rollup을 지원하고 날짜는 Asia/Seoul 기준이다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-009",
+      "kind": "keyword",
+      "query": "BLRO OS 원격 저장소",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "원격 저장소는 whelp99-code/BLRO-OS다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-010",
+      "kind": "reordered_terms",
+      "query": "개발 위치 BLRO OS sangfor-os",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "현재 개발 위치는 ~/Playground/sangfor-os이며, 디렉터리명과 달리 이곳이 BLRO OS 본체다.",
+      "difficulty": "hard",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-011",
+      "kind": "natural_question",
+      "query": "jarvis-ai 저장소 주소가 어떻게 되나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-jarvis-ai"
+      ],
+      "answer_span": "원격: https://github.com/whelp99-code/aios-jarvis",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-012",
+      "kind": "keyword",
+      "query": "agentgauge 테스트 74개",
+      "expected_page_ids": [
+        "wiki/me-projects-agentgauge"
+      ],
+      "answer_span": "Sonnet 감사 3회를 통과했고 테스트 74개가 모두 성공했으며, init → mine → run → report 전체 과정의 e2e 스모크 테스트도 통과했다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-013",
+      "kind": "natural_question",
+      "query": "agentgauge는 어떤 모델로 12개 태스크를 개발했나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-agentgauge"
+      ],
+      "answer_span": "opencode의 deepseek-v4-flash 모델을 활용해 12개 태스크를 TDD 방식으로 개발했다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-014",
+      "kind": "natural_question",
+      "query": "고객 메일에서 자주 쓰는 표현이 뭔가요?",
+      "expected_page_ids": [
+        "wiki/me-voice-customer-email"
+      ],
+      "answer_span": "자주 쓰는 표현은 “전달 드립니다”, “확인 부탁드립니다”, “회신이 늦어져서 죄송합니다”이다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-015",
+      "kind": "keyword",
+      "query": "고객 메일 문장 수",
+      "expected_page_ids": [
+        "wiki/me-voice-customer-email"
+      ],
+      "answer_span": "인사를 포함해 4~6문장으로 짧게 작성하며, 군더더기·수식어·이모지는 사용하지 않는다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-016",
+      "kind": "exact_phrase",
+      "query": "mail-unread-event 마지막 실행 00:43:33",
+      "expected_page_ids": [
+        "wiki/inbox-mail-tick-0043"
+      ],
+      "answer_span": "메일 봇 mail-unread-event의 마지막 실행은 2026-09-11 00:43:33 KST이며 성공했다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-017",
+      "kind": "keyword",
+      "query": "Windows 슬롯",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "Windows 슬롯은 하나다.",
+      "difficulty": "easy",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-018",
+      "kind": "natural_question",
+      "query": "어떤 상태여야 완료로 인정되나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "연결됨·등록됨·명령 전송·초안은 완료가 아니다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated",
+      "curation_note": "초안은 삭제된 요약 페이지를 참조했다. 현재 세대에 존재하는 계약 전문 페이지로 옮겼다."
+    },
+    {
+      "id": "fact-019",
+      "kind": "exact_phrase",
+      "query": "25d49b4 wheel SHA-256",
+      "expected_page_ids": [
+        "wiki/inbox-release-verification"
+      ],
+      "answer_span": "wheel SHA-256은 aa6fad5fc76ebda509ad3ac616b4e94b538bad2ae2161c83b86158a09a886dcf다",
+      "difficulty": "hard",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-020",
+      "kind": "keyword",
+      "query": "전체 회귀 1,785 passed",
+      "expected_page_ids": [
+        "wiki/inbox-release-verification"
+      ],
+      "answer_span": "세컨드브레인 앱의 소스 HEAD d4cbdda 기준 전체 회귀 검사는 1,785 passed / 2 skipped, 569.06초, exit 0으로 완료됐으며, ruff --no-cache와 basedpyright도 통과했다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-021",
+      "kind": "natural_question",
+      "query": "카톡 분석 승인을 완화한 뒤 권한 점수는 어떻게 됐나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-approval-change"
+      ],
+      "answer_span": "권한 점수는 8에서 6으로 변경됐다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-022",
+      "kind": "keyword",
+      "query": "Grok Bot 실측 버전 0.44.0",
+      "expected_page_ids": [
+        "wiki/inbox-mail-routine-measure"
+      ],
+      "answer_span": "실측 환경은 Grok Bot 0.44.0이며, 실측 시각은 2026-09-10 20:50 KST다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-023",
+      "kind": "natural_question",
+      "query": "BLRO OS의 기술 스택은 무엇인가요?",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "기술 스택은 Next.js의 apps/web, Prisma, TypeScript로 구성된다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-024",
+      "kind": "keyword",
+      "query": "메일 학습 데이터셋 1,237개 메시지",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "memory/mail-learning/에는 실제 CRM 수치를 포함한 메일 학습 데이터셋 1,237개 메시지가 있으며, Phase 4에서 통합 DB의 raw.*에 적재할 1순위 후보다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-025",
+      "kind": "natural_question",
+      "query": "스킬 테스트에서 wehago-lookup은 어떤 상태였나요?",
+      "expected_page_ids": [
+        "wiki/inbox-skill-tests"
+      ],
+      "answer_span": "C · wehago-lookup — IN_PROGRESS: 장부 WEHAGO 화면을 여는 중이다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "fact-026",
+      "kind": "natural_question",
+      "query": "카톡 PC 로그인 여부를 확인하지 못한 이유는 무엇인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-session-unknown"
+      ],
+      "answer_span": "카톡 PC 로그인 여부는 윈도우 화면이 보이지 않아 알 수 없다. 김비서 홈택스 lock은 없고 Mac win-gui.lock은 free이며, 스캔·Win+D·CU 전면은 없다. Windows SSH는 여전히 publickey 거부 상태다.",
+      "difficulty": "medium",
+      "type_ko": "fact",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-001",
+      "kind": "natural_question",
+      "query": "마진 기준은 언제 정해졌나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "2026년 7월 3일 인터뷰에서 총판가를 기준으로 파트너사에는 10%, 최종 고객에게는 40%의 마진을 적용하기로 결정했다.",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-002",
+      "kind": "keyword",
+      "query": "우선순위 판례 2026-07-03",
+      "expected_page_ids": [
+        "wiki/me-principles-prioritization"
+      ],
+      "answer_span": "판례 1 — 2026-07-03 인터뷰",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-003",
+      "kind": "natural_question",
+      "query": "수임 기준 판례는 언제 만들어졌나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-work-acceptance"
+      ],
+      "answer_span": "2026년 7월 3일 인터뷰",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-004",
+      "kind": "natural_question",
+      "query": "agentgauge MVP는 언제 완성됐나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-agentgauge"
+      ],
+      "answer_span": "2026년 7월 2일 MVP가 완성되었으며, git 히스토리 채굴을 통해 에이전트의 작업 품질을 평가한다.",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-005",
+      "kind": "paraphrase",
+      "query": "Playground 메모리 스텁 회수는 어느 기간에 이뤄졌나요?",
+      "expected_page_ids": [
+        "wiki/me-ops-repo-cleanup"
+      ],
+      "answer_span": "2026년 7월 2일부터 3일까지 14개 레포에 설치된 구형 파일 기반 에이전트 메모리 스텁을 unified-db 저널로 대체했다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-006",
+      "kind": "natural_question",
+      "query": "BLRO OS 이벤트를 통합 DB에 연결하는 방식은 언제 승인됐나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "Phase 4b에서는 BLRO OS 작업 세션의 앱 이벤트를 개발 흐름 안에서 통합 DB에 연결하며, 이 방식은 2026년 7월 3일 승인됐다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-007",
+      "kind": "keyword",
+      "query": "7일 홀드 시작",
+      "expected_page_ids": [
+        "wiki/inbox-hold-launchagent"
+      ],
+      "answer_span": "홀드 시작은 2026-09-11 00:00이다.",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-008",
+      "kind": "natural_question",
+      "query": "grokbot-hold LaunchAgent는 하루 중 몇 시에 도나요?",
+      "expected_page_ids": [
+        "wiki/inbox-hold-launchagent"
+      ],
+      "answer_span": "LaunchAgent com.jmpark.grokbot-hold는 매일 09:05·18:05·21:30 KST에 apply-settings.py(ask 유지)와 record-evidence.py를 실행한다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-009",
+      "kind": "exact_phrase",
+      "query": "p3.hold.active는 언제부터 true",
+      "expected_page_ids": [
+        "wiki/inbox-hold-matrix"
+      ],
+      "answer_span": "record-evidence의 p3.hold.active는 2026-09-11 00:00 KST부터 true이며, 로그 시점에는 false, day_n=0이다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-010",
+      "kind": "keyword",
+      "query": "7일 홀드 집계 9월 10일 제외",
+      "expected_page_ids": [
+        "wiki/daily-2026-09-10"
+      ],
+      "answer_span": "7일 홀드는 9월 11일 00:00 KST부터 집계하고, 00:05 스냅샷에서 p3.hold.active 전환을 확인하세요. 9월 10일은 집계에서 제외하세요.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated",
+      "curation_note": "초안은 09-11 브리핑을 정답으로 잡았으나 해당 문장은 09-10 브리핑에 있다."
+    },
+    {
+      "id": "date-011",
+      "kind": "exact_phrase",
+      "query": "윤비서 아침 보고 09:06:41",
+      "expected_page_ids": [
+        "wiki/inbox-yun-last-run"
+      ],
+      "answer_span": "윤비서 last run 자기보고는 아침 보고 2026-09-10 09:06:41 KST(<24h), 퇴근 보고 2026-09-09 18:02:12 KST(>24h), 협업 점검 2026-09-09 19:21:43 KST(>24h)다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-012",
+      "kind": "keyword",
+      "query": "협업 점검 19:25:18",
+      "expected_page_ids": [
+        "wiki/inbox-evening-collab"
+      ],
+      "answer_span": "아침 기록은 09:05:47, 퇴근 보고는 18:04:32, 협업 점검은 19:25:18이다.",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-013",
+      "kind": "natural_question",
+      "query": "카톡 분석 자동 승인은 언제 결정됐나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-approval-change"
+      ],
+      "answer_span": "재민은 2026-09-11 16:30 KST에 카톡 분석에서 10회 이상 승인을 요청하는 불편을 줄이기 위해 로컬 실행을 Always allow로, Auto Review의 카톡 CU 분석을 AUTO-APPROVE로 변경했다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-014",
+      "kind": "natural_question",
+      "query": "2026-09-07 운영 복구에서는 무엇을 수정했나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-recovery"
+      ],
+      "answer_span": "2026-09-07 Second Brain의 MCP 계약 호환성, 세대 기반 저장·검색, 한국어 두 글자 검색, 실패 작업 오류 보고, 백업을 수정했다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-015",
+      "kind": "exact_phrase",
+      "query": "메일 last run 2026-09-11 01:26:15",
+      "expected_page_ids": [
+        "wiki/inbox-mail-tick-0126"
+      ],
+      "answer_span": "메일 봇 mail-unread-event의 마지막 실행은 2026-09-11 01:26:15 KST이며, 상태는 succeeded이고 직전 00:43:33 실행으로부터 약 43분 간격이다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-016",
+      "kind": "natural_question",
+      "query": "21시 30분 관측에서 메일 last run은 몇 시였나요?",
+      "expected_page_ids": [
+        "wiki/inbox-hold-2130"
+      ],
+      "answer_span": "메일 last run은 20:20:09로 lt_2h다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-017",
+      "kind": "exact_phrase",
+      "query": "아침 보고 last run 2026-09-11 09:07:30",
+      "expected_page_ids": [
+        "wiki/inbox-morning-afternoon-hold"
+      ],
+      "answer_span": "아침 보고의 last run은 2026-09-11 09:07:30이며, 한 줄 self-log로 기록됐다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-018",
+      "kind": "keyword",
+      "query": "브리핑 회귀 1,785 passed 2 skipped",
+      "expected_page_ids": [
+        "wiki/daily-2026-09-10"
+      ],
+      "answer_span": "각주 중복 결함이 있는 릴리스 후보 25d49b4 대신, 수정 커밋으로 새 후보를 준비하고 인수 검증을 진행하세요.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated",
+      "curation_note": "09-10 브리핑 본문에는 회귀 수치가 없어, 같은 브리핑의 릴리스 권고 문장으로 정답을 옮겼다."
+    },
+    {
+      "id": "date-019",
+      "kind": "paraphrase",
+      "query": "계약 복창 홀드 D1은 몇 시쯤 있었던 일인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-contract-ack-askwatch"
+      ],
+      "answer_span": "2026-09-11 00:29–00:30 KST 결정은 홀드 D1이다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-020",
+      "kind": "exact_phrase",
+      "query": "홀드 기록 구간 02:35–02:43",
+      "expected_page_ids": [
+        "wiki/inbox-mail-self-log-0234"
+      ],
+      "answer_span": "홀드 기록 구간은 2026-09-11 02:35–02:43 KST다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-021",
+      "kind": "keyword",
+      "query": "홀드 D1 01:02–01:03",
+      "expected_page_ids": [
+        "wiki/inbox-kim-completion-ack"
+      ],
+      "answer_span": "Grok Bot 홀드 D1 시간은 01:02–01:03 KST다.",
+      "difficulty": "easy",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "date-022",
+      "kind": "natural_question",
+      "query": "메일 hourly는 오후까지 몇 번 실행됐나요?",
+      "expected_page_ids": [
+        "wiki/inbox-morning-afternoon-hold"
+      ],
+      "answer_span": "메일 hourly는 06:38~16:23에 11회 실행됐으며, 간격은 2시간 미만이었다.",
+      "difficulty": "medium",
+      "type_ko": "date",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-001",
+      "kind": "natural_question",
+      "query": "파트너사와 최종 고객에 마진을 다르게 적용하는 근거가 뭔가요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "파트너사는 물량과 관계를 기반으로 박리 구조를 적용하고, 최종 고객 가격에는 구축과 지원의 가치를 포함한다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-002",
+      "kind": "natural_question",
+      "query": "고객사 업무를 자체 개발보다 우선하는 이유는 뭔가요?",
+      "expected_page_ids": [
+        "wiki/me-principles-prioritization"
+      ],
+      "answer_span": "교훈: 고객 업무는 매출과 신뢰의 기반이며, 예외가 생기면 판례를 추가한다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-003",
+      "kind": "paraphrase",
+      "query": "일을 맡을지 말지 판단하는 기준이 뭐예요?",
+      "expected_page_ids": [
+        "wiki/me-principles-work-acceptance"
+      ],
+      "answer_span": "업무 관련 요청은 비용 지급이 확보되면 진행한다.",
+      "difficulty": "easy",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-004",
+      "kind": "natural_question",
+      "query": "견적서에 마진 구조를 적지 않는 이유가 뭔가요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "대외비: 이 마진 구조는 파트너·고객에게 절대 노출하지 않으며, 견적서에는 최종 금액만 기재한다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-005",
+      "kind": "natural_question",
+      "query": "sangfor-os의 mail-learning은 왜 지우지 않았나요?",
+      "expected_page_ids": [
+        "wiki/me-ops-repo-cleanup"
+      ],
+      "answer_span": "sangfor-os에서는 실운영 데이터인 mail-learning과 실제 핸드오프를 발견해 파일을 모두 보존하고 핸드오프 내용만 저널에 흡수했다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-006",
+      "kind": "natural_question",
+      "query": "레포 정리를 삭제가 아니라 백업 후 회수로 하는 이유는?",
+      "expected_page_ids": [
+        "wiki/me-ops-repo-cleanup"
+      ],
+      "answer_span": "이 결정의 목적은 파편화된 기억 시스템을 일원화하면서 실데이터를 보존하는 것이며, 정리 방식은 삭제가 아니라 백업 후 회수이다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-007",
+      "kind": "stale_decision",
+      "query": "릴리스 후보 25d49b4는 왜 최신 인수 후보가 아닌가요?",
+      "expected_page_ids": [
+        "wiki/inbox-release-defect-fix"
+      ],
+      "answer_span": "따라서 후보 25d49b4는 최신 인수 후보가 아니며, 수정 커밋으로 후보를 다시 준비해야 한다.",
+      "difficulty": "hard",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "forbidden_page_ids": [
+        "wiki/inbox-release-verification"
+      ],
+      "curation_note": "25d49b4를 인수 통과로 기록한 검증 페이지는 정정 전 판단이므로 forbidden. 두 페이지가 같은 후보를 반대로 말하므로 stale 판정이 타당하다."
+    },
+    {
+      "id": "dec-008",
+      "kind": "natural_question",
+      "query": "각주가 두 줄로 남는 결함의 원인은 무엇인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-release-defect-fix"
+      ],
+      "answer_span": "모델이 origin, span=0-480처럼 쉼표로 span을 붙이면 sb/vault.py의 각주 dedup이 이를 소유 정의로 인식하지 못하는 것이 원인이다.",
+      "difficulty": "hard",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-009",
+      "kind": "natural_question",
+      "query": "TeamViewer가 전면에 있으면 SESSION_BUSY로 보나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-order"
+      ],
+      "answer_span": "TeamViewer가 전면에 있는 것은 SESSION_BUSY가 아니다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "curation_note": "초안은 '왜 Win+D 순서로 정했나'라는 질문에 TeamViewer 문장을 붙여 두었다. 질문을 근거에 맞게 고쳤다."
+    },
+    {
+      "id": "dec-010",
+      "kind": "paraphrase",
+      "query": "카톡 분석을 로컬 Always allow로 바꾼 배경이 뭔가요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-approval-change"
+      ],
+      "answer_span": "재민은 2026-09-11 16:30 KST에 카톡 분석에서 10회 이상 승인을 요청하는 불편을 줄이기 위해 로컬 실행을 Always allow로, Auto Review의 카톡 CU 분석을 AUTO-APPROVE로 변경했다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-011",
+      "kind": "natural_question",
+      "query": "발송이나 송금은 여전히 승인 카드가 필요한가요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-approval-change"
+      ],
+      "answer_span": "발송·친구추가·메일 발송·WEHAGO 발행·Drive 휴지통·OTP·송금은 계속 승인 카드를 사용한다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-012",
+      "kind": "natural_question",
+      "query": "VERIFIED는 누가 부여할 수 있나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "완료이만 화면이나 로그를 재조회해 VERIFIED를 부여할 수 있다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-013",
+      "kind": "natural_question",
+      "query": "Notion은 무엇의 정본인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "Notion은 승인함 투영만 담당하며, 금액·단계·결제의 정본이 아니다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-014",
+      "kind": "natural_question",
+      "query": "봇 학습 메모리에 넣지 않는 정보는 무엇인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "봇 학습 메모리에 잔고·CRM 단계·다음 액션 날짜를 넣지 않는다.",
+      "difficulty": "hard",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "curation_note": "초안은 Second Brain 문장을 근거로 달아 두었다. 질문에 실제로 답하는 문장으로 교체했다."
+    },
+    {
+      "id": "dec-015",
+      "kind": "paraphrase",
+      "query": "메일 봇은 왜 분류만 하고 발송은 하지 않나요?",
+      "expected_page_ids": [
+        "wiki/inbox-mail-hourly-routine"
+      ],
+      "answer_span": "작업 범위는 분류·패킷만이며, 발송은 금지다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-016",
+      "kind": "natural_question",
+      "query": "2026-09-10은 왜 홀드 집계에서 빠졌나요?",
+      "expected_page_ids": [
+        "wiki/inbox-hold-launchagent"
+      ],
+      "answer_span": "2026-09-10은 무승인 발송·SESSION_BUSY 5건으로 제외한다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-017",
+      "kind": "natural_question",
+      "query": "김비서의 홈택스 시작 순서는 어떻게 되나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kim-completion-ack"
+      ],
+      "answer_span": "김비서 복창: 홈택스 시작 순서는 바탕화면 보기 → 홈택스 Chrome → 재민 대기이며, 카톡 lock이면 Win+D를 하지 않는다. 비번·OTP는 채팅에 쓰지 않으며, 지금은 열기·로그인을 시도하지 않는다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "dec-018",
+      "kind": "natural_question",
+      "query": "파괴적 작업은 어떤 절차로 수행하나요?",
+      "expected_page_ids": [
+        "wiki/me-identity-profile"
+      ],
+      "answer_span": "결론을 먼저 제시하고, 검증 없이 완료를 선언하지 않으며, 파괴적 작업은 승인 후 수행한다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "curation_note": "초안 질문('프리미엄 모델을 계획·리뷰에만 쓰는 이유')은 근거 문장과 맞지 않아 질문을 바꿨다."
+    },
+    {
+      "id": "dec-019",
+      "kind": "natural_question",
+      "query": "에이전트가 위키를 고치고 싶으면 어떻게 해야 하나요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "에이전트는 수정안을 diff 또는 PR 형태로 제안하고 사용자의 승인을 받는다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다. 문서가 실제로 규정하는 절차를 묻도록 고쳤다."
+    },
+    {
+      "id": "dec-020",
+      "kind": "paraphrase",
+      "query": "증류기 크론에게는 어떤 예외가 허용되나요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "예외적으로 증류기 크론은 projects/의 현황 갱신을 위한 제안 커밋을 만들 수 있지만, 머지는 사용자가 수행한다.",
+      "difficulty": "hard",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다."
+    },
+    {
+      "id": "dec-021",
+      "kind": "natural_question",
+      "query": "판단 원칙은 어떤 형태로 기록하나요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "판단 원칙은 일반 규칙이 아니라 실제 상황, 실제 결정, 그 이유를 담은 판례로 기록한다.",
+      "difficulty": "hard",
+      "type_ko": "decision",
+      "curation": "claude_curated",
+      "curation_note": "초안 질문은 문서에 없는 '이유'를 물었다."
+    },
+    {
+      "id": "dec-022",
+      "kind": "natural_question",
+      "query": "Restart to Update는 해도 되나요?",
+      "expected_page_ids": [
+        "wiki/inbox-hold-matrix"
+      ],
+      "answer_span": "Restart to Update는 금지되어 있다.",
+      "difficulty": "medium",
+      "type_ko": "decision",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-001",
+      "kind": "natural_question",
+      "query": "견적 산정은 무엇부터 확인하나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "총판가를 확인한다.",
+      "difficulty": "easy",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-002",
+      "kind": "keyword",
+      "query": "상대 유형 불명확 확인",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "상대 유형이 불명확하면 사용자에게 확인한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-003",
+      "kind": "natural_question",
+      "query": "견적 초안은 누구 승인을 받고 보내나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "견적 초안은 항상 사용자 승인을 받은 후 발송한다.",
+      "difficulty": "easy",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-004",
+      "kind": "natural_question",
+      "query": "제거할 파일은 어디에 백업하나요?",
+      "expected_page_ids": [
+        "wiki/me-ops-repo-cleanup"
+      ],
+      "answer_span": "제거 대상은 ~/unified-db/archive/에 백업하고 byte-diff로 검증한 뒤 삭제해 복원 가능성을 유지한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-005",
+      "kind": "reordered_terms",
+      "query": "정리 전 판정 스텁 실제 코드",
+      "expected_page_ids": [
+        "wiki/me-ops-repo-cleanup"
+      ],
+      "answer_span": "정리 전에 대상이 스텁·템플릿인지 실제 코드·데이터인지 먼저 판정하며, 실제 내용은 보존을 기본값으로 삼는다.",
+      "difficulty": "hard",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-006",
+      "kind": "keyword",
+      "query": "memlog write raw digest recall rollup",
+      "expected_page_ids": [
+        "wiki/me-projects-unified-db"
+      ],
+      "answer_span": "CLI는 ~/unified-db/bin/memlog이며 write, raw, digest, recall, rollup을 지원하고 날짜는 Asia/Seoul 기준이다.",
+      "difficulty": "easy",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-007",
+      "kind": "natural_question",
+      "query": "통합 DB 이벤트는 어디에 기록하나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "이벤트는 raw.events(source, kind, payload, dedup_key)에 기록한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-008",
+      "kind": "natural_question",
+      "query": "dedup_key는 어떤 규약을 따르나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "dedup_key는 <source>/<자연키> 규약을 따른다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-009",
+      "kind": "keyword",
+      "query": "T2 페이지 필요 알림",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "클라우드 모델 세션에서 T2 페이지가 필요하면 파일을 읽지 않고 사용자에게 “T2 페이지 필요”라고 알린다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-010",
+      "kind": "natural_question",
+      "query": "메일 봇 details 화면은 어떻게 들어가나요?",
+      "expected_page_ids": [
+        "wiki/inbox-mail-routine-measure"
+      ],
+      "answer_span": "메일 봇 details는 Cmd+Shift+, 후 Back to details로 접근한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-011",
+      "kind": "natural_question",
+      "query": "봇 전환은 어떤 단축키로 하나요?",
+      "expected_page_ids": [
+        "wiki/inbox-mail-routine-measure"
+      ],
+      "answer_span": "봇 전환은 Option+Down/Up으로 가능하며, 사이드바 클릭으로는 전환에 실패했다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-012",
+      "kind": "keyword",
+      "query": "Add trigger On a schedule Hourly",
+      "expected_page_ids": [
+        "wiki/inbox-mail-routine-measure"
+      ],
+      "answer_span": "대안은 Add trigger → On a schedule → Hourly와 스킬 mail-unread-event의 조합이며, 발송은 금지한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-013",
+      "kind": "natural_question",
+      "query": "Windows 카톡 작업 순서가 어떻게 되나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-order",
+        "wiki/daily-2026-09-10"
+      ],
+      "answer_span": "카톡 선택 → 작업",
+      "difficulty": "easy",
+      "type_ko": "procedure",
+      "curation": "claude_curated",
+      "curation_note": "같은 순서를 09-10 브리핑도 권고한다. 두 페이지를 모두 정답으로 인정했다."
+    },
+    {
+      "id": "proc-014",
+      "kind": "natural_question",
+      "query": "김비서 lock 중에는 어떤 조작을 피해야 하나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-order"
+      ],
+      "answer_span": "김비서 lock(홈택스 OTP) 중에는 Win+D를 사용하지 않는다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-015",
+      "kind": "paraphrase",
+      "query": "LOGIN_NEEDED가 뜨면 봇은 어떻게 대응하나요?",
+      "expected_page_ids": [
+        "wiki/inbox-contract-ack-askwatch"
+      ],
+      "answer_span": "장부 복창: SQLite는 관측 정본, Notion은 승인함만이며, WEHAGO 발행은 재민 승인 카드로 한다. LOGIN_NEEDED면 한 줄만 남기고 비밀번호를 묻지 않으며, 이 턴에는 조회·발행·로그인이 없었다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-016",
+      "kind": "natural_question",
+      "query": "apply-settings.py는 언제 파일을 쓰지 않나요?",
+      "expected_page_ids": [
+        "wiki/inbox-contract-ack-askwatch"
+      ],
+      "answer_span": "ask 유지: apply-settings.py는 설정이 이미 맞으면 파일을 쓰지 않으며, LaunchAgent com.jmpark.grokbot-askwatch가 settings.json의 WatchPaths로 회귀를 되돌린다.",
+      "difficulty": "hard",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-017",
+      "kind": "keyword",
+      "query": "SESSION_BUSY 실패 보고",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "SESSION_BUSY이면 창을 뺏지 않고 실패로 보고한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated",
+      "curation_note": "초안은 삭제된 요약 페이지를 참조했다. 계약 전문 페이지로 옮겼다."
+    },
+    {
+      "id": "proc-018",
+      "kind": "natural_question",
+      "query": "핸드오프 본문에는 무엇을 넣나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "핸드오프 본문에는 TASK-ID와 패킷 경로만 넣는다.",
+      "difficulty": "easy",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-019",
+      "kind": "natural_question",
+      "query": "vault 경로는 어떤 명령으로 해석하나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "jm-acloud에서 readlink -f /home/jm/.local/share/second-brain/vault를 실행해 심링크를 해석한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-020",
+      "kind": "paraphrase",
+      "query": "기록이는 어떤 상태만 세컨드브레인에 넘기나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "기록이는 VERIFIED만 RECORDED로 세컨드브레인에 넘긴다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-021",
+      "kind": "natural_question",
+      "query": "프론트매터 type에는 어떤 값을 쓸 수 있나요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "type에는 identity, principle, voice, person, project, ops, faq 중 하나를 사용한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-022",
+      "kind": "natural_question",
+      "query": "무보수 요청이 오면 어떻게 회신하나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-work-acceptance"
+      ],
+      "answer_span": "무보수이거나 비용이 확정되지 않은 요청은 바로 거절하지 않고 비용 조건을 묻는 회신 초안을 제안한다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-023",
+      "kind": "keyword",
+      "query": "Outlook 57302029 unread 5건 DROP WORK",
+      "expected_page_ids": [
+        "wiki/inbox-skill-tests"
+      ],
+      "answer_span": "B · mail-unread-event — PASS: Outlook 57302029의 읽지 않은 메일 5건은 DROP 4건, WORK 1건(이재윤 부라더)이며, 발송은 없었다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "proc-024",
+      "kind": "natural_question",
+      "query": "세컨드브레인 수집 결과는 몇 페이지였나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-session-unknown"
+      ],
+      "answer_span": "세컨드브레인은 sb ingest pages=4 errors=0이며, sb_search에 daily/2026-09-11이 보인다. 위키 페이지는 여전히 UNVERIFIED다.",
+      "difficulty": "medium",
+      "type_ko": "procedure",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-001",
+      "kind": "natural_question",
+      "query": "파트너사에는 마진을 몇 퍼센트 붙이나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "파트너사: 총판가에 10% 마진을 적용한다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-002",
+      "kind": "natural_question",
+      "query": "최종 고객에게는 마진을 몇 퍼센트 붙이나요?",
+      "expected_page_ids": [
+        "wiki/me-principles-pricing"
+      ],
+      "answer_span": "최종 고객: 총판가에 40% 마진을 적용한다.",
+      "difficulty": "easy",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-003",
+      "kind": "natural_question",
+      "query": "5433과 5434 포트는 각각 무엇이 쓰나요?",
+      "expected_page_ids": [
+        "wiki/me-projects-unified-db"
+      ],
+      "answer_span": "5434 포트는 sangfor-postgres가 사용한다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-004",
+      "kind": "paraphrase",
+      "query": "T0와 T1 등급은 어떻게 다른가요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "T0는 공개 가능한 정보이며 모든 모델과 모든 용도에서 사용할 수 있다. T1은 일반 업무 정보이며 클라우드 LLM 컨텍스트에서 사용할 수 있는 기본 등급이다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-005",
+      "kind": "natural_question",
+      "query": "T3 등급은 누가 읽을 수 있나요?",
+      "expected_page_ids": [
+        "wiki/me-agent-rules"
+      ],
+      "answer_span": "T3는 어떤 에이전트도 읽지 않는 금지 정보이며 암호화 대상이다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-006",
+      "kind": "stale_decision",
+      "query": "25d49b4에 대한 검증 기록과 정정 기록 중 어느 쪽이 최신 판단인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-release-defect-fix"
+      ],
+      "answer_span": "따라서 후보 25d49b4는 최신 인수 후보가 아니며, 수정 커밋으로 후보를 다시 준비해야 한다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated",
+      "forbidden_page_ids": [
+        "wiki/inbox-release-verification"
+      ],
+      "curation_note": "검증 페이지는 정정 전 판단이므로 forbidden, 정정 페이지가 gold."
+    },
+    {
+      "id": "cmp-007",
+      "kind": "natural_question",
+      "query": "릴리스 후보 권고는 09-10 브리핑에서 어떻게 정정됐나요?",
+      "expected_page_ids": [
+        "wiki/daily-2026-09-11"
+      ],
+      "answer_span": "이전 브리핑의 릴리스 인수 추천을 정정하고, 각주 중복 결함을 수정한 커밋으로 후보를 다시 준비하세요. 25d49b4는 최신 인수 후보가 아닙니다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-008",
+      "kind": "exact_phrase",
+      "query": "00:43:33에서 01:26:15까지 간격",
+      "expected_page_ids": [
+        "wiki/inbox-mail-tick-0126"
+      ],
+      "answer_span": "메일 봇 mail-unread-event의 마지막 실행은 2026-09-11 01:26:15 KST이며, 상태는 succeeded이고 직전 00:43:33 실행으로부터 약 43분 간격이다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-009",
+      "kind": "paraphrase",
+      "query": "메일 루틴 실행 간격은 얼마나 들쭉날쭉했나요?",
+      "expected_page_ids": [
+        "wiki/inbox-mail-tick-0126"
+      ],
+      "answer_span": "unread 재분류·발송은 없었으며, 실행 간격은 85·59·43분으로 불규칙하다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-010",
+      "kind": "natural_question",
+      "query": "권한 점수는 승인 완화 전후로 어떻게 달라졌나요?",
+      "expected_page_ids": [
+        "wiki/inbox-kakao-approval-change"
+      ],
+      "answer_span": "권한 점수는 8에서 6으로 변경됐다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-011",
+      "kind": "natural_question",
+      "query": "연결됨이나 초안은 완료로 보나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "연결됨·등록됨·명령 전송·초안은 완료가 아니다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated",
+      "curation_note": "초안은 삭제된 요약 페이지를 참조했다. 계약 전문 페이지로 옮겼다."
+    },
+    {
+      "id": "cmp-012",
+      "kind": "natural_question",
+      "query": "SQLite와 Notion의 역할은 어떻게 나뉘나요?",
+      "expected_page_ids": [
+        "wiki/inbox-ops-contract-full"
+      ],
+      "answer_span": "SQLite(jm-business.db)는 은행·WEHAGO·메일 원문 해시를 포함한 관측 패킷의 정본이다. Notion은 승인함 투영만 담당하며, 금액·단계·결제의 정본이 아니다.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-013",
+      "kind": "paraphrase",
+      "query": "09-10 기준으로 윤비서의 어떤 보고가 24시간을 넘겼나요?",
+      "expected_page_ids": [
+        "wiki/inbox-yun-last-run"
+      ],
+      "answer_span": "윤비서 last run 자기보고는 아침 보고 2026-09-10 09:06:41 KST(<24h), 퇴근 보고 2026-09-09 18:02:12 KST(>24h), 협업 점검 2026-09-09 19:21:43 KST(>24h)다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-014",
+      "kind": "natural_question",
+      "query": "BLRO OS의 이전 스타터 경로는 지금도 기준인가요?",
+      "expected_page_ids": [
+        "wiki/me-projects-blro-os"
+      ],
+      "answer_span": "이전 스타터는 ~/Downloads/01.Pilot_Coding/blro_company_ops_agentic_os_bundle/starter에 있지만 현재 기준은 아니다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-015",
+      "kind": "natural_question",
+      "query": "jarvis-ai는 개발 중인가요 완료인가요?",
+      "expected_page_ids": [
+        "wiki/me-projects-jarvis-ai"
+      ],
+      "answer_span": "상태: 개발 중.",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-016",
+      "kind": "exact_phrase",
+      "query": "hold 스냅샷 12:05 15:05 추가",
+      "expected_page_ids": [
+        "wiki/inbox-contract-ack-askwatch"
+      ],
+      "answer_span": "hold 스냅샷 시각에 12:05·15:05를 추가했으며, 7일 실사용은 아직 미증이다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "cmp-017",
+      "kind": "natural_question",
+      "query": "7일 홀드 완료 판정은 지금 어떤 상태인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-morning-afternoon-hold",
+        "wiki/inbox-evening-collab",
+        "wiki/inbox-hold-2130"
+      ],
+      "answer_span": "seven_day_complete=false",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated",
+      "curation_note": "세 관측 페이지가 같은 판정을 기록한다. 임의로 한 페이지로 좁히지 않았다."
+    },
+    {
+      "id": "cmp-018",
+      "kind": "keyword",
+      "query": "15:12 일에이엔 혼입 발송",
+      "expected_page_ids": [
+        "wiki/inbox-morning-afternoon-hold",
+        "wiki/inbox-evening-collab",
+        "wiki/inbox-hold-2130",
+        "wiki/daily-2026-09-11"
+      ],
+      "answer_span": "15:12 일에이엔 혼입 발송",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated",
+      "curation_note": "같은 사건이 세 관측 페이지와 09-11 브리핑에 기록돼 있다."
+    },
+    {
+      "id": "cmp-019",
+      "kind": "natural_question",
+      "query": "윤비서 세 루틴의 마지막 실행 시각은 각각 언제인가요?",
+      "expected_page_ids": [
+        "wiki/inbox-evening-collab",
+        "wiki/inbox-hold-2130"
+      ],
+      "answer_span": "09:05:47",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated",
+      "curation_note": "퇴근·협업 관측과 21:30 관측이 같은 시각을 기록한다."
+    },
+    {
+      "id": "cmp-020",
+      "kind": "keyword",
+      "query": "mail-unread-event 마지막 실행",
+      "expected_page_ids": [
+        "wiki/inbox-mail-tick-0043",
+        "wiki/inbox-mail-tick-0126"
+      ],
+      "answer_span": "메일 봇 mail-unread-event의 마지막 실행은",
+      "difficulty": "medium",
+      "type_ko": "comparison",
+      "curation": "claude_curated",
+      "curation_note": "00:43 관측과 01:26 관측 모두 이 질의에 정당하게 답한다. 초안처럼 한쪽으로 좁히지 않았다."
+    },
+    {
+      "id": "cmp-021",
+      "kind": "paraphrase",
+      "query": "스텁 제거와 앱 코드 보존은 어떻게 갈렸나요?",
+      "expected_page_ids": [
+        "wiki/me-ops-repo-cleanup"
+      ],
+      "answer_span": "aios-jarvis와 ragflow의 memory/에는 실제 앱 코드가 섞여 있어 스텁만 선별 제거하고 앱 모듈은 보존했다.",
+      "difficulty": "hard",
+      "type_ko": "comparison",
+      "curation": "claude_curated"
+    },
+    {
+      "id": "neg-001",
+      "kind": "no_answer",
+      "query": "베를로의 연간 매출액은 얼마인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "easy",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "vault에 매출 수치가 없다."
+    },
+    {
+      "id": "neg-002",
+      "kind": "no_answer",
+      "query": "박재민이 다니는 헬스장은 어디인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "easy",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "개인 생활 정보가 vault에 없다."
+    },
+    {
+      "id": "neg-003",
+      "kind": "no_answer",
+      "query": "BLRO OS의 정식 출시일은 언제인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "MVP 개발 중이라는 서술만 있고 출시일이 없다."
+    },
+    {
+      "id": "neg-004",
+      "kind": "no_answer",
+      "query": "jarvis-ai의 담당 디자이너는 누구인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "디자이너 역할이 vault에 없다."
+    },
+    {
+      "id": "neg-005",
+      "kind": "no_answer",
+      "query": "unified-db의 백업 주기는 며칠인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "백업 주기 기록이 없다."
+    },
+    {
+      "id": "neg-006",
+      "kind": "no_answer",
+      "query": "40% 마진이 처음 적용된 실제 견적 건은 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "hard",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "마진 원칙만 있고 개별 견적 사례가 없다."
+    },
+    {
+      "id": "neg-007",
+      "kind": "no_answer",
+      "query": "agentgauge의 다음 릴리스 버전 번호는 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "버전 번호가 기록돼 있지 않다."
+    },
+    {
+      "id": "neg-008",
+      "kind": "no_answer",
+      "query": "친구추가 승인 정책을 처음 만든 날짜는 언제인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "hard",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "승인 대상 목록만 있고 제정일이 없다."
+    },
+    {
+      "id": "neg-009",
+      "kind": "no_answer",
+      "query": "T3로 분류된 실제 파일 목록은 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "hard",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "T3 정의만 있고 목록이 없다(있어도 읽지 않는 등급)."
+    },
+    {
+      "id": "neg-010",
+      "kind": "no_answer",
+      "query": "윤비서 인앱 스킬 5개의 이름은 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "hard",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "5개 저장 주장만 있고 이름은 미실측이다."
+    },
+    {
+      "id": "neg-011",
+      "kind": "no_answer",
+      "query": "25d49b4 다음 릴리스 후보의 커밋 해시는 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "hard",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "다시 준비해야 한다는 서술만 있고 새 해시가 없다."
+    },
+    {
+      "id": "neg-012",
+      "kind": "no_answer",
+      "query": "베를로의 파트너사 목록에는 어떤 회사가 있나요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "파트너 구조만 있고 회사 목록이 없다."
+    },
+    {
+      "id": "neg-013",
+      "kind": "no_answer",
+      "query": "김비서 봇은 어떤 언어로 만들어졌나요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "구현 언어 기록이 없다."
+    },
+    {
+      "id": "neg-014",
+      "kind": "no_answer",
+      "query": "일지테크 파일서버 이관의 완료 예정일은 언제인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "hard",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "역할 소개만 있고 일정이 없다."
+    },
+    {
+      "id": "neg-015",
+      "kind": "no_answer",
+      "query": "unified-db Postgres 컨테이너의 이미지 태그는 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "Docker 운영 사실만 있고 이미지 태그가 없다."
+    },
+    {
+      "id": "neg-016",
+      "kind": "no_answer",
+      "query": "베를로의 사업자등록번호는 무엇인가요?",
+      "expected_page_ids": [],
+      "answer_span": null,
+      "difficulty": "medium",
+      "type_ko": "no_data",
+      "curation": "claude_curated",
+      "curation_note": "등록번호가 vault에 없다."
+    }
+  ]
+}
