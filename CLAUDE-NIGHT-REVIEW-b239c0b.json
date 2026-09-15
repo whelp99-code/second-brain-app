@@ -1,0 +1,41 @@
+{
+ "author": "Claude Fable 5.1",
+ "created_at": "2026-09-15T04:24:00.141466+00:00",
+ "submission": "b239c0b",
+ "product_pin": "83a7abab630a81c0c3b3d3565e533f26ad6caa62",
+ "candidate": "/var/tmp/sb-candidate-83a7aba/releases/8ea65a7d968fdcf99560f449b2a1ad656a99a2e9",
+ "wheel_sha256": "6bc94e226c0158ab2ee517a344efc3d0c07faddcf75eb27868dafd46d1f965ba",
+ "identity": {
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "hook_sha256": "54ef6c71c686f7de2f9f63cbcffec37e2ddce8181fb83f490547035434e1401b"
+ },
+ "product_change": "sb/postcompact_hook.py only (0f0dd84): stage directory opened O_DIRECTORY|O_NOFOLLOW, stage file written via O_NOFOLLOW|O_NONBLOCK fd with S_ISREG check, ftruncate, fsync; HOOK_STAGE_UNSAFE on any unsafe kind",
+ "direct_checks": {
+  "H1 tests/test_m3_open_connection_rollback.py": "3 passed (two stdio sessions deny after revoke; old config cannot revive revoked key; rollback compat allowed=false when store present)",
+  "H2 test_held_path_safety+test_postcompact_hook+test_revoked_keys": "53 passed (fifo/dir/symlink/dangling for stage file, stage dir, revocation store; regular file still writes)",
+  "H3 tests/test_delete_compile_race.py": "3 passed incl. real two-subprocess writer serialization then forget wins",
+  "H4 tests/test_pre_delete_backup_lifetime.py": "1 passed (post-forget backup restore stays empty after reindex)",
+  "tests/test_rollback_compat.py": "3 passed",
+  "ruff": "All checks passed",
+  "basedpyright": "0 errors / 58 warnings in the repo venv (harness archive showed 2 'mcp' import errors = harness env only)",
+  "probes on 8ea65a7 candidate": "inturn 17/17, quality 7/7, hangul 3/3",
+  "full_regression": "1924 passed / 3 skipped / 670.32s / EXIT0"
+ },
+ "verdict": "ACCEPTED (isolated) - full regression passed; promoted to ops app root release 8ea65a7",
+ "notes": [
+  {
+   "id": "H4-scope",
+   "severity": "note",
+   "issue": "New H4 test covers a backup taken after forget. The pre-delete backup case (backup contains the record, delete, restore must not re-expose) is covered by existing tests/test_restore.py::test_restore_shifted_deleted_record_cannot_survive_signed_restore and the M12 DR harness (tombstone high-water, deleted_records=0 after restore); no new gap, but the directive wording asked for it explicitly - recorded as covered-elsewhere."
+  },
+  {
+   "id": "ops",
+   "severity": "note",
+   "issue": "Ops SB current is still 2ccf0267 (8d1f8cc). If the full regression passes, promote b239c0b/83a7aba to the app root and relink (hook-only change; derived index schema unchanged so no generation rebuild expected)."
+  }
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la"
+}

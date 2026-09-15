@@ -1,0 +1,96 @@
+{
+ "author": "Claude Fable 5.1 overnight session",
+ "created_at": "2026-09-13T13:10:14.628945+00:00",
+ "submission": "7de7c6f",
+ "product_pin": "f475adb44e87f4c3d63a7aee726fed37f41c291a",
+ "candidate": "/var/tmp/sb-candidate-f475adb/releases/b277adcc789a27aa4f69b8525acca9100d61763e",
+ "wheel_sha256": "35ea42744ef7b05e02ec8a8f456c3fad90d96532b5fb5c58c57e37257844de02",
+ "identity": {
+  "archive_sha256": "b93ed003626254277fd7924ec5ff5a2c398c9b5395f1f4946766f8e1d909bbf3",
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "hook_sha256": "765d2b6d10e4cd94d316efc8624ed1f750e5ecf9df81d3fc47e69282459fafc6"
+ },
+ "direct_checks": {
+  "pytest": "24 passed / 1.65s EXIT0",
+  "ruff": "EXIT0",
+  "basedpyright": "0 errors / 13 warnings / EXIT1",
+  "probe_inturn": "15/17",
+  "probe_quality": "3/7"
+ },
+ "probe_inturn": {
+  "compact_before_prompt_is_empty_exit0": true,
+  "first_prompt_no_stage_empty": true,
+  "startup_source_empty": true,
+  "compact_inturn_event_is_SessionStart": true,
+  "compact_inturn_has_omega_not_theta": true,
+  "compact_inturn_within_budget": true,
+  "postcompact_same_stages_empty": true,
+  "prompt_after_same_not_reinjected": true,
+  "postcompact_other_empty": true,
+  "prompt_after_other_only_theta": true,
+  "hookreplaced_order_inturn_theta": true,
+  "hookreplaced_order_remainder_omega_only": false,
+  "second_compaction_new_epoch_reinjects_last_query": false,
+  "prompt_after_second_compact_empty": true,
+  "realistic_summary_next_prompt_injects_omega": true,
+  "realistic_prompt_compact_inturn_injects_omega": true,
+  "all_exit0": true
+ },
+ "probe_quality": {
+  "late_target_selected": false,
+  "late_target_ranked_first": false,
+  "late_target_not_only_noise": false,
+  "quote_token_no_crash_exit0": true,
+  "quote_token_still_selects_omega": true,
+  "hangul_prompt_compact_selects_omega": true,
+  "stage_does_not_store_raw_prompt": false
+ },
+ "verdict": "NOT ACCEPTED (closer): multi-word summary/prompt now selects records; remaining: content-free prompt overwrites last_query, SessionStart stage discards pending PostCompact remainder in hook-replaced order, first-8-token term choice misses late targets and lets noise pages fill the budget, raw prompt persisted, D2 classification and installed-unit rows",
+ "findings": [
+  {
+   "id": "C1",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py UserPromptSubmit _remember_last_query / _bound_query_text",
+   "issue": "Every prompt overwrites last_query, including content-free ones. Probe: after prompts 'continue' / 'go on', stage last_query='go on' -> second SessionStart(compact) returns {} (s8); inturn-2 last_query='go'. Real sessions are full of 'ok/continue/yes' prompts, so the in-turn reselect at the next compaction degrades to nothing.",
+   "completion": "Update last_query only when the prompt yields >=1 hook term (non-stop, len>=3) - no longest-token fallback for prompts; otherwise keep the prior query. Probe second_compaction_new_epoch_reinjects_last_query must pass."
+  },
+  {
+   "id": "C2",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py SessionStart branch _write_stage",
+   "issue": "Hook-replaced order (PostCompact first, then SessionStart compact): SessionStart writes a fresh stage with its own records and delivered_in_turn=None, discarding the pending undelivered PostCompact remainder. Probe t2->t3->t4: PostCompact staged Omega+Theta, SessionStart delivered Theta, next prompt {} (Omega lost).",
+   "completion": "On SessionStart(compact): deliver in-turn records; keep prior undelivered PostCompact records minus the in-turn set as the pending remainder (delivered=False) in the same stage; new epoch delivered_in_turn = in-turn set only. Probe hookreplaced_order_remainder_omega_only must pass."
+  },
+  {
+   "id": "C3",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py _hook_terms/_hook_search (_MAX_HOOK_TERMS=8, first-come order)",
+   "issue": "Terms are the first 8 non-stop tokens in text order. quality-probe q1/q2: a realistic 60-word summary whose target OmegaInturnTarget appears after the preamble -> Omega never searched; all 8 slots filled by noise pages matching preamble words (deployment, dashboard, gateway...). late_target_selected=false, ranked_first=false. The _HOOK_STOP list is fitted to earlier probe sentences and is not a general solution.",
+   "completion": "Select terms by distinctiveness, not position: gather up to 32 distinct candidate tokens (stop/short removed), query each, weight term by rarity (e.g. 1/hit-count, drop terms with 0 or too many hits), rank records by summed weight then engine rank; cap MAX_ITEMS. Keep sb search AND contract untouched. Probe: late_target_selected, late_target_ranked_first, late_target_not_only_noise."
+  },
+  {
+   "id": "C4",
+   "severity": "ordinary",
+   "location": "sb/postcompact_hook.py _bound_query_text -> stage last_query",
+   "issue": "The raw prompt (up to 4096 bytes) is persisted verbatim in state_root/.sb/session-memory/<session>.json (stage_does_not_store_raw_prompt=false). Directive: store derived bounded terms, not prompt text.",
+   "completion": "Persist only the derived term tuple (bounded), never the prompt body."
+  },
+  {
+   "id": "C5",
+   "severity": "ordinary",
+   "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md D2 table and installed-file paragraph",
+   "issue": "(a) states row says 'row present -> forbid current' which conflates terminal rows (memory_outbox settled/expired per Orca-JARVIS migrations/033 transition trigger) with unresolved ones (queued/delivering/accepted_unsettled/uncertain); other tables' value sets unknown -> must be 'unclassified => stop'. (b) installed-unit paragraph lost the exact observed rows (ConditionPathExists=/home/jm/.config/second-brain/request-executor.enabled, WorkingDirectory/ExecStart absolute current paths, Environment=SB_CONFIG=/home/jm/.config/second-brain/config.toml, drop-in 20-runtime.conf) and the observation time.",
+   "completion": "Per-table state classification with unresolved/terminal/unclassified columns and {table: []} vs count>0; restore exact installed rows with time."
+  }
+ ],
+ "passed": [
+  "7de7c6f archive: 183 files identical to wheel/installed; manifest source f475adb",
+  "real-shaped SessionStart(compact) + PostCompact + UserPromptSubmit sequence: 15/17 inturn assertions incl. realistic multi-word summary and prompt, source!=compact {}, in-turn/PostCompact dedupe within epoch, quote tokens no crash, Hangul+ASCII prompt",
+  "D1 fixed; D3 slots and doctor/search examples present; constraint doc restored JARVIS consumer/digest/stdout sections, matcher compact, PostCompact additionalContext not consumed",
+  "24 tests, Ruff clean, sb search AND unchanged"
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la"
+}

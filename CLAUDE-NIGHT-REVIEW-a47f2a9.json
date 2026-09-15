@@ -1,0 +1,94 @@
+{
+ "author": "Claude Fable 5.1 overnight session (Codex reviewer role taken over 2026-09-13)",
+ "created_at": "2026-09-13T12:56:35.179488+00:00",
+ "submission": "a47f2a9739a41e439d294135b77411a130f404d8",
+ "product_pin": "5680155ba6db21712f159aa08c9d030dbb0c637f",
+ "candidate": "/var/tmp/sb-candidate-5680155/releases/64274fd223c84bde58cde3c9029d3515062e4a40",
+ "wheel_sha256": "c79ebc0bbd5c0dbb2ed158c59d21f265c57bf1fc450755942100371e22c7223c",
+ "identity": {
+  "archive_sha256": "94dc327af293ca36340f5b7a743a775736fe399838762144f083e77669bd41d9",
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "test_file_sha256": {
+   "tests/test_postcompact_hook.py": "9ef73576a8f0fd4efdd4abe4789a1a6f8e32b98c6e25e26b69dc9026f2ace522"
+  },
+  "hook_sha256": "263b5c392facfb198dd3334c193b4c144ce5dbd079a387498448f9b30ee10aec"
+ },
+ "direct_checks": {
+  "pytest": "21 passed / 1.57s EXIT0",
+  "ruff": "EXIT0",
+  "basedpyright": "0 errors / 13 warnings / EXIT1",
+  "probe": "inturn-probe-5680155.json 17 assertions: 10 pass / 7 fail",
+  "baseline_probe": "inturn-probe-baseline-a41b70d.json (same realistic-summary failure)"
+ },
+ "verdict": "NOT ACCEPTED: hook query selection is an all-terms conjunction, so any multi-word compaction summary or user prompt yields no records and no injection (pre-existing since PostCompact hook; also on a41b70d); in-turn dedupe set accumulates across compactions; D2/D3/constraint-doc residuals",
+ "probe_assertions": {
+  "compact_before_prompt_is_empty_exit0": true,
+  "first_prompt_no_stage_empty": true,
+  "startup_source_empty": true,
+  "compact_inturn_event_is_SessionStart": false,
+  "compact_inturn_has_omega_not_theta": false,
+  "compact_inturn_within_budget": true,
+  "postcompact_same_stages_empty": true,
+  "prompt_after_same_not_reinjected": false,
+  "postcompact_other_empty": true,
+  "prompt_after_other_only_theta": true,
+  "hookreplaced_order_inturn_theta": false,
+  "hookreplaced_order_remainder_omega_only": false,
+  "second_compaction_new_epoch_reinjects_last_query": false,
+  "prompt_after_second_compact_empty": true,
+  "realistic_summary_next_prompt_injects_omega": false,
+  "realistic_prompt_compact_inturn_injects_omega": false,
+  "all_exit0": true
+ },
+ "findings": [
+  {
+   "id": "B5",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py select_search_query + _serialize/_matching_records; sb/search_query.py LexicalQuery.matches_record (all-terms by design)",
+   "issue": "select_search_query keeps up to 32 whitespace tokens of the summary/prompt and the hook then requires EVERY token to appear in a record (index predicate AND + matches_record all()). Frozen candidate: PostCompact compact_summary 'Session summary: the user asked about OmegaInturnTarget in the notes and we reviewed it; next step is to continue the write-up.' -> stage empty, next UserPromptSubmit {} (r1/r2). UserPromptSubmit prompt 'Can you remind me what the notes say about OmegaInturnTarget before I continue?' then SessionStart(compact) -> {} (r3/r4). Even 'OmegaInturnTarget please' -> {} (s3). Unit tests pass only because fixtures use single-token or repeated-token summaries (e.g. 'OmegaCompiledBody '*400 dedupes to one group). Same result on prior candidate a41b70d. Effective real-session behaviour of the whole M9 hook path is no_data.",
+   "completion": "Hook-level selection must tolerate natural text without changing the sb search contract: e.g. derive candidate terms (drop very short/stop tokens, keep bounded count), search per term or per small term group, aggregate records by number of matched terms then engine relevance, bounded by MAX_ITEMS/budget; keep record identity/version/source_ref/dedupe/budget. Tests and probes must use multi-word summaries and prompts (assertions r1-r4, s3 in probe-inturn.py)."
+  },
+  {
+   "id": "B2b",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py confirm_delivery/_write_stage delivered_in_turn",
+   "issue": "delivered_in_turn is carried forward on every stage write and appended on every confirm; it is never reset. After a later compaction the same still-relevant record is excluded forever in the session, so SessionStart(compact) #2 and its PostCompact inject nothing (probe s8 -> {} with last_query present; also depends on B5).",
+   "completion": "Scope the exclusion set to one compaction epoch: SessionStart(compact) starts a new epoch (delivered_in_turn := records delivered now, not prior+now); PostCompact of that epoch excludes only that set; UserPromptSubmit confirm may add within the epoch. Probe: second_compaction_new_epoch_reinjects_last_query."
+  },
+  {
+   "id": "A-D2",
+   "severity": "ordinary",
+   "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:55-56",
+   "issue": "ops review :55-56 still lists states keys gjc_runtime/gjc_intents/gjc_intent_leases/gjc_microloop_leases and counts unexpired_lease_rows/invalid_lease_rows which do not exist in deploy/check-jarvis-pending-state.py (STATES: memory_outbox, memory_outbox_attempts, memory_candidate_dispatch_publications, collaboration_bridge_outbox, pre_gjc_report_outbox, outbox; COUNTS: cursor_rows, active_cursor_rows, gjc_lease_rows, microloop_lease_rows; leases: gjc_runtime_leases, microloop_leases with unexpired/expired/invalid)",
+   "completion": "replace with real keys; state/outcome value classification rule; {table: []} vs count>0"
+  },
+  {
+   "id": "A-D3",
+   "severity": "ordinary",
+   "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:68-72",
+   "issue": "slots RESTORED_ROOT/VERIFY_CONFIG present; VERIFY_STATE_ROOT/VERIFY_REQUEST_ROOT/VERIFY_QUERY missing; mapping table vault_root->RESTORED_ROOT, state_root/request_root->independent slots missing",
+   "completion": "add the three slots and mapping table; keep doctor/search examples"
+  },
+  {
+   "id": "B4-doc",
+   "severity": "ordinary",
+   "location": "GROK-M9-SESSION-COMPACTION-CONSTRAINT-2026-09-13.md",
+   "issue": "GROK-M9-SESSION-COMPACTION-CONSTRAINT: JARVIS consumer (JARVIS_MODEL_TRANSPORT_CMD exit0 accepted; FileModelTransport not consumer), event digest lifetime, and stdout-failure/no-ACK sections were deleted although still true; PostCompact additionalContext-ignored fact and prompt-based query limitation (summary reselection lands at next prompt) not stated; SessionStart registration example lacks matcher compact",
+   "completion": "restore the three sections; add the two facts; add matcher"
+  }
+ ],
+ "passed": [
+  "a47f2a9 archive: source/wheel/installed 183 files identical; manifest source_commit 5680155; wheel sha matches",
+  "documented SessionStart(compact) input without summary no longer exits 2; missing last_query -> {} exit 0; source!=compact -> {} exit 0 (probe s0,s2 pass)",
+  "PostCompact excludes in-turn delivered record_id+version within an epoch (probe s7 pass)",
+  "UserPromptSubmit records bounded last_query; D1 fixed (SB_CONFIG row removed, config.py:184-192 order, absolute path); not_complete keeps M9_native_session",
+  "21 hook tests, Ruff clean"
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la",
+ "claude_contract_evidence": "/var/tmp/claude-night-e53dd66-GBr0la/claude-2.1.270-hook-contract.json",
+ "held": "unchanged",
+ "external": "native logged-in session, ops cutover, real task, gold set, RPO/RTO unchanged"
+}

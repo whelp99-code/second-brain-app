@@ -1,0 +1,86 @@
+{
+ "author": "Claude Fable 5.1 overnight session",
+ "created_at": "2026-09-13T13:53:34.720728+00:00",
+ "submission": "46a3d60",
+ "product_pin": "e02bc15072d77968d02d7d746ad9e504d8d9983a",
+ "candidate": "/var/tmp/sb-candidate-e02bc15/releases/34429e1eed029a3ac000daa561f26c2432c2d8a0",
+ "wheel_sha256": "e715b968d4ca338d47d17b67151685f37f68351c808f9ca48caa51dcd3e4ae19",
+ "identity": {
+  "archive_sha256": "c181c17622c4ebebaec22c070332012d50fa0cfbe1b1b1086d71ec3e26a8e4bd",
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "hook_sha256": "a6a394045b3b6792e62da0fc1247b2d5f0fb29c771cc60c8aa0aa15afdb8898a"
+ },
+ "direct_checks": {
+  "pytest": "29 passed / 2.21s EXIT0",
+  "ruff": "EXIT0",
+  "basedpyright": "0 errors / 22 warnings / EXIT1",
+  "probe_inturn": "17/17",
+  "probe_quality": "6/7",
+  "check_docs": "10/10"
+ },
+ "probe_inturn": {
+  "compact_before_prompt_is_empty_exit0": true,
+  "first_prompt_no_stage_empty": true,
+  "startup_source_empty": true,
+  "compact_inturn_event_is_SessionStart": true,
+  "compact_inturn_has_omega_not_theta": true,
+  "compact_inturn_within_budget": true,
+  "postcompact_same_stages_empty": true,
+  "prompt_after_same_not_reinjected": true,
+  "postcompact_other_empty": true,
+  "prompt_after_other_only_theta": true,
+  "hookreplaced_order_inturn_theta": true,
+  "hookreplaced_order_remainder_omega_only": true,
+  "second_compaction_new_epoch_reinjects_last_query": true,
+  "prompt_after_second_compact_empty": true,
+  "realistic_summary_next_prompt_injects_omega": true,
+  "realistic_prompt_compact_inturn_injects_omega": true,
+  "all_exit0": true
+ },
+ "probe_quality": {
+  "late_target_selected": true,
+  "late_target_ranked_first": false,
+  "late_target_not_only_noise": true,
+  "quote_token_no_crash_exit0": true,
+  "quote_token_still_selects_omega": true,
+  "hangul_prompt_compact_selects_omega": true,
+  "stage_does_not_store_raw_prompt": true
+ },
+ "verdict": "ACCEPTED for the bounded ordinary scope (M9 in-turn compaction connection on Claude Code 2.1.270 public hooks, isolated synthetic verification; D1-D3 ops docs). One ordinary ranking residual delivered as non-blocking followup. Native logged-in session, ops cutover and the original A-F/M1-M14 full acceptance remain NOT complete.",
+ "findings": [
+  {
+   "id": "Q1",
+   "severity": "ordinary",
+   "location": "sb/postcompact_hook.py _weighted_terms/_hook_search (instr substring hits)",
+   "issue": "Short common tokens matching inside identifiers get rarity weight: in quality-probe the token 'Later' hits only wiki/theta because it is a substring of 'ThetaLaterTarget' (weight 1.0), so theta outranks omega (target is #2 of 8, still injected). Also the 32-token cap dropped 'window'/'confirmed' which would have boosted omega. late_target_ranked_first=false; all other 6 quality assertions pass.",
+   "completion": "Non-blocking: e.g. require whole-word (boundary) match for short tokens (<6 chars) when computing hits, or scale weight by token length; keep sb search contract unchanged. Probe late_target_ranked_first."
+  },
+  {
+   "id": "T1",
+   "severity": "ordinary",
+   "location": "tests/test_postcompact_hook.py",
+   "issue": "basedpyright 22 warnings (0 errors).",
+   "completion": "optional cleanup"
+  }
+ ],
+ "passed": [
+  "46a3d60 archive: 183 files identical to wheel/installed; manifest source e02bc15",
+  "probe-inturn 17/17 on the frozen candidate CLI with documented input shapes: SessionStart(source=compact) in-turn injection from last_query, source!=compact {}, PostCompact staging, epoch dedupe, hook-replaced order remainder, content-free prompts do not clobber last_query, realistic multi-word summary/prompt, budgets, all exit 0",
+  "quality 6/7: late target selected via frequency/identifier/length token ranking + 1/hit weighting; quote tokens no crash; Hangul+ASCII prompt; stage stores derived terms only",
+  "check-docs 10/10 (D1-D3), constraint doc (2.1.270 SessionStart compact, PostCompact additionalContext not consumed, JARVIS consumer/digest/stdout sections, matcher compact), readiness JSON keeps M9_native_session",
+  "29 hook tests, Ruff clean, sb search AND contract unchanged"
+ ],
+ "not_complete": [
+  "M9_native_session (no logged-in native run)",
+  "ops_cutover",
+  "M5",
+  "M13_deferred",
+  "security_delete_race_branches (held, not retried)",
+  "A-F/M1-M14 full acceptance"
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la",
+ "claude_contract_evidence": "/var/tmp/claude-night-e53dd66-GBr0la/claude-2.1.270-hook-contract.json"
+}

@@ -1,0 +1,92 @@
+{
+ "author": "Claude Fable 5.1 overnight session",
+ "created_at": "2026-09-13T14:05:23.163064+00:00",
+ "submission": "9d2041f",
+ "product_pin": "8d1f8ccd98ee32ee429a7d762c4b60d65e0c8e56",
+ "candidate": "/var/tmp/sb-candidate-8d1f8cc/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3",
+ "wheel_sha256": "60d66ad6c3d488af843e7132eea2d7104528fb9b0c06ce732d110a2f4ca189f1",
+ "identity": {
+  "archive_sha256": "07072615bc69b947eca07a28036a838fd4996626cea50ec63749c23ebb5be02d",
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "hook_sha256": "8d10bcd10b7092ab73100a164507e3273eb3e443964f4deca35286bc08b832dd"
+ },
+ "direct_checks": {
+  "pytest": "30 passed / 2.19s EXIT0",
+  "ruff": "EXIT0",
+  "basedpyright": "0 errors / 24 warnings / EXIT1",
+  "probe_inturn": "17/17",
+  "probe_quality": "7/7",
+  "probe_hangul": "3/3",
+  "check_docs": "10/10",
+  "full_regression": "1904 passed / 3 skipped / 640.09s / EXIT0"
+ },
+ "probe_inturn": {
+  "compact_before_prompt_is_empty_exit0": true,
+  "first_prompt_no_stage_empty": true,
+  "startup_source_empty": true,
+  "compact_inturn_event_is_SessionStart": true,
+  "compact_inturn_has_omega_not_theta": true,
+  "compact_inturn_within_budget": true,
+  "postcompact_same_stages_empty": true,
+  "prompt_after_same_not_reinjected": true,
+  "postcompact_other_empty": true,
+  "prompt_after_other_only_theta": true,
+  "hookreplaced_order_inturn_theta": true,
+  "hookreplaced_order_remainder_omega_only": true,
+  "second_compaction_new_epoch_reinjects_last_query": true,
+  "prompt_after_second_compact_empty": true,
+  "realistic_summary_next_prompt_injects_omega": true,
+  "realistic_prompt_compact_inturn_injects_omega": true,
+  "all_exit0": true
+ },
+ "probe_quality": {
+  "late_target_selected": true,
+  "late_target_ranked_first": true,
+  "late_target_not_only_noise": true,
+  "quote_token_no_crash_exit0": true,
+  "quote_token_still_selects_omega": true,
+  "hangul_prompt_compact_selects_omega": true,
+  "stage_does_not_store_raw_prompt": true
+ },
+ "probe_hangul": {
+  "hangul_prompt_compact_selects_deploy": true,
+  "hangul_summary_prompt_selects_deploy": true,
+  "all_exit0": true
+ },
+ "verdict": "ACCEPTED for the bounded ordinary scope: M9 in-turn compaction connection on Claude Code 2.1.270 public hooks (SessionStart source=compact / PostCompact / UserPromptSubmit) with isolated synthetic verification, plus D1-D3 ops docs. No blocking residual. Native logged-in run, ops cutover, held branches and A-F/M1-M14 full acceptance remain NOT complete.",
+ "notes": [
+  {
+   "id": "N-a",
+   "severity": "note",
+   "issue": "Short-token (<6 chars) word-boundary filter is applied to hit.snippet, not the whole page text; a short term present elsewhere on the page but not in the snippet is dropped (conservative, fewer hits)."
+  },
+  {
+   "id": "N-b",
+   "severity": "note",
+   "issue": "Short Hangul tokens with attached particles (e.g. 배포를) no longer match the bare term 배포 under the word-boundary rule; the probe passed because a longer token (게이트웨이) carried the match. Real Korean quality remains the external M10 gold-set item."
+  },
+  {
+   "id": "N-c",
+   "severity": "note",
+   "issue": "basedpyright 24 warnings / 0 errors on the changed files; not a gate."
+  }
+ ],
+ "passed": [
+  "9d2041f archive: 183 files identical to wheel/installed; manifest source 8d1f8cc",
+  "probe-inturn 17/17, probe-quality 7/7 (late target now ranked first), probe-hangul 3/3 on the frozen candidate CLI",
+  "check-docs 10/10; handoff pins 8d1f8cc / wheel 60d66ad6…; readiness JSON keeps M9_native_session",
+  "30 hook tests, Ruff clean, sb search AND contract unchanged, JARVIS 64715ba unchanged"
+ ],
+ "not_complete": [
+  "M9_native_session (no logged-in native run)",
+  "ops_cutover",
+  "M5",
+  "M13_deferred",
+  "held security/delete-race branches (not retried)",
+  "A-F/M1-M14 full acceptance"
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la"
+}

@@ -1,0 +1,134 @@
+{
+ "author": "Claude Fable 5.1 (Codex reviewer role)",
+ "created_at": "2026-09-15T00:32:32.614620+00:00",
+ "request": "GROK-FINAL-VERIFICATION-REQUEST-2026-09-14.md (working copy differs from committed 365f8e4 version; verified the working copy content)",
+ "pins": {
+  "sb_head": "365f8e4",
+  "sb_product": "8d1f8cc",
+  "candidate": "/var/tmp/sb-candidate-8d1f8cc/releases/2ccf0267e52da2482d215b1e47dc6bf3f0fbd0e3",
+  "wheel_sha256": "60d66ad6c3d488af843e7132eea2d7104528fb9b0c06ce732d110a2f4ca189f1",
+  "jarvis_pin_dist": "/var/tmp/jarvis-artifact-64715ba/dist",
+  "jarvis_n1_commit": "4d76572 (local, unpushed)",
+  "jarvis_n1_dist": "/var/tmp/jarvis-artifact-n1-20260914/dist",
+  "ops_current_unchanged": "SB 41f0751 / J a3cbbbe"
+ },
+ "identity": {
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "product_diff_9d2041f_to_365f8e4_in_sb_deploy_systemd": "empty (tests/scripts/docs only)",
+  "n1_dist_vs_clean_rebuild_of_4d76572": {
+   "js_files": 586,
+   "mismatches": 0,
+   "extra": 0,
+   "note": "N1 dist build-metadata says head 64715ba dirty=true (built before commit); bytes equal clean 4d76572 rebuild"
+  }
+ },
+ "direct_reruns": {
+  "gate_maintenance": "MAINT_EXIT=0",
+  "gate_integration_64715ba_dist": "INTEGRATION_EXIT=0",
+  "gate_work_n1_dist": "WORK_EXIT=0",
+  "m12_dr_64715ba_dist": "M12_EXIT=0 ; classified_write_after_required_restores=true, shared_restored_memory_equal=true, generic_reader extra_lost=0 keep_beta=0, crash_loss_records=0, rto_restore_to_readable_ms=2077",
+  "m6_writer_cutover": {
+   "cutover": false,
+   "busy_while_held": true,
+   "after_sigkill_busy": false,
+   "after_sigkill_status": "ok",
+   "after_sigkill_exit": 0,
+   "denied_store_blind_allowed": false
+  },
+  "m13_chrome_lifetime": {
+   "remember_fail_has_content_required": true,
+   "remember_ok_has_inbox": true,
+   "run_status": "ok",
+   "run_pages": 1,
+   "run_errors": 0,
+   "run_exit_code": 0,
+   "run_ok": true,
+   "search_has_processed_needle": true,
+   "page_has_term": true,
+   "conflict_fail": true,
+   "discard_after_run": true,
+   "search_after_still_processed": true,
+   "search_after_forget_empty": true,
+   "resolved_conflict_file": true
+  },
+  "m14_measure": {
+   "control_lexical_ids": [
+    "wiki/deploy"
+   ],
+   "lexical_ids": [],
+   "hybrid_ids": [],
+   "hybrid_extra_ids": [],
+   "keep_hybrid_default_off": true,
+   "value": "no extra recall"
+  },
+  "m11_latency_candidate": {
+   "small": {
+    "pages": 30,
+    "p50": 0.0507,
+    "p95": 0.0801,
+    "server_rss": null
+   },
+   "medium": {
+    "pages": 100,
+    "p50": 0.0799,
+    "p95": 0.0834,
+    "server_rss": null
+   },
+   "large": {
+    "pages": 300,
+    "p50": 0.161,
+    "p95": 0.189,
+    "server_rss": null
+   }
+  },
+  "pytest_365f8e4_archive": {
+   "tests/test_mcp_generation.py": "4 passed (incl. test_held_pin_blocks_publish_then_omega_is_current)",
+   "tests/test_compiled_marker_recovery.py": "8 passed",
+   "tests/test_revoked_keys.py": "11 passed",
+   "memory_access+web+scoped_read_policy": "36 passed"
+  },
+  "jarvis_vitest_4d76572_worktree": "40 passed / 4 failed (gjc-dispatch-assemble memory_ref expectations)",
+  "jarvis_vitest_64715ba_archive": "36 passed / 4 failed (same 4 tests) -> failures pre-exist; N1 adds 4 passing tests",
+  "prior_full_regression": "9d2041f archive 1904 passed / 3 skipped (2026-09-13); product bytes unchanged since"
+ },
+ "verdict": "ACCEPTED as an isolated candidate handoff: SB 8d1f8cc x JARVIS 64715ba dist (+ N1 4d76572 dist for the --work gate). All pins, gates, DR, harnesses and test counts in the request were independently reproduced. This is not product/operations acceptance: native /compact, ops cutover, real-user task, Korean gold, held branches and A-F/M1-M14 full acceptance remain external/deferred.",
+ "conditions_and_residuals": [
+  {
+   "id": "F1",
+   "severity": "ordinary",
+   "issue": "GROK-FINAL-VERIFICATION-REQUEST-2026-09-14.md is modified and uncommitted; the frozen submission must be a commit. Commit the working copy (docs only)."
+  },
+  {
+   "id": "F2",
+   "severity": "ordinary (JARVIS)",
+   "issue": "4 JARVIS tests in tests/integration/gjc-dispatch-assemble.test.ts fail at both 64715ba and 4d76572 (memory_ref expected 8-hex ids, received sbrecord:v1:... after the 64715ba record_digest change). Pre-existing, not caused by N1, but it is an open JARVIS test/contract mismatch and must be listed as a JARVIS residual, not dismissed."
+  },
+  {
+   "id": "F3",
+   "severity": "note",
+   "issue": "N1 dist was built from a dirty 64715ba tree before commit 4d76572 existed (build-metadata dirty=true); verified byte-equal to a clean rebuild of 4d76572, so provenance is acceptable. 4d76572 is unpushed (push not approved)."
+  },
+  {
+   "id": "F4",
+   "severity": "note",
+   "issue": "M11 script reports server RSS null (not measured); M14 shows no extra recall for the fixed Korean query (hybrid off) - a measurement, not a value decision."
+  }
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la",
+ "followup": {
+  "commit": "efaec8f",
+  "F1": "request MD committed (docs only, sb/deploy/systemd unchanged)",
+  "F2": "JARVIS residual recorded in request section 3b and IMPLEMENTATION-STATUS"
+ },
+ "f2_closure": {
+  "jarvis_commit": "8745ce7 (test-only, on top of 4d76572, unpushed)",
+  "decision": "contract canonical: memory_ref = record_id 'sbrecord:v1:<digest>' (SB sb/memory_records.py:217); tests updated to bind to record_id, intent of the 4 tests preserved",
+  "independent_rerun": "vitest 3 files 44 passed / 0 failed (EXIT0); tsc --noEmit EXIT0",
+  "dist": "N1 dist unchanged (tests only)",
+  "sb_docs": "e83ad4e, c7b34a8",
+  "at_utc": "2026-09-15T02:46:43.682121+00:00"
+ }
+}

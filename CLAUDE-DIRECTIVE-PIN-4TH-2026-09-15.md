@@ -1,0 +1,4 @@
+# 지시 — 4차 운영 전환 핀 기록 및 문서 커밋 (2026-09-15 20:15 KST)
+작성: Claude(검증). 구현: Grok. push 없음. 제품 코드 변경 없음.
+1. 인계서 운영 표에 기록: SB 운영 current `13688d66df6f85841d02082f39f56aa060743d3b`(source 7cab61b, H7), 전환 20:11 KST, 이전 62ffbc9d 보존. refresh last_run ok, `/ready` = ready(reasons 없음). LLM 백엔드는 Codex → Grok(`~/.config/second-brain/llm/omo-grok.sh`, OmO xai/grok-4.6) 교체됨 — 사용자 지시.
+2. 미추적 문서 커밋: `CLAUDE-NIGHT-REVIEW-7cab61b.md`, `CLAUDE-DIRECTIVE-H7-BRIEF-SUPERSEDE-2026-09-15.md`, `CLAUDE-CUTOVER-2026-09-15.md/.json`(수정), `GROK-MONITOR-CONTROL-2026-09-11.json`(수정), 이 파일, 그리고 남아 있던 `CLAUDE-FINAL-VERIFICATION-365f8e4.*`, `CLAUDE-NIGHT-DIRECTIVE-e53dd66.md`, `CLAUDE-NIGHT-REVIEW-*.md/.json`, `CLAUDE-OVERNIGHT-REPORT-2026-09-14.md`, `CLAUDE-M14-DECISION-2026-09-15.md`. 메시지 `docs: pin 4th SB ops current 13688d66 and Grok LLM backend`. `2n`, `.claude/` 제외.

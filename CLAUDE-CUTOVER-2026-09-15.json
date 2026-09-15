@@ -55,5 +55,21 @@
     "claude": "~/.claude/settings.json (+3 hooks)",
     "codex": "~/.codex/hooks.json (+3 hooks; needs one-time TUI trust)",
     "omo": "~/.omo/agent/extensions/sb-memory.js"
+  },
+  "llm_backend_switch": {
+    "at": "2026-09-15T18:55+09:00",
+    "from": "codex exec (isolated CODEX_HOME)",
+    "to": "~/.config/second-brain/llm/omo-grok.sh (omo -p xai/grok-4.6)",
+    "reason": "Codex quota until 2026-09-19; user directed Grok",
+    "backups": "*.bak-20260915T1855"
+  },
+  "fourth_cutover": {
+    "executed_at": "2026-09-15T20:11+09:00",
+    "release": "13688d66df6f85841d02082f39f56aa060743d3b",
+    "source": "7cab61b",
+    "previous_current": "62ffbc9d8267f142c2f86dd2c38af6dc5efd2028",
+    "backup": "second-brain-20260915T201138+0900.tar.gz",
+    "regression": "1933 passed/3 skipped",
+    "ready_after": []
   }
 }

@@ -54,3 +54,11 @@
 - Claude Code `~/.claude/settings.json`(백업 `.bak-sb-20260915T1840`): UserPromptSubmit / SessionStart(matcher compact) / PostCompact 추가.
 - Codex CLI `~/.codex/hooks.json`(백업 `.bak-sb-20260915T1840`): 동일 3이벤트. 격리 CODEX_HOME 프로브에서 UserPromptSubmit 훅 실행·SB 응답 확인, SessionStart(source=compact)로 in-turn 컨텍스트 반환 확인(합성 이벤트). **주의: Codex는 hooks.json 변경 후 TUI 첫 실행 시 "Hooks need review" → "Trust all and continue"를 사용자가 1회 선택해야 훅이 켜진다**(신뢰 전에는 조용히 실행 안 됨). 컴파일용 격리 CODEX_HOME에는 hooks.json이 없어 영향 없음.
 - OmO(senpi 2026.9.13) `~/.omo/agent/extensions/sb-memory.js`: `before_agent_start`→UserPromptSubmit(last_query 기억, 잔여 주입), `session_compact`(accepted)→PostCompact 스테이징 + SessionStart(compact) 조회 → `pi.sendMessage(steer)`로 in-turn 주입. fake-pi 하네스(주입/중복억제/거부 이벤트 무시) + 실제 `omo -p -e` 로드 확인. 실행 중인 Grok OmO 세션은 `/reload` 또는 재시작 후 적용.
+
+## LLM 백엔드 교체 — 2026-09-15 18:55 KST (사용자 지시: Codex 한도 → Grok)
+- `~/.config/second-brain/llm/omo-grok.sh`(OmO print 모드, `xai/grok-4.6`, thinking low, 최소 system prompt, stdin 프롬프트)로 `config.toml`·`jarvis-provider.toml`의 `llm.argv_template` 교체(백업 `*.bak-20260915T1855`). `sb retry --stage compile` requeued=2 → 19:52 refresh에서 compile 2행 done(Grok, 행당 ~10초).
+- 같은 refresh에서 brief 단계 failed(20ms, 무메시지): 45f5b72 H6가 오늘 15:00 실패행(일시 장애)까지 superseded로 만들어 `mark_running` 전이 불가. → H7 지시(`CLAUDE-DIRECTIVE-H7-BRIEF-SUPERSEDE-2026-09-15.md`).
+
+## 4차 SB 전환 — 2026-09-15 20:11 KST (H7, 제품 7cab61b)
+- 릴리스 `releases/13688d66…`(source 7cab61b). 검증 `CLAUDE-NIGHT-REVIEW-7cab61b.md`(1933 passed). 백업 `second-brain-20260915T201138+0900.tar.gz`.
+- 20:11:53 stop → relink → start, web 200, doctor PASS 8. 20:11:56 refresh 1회 → **last_run ok**, `/ready` = **ready, reasons []**. 이전 current 62ffbc9d 보존.

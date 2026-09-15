@@ -1,0 +1,77 @@
+{
+ "author": "Claude Fable 5.1 overnight session",
+ "created_at": "2026-09-13T13:31:53.216639+00:00",
+ "submission": "9f604d7",
+ "product_pin": "bad60a66c9b91fa6766e06cf552bf7c001013edc",
+ "candidate": "/var/tmp/sb-candidate-bad60a6/releases/18725677f61d5f4f3a1fe4e2ad2d8829927aaf32",
+ "wheel_sha256": "6089244996f56a43e72a370b1a8843820c3f89677e7839ba588fbcc091787eb1",
+ "identity": {
+  "archive_sha256": "09431eafb46736ee3b22c2001ab7bee51a35db02a4c047aaedd50fe226662810",
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "hook_sha256": "1d896d6358b372aabf1e0cec186cfbed88d35d7b6f166c3e6026412ddc151454"
+ },
+ "direct_checks": {
+  "pytest": "28 passed / 2.00s EXIT0",
+  "ruff": "EXIT0",
+  "basedpyright": "0 errors / 21 warnings / EXIT1 (was 13 warnings)",
+  "probe_inturn": "17/17",
+  "probe_quality": "4/7",
+  "check_docs": "10/10"
+ },
+ "probe_inturn": {
+  "compact_before_prompt_is_empty_exit0": true,
+  "first_prompt_no_stage_empty": true,
+  "startup_source_empty": true,
+  "compact_inturn_event_is_SessionStart": true,
+  "compact_inturn_has_omega_not_theta": true,
+  "compact_inturn_within_budget": true,
+  "postcompact_same_stages_empty": true,
+  "prompt_after_same_not_reinjected": true,
+  "postcompact_other_empty": true,
+  "prompt_after_other_only_theta": true,
+  "hookreplaced_order_inturn_theta": true,
+  "hookreplaced_order_remainder_omega_only": true,
+  "second_compaction_new_epoch_reinjects_last_query": true,
+  "prompt_after_second_compact_empty": true,
+  "realistic_summary_next_prompt_injects_omega": true,
+  "realistic_prompt_compact_inturn_injects_omega": true,
+  "all_exit0": true
+ },
+ "probe_quality": {
+  "late_target_selected": false,
+  "late_target_ranked_first": false,
+  "late_target_not_only_noise": false,
+  "quote_token_no_crash_exit0": true,
+  "quote_token_still_selects_omega": true,
+  "hangul_prompt_compact_selects_omega": true,
+  "stage_does_not_store_raw_prompt": true
+ },
+ "verdict": "NOT ACCEPTED (one blocking residual): in-turn/next-prompt lifecycle, dedupe epochs, remainder, last_query guard, D1-D3 docs all pass; candidate-token selection is still positional (first 32 distinct tokens), so a target mentioned after ~32 distinct words of a summary is never searched",
+ "findings": [
+  {
+   "id": "C3b",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py _candidate_tokens (_MAX_CANDIDATE_TOKENS=32, text order)",
+   "issue": "Direct check on the frozen archive: _candidate_tokens(late summary) returns the first 32 distinct tokens and OmegaInturnTarget (33rd) is absent, so _weighted_terms never queries it; quality-probe q2 injects only noise pages (late_target_selected=false, ranked_first=false, not_only_noise=false). Real compaction summaries are hundreds of words, so anything past the preamble is invisible.",
+   "completion": "Choose the <=32 tokens to search by a position-independent prior over ALL distinct tokens of the bounded text (e.g. term frequency within the text desc, then token length desc / mixed-case-digit-Hangul identifiers first), then apply the existing 1/hit-count weighting. Do not raise the cap by position. Probe: late_target_selected, late_target_ranked_first, late_target_not_only_noise must pass; add a unit test whose target appears after >=40 distinct tokens."
+  },
+  {
+   "id": "T1",
+   "severity": "ordinary",
+   "location": "tests/test_postcompact_hook.py",
+   "issue": "basedpyright warnings rose from 13 to 21 on the changed files (0 errors).",
+   "completion": "Reduce or annotate; not a gate."
+  }
+ ],
+ "passed": [
+  "9f604d7 archive: 183 files identical to wheel/installed; manifest source bad60a6",
+  "probe-inturn 17/17: documented SessionStart(compact) input, in-turn injection, epoch reset at second compaction, hook-replaced order keeps PostCompact remainder, content-free prompts do not clobber last_query, realistic multi-word summary/prompt, budgets, all exit 0",
+  "quality: no crash on quote tokens, Hangul+ASCII prompt selects, stage stores derived terms not the prompt",
+  "check-docs 10/10 (D1-D3), constraint doc, readiness JSON keeps M9_native_session",
+  "28 hook tests, Ruff clean, sb search AND contract unchanged"
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la"
+}

@@ -1,0 +1,93 @@
+{
+ "author": "Claude Fable 5.1 overnight session (took over Codex reviewer role 2026-09-13; designated Codex terminal exited)",
+ "created_at": "2026-09-13T12:41:55.212922+00:00",
+ "submission": "a18396fc549ef245bfd646a348fde813666d5549",
+ "product_pin": "cffaf9e6df5e9afd2af4d8ce045b535fe526dca4",
+ "docs_pin": "74c9877ba600e3aec056034220de52cd0d239f91",
+ "candidate": "/var/tmp/sb-candidate-cffaf9e/releases/ba33e5e8b0d46585076352b78ac48e09902e159f",
+ "wheel_sha256": "989da1a3b295635f5272eedcaa1d7ec7e58dd57bb0e18538a4bb49080f2a17d4",
+ "identity": {
+  "archive_sha256": "22a3f7875e1320782548e9260cbbeaaf37835aa010fb902c679780b8e13f9a3c",
+  "sb_python_files": 183,
+  "wheel_matches_manifest": true,
+  "wheel_mismatches": [],
+  "installed_mismatches": [],
+  "test_file_sha256": {
+   "tests/test_postcompact_hook.py": "ab4b286092ef439bf597c86ff71de7949d3be9bb7db9fd8a0a23c67eb86802eb"
+  },
+  "hook_sha256": "623753b5796c5dcefef05ce52fb945066c46ebeb1bd25080966f175098ece2ca",
+  "tracked_product_dirty": "?? sb/compile.py.bak-20260906-214804\n?? sb/llm.py.bak-20260906-214804\n"
+ },
+ "direct_checks": {
+  "pytest_tests/test_postcompact_hook.py": "17 passed / 1.40s EXIT0",
+  "ruff": "EXIT0",
+  "basedpyright": "0 errors / 13 warnings / EXIT1",
+  "exits": {
+   "sb-tests": 0,
+   "sb-ruff": 0,
+   "sb-types": 1
+  }
+ },
+ "verdict": "NOT ACCEPTED: A(D1-D3) unmet; B in-turn path cannot fire on the real SessionStart(compact) input (HOOK_QUERY_MISSING exit 2); dedupe between in-turn and next-prompt injection missing",
+ "findings": [
+  {
+   "id": "B1",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py:83-90 (cffaf9e)",
+   "issue": "SessionStart(compact) handler requires query/compact_summary in the hook input. Claude Code 2.1.270 SessionStart input schema carries source/agent_type/model/session_title only (no summary). Frozen candidate CLI with a real-shaped event {hook_event_name:SessionStart,source:compact,session_id} -> stderr HOOK_QUERY_MISSING, exit 2, no additionalContext (inturn-probe-cffaf9e.json s0,s3). Unit tests pass only because the synthetic _session() fixture adds compact_summary.",
+   "completion": "Record last UserPromptSubmit prompt as bounded lexical query (last_query) in the session stage; SessionStart(compact) reselects from last_query; no last_query -> {} exit 0 (no_data). Test must use the documented input shape without summary."
+  },
+  {
+   "id": "B2",
+   "severity": "blocking",
+   "location": "sb/postcompact_hook.py handle_postcompact PostCompact/UserPromptSubmit",
+   "issue": "After an in-turn SessionStart delivery, the following PostCompact (different event_digest) writes a fresh stage and the next UserPromptSubmit re-injects the same record_id+version (probe s5 shows Omega re-injected). Directive B.3 dedupe not implemented.",
+   "completion": "Track delivered_in_turn record_id+version set per session; PostCompact stage excludes them; empty remainder -> stage delivered. Keep event_digest duplicate rule. Probe: prompt_after_same_not_reinjected and prompt_after_other_only_theta must pass."
+  },
+  {
+   "id": "B3",
+   "severity": "ordinary",
+   "location": "sb/postcompact_hook.py parse SessionStart",
+   "issue": "SessionStart source!=compact raises HOOK_EVENT_UNSUPPORTED -> exit 2. With a single hook registration for SessionStart (matcher compact) this is unreachable, but a registration without matcher would surface hook errors on every startup/resume. Directive asked {} exit 0 for non-compact sources.",
+   "completion": "Return {} exit 0 for startup/resume/clear/fork; keep PreCompact etc. unsupported."
+  },
+  {
+   "id": "B4",
+   "severity": "ordinary",
+   "location": "GROK-M9-SESSION-COMPACTION-CONSTRAINT-2026-09-13.md; GROK-CLIENT-CONNECTION-READINESS-2026-09-13.json",
+   "issue": "Constraint doc not updated (still says only UserPromptSubmit documented, PostCompact stage only) ; no hook registration example (SessionStart matcher compact + PostCompact + UserPromptSubmit -> <candidate>/bin/sb postcompact-hook, SB_CONFIG slot); readiness JSON dropped M9_native_session from not_complete although native was not executed; PostCompact additionalContext-ignored fact and query-source limitation not stated.",
+   "completion": "Directive B.5 items (a)-(d); keep M9_native_session in not_complete; state that in-turn query is prompt-based and summary-based reselection lands at next prompt."
+  },
+  {
+   "id": "A-D1",
+   "severity": "ordinary",
+   "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:20,40 (74c9877)",
+   "issue": "doc line with `SB_CONFIG=%h/.config/second-brain/config.toml` still attributed to repo jm-second-brain-requests.service (systemd/user/jm-second-brain-requests.service has no Environment line: lines 1-17 read); shell var block still `SB_CONFIG=%h/...`; sb/config.py:184-192 env->user->app fallback not cited",
+   "completion": "remove SB_CONFIG from repo requests.service row, cite sb/config.py:184-192 order, absolute /home/jm path in shell block"
+  },
+  {
+   "id": "A-D2",
+   "severity": "ordinary",
+   "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:34,57",
+   "issue": "`states` 비어 있지 않음 unchanged; new text lists inspect() states keys gjc_runtime/gjc_intents/gjc_intent_leases/gjc_microloop_leases and counts.unexpired_lease_rows which do not exist. deploy/check-jarvis-pending-state.py STATES = memory_outbox(state), memory_outbox_attempts(outcome), memory_candidate_dispatch_publications(state), collaboration_bridge_outbox(state), pre_gjc_report_outbox(state), outbox(outcome); COUNTS = cursor_rows, active_cursor_rows, gjc_lease_rows, microloop_lease_rows; leases = gjc_runtime_leases, microloop_leases",
+   "completion": "per table/state/count unresolved table with real keys; {table: []} vs count>0 distinction; unknown state => stop"
+  },
+  {
+   "id": "A-D3",
+   "severity": "ordinary",
+   "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md restore paragraph",
+   "issue": "no RESTORED_ROOT/VERIFY_CONFIG/VERIFY_STATE_ROOT/VERIFY_REQUEST_ROOT/VERIFY_QUERY slots; no `SB_CONFIG=\"$VERIFY_CONFIG\" $SB_CANDIDATE/bin/sb doctor|search \"$VERIFY_QUERY\"` examples; restore paragraph unchanged in substance",
+   "completion": "as directive A.D3"
+  }
+ ],
+ "passed": [
+  "source/wheel/installed 183 files identical to a18396f archive; manifest source_commit cffaf9e; wheel sha matches",
+  "SessionStart(compact) with synthetic summary emits hookEventName SessionStart additionalContext within budget (unit tests)",
+  "UserPromptSubmit path, PostCompact staging, duplicate event_digest, BrokenPipe retry preserved (17 passed)",
+  "no product change outside sb/postcompact_hook.py and its test"
+ ],
+ "evidence_dir": "/var/tmp/claude-night-e53dd66-GBr0la",
+ "claude_contract_evidence": "/var/tmp/claude-night-e53dd66-GBr0la/claude-2.1.270-hook-contract.json",
+ "held": "Unverified content-related branches untouched; no retry/transfer",
+ "external": "native logged-in session run, ops cutover, real-user task, gold set, RPO/RTO unchanged"
+}
