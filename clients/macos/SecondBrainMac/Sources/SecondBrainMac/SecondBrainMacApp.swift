@@ -3,16 +3,33 @@ import SecondBrainCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Bootstraps the tunnel, status poll and folder sync at launch.
+///
+/// `LSUIElement` apps open no window, and `MenuBarExtra` builds its content only
+/// when the icon is clicked, so relying on `.task` left a login-launched app idle
+/// and disconnected until the user opened the menu by hand.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    static var model: AppModel?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Task { await AppDelegate.model?.startIfNeeded() }
+    }
+}
+
 @main
 @MainActor
 struct SecondBrainMacApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var settingsStore: SettingsStore
     @StateObject private var model: AppModel
 
     init() {
         let store = SettingsStore()
+        let appModel = AppModel(settingsStore: store)
         _settingsStore = StateObject(wrappedValue: store)
-        _model = StateObject(wrappedValue: AppModel(settingsStore: store))
+        _model = StateObject(wrappedValue: appModel)
+        AppDelegate.model = appModel
     }
 
     var body: some Scene {

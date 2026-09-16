@@ -6,6 +6,47 @@ import ServiceManagement
 import SecondBrainCore
 import UserNotifications
 
+/// TCP reachability probe for the loopback end of the SSH tunnel.
+///
+/// `Process.run()` returns as soon as `/usr/bin/ssh` is spawned, long before the
+/// forward is bound. Waiting for the port to accept a connection removes the race
+/// between starting the tunnel and the first API request.
+enum TunnelProbe {
+    static func waitUntilAccepting(port: Int, timeout: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if await Task.detached(priority: .utility, operation: { accepts(port: port) }).value {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        } while Date() < deadline
+        return await Task.detached(priority: .utility, operation: { accepts(port: port) }).value
+    }
+
+    private static func accepts(port: Int) -> Bool {
+        let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else { return false }
+        defer { close(descriptor) }
+        var timeout = timeval(tv_sec: 1, tv_usec: 0)
+        _ = withUnsafePointer(to: &timeout) { pointer in
+            setsockopt(
+                descriptor, SOL_SOCKET, SO_SNDTIMEO, pointer, socklen_t(MemoryLayout<timeval>.size)
+            )
+        }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = UInt16(truncatingIfNeeded: port).bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let outcome = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { raw in
+                connect(descriptor, raw, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        return outcome == 0
+    }
+}
+
 @MainActor
 final class SSHTunnelController: ObservableObject {
     @Published private(set) var isRunning = false
@@ -50,6 +91,27 @@ final class SSHTunnelController: ObservableObject {
             isRunning = false
             lastError = error.localizedDescription
         }
+    }
+
+    /// Guarantees the loopback port is accepting connections before callers issue requests.
+    ///
+    /// Returns `true` when the tunnel is not managed by the app (the user runs their own)
+    /// or when the port answers. A tunnel whose process is alive but whose forward never
+    /// binds is recycled once before giving up.
+    func ensureReady(settings: AppSettings, timeout: TimeInterval = 8) async -> Bool {
+        guard settings.automaticSSHTunnel,
+              !settings.sshHostAlias.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return true
+        }
+        if process?.isRunning != true {
+            start(settings: settings)
+        }
+        if await TunnelProbe.waitUntilAccepting(port: settings.localPort, timeout: timeout) {
+            return true
+        }
+        stop()
+        start(settings: settings)
+        return await TunnelProbe.waitUntilAccepting(port: settings.localPort, timeout: timeout)
     }
 
     func stop() {

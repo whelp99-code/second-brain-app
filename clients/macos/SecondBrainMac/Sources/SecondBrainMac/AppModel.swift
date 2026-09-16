@@ -49,12 +49,11 @@ final class AppModel: ObservableObject {
     func startIfNeeded() async {
         guard !started else { return }
         started = true
-        tunnel.start(settings: settingsStore.settings)
+        _ = await tunnel.ensureReady(settings: settingsStore.settings)
         if settingsStore.settings.notificationBriefings {
             _ = await notificationService.requestAuthorization()
         }
         installFolderWatchers()
-        try? await Task.sleep(nanoseconds: 600_000_000)
         await refreshStatus()
         await refreshBriefing(notify: true)
         startPeriodicWork()
@@ -65,22 +64,32 @@ final class AppModel: ObservableObject {
 
     func reconnect() async {
         tunnel.stop()
-        tunnel.start(settings: settingsStore.settings)
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        _ = await tunnel.ensureReady(settings: settingsStore.settings)
         await refreshStatus()
     }
 
+    /// Reads server status, repairing a dead or half-open tunnel once before reporting failure.
     func refreshStatus() async {
+        if await requestStatus() { return }
+        guard settingsStore.settings.automaticSSHTunnel else { return }
+        guard await tunnel.ensureReady(settings: settingsStore.settings) else { return }
+        _ = await requestStatus()
+    }
+
+    @discardableResult
+    private func requestStatus() async -> Bool {
         do {
             let response = try await client().status()
             serverStatus = response.status
             lastRunStatus = response.lastRunStatus
             isConnected = true
             lastError = nil
+            return true
         } catch {
             isConnected = false
             serverStatus = "연결 실패"
             lastError = error.localizedDescription
+            return false
         }
     }
 
@@ -273,6 +282,7 @@ final class AppModel: ObservableObject {
                 let seconds = max(15, self.settingsStore.settings.syncIntervalSeconds)
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
                 guard !Task.isCancelled else { return }
+                await self.refreshStatus()
                 await self.syncAll()
                 await self.refreshBriefing(notify: true)
             }
