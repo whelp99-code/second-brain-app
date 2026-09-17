@@ -1,0 +1,182 @@
+{
+  "schema": "shipping-harness/plan-v1",
+  "project": "second-brain-app",
+  "program": {
+    "title": "1.0.2 이후 재가동",
+    "outcome": "1.0.2를 발행 라인에 합치고, unified-db 수집을 운영에 연결한 뒤, 2026-09-11에 멈춘 수집 경로를 단계별 증거와 함께 되살린다."
+  },
+  "sources": [
+    {
+      "path": "docs/PROGRESS-PLAN-2026-09-17.md",
+      "note": "단계별 선행 조건·완료 기준·롤백·증명 방법의 근거 원본.",
+      "sha256": "a3c9c78f5bd634e9a45f48af00871d9fcc7ee5886794c1558061989f599acc17"
+    },
+    {
+      "path": "SECOND-BRAIN-LIFE-MEMORY-ANALYSIS-2026-09-17.md",
+      "note": "재가동 7단계 표와 두 기계 실측.",
+      "sha256": "c8ac11e2be1aa9dbe7b9cbe1bc9c85628bf551f5b9995b828c813980f99c71a6"
+    },
+    {
+      "path": "RESUME-2026-09-17-UNIFIED-DB.md",
+      "note": "unified-db 1단계 재개 지점과 환경 주의.",
+      "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
+    }
+  ],
+  "revision": 2,
+  "stages": [
+    {
+      "id": "S-01",
+      "title": "1.0.2를 발행 브랜치에 합치고 master 갱신",
+      "outcome": "발행 브랜치가 1.0.2 라인을 담고 master가 그 결과를 가리키며, 합류 커밋에서 저장소 검증이 통과한다.",
+      "dependsOn": [],
+      "acceptanceRefs": [
+        "python-ruff",
+        "python-pytest"
+      ],
+      "scopeInclude": [
+        "발행 브랜치 합류와 master 갱신",
+        "합류 후 저장소 검증 재실행"
+      ],
+      "scopeExclude": [
+        "새 제품 기능",
+        "공개 배포"
+      ],
+      "size": "PATCH"
+    },
+    {
+      "id": "S-02",
+      "title": "격리 볼트에서 unified-db 수집 증명",
+      "outcome": "운영 볼트를 변경하지 않고 격리 볼트에 실수집이 완주하며, 커서가 전진하고 심박 잡음이 걸러진다.",
+      "dependsOn": [],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "읽기 전용 실접속",
+        "격리 볼트 수집 실행",
+        "잡음 선별 확인"
+      ],
+      "scopeExclude": [
+        "운영 볼트 변경",
+        "프로바이더 설정 변경"
+      ],
+      "size": "PATCH"
+    },
+    {
+      "id": "S-03",
+      "title": "프로바이더 설정에 unified-db 소스 추가",
+      "outcome": "relink 없이 refresh 1회로 적재가 확인되고, 어제 한 일을 검색으로 답할 수 있다.",
+      "dependsOn": [
+        "S-02"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "저장소 밖 프로바이더 설정 변경",
+        "refresh 1회 검증"
+      ],
+      "scopeExclude": [
+        "relink",
+        "운영 볼트 재구축"
+      ],
+      "size": "PATCH"
+    },
+    {
+      "id": "S-04",
+      "title": "AI 세션 직접 수집",
+      "outcome": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
+      "dependsOn": [
+        "S-03"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "세 계열 세션 수집기 연결"
+      ],
+      "scopeExclude": [
+        "세션 외 자동화 복구"
+      ],
+      "size": "MILESTONE"
+    },
+    {
+      "id": "S-05",
+      "title": "카톡 일일 요약 전송 복구",
+      "outcome": "하루 1회 자동 적재가 연속으로 동작한다.",
+      "dependsOn": [
+        "S-03"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "일일 요약 전송 경로 복구"
+      ],
+      "scopeExclude": [
+        "대화 원문 적재"
+      ],
+      "size": "PATCH"
+    },
+    {
+      "id": "S-06",
+      "title": "메일 결론 일일 핸드오프",
+      "outcome": "이번 주 메일 결정에 답할 수 있고, 본문은 전송되지 않는다.",
+      "dependsOn": [
+        "S-03"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "결론만 추출해 일일 핸드오프"
+      ],
+      "scopeExclude": [
+        "메일 본문 전송"
+      ],
+      "size": "PATCH"
+    },
+    {
+      "id": "S-07",
+      "title": "2026-09-11 중단 자동화 선별 복구",
+      "outcome": "복구 목록과 제외 목록이 문서로 남는다.",
+      "dependsOn": [
+        "S-03"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "중단된 자동화 선별",
+        "복구·제외 목록 기록"
+      ],
+      "scopeExclude": [
+        "선별 없는 일괄 복구"
+      ],
+      "size": "PATCH"
+    },
+    {
+      "id": "S-08",
+      "title": "JARVIS closeout 자동 적재와 ORCA 관측",
+      "outcome": "작업 종료가 승인 후 자동으로 기억되며 무단 적재가 0건이다.",
+      "dependsOn": [
+        "S-04"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "closeout 적재 경로",
+        "ORCA 관측"
+      ],
+      "scopeExclude": [
+        "승인 없는 적재"
+      ],
+      "size": "MILESTONE"
+    },
+    {
+      "id": "S-09",
+      "title": "전화·통화, 위키 재연결, 한국어 검색 개선",
+      "outcome": "항목별 완료 기준을 따로 정해 각각 닫는다.",
+      "dependsOn": [
+        "S-04"
+      ],
+      "acceptanceRefs": [],
+      "scopeInclude": [
+        "phone-history 실기기",
+        "위키 재연결",
+        "한국어 검색 개선"
+      ],
+      "scopeExclude": [
+        "세 항목을 한 덩어리로 종료"
+      ],
+      "size": "MILESTONE"
+    }
+  ]
+}
