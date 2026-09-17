@@ -20,6 +20,7 @@ config.toml
 .omo/
 node_modules/
 
-# Shipping Harness runtime state (per-worktree, not product source)
-.shipping/decision-ledger.jsonl
-.shipping/proposals/
+# Shipping Harness runtime state (per-worktree, not product source).
+# Release receipts under .shipping/releases/ are portable evidence and stay tracked.
+.shipping/*
+!.shipping/releases/

@@ -1,0 +1,33 @@
+{
+  "acceptance": {
+    "failed": 0,
+    "passed": 2,
+    "requiredFailed": 0,
+    "total": 2
+  },
+  "agentRuns": 0,
+  "backlogCount": 0,
+  "baselineSha": "84ab2e6f1a1a3a9403c6fa4051ec309d7dde1292",
+  "closedAt": "2026-09-17T06:30:48.696Z",
+  "closedGitSha": "84ab2e6f1a1a3a9403c6fa4051ec309d7dde1292",
+  "contractHash": "bd131be58bc83d30b0f3375638078ae2cac65d1662eba74992e8700da964efd4",
+  "evidenceRunId": "run-2026-09-17T06-19-51-869Z-dcc4d63d",
+  "fixCycles": 1,
+  "goal": "second-brain-app 1.0.2를 릴리스한다 — unified-db 커넥터 심박 행 스킵, 버전 표기(pyproject·uv.lock·Info.plist) 정리, 저장소 전역 ruff 정리 포함.",
+  "integrations": null,
+  "issueCounts": {
+    "BLOCKER": 0,
+    "IGNORE": 0,
+    "NEXT": 0,
+    "UNKNOWN": 0
+  },
+  "postLockCommits": [],
+  "project": "harness-truncation-fix-446f99",
+  "release": "1.0.2",
+  "schema": "shipping-harness/release-v1",
+  "telemetry": {
+    "totalAgentDurationMs": 0
+  },
+  "verifyRuns": 2,
+  "worker": "shipping-harness"
+}
