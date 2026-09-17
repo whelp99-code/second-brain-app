@@ -62,3 +62,11 @@
 ## 4차 SB 전환 — 2026-09-15 20:11 KST (H7, 제품 7cab61b)
 - 릴리스 `releases/13688d66…`(source 7cab61b). 검증 `CLAUDE-NIGHT-REVIEW-7cab61b.md`(1933 passed). 백업 `second-brain-20260915T201138+0900.tar.gz`.
 - 20:11:53 stop → relink → start, web 200, doctor PASS 8. 20:11:56 refresh 1회 → **last_run ok**, `/ready` = **ready, reasons []**. 이전 current 62ffbc9d 보존.
+- 20:14 `sb brief` 1회(CLI): superseded였던 오늘 brief 행 `4a635cb0…` → pending 재개 → Grok으로 done(attempts 2). `daily/2026-09-15.md`가 실제 패킷 항목이 담긴 브리핑으로 갱신. `/ready` ready 유지. H7 운영 복구 경로 확인.
+
+## 5차 SB 전환 — 2026-09-17 13:39 KST (충돌 판정 복구 + 운영/공개 코드 합류)
+- 배경: 9/17 점검에서 conflict 단계가 Grok 백엔드에서 100% 실패함을 확인(Grok이 cites의 `unit:` 접두사를 제거 → `sb/conflict.py:_parse` 거부 → "invalid conflict verdict"). 9/15 백엔드 교체 이후 신규 콘텐츠가 없어 운영에 드러나지 않았을 뿐이었다.
+- 조치 1: 운영이 쓰던 `feat/refresh-receipt-write-authorization-2`(e2809ad 갱신 영수증, 8d2ceac 쓰기 권한 보고)를 공개 브랜치에 병합(7e0ea5f). 운영과 GitHub 코드가 한 줄로 합류.
+- 조치 2: `sb/prompts/conflict.md`에 "cites는 주어진 ID를 접두사까지 그대로 복사" 규칙 추가(66b4e59) + 회귀 테스트 2건. `prompt_version`은 v1 유지(deriv_key는 프롬프트 본문이 아니라 prompt_version·model_id로 만들어져 기존 판정 캐시가 유효).
+- 검증: 격리 볼트에서 상반된 노트 2건 → conflict 파생 5건 전부 done, 오류 0, 충돌 페이지 3건 생성(수정 전 동일 시나리오는 partial + 실패 1). 전체 회귀 1951 passed / 3 skipped.
+- 전환: 릴리스 `releases/d35b5e5a…`(source 66b4e59), 백업 `second-brain-20260917T133914+0900.tar.gz`. 13:39:30 유닛 정지(웹·타이머·요청 path·브로커 소켓 2종) → relink → 재기동. 웹 200, doctor 8 PASS/1 WARN, refresh 1회 ok, `/ready` ready, JARVIS CLI 브로커 정상 응답. 이전 current 78f26457 보존.
