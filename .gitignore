@@ -19,3 +19,7 @@ config.toml
 .ruff_cache/
 .omo/
 node_modules/
+
+# Shipping Harness runtime state (per-worktree, not product source)
+.shipping/decision-ledger.jsonl
+.shipping/proposals/
