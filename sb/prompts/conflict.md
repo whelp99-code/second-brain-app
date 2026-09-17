@@ -7,6 +7,7 @@
 - 출력은 JSON 객체 하나만. 설명·코드펜스 금지.
 - 키는 relation, confidence, rationale, cites 만.
 - cites는 근거로 사용한 입력 단위 ID의 문자열 배열. 근거가 없으면 빈 배열.
+- cites 원소는 위 슬롯에 주어진 ID 문자열을 접두사까지 그대로 복사한다. 축약·변형·재작성 금지.
 - relation은 supports, contradicts, unrelated, supersedes 중 하나.
 - confidence는 0과 1 사이 숫자.
 - rationale은 280자 이하 한국어.

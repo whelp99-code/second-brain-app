@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from importlib.resources import files
 from pathlib import Path
 
 import pytest
@@ -354,3 +355,26 @@ def test_prior_parser_cached_verdict_is_rejudged(ledger, config, unit, monkeypat
     again = check(units, EMPTY_PAGES, ledger, current, config)
     assert current.calls == 1
     assert again[0].verdict == result[0].verdict
+
+
+def test_prompt_requires_verbatim_cite_ids() -> None:
+    """Given the conflict prompt, when read, then it forbids rewriting the given IDs.
+
+    Grok returned `["aaa111"]` for a unit whose ID is `unit:aaa111`, which the parser
+    refuses, so every verdict became `invalid conflict verdict` (2026-09-17). The rule
+    below is what made the model copy the IDs unchanged.
+    """
+    template = (files("sb") / "prompts" / "conflict.md").read_text(encoding="utf-8")
+    assert "접두사까지 그대로 복사" in template
+
+
+def test_cites_outside_the_pair_are_refused(
+    ledger: Ledger, config: Config, unit: Unit
+) -> None:
+    """Given a verdict citing a rewritten ID, when checked, then the finding stays open."""
+    llm = FakeLLM([_verdict("contradicts", CONTRA_FLOOR, "상반됨", ["1"])])
+    found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, llm, config)
+    hit = found[0]
+    assert hit.route == "unrelated"
+    assert hit.warning is True
+    assert hit.verdict.confidence == 0.0
