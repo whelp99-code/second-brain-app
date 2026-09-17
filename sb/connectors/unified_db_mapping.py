@@ -54,11 +54,25 @@ class ScanTable:
 
 
 @dataclass(frozen=True, slots=True)
+class LowValueRule:
+    """One (project, summary) pair whose rows carry no recallable content.
+
+    unified-db records a bare agent heartbeat as `summary = "[<project>] session"`
+    with no project_id. Those rows are the largest single group in the source and
+    say nothing a later question could be answered from, so they never become units.
+    """
+
+    project: str
+    summary: str
+
+
+@dataclass(frozen=True, slots=True)
 class MappingSpec:
     page_size: int
     projects: CatalogSpec
     sources: CatalogSpec
     tables: tuple[ScanTable, ...]
+    low_value: tuple[LowValueRule, ...] = ()
 
 
 # Adjustment point B: recorded from unified-db init SQL (catalog/memory/evidence).
@@ -89,6 +103,7 @@ DEFAULT_MAPPING: Final = MappingSpec(
             ("uri", "sensitivity"),
         ),
     ),
+    (LowValueRule("ClaudeProbe", "session"),),
 )
 
 
@@ -143,6 +158,7 @@ class EmitCtx:
     lookup: dict[str, str]
     disabled: frozenset[str]
     seen_disabled: set[str]
+    low_value: tuple[LowValueRule, ...] = ()
 
 
 def build_lookup(rows: list[tuple[Scalar, ...]]) -> dict[str, str]:
@@ -196,12 +212,15 @@ def emit_row(table: ScanTable, row: tuple[Scalar, ...], ctx: EmitCtx) -> tuple[I
         )
         return skip, mark
     project = resolve_project(row[2], ctx.lookup)
+    texts = list(zip(table.text, (cell_text(value) for value in row[4:]), strict=False))
+    if is_low_value(project, dict(texts).get("summary", ""), ctx.low_value):
+        return None, mark
     fields = [
         (table.pk, pk),
         (table.occurred_at, stamp.isoformat()),
         (table.project_id, project),
         (table.source_id, source),
-        *zip(table.text, (cell_text(value) for value in row[4:]), strict=False),
+        *texts,
     ]
     token = f"{stamp.isoformat()}|{pk}"
     meta: ItemMeta = {"relative_path": table.name, "cursor": token}
@@ -212,6 +231,35 @@ def emit_row(table: ScanTable, row: tuple[Scalar, ...], ctx: EmitCtx) -> tuple[I
         meta,
     )
     return item, mark
+
+
+def split_summary_label(summary: str) -> tuple[str, str]:
+    """Split `"[project] body"` into its label and body; an unlabelled summary keeps both."""
+    text = summary.strip()
+    if not text.startswith("["):
+        return "", text
+    closing = text.find("]")
+    if closing == -1:
+        return "", text
+    return text[1:closing].strip(), text[closing + 1 :].strip()
+
+
+def is_low_value(project: str, summary: str, rules: tuple[LowValueRule, ...]) -> bool:
+    """Whether this row is a contentless heartbeat one of `rules` names.
+
+    The row carries the project either in its own column or as the `[project]`
+    label unified-db writes into the summary, so both spellings are matched.
+    """
+    if not rules:
+        return False
+    label, body = split_summary_label(summary)
+    for rule in rules:
+        wanted = rule.project.casefold()
+        if label.casefold() != wanted and project.casefold() != wanted:
+            continue
+        if body.casefold() == rule.summary.casefold():
+            return True
+    return False
 
 
 def resolve_project(raw: Scalar, lookup: dict[str, str]) -> str:

@@ -25,6 +25,12 @@ from sb.connectors.unified_db import (
     create,
     load_mapping,
 )
+from sb.connectors.unified_db_mapping import (
+    DEFAULT_MAPPING,
+    EmitCtx,
+    emit_row,
+    is_low_value,
+)
 from sb.contracts import SourceRef
 
 _FORBIDDEN_SQL: re.Pattern[str] = re.compile(
@@ -410,3 +416,60 @@ def test_live_scan_yields_orca_jarvis_when_database_reachable() -> None:
 def _is_source_select(sql: str) -> bool:
     upper = sql.upper()
     return "SELECT" in upper and "CURRENT_SETTING" not in upper
+
+
+def _memory_row(*, summary: str) -> tuple[object, ...]:
+    """One `memory.events` row shaped as the connector selects it."""
+    return (
+        "e1",
+        datetime(2026, 9, 17, 5, 0, tzinfo=UTC),
+        None,
+        "memory-router",
+        "claude",
+        "journal_entry",
+        "observed",
+        summary,
+    )
+
+def test_claude_probe_heartbeat_rows_never_become_units() -> None:
+    """Given a bare heartbeat row, when emitted, then it is skipped with no item.
+
+    unified-db writes 1,548 of these `[ClaudeProbe] session` rows and they answer
+    no later question, so they must not reach the vault (2026-09-17).
+    """
+    table = DEFAULT_MAPPING.tables[0]
+    ctx = EmitCtx("unified-db", {}, frozenset(), set(), DEFAULT_MAPPING.low_value)
+    row = _memory_row(summary="[ClaudeProbe] session")
+    item, mark = emit_row(table, row, ctx)
+    assert item is None
+    assert mark[1] == "e1"
+
+
+def test_rows_with_content_still_emit() -> None:
+    """Given a normal journal row, when emitted, then the unit is produced."""
+    table = DEFAULT_MAPPING.tables[0]
+    ctx = EmitCtx("unified-db", {}, frozenset(), set(), DEFAULT_MAPPING.low_value)
+    row = _memory_row(summary="[ClaudeProbe] 릴리스 1.0.2 범위를 잠갔다")
+    item, _mark = emit_row(table, row, ctx)
+    assert item is not None
+    assert b"\xeb\xa6\xb4\xeb\xa6\xac\xec\x8a\xa4" in item[1]
+
+
+def test_other_projects_keep_their_session_rows() -> None:
+    """Given another project's session row, when emitted, then it is kept.
+
+    Only the labelled rules are excluded; a narrow rule must not widen by itself.
+    """
+    table = DEFAULT_MAPPING.tables[0]
+    ctx = EmitCtx("unified-db", {}, frozenset(), set(), DEFAULT_MAPPING.low_value)
+    item, _mark = emit_row(table, _memory_row(summary="[home] session"), ctx)
+    assert item is not None
+
+
+def test_low_value_matching_reads_both_project_spellings() -> None:
+    """Given the project in its own column, when checked, then the rule still matches."""
+    rules = DEFAULT_MAPPING.low_value
+    assert is_low_value("ClaudeProbe", "session", rules)
+    assert is_low_value("global", "[claudeprobe] Session", rules)
+    assert not is_low_value("global", "[ClaudeProbe] 세션 요약", rules)
+    assert not is_low_value("global", "session", ())
