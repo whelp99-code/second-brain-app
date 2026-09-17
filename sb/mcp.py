@@ -39,7 +39,7 @@ from sb.cancellation_submission import CancellationSubmissionError, submit_corre
 from sb.config import Config, load_config
 from sb.contracts import MemoryWriteResultV1
 from sb.correction_cancellation_models import CorrectionCancellationIntentV1
-from sb.delegations import DelegationRejected, verify_read_fence
+from sb.delegations import DelegationRejected, MemoryReadFenceV1, verify_read_fence
 from sb.effect_values import (
     JsonObject,
     JsonValue,
@@ -500,10 +500,11 @@ def build_server(
         purpose: Literal["memory_read", "memory_status", "memory_resolve"],
         operation: Literal["read", "status", "resolve"],
         current_high_water: tuple[int, str],
-    ) -> None:
+    ) -> MemoryReadFenceV1 | None:
+        """Admit the call, and hand back the caller identity the fence proved."""
         sequence, set_root = current_high_water
         if sequence == 0 and value is None:
-            return
+            return None
         if public_keys is None or value is None:
             raise ToolError("TOMBSTONE_FENCE_REQUIRED")
         try:
@@ -519,6 +520,27 @@ def build_server(
             raise ToolError(str(exc)) from exc
         if fence.purpose != purpose or fence.operation != operation:
             raise ToolError("TOMBSTONE_FENCE_REQUIRED")
+        return fence
+
+    def write_authorization(fence: MemoryReadFenceV1 | None) -> str | None:
+        """Whether the caller may submit a write - decided without performing one.
+
+        Read off the same authorized-key map and durable revocation store that
+        `sb_write_request` verifies a delegation against, so the answer cannot
+        promise an admission the write path would refuse.
+
+        A provider with no `[jarvis_public_keys]` surface reports nothing: there
+        is no JARVIS identity to answer for, and silence keeps the frozen
+        schema-4 response - and the contract digest taken over it - unchanged.
+        """
+        if not configured_keys:
+            return None
+        if public_keys is None:
+            # Declared but unusable key material, or a revocation store that
+            # refused: no caller can be authorized, this one included.
+            return "disabled"
+        caller = config.jarvis_signing_key_id if fence is None else fence.signing_key_id
+        return "authorized" if caller is not None and caller in public_keys else "unauthorized"
 
     def require_active_high_water(generation: GenerationIdentityV1, current: tuple[int, str]) -> None:
         if generation_store is None:
@@ -685,7 +707,7 @@ def build_server(
         """Return active generation and permanent tombstone high-water without content."""
         with pin_generation() as (_current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_status", "status", current)
+            fence = require_read_fence(read_fence, "memory_status", "status", current)
             sequence, set_root = current
             pointer_health = "healthy"
             if generation_store is not None:
@@ -715,6 +737,9 @@ def build_server(
                     + (["memory_cancellation_status_v1"] if contract_schema_version >= 6 else [])
                     + (["memory_cancellation_submit_v1"] if contract_schema_version == 7 else []),
                 })
+                authorization = write_authorization(fence)
+                if authorization is not None:
+                    status["write_authorization"] = authorization
             return status
 
     def sb_request_status(
