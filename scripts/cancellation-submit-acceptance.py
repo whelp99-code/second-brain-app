@@ -88,7 +88,7 @@ module.main()
         'contract': str(ROOT / 'contracts/second-brain-mcp-v5.json'),
         'resolved': {'target': original['targets'][0], 'scope': original['scope']}}
     run = subprocess.run(['node', str(ROOT / ('scripts/cancellation-dispatch-race.mjs' if payload['race_first'] else 'scripts/cancellation-submit-acceptance.mjs'))],
-        input=json.dumps(payload), text=True, capture_output=True, timeout=120, cwd=ROOT.parent / "Orca-JARVIS")
+        input=json.dumps(payload), text=True, capture_output=True, timeout=120, cwd=ROOT.parent / "Orca-JARVIS", check=False)
     if run.returncode:
         print(run.stderr, file=sys.stderr)
         raise SystemExit(run.returncode)
@@ -99,7 +99,7 @@ module.main()
         assert executor.store.tombstone_high_water()[0] == 1
         if cancel_first:
             result = subprocess.run([sys.executable, '-m', 'sb.cli', 'apply-cancellation', '--intent-id', observed['intent_id']],
-                env={**os.environ, 'SB_CONFIG':str(execution_config), 'TMPDIR':'/var/tmp'}, capture_output=True,text=True,timeout=60)
+                env={**os.environ, 'SB_CONFIG':str(execution_config), 'TMPDIR':'/var/tmp'}, capture_output=True,text=True,timeout=60, check=False)
             assert result.returncode == 0, result.stderr
             assert executor.store.get(observed['request_id']) is None
             execution = 'cancellation_applied'

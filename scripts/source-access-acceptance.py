@@ -33,7 +33,7 @@ env = {**os.environ, "TMPDIR": "/var/tmp", "SB_CONFIG": str(config)}
 
 def ingest():
     return subprocess.run([sys.executable, "-m", "sb.cli", "ingest", "--source", "docs"],
-        cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=60, check=False)
 
 
 def rows():

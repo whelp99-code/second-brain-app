@@ -42,7 +42,7 @@ else:
             generation = store.build(request_id=f'fixture:{index}', parent=None if not generations else generations[-1],
                 tombstone_sequence=0, tombstone_set_root='sha256:' + '0' * 64,
                 created_at=now, allowed=lambda _: True,
-                mutate=lambda root: materialize_remember(root,
+                mutate=lambda root, index=index: materialize_remember(root,
                     content=request.preparation.content if index == 0 else '후속 기억',
                     candidate_id=raw['source_request']['candidate_id'] if index == 0 else 'memcand:pos:v1:' + 'd' * 64,
                     created_at=raw['created_at'], release_sha='a' * 40,

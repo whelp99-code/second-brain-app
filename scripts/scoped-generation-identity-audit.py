@@ -22,7 +22,7 @@ def main():
             root = temporary / label
             store = GenerationStore(root / "state", root / "share", provider_instance_id="provider:fixture", provider_release_sha="a" * 40)
             try:
-                def materialize(path):
+                def materialize(path, label=label):
                     materialize_remember(path, content="동일한 기억 내용", candidate_id="memcand:pos:v1:" + "a" * 64,
                         created_at=now.isoformat(), release_sha="a" * 40,
                         source_access=SourceAccess("principal:owner", (f"project:{label}",), "policy:fixture"))

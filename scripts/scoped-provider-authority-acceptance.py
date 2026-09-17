@@ -9,9 +9,9 @@ from pathlib import Path
 
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
-from sb.scoped_request_acceptance import accept_scoped_request
 from sb.scoped_provider_decision import create_scoped_provider_authority
 from sb.scoped_provider_process import ScopedProviderChannelError, ScopedProviderProcess
+from sb.scoped_request_acceptance import accept_scoped_request
 from tests.task30_process_harness import executor_config
 
 node, script, build, state_path, mode, root = sys.argv[1:]

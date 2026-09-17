@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cryptography.hazmat.primitives import serialization
+
 from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_requests import accept_effect_request
 from sb.mcp_contract import write_fixture_request
@@ -23,7 +24,7 @@ from tests.test_request_executor import _config
 
 build = str(Path(sys.argv[1]).resolve())
 run = subprocess.run([sys.executable, str(ROOT/'scripts/cancellation-submit-acceptance.py'), build, '--settle-result'],
-    capture_output=True, text=True, timeout=120, env={**os.environ, 'TMPDIR':'/var/tmp'})
+    capture_output=True, text=True, timeout=120, env={**os.environ, 'TMPDIR':'/var/tmp'}, check=False)
 if run.returncode:
     raise SystemExit(run.stderr)
 prior_path = Path(run.stdout.splitlines()[0])
@@ -63,7 +64,7 @@ try:
     assert request['tombstone_chain_delta'][0]['previous_root'] == prior['local_recovery']['settlement']['tombstone_set_root']
     public = HISTORICAL.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
     validated = subprocess.run(['node', str(ROOT/'scripts/cancellation-followup-validate.mjs')], input=json.dumps({
-        'build':build,'request':request,'now':format_instant(now),'public_key':public}), capture_output=True,text=True,timeout=30)
+        'build':build,'request':request,'now':format_instant(now),'public_key':public}), capture_output=True,text=True,timeout=30, check=False)
     assert validated.returncode == 0, validated.stderr
     accepted = accept_effect_request(executor.config.request_root,request,now,
         public_keys=executor.config.jarvis_public_keys, provider_instance_id=executor.config.provider_instance_id)

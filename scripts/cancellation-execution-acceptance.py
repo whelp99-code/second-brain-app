@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from cryptography.hazmat.primitives import serialization
+
 from sb.delegations import create_read_fence
 from sb.effect_values import format_instant
 from sb.effect_write_values import model_object
@@ -49,9 +50,9 @@ boundary.execute_cancellation = interrupted
 raise SystemExit(main(["apply-cancellation", "--intent-id", {identity!r}]))
 ''')
     env = {**os.environ, 'SB_CONFIG': str(config), 'TMPDIR': '/var/tmp'}
-    stopped = subprocess.run([sys.executable, str(crash)], env=env, cwd=ROOT, text=True, capture_output=True, timeout=60)
+    stopped = subprocess.run([sys.executable, str(crash)], env=env, cwd=ROOT, text=True, capture_output=True, timeout=60, check=False)
     assert stopped.returncode == 77, (stopped.returncode, stopped.stderr)
-    def execute():
+    def execute(identity=identity, env=env):
         completed = subprocess.run([sys.executable, '-m', 'sb.cli', 'apply-cancellation', '--intent-id', identity],
             env=env, cwd=ROOT, text=True, capture_output=True, timeout=60, check=True)
         return json.loads(completed.stdout)

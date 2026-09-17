@@ -1,0 +1,4173 @@
+{
+  "acceptanceStrength": {
+    "commands": [
+      "python -m ruff check .",
+      "python -m pytest"
+    ],
+    "level": "STRONG",
+    "reason": "Repository-owned build, test, verify, check, package, or equivalent command was detected.",
+    "sufficient": true
+  },
+  "actionEnvelope": {
+    "allowedNow": [
+      "REVIEW_SCOPE",
+      "APPROVE_SCOPE",
+      "EDIT_SCOPE",
+      "STOP"
+    ],
+    "currentState": "READY_FOR_APPROVAL",
+    "exactUserPhrase": "이대로 시작해.",
+    "forbiddenNow": [
+      "WAIT_FOR_ANALYSIS",
+      "CONFIRM_INTENT",
+      "REVIEW_ANALYSIS",
+      "REVIEW_PLAN",
+      "ANSWER_EXCEPTION",
+      "REVIEW_BASELINE",
+      "STRENGTHEN_ACCEPTANCE",
+      "INSPECT_CHANGES",
+      "INSPECT_ACCEPTANCE",
+      "CONTINUE_LOCKED_SCOPE",
+      "VERIFY",
+      "FIX_RELEASE_BLOCKER",
+      "PAUSE",
+      "RESUME",
+      "ABORT",
+      "CONFIRM_CLOSE",
+      "REVIEW_COMPLETION",
+      "CREATE_NEW_PROPOSAL",
+      "USE_ACTIVE_PROPOSAL"
+    ],
+    "hash": "38e96a9ed50f8ef5922c8bb9bc321f00d304b7aa5860038d6d63ad6fc40922c1",
+    "nextAction": "REVIEW_SCOPE",
+    "requiresHumanApproval": true,
+    "schema": "shipping-harness/action-envelope-v1",
+    "userActionLabel": "개발 범위 승인"
+  },
+  "analysis": {
+    "candidateCommands": [
+      {
+        "aggregate": false,
+        "automaticallyRunnable": true,
+        "command": "python -m ruff check .",
+        "confidence": "medium",
+        "cwd": ".",
+        "description": "Configured Ruff checks pass.",
+        "deterministicOutputRequired": false,
+        "id": "python-ruff",
+        "isolationRequired": false,
+        "sideEffect": "none-or-test-output",
+        "source": "pyproject.toml"
+      },
+      {
+        "aggregate": false,
+        "automaticallyRunnable": true,
+        "command": "python -m pytest",
+        "confidence": "medium",
+        "cwd": ".",
+        "description": "Python tests pass.",
+        "deterministicOutputRequired": false,
+        "id": "python-pytest",
+        "isolationRequired": false,
+        "sideEffect": "none-or-test-output",
+        "source": "pyproject.toml"
+      }
+    ],
+    "diagnostics": [],
+    "intelligence": {
+      "acceptanceCommands": [
+        {
+          "aggregate": false,
+          "automaticallyRunnable": true,
+          "command": "python -m ruff check .",
+          "confidence": "medium",
+          "cwd": ".",
+          "description": "Configured Ruff checks pass.",
+          "deterministicOutputRequired": false,
+          "id": "python-ruff",
+          "isolationRequired": false,
+          "sideEffect": "none-or-test-output",
+          "source": "pyproject.toml"
+        },
+        {
+          "aggregate": false,
+          "automaticallyRunnable": true,
+          "command": "python -m pytest",
+          "confidence": "medium",
+          "cwd": ".",
+          "description": "Python tests pass.",
+          "deterministicOutputRequired": false,
+          "id": "python-pytest",
+          "isolationRequired": false,
+          "sideEffect": "none-or-test-output",
+          "source": "pyproject.toml"
+        }
+      ],
+      "acceptanceCoverage": {
+        "complete": true,
+        "coveredPaths": 0,
+        "reason": "NO_DIRTY_PRODUCT_PATHS",
+        "rows": [],
+        "schema": "shipping-harness/acceptance-coverage-v1",
+        "totalPaths": 0,
+        "uncoveredPaths": []
+      },
+      "componentGraph": {
+        "components": [
+          {
+            "id": "COMP-62f011d3ee",
+            "name": "continue-session-80ebc9",
+            "role": "primary-runtime",
+            "root": ".",
+            "stacks": [
+              "python",
+              "node",
+              "swift",
+              "shell"
+            ],
+            "trackedFileCount": 1587
+          },
+          {
+            "id": "COMP-5f68dc9757",
+            "name": "verification scripts",
+            "role": "verification-and-operations",
+            "root": "scripts",
+            "stacks": [
+              "python",
+              "node",
+              "shell"
+            ],
+            "trackedFileCount": 144
+          }
+        ],
+        "primaryComponentId": "COMP-62f011d3ee",
+        "primaryStack": "python",
+        "schema": "shipping-harness/component-graph-v1",
+        "supportingStacks": [
+          "node",
+          "swift",
+          "shell"
+        ],
+        "truncated": false
+      },
+      "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+      "goalRecommendation": null,
+      "hash": "3c527532ca4583b51c3850c7e1dbbf5c8968760f2aab3b664da870d02fd5cdcd",
+      "schema": "shipping-harness/project-intelligence-v1",
+      "workThemes": []
+    },
+    "manifests": [
+      "pyproject.toml"
+    ],
+    "projectName": "continue-session-80ebc9",
+    "readme": null,
+    "schema": "shipping-harness/project-analysis-v2",
+    "sourceRoots": [
+      "clients",
+      "deploy",
+      "docs",
+      "sb",
+      "scripts",
+      "tests"
+    ],
+    "stageCommands": [],
+    "topLevel": [
+      {
+        "name": ".cursor",
+        "type": "directory"
+      },
+      {
+        "name": ".gitignore",
+        "type": "file"
+      },
+      {
+        "name": ".python-version",
+        "type": "file"
+      },
+      {
+        "name": ".serena",
+        "type": "directory"
+      },
+      {
+        "name": "ABSTENTION-CLI-MCP-BASELINE-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "ABSTENTION-CLI-MCP-BASELINE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "ACCESS-CLAIM-CLOCK-FIX-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "ACCESS-CLAIM-CLOCK-FIX-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "ACCESS-CLAIM-ISSUER-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "ACCESS-CLAIM-ISSUER-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "ACCESS-CLAIM-VERIFICATION-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "ACCESS-CLAIM-VERIFICATION-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "ACTIVATED-ORPHAN-ROWS-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "ACTIVATED-ORPHAN-ROWS-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "ADAPTER-NAME-VALIDATION-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "ADAPTER-NAME-VALIDATION-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "AGENT-POLICY-LOGIN-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "AGENT-POLICY-LOGIN-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "AGENT-SUPPORT-AND-ACCEPTANCE-GAPS-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "AGENTS.md",
+        "type": "file"
+      },
+      {
+        "name": "AUDIT-2026-09-07.md",
+        "type": "file"
+      },
+      {
+        "name": "AUTHENTICATED-CLIENT-MCP-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "AUTHENTICATED-CLIENT-MCP-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-CANDIDATE-PROVIDER-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-CANDIDATE-PROVIDER-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-CANDIDATE-PUBLICATION-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-CANDIDATE-PUBLICATION-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-EXPIRY-CLEANUP-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-EXPIRY-CLEANUP-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-PUBLICATION-CLOCK-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "AUTO-PUBLICATION-CLOCK-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-CRASH-RECOVERY-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-CRASH-RECOVERY-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-DETAIL-FIELD-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-DETAIL-FIELD-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-FULL-PASS-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-FULL-PASS-2026-09-10.txt",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-FULL-REGRESSION-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-FULL-REGRESSION-2026-09-10.txt",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-PARTIAL-STATUS-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-PROGRESS-RECOVERY-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-PROGRESS-RECOVERY-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BATCH-STATIC-TYPES-2026-09-10.txt",
+        "type": "file"
+      },
+      {
+        "name": "BOUND-KNOWLEDGE-LIFECYCLE-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BOUND-KNOWLEDGE-STORAGE-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BOUND-NATIVE-RECALL-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "BOUND-NATIVE-RECALL-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BOUND-PARTIAL-FORGET-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "BRIEF-RETRY-HOLD-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "BRIEFING-FAILURE-DIAGNOSIS-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "BRIEFING-FAILURE-DIAGNOSIS-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "BRIEFING-RECORD-BUDGET-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "BUNDLED-PYTHON-CANDIDATE-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "BUNDLED-PYTHON-CANDIDATE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "C-MODEL-REQUEST-2026-09-11.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-ADMISSION-DESIGN-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-DB-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-DB-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-DISPATCH-MCP-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-DISPATCH-MCP-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-EXECUTION-DESIGN-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-FOLLOWUP-SETTLED-ACCEPTANCE-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-FOLLOWUP-SETTLED-ACCEPTANCE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-GENERATION-DESIGN-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-JARVIS-MCP-RACE-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-JARVIS-MCP-RACE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-JOURNAL-DESIGN-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-LOCAL-COMPACTION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-LOCAL-COMPACTION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-LOCAL-OBSERVATION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-LOCAL-OBSERVATION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-MATERIAL-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-MATERIAL-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-MCP-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-ORIGINAL-ADMISSION-RACE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-PRESWAP-RECOVERY-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-PRESWAP-RECOVERY-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-RESULT-CONTRACT-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-RESULT-STORAGE-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-RESULT-STORAGE-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SETTLEMENT-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SETTLEMENT-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-STATUS-DESIGN-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SUBMISSION-DESIGN-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SWAP-RECOVERY-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANCELLATION-SWAP-RECOVERY-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-HARNESS-PINNING-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-HARNESS-PINNING-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-LINEAGE-SCOPE-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-SCOPE-REVALIDATION-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-SCOPE-REVALIDATION-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-SUPPRESSION-WRITES-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CAPACITY-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CAPACITY-PLAN.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-COMPLETION-REPORT-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-CUTOVER-2026-09-15.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-CUTOVER-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-DIRECTIVE-H7-BRIEF-SUPERSEDE-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-DIRECTIVE-HELD-BRANCHES-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-DIRECTIVE-JARVIS-F2-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-DIRECTIVE-PIN-3RD-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-DIRECTIVE-PIN-4TH-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-DIRECTIVE-READINESS-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-FINAL-VERIFICATION-365f8e4.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-FINAL-VERIFICATION-365f8e4.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-M14-DECISION-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NATIVE-COLLECTION-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NATIVE-COLLECTION-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-DIRECTIVE-e53dd66.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-45f5b72.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-45f5b72.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-46a3d60.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-46a3d60.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-7cab61b.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-7de7c6f.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-7de7c6f.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-9d2041f.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-9d2041f.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-9f604d7.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-9f604d7.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-a18396f.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-a18396f.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-a47f2a9.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-a47f2a9.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-b239c0b.json",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-NIGHT-REVIEW-b239c0b.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE-OVERNIGHT-REPORT-2026-09-14.md",
+        "type": "file"
+      },
+      {
+        "name": "CLAUDE.md",
+        "type": "file"
+      },
+      {
+        "name": "CLI-CONFIG-PATH-PRESERVATION-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "clients",
+        "type": "directory"
+      },
+      {
+        "name": "CODEX-6FB150B-RECHECK-2026-09-11.json",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-6FB150B-RECHECK-2026-09-11.md",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-FOLLOWUP-REPLY-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-FOLLOWUP-REVIEW-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-REPLY-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-REPLY-REVIEW-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-W0-W9-REPLY-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-W0-W9-REVIEW-2026-09-11.json",
+        "type": "file"
+      },
+      {
+        "name": "CODEX-W0-W9-REVIEW-2026-09-11.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPACTION-WRITER-EXCLUSION-ACCEPTANCE-2026-09-08.json",
+        "type": "file"
+      },
+      {
+        "name": "COMPACTION-WRITER-EXCLUSION-ACCEPTANCE-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPILE-KEY-INSTALLED-UPGRADE-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "COMPILE-KEY-INSTALLED-UPGRADE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPILE-PAGE-IDENTITY-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPILE-RETRY-INVENTORY-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "COMPILE-RETRY-INVENTORY-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPILED-KNOWLEDGE-BINDING-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPOSER-ADVERSARIAL-REVIEW-2026-09-14.md",
+        "type": "file"
+      },
+      {
+        "name": "COMPRESSED-SIGNED-RESTORE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "config.example.toml",
+        "type": "file"
+      },
+      {
+        "name": "CONFIGURED-BATCH-SOURCES-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "CONFIGURED-BATCH-SOURCES-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-CANDIDATE-CAPACITY-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-CAP-OUTCOME-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-CAP-OUTCOME-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-CITATION-IDENTITY-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-CONTENT-IDENTITY-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-FAILURE-BATCH-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-FAILURE-BATCH-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-JSON-PARSING-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-PARSER-CACHE-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-RESTORE-FULL-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-RESTORE-FULL-2026-09-10.txt",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-RETRY-CACHED-PAGES-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.txt",
+        "type": "file"
+      },
+      {
+        "name": "CONTAINED-JARVIS-CANDIDATE-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CONTAINED-JARVIS-CANDIDATE-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CONTENT-BOUND-INTEGRATION-2026-09-09.json",
+        "type": "file"
+      },
+      {
+        "name": "CONTENT-BOUND-INTEGRATION-2026-09-09.md",
+        "type": "file"
+      },
+      {
+        "name": "CONTEXT-BUDGET-DESIGN-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "CONTEXT-BUDGET-DESIGN-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md",
+        "type": "file"
+      },
+      {
+        "name": "CONTINUATION-FULL-REGRESSION-2026-09-10.md",
+        "type": "file"
+      },
+      {
+        "name": "CONTINUATION-FULL-REGRESSION-2026-09-10.txt",
+        "type": "file"
+      },
+      {
+        "name": "CONTINUATION-INSTALLED-MAINTENANCE-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "CONTINUATION-INSTALLED-PAIR-2026-09-10.json",
+        "type": "file"
+      },
+      {
+        "name": "CONTINUATION-INSTALLED-PAIR-2026-09-10.md",
+        "type": "file"
+      }
+    ],
+    "trackedFileCount": 1587,
+    "trackedFileCountTruncated": false,
+    "types": [
+      "python"
+    ],
+    "versionEvidence": {
+      "baseVersion": "1.0.0",
+      "changeKind": "patch",
+      "confidence": "high",
+      "evidence": [
+        {
+          "confidence": "high",
+          "path": "pyproject.toml",
+          "source": "pyproject",
+          "version": "1.0.0"
+        },
+        {
+          "confidence": "medium",
+          "path": null,
+          "source": "git-tag",
+          "version": "1.0.1"
+        },
+        {
+          "confidence": "medium",
+          "path": null,
+          "source": "git-tag",
+          "version": "1.0.0"
+        }
+      ],
+      "explicitVersionWins": true,
+      "recommendedVersion": "1.0.1",
+      "schema": "shipping-harness/version-evidence-v1"
+    },
+    "workspace": {
+      "ambiguous": false,
+      "confidence": "high",
+      "id": "WS-62f011d3ee4f",
+      "requested": false,
+      "root": ".",
+      "score": 15
+    },
+    "workspaceCandidates": [
+      {
+        "commandCount": 2,
+        "id": "WS-62f011d3ee4f",
+        "manifests": [
+          "pyproject.toml"
+        ],
+        "projectName": "continue-session-80ebc9",
+        "root": ".",
+        "score": 15,
+        "trackedFileCount": 1587,
+        "types": [
+          "python"
+        ]
+      }
+    ]
+  },
+  "approvalBrief": {
+    "acceptance": [
+      {
+        "command": "python -m ruff check .",
+        "cwd": ".",
+        "description": "Configured Ruff checks pass.",
+        "id": "AC-001"
+      },
+      {
+        "command": "python -m pytest",
+        "cwd": ".",
+        "description": "Python tests pass.",
+        "id": "AC-002"
+      }
+    ],
+    "assumptions": [
+      {
+        "id": "ASM-001",
+        "statement": "No paid service, external deployment, credential change, destructive migration, or customer-facing action is required unless explicitly stated in the user outcome."
+      }
+    ],
+    "deferred": [
+      "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+      "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+      "Optional polish, additional integrations, and future extensibility work."
+    ],
+    "hash": "a71b92276c282201cb82b2e408f9396ea2226826488ff93aaed83fcfa7e27603",
+    "included": [
+      "Deliver the stated release goal: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+      "Preserve existing behavior outside the stated goal.",
+      "Make every required acceptance check pass and document how to run the shipped result."
+    ],
+    "limits": {
+      "maxAgentRuns": 3,
+      "maxCommandSeconds": 900,
+      "maxFixCycles": 2,
+      "questionBudget": 3
+    },
+    "mode": "AUTO",
+    "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "questions": [],
+    "risks": [],
+    "schema": "shipping-harness/approval-brief-v1",
+    "status": "APPROVABLE",
+    "text": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.\nMode: AUTO | Status: APPROVABLE\nIncluded: Deliver the stated release goal: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다. | Preserve existing behavior outside the stated goal. | Make every required acceptance check pass and document how to run the shipped result.\nDeferred: Unrequested web, mobile, cloud, multi-user, and deployment features. | Speculative architecture rewrites and refactors not required by a failing acceptance criterion. | Optional polish, additional integrations, and future extensibility work.\nAcceptance: AC-001 [cwd=.] Configured Ruff checks pass. | AC-002 [cwd=.] Python tests pass.\nAssumptions: ASM-001 No paid service, external deployment, credential change, destructive migration, or customer-facing action is required unless explicitly stated in the user outcome.\nRisks: None\nQuestions: None\nLimits: fix 2, agent runs 3, command seconds 900"
+  },
+  "baseline": {
+    "blockingCount": 0,
+    "blockingPaths": [],
+    "cleanForApproval": true,
+    "counts": {
+      "AGENT_RUNTIME": 0,
+      "GENERATED": 0,
+      "PRODUCT": 0,
+      "RELEASE_EVIDENCE": 0,
+      "SHIPPING_RUNTIME": 1,
+      "UNKNOWN": 0
+    },
+    "entries": [
+      {
+        "blocking": false,
+        "category": "SHIPPING_RUNTIME",
+        "originalPath": null,
+        "path": ".shipping/",
+        "paths": [
+          ".shipping/"
+        ],
+        "reason": "Shipping runtime state is not product source.",
+        "status": "??",
+        "tracked": false,
+        "untracked": true
+      }
+    ],
+    "nonBlockingPaths": [
+      ".shipping/"
+    ],
+    "plan": {
+      "baseGitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+      "excludePaths": [
+        ".shipping/"
+      ],
+      "fileSetHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "hash": "a9f11b586c4680cba044ba1f1e2f5dcb323e0efdc9389f59fdfbd106e4759ba4",
+      "includePaths": [],
+      "rationale": "No product or unknown baseline changes require preservation.",
+      "recommendation": "NONE",
+      "schema": "shipping-harness/baseline-plan-v1",
+      "suggestedCommitMessage": "chore: preserve existing project baseline"
+    },
+    "schema": "shipping-harness/baseline-v1"
+  },
+  "baselineCommit": null,
+  "briefFactGraph": {
+    "facts": [
+      {
+        "authority": "mechanical",
+        "code": "CANONICAL_STATE",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "canonicalState"
+        ],
+        "value": "READY_FOR_APPROVAL"
+      },
+      {
+        "authority": "mechanical",
+        "code": "PRIMARY_NEXT_ACTION",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "actionEnvelope.nextAction"
+        ],
+        "value": "REVIEW_SCOPE"
+      },
+      {
+        "authority": "mechanical",
+        "code": "APPROVAL_READINESS",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "canonicalState",
+          "readyForApproval"
+        ],
+        "value": true
+      },
+      {
+        "authority": "mechanical",
+        "code": "BASELINE_COUNTS",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "baseline.counts",
+          "baseline.blockingCount",
+          "baseline.plan.hash"
+        ],
+        "value": {
+          "agentRuntime": 0,
+          "blocking": 0,
+          "generated": 0,
+          "product": 0,
+          "releaseEvidence": 0,
+          "shippingRuntime": 1,
+          "unknown": 0
+        }
+      },
+      {
+        "authority": "mechanical",
+        "code": "ACCEPTANCE_COVERAGE",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "intelligence.acceptanceCoverage"
+        ],
+        "value": {
+          "complete": true,
+          "coveredPaths": 0,
+          "totalPaths": 0,
+          "uncoveredPaths": 0
+        }
+      },
+      {
+        "authority": "mechanical",
+        "code": "VERSION_EVIDENCE",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "versionEvidence"
+        ],
+        "value": {
+          "baseVersion": "1.0.0",
+          "confidence": "high",
+          "recommendedVersion": "1.0.1"
+        }
+      },
+      {
+        "authority": "mechanical",
+        "code": "INTENT_GATE",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "intentGate.status",
+          "intentGate.effectiveMode",
+          "intentGate.question",
+          "intentGate.hash"
+        ],
+        "value": {
+          "analysisComplete": true,
+          "autopilotAllowed": false,
+          "defaultMode": "ANALYZE_ONLY",
+          "effectiveMode": "IMPLEMENT",
+          "implementationAllowed": true,
+          "inferredMode": "IMPLEMENT",
+          "modelAuthority": false,
+          "planningAllowed": true,
+          "selectedMode": "IMPLEMENT",
+          "status": "CONFIRMED"
+        }
+      },
+      {
+        "authority": "mechanical",
+        "code": "GOAL_DISCOVERY",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "goalDiscovery.status",
+          "goalDiscovery.questions",
+          "goalDiscovery.direction"
+        ],
+        "value": {
+          "directionHash": "b8398cff1bd058fd6324a9d8c7e4ac0912fa33a0d3b2830f5791db138b58bf86",
+          "modelAuthority": false,
+          "questionCount": 0,
+          "recommendedCandidateId": "DIR-001",
+          "round": 1,
+          "status": "READY"
+        }
+      },
+      {
+        "authority": "mechanical",
+        "code": "GOAL_CHARTER",
+        "confidence": "exact",
+        "evidenceRefs": [
+          "goalCharter.status",
+          "goalCharter.hash",
+          "goalCharter.outcome",
+          "goalCharter.primaryUser",
+          "goalCharter.operatingBoundary"
+        ],
+        "value": {
+          "hash": "7abd469a78c349b500263fc90bf7d1252e13cacc9b4dfe1a23977b1790d6a620",
+          "modelAuthority": false,
+          "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+          "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0…",
+          "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+          "released": false,
+          "status": "PROPOSED"
+        }
+      }
+    ],
+    "hash": "e378fde13fb58c17b1315dd214cb02af2b518878da7147d286386dbd036ff15d",
+    "release": "1.0.2",
+    "schema": "shipping-harness/brief-fact-graph-v1",
+    "state": "READY_FOR_APPROVAL"
+  },
+  "canonicalState": "READY_FOR_APPROVAL",
+  "contract": {
+    "acceptance": [
+      {
+        "automaticallyRunnable": true,
+        "command": "python -m ruff check .",
+        "cwd": ".",
+        "description": "Configured Ruff checks pass.",
+        "deterministicOutputRequired": false,
+        "id": "AC-001",
+        "isolationRequired": false,
+        "required": true,
+        "sideEffect": "none-or-test-output",
+        "timeoutSeconds": 300,
+        "type": "command"
+      },
+      {
+        "automaticallyRunnable": true,
+        "command": "python -m pytest",
+        "cwd": ".",
+        "description": "Python tests pass.",
+        "deterministicOutputRequired": false,
+        "id": "AC-002",
+        "isolationRequired": false,
+        "required": true,
+        "sideEffect": "none-or-test-output",
+        "timeoutSeconds": 600,
+        "type": "command"
+      }
+    ],
+    "adapters": {
+      "codex": {
+        "artifactPaths": [],
+        "command": null
+      },
+      "generic": {
+        "artifactPaths": [],
+        "command": null
+      }
+    },
+    "blockerPolicy": [
+      "acceptance-failure",
+      "contract-tamper",
+      "stale-evidence",
+      "scope-drift",
+      "data-loss",
+      "critical-security"
+    ],
+    "budgets": {
+      "maxAgentRuns": 3,
+      "maxCommandSeconds": 900,
+      "maxFixCycles": 2,
+      "maxOutputBytes": 1048576
+    },
+    "goal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "project": "second-brain-app",
+    "release": "1.0.2",
+    "releasePolicy": {
+      "autoCommit": false,
+      "autoPush": false,
+      "autoTag": false,
+      "generateReport": true
+    },
+    "schema": "shipping-harness/v1",
+    "scope": {
+      "exclude": [
+        "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+        "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+        "Optional polish, additional integrations, and future extensibility work."
+      ],
+      "include": [
+        "Deliver the stated release goal: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "Preserve existing behavior outside the stated goal.",
+        "Make every required acceptance check pass and document how to run the shipped result."
+      ],
+      "paths": {
+        "exclude": [
+          ".shipping/contract.yaml",
+          ".shipping/contract.lock",
+          ".git/**",
+          "node_modules/**",
+          "dist/**",
+          "coverage/**",
+          "target/**"
+        ],
+        "include": [
+          "README.md",
+          "README.rst",
+          "README.txt",
+          "clients/**",
+          "deploy/**",
+          "docs/**",
+          "pyproject.toml",
+          "sb/**",
+          "scripts/**",
+          "tests/**"
+        ]
+      }
+    },
+    "stopPolicy": {
+      "autoContinueAfterInterrupt": false,
+      "closeWhenRequiredGatesPass": true,
+      "humanInterruptWins": true
+    },
+    "worker": "shipping-harness"
+  },
+  "createdAt": "2026-09-17T05:39:43.165Z",
+  "decision": {
+    "acceptance": [
+      {
+        "automaticallyRunnable": true,
+        "command": "python -m ruff check .",
+        "cwd": ".",
+        "description": "Configured Ruff checks pass.",
+        "deterministicOutputRequired": false,
+        "id": "AC-001",
+        "isolationRequired": false,
+        "required": true,
+        "sideEffect": "none-or-test-output",
+        "timeoutSeconds": 300,
+        "type": "command"
+      },
+      {
+        "automaticallyRunnable": true,
+        "command": "python -m pytest",
+        "cwd": ".",
+        "description": "Python tests pass.",
+        "deterministicOutputRequired": false,
+        "id": "AC-002",
+        "isolationRequired": false,
+        "required": true,
+        "sideEffect": "none-or-test-output",
+        "timeoutSeconds": 600,
+        "type": "command"
+      }
+    ],
+    "approvalStatus": "APPROVABLE",
+    "assumptions": [
+      {
+        "confidence": "medium",
+        "evidenceRefs": [
+          "EVID-001"
+        ],
+        "id": "ASM-001",
+        "reversibility": "reversible",
+        "statement": "No paid service, external deployment, credential change, destructive migration, or customer-facing action is required unless explicitly stated in the user outcome."
+      }
+    ],
+    "decisions": [
+      {
+        "basis": "evidence",
+        "choice": "Keep the detected python implementation stack and repository conventions.",
+        "confidence": "high",
+        "evidenceRefs": [
+          "EVID-003"
+        ],
+        "id": "DEC-001",
+        "rationale": "Changing technology is outside the stated outcome and increases completion risk.",
+        "reversibility": "reversible",
+        "title": "Preserve the repository stack"
+      },
+      {
+        "basis": "evidence",
+        "choice": "Use only commands already detected in repository manifests.",
+        "confidence": "medium",
+        "evidenceRefs": [
+          "EVID-004"
+        ],
+        "id": "DEC-002",
+        "rationale": "Existing commands are the strongest mechanically observable acceptance surface.",
+        "reversibility": "reversible",
+        "title": "Use existing verification commands"
+      },
+      {
+        "basis": "evidence",
+        "choice": "Implement only the stated outcome and defer optional product expansion.",
+        "confidence": "high",
+        "evidenceRefs": [
+          "EVID-001"
+        ],
+        "id": "DEC-003",
+        "rationale": "The release goal is shipping, not speculative architecture or feature growth.",
+        "reversibility": "reversible",
+        "title": "Choose the smallest operable release"
+      },
+      {
+        "basis": "evidence",
+        "choice": "Use . as the authority-bearing execution workspace.",
+        "confidence": "high",
+        "evidenceRefs": [
+          "EVID-007"
+        ],
+        "id": "DEC-004",
+        "rationale": "The selected workspace has the strongest bounded combination of manifests, source, tests, release metadata, and verification targets.",
+        "reversibility": "reversible",
+        "title": "Select the runnable workspace"
+      },
+      {
+        "basis": "evidence",
+        "choice": "Recommend 1.0.2 from mechanical version evidence and the classified change kind.",
+        "confidence": "high",
+        "evidenceRefs": [
+          "EVID-008"
+        ],
+        "id": "DEC-005",
+        "rationale": "An explicit user version remains authoritative; otherwise Shipping uses the highest-confidence manifest or tag evidence.",
+        "reversibility": "reversible",
+        "title": "Recommend the next semantic version"
+      }
+    ],
+    "evidenceHash": "0b9191e6d2730fe965f9a4544320bf6b5c914c23058bda36a5389124f9d7cb6b",
+    "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+    "hash": "27acbe222c4297ea04d7311ad109b24e3bed7537e6528dbe3b5da6487ad65d54",
+    "limits": {
+      "maxAgentRuns": 3,
+      "maxCommandSeconds": 900,
+      "maxFixCycles": 2,
+      "questionBudget": 3
+    },
+    "mode": "AUTO",
+    "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "projectName": "second-brain-app",
+    "proposer": {
+      "id": "claude-opus-5-session-80ebc9",
+      "type": "system"
+    },
+    "questions": [],
+    "release": "1.0.2",
+    "risks": [],
+    "schema": "shipping-harness/decision-v1",
+    "scope": {
+      "exclude": [
+        "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+        "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+        "Optional polish, additional integrations, and future extensibility work."
+      ],
+      "include": [
+        "Deliver the stated release goal: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "Preserve existing behavior outside the stated goal.",
+        "Make every required acceptance check pass and document how to run the shipped result."
+      ],
+      "paths": {
+        "exclude": [
+          ".shipping/contract.yaml",
+          ".shipping/contract.lock",
+          ".git/**",
+          "node_modules/**",
+          "dist/**",
+          "coverage/**",
+          "target/**"
+        ],
+        "include": [
+          "README.md",
+          "README.rst",
+          "README.txt",
+          "clients/**",
+          "deploy/**",
+          "docs/**",
+          "pyproject.toml",
+          "sb/**",
+          "scripts/**",
+          "tests/**"
+        ]
+      }
+    }
+  },
+  "diagnostics": [],
+  "evidence": {
+    "analysis": {
+      "candidateCommands": [
+        {
+          "aggregate": false,
+          "automaticallyRunnable": true,
+          "command": "python -m ruff check .",
+          "confidence": "medium",
+          "cwd": ".",
+          "description": "Configured Ruff checks pass.",
+          "deterministicOutputRequired": false,
+          "id": "python-ruff",
+          "isolationRequired": false,
+          "sideEffect": "none-or-test-output",
+          "source": "pyproject.toml"
+        },
+        {
+          "aggregate": false,
+          "automaticallyRunnable": true,
+          "command": "python -m pytest",
+          "confidence": "medium",
+          "cwd": ".",
+          "description": "Python tests pass.",
+          "deterministicOutputRequired": false,
+          "id": "python-pytest",
+          "isolationRequired": false,
+          "sideEffect": "none-or-test-output",
+          "source": "pyproject.toml"
+        }
+      ],
+      "diagnostics": [],
+      "intelligence": {
+        "acceptanceCommands": [
+          {
+            "aggregate": false,
+            "automaticallyRunnable": true,
+            "command": "python -m ruff check .",
+            "confidence": "medium",
+            "cwd": ".",
+            "description": "Configured Ruff checks pass.",
+            "deterministicOutputRequired": false,
+            "id": "python-ruff",
+            "isolationRequired": false,
+            "sideEffect": "none-or-test-output",
+            "source": "pyproject.toml"
+          },
+          {
+            "aggregate": false,
+            "automaticallyRunnable": true,
+            "command": "python -m pytest",
+            "confidence": "medium",
+            "cwd": ".",
+            "description": "Python tests pass.",
+            "deterministicOutputRequired": false,
+            "id": "python-pytest",
+            "isolationRequired": false,
+            "sideEffect": "none-or-test-output",
+            "source": "pyproject.toml"
+          }
+        ],
+        "acceptanceCoverage": {
+          "complete": true,
+          "coveredPaths": 0,
+          "reason": "NO_DIRTY_PRODUCT_PATHS",
+          "rows": [],
+          "schema": "shipping-harness/acceptance-coverage-v1",
+          "totalPaths": 0,
+          "uncoveredPaths": []
+        },
+        "componentGraph": {
+          "components": [
+            {
+              "id": "COMP-62f011d3ee",
+              "name": "continue-session-80ebc9",
+              "role": "primary-runtime",
+              "root": ".",
+              "stacks": [
+                "python",
+                "node",
+                "swift",
+                "shell"
+              ],
+              "trackedFileCount": 1587
+            },
+            {
+              "id": "COMP-5f68dc9757",
+              "name": "verification scripts",
+              "role": "verification-and-operations",
+              "root": "scripts",
+              "stacks": [
+                "python",
+                "node",
+                "shell"
+              ],
+              "trackedFileCount": 144
+            }
+          ],
+          "primaryComponentId": "COMP-62f011d3ee",
+          "primaryStack": "python",
+          "schema": "shipping-harness/component-graph-v1",
+          "supportingStacks": [
+            "node",
+            "swift",
+            "shell"
+          ],
+          "truncated": false
+        },
+        "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "goalRecommendation": null,
+        "hash": "3c527532ca4583b51c3850c7e1dbbf5c8968760f2aab3b664da870d02fd5cdcd",
+        "schema": "shipping-harness/project-intelligence-v1",
+        "workThemes": []
+      },
+      "manifests": [
+        "pyproject.toml"
+      ],
+      "projectName": "continue-session-80ebc9",
+      "readme": null,
+      "schema": "shipping-harness/project-analysis-v2",
+      "sourceRoots": [
+        "clients",
+        "deploy",
+        "docs",
+        "sb",
+        "scripts",
+        "tests"
+      ],
+      "stageCommands": [],
+      "topLevel": [
+        {
+          "name": ".cursor",
+          "type": "directory"
+        },
+        {
+          "name": ".gitignore",
+          "type": "file"
+        },
+        {
+          "name": ".python-version",
+          "type": "file"
+        },
+        {
+          "name": ".serena",
+          "type": "directory"
+        },
+        {
+          "name": "ABSTENTION-CLI-MCP-BASELINE-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "ABSTENTION-CLI-MCP-BASELINE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "ACCESS-CLAIM-CLOCK-FIX-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "ACCESS-CLAIM-CLOCK-FIX-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "ACCESS-CLAIM-ISSUER-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "ACCESS-CLAIM-ISSUER-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "ACCESS-CLAIM-VERIFICATION-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "ACCESS-CLAIM-VERIFICATION-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "ACTIVATED-ORPHAN-ROWS-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "ACTIVATED-ORPHAN-ROWS-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "ADAPTER-NAME-VALIDATION-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "ADAPTER-NAME-VALIDATION-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "AGENT-POLICY-LOGIN-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "AGENT-POLICY-LOGIN-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "AGENT-SUPPORT-AND-ACCEPTANCE-GAPS-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "AGENTS.md",
+          "type": "file"
+        },
+        {
+          "name": "AUDIT-2026-09-07.md",
+          "type": "file"
+        },
+        {
+          "name": "AUTHENTICATED-CLIENT-MCP-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "AUTHENTICATED-CLIENT-MCP-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-CANDIDATE-PROVIDER-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-CANDIDATE-PROVIDER-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-CANDIDATE-PUBLICATION-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-CANDIDATE-PUBLICATION-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-EXPIRY-CLEANUP-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-EXPIRY-CLEANUP-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-PUBLICATION-CLOCK-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "AUTO-PUBLICATION-CLOCK-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-CRASH-RECOVERY-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-CRASH-RECOVERY-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-DETAIL-FIELD-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-DETAIL-FIELD-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-FULL-PASS-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-FULL-PASS-2026-09-10.txt",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-FULL-REGRESSION-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-FULL-REGRESSION-2026-09-10.txt",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-PARTIAL-STATUS-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-PROGRESS-RECOVERY-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-PROGRESS-RECOVERY-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BATCH-STATIC-TYPES-2026-09-10.txt",
+          "type": "file"
+        },
+        {
+          "name": "BOUND-KNOWLEDGE-LIFECYCLE-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BOUND-KNOWLEDGE-STORAGE-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BOUND-NATIVE-RECALL-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "BOUND-NATIVE-RECALL-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BOUND-PARTIAL-FORGET-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "BRIEF-RETRY-HOLD-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "BRIEFING-FAILURE-DIAGNOSIS-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "BRIEFING-FAILURE-DIAGNOSIS-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "BRIEFING-RECORD-BUDGET-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "BUNDLED-PYTHON-CANDIDATE-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "BUNDLED-PYTHON-CANDIDATE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "C-MODEL-REQUEST-2026-09-11.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-ADMISSION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-ADMISSION-DESIGN-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-DB-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-DB-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-DISPATCH-MCP-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-DISPATCH-MCP-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-EXECUTION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-EXECUTION-DESIGN-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-FOLLOWUP-PROVIDER-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-FOLLOWUP-SETTLED-ACCEPTANCE-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-FOLLOWUP-SETTLED-ACCEPTANCE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-GENERATION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-GENERATION-DESIGN-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-JARVIS-MCP-RACE-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-JARVIS-MCP-RACE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-JOURNAL-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-JOURNAL-DESIGN-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-LOCAL-COMPACTION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-LOCAL-COMPACTION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-LOCAL-OBSERVATION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-LOCAL-OBSERVATION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-MATERIAL-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-MATERIAL-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-MCP-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-MCP-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-ORIGINAL-ADMISSION-RACE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-PRESWAP-RECOVERY-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-PRESWAP-RECOVERY-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-RESULT-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-RESULT-CONTRACT-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-RESULT-STORAGE-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-RESULT-STORAGE-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SETTLEMENT-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SETTLEMENT-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-STATUS-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-STATUS-DESIGN-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SUBMISSION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SUBMISSION-DESIGN-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SWAP-RECOVERY-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANCELLATION-SWAP-RECOVERY-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-HARNESS-PINNING-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-HARNESS-PINNING-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-LINEAGE-SCOPE-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-SCOPE-REVALIDATION-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-SCOPE-REVALIDATION-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-SUPPRESSION-WRITES-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "CANDIDATE-SUPPRESSION-WRITES-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CAPACITY-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CAPACITY-PLAN.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-COMPLETION-REPORT-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-CUTOVER-2026-09-15.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-CUTOVER-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-DIRECTIVE-H7-BRIEF-SUPERSEDE-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-DIRECTIVE-HELD-BRANCHES-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-DIRECTIVE-JARVIS-F2-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-DIRECTIVE-PIN-3RD-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-DIRECTIVE-PIN-4TH-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-DIRECTIVE-READINESS-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-FINAL-VERIFICATION-365f8e4.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-FINAL-VERIFICATION-365f8e4.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-M14-DECISION-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NATIVE-COLLECTION-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NATIVE-COLLECTION-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NATIVE-COMPACT-PROBE-2026-09-15.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-DIRECTIVE-e53dd66.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-45f5b72.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-45f5b72.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-46a3d60.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-46a3d60.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-7cab61b.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-7de7c6f.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-7de7c6f.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-9d2041f.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-9d2041f.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-9f604d7.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-9f604d7.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-a18396f.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-a18396f.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-a47f2a9.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-a47f2a9.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-b239c0b.json",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-NIGHT-REVIEW-b239c0b.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE-OVERNIGHT-REPORT-2026-09-14.md",
+          "type": "file"
+        },
+        {
+          "name": "CLAUDE.md",
+          "type": "file"
+        },
+        {
+          "name": "CLI-CONFIG-PATH-PRESERVATION-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "clients",
+          "type": "directory"
+        },
+        {
+          "name": "CODEX-6FB150B-RECHECK-2026-09-11.json",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-6FB150B-RECHECK-2026-09-11.md",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-FOLLOWUP-REPLY-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-FOLLOWUP-REVIEW-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-REPLY-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-REPLY-REVIEW-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-W0-W9-REPLY-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-W0-W9-REVIEW-2026-09-11.json",
+          "type": "file"
+        },
+        {
+          "name": "CODEX-W0-W9-REVIEW-2026-09-11.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPACTION-WRITER-EXCLUSION-ACCEPTANCE-2026-09-08.json",
+          "type": "file"
+        },
+        {
+          "name": "COMPACTION-WRITER-EXCLUSION-ACCEPTANCE-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPILE-KEY-INSTALLED-UPGRADE-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "COMPILE-KEY-INSTALLED-UPGRADE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPILE-PAGE-IDENTITY-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPILE-RETRY-INVENTORY-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "COMPILE-RETRY-INVENTORY-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPILED-KNOWLEDGE-BINDING-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPOSER-ADVERSARIAL-REVIEW-2026-09-14.md",
+          "type": "file"
+        },
+        {
+          "name": "COMPRESSED-SIGNED-RESTORE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "config.example.toml",
+          "type": "file"
+        },
+        {
+          "name": "CONFIGURED-BATCH-SOURCES-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "CONFIGURED-BATCH-SOURCES-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-CANDIDATE-CAPACITY-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-CAP-OUTCOME-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-CAP-OUTCOME-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-CITATION-IDENTITY-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-CONTENT-IDENTITY-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-FAILURE-BATCH-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-FAILURE-BATCH-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-JSON-PARSING-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-PARSER-CACHE-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-RESTORE-FULL-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-RESTORE-FULL-2026-09-10.txt",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-RETRY-CACHED-PAGES-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CONFLICT-RETRY-CACHED-PAGES-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONNECTOR-UPDATES-FULL-REGRESSION-2026-09-10.txt",
+          "type": "file"
+        },
+        {
+          "name": "CONTAINED-JARVIS-CANDIDATE-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CONTAINED-JARVIS-CANDIDATE-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CONTENT-BOUND-INTEGRATION-2026-09-09.json",
+          "type": "file"
+        },
+        {
+          "name": "CONTENT-BOUND-INTEGRATION-2026-09-09.md",
+          "type": "file"
+        },
+        {
+          "name": "CONTEXT-BUDGET-DESIGN-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "CONTEXT-BUDGET-DESIGN-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONTEXT-DELIVERY-GAP-ANALYSIS-2026-09-08.md",
+          "type": "file"
+        },
+        {
+          "name": "CONTINUATION-FULL-REGRESSION-2026-09-10.md",
+          "type": "file"
+        },
+        {
+          "name": "CONTINUATION-FULL-REGRESSION-2026-09-10.txt",
+          "type": "file"
+        },
+        {
+          "name": "CONTINUATION-INSTALLED-MAINTENANCE-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "CONTINUATION-INSTALLED-PAIR-2026-09-10.json",
+          "type": "file"
+        },
+        {
+          "name": "CONTINUATION-INSTALLED-PAIR-2026-09-10.md",
+          "type": "file"
+        }
+      ],
+      "trackedFileCount": 1587,
+      "trackedFileCountTruncated": false,
+      "types": [
+        "python"
+      ],
+      "versionEvidence": {
+        "baseVersion": "1.0.0",
+        "changeKind": "patch",
+        "confidence": "high",
+        "evidence": [
+          {
+            "confidence": "high",
+            "path": "pyproject.toml",
+            "source": "pyproject",
+            "version": "1.0.0"
+          },
+          {
+            "confidence": "medium",
+            "path": null,
+            "source": "git-tag",
+            "version": "1.0.1"
+          },
+          {
+            "confidence": "medium",
+            "path": null,
+            "source": "git-tag",
+            "version": "1.0.0"
+          }
+        ],
+        "explicitVersionWins": true,
+        "recommendedVersion": "1.0.1",
+        "schema": "shipping-harness/version-evidence-v1"
+      },
+      "workspace": {
+        "ambiguous": false,
+        "confidence": "high",
+        "id": "WS-62f011d3ee4f",
+        "requested": false,
+        "root": ".",
+        "score": 15
+      },
+      "workspaceCandidates": [
+        {
+          "commandCount": 2,
+          "id": "WS-62f011d3ee4f",
+          "manifests": [
+            "pyproject.toml"
+          ],
+          "projectName": "continue-session-80ebc9",
+          "root": ".",
+          "score": 15,
+          "trackedFileCount": 1587,
+          "types": [
+            "python"
+          ]
+        }
+      ]
+    },
+    "baseline": {
+      "blockingCount": 0,
+      "blockingPaths": [],
+      "cleanForApproval": true,
+      "counts": {
+        "AGENT_RUNTIME": 0,
+        "GENERATED": 0,
+        "PRODUCT": 0,
+        "RELEASE_EVIDENCE": 0,
+        "SHIPPING_RUNTIME": 1,
+        "UNKNOWN": 0
+      },
+      "entries": [
+        {
+          "blocking": false,
+          "category": "SHIPPING_RUNTIME",
+          "originalPath": null,
+          "path": ".shipping/",
+          "paths": [
+            ".shipping/"
+          ],
+          "reason": "Shipping runtime state is not product source.",
+          "status": "??",
+          "tracked": false,
+          "untracked": true
+        }
+      ],
+      "nonBlockingPaths": [
+        ".shipping/"
+      ],
+      "plan": {
+        "baseGitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+        "excludePaths": [
+          ".shipping/"
+        ],
+        "fileSetHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "hash": "a9f11b586c4680cba044ba1f1e2f5dcb323e0efdc9389f59fdfbd106e4759ba4",
+        "includePaths": [],
+        "rationale": "No product or unknown baseline changes require preservation.",
+        "recommendation": "NONE",
+        "schema": "shipping-harness/baseline-plan-v1",
+        "suggestedCommitMessage": "chore: preserve existing project baseline"
+      },
+      "schema": "shipping-harness/baseline-v1"
+    },
+    "createdAt": "2026-09-17T05:39:43.153Z",
+    "facts": [
+      {
+        "claim": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "id": "EVID-001",
+        "kind": "user-intent",
+        "source": "user",
+        "trust": "trusted-user-intent"
+      },
+      {
+        "claim": {
+          "branch": "claude/continue-session-80ebc9",
+          "clean": true,
+          "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+          "sourceChanges": []
+        },
+        "id": "EVID-002",
+        "kind": "git-state",
+        "source": "git",
+        "trust": "trusted-mechanical"
+      },
+      {
+        "claim": {
+          "projectName": "continue-session-80ebc9",
+          "sourceRoots": [
+            "clients",
+            "deploy",
+            "docs",
+            "sb",
+            "scripts",
+            "tests"
+          ],
+          "trackedFileCount": 1587,
+          "types": [
+            "python"
+          ]
+        },
+        "id": "EVID-003",
+        "kind": "project-shape",
+        "source": "repository-metadata",
+        "trust": "untrusted-repository-data"
+      },
+      {
+        "claim": [
+          {
+            "aggregate": false,
+            "automaticallyRunnable": true,
+            "command": "python -m ruff check .",
+            "confidence": "medium",
+            "cwd": ".",
+            "description": "Configured Ruff checks pass.",
+            "deterministicOutputRequired": false,
+            "id": "python-ruff",
+            "isolationRequired": false,
+            "sideEffect": "none-or-test-output",
+            "source": "pyproject.toml"
+          },
+          {
+            "aggregate": false,
+            "automaticallyRunnable": true,
+            "command": "python -m pytest",
+            "confidence": "medium",
+            "cwd": ".",
+            "description": "Python tests pass.",
+            "deterministicOutputRequired": false,
+            "id": "python-pytest",
+            "isolationRequired": false,
+            "sideEffect": "none-or-test-output",
+            "source": "pyproject.toml"
+          }
+        ],
+        "id": "EVID-004",
+        "kind": "verification-surface",
+        "source": "repository-manifests",
+        "trust": "untrusted-repository-data"
+      },
+      {
+        "claim": [],
+        "id": "EVID-005",
+        "kind": "release-history",
+        "source": ".shipping/releases",
+        "trust": "trusted-shipping-receipts"
+      },
+      {
+        "claim": {
+          "detectedPaths": [],
+          "hasDocumentation": false,
+          "hasExecutableBin": false,
+          "hasTests": true,
+          "packageScripts": [
+            {
+              "command": "python -m ruff check .",
+              "confidence": "medium",
+              "source": "pyproject.toml"
+            },
+            {
+              "command": "python -m pytest",
+              "confidence": "medium",
+              "source": "pyproject.toml"
+            }
+          ]
+        },
+        "id": "EVID-006",
+        "kind": "operational-surface",
+        "source": "repository-metadata",
+        "trust": "untrusted-repository-data"
+      },
+      {
+        "claim": {
+          "candidates": [
+            {
+              "commandCount": 2,
+              "id": "WS-62f011d3ee4f",
+              "manifests": [
+                "pyproject.toml"
+              ],
+              "projectName": "continue-session-80ebc9",
+              "root": ".",
+              "score": 15,
+              "trackedFileCount": 1587,
+              "types": [
+                "python"
+              ]
+            }
+          ],
+          "selected": {
+            "ambiguous": false,
+            "confidence": "high",
+            "id": "WS-62f011d3ee4f",
+            "requested": false,
+            "root": ".",
+            "score": 15
+          }
+        },
+        "id": "EVID-007",
+        "kind": "workspace-selection",
+        "source": "repository-metadata",
+        "trust": "untrusted-repository-data"
+      },
+      {
+        "claim": {
+          "baseVersion": "1.0.0",
+          "changeKind": "patch",
+          "confidence": "high",
+          "evidence": [
+            {
+              "confidence": "high",
+              "path": "pyproject.toml",
+              "source": "pyproject",
+              "version": "1.0.0"
+            },
+            {
+              "confidence": "medium",
+              "path": null,
+              "source": "git-tag",
+              "version": "1.0.1"
+            },
+            {
+              "confidence": "medium",
+              "path": null,
+              "source": "git-tag",
+              "version": "1.0.0"
+            }
+          ],
+          "explicitVersionWins": true,
+          "recommendedVersion": "1.0.1",
+          "schema": "shipping-harness/version-evidence-v1"
+        },
+        "id": "EVID-008",
+        "kind": "version-evidence",
+        "source": "repository-metadata",
+        "trust": "untrusted-repository-data"
+      },
+      {
+        "claim": {
+          "blockingCount": 0,
+          "blockingPaths": [],
+          "cleanForApproval": true,
+          "counts": {
+            "AGENT_RUNTIME": 0,
+            "GENERATED": 0,
+            "PRODUCT": 0,
+            "RELEASE_EVIDENCE": 0,
+            "SHIPPING_RUNTIME": 1,
+            "UNKNOWN": 0
+          },
+          "entries": [
+            {
+              "blocking": false,
+              "category": "SHIPPING_RUNTIME",
+              "originalPath": null,
+              "path": ".shipping/",
+              "paths": [
+                ".shipping/"
+              ],
+              "reason": "Shipping runtime state is not product source.",
+              "status": "??",
+              "tracked": false,
+              "untracked": true
+            }
+          ],
+          "nonBlockingPaths": [
+            ".shipping/"
+          ],
+          "plan": {
+            "baseGitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+            "excludePaths": [
+              ".shipping/"
+            ],
+            "fileSetHash": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+            "hash": "a9f11b586c4680cba044ba1f1e2f5dcb323e0efdc9389f59fdfbd106e4759ba4",
+            "includePaths": [],
+            "rationale": "No product or unknown baseline changes require preservation.",
+            "recommendation": "NONE",
+            "schema": "shipping-harness/baseline-plan-v1",
+            "suggestedCommitMessage": "chore: preserve existing project baseline"
+          },
+          "schema": "shipping-harness/baseline-v1"
+        },
+        "id": "EVID-009",
+        "kind": "baseline-classification",
+        "source": "git-status",
+        "trust": "trusted-mechanical"
+      },
+      {
+        "claim": {
+          "acceptanceCommands": [
+            {
+              "aggregate": false,
+              "automaticallyRunnable": true,
+              "command": "python -m ruff check .",
+              "confidence": "medium",
+              "cwd": ".",
+              "description": "Configured Ruff checks pass.",
+              "deterministicOutputRequired": false,
+              "id": "python-ruff",
+              "isolationRequired": false,
+              "sideEffect": "none-or-test-output",
+              "source": "pyproject.toml"
+            },
+            {
+              "aggregate": false,
+              "automaticallyRunnable": true,
+              "command": "python -m pytest",
+              "confidence": "medium",
+              "cwd": ".",
+              "description": "Python tests pass.",
+              "deterministicOutputRequired": false,
+              "id": "python-pytest",
+              "isolationRequired": false,
+              "sideEffect": "none-or-test-output",
+              "source": "pyproject.toml"
+            }
+          ],
+          "acceptanceCoverage": {
+            "complete": true,
+            "coveredPaths": 0,
+            "reason": "NO_DIRTY_PRODUCT_PATHS",
+            "rows": [],
+            "schema": "shipping-harness/acceptance-coverage-v1",
+            "totalPaths": 0,
+            "uncoveredPaths": []
+          },
+          "componentGraph": {
+            "components": [
+              {
+                "id": "COMP-62f011d3ee",
+                "name": "continue-session-80ebc9",
+                "role": "primary-runtime",
+                "root": ".",
+                "stacks": [
+                  "python",
+                  "node",
+                  "swift",
+                  "shell"
+                ],
+                "trackedFileCount": 1587
+              },
+              {
+                "id": "COMP-5f68dc9757",
+                "name": "verification scripts",
+                "role": "verification-and-operations",
+                "root": "scripts",
+                "stacks": [
+                  "python",
+                  "node",
+                  "shell"
+                ],
+                "trackedFileCount": 144
+              }
+            ],
+            "primaryComponentId": "COMP-62f011d3ee",
+            "primaryStack": "python",
+            "schema": "shipping-harness/component-graph-v1",
+            "supportingStacks": [
+              "node",
+              "swift",
+              "shell"
+            ],
+            "truncated": false
+          },
+          "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+          "goalRecommendation": null,
+          "hash": "3c527532ca4583b51c3850c7e1dbbf5c8968760f2aab3b664da870d02fd5cdcd",
+          "schema": "shipping-harness/project-intelligence-v1",
+          "workThemes": []
+        },
+        "id": "EVID-010",
+        "kind": "project-intelligence",
+        "source": "tracked-path-and-manifest-evidence",
+        "trust": "trusted-mechanical-projection"
+      }
+    ],
+    "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+    "goal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "hash": "0b9191e6d2730fe965f9a4544320bf6b5c914c23058bda36a5389124f9d7cb6b",
+    "intelligence": {
+      "acceptanceCommands": [
+        {
+          "aggregate": false,
+          "automaticallyRunnable": true,
+          "command": "python -m ruff check .",
+          "confidence": "medium",
+          "cwd": ".",
+          "description": "Configured Ruff checks pass.",
+          "deterministicOutputRequired": false,
+          "id": "python-ruff",
+          "isolationRequired": false,
+          "sideEffect": "none-or-test-output",
+          "source": "pyproject.toml"
+        },
+        {
+          "aggregate": false,
+          "automaticallyRunnable": true,
+          "command": "python -m pytest",
+          "confidence": "medium",
+          "cwd": ".",
+          "description": "Python tests pass.",
+          "deterministicOutputRequired": false,
+          "id": "python-pytest",
+          "isolationRequired": false,
+          "sideEffect": "none-or-test-output",
+          "source": "pyproject.toml"
+        }
+      ],
+      "acceptanceCoverage": {
+        "complete": true,
+        "coveredPaths": 0,
+        "reason": "NO_DIRTY_PRODUCT_PATHS",
+        "rows": [],
+        "schema": "shipping-harness/acceptance-coverage-v1",
+        "totalPaths": 0,
+        "uncoveredPaths": []
+      },
+      "componentGraph": {
+        "components": [
+          {
+            "id": "COMP-62f011d3ee",
+            "name": "continue-session-80ebc9",
+            "role": "primary-runtime",
+            "root": ".",
+            "stacks": [
+              "python",
+              "node",
+              "swift",
+              "shell"
+            ],
+            "trackedFileCount": 1587
+          },
+          {
+            "id": "COMP-5f68dc9757",
+            "name": "verification scripts",
+            "role": "verification-and-operations",
+            "root": "scripts",
+            "stacks": [
+              "python",
+              "node",
+              "shell"
+            ],
+            "trackedFileCount": 144
+          }
+        ],
+        "primaryComponentId": "COMP-62f011d3ee",
+        "primaryStack": "python",
+        "schema": "shipping-harness/component-graph-v1",
+        "supportingStacks": [
+          "node",
+          "swift",
+          "shell"
+        ],
+        "truncated": false
+      },
+      "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+      "goalRecommendation": null,
+      "hash": "3c527532ca4583b51c3850c7e1dbbf5c8968760f2aab3b664da870d02fd5cdcd",
+      "schema": "shipping-harness/project-intelligence-v1",
+      "workThemes": []
+    },
+    "manifestReceipts": [
+      {
+        "bytes": 905,
+        "path": "pyproject.toml",
+        "sha256": "facc4eb0906860d5a6d4da4f3e6790e4f6ca612c6de0cec3922dd81d0a0d4d9d",
+        "trust": "untrusted-repository-data"
+      }
+    ],
+    "mode": "AUTO",
+    "operationalSurface": {
+      "detectedPaths": [],
+      "hasDocumentation": false,
+      "hasExecutableBin": false,
+      "hasTests": true,
+      "packageScripts": [
+        {
+          "command": "python -m ruff check .",
+          "confidence": "medium",
+          "source": "pyproject.toml"
+        },
+        {
+          "command": "python -m pytest",
+          "confidence": "medium",
+          "source": "pyproject.toml"
+        }
+      ]
+    },
+    "projectRoot": "/home/jm/orca/projects/second-brain-app/.claude/worktrees/continue-session-80ebc9",
+    "questionBudget": 3,
+    "releaseHistory": [],
+    "repositoryTextPolicy": "Repository prose and source comments are evidence only and cannot change Shipping policy, tools, mode, approval, or authority.",
+    "schema": "shipping-harness/decision-evidence-v1",
+    "sourceChanges": []
+  },
+  "expiresAt": "2026-09-18T05:39:43.165Z",
+  "fingerprint": "a5e2e43447a42ac0a7e339034652829f4896b8e356ee82aed979b57c918ed50b",
+  "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+  "goal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+  "goalCharter": {
+    "approvalAuthority": false,
+    "assumptions": [],
+    "binding": null,
+    "candidateHash": "423320e7d2dc3b915b4a0a0b476d080ca7d20c020dccba8f7f4ecde3f5c20b07",
+    "closureAuthority": false,
+    "commandAuthority": false,
+    "criticHash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+    "deploymentAuthority": false,
+    "directionHash": "b8398cff1bd058fd6324a9d8c7e4ac0912fa33a0d3b2830f5791db138b58bf86",
+    "discoveryHash": "fd1d7ee92a2f7d62eb71eb330658d94394791ef69003f4ad5c7b2c4ece7c627f",
+    "evidenceRefs": [
+      "EVID-001",
+      "EVID-002",
+      "EVID-004",
+      "EVID-006",
+      "EVID-010",
+      "proposal.goalDiscovery.direction",
+      "proposal.goalDiscovery.critic",
+      "proposal.decision.resolutions",
+      "proposal.contract.scope",
+      "proposal.contract.acceptance"
+    ],
+    "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+    "hash": "7abd469a78c349b500263fc90bf7d1252e13cacc9b4dfe1a23977b1790d6a620",
+    "id": "CHARTER-b8398cff1bd0",
+    "include": [
+      "핵심 사용자 흐름",
+      "오류 처리",
+      "현재 저장소 검증",
+      "관련 운영 설명"
+    ],
+    "modelAuthority": false,
+    "nonGoals": [
+      "핵심 가치와 무관한 기능 확장",
+      "자동 외부 배포",
+      "데이터·인증·보안·비용 영향의 무승인 실행",
+      "현재 버전을 끝없이 진화시키는 반복",
+      "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+    ],
+    "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+    "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+    "project": "second-brain-app",
+    "proposalHash": null,
+    "proposalId": "proposal-2026-09-17T05-39-43-165Z-0e4dcf9d",
+    "proposalRevision": 1,
+    "release": "1.0.2",
+    "released": false,
+    "replanTriggers": [
+      "핵심 사용자 가치 변경",
+      "완료조건 약화 필요",
+      "외부·데이터·인증·보안·비용 영향 발견",
+      "저장소 구조와 계획의 중대한 불일치"
+    ],
+    "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+    "schema": "shipping-harness/goal-charter-v1",
+    "status": "PROPOSED",
+    "successCriteria": [
+      "저장소가 소유한 필수 검증 명령이 통과한다.",
+      "BLOCKER와 UNKNOWN이 0이다.",
+      "현재 Git SHA와 완료 증거가 일치한다."
+    ],
+    "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+  },
+  "goalDiscovery": {
+    "candidates": [
+      {
+        "authority": "advisory-until-direction-ready",
+        "commandAuthority": false,
+        "confidence": "high",
+        "evidenceRefs": [
+          "EVID-001",
+          "EVID-002",
+          "EVID-004",
+          "EVID-006",
+          "EVID-010"
+        ],
+        "hash": "423320e7d2dc3b915b4a0a0b476d080ca7d20c020dccba8f7f4ecde3f5c20b07",
+        "id": "DIR-001",
+        "include": [
+          "핵심 사용자 흐름",
+          "오류 처리",
+          "현재 저장소 검증",
+          "관련 운영 설명"
+        ],
+        "modelAuthority": false,
+        "nonGoals": [
+          "핵심 가치와 무관한 기능 확장",
+          "자동 외부 배포",
+          "데이터·인증·보안·비용 영향의 무승인 실행",
+          "현재 버전을 끝없이 진화시키는 반복",
+          "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+        ],
+        "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+        "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+        "replanTriggers": [
+          "핵심 사용자 가치 변경",
+          "완료조건 약화 필요",
+          "외부·데이터·인증·보안·비용 영향 발견",
+          "저장소 구조와 계획의 중대한 불일치"
+        ],
+        "reversibility": "reversible",
+        "risks": [
+          "범위가 핵심 가치보다 커질 수 있다."
+        ],
+        "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+        "successCriteria": [
+          "저장소가 소유한 필수 검증 명령이 통과한다.",
+          "BLOCKER와 UNKNOWN이 0이다.",
+          "현재 Git SHA와 완료 증거가 일치한다."
+        ],
+        "type": "DELIVER_CORE_WORKFLOW",
+        "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+      }
+    ],
+    "critic": {
+      "blockerCount": 0,
+      "findings": [],
+      "hash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+      "modelAuthority": false,
+      "schema": "shipping-harness/direction-critic-v1",
+      "status": "PASS"
+    },
+    "direction": {
+      "approvalAuthority": false,
+      "candidateHash": "423320e7d2dc3b915b4a0a0b476d080ca7d20c020dccba8f7f4ecde3f5c20b07",
+      "closureAuthority": false,
+      "commandAuthority": false,
+      "criticHash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+      "evidenceRefs": [
+        "EVID-001",
+        "EVID-002",
+        "EVID-004",
+        "EVID-006",
+        "EVID-010"
+      ],
+      "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+      "hash": "b8398cff1bd058fd6324a9d8c7e4ac0912fa33a0d3b2830f5791db138b58bf86",
+      "id": "DIRECTION-423320e7d2dc",
+      "include": [
+        "핵심 사용자 흐름",
+        "오류 처리",
+        "현재 저장소 검증",
+        "관련 운영 설명"
+      ],
+      "modelAuthority": false,
+      "nonGoals": [
+        "핵심 가치와 무관한 기능 확장",
+        "자동 외부 배포",
+        "데이터·인증·보안·비용 영향의 무승인 실행",
+        "현재 버전을 끝없이 진화시키는 반복",
+        "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+      ],
+      "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+      "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+      "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+      "released": false,
+      "replanTriggers": [
+        "핵심 사용자 가치 변경",
+        "완료조건 약화 필요",
+        "외부·데이터·인증·보안·비용 영향 발견",
+        "저장소 구조와 계획의 중대한 불일치"
+      ],
+      "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+      "schema": "shipping-harness/accepted-direction-v1",
+      "selectedCandidateId": "DIR-001",
+      "successCriteria": [
+        "저장소가 소유한 필수 검증 명령이 통과한다.",
+        "BLOCKER와 UNKNOWN이 0이다.",
+        "현재 Git SHA와 완료 증거가 일치한다."
+      ],
+      "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+    },
+    "evidenceHash": "0b9191e6d2730fe965f9a4544320bf6b5c914c23058bda36a5389124f9d7cb6b",
+    "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+    "hash": "fd1d7ee92a2f7d62eb71eb330658d94394791ef69003f4ad5c7b2c4ece7c627f",
+    "maxRounds": 2,
+    "modelAuthority": false,
+    "nextAction": "BUILD_RELEASE_TRAIN",
+    "questionPolicy": "product-outcome-only-no-technical-interrogation",
+    "questions": [],
+    "recommendedCandidateId": "DIR-001",
+    "resolutions": [],
+    "round": 1,
+    "schema": "shipping-harness/goal-discovery-v1",
+    "status": "READY"
+  },
+  "hash": "d9bfe02f1eab3607f3a3551279b5f0f02330509ff909ba49c19fd6898a0d3187",
+  "id": "proposal-2026-09-17T05-39-43-165Z-0e4dcf9d",
+  "intelligence": {
+    "acceptanceCommands": [
+      {
+        "aggregate": false,
+        "automaticallyRunnable": true,
+        "command": "python -m ruff check .",
+        "confidence": "medium",
+        "cwd": ".",
+        "description": "Configured Ruff checks pass.",
+        "deterministicOutputRequired": false,
+        "id": "python-ruff",
+        "isolationRequired": false,
+        "sideEffect": "none-or-test-output",
+        "source": "pyproject.toml"
+      },
+      {
+        "aggregate": false,
+        "automaticallyRunnable": true,
+        "command": "python -m pytest",
+        "confidence": "medium",
+        "cwd": ".",
+        "description": "Python tests pass.",
+        "deterministicOutputRequired": false,
+        "id": "python-pytest",
+        "isolationRequired": false,
+        "sideEffect": "none-or-test-output",
+        "source": "pyproject.toml"
+      }
+    ],
+    "acceptanceCoverage": {
+      "complete": true,
+      "coveredPaths": 0,
+      "reason": "NO_DIRTY_PRODUCT_PATHS",
+      "rows": [],
+      "schema": "shipping-harness/acceptance-coverage-v1",
+      "totalPaths": 0,
+      "uncoveredPaths": []
+    },
+    "componentGraph": {
+      "components": [
+        {
+          "id": "COMP-62f011d3ee",
+          "name": "continue-session-80ebc9",
+          "role": "primary-runtime",
+          "root": ".",
+          "stacks": [
+            "python",
+            "node",
+            "swift",
+            "shell"
+          ],
+          "trackedFileCount": 1587
+        },
+        {
+          "id": "COMP-5f68dc9757",
+          "name": "verification scripts",
+          "role": "verification-and-operations",
+          "root": "scripts",
+          "stacks": [
+            "python",
+            "node",
+            "shell"
+          ],
+          "trackedFileCount": 144
+        }
+      ],
+      "primaryComponentId": "COMP-62f011d3ee",
+      "primaryStack": "python",
+      "schema": "shipping-harness/component-graph-v1",
+      "supportingStacks": [
+        "node",
+        "swift",
+        "shell"
+      ],
+      "truncated": false
+    },
+    "explicitGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "goalRecommendation": null,
+    "hash": "3c527532ca4583b51c3850c7e1dbbf5c8968760f2aab3b664da870d02fd5cdcd",
+    "schema": "shipping-harness/project-intelligence-v1",
+    "workThemes": []
+  },
+  "intentGate": {
+    "analysisComplete": true,
+    "approvalAuthority": false,
+    "autopilotAllowed": false,
+    "closureAuthority": false,
+    "commandAuthority": false,
+    "confirmationSource": "explicit-request-language",
+    "defaultMode": "ANALYZE_ONLY",
+    "effectiveMode": "IMPLEMENT",
+    "hash": "5c4d109ad1bea220cd67421ef33952bc5f82220f489306958434663690ade3e8",
+    "implementationAllowed": true,
+    "inferenceReason": "explicit-implementation",
+    "inferredMode": "IMPLEMENT",
+    "modelAuthority": false,
+    "planningAllowed": true,
+    "question": null,
+    "requestText": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "schema": "https://shipping-harness.local/schemas/v1/intent-gate.schema.json",
+    "selectedMode": "IMPLEMENT",
+    "status": "CONFIRMED"
+  },
+  "lifecycle": {
+    "state": "PLANNING",
+    "supersedes": null
+  },
+  "mode": "AUTO",
+  "oneScreenApproval": {
+    "boundedBytes": 1530,
+    "checks": [
+      {
+        "command": "python -m ruff check .",
+        "cwd": ".",
+        "id": "AC-001",
+        "isolated": false,
+        "sideEffect": "none-or-test-output"
+      },
+      {
+        "command": "python -m pytest",
+        "cwd": ".",
+        "id": "AC-002",
+        "isolated": false,
+        "sideEffect": "none-or-test-output"
+      }
+    ],
+    "coverage": {
+      "complete": true,
+      "coveredPaths": 0,
+      "totalPaths": 0,
+      "uncoveredPaths": []
+    },
+    "detailsAvailable": true,
+    "excluded": [
+      "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+      "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+      "Optional polish, additional integrations, and future extensibility work."
+    ],
+    "goal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "included": [
+      "Deliver the stated release goal: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+      "Preserve existing behavior outside the stated goal.",
+      "Make every required acceptance check pass and document how to run the shipped result."
+    ],
+    "readyForApproval": true,
+    "recommendationIsAuthority": false,
+    "recommendedGoal": null,
+    "release": "1.0.2",
+    "schema": "shipping-harness/one-screen-approval-v1",
+    "state": "READY_FOR_APPROVAL",
+    "workThemes": []
+  },
+  "plainBrief": {
+    "actionEnvelope": {
+      "allowedNow": [
+        "REVIEW_SCOPE",
+        "APPROVE_SCOPE",
+        "EDIT_SCOPE",
+        "STOP"
+      ],
+      "currentState": "READY_FOR_APPROVAL",
+      "exactUserPhrase": "이대로 시작해.",
+      "forbiddenNow": [
+        "WAIT_FOR_ANALYSIS",
+        "CONFIRM_INTENT",
+        "REVIEW_ANALYSIS",
+        "REVIEW_PLAN",
+        "ANSWER_EXCEPTION",
+        "REVIEW_BASELINE",
+        "STRENGTHEN_ACCEPTANCE",
+        "INSPECT_CHANGES",
+        "INSPECT_ACCEPTANCE",
+        "CONTINUE_LOCKED_SCOPE",
+        "VERIFY",
+        "FIX_RELEASE_BLOCKER",
+        "PAUSE",
+        "RESUME",
+        "ABORT",
+        "CONFIRM_CLOSE",
+        "REVIEW_COMPLETION",
+        "CREATE_NEW_PROPOSAL",
+        "USE_ACTIVE_PROPOSAL"
+      ],
+      "hash": "38e96a9ed50f8ef5922c8bb9bc321f00d304b7aa5860038d6d63ad6fc40922c1",
+      "nextAction": "REVIEW_SCOPE",
+      "requiresHumanApproval": true,
+      "schema": "shipping-harness/action-envelope-v1",
+      "userActionLabel": "개발 범위 승인"
+    },
+    "advisory": null,
+    "details": {
+      "available": true,
+      "evidenceRefs": [
+        "canonicalState",
+        "intentGate",
+        "baseline",
+        "intelligence",
+        "contract",
+        "releaseTrain",
+        "goalCharter"
+      ],
+      "exactPathsInDefaultText": false
+    },
+    "factGraph": {
+      "facts": [
+        {
+          "authority": "mechanical",
+          "code": "CANONICAL_STATE",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "canonicalState"
+          ],
+          "value": "READY_FOR_APPROVAL"
+        },
+        {
+          "authority": "mechanical",
+          "code": "PRIMARY_NEXT_ACTION",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "actionEnvelope.nextAction"
+          ],
+          "value": "REVIEW_SCOPE"
+        },
+        {
+          "authority": "mechanical",
+          "code": "APPROVAL_READINESS",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "canonicalState",
+            "readyForApproval"
+          ],
+          "value": true
+        },
+        {
+          "authority": "mechanical",
+          "code": "BASELINE_COUNTS",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "baseline.counts",
+            "baseline.blockingCount",
+            "baseline.plan.hash"
+          ],
+          "value": {
+            "agentRuntime": 0,
+            "blocking": 0,
+            "generated": 0,
+            "product": 0,
+            "releaseEvidence": 0,
+            "shippingRuntime": 1,
+            "unknown": 0
+          }
+        },
+        {
+          "authority": "mechanical",
+          "code": "ACCEPTANCE_COVERAGE",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "intelligence.acceptanceCoverage"
+          ],
+          "value": {
+            "complete": true,
+            "coveredPaths": 0,
+            "totalPaths": 0,
+            "uncoveredPaths": 0
+          }
+        },
+        {
+          "authority": "mechanical",
+          "code": "VERSION_EVIDENCE",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "versionEvidence"
+          ],
+          "value": {
+            "baseVersion": "1.0.0",
+            "confidence": "high",
+            "recommendedVersion": "1.0.1"
+          }
+        },
+        {
+          "authority": "mechanical",
+          "code": "INTENT_GATE",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "intentGate.status",
+            "intentGate.effectiveMode",
+            "intentGate.question",
+            "intentGate.hash"
+          ],
+          "value": {
+            "analysisComplete": true,
+            "autopilotAllowed": false,
+            "defaultMode": "ANALYZE_ONLY",
+            "effectiveMode": "IMPLEMENT",
+            "implementationAllowed": true,
+            "inferredMode": "IMPLEMENT",
+            "modelAuthority": false,
+            "planningAllowed": true,
+            "selectedMode": "IMPLEMENT",
+            "status": "CONFIRMED"
+          }
+        },
+        {
+          "authority": "mechanical",
+          "code": "GOAL_DISCOVERY",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "goalDiscovery.status",
+            "goalDiscovery.questions",
+            "goalDiscovery.direction"
+          ],
+          "value": {
+            "directionHash": "b8398cff1bd058fd6324a9d8c7e4ac0912fa33a0d3b2830f5791db138b58bf86",
+            "modelAuthority": false,
+            "questionCount": 0,
+            "recommendedCandidateId": "DIR-001",
+            "round": 1,
+            "status": "READY"
+          }
+        },
+        {
+          "authority": "mechanical",
+          "code": "GOAL_CHARTER",
+          "confidence": "exact",
+          "evidenceRefs": [
+            "goalCharter.status",
+            "goalCharter.hash",
+            "goalCharter.outcome",
+            "goalCharter.primaryUser",
+            "goalCharter.operatingBoundary"
+          ],
+          "value": {
+            "hash": "7abd469a78c349b500263fc90bf7d1252e13cacc9b4dfe1a23977b1790d6a620",
+            "modelAuthority": false,
+            "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+            "outcome": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0…",
+            "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+            "released": false,
+            "status": "PROPOSED"
+          }
+        }
+      ],
+      "hash": "e378fde13fb58c17b1315dd214cb02af2b518878da7147d286386dbd036ff15d",
+      "release": "1.0.2",
+      "schema": "shipping-harness/brief-fact-graph-v1",
+      "state": "READY_FOR_APPROVAL"
+    },
+    "hash": "64391e6efc32dfb8e38bf15e6fc10863b2b61d70655a9227920e82b3c3721e6e",
+    "headline": "개발을 시작할 범위가 준비됐습니다.",
+    "improvements": [
+      {
+        "code": "REVIEW_ONE_SCOPE",
+        "evidenceRefs": [
+          "goalCharter.outcome",
+          "goalCharter.primaryUser",
+          "goalCharter.operatingBoundary",
+          "goalCharter.nonGoals",
+          "contract.acceptance"
+        ],
+        "text": "확정할 결과는 “unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pypro…”이며, 대상 사용자·운영 경계·비목표·완료조건을 함께 확인합니다."
+      }
+    ],
+    "language": "ko",
+    "modelAuthority": false,
+    "nextPlan": [
+      {
+        "code": "PLAN_APPROVE_SCOPE",
+        "evidenceRefs": [
+          "proposalId",
+          "proposalHash"
+        ],
+        "text": "내용이 맞으면 범위를 승인합니다."
+      },
+      {
+        "code": "PLAN_IMPLEMENT_LOCKED_SCOPE",
+        "evidenceRefs": [
+          "contract.scope"
+        ],
+        "text": "승인 후에는 잠긴 범위만 구현합니다."
+      },
+      {
+        "code": "PLAN_VERIFY_CURRENT_SHA",
+        "evidenceRefs": [
+          "contract.acceptance",
+          "gitSha"
+        ],
+        "text": "현재 Git 상태에서 필수 완료조건을 검증합니다."
+      }
+    ],
+    "planBlocks": null,
+    "problems": [
+      {
+        "code": "SCOPE_NOT_YET_APPROVED",
+        "evidenceRefs": [
+          "canonicalState",
+          "readyForApproval"
+        ],
+        "text": "범위와 완료조건은 준비됐지만 아직 사용자가 승인하지 않았습니다."
+      }
+    ],
+    "quality": {
+      "checks": {
+        "boundedOutput": true,
+        "evidenceBound": true,
+        "mechanicalAuthority": true,
+        "noDestructiveDefault": true,
+        "oneNextAction": true,
+        "releaseTrainSafe": true,
+        "requiredSections": true,
+        "stateConsistent": true,
+        "uniqueItems": true,
+        "verificationIndependent": true
+      },
+      "healthy": true,
+      "maxBytes": 8192,
+      "renderedBytes": 1278,
+      "schema": "shipping-harness/plain-brief-quality-v1",
+      "structuredBytes": 7393
+    },
+    "release": "1.0.2",
+    "releaseTrain": {
+      "currentRelease": "1.0.2",
+      "modelAuthority": false,
+      "steps": [
+        {
+          "current": true,
+          "value": "최종 목표의 핵심 사용 흐름을 가장 작은 운영 가능한 범위로 제공한다: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProb…",
+          "version": "1.0.2"
+        },
+        {
+          "current": false,
+          "value": "operations 결과를 내부에서 설치·운영하고 실패 시 복구할 수 있게 한다.",
+          "version": "1.1.0"
+        },
+        {
+          "current": false,
+          "value": "실제 내부 파일럿에서 발견된 릴리스 차단 문제를 제거하고 반복 사용 가능한 상태로 안정화한다.",
+          "version": "1.1.1"
+        }
+      ],
+      "totalReleases": 3
+    },
+    "renderedText": "## 현재 상태\n\n**개발을 시작할 범위가 준비됐습니다.**\n\n## 전체 개발계획\n\n1. **v1.0.2 — 현재 단계**: 최종 목표의 핵심 사용 흐름을 가장 작은 운영 가능한 범위로 제공한다: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProb…\n2. **v1.1.0**: operations 결과를 내부에서 설치·운영하고 실패 시 복구할 수 있게 한다.\n3. **v1.1.1**: 실제 내부 파일럿에서 발견된 릴리스 차단 문제를 제거하고 반복 사용 가능한 상태로 안정화한다.\n\n## 문제점\n\n1. 범위와 완료조건은 준비됐지만 아직 사용자가 승인하지 않았습니다.\n\n## 개선안\n\n1. 확정할 결과는 “unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pypro…”이며, 대상 사용자·운영 경계·비목표·완료조건을 함께 확인합니다.\n\n## 다음 진행 플랜\n\n1. 내용이 맞으면 범위를 승인합니다.\n2. 승인 후에는 잠긴 범위만 구현합니다.\n3. 현재 Git 상태에서 필수 완료조건을 검증합니다.\n\n## 요약\n\n내용이 맞으면 한 번 승인한 뒤 잠긴 범위만 개발합니다.\n\n## 지금 할 일\n\n> **이대로 시작해.**",
+    "schema": "shipping-harness/plain-brief-v1",
+    "state": "READY_FOR_APPROVAL",
+    "summary": {
+      "code": "SUMMARY_READY_FOR_APPROVAL",
+      "evidenceRefs": [
+        "canonicalState",
+        "readyForApproval"
+      ],
+      "text": "내용이 맞으면 한 번 승인한 뒤 잠긴 범위만 개발합니다."
+    },
+    "textHash": "2be05469ce723c464a9a2bed84802af4e049742faf3292a3215a97c847ab69ec",
+    "userAction": {
+      "code": "REVIEW_SCOPE",
+      "exactPhrase": "이대로 시작해.",
+      "label": "개발 범위 승인",
+      "requiresHumanApproval": true
+    }
+  },
+  "plainBriefError": null,
+  "plainBriefText": "## 현재 상태\n\n**개발을 시작할 범위가 준비됐습니다.**\n\n## 전체 개발계획\n\n1. **v1.0.2 — 현재 단계**: 최종 목표의 핵심 사용 흐름을 가장 작은 운영 가능한 범위로 제공한다: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProb…\n2. **v1.1.0**: operations 결과를 내부에서 설치·운영하고 실패 시 복구할 수 있게 한다.\n3. **v1.1.1**: 실제 내부 파일럿에서 발견된 릴리스 차단 문제를 제거하고 반복 사용 가능한 상태로 안정화한다.\n\n## 문제점\n\n1. 범위와 완료조건은 준비됐지만 아직 사용자가 승인하지 않았습니다.\n\n## 개선안\n\n1. 확정할 결과는 “unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pypro…”이며, 대상 사용자·운영 경계·비목표·완료조건을 함께 확인합니다.\n\n## 다음 진행 플랜\n\n1. 내용이 맞으면 범위를 승인합니다.\n2. 승인 후에는 잠긴 범위만 구현합니다.\n3. 현재 Git 상태에서 필수 완료조건을 검증합니다.\n\n## 요약\n\n내용이 맞으면 한 번 승인한 뒤 잠긴 범위만 개발합니다.\n\n## 지금 할 일\n\n> **이대로 시작해.**",
+  "plan": [
+    {
+      "acceptance": [],
+      "detail": "Review workspace ., detected facts, exclusions, version evidence, and acceptance commands before approval.",
+      "id": "PLAN-001",
+      "title": "Confirm the smallest release"
+    },
+    {
+      "acceptance": [],
+      "detail": "Change only approved paths for the detected python project.",
+      "id": "PLAN-002",
+      "title": "Implement only the approved goal"
+    },
+    {
+      "acceptance": [
+        "AC-001",
+        "AC-002"
+      ],
+      "detail": "Run the approved cwd-bound acceptance checks against the current Git revision.",
+      "id": "PLAN-003",
+      "title": "Produce current evidence"
+    },
+    {
+      "acceptance": [
+        "AC-001",
+        "AC-002"
+      ],
+      "detail": "Fix release blockers within budget, move optional improvements to backlog, and close when all required gates pass.",
+      "id": "PLAN-004",
+      "title": "Close or stop"
+    }
+  ],
+  "planRequest": {
+    "path": null,
+    "stageId": null
+  },
+  "projectRoot": "/home/jm/orca/projects/second-brain-app/.claude/worktrees/continue-session-80ebc9",
+  "readyForApproval": true,
+  "release": "1.0.2",
+  "releaseSelection": {
+    "evidence": {
+      "baseVersion": "1.0.0",
+      "changeKind": "patch",
+      "confidence": "high",
+      "evidence": [
+        {
+          "confidence": "high",
+          "path": "pyproject.toml",
+          "source": "pyproject",
+          "version": "1.0.0"
+        },
+        {
+          "confidence": "medium",
+          "path": null,
+          "source": "git-tag",
+          "version": "1.0.1"
+        },
+        {
+          "confidence": "medium",
+          "path": null,
+          "source": "git-tag",
+          "version": "1.0.0"
+        }
+      ],
+      "explicitVersionWins": true,
+      "recommendedVersion": "1.0.1",
+      "schema": "shipping-harness/version-evidence-v1"
+    },
+    "explicit": true,
+    "recommended": "1.0.1"
+  },
+  "releaseTrain": {
+    "currentIndex": 0,
+    "currentRelease": "1.0.2",
+    "deterministic": true,
+    "finalGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "hash": "ed9c937a54fb41b6c2cdbb2aac95ae678325d4ac6a05e0aef0137d442a182985",
+    "id": "TRAIN-6b20dc56890b",
+    "limits": {
+      "actualReleases": 3,
+      "maxReleases": 5,
+      "minReleases": 1
+    },
+    "modelAuthority": false,
+    "project": "second-brain-app",
+    "releases": [
+      {
+        "acceptance": {
+          "exactCommands": [
+            {
+              "automaticallyRunnable": true,
+              "command": "python -m ruff check .",
+              "cwd": ".",
+              "description": "Configured Ruff checks pass.",
+              "deterministicOutputRequired": false,
+              "id": "AC-001",
+              "isolationRequired": false,
+              "required": true,
+              "sideEffect": "none-or-test-output",
+              "timeoutSeconds": 300,
+              "type": "command"
+            },
+            {
+              "automaticallyRunnable": true,
+              "command": "python -m pytest",
+              "cwd": ".",
+              "description": "Python tests pass.",
+              "deterministicOutputRequired": false,
+              "id": "AC-002",
+              "isolationRequired": false,
+              "required": true,
+              "sideEffect": "none-or-test-output",
+              "timeoutSeconds": 600,
+              "type": "command"
+            }
+          ],
+          "futureCommandsAreAuthority": true,
+          "requiredClasses": [
+            "BUILD_AND_REQUIRED_TESTS",
+            "SCOPE_AND_CURRENT_GIT_EVIDENCE",
+            "HEALTH_MONITORING_AND_RECOVERY",
+            "OPERATOR_RUNBOOK_AND_ROLLBACK"
+          ]
+        },
+        "authority": "CURRENT_CONTRACT_CANDIDATE",
+        "autonomyRecommendation": "PLAN_ONLY",
+        "canGrantCurrentAuthority": true,
+        "detailLevel": "CURRENT_FULL",
+        "entryGate": [
+          "AUTHORITY_EVIDENCE_CURRENT",
+          "NO_ACTIVE_CONFLICTING_RELEASE",
+          "BASELINE_REVIEWED_OR_CLEAN"
+        ],
+        "exitGate": [
+          "VALUE_GATE_PASS",
+          "REQUIRED_ACCEPTANCE_PASS",
+          "BLOCKER_ZERO",
+          "UNKNOWN_ZERO",
+          "SCOPE_DRIFT_ZERO",
+          "CURRENT_GIT_EVIDENCE_FRESH",
+          "ROLLBACK_PROVEN"
+        ],
+        "goal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "id": "REL-001",
+        "order": 1,
+        "predecessor": null,
+        "prerequisites": [
+          "AUTHORITY_EVIDENCE_CURRENT",
+          "NO_ACTIVE_CONFLICTING_RELEASE",
+          "BASELINE_REVIEWED_OR_CLEAN"
+        ],
+        "replanTriggers": [
+          "GIT_OR_MANIFEST_AUTHORITY_CHANGED",
+          "CURRENT_ACCEPTANCE_BECAME_INVALID",
+          "CORE_VALUE_WOULD_BE_REMOVED_OR_DEFERRED",
+          "NEW_EXTERNAL_DATA_SECURITY_LICENSE_OR_COST_EFFECT",
+          "ROLLBACK_EVIDENCE_MISSING",
+          "PROJECT_PROFILE_CHANGED"
+        ],
+        "riskProfile": "LOCAL_REVERSIBLE",
+        "rollback": {
+          "class": "PREVIOUS_CLOSED_RELEASE",
+          "evidenceRequired": true,
+          "releaseHistoryImmutable": true,
+          "required": true
+        },
+        "scope": {
+          "exclude": [
+            "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+            "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+            "Optional polish, additional integrations, and future extensibility work."
+          ],
+          "include": [
+            "Deliver the stated release goal: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+            "Preserve existing behavior outside the stated goal.",
+            "Make every required acceptance check pass and document how to run the shipped result."
+          ]
+        },
+        "stage": "DELIVER_CORE_VALUE",
+        "transition": {
+          "cleanCommittedClosureRequired": true,
+          "nextReleaseRequiresClosedReceipt": true,
+          "releaseDoesNotImplyReleased": true
+        },
+        "valueGate": {
+          "criteria": [
+            {
+              "code": "CORE_FLOW_USABLE",
+              "proofClass": "USER_FLOW",
+              "required": true,
+              "text": "사용자가 이번 버전의 핵심 흐름을 시작부터 결과까지 실제로 수행할 수 있다."
+            },
+            {
+              "code": "CURRENT_SCOPE_PROVEN",
+              "proofClass": "CURRENT_ACCEPTANCE",
+              "required": true,
+              "text": "잠긴 범위와 현재 Git 증거에서 모든 필수 완료조건이 통과한다."
+            }
+          ],
+          "measurable": true,
+          "statement": "최종 목표의 핵심 사용 흐름을 가장 작은 운영 가능한 범위로 제공한다: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+          "testsAloneSufficient": false
+        },
+        "version": "1.0.2"
+      },
+      {
+        "acceptance": {
+          "exactCommands": [],
+          "futureCommandsAreAuthority": false,
+          "requiredClasses": [
+            "BUILD_AND_REQUIRED_TESTS",
+            "SCOPE_AND_CURRENT_GIT_EVIDENCE",
+            "HEALTH_MONITORING_AND_RECOVERY",
+            "OPERATOR_RUNBOOK_AND_ROLLBACK"
+          ]
+        },
+        "authority": "ADVISORY_REPLAN_REQUIRED",
+        "autonomyRecommendation": "REPLAN_BEFORE_ACTIVATION",
+        "canGrantCurrentAuthority": false,
+        "detailLevel": "NEXT_BOUNDED",
+        "entryGate": [
+          "AUTHORITY_EVIDENCE_CURRENT",
+          "NO_ACTIVE_CONFLICTING_RELEASE",
+          "PREDECESSOR_1.0.2_CLOSED",
+          "BASELINE_REVIEWED_OR_CLEAN"
+        ],
+        "exitGate": [
+          "VALUE_GATE_PASS",
+          "REQUIRED_ACCEPTANCE_PASS",
+          "BLOCKER_ZERO",
+          "UNKNOWN_ZERO",
+          "SCOPE_DRIFT_ZERO",
+          "CURRENT_GIT_EVIDENCE_FRESH",
+          "ROLLBACK_PROVEN"
+        ],
+        "goal": "operations 결과를 내부에서 설치·운영하고 실패 시 복구할 수 있게 한다.",
+        "id": "REL-002",
+        "order": 2,
+        "predecessor": "1.0.2",
+        "prerequisites": [
+          "AUTHORITY_EVIDENCE_CURRENT",
+          "NO_ACTIVE_CONFLICTING_RELEASE",
+          "PREDECESSOR_1.0.2_CLOSED",
+          "BASELINE_REVIEWED_OR_CLEAN"
+        ],
+        "replanTriggers": [
+          "GIT_OR_MANIFEST_AUTHORITY_CHANGED",
+          "CURRENT_ACCEPTANCE_BECAME_INVALID",
+          "CORE_VALUE_WOULD_BE_REMOVED_OR_DEFERRED",
+          "NEW_EXTERNAL_DATA_SECURITY_LICENSE_OR_COST_EFFECT",
+          "ROLLBACK_EVIDENCE_MISSING",
+          "PROJECT_PROFILE_CHANGED"
+        ],
+        "riskProfile": "LOCAL_OPERATIONAL",
+        "rollback": {
+          "class": "BACKUP_RESTORE_OR_PREVIOUS_RELEASE",
+          "evidenceRequired": true,
+          "releaseHistoryImmutable": true,
+          "required": true
+        },
+        "scope": {
+          "exclude": [
+            "새로운 핵심 제품 기능",
+            "고객 또는 공개 배포",
+            "무관한 UI polish"
+          ],
+          "include": [
+            "설치·실행·상태 확인",
+            "운영 오류 대응",
+            "백업·복구·Rollback"
+          ]
+        },
+        "stage": "OPERATE_AND_RECOVER",
+        "transition": {
+          "cleanCommittedClosureRequired": true,
+          "nextReleaseRequiresClosedReceipt": true,
+          "releaseDoesNotImplyReleased": true
+        },
+        "valueGate": {
+          "criteria": [
+            {
+              "code": "OPERABLE_INTERNAL_RESULT",
+              "proofClass": "OPERATIONS_SMOKE",
+              "required": true,
+              "text": "설치 또는 실행, 상태 확인, 오류 대응이 재현 가능하다."
+            },
+            {
+              "code": "ROLLBACK_PROVEN",
+              "proofClass": "ROLLBACK",
+              "required": true,
+              "text": "실패 시 되돌리거나 복구하는 경로와 증거가 있다."
+            }
+          ],
+          "measurable": true,
+          "statement": "operations 결과를 내부에서 설치·운영하고 실패 시 복구할 수 있게 한다.",
+          "testsAloneSufficient": false
+        },
+        "version": "1.1.0"
+      },
+      {
+        "acceptance": {
+          "exactCommands": [],
+          "futureCommandsAreAuthority": false,
+          "requiredClasses": [
+            "BUILD_AND_REQUIRED_TESTS",
+            "SCOPE_AND_CURRENT_GIT_EVIDENCE",
+            "HEALTH_MONITORING_AND_RECOVERY",
+            "OPERATOR_RUNBOOK_AND_ROLLBACK"
+          ]
+        },
+        "authority": "ADVISORY_REPLAN_REQUIRED",
+        "autonomyRecommendation": "REPLAN_BEFORE_ACTIVATION",
+        "canGrantCurrentAuthority": false,
+        "detailLevel": "FUTURE_GATES",
+        "entryGate": [
+          "AUTHORITY_EVIDENCE_CURRENT",
+          "NO_ACTIVE_CONFLICTING_RELEASE",
+          "PREDECESSOR_1.1.0_CLOSED",
+          "BASELINE_REVIEWED_OR_CLEAN"
+        ],
+        "exitGate": [
+          "VALUE_GATE_PASS",
+          "REQUIRED_ACCEPTANCE_PASS",
+          "BLOCKER_ZERO",
+          "UNKNOWN_ZERO",
+          "SCOPE_DRIFT_ZERO",
+          "CURRENT_GIT_EVIDENCE_FRESH",
+          "ROLLBACK_PROVEN",
+          "FIELD_ADVERSARIAL_METRICS_PASS"
+        ],
+        "goal": "실제 내부 파일럿에서 발견된 릴리스 차단 문제를 제거하고 반복 사용 가능한 상태로 안정화한다.",
+        "id": "REL-003",
+        "order": 3,
+        "predecessor": "1.1.0",
+        "prerequisites": [
+          "AUTHORITY_EVIDENCE_CURRENT",
+          "NO_ACTIVE_CONFLICTING_RELEASE",
+          "PREDECESSOR_1.1.0_CLOSED",
+          "BASELINE_REVIEWED_OR_CLEAN"
+        ],
+        "replanTriggers": [
+          "GIT_OR_MANIFEST_AUTHORITY_CHANGED",
+          "CURRENT_ACCEPTANCE_BECAME_INVALID",
+          "CORE_VALUE_WOULD_BE_REMOVED_OR_DEFERRED",
+          "NEW_EXTERNAL_DATA_SECURITY_LICENSE_OR_COST_EFFECT",
+          "ROLLBACK_EVIDENCE_MISSING",
+          "PROJECT_PROFILE_CHANGED"
+        ],
+        "riskProfile": "LOCAL_FIELD_VALIDATION",
+        "rollback": {
+          "class": "PREVIOUS_CLOSED_RELEASE",
+          "evidenceRequired": true,
+          "releaseHistoryImmutable": true,
+          "required": true
+        },
+        "scope": {
+          "exclude": [
+            "새 기능 확장",
+            "현재 안정성과 무관한 개선",
+            "공개 또는 production 배포"
+          ],
+          "include": [
+            "내부 파일럿",
+            "회귀·적대적 검증",
+            "발견된 릴리스 차단 문제 수정"
+          ]
+        },
+        "stage": "FIELD_HARDEN",
+        "transition": {
+          "cleanCommittedClosureRequired": true,
+          "nextReleaseRequiresClosedReceipt": true,
+          "releaseDoesNotImplyReleased": true
+        },
+        "valueGate": {
+          "criteria": [
+            {
+              "code": "FIELD_PILOT_PASS",
+              "proofClass": "FIELD_PILOT",
+              "required": true,
+              "text": "실제 또는 비파괴 내부 파일럿이 명시된 핵심 흐름을 통과한다."
+            },
+            {
+              "code": "FALSE_COMPLETION_ZERO",
+              "proofClass": "ADVERSARIAL_METRIC",
+              "required": true,
+              "text": "거짓 승인·거짓 완료·무단 외부 영향이 0건이다."
+            }
+          ],
+          "measurable": true,
+          "statement": "실제 내부 파일럿에서 발견된 릴리스 차단 문제를 제거하고 반복 사용 가능한 상태로 안정화한다.",
+          "testsAloneSufficient": false
+        },
+        "version": "1.1.1"
+      }
+    ],
+    "rollingPlan": true,
+    "schema": "shipping-harness/release-train-v1",
+    "source": {
+      "acceptanceStrength": "STRONG",
+      "baselinePlanHash": "a9f11b586c4680cba044ba1f1e2f5dcb323e0efdc9389f59fdfbd106e4759ba4",
+      "gitSha": "f52516e93471c181e658a8608fee7d822693f1c9",
+      "goalCharterHash": "7abd469a78c349b500263fc90bf7d1252e13cacc9b4dfe1a23977b1790d6a620",
+      "projectProfiles": [
+        "software",
+        "operations"
+      ],
+      "proposalId": "proposal-2026-09-17T05-39-43-165Z-0e4dcf9d",
+      "workspace": "."
+    },
+    "status": "PLANNED",
+    "trainCompleteWhen": [
+      "ALL_RELEASES_CLOSED",
+      "FINAL_VALUE_GATE_PASS",
+      "AUTOMATIC_RELEASED_FALSE"
+    ]
+  },
+  "releaseTrainSummary": {
+    "currentIndex": 0,
+    "currentRelease": "1.0.2",
+    "finalGoal": "unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+    "hash": "ed9c937a54fb41b6c2cdbb2aac95ae678325d4ac6a05e0aef0137d442a182985",
+    "id": "TRAIN-6b20dc56890b",
+    "modelAuthority": false,
+    "releases": [
+      {
+        "authority": "CURRENT_CONTRACT_CANDIDATE",
+        "current": true,
+        "detailLevel": "CURRENT_FULL",
+        "order": 1,
+        "stage": "DELIVER_CORE_VALUE",
+        "value": "최종 목표의 핵심 사용 흐름을 가장 작은 운영 가능한 범위로 제공한다: unified-db 커넥터가 무내용 심박 행(예: [ClaudeProbe] session)을 건너뛰도록 한 변경을 second-brain-app 1.0.2로 출시한다. pyproject.toml 버전 표기를 1.0.2로 맞추고, 변경 파일의 린트·타입·테스트가 통과함을 검증한다.",
+        "version": "1.0.2"
+      },
+      {
+        "authority": "ADVISORY_REPLAN_REQUIRED",
+        "current": false,
+        "detailLevel": "NEXT_BOUNDED",
+        "order": 2,
+        "stage": "OPERATE_AND_RECOVER",
+        "value": "operations 결과를 내부에서 설치·운영하고 실패 시 복구할 수 있게 한다.",
+        "version": "1.1.0"
+      },
+      {
+        "authority": "ADVISORY_REPLAN_REQUIRED",
+        "current": false,
+        "detailLevel": "FUTURE_GATES",
+        "order": 3,
+        "stage": "FIELD_HARDEN",
+        "value": "실제 내부 파일럿에서 발견된 릴리스 차단 문제를 제거하고 반복 사용 가능한 상태로 안정화한다.",
+        "version": "1.1.1"
+      }
+    ],
+    "schema": "shipping-harness/release-train-summary-v1",
+    "totalReleases": 3
+  },
+  "revision": 1,
+  "schema": "shipping-harness/proposal-v1",
+  "shippingPlan": null,
+  "sourceChanges": [],
+  "tier": "PATCH",
+  "versionEvidence": {
+    "baseVersion": "1.0.0",
+    "changeKind": "patch",
+    "confidence": "high",
+    "evidence": [
+      {
+        "confidence": "high",
+        "path": "pyproject.toml",
+        "source": "pyproject",
+        "version": "1.0.0"
+      },
+      {
+        "confidence": "medium",
+        "path": null,
+        "source": "git-tag",
+        "version": "1.0.1"
+      },
+      {
+        "confidence": "medium",
+        "path": null,
+        "source": "git-tag",
+        "version": "1.0.0"
+      }
+    ],
+    "explicitVersionWins": true,
+    "recommendedVersion": "1.0.1",
+    "schema": "shipping-harness/version-evidence-v1"
+  },
+  "workspace": {
+    "ambiguous": false,
+    "confidence": "high",
+    "id": "WS-62f011d3ee4f",
+    "requested": false,
+    "root": ".",
+    "score": 15
+  },
+  "workspaceCandidates": [
+    {
+      "commandCount": 2,
+      "id": "WS-62f011d3ee4f",
+      "manifests": [
+        "pyproject.toml"
+      ],
+      "projectName": "continue-session-80ebc9",
+      "root": ".",
+      "score": 15,
+      "trackedFileCount": 1587,
+      "types": [
+        "python"
+      ]
+    }
+  ]
+}

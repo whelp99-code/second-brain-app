@@ -2,16 +2,17 @@
 import base64
 import hashlib
 import json
-import sys
-from datetime import UTC, datetime, timedelta
-from dataclasses import replace
-from pathlib import Path
 import subprocess
+import sys
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from sb.effect_values import canonical_bytes, format_instant
 from sb.mcp_contract import write_fixture_request
 from sb.request_executor import RequestExecutor

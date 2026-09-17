@@ -1,17 +1,17 @@
 """Actual HTTPS authority checks at provider admission and execution boundaries."""
-import json
 import base64
-import subprocess
+import json
 import os
 import shlex
-from contextlib import redirect_stdout
-from io import StringIO
-from types import SimpleNamespace
-from unittest.mock import patch
+import subprocess
 import sys
+from contextlib import redirect_stdout
 from dataclasses import asdict
 from datetime import datetime
+from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore

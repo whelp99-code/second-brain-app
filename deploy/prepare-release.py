@@ -10,12 +10,12 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import shlex
 import shutil
 import subprocess
-import tempfile
 import tarfile
+import tempfile
+from pathlib import Path
 
 from bundle_python_runtime import bundle_runtime, release_identity, runtime_digest
 

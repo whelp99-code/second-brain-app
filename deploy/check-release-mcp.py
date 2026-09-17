@@ -1,9 +1,15 @@
 """Check installed MCP initialization/tool lists with temporary, non-operational fixtures."""
-import base64,json,os,tempfile,sys
+import base64
+import json
+import os
+import sys
+import tempfile
 from pathlib import Path
+
 import anyio
 from mcp import StdioServerParameters
 from mcp.client import Client
+
 if len(sys.argv) != 2:
  raise SystemExit('usage: check-release-mcp.py ABSOLUTE_RELEASE_PATH')
 release=Path(sys.argv[1]).resolve(strict=True)

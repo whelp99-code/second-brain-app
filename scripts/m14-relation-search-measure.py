@@ -35,7 +35,7 @@ def _vault(root: Path) -> Path:
 
 
 def _ids(hits: tuple[object, ...]) -> list[str]:
-    return [str(getattr(hit, "page_id")) for hit in hits]
+    return [str(hit.page_id) for hit in hits]
 
 
 def main() -> None:
