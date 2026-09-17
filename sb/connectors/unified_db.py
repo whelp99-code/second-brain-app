@@ -127,7 +127,7 @@ class UnifiedDbAdapter:
 
     def scan(self, cursor: str | None) -> Iterator[Item]:
         mapping = self._settings.mapping
-        emit = EmitCtx(ADAPTER_ID, {}, frozenset(), set())
+        emit = EmitCtx(ADAPTER_ID, {}, frozenset(), set(), mapping.low_value)
         state = _Scan(decode_cursor(cursor), [], emit, mapping.page_size, self._settings.max_rows)
         with self._settings.connect(self.dsn) as session:
             self.last_settings = _guard(session)
