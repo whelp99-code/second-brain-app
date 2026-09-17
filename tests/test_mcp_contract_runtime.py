@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 from collections.abc import Iterator, Mapping
+from importlib import metadata
 from pathlib import Path
 from typing import ClassVar
 
@@ -135,7 +136,8 @@ def test_read_page_fixture_matches_complete_runtime_frontmatter(runtime: tuple[P
     expected_frontmatter = _mapping(expected["frontmatter"])
     actual_frontmatter["updated"] = "<YYYY-MM-DD>"
     # Fixture pins the schema, while the producer version follows the installed release.
-    expected_frontmatter["compiled_by"] = str(expected_frontmatter["compiled_by"]).replace("sb/0.1.0|", "sb/1.0.0|")
+    installed = metadata.version("second-brain")
+    expected_frontmatter["compiled_by"] = str(expected_frontmatter["compiled_by"]).replace("sb/0.1.0|", f"sb/{installed}|")
     assert actual_frontmatter == expected_frontmatter
 
 
