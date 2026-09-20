@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 12,
+  "revision": 13,
   "stages": [
     {
       "id": "S-01",
@@ -76,9 +76,13 @@
       "dependsOn": [
         "S-02B"
       ],
-      "acceptanceRefs": [],
+      "acceptanceRefs": [
+        "python-ruff",
+        "python-pytest"
+      ],
       "scopeInclude": [
-        "세 계열 세션 수집기 연결"
+        "세 계열 세션 수집기를 어댑터로 등록",
+        "계열별 수집을 저장소 테스트로 증명"
       ],
       "scopeExclude": [
         "세션 외 자동화 복구"
