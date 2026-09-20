@@ -1,0 +1,113 @@
+{
+  "acceptance": {
+    "failed": 0,
+    "passed": 2,
+    "requiredFailed": 0,
+    "total": 2
+  },
+  "agentRuns": 0,
+  "backlogCount": 0,
+  "baselineSha": "30e9ebcd1f14fc6e691afe990211bbe4d93e7438",
+  "closedAt": "2026-09-20T05:29:55.392Z",
+  "closedGitSha": "d81f700a56d7b83895e468be3a13c6c815a9b342",
+  "contractHash": "b7e3a3a9d8d4ce5420fdadf88c6617e02353c73bee809811dd47c0b141f0787e",
+  "evidenceRunId": "run-2026-09-20T05-23-43-302Z-4a3333b3",
+  "fixCycles": 0,
+  "goal": "발행 브랜치가 1.0.2 라인을 담고 master가 그 결과를 가리키며, 합류 커밋에서 저장소 검증이 통과한다.",
+  "integrations": null,
+  "issueCounts": {
+    "BLOCKER": 0,
+    "IGNORE": 0,
+    "NEXT": 0,
+    "UNKNOWN": 0
+  },
+  "planHash": "f9fe6a91aff6a7386d40b79d2f598f2a32955c2047e70883e2c4185577bfc2fc",
+  "planStage": {
+    "acceptanceRefs": [
+      "python-ruff",
+      "python-pytest"
+    ],
+    "dependsOn": [],
+    "id": "S-01",
+    "outcome": "발행 브랜치가 1.0.2 라인을 담고 master가 그 결과를 가리키며, 합류 커밋에서 저장소 검증이 통과한다.",
+    "scopeExclude": [
+      "새 제품 기능",
+      "공개 배포"
+    ],
+    "scopeInclude": [
+      "발행 브랜치 합류와 master 갱신",
+      "합류 후 저장소 검증 재실행"
+    ],
+    "size": "PATCH",
+    "title": "1.0.2를 발행 브랜치에 합치고 master 갱신"
+  },
+  "planStageId": "S-01",
+  "postLockCommits": [
+    {
+      "paths": [
+        "docs/PROGRESS-PLAN-2026-09-17.md",
+        "docs/shipping-plan.json"
+      ],
+      "sha": "d81f700a56d7b83895e468be3a13c6c815a9b342",
+      "subject": "docs: record the deploy S-03 could not include, and correct S-02"
+    },
+    {
+      "paths": [
+        "sb/briefing.py",
+        "tests/test_briefing.py"
+      ],
+      "sha": "00373b54732cd08ad43eccb081b678442cb2e530",
+      "subject": "fix(brief): an empty vault reports no recommendations instead of failing"
+    },
+    {
+      "paths": [
+        "sb/pipeline.py",
+        "tests/test_cli.py"
+      ],
+      "sha": "c30e377083e3d3e1723bf5c90d576f1978b56954",
+      "subject": "fix(brief): a date-shaped string in source text need not be a date"
+    },
+    {
+      "paths": [
+        "sb/security.py",
+        "tests/test_security.py"
+      ],
+      "sha": "056cbece5b44dc8784655243426e3de210d29ec2",
+      "subject": "fix(brief): a refusing source withholds its line, it does not fail the stage"
+    },
+    {
+      "paths": [
+        "sb/security.py",
+        "tests/test_briefing.py",
+        "tests/test_cli.py",
+        "tests/test_compile_upgrade_estimate.py",
+        "tests/test_mcp_generation_overlap.py",
+        "tests/test_mcp_scoped.py",
+        "tests/test_memory_access.py",
+        "tests/test_page_access.py",
+        "tests/test_scoped_search.py",
+        "tests/test_security.py",
+        "tests/test_security_policy.py"
+      ],
+      "sha": "7d375846dae32f04f277b6ec408e740ea7f88969",
+      "subject": "fix(security): an unstated model is not a local one"
+    },
+    {
+      "paths": [
+        "sb/pipeline.py",
+        "tests/test_connectors_unified_db.py"
+      ],
+      "sha": "ea00d18b151f0a759a4337699c4ced06da68ad21",
+      "subject": "fix(ingest): a dotted row identifier is not a file extension"
+    }
+  ],
+  "project": "second-brain-app",
+  "release": "1.0.3",
+  "schema": "shipping-harness/release-v1",
+  "telemetry": {
+    "totalAgentDurationMs": 0
+  },
+  "tier": "PATCH",
+  "verifyRuns": 1,
+  "worker": "shipping-harness"
+}

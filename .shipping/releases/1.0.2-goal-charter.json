@@ -1,0 +1,75 @@
+{
+  "approvalAuthority": false,
+  "assumptions": [
+    "workflow-boundary: AUTOPILOT"
+  ],
+  "binding": {
+    "acceptedAt": "2026-09-17T06:12:53.867Z",
+    "approverId": "mcp-confirmed-user",
+    "approverType": "human",
+    "baselineSha": "84ab2e6f1a1a3a9403c6fa4051ec309d7dde1292",
+    "contractHash": "bd131be58bc83d30b0f3375638078ae2cac65d1662eba74992e8700da964efd4",
+    "previewHash": "c0016128516625c8063a40f87e3f80583202712310963e3b5090ff667d02ccbd",
+    "releaseTrainHash": "d44069736dbf5e5f01ed93a7d3412c520f4ca635f95ddf702b7c96d6543a6d5c"
+  },
+  "candidateHash": "a14a2941dbf4ecb9b2c304738493e2a737812481eb3a8cc91f708be0bdc4a553",
+  "closureAuthority": false,
+  "commandAuthority": false,
+  "criticHash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+  "deploymentAuthority": false,
+  "directionHash": "3dcb27742916bef81d8fb0ed7a49ecce8a175cb520cc9ed48b37472ed8c876c5",
+  "discoveryHash": "972be77bea1fbab7313bedcfa5681ec37ceb49f4a1ec4bae962de72df0582be1",
+  "evidenceRefs": [
+    "EVID-001",
+    "EVID-002",
+    "EVID-004",
+    "EVID-006",
+    "EVID-010",
+    "proposal.goalDiscovery.direction",
+    "proposal.goalDiscovery.critic",
+    "proposal.decision.resolutions",
+    "proposal.contract.scope",
+    "proposal.contract.acceptance"
+  ],
+  "gitSha": "84ab2e6f1a1a3a9403c6fa4051ec309d7dde1292",
+  "hash": "2dd5223ca4df8442feccd4dc25bab30dbc0b763cf19f992f64aa31537692f8b9",
+  "id": "CHARTER-3dcb27742916",
+  "include": [
+    "핵심 사용자 흐름",
+    "오류 처리",
+    "현재 저장소 검증",
+    "관련 운영 설명"
+  ],
+  "modelAuthority": false,
+  "nonGoals": [
+    "핵심 가치와 무관한 기능 확장",
+    "자동 외부 배포",
+    "데이터·인증·보안·비용 영향의 무승인 실행",
+    "현재 버전을 끝없이 진화시키는 반복",
+    "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+  ],
+  "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+  "outcome": "second-brain-app 1.0.2를 릴리스한다 — unified-db 커넥터 심박 행 스킵, 버전 표기(pyproject·uv.lock·Info.plist) 정리, 저장소 전역 ruff 정리 포함.",
+  "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+  "project": "harness-truncation-fix-446f99",
+  "proposalHash": "13cd229ed580a61ad184c4369c5209d13574774b10ccae03b72da898a6137e5c",
+  "proposalId": "proposal-2026-09-17T06-10-40-675Z-ec266208",
+  "proposalRevision": 2,
+  "release": "1.0.2",
+  "released": false,
+  "replanTriggers": [
+    "핵심 사용자 가치 변경",
+    "완료조건 약화 필요",
+    "외부·데이터·인증·보안·비용 영향 발견",
+    "저장소 구조와 계획의 중대한 불일치"
+  ],
+  "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+  "schema": "shipping-harness/goal-charter-v1",
+  "status": "ACCEPTED",
+  "successCriteria": [
+    "저장소가 소유한 필수 검증 명령이 통과한다.",
+    "BLOCKER와 UNKNOWN이 0이다.",
+    "현재 Git SHA와 완료 증거가 일치한다."
+  ],
+  "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+}

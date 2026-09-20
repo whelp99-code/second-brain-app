@@ -1,0 +1,105 @@
+{
+  "acceptance": [
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen ruff check .",
+      "cwd": ".",
+      "description": "Configured Ruff checks pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-001",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 300,
+      "type": "command"
+    },
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen pytest",
+      "cwd": ".",
+      "description": "Python tests pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-002",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 600,
+      "type": "command"
+    }
+  ],
+  "adapters": {
+    "codex": {
+      "artifactPaths": [],
+      "command": null
+    },
+    "generic": {
+      "artifactPaths": [],
+      "command": null
+    }
+  },
+  "blockerPolicy": [
+    "acceptance-failure",
+    "contract-tamper",
+    "stale-evidence",
+    "scope-drift",
+    "data-loss",
+    "critical-security"
+  ],
+  "budgets": {
+    "maxAgentRuns": 3,
+    "maxCommandSeconds": 900,
+    "maxFixCycles": 2,
+    "maxOutputBytes": 1048576
+  },
+  "goal": "second-brain-app 1.0.2를 릴리스한다 — unified-db 커넥터 심박 행 스킵, 버전 표기(pyproject·uv.lock·Info.plist) 정리, 저장소 전역 ruff 정리 포함.",
+  "project": "harness-truncation-fix-446f99",
+  "release": "1.0.2",
+  "releasePolicy": {
+    "autoCommit": false,
+    "autoPush": false,
+    "autoTag": false,
+    "generateReport": true
+  },
+  "schema": "shipping-harness/v1",
+  "scope": {
+    "exclude": [
+      "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+      "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+      "Optional polish, additional integrations, and future extensibility work."
+    ],
+    "include": [
+      "Deliver the stated release goal: second-brain-app 1.0.2를 릴리스한다 — unified-db 커넥터 심박 행 스킵, 버전 표기(pyproject·uv.lock·Info.plist) 정리, 저장소 전역 ruff 정리 포함.",
+      "Preserve existing behavior outside the stated goal.",
+      "Make every required acceptance check pass and document how to run the shipped result."
+    ],
+    "paths": {
+      "exclude": [
+        ".shipping/contract.yaml",
+        ".shipping/contract.lock",
+        ".git/**",
+        "node_modules/**",
+        "dist/**",
+        "coverage/**",
+        "target/**"
+      ],
+      "include": [
+        "README.md",
+        "README.rst",
+        "README.txt",
+        "clients/**",
+        "deploy/**",
+        "docs/**",
+        "pyproject.toml",
+        "sb/**",
+        "scripts/**",
+        "tests/**"
+      ]
+    }
+  },
+  "stopPolicy": {
+    "autoContinueAfterInterrupt": false,
+    "closeWhenRequiredGatesPass": true,
+    "humanInterruptWins": true
+  },
+  "worker": "shipping-harness"
+}
