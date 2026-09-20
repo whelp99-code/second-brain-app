@@ -432,3 +432,19 @@ def test_citation_regeneration_exhaustion_never_publishes(tmp_path: Path, cap: i
     error = _reject_write(tmp_path, page, 'retry-exhausted')
     assert 'uncited' in str(error)
     assert not (tmp_path / (page.page_id + '.md')).exists()
+
+
+def test_uncitable_recommendations_become_none_when_nothing_was_citable() -> None:
+    """Given no available citation, when the model answers with bullets, then none are kept.
+
+    An empty vault offers the model nothing to cite, so every bullet it returns is
+    uncitable by construction and three retries cannot change that. The stage used
+    to fail on those marks, which left whether an empty vault briefed at all up to
+    how talkative the model felt that run (2026-09-20).
+    """
+    fake = FakeLLM(["- 추천 하나\n- 추천 둘"])
+    empty = BriefingInputs((), (), (), (), None, "ok")
+    spec = generate_briefing(empty, fake, _config())
+    assert fake.calls == 1
+    assert _section(spec.body_md, "오늘의 추천") == EMPTY
+    assert UNCITED_SENTINEL not in spec.body_md

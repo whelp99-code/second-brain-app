@@ -79,6 +79,14 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     attempts = min(cap, max(1, config.caps.get("max_briefing_validation_attempts", 1)))
     for _ in range(attempts):
         recs = _mark_uncited_bullets(_recommendation_body(llm.generate(prompt)))
+        if not allowed:
+            # Nothing was citable, so no answer could carry a valid citation and
+            # retrying only spends the remaining attempts. Report no
+            # recommendations rather than fail the stage over citations that
+            # could not have existed: whether an empty vault briefed at all was
+            # otherwise decided by how talkative the model felt.
+            recs = EMPTY_PLACEHOLDER
+            break
         # Do not hide invalid citations by trimming them away. Minimum cited
         # recommendation validation runs after the display budget is applied.
         if not ({match.group(1) for match in SID_RE.finditer(recs)} - allowed):
