@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 5,
+  "revision": 6,
   "stages": [
     {
       "id": "S-01",
@@ -73,7 +73,7 @@
       ],
       "scopeInclude": [
         "릴리스 빌드와 app/current 재연결",
-        "상태 점검 경로(web /ready, sb doctor, sb status) 확인",
+        "상태 점검 경로(웹 준비 엔드포인트, sb doctor, sb status) 확인",
         "백업 생성·검증과 이전 릴리스 relink 롤백 증명",
         "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정"
       ],
@@ -83,7 +83,7 @@
         "AI 세션 소스 추가(S-04)",
         "LLM 상한 상향"
       ],
-      "size": "MINOR"
+      "size": "MILESTONE"
     },
     {
       "id": "S-03",
