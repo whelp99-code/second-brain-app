@@ -29,6 +29,7 @@ dev = [
     "pytest",
     "ruff",
     "basedpyright",
+    "sqlite-vec==0.1.9",
 ]
 
 [project.scripts]

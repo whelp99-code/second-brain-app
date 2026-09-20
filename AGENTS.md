@@ -40,11 +40,13 @@ From plan Scope. Do not add these.
 
 ## Tests
 
-From the app root. The ignore matches a plain `uv sync`; `tests/test_embeddings.py` needs the optional `embeddings` extra.
+From the app root. The whole suite runs on a plain `uv sync`; `sqlite-vec` sits in the `dev`
+group so `tests/test_embeddings.py` needs no extra. The `embeddings` extra is the product's
+optional feature, not a test dependency -- those tests encode with a fake model.
 
 ```bash
 cd /Volumes/DevSpace/second-brain-app
-uv run pytest -q --ignore=tests/test_embeddings.py
+uv run pytest -q
 ```
 
 ```bash
