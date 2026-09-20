@@ -170,6 +170,13 @@ S-02B의 마지막 남은 항목은 버전 표기였다. 그것을 고치자 수
 롤백 경로는 위 "복구 경로 실측"에서 같은 기계·같은 절차로 양방향 증명했고, 직전 릴리스
 `fb3f6f8b…`는 `app/releases/` 아래 그대로 보존되어 있다.
 
+1.0.5(`a5dedd78…`, source `d3f9591`)가 그 뒤를 이었다. `sqlite-vec`를 기본 의존성에서 dev 그룹과
+`embeddings` 엑스트라로 되돌린 패치라 배포본에서 `sqlite-vec`가 다시 빠졌고, 1.0.4가 만든 배포본
+의존성 delta는 되돌아갔다. 검증은 같다 — web `/ready` 200 ready(reasons []), `doctor` 8 PASS /
+1 WARN, `sb status` ok, refresh 1회 success. 백업은
+`second-brain-20260920T221827+0900.tar.gz`(40,386 파일, 격리 복원 검증 완료). 현재 운영 배포본은
+이것이다.
+
 ## S-03 — 프로바이더 설정에 unified-db 소스 추가
 
 `(c)` · 증명 등급 `MANUAL` · 크기 `PATCH` · **2026-09-20 완료**
