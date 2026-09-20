@@ -137,6 +137,39 @@ compile이 아니라 ingest에서 만들어지고, 당시 `_materialize`가 unif
 
 `doctor`의 `scheduler-assets` WARN은 배포본마다 항상 뜬다. 이번 변경과 무관한 기존 상태다.
 
+### 1.0.4 배포 (2026-09-20)
+
+S-02B의 마지막 남은 항목은 버전 표기였다. 그것을 고치자 수용 명령이 스스로 완결되지 않는다는
+사실이 함께 드러났다. `uv run --frozen pytest`는 엑스트라를 설치하지 않는데 `sqlite-vec`가
+`embeddings` 엑스트라에 있어서, 새 워크트리에서는 `tests/test_embeddings.py` 20건이
+`EmbeddingUnavailable`로 실패한다. 메인 체크아웃이 통과한 것은 `.venv`에 남아 있던 옛
+`uv sync --extra embeddings` 잔재 덕분이었다. 즉 1.0.3의 AC-002 PASS는 저장소가 아니라 그 기계의
+숨은 상태에 기대고 있었다.
+
+`sqlite-vec`만 기본 의존성으로 올렸다. 엑스트라를 통째로 올리면 torch·transformers·triton이 모든
+배포에 따라 들어오는데, 그 20건은 `sqlite_vec`만 있으면 통과한다(엑스트라 제거 상태에서 30 passed,
+1 skipped). `sentence-transformers`는 엑스트라에 남겼다.
+
+| 항목 | 값 |
+|---|---|
+| 이전 배포본 | `fb3f6f8b…`(source `5dfceeb`) |
+| 커밋 | `92ea7f5`(1.0.4 + sqlite-vec 기본 의존성), `9cd9953`(macOS 번들 버전) |
+| 배포 | `8bd05730…`(source `9cd9953`, `working_tree_modified: false`) |
+| 백업 | `second-brain-20260920T212342+0900.tar.gz` (40,374 파일, 격리 복원 검증 완료) |
+| 검증 | web `/ready` 200 ready(reasons []), `doctor` 8 PASS / 1 WARN(`scheduler-assets`), `sb status` ok |
+| refresh | `jm-second-brain-refresh.service` success (41.9s) |
+| 하네스 | 1.0.4 SHIPPABLE, AC-001·AC-002 PASS, 블로커 0, 범위 위반 0 |
+
+버전을 올리면 `clients/macos/SecondBrainMac/Resources/Info.plist`의
+`CFBundleShortVersionString`도 함께 올려야 한다. `tests/test_macos_client_contract.py`가 그것을
+`pyproject.toml`의 버전과 같아야 한다고 못박고 있어서, 한쪽만 고치면 AC-002가 깨진다. 첫 verify가
+그 한 건으로 FAIL했다.
+
+수용 명령 실측은 두 번 모두 예산 안쪽이다. 397.7초·395.9초 / 600초 = 66%.
+
+롤백 경로는 위 "복구 경로 실측"에서 같은 기계·같은 절차로 양방향 증명했고, 직전 릴리스
+`fb3f6f8b…`는 `app/releases/` 아래 그대로 보존되어 있다.
+
 ## S-03 — 프로바이더 설정에 unified-db 소스 추가
 
 `(c)` · 증명 등급 `MANUAL` · 크기 `PATCH` · **2026-09-20 완료**

@@ -9,7 +9,7 @@
     {
       "path": "docs/PROGRESS-PLAN-2026-09-17.md",
       "note": "단계별 선행 조건·완료 기준·롤백·증명 방법의 근거 원본.",
-      "sha256": "d27c9d9a1fdcd7648e34fa26cfbbbae4ad13a3ff7ec740bd941fbc10324f4b85"
+      "sha256": "0796bcdcd52f936e270a62074781fa128800a974154bb40af682feda2d2fea01"
     },
     {
       "path": "SECOND-BRAIN-LIFE-MEMORY-ANALYSIS-2026-09-17.md",
@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 10,
+  "revision": 11,
   "stages": [
     {
       "id": "S-01",
