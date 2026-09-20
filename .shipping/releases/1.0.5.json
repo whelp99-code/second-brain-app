@@ -1,0 +1,96 @@
+{
+  "acceptance": {
+    "failed": 0,
+    "passed": 2,
+    "requiredFailed": 0,
+    "total": 2
+  },
+  "agentRuns": 0,
+  "backlogCount": 0,
+  "baselineSha": "d0c74d0746a5c5a92676847e740afbe7e46f6701",
+  "closedAt": "2026-09-20T13:18:24.155Z",
+  "closedGitSha": "03437aee1c4cd209db080e8051957c0c7fb853a4",
+  "contractHash": "7a7ec95a3a8b98ae0b906fc468ea67f21d605f821aba835b73c30030d4b9270a",
+  "evidenceRunId": "run-2026-09-20T13-11-44-206Z-a00bf503",
+  "fixCycles": 0,
+  "goal": "sqlite-vec 를 기본 의존성에서 dev 그룹으로 옮기고 embeddings 엑스트라에 되돌려, 배포본은 sqlite-vec 없이 나가면서 uv run --frozen pytest 는 엑스트라 없이 그대로 통과한다. pyproject.toml 과 uv.lock 과 AGENTS.md 를 함께 고친다.",
+  "integrations": null,
+  "issueCounts": {
+    "BLOCKER": 0,
+    "IGNORE": 0,
+    "NEXT": 0,
+    "UNKNOWN": 0
+  },
+  "planHash": "fdb4329240cce037a1daa066ae33f32460a6a89ac62f2ec267391201160e460f",
+  "planStage": {
+    "acceptanceRefs": [
+      "python-ruff",
+      "python-pytest"
+    ],
+    "dependsOn": [
+      "S-01"
+    ],
+    "id": "S-02B",
+    "outcome": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다.",
+    "scopeExclude": [
+      "새 제품 기능",
+      "공개 또는 고객 배포",
+      "AI 세션 소스 추가(S-04)",
+      "LLM 상한 상향"
+    ],
+    "scopeInclude": [
+      "릴리스 빌드와 app/current 재연결",
+      "상태 점검 경로(웹 준비 엔드포인트, sb doctor, sb status) 확인",
+      "백업 생성·검증과 이전 릴리스 relink 롤백 증명",
+      "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정",
+      "버전 표기를 pyproject.toml 과 uv.lock 에 함께 반영"
+    ],
+    "size": "MILESTONE",
+    "title": "운영 배포(relink)와 복구 경로 증명"
+  },
+  "planStageId": "S-02B",
+  "postLockCommits": [
+    {
+      "paths": [
+        "clients/macos/SecondBrainMac/Resources/Info.plist",
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "sha": "03437aee1c4cd209db080e8051957c0c7fb853a4",
+      "subject": "fix(deps): keep sqlite-vec out of the release, 1.0.5"
+    },
+    {
+      "paths": [
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "sha": "66377307515d71fa390361382deb9fbd5ede4baa",
+      "subject": "Merge branch 'claude/hopeful-murdock-b8672c' into 1.0.5"
+    },
+    {
+      "paths": [
+        "AGENTS.md",
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "sha": "d5febd939f7113fd7711ce90311b23a31ed36021",
+      "subject": "test(deps): let the plain test command run the embeddings tests"
+    },
+    {
+      "paths": [
+        "tests/test_shipping_plan_sources.py"
+      ],
+      "sha": "050e0a824587cd830e53a088d37138ee10b9e07a",
+      "subject": "test(plan): catch a stale source hash here, not at proposal time"
+    }
+  ],
+  "project": "second-brain-app",
+  "release": "1.0.5",
+  "schema": "shipping-harness/release-v1",
+  "telemetry": {
+    "totalAgentDurationMs": 0
+  },
+  "tier": "MILESTONE",
+  "verifyRuns": 1,
+  "worker": "shipping-harness"
+}
