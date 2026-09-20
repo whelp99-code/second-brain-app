@@ -1,0 +1,68 @@
+{
+  "acceptance": {
+    "failed": 0,
+    "passed": 2,
+    "requiredFailed": 0,
+    "total": 2
+  },
+  "agentRuns": 0,
+  "backlogCount": 0,
+  "baselineSha": "067a602a87f9d7e136c1bd61070137fe0d6c15db",
+  "closedAt": "2026-09-20T13:51:13.408Z",
+  "closedGitSha": "68002fe8dd37c4dc02dbb942244c2424a39989c5",
+  "contractHash": "661bdcbdd8c358049a6d9ad6cc3f2a5e1c2041ccc31eb83d88f5a063ffab14c7",
+  "evidenceRunId": "run-2026-09-20T13-44-08-820Z-37badde2",
+  "fixCycles": 0,
+  "goal": "config.example.toml 에 claude·codex·omo 세션 소스 세 행을 문서화해 운영자가 설정을 복사해 쓸 수 있게 하고, 그 예시가 실제 어댑터 이름과 일치함을 저장소 테스트로 잠근다. 버전 표기를 pyproject.toml 과 uv.lock 에 함께 올린다.",
+  "integrations": null,
+  "issueCounts": {
+    "BLOCKER": 0,
+    "IGNORE": 0,
+    "NEXT": 0,
+    "UNKNOWN": 0
+  },
+  "planHash": "0ca9137d07f2fb9f81e7dd4d2aa4754c9d73e1b5d280636840735851b55e9518",
+  "planStage": {
+    "acceptanceRefs": [
+      "python-ruff",
+      "python-pytest"
+    ],
+    "dependsOn": [
+      "S-02B"
+    ],
+    "id": "S-04",
+    "outcome": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
+    "scopeExclude": [
+      "세션 외 자동화 복구"
+    ],
+    "scopeInclude": [
+      "세 계열 세션 수집기를 어댑터로 등록",
+      "계열별 수집을 저장소 테스트로 증명"
+    ],
+    "size": "MILESTONE",
+    "title": "AI 세션 직접 수집"
+  },
+  "planStageId": "S-04",
+  "postLockCommits": [
+    {
+      "paths": [
+        "clients/macos/SecondBrainMac/Resources/Info.plist",
+        "config.example.toml",
+        "pyproject.toml",
+        "tests/test_connectors_sessions_configured.py",
+        "uv.lock"
+      ],
+      "sha": "68002fe8dd37c4dc02dbb942244c2424a39989c5",
+      "subject": "feat(config): document the three session sources, 1.0.7"
+    }
+  ],
+  "project": "post-reconnection-checks-1eadea",
+  "release": "1.0.7",
+  "schema": "shipping-harness/release-v1",
+  "telemetry": {
+    "totalAgentDurationMs": 0
+  },
+  "tier": "MILESTONE",
+  "verifyRuns": 1,
+  "worker": "shipping-harness"
+}
