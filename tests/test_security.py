@@ -239,3 +239,32 @@ def test_unstated_model_denies_a_source_that_states_no_policy(tmp_path: Path) ->
     """Given an unstated model, when a source omits llm_policy, then egress is denied."""
     config = _inferred_config(tmp_path, None, "omo-grok.sh")
     assert source_llm_policy(config, "private") == "deny"
+
+
+def test_briefing_drops_a_denied_source_line_instead_of_failing(tmp_path: Path) -> None:
+    """Given a denied source in briefing inputs, when protected, then its line is dropped.
+
+    compile falls back to no LLM and conflict filters what it may not send; briefing
+    raised instead, so one `deny` source failed the whole stage — which is what the
+    operational refresh did the moment unified-db arrived denied (2026-09-20).
+    """
+    config = _config(tmp_path, external=True, llm_policy="deny")
+    inputs = BriefingInputs(
+        ("origin=private:notes.md 어제 한 일", "무출처 줄"),
+        (),
+        ("origin=private:stale.md 오래된 쪽",),
+        (),
+        None,
+        None,
+    )
+    protected = protect_briefing_inputs(inputs, config)
+    assert protected.yesterday_items == ("무출처 줄",)
+    assert protected.stale_pages == ()
+
+
+def test_briefing_still_raises_on_a_malformed_source_policy(tmp_path: Path) -> None:
+    """Given an invalid llm_policy, when protected, then it raises rather than dropping."""
+    config = _config(tmp_path, external=True, llm_policy="nonsense")
+    inputs = BriefingInputs(("origin=private:notes.md 어제 한 일",), (), (), (), None, None)
+    with pytest.raises(SecurityPolicyError):
+        _ = protect_briefing_inputs(inputs, config)

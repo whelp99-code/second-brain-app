@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Final, cast
@@ -108,13 +108,45 @@ def protect_units(units: list[Unit], config: Config) -> list[Unit]:
 def protect_briefing_inputs(inputs: BriefingInputs, config: Config) -> BriefingInputs:
     """Apply source policy and masking to all text that can enter briefing prompts."""
     return BriefingInputs(
-        tuple(_protect_line(line, config) for line in inputs.yesterday_items),
+        _briefing_lines(inputs.yesterday_items, config),
         tuple(mask_sensitive(line) for line in inputs.open_conflict_pages),
-        tuple(_protect_line(line, config) for line in inputs.stale_pages),
-        tuple(_protect_line(line, config) for line in inputs.upcoming_items),
+        _briefing_lines(inputs.stale_pages, config),
+        _briefing_lines(inputs.upcoming_items, config),
         None if inputs.last_brief is None else mask_sensitive(inputs.last_brief),
         inputs.previous_run_status,
     )
+
+
+def _briefing_lines(lines: Sequence[str], config: Config) -> tuple[str, ...]:
+    """Keep the lines a briefing prompt may carry and drop the ones it may not.
+
+    A refusing source withholds its own line here, the way compile falls back to
+    no LLM and conflict filters the units it may not send. Raising instead would
+    let one denied source fail the whole briefing, which is what happened once
+    unified-db arrived with the `deny` its unjudged payloads call for.
+    """
+    kept: list[str] = []
+    for line in lines:
+        protected = _briefing_line(line, config)
+        if protected is not None:
+            kept.append(protected)
+    return tuple(kept)
+
+
+def _briefing_line(line: str, config: Config) -> str | None:
+    """Return the prompt-safe line, or None when policy forbids sending it."""
+    matched = _ORIGIN.search(line)
+    if matched is None:
+        return mask_sensitive(line)
+    source_id = matched.group(1)
+    # A malformed policy still raises: that is a configuration fault, not a refusal.
+    policy, sensitive = _policies(config, source_id)
+    if policy == "deny" or (policy == "local-only" and llm_is_external(config)):
+        return None
+    protected = mask_sensitive(line)
+    if sensitive == "deny" and protected != line:
+        return None
+    return line if sensitive == "allow" else protected
 
 
 def source_policy_snapshot(config: Config) -> tuple[dict[str, object], ...]:
@@ -143,19 +175,6 @@ def source_policy_snapshot(config: Config) -> tuple[dict[str, object], ...]:
         )
     rows.sort(key=lambda row: (str(row["id"]), str(row["adapter"])))
     return tuple(rows)
-
-
-def _protect_line(line: str, config: Config) -> str:
-    matched = _ORIGIN.search(line)
-    if matched is not None:
-        source_id = matched.group(1)
-        policy, sensitive = _policies(config, source_id)
-        _enforce_egress(source_id, policy, config)
-        protected = mask_sensitive(line)
-        if sensitive == "deny" and protected != line:
-            raise SecurityPolicyError(source_id, "sensitive content denied")
-        return line if sensitive == "allow" else protected
-    return mask_sensitive(line)
 
 
 def _enforce_egress(source_id: str, policy: str, config: Config) -> None:
