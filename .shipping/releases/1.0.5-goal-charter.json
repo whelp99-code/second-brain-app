@@ -1,0 +1,73 @@
+{
+  "approvalAuthority": false,
+  "assumptions": [],
+  "binding": {
+    "acceptedAt": "2026-09-20T13:11:18.790Z",
+    "approverId": "mcp-confirmed-user",
+    "approverType": "human",
+    "baselineSha": "d0c74d0746a5c5a92676847e740afbe7e46f6701",
+    "contractHash": "7a7ec95a3a8b98ae0b906fc468ea67f21d605f821aba835b73c30030d4b9270a",
+    "previewHash": "96b44ca7d29801a14a932d5997a967c44dbd490e9e2622497003c08488b76da2",
+    "releaseTrainHash": "e6235e7dadcf133617e8ab44c356d49de8a935ceea930b7e302d731192f40d98"
+  },
+  "candidateHash": "a84485cd29320569d5c1db2284dde039e058848dc7f2a7127beb653d8d6a2c13",
+  "closureAuthority": false,
+  "commandAuthority": false,
+  "criticHash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+  "deploymentAuthority": false,
+  "directionHash": "b80c32617ec5fb439250f814f659b6764c9f465f134c5e18a429704ebd6d332d",
+  "discoveryHash": "67a970258a03cdb42a424c2d5508fb00fed8f819800afa5730bce9385706bd90",
+  "evidenceRefs": [
+    "EVID-001",
+    "EVID-002",
+    "EVID-004",
+    "EVID-006",
+    "EVID-010",
+    "proposal.goalDiscovery.direction",
+    "proposal.goalDiscovery.critic",
+    "proposal.decision.resolutions",
+    "proposal.contract.scope",
+    "proposal.contract.acceptance"
+  ],
+  "gitSha": "d0c74d0746a5c5a92676847e740afbe7e46f6701",
+  "hash": "cca7e6aa7b57ad641be2991c9f38bb115a1201682951244f88486bcb9443f64c",
+  "id": "CHARTER-b80c32617ec5",
+  "include": [
+    "핵심 사용자 흐름",
+    "오류 처리",
+    "현재 저장소 검증",
+    "관련 운영 설명"
+  ],
+  "modelAuthority": false,
+  "nonGoals": [
+    "핵심 가치와 무관한 기능 확장",
+    "자동 외부 배포",
+    "데이터·인증·보안·비용 영향의 무승인 실행",
+    "현재 버전을 끝없이 진화시키는 반복",
+    "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+  ],
+  "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+  "outcome": "sqlite-vec 를 기본 의존성에서 dev 그룹으로 옮기고 embeddings 엑스트라에 되돌려, 배포본은 sqlite-vec 없이 나가면서 uv run --frozen pytest 는 엑스트라 없이 그대로 통과한다. pyproject.toml 과 uv.lock 과 AGENTS.md 를 함께 고친다.",
+  "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+  "project": "second-brain-app",
+  "proposalHash": "40ceda96364c1de3368a448ea2ff373e5284858c143b4091b61e88a73b4c1c26",
+  "proposalId": "proposal-2026-09-20T13-09-24-325Z-e25ab34a",
+  "proposalRevision": 1,
+  "release": "1.0.5",
+  "released": false,
+  "replanTriggers": [
+    "핵심 사용자 가치 변경",
+    "완료조건 약화 필요",
+    "외부·데이터·인증·보안·비용 영향 발견",
+    "저장소 구조와 계획의 중대한 불일치"
+  ],
+  "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+  "schema": "shipping-harness/goal-charter-v1",
+  "status": "ACCEPTED",
+  "successCriteria": [
+    "저장소가 소유한 필수 검증 명령이 통과한다.",
+    "BLOCKER와 UNKNOWN이 0이다.",
+    "현재 Git SHA와 완료 증거가 일치한다."
+  ],
+  "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+}

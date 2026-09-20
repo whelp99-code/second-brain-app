@@ -1,0 +1,113 @@
+{
+  "acceptance": [
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen ruff check .",
+      "cwd": ".",
+      "description": "Configured Ruff checks pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-001",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 300,
+      "type": "command"
+    },
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen pytest",
+      "cwd": ".",
+      "description": "Python tests pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-002",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 600,
+      "type": "command"
+    }
+  ],
+  "adapters": {
+    "codex": {
+      "artifactPaths": [],
+      "command": null
+    },
+    "generic": {
+      "artifactPaths": [],
+      "command": null
+    }
+  },
+  "blockerPolicy": [
+    "acceptance-failure",
+    "contract-tamper",
+    "stale-evidence",
+    "scope-drift",
+    "data-loss",
+    "critical-security"
+  ],
+  "budgets": {
+    "maxAgentRuns": 3,
+    "maxCommandSeconds": 900,
+    "maxFixCycles": 2,
+    "maxOutputBytes": 1048576
+  },
+  "goal": "sqlite-vec 를 기본 의존성에서 dev 그룹으로 옮기고 embeddings 엑스트라에 되돌려, 배포본은 sqlite-vec 없이 나가면서 uv run --frozen pytest 는 엑스트라 없이 그대로 통과한다. pyproject.toml 과 uv.lock 과 AGENTS.md 를 함께 고친다.",
+  "plan": {
+    "path": "docs/shipping-plan.json",
+    "planHash": "fdb4329240cce037a1daa066ae33f32460a6a89ac62f2ec267391201160e460f",
+    "stageId": "S-02B",
+    "tier": "MILESTONE"
+  },
+  "project": "second-brain-app",
+  "release": "1.0.5",
+  "releasePolicy": {
+    "autoCommit": false,
+    "autoPush": false,
+    "autoTag": false,
+    "generateReport": true
+  },
+  "schema": "shipping-harness/v1",
+  "scope": {
+    "exclude": [
+      "Unrequested web, mobile, cloud, multi-user, and deployment features.",
+      "Speculative architecture rewrites and refactors not required by a failing acceptance criterion.",
+      "Optional polish, additional integrations, and future extensibility work."
+    ],
+    "include": [
+      "Deliver the stated release goal: sqlite-vec 를 기본 의존성에서 dev 그룹으로 옮기고 embeddings 엑스트라에 되돌려, 배포본은 sqlite-vec 없이 나가면서 uv run --frozen pytest 는 엑스트라 없이 그대로 통과한다. pyproject.toml 과 uv.lock 과 AGENTS.md 를 함께 고친다.",
+      "Preserve existing behavior outside the stated goal.",
+      "Make every required acceptance check pass and document how to run the shipped result."
+    ],
+    "paths": {
+      "exclude": [
+        ".shipping/contract.yaml",
+        ".shipping/contract.lock",
+        ".git/**",
+        "node_modules/**",
+        "dist/**",
+        "coverage/**",
+        "target/**"
+      ],
+      "include": [
+        "AGENTS.md",
+        "README.md",
+        "README.rst",
+        "README.txt",
+        "clients/**",
+        "deploy/**",
+        "docs/**",
+        "pyproject.toml",
+        "sb/**",
+        "scripts/**",
+        "tests/**",
+        "uv.lock"
+      ]
+    }
+  },
+  "stopPolicy": {
+    "autoContinueAfterInterrupt": false,
+    "closeWhenRequiredGatesPass": true,
+    "humanInterruptWins": true
+  },
+  "worker": "shipping-harness"
+}
