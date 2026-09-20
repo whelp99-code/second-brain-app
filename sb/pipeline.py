@@ -338,12 +338,22 @@ def _select_adapters(
     return [adapter for key, adapter in candidates if key in names or adapter.source_id in names]
 
 
+# A source URI is not always a filesystem path. unified-db addresses a row as
+# `unified-db:<project>:<table>:<row>`, whose dotted table name otherwise reads as
+# a file extension (".events:evt_...") that routes to no parser, so the row is
+# stored but never becomes a unit. A scheme prefix marks an identifier that is not
+# a path, so it carries no suffix; every path-shaped URI keeps its own, which is
+# what leaves a genuinely unsupported file (.png, .unsupported) skipped rather
+# than parsed as text.
+_URI_SCHEME: Final = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*:")
+
+
 def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
     from sb.normalize import normalize
     from sb.parsers import ParseError, UnsupportedSuffix, parser_for
 
     path_part = uri.split("#", 1)[0]
-    suffix = Path(path_part).suffix.lower()
+    suffix = "" if _URI_SCHEME.match(path_part) else Path(path_part).suffix.lower()
     if suffix in {".jsonl", ".json"}:
         suffix = ".md"
     try:

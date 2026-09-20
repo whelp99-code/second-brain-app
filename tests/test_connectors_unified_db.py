@@ -32,6 +32,7 @@ from sb.connectors.unified_db_mapping import (
     is_low_value,
 )
 from sb.contracts import SourceRef
+from sb.pipeline import _materialize
 
 _FORBIDDEN_SQL: re.Pattern[str] = re.compile(
     r"\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)\b", re.IGNORECASE
@@ -473,3 +474,29 @@ def test_low_value_matching_reads_both_project_spellings() -> None:
     assert is_low_value("global", "[claudeprobe] Session", rules)
     assert not is_low_value("global", "[ClaudeProbe] 세션 요약", rules)
     assert not is_low_value("global", "session", ())
+
+
+def test_dotted_row_uri_still_materializes_units() -> None:
+    """Given a unified-db row URI, when materialized, then units are produced.
+
+    `unified-db:<project>:<table>:<row>` carries no file extension, but the dotted
+    table name used to read as one (".events:evt_...") and routed to no parser, so
+    602 rows reached the operational vault as stored bytes that no search could
+    ever reach (2026-09-20).
+    """
+    units = _materialize(
+        b"# 1.0.2\n\n\xeb\xb0\x9c\xed\x96\x89 \xeb\xb8\x8c\xeb\x9e\x9c\xec\xb9\x98\xec\x97\x90 \xed\x95\xa9\xec\xb3\xa4\xeb\x8b\xa4.\n",
+        "d" * 64,
+        "unified-db:global:memory.events:evt_006b62f70530e8af",
+        "unified-db:unified-db:global:memory.events:evt_006b62f70530e8af",
+    )
+    assert units
+
+
+def test_unsupported_file_suffix_is_still_skipped() -> None:
+    """Given a real file URI with an unsupported extension, when materialized, then nothing is produced.
+
+    Treating every unknown tail as "no suffix" would parse binaries as text; only
+    an extension-shaped tail counts, so `.png` keeps its skip.
+    """
+    assert _materialize(b"\x89PNG\r\n\x1a\n", "e" * 64, "inbox/scan.png", "inbox:scan.png") == []
