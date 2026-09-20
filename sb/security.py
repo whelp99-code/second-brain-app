@@ -13,9 +13,16 @@ from sb.contracts import BriefingInputs, Unit
 
 _EMAIL: Final = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 _BEARER: Final = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}")
+# The leading `[A-Za-z0-9_.-]*` matches a compound key's own prefix. A word boundary
+# alone missed every real config spelling: `provider_private_key` and `client_secret`
+# have a word character before the keyword, so `\bsecret\b` never matched them, and
+# they went through unmasked.
 _SECRET_ASSIGN: Final = re.compile(
-    r"(?im)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\b"
-    + r"\s*[:=]\s*([^\s,;]{4,})"
+    r"(?im)([A-Za-z0-9_.-]*"
+    + r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|password|passwd|secret))\b"
+    # The optional quote is TOML's `"key" = "value"`, which the operational provider
+    # config is written in: without it the closing quote separated key from separator.
+    + r"[\"']?\s*[:=]\s*([^\s,;]{4,})"
 )
 _PRIVATE_KEY: Final = re.compile(
     r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----",

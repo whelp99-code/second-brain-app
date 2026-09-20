@@ -17,9 +17,13 @@ def _previous_mask(text: str) -> str:
         "[REDACTED_PRIVATE_KEY]", text, flags=re.DOTALL,
     )
     text = re.sub(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}", "Bearer [REDACTED_TOKEN]", text)
+    # Widened on 2026-09-20 to reach compound and quoted keys; the oracle tracks the
+    # policy so this file keeps proving that the fast-path guards in mask_sensitive
+    # do not change its meaning, which is the only thing it was ever for.
     text = re.sub(
-        r"(?im)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\b"
-        + r"\s*[:=]\s*([^\s,;]{4,})",
+        r"(?im)([A-Za-z0-9_.-]*"
+        + r"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|private[_-]?key|password|passwd|secret))\b"
+        + r"[\"\']?\s*[:=]\s*([^\s,;]{4,})",
         lambda match: f"{match.group(1)}=[REDACTED_SECRET]", text,
     )
     return re.sub(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", "[REDACTED_EMAIL]", text)

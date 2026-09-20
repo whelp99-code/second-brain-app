@@ -268,3 +268,42 @@ def test_briefing_still_raises_on_a_malformed_source_policy(tmp_path: Path) -> N
     inputs = BriefingInputs(("origin=private:notes.md 어제 한 일",), (), (), (), None, None)
     with pytest.raises(SecurityPolicyError):
         _ = protect_briefing_inputs(inputs, config)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '"provider_private_key" = "mnSvLkhuarE3bWCaFz7t88paGfgg_VOf04GS-evjxOs"',
+        'client_secret = "abcd1234efgh5678"',
+        "api_key=abcdefghijklmnop",
+        "password: hunter2xyz",
+    ],
+)
+def test_compound_and_quoted_secret_keys_are_masked(line: str) -> None:
+    """Given a secret under a compound or quoted key, when masked, then the value is gone.
+
+    Every real spelling missed: `\\bsecret\\b` cannot match inside `client_secret`,
+    `private_key` was not listed at all, and TOML's `"key" = "value"` put a closing
+    quote between the key and the separator. The operational provider config is
+    written exactly that way, and S-04 ingests agent transcripts that quote it.
+    """
+    masked = mask_sensitive(line)
+    assert "[REDACTED_SECRET]" in masked
+    assert line.rsplit("=", 1)[-1].strip().strip('"') not in masked
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '"signing_key_id" = "provider:second-brain:linux:45ce243a24e817c6"',
+        '"jarvis_public_key" = "ejwLJrRDU406I8qNZ1aCd4hsbU4A5dU4W732NYmA-Co"',
+        "이 문서는 secret 없이 작성되었다",
+    ],
+)
+def test_identifiers_and_public_keys_survive_masking(line: str) -> None:
+    """Given a key identifier, a public key or prose, when masked, then it is untouched.
+
+    Widening the pattern must not start redacting the values an operator reads to
+    tell one instance from another.
+    """
+    assert mask_sensitive(line) == line
