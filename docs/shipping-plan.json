@@ -9,7 +9,7 @@
     {
       "path": "docs/PROGRESS-PLAN-2026-09-17.md",
       "note": "단계별 선행 조건·완료 기준·롤백·증명 방법의 근거 원본.",
-      "sha256": "63f0a8409e5ece59a43d9546453ab9e3e556a432b37f195c682fa66b93fcdd8b"
+      "sha256": "b12008c8046d7d5306de4df6b024b333090fe94c7a86a485f02d516ccbb6cd33"
     },
     {
       "path": "SECOND-BRAIN-LIFE-MEMORY-ANALYSIS-2026-09-17.md",
@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 4,
+  "revision": 5,
   "stages": [
     {
       "id": "S-01",
@@ -62,8 +62,8 @@
     },
     {
       "id": "S-02B",
-      "title": "1.0.2 라인을 운영에 배포 (relink)",
-      "outcome": "app/current가 현재 줄을 가리키고 web·doctor·/ready가 통과한다. S-03이 relink를 배제하므로 별도 단계로 분리한다.",
+      "title": "운영 배포(relink)와 복구 경로 증명",
+      "outcome": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다. S-03이 relink를 배제하므로 별도 단계다.",
       "dependsOn": [
         "S-01"
       ],
@@ -73,13 +73,17 @@
       ],
       "scopeInclude": [
         "릴리스 빌드와 app/current 재연결",
-        "배포 후 운영 점검"
+        "상태 점검 경로(web /ready, sb doctor, sb status) 확인",
+        "백업 생성·검증과 이전 릴리스 relink 롤백 증명",
+        "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정"
       ],
       "scopeExclude": [
-        "프로바이더 소스 변경",
-        "운영 볼트 재구축"
+        "새 제품 기능",
+        "공개 또는 고객 배포",
+        "AI 세션 소스 추가(S-04)",
+        "LLM 상한 상향"
       ],
-      "size": "PATCH"
+      "size": "MINOR"
     },
     {
       "id": "S-03",
