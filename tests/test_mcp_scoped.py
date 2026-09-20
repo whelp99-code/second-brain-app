@@ -26,7 +26,7 @@ class FrozenDate(datetime):
 def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkeypatch, version, issuer_sessions):  # noqa: F811
     root, name, generation = classified
     work = root.parents[2]
-    config = Config(raw={"vault_root": str(work / "share" / "vault"), "share_root": str(work / "share"),
+    config = Config(raw={"llm": {"model_id": "fake"}, "vault_root": str(work / "share" / "vault"), "share_root": str(work / "share"),
         "state_root": str(work / "state"), "request_root": str(work / "requests"),
         "provider_instance_id": generation.provider_instance_id,
         "jarvis_public_keys": {"key:test": base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()},

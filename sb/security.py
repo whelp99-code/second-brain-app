@@ -65,11 +65,18 @@ def llm_is_external(config: Config) -> bool:
     if isinstance(explicit, bool):
         return explicit
     model = config.llm.model_id.casefold()
-    if model in {"fake", "test", "unknown"} or model.startswith(_LOCAL_MODEL_PREFIXES):
+    # `unknown` is the default when no model_id is configured, so it means "not
+    # stated", not "local". Reading it as local silently disarmed the protection:
+    # the operational config names a Grok backend by argv alone, so every new
+    # source defaulted to `allow` instead of `deny` and a `local-only` source
+    # would have been sent outside the host without the error that forbids it.
+    if model in {"fake", "test"} or model.startswith(_LOCAL_MODEL_PREFIXES):
         return False
     argv = config.llm.argv_template
-    command = _command_name(argv[0]).casefold() if argv else ""
-    return command not in _LOCAL_COMMANDS
+    if not argv:
+        # No command means no transport: there is nothing to send a prompt to.
+        return False
+    return _command_name(argv[0]).casefold() not in _LOCAL_COMMANDS
 
 
 def _command_name(value: str) -> str:

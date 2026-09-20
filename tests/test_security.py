@@ -18,6 +18,7 @@ from sb.security import (
     mask_sensitive,
     protect_briefing_inputs,
     protect_unit,
+    source_llm_policy,
     source_policy_snapshot,
 )
 from sb.store.ledger import Ledger
@@ -200,3 +201,41 @@ def test_source_policy_snapshot_contains_no_source_content(tmp_path: Path) -> No
     assert rows[0]["llm_policy"] == "allow"
     assert rows[0]["sensitive"] == "mask"
     assert "content" not in rows[0]
+
+
+def _inferred_config(root: Path, model_id: str | None, command: str) -> Config:
+    llm: dict[str, object] = {"argv_template": [command], "prompt_version": "v1"}
+    if model_id is not None:
+        llm["model_id"] = model_id
+    return Config(
+        raw=cast(
+            dict[str, TomlValue],
+            {
+                "vault_root": str(root),
+                "llm": llm,
+                "sources": [{"id": "private", "adapter": "markdown-vault", "root": str(root / "source")}],
+            },
+        )
+    )
+
+
+def test_unstated_model_is_treated_as_external(tmp_path: Path) -> None:
+    """Given no model_id, when egress is inferred, then the backend counts as external.
+
+    The operational config names its Grok backend by argv alone, leaving model_id at
+    its `unknown` default. Reading `unknown` as local silently defaulted new sources
+    to `allow` and would have sent a `local-only` source outside the host (2026-09-20).
+    """
+    assert llm_is_external(_inferred_config(tmp_path, None, "/home/jm/.config/second-brain/llm/omo-grok.sh"))
+    assert llm_is_external(_inferred_config(tmp_path, "unknown", "omo-grok.sh"))
+
+
+def test_unstated_model_with_a_local_command_stays_local(tmp_path: Path) -> None:
+    """Given no model_id but a known local runner, when inferred, then it stays local."""
+    assert not llm_is_external(_inferred_config(tmp_path, None, "/usr/bin/ollama"))
+
+
+def test_unstated_model_denies_a_source_that_states_no_policy(tmp_path: Path) -> None:
+    """Given an unstated model, when a source omits llm_policy, then egress is denied."""
+    config = _inferred_config(tmp_path, None, "omo-grok.sh")
+    assert source_llm_policy(config, "private") == "deny"

@@ -21,7 +21,7 @@ def classified(tmp_path: Path, request):
     source.mkdir()
     (source / "a.md").write_text("Alpha fixture memory.")
     vault = tmp_path / "share" / "vault"
-    config = Config(raw={"vault_root": str(vault), "share_root": str(tmp_path / "share"),
+    config = Config(raw={"llm": {"model_id": "fake"}, "vault_root": str(vault), "share_root": str(tmp_path / "share"),
         "state_root": str(tmp_path / "state"), "knowledge_registry": str(tmp_path / "registry.db"),
         "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(source)}],
         "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}}})

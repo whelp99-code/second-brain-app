@@ -18,7 +18,7 @@ def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
     root = Path(__file__).resolve().parents[1]
     vault = tmp_path / "share/vault"
     config_path = tmp_path / "config.toml"
-    text = f'vault_root = "{vault}"\nshare_root = "{tmp_path / "share"}"\nstate_root = "{tmp_path / "state"}"\nknowledge_registry = "{tmp_path / "registry.db"}"\n'
+    text = f'llm = {{ model_id = "fake" }}\nvault_root = "{vault}"\nshare_root = "{tmp_path / "share"}"\nstate_root = "{tmp_path / "state"}"\nknowledge_registry = "{tmp_path / "registry.db"}"\n'
     for name in ("a", "b"):
         source = tmp_path / name
         source.mkdir()

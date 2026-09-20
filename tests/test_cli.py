@@ -79,7 +79,7 @@ def _hold_exclusive_lock(lock_path: str, held: MpEvent, release: MpEvent) -> Non
 def _ready(tmp_path: Path) -> tuple[Config, Path]:
     root = tmp_path / "vault"
     _ = init_vault(root)
-    return Config(raw={"vault_root": str(root)}), root
+    return Config(raw={"llm": {"model_id": "fake"}, "vault_root": str(root)}), root
 
 
 def _put(root: Path, data: bytes) -> str:

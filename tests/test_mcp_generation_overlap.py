@@ -32,6 +32,7 @@ class FrozenDate(datetime):
 
 def _mcp_config(work, generation):
     return Config(raw={
+        "llm": {"model_id": "fake"},
         "vault_root": str(work / "share" / "vault"),
         "share_root": str(work / "share"),
         "state_root": str(work / "state"),
@@ -80,6 +81,7 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
     page = source / "a.md"
     page.write_text("Alpha original unique memory.")
     config = Config(raw={
+        "llm": {"model_id": "fake"},
         "vault_root": str(tmp_path / "share" / "vault"),
         "share_root": str(tmp_path / "share"),
         "state_root": str(tmp_path / "state"),

@@ -54,6 +54,7 @@ def test_ingest_compile_binds_committed_page_bytes(tmp_path: Path):
     vault = tmp_path / "share" / "vault"
     config = Config(
         raw={
+            "llm": {"model_id": "fake"},
             "vault_root": str(vault),
             "share_root": str(tmp_path / "share"),
             "state_root": str(tmp_path / "state"),

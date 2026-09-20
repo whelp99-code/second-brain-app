@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 from datetime import date
 from pathlib import Path
+from typing import Final
 
 import pytest
 
@@ -115,8 +116,13 @@ def _inputs(
     )
 
 
+# These tests drive generate_briefing with FakeLLM, so the config says so: left
+# unstated it would name the default external CLI and every source would be denied.
+_FAKE_LLM: Final = {"model_id": "fake"}
+
+
 def _config(cap: int = 10) -> Config:
-    return Config(raw={"caps": {"max_llm_calls_briefing": cap}})
+    return Config(raw={"llm": _FAKE_LLM, "caps": {"max_llm_calls_briefing": cap}})
 
 
 def _spec(text: str = CITED_RECS, inputs: BriefingInputs | None = None) -> PageSpec:
@@ -409,7 +415,7 @@ def test_budget_does_not_separate_recommendation_from_its_continuation(tmp_path:
 def test_citation_regeneration_recovers_before_publishing(tmp_path: Path) -> None:
     valid = '\n'.join(f'- recommendation {number} [^{CAS_SID}]' for number in range(3))
     fake = FakeLLM(['- recommendation without citation', valid])
-    config = Config(raw={'caps': {'max_llm_calls_briefing': 5, 'max_briefing_validation_attempts': 3}})
+    config = Config(raw={'llm': _FAKE_LLM, 'caps': {'max_llm_calls_briefing': 5, 'max_briefing_validation_attempts': 3}})
     page = generate_briefing(_inputs(), fake, config)
     assert fake.calls == 2
     assert UNCITED_SENTINEL not in page.body_md
@@ -419,7 +425,7 @@ def test_citation_regeneration_recovers_before_publishing(tmp_path: Path) -> Non
 @pytest.mark.parametrize('cap,attempts,expected', [(1, 3, 1), (5, 3, 3)])
 def test_citation_regeneration_exhaustion_never_publishes(tmp_path: Path, cap: int, attempts: int, expected: int) -> None:
     fake = FakeLLM(['- recommendation without citation'] * expected)
-    config = Config(raw={'caps': {'max_llm_calls_briefing': cap, 'max_briefing_validation_attempts': attempts}})
+    config = Config(raw={'llm': _FAKE_LLM, 'caps': {'max_llm_calls_briefing': cap, 'max_briefing_validation_attempts': attempts}})
     page = generate_briefing(_inputs(), fake, config)
     assert fake.calls == expected
     assert UNCITED_SENTINEL in page.body_md

@@ -23,7 +23,7 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
         (folder / "note.md").write_text(text)
         sources.append({"id": name, "adapter": "markdown-vault", "root": str(folder)})
     vault = tmp_path / "share" / "vault"
-    config = Config(raw={"vault_root": str(vault), "share_root": str(tmp_path / "share"), "state_root": str(tmp_path / "state"),
+    config = Config(raw={"llm": {"model_id": "fake"}, "vault_root": str(vault), "share_root": str(tmp_path / "share"), "state_root": str(tmp_path / "state"),
         "knowledge_registry": str(tmp_path / "registry.db"), "sources": sources,
         "source_access": {name: {"owner": "principal:owner", "projects": [project], "policy_revision": "1"}
             for name, project in [("a_hidden", "project:b"), ("z_allowed", "project:a")]}})
