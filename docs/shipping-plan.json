@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 8,
+  "revision": 9,
   "stages": [
     {
       "id": "S-01",
@@ -58,7 +58,8 @@
         "릴리스 빌드와 app/current 재연결",
         "상태 점검 경로(웹 준비 엔드포인트, sb doctor, sb status) 확인",
         "백업 생성·검증과 이전 릴리스 relink 롤백 증명",
-        "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정"
+        "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정",
+        "버전 표기를 pyproject.toml 과 uv.lock 에 함께 반영"
       ],
       "scopeExclude": [
         "새 제품 기능",
