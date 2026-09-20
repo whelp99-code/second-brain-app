@@ -9,7 +9,7 @@
     {
       "path": "docs/PROGRESS-PLAN-2026-09-17.md",
       "note": "단계별 선행 조건·완료 기준·롤백·증명 방법의 근거 원본.",
-      "sha256": "1320e21d73b9715d6c6011b3dc8d8450528f25f654e2a32244f87aff862c1115"
+      "sha256": "63f0a8409e5ece59a43d9546453ab9e3e556a432b37f195c682fa66b93fcdd8b"
     },
     {
       "path": "SECOND-BRAIN-LIFE-MEMORY-ANALYSIS-2026-09-17.md",
@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 3,
+  "revision": 4,
   "stages": [
     {
       "id": "S-01",
@@ -61,11 +61,33 @@
       "size": "PATCH"
     },
     {
+      "id": "S-02B",
+      "title": "1.0.2 라인을 운영에 배포 (relink)",
+      "outcome": "app/current가 현재 줄을 가리키고 web·doctor·/ready가 통과한다. S-03이 relink를 배제하므로 별도 단계로 분리한다.",
+      "dependsOn": [
+        "S-01"
+      ],
+      "acceptanceRefs": [
+        "python-ruff",
+        "python-pytest"
+      ],
+      "scopeInclude": [
+        "릴리스 빌드와 app/current 재연결",
+        "배포 후 운영 점검"
+      ],
+      "scopeExclude": [
+        "프로바이더 소스 변경",
+        "운영 볼트 재구축"
+      ],
+      "size": "PATCH"
+    },
+    {
       "id": "S-03",
       "title": "프로바이더 설정에 unified-db 소스 추가",
       "outcome": "relink 없이 refresh 1회로 적재가 확인되고, 어제 한 일을 검색으로 답할 수 있다.",
       "dependsOn": [
-        "S-02"
+        "S-02",
+        "S-02B"
       ],
       "acceptanceRefs": [],
       "scopeInclude": [
@@ -73,8 +95,8 @@
         "refresh 1회 검증"
       ],
       "scopeExclude": [
-        "relink",
-        "운영 볼트 재구축"
+        "운영 볼트 재구축",
+        "relink(S-02B가 담당)"
       ],
       "size": "PATCH"
     },

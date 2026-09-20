@@ -78,11 +78,43 @@ ready가 아니라 ungated로 처리되어 `UNGATED_STAGE`로 보고되고, 탐�
 | 심박 잡음 | `memory.events` 4,704건 중 `[ClaudeProbe] session` 1,550건 포함 1,704건 스킵 → 3,000건만 수집 |
 | 운영 볼트 | `~/.local/share/second-brain/vault` 무변경 확인 |
 
-`unit`은 0이다. 유닛 파생은 compile 단계이고 이번 격리 실행은 LLM 호출을 0으로 막았다. 수집
-경로가 증명된 것이지 검색까지 증명된 것이 아니다. 검색까지는 S-03에서 본다.
+`unit`은 0이다. **이 기록의 원래 설명은 틀렸다.** LLM 호출을 0으로 막아서가 아니었다. 유닛은
+compile이 아니라 ingest에서 만들어지고, 당시 `_materialize`가 unified-db의 행 식별자
+`unified-db:<project>:<table>:<row>`에서 마지막 점 뒤를 파일 확장자로 읽어 `.events:evt_...`를
+찾다가 파서를 못 만나 빈 목록을 돌려주고 있었다. 즉 내용은 저장됐지만 회상 가능한 유닛이 하나도
+만들어지지 않았다. 2026-09-20에 운영에서 같은 증상을 다시 만나 원인을 특정하고 `ea00d18`로
+고쳤다. 수집 경로가 증명된 것은 맞지만 검색은 그때 증명되지 않았다.
 
 주의: 격리 볼트를 만들 때 `vault_root`를 심볼릭 링크로 가리키면 관리형 생성 경로가 발동해
 `GENERATION_SPLIT_BRAIN`으로 실패한다. 절대 경로를 쓴다.
+
+## S-02B — 1.0.2 라인을 운영에 배포 (relink)
+
+`(b)` · 증명 등급 `REPO` · 크기 `PATCH` · **2026-09-20 완료**
+
+이 단계는 원래 계획에 없었다. S-03을 착수하면서 드러났다. S-03은 `scopeExclude`에 `relink`를
+두고 "relink 없이 refresh 1회"를 완료 기준으로 삼는데, 당시 운영 배포본은 `66b4e59`(9/17)로
+1.0.2 이전이었고 S-02가 증명한 심박 잡음 필터(`low_value`)가 빠져 있었다. 그 상태로 소스를
+추가하면 `[ClaudeProbe] session` 1,704건이 운영 볼트로 들어간다. relink를 S-03 안에 몰래
+넣지 않고 선행 단계로 분리한 이유다.
+
+- **선행 조건**: S-01 완료(발행 브랜치·master가 같은 줄). 백업 1회.
+- **완료 기준**: `app/current`가 현재 줄을 가리키고, web 200 / `doctor` / `/ready`가 통과한다.
+- **롤백**: 이전 `current`가 보존된다. 심볼릭 링크를 되돌리고 유닛을 재기동한다.
+- **증명**: 배포 전 `ruff` + `pytest` 통과, 배포 후 `/ready`.
+
+실행 기록(2026-09-20):
+
+| 항목 | 값 |
+|---|---|
+| 이전 배포본 | `d35b5e5a`(source `66b4e59`, `working_tree_modified: true`) |
+| 유실 패치 확인 | 배포본과 HEAD의 차이는 unified-db 2개 파일뿐이고 모두 전진 방향 |
+| 배포 | `0697933556…`(source `30e9ebc`), 이후 결함 수정마다 재배포 |
+| 검증 | web 200, `doctor` 8 PASS / 1 WARN(`scheduler-assets`, 기존과 동일), `/ready` ready |
+| 백업 | `second-brain-20260920T123758+0900.tar.gz` (17,552 파일, 검증 완료) |
+
+`v1.0.2` 태그와 HEAD의 `sb/`는 동일해서 어느 쪽에서 빌드해도 같은 휠이 나온다. `origin/master`가
+가리키는 줄을 그대로 쓰는 편이 운영 이력으로 읽기 쉬워 HEAD에서 빌드했다.
 
 ## S-03 — 프로바이더 설정에 unified-db 소스 추가
 
@@ -94,6 +126,33 @@ ready가 아니라 ungated로 처리되어 `UNGATED_STAGE`로 보고되고, 탐�
   적재가 확인된다. "9월 16일에 무엇을 했나"가 검색으로 응답한다(재가동 계획 1단계 완료 기준).
 - **롤백**: 설정에서 소스 항목을 제거하고 refresh 1회. 추가된 유닛은 세대 롤백으로 되돌린다.
 - **증명**: refresh 전후 유닛 수와 검색 응답. 사람이 확인한다. 저장소 명령으로는 증명되지 않는다.
+
+진행 기록(2026-09-20) — **적재 증명 완료, 검색 기준 미달**:
+
+| 항목 | 값 |
+|---|---|
+| 설정 | `jarvis-provider.toml`·`config.toml` 양쪽에 `{id=unified-db, adapter=unified-db, llm_policy=deny, sensitive=mask}` |
+| 백업 | 변경 전 `config.toml.bak-unified-db-*` 2개, 볼트 백업 4회 |
+| 적재 | source_item 0 → 2,543건, unit 55 → 2,155건 |
+| refresh | `jm-second-brain-refresh.service` 성공, `/ready` ready(reasons []) |
+| 검색 | `sb search "unified-db"` 가 unified-db 유래 wiki 페이지를 반환 |
+
+`llm_policy`는 `deny`로 넣었다. 이 문서의 "외부 LLM 사용 시 신규 소스 기본값은 deny"와
+`SECOND-BRAIN-LIFE-MEMORY-ANALYSIS-2026-09-17.md`의 "payload 민감도 미판정"을 따른 것이다.
+`deny`는 하드 실패가 아니라 `_compile_without_llm` 경로로 처리되어 유닛과 페이지가 생기고 검색에
+걸린다. LLM 호출 상한도 쓰지 않는다. 반대로 `local-only`는 외부 모델(Grok) 환경에서
+`SecurityPolicyError`를 던져 refresh를 깨뜨리므로 쓸 수 없다. 민감도를 판정한 뒤 `allow`로
+올리는 것은 한 줄 변경이고 되돌릴 수 있다.
+
+**아직 닫지 않는다.** 완료 기준의 "어제 한 일을 검색으로 답할 수 있다"가 남았다. 어댑터가
+오래된 행부터 적재하고 `max_new_units_per_run`이 300이라, 9월 자료는 backlog(약 7,585건 중
+2,543건 적재)가 빠진 뒤에 들어온다. 상한을 올리는 것은 비용 결정이라 하지 않았고, 시간당
+타이머가 회차를 쌓는다. 남은 분량이 소진되고 날짜 질의가 응답하면 그때 닫는다.
+
+이 단계에서 제품 결함 넷이 드러났고 모두 고쳐 배포했다. `ea00d18`(점 든 행 식별자를 확장자로
+오독), `7d37584`(미기재 모델을 로컬로 취급), `056cbec`(거부 소스가 brief 단계를 죽임),
+`c30e377`(본문의 날짜 모양 문자열이 brief를 깨뜨림), `00373b5`(인용 근거가 없을 때 실패).
+앞의 둘은 S-02가 "unit = 0"을 잘못 설명하고 지나간 것과 같은 뿌리다.
 
 ## S-04 — AI 세션 직접 수집 (claude → codex → omo)
 
