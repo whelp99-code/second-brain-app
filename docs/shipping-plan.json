@@ -3,13 +3,13 @@
   "project": "second-brain-app",
   "program": {
     "title": "1.0.2 이후 재가동",
-    "outcome": "1.0.2를 발행 라인에 합치고, unified-db 수집을 운영에 연결한 뒤, 2026-09-11에 멈춘 수집 경로를 단계별 증거와 함께 되살린다."
+    "outcome": "1.0.2를 발행 라인에 합치고, unified-db 수집을 운영에 연결한 뒤, 2026-09-11에 멈춘 수집 경로를 단계별 증거와 함께 되살린다. 격리 볼트 수집 증명과 프로바이더 설정 추가는 저장소 커밋으로 증명할 수 없어 하네스 밖에서 끝내고 docs/PROGRESS-PLAN-2026-09-17.md 에 기록했으므로, 여기에는 하네스가 실제로 닫을 수 있는 단계만 남긴다."
   },
   "sources": [
     {
       "path": "docs/PROGRESS-PLAN-2026-09-17.md",
       "note": "단계별 선행 조건·완료 기준·롤백·증명 방법의 근거 원본.",
-      "sha256": "12ecd43814deccbb0e9b694dc8576ab6bd1cb04104a3ef2a41bf2794680caa5c"
+      "sha256": "529ddaab76b71781c518e33c16e7cf84d37c51209cdc2d654a14fd78396def00"
     },
     {
       "path": "SECOND-BRAIN-LIFE-MEMORY-ANALYSIS-2026-09-17.md",
@@ -22,7 +22,7 @@
       "sha256": "aa1c184f93c26aea624a96b9f5ab5278a82d660d7cfe6a2751980e4d24e28d9e"
     }
   ],
-  "revision": 7,
+  "revision": 8,
   "stages": [
     {
       "id": "S-01",
@@ -44,26 +44,9 @@
       "size": "PATCH"
     },
     {
-      "id": "S-02",
-      "title": "격리 볼트에서 unified-db 수집 증명",
-      "outcome": "운영 볼트를 변경하지 않고 격리 볼트에 실수집이 완주하며, 커서가 전진하고 심박 잡음이 걸러진다.",
-      "dependsOn": [],
-      "acceptanceRefs": [],
-      "scopeInclude": [
-        "읽기 전용 실접속",
-        "격리 볼트 수집 실행",
-        "잡음 선별 확인"
-      ],
-      "scopeExclude": [
-        "운영 볼트 변경",
-        "프로바이더 설정 변경"
-      ],
-      "size": "PATCH"
-    },
-    {
       "id": "S-02B",
       "title": "운영 배포(relink)와 복구 경로 증명",
-      "outcome": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다. S-03이 relink를 배제하므로 별도 단계다.",
+      "outcome": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다.",
       "dependsOn": [
         "S-01"
       ],
@@ -86,30 +69,11 @@
       "size": "MILESTONE"
     },
     {
-      "id": "S-03",
-      "title": "프로바이더 설정에 unified-db 소스 추가",
-      "outcome": "relink 없이 refresh 1회로 적재가 확인되고, 어제 한 일을 검색으로 답할 수 있다.",
-      "dependsOn": [
-        "S-02",
-        "S-02B"
-      ],
-      "acceptanceRefs": [],
-      "scopeInclude": [
-        "저장소 밖 프로바이더 설정 변경",
-        "refresh 1회 검증"
-      ],
-      "scopeExclude": [
-        "운영 볼트 재구축",
-        "relink(S-02B가 담당)"
-      ],
-      "size": "PATCH"
-    },
-    {
       "id": "S-04",
       "title": "AI 세션 직접 수집",
       "outcome": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
       "dependsOn": [
-        "S-03"
+        "S-02B"
       ],
       "acceptanceRefs": [],
       "scopeInclude": [
@@ -125,7 +89,7 @@
       "title": "카톡 일일 요약 전송 복구",
       "outcome": "하루 1회 자동 적재가 연속으로 동작한다.",
       "dependsOn": [
-        "S-03"
+        "S-02B"
       ],
       "acceptanceRefs": [],
       "scopeInclude": [
@@ -141,7 +105,7 @@
       "title": "메일 결론 일일 핸드오프",
       "outcome": "이번 주 메일 결정에 답할 수 있고, 본문은 전송되지 않는다.",
       "dependsOn": [
-        "S-03"
+        "S-02B"
       ],
       "acceptanceRefs": [],
       "scopeInclude": [
@@ -157,7 +121,7 @@
       "title": "2026-09-11 중단 자동화 선별 복구",
       "outcome": "복구 목록과 제외 목록이 문서로 남는다.",
       "dependsOn": [
-        "S-03"
+        "S-02B"
       ],
       "acceptanceRefs": [],
       "scopeInclude": [
