@@ -1,0 +1,75 @@
+{
+  "approvalAuthority": false,
+  "assumptions": [
+    "workflow-boundary: IMPLEMENT"
+  ],
+  "binding": {
+    "acceptedAt": "2026-09-20T13:31:00.435Z",
+    "approverId": "mcp-confirmed-user",
+    "approverType": "human",
+    "baselineSha": "d145b5bf1325adf065109d1dd9941ed774ec5fda",
+    "contractHash": "3c1a09ce5f9f5f936d06b2da4e605f7619a488047b61caa2b404440a0bb12718",
+    "previewHash": "2a9ee124973bbdb31e33c9be14649f79c018dd753ba6f3b22bc18049ee2d175b",
+    "releaseTrainHash": "9c5a044bc3910213eb1e4563aca4c3564a81381c1ecce7e1ae4e41f9f82bbdf0"
+  },
+  "candidateHash": "0ab3dd448fd6a6fa51567c304f2978a47f8e59c72d98f43af547ee1e1ee8fa49",
+  "closureAuthority": false,
+  "commandAuthority": false,
+  "criticHash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+  "deploymentAuthority": false,
+  "directionHash": "59cd0ea3a16450c146afbde1b5c5fc6ae8f0237ad23371b3be7ea48f180390c0",
+  "discoveryHash": "b417de6f3da0c8d7838825ae23dc022fb7fdd92d3f8bb3778f256fe1dda2050d",
+  "evidenceRefs": [
+    "EVID-001",
+    "EVID-002",
+    "EVID-004",
+    "EVID-006",
+    "EVID-010",
+    "proposal.goalDiscovery.direction",
+    "proposal.goalDiscovery.critic",
+    "proposal.decision.resolutions",
+    "proposal.contract.scope",
+    "proposal.contract.acceptance"
+  ],
+  "gitSha": "d145b5bf1325adf065109d1dd9941ed774ec5fda",
+  "hash": "10690dc25631a11a7c624ab447bdd9350b832a13201be06ced6d3767650b106b",
+  "id": "CHARTER-59cd0ea3a164",
+  "include": [
+    "핵심 사용자 흐름",
+    "오류 처리",
+    "현재 저장소 검증",
+    "관련 운영 설명"
+  ],
+  "modelAuthority": false,
+  "nonGoals": [
+    "핵심 가치와 무관한 기능 확장",
+    "자동 외부 배포",
+    "데이터·인증·보안·비용 영향의 무승인 실행",
+    "현재 버전을 끝없이 진화시키는 반복",
+    "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+  ],
+  "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+  "outcome": "claude·codex·omo 세션 수집기를 어댑터로 등록해 설정에서 소스로 지목할 수 있게 하고, 세 계열 각각의 수집을 저장소 테스트로 증명한다.",
+  "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+  "project": "post-reconnection-checks-1eadea",
+  "proposalHash": "05ef02625d2277bab53073696e020e3d3a3969cd60ac2e88ea4a38cd8d5f263e",
+  "proposalId": "proposal-2026-09-20T13-25-53-599Z-0903944a",
+  "proposalRevision": 2,
+  "release": "1.0.6",
+  "released": false,
+  "replanTriggers": [
+    "핵심 사용자 가치 변경",
+    "완료조건 약화 필요",
+    "외부·데이터·인증·보안·비용 영향 발견",
+    "저장소 구조와 계획의 중대한 불일치"
+  ],
+  "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+  "schema": "shipping-harness/goal-charter-v1",
+  "status": "ACCEPTED",
+  "successCriteria": [
+    "저장소가 소유한 필수 검증 명령이 통과한다.",
+    "BLOCKER와 UNKNOWN이 0이다.",
+    "현재 Git SHA와 완료 증거가 일치한다."
+  ],
+  "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+}

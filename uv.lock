@@ -2639,7 +2639,7 @@ wheels = [
 
 [[package]]
 name = "second-brain"
-version = "1.0.5"
+version = "1.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

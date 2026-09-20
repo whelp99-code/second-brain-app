@@ -1,0 +1,28 @@
+{
+  "baselineSha": "d145b5bf1325adf065109d1dd9941ed774ec5fda",
+  "contractHash": "3c1a09ce5f9f5f936d06b2da4e605f7619a488047b61caa2b404440a0bb12718",
+  "lockedAt": "2026-09-20T13:31:00.433Z",
+  "planStage": {
+    "acceptanceRefs": [
+      "python-ruff",
+      "python-pytest"
+    ],
+    "dependsOn": [
+      "S-02B"
+    ],
+    "id": "S-04",
+    "outcome": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
+    "scopeExclude": [
+      "세션 외 자동화 복구"
+    ],
+    "scopeInclude": [
+      "세 계열 세션 수집기를 어댑터로 등록",
+      "계열별 수집을 저장소 테스트로 증명"
+    ],
+    "size": "MILESTONE",
+    "title": "AI 세션 직접 수집"
+  },
+  "release": "1.0.6",
+  "schema": "shipping-harness/lock-v1",
+  "scopeRevision": 1
+}

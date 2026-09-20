@@ -21,6 +21,7 @@ from sb.connectors.sessions_omo import ADAPTER_ID as OMO_ID
 from sb.contracts import SourceRef
 from sb.pipeline import _select_adapters
 
+EXAMPLE = Path(__file__).resolve().parents[1] / "config.example.toml"
 FIXTURES = Path(__file__).parent / "fixtures" / "second-brain"
 FAMILIES: tuple[tuple[str, str, str, str], ...] = (
     ("claude", CLAUDE_ID, "claude", "golden.jsonl"),
@@ -31,6 +32,15 @@ FAMILIES: tuple[tuple[str, str, str, str], ...] = (
 
 def _delivered(items: Sequence[tuple[SourceRef, bytes, ItemMeta]]) -> list[bytes]:
     return [body for _ref, body, meta in items if "skip_reason" not in meta]
+
+
+def test_example_config_documents_session_source_adapters() -> None:
+    # Given: the checked-in example configuration operators copy.
+    text = EXAMPLE.read_text(encoding="utf-8")
+
+    # Then: each session family is named as a [[sources]] adapter.
+    for _source_id, adapter_id, _family, _fixture in FAMILIES:
+        assert f'adapter = "{adapter_id}"' in text
 
 
 @pytest.mark.parametrize(("source_id", "adapter_id", "family", "fixture"), FAMILIES)

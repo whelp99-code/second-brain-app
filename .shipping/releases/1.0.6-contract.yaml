@@ -1,0 +1,108 @@
+{
+  "acceptance": [
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen ruff check .",
+      "cwd": ".",
+      "description": "Configured Ruff checks pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-001",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 300,
+      "type": "command"
+    },
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen pytest",
+      "cwd": ".",
+      "description": "Python tests pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-002",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 600,
+      "type": "command"
+    }
+  ],
+  "adapters": {
+    "codex": {
+      "artifactPaths": [],
+      "command": null
+    },
+    "generic": {
+      "artifactPaths": [],
+      "command": null
+    }
+  },
+  "blockerPolicy": [
+    "acceptance-failure",
+    "contract-tamper",
+    "stale-evidence",
+    "scope-drift",
+    "data-loss",
+    "critical-security"
+  ],
+  "budgets": {
+    "maxAgentRuns": 3,
+    "maxCommandSeconds": 900,
+    "maxFixCycles": 2,
+    "maxOutputBytes": 1048576
+  },
+  "goal": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
+  "plan": {
+    "path": "docs/shipping-plan.json",
+    "planHash": "0ca9137d07f2fb9f81e7dd4d2aa4754c9d73e1b5d280636840735851b55e9518",
+    "stageId": "S-04",
+    "tier": "MILESTONE"
+  },
+  "project": "post-reconnection-checks-1eadea",
+  "release": "1.0.6",
+  "releasePolicy": {
+    "autoCommit": false,
+    "autoPush": false,
+    "autoTag": false,
+    "generateReport": true
+  },
+  "schema": "shipping-harness/v1",
+  "scope": {
+    "exclude": [
+      "세션 외 자동화 복구"
+    ],
+    "include": [
+      "세 계열 세션 수집기를 어댑터로 등록",
+      "계열별 수집을 저장소 테스트로 증명"
+    ],
+    "paths": {
+      "exclude": [
+        ".shipping/contract.yaml",
+        ".shipping/contract.lock",
+        ".git/**",
+        "node_modules/**",
+        "dist/**",
+        "coverage/**",
+        "target/**"
+      ],
+      "include": [
+        "README.md",
+        "README.rst",
+        "README.txt",
+        "clients/**",
+        "deploy/**",
+        "docs/**",
+        "pyproject.toml",
+        "sb/**",
+        "scripts/**",
+        "tests/**"
+      ]
+    }
+  },
+  "stopPolicy": {
+    "autoContinueAfterInterrupt": false,
+    "closeWhenRequiredGatesPass": true,
+    "humanInterruptWins": true
+  },
+  "worker": "shipping-harness"
+}
