@@ -1,0 +1,115 @@
+{
+  "acceptance": [
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen ruff check .",
+      "cwd": ".",
+      "description": "Configured Ruff checks pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-001",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 300,
+      "type": "command"
+    },
+    {
+      "automaticallyRunnable": true,
+      "command": "uv run --frozen pytest",
+      "cwd": ".",
+      "description": "Python tests pass.",
+      "deterministicOutputRequired": false,
+      "id": "AC-002",
+      "isolationRequired": false,
+      "required": true,
+      "sideEffect": "none-or-test-output",
+      "timeoutSeconds": 600,
+      "type": "command"
+    }
+  ],
+  "adapters": {
+    "codex": {
+      "artifactPaths": [],
+      "command": null
+    },
+    "generic": {
+      "artifactPaths": [],
+      "command": null
+    }
+  },
+  "blockerPolicy": [
+    "acceptance-failure",
+    "contract-tamper",
+    "stale-evidence",
+    "scope-drift",
+    "data-loss",
+    "critical-security"
+  ],
+  "budgets": {
+    "maxAgentRuns": 3,
+    "maxCommandSeconds": 900,
+    "maxFixCycles": 2,
+    "maxOutputBytes": 1048576
+  },
+  "goal": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다.",
+  "plan": {
+    "path": "docs/shipping-plan.json",
+    "planHash": "fdb4329240cce037a1daa066ae33f32460a6a89ac62f2ec267391201160e460f",
+    "stageId": "S-02B",
+    "tier": "MILESTONE"
+  },
+  "project": "second-brain-app",
+  "release": "1.0.4",
+  "releasePolicy": {
+    "autoCommit": false,
+    "autoPush": false,
+    "autoTag": false,
+    "generateReport": true
+  },
+  "schema": "shipping-harness/v1",
+  "scope": {
+    "exclude": [
+      "새 제품 기능",
+      "공개 또는 고객 배포",
+      "AI 세션 소스 추가(S-04)",
+      "LLM 상한 상향"
+    ],
+    "include": [
+      "릴리스 빌드와 app/current 재연결",
+      "상태 점검 경로(웹 준비 엔드포인트, sb doctor, sb status) 확인",
+      "백업 생성·검증과 이전 릴리스 relink 롤백 증명",
+      "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정",
+      "버전 표기를 pyproject.toml 과 uv.lock 에 함께 반영"
+    ],
+    "paths": {
+      "exclude": [
+        ".shipping/contract.yaml",
+        ".shipping/contract.lock",
+        ".git/**",
+        "node_modules/**",
+        "dist/**",
+        "coverage/**",
+        "target/**"
+      ],
+      "include": [
+        "README.md",
+        "README.rst",
+        "README.txt",
+        "clients/**",
+        "deploy/**",
+        "docs/**",
+        "pyproject.toml",
+        "sb/**",
+        "scripts/**",
+        "tests/**",
+        "uv.lock"
+      ]
+    }
+  },
+  "stopPolicy": {
+    "autoContinueAfterInterrupt": false,
+    "closeWhenRequiredGatesPass": true,
+    "humanInterruptWins": true
+  },
+  "worker": "shipping-harness"
+}

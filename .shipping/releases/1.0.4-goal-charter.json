@@ -1,0 +1,73 @@
+{
+  "approvalAuthority": false,
+  "assumptions": [],
+  "binding": {
+    "acceptedAt": "2026-09-20T09:30:48.389Z",
+    "approverId": "mcp-confirmed-user",
+    "approverType": "human",
+    "baselineSha": "2ef759d82eb1a25185ce8e91eca25ca604c36493",
+    "contractHash": "32c6316bd3999f582fd01135eb5cef2d25be6832ae288eab6a0d3f4abdce478a",
+    "previewHash": "1a25c809e850c9073494768b40e3bf19d593e1147f754f8b4e8bb999b348c7c0",
+    "releaseTrainHash": "57a657cea7d7e07d05ba58a7064fc81463c761fa55abbf9219e0acab6efc93a7"
+  },
+  "candidateHash": "0e4442a157e56b552047d0b61c2ae5af15c17d128bcad08f940b32cd15c0b7cf",
+  "closureAuthority": false,
+  "commandAuthority": false,
+  "criticHash": "f7462e44e2c945494ade49f00d0106582076b5c14da8a38f9cd41cc632244828",
+  "deploymentAuthority": false,
+  "directionHash": "61670123084b7a30334bb1e5c79a41949e68f218d5ffabca12e37c8b01ff7d0a",
+  "discoveryHash": "d62ed337622bcee42b0bc50de2986d46889cb98cd837ead1b01127b58bb937ef",
+  "evidenceRefs": [
+    "EVID-001",
+    "EVID-002",
+    "EVID-004",
+    "EVID-006",
+    "EVID-010",
+    "proposal.goalDiscovery.direction",
+    "proposal.goalDiscovery.critic",
+    "proposal.decision.resolutions",
+    "proposal.contract.scope",
+    "proposal.contract.acceptance"
+  ],
+  "gitSha": "2ef759d82eb1a25185ce8e91eca25ca604c36493",
+  "hash": "cecd02b164b6e98aca8771fefa8998a317cd4e07e040e100355c237c424a448b",
+  "id": "CHARTER-61670123084b",
+  "include": [
+    "핵심 사용자 흐름",
+    "오류 처리",
+    "현재 저장소 검증",
+    "관련 운영 설명"
+  ],
+  "modelAuthority": false,
+  "nonGoals": [
+    "핵심 가치와 무관한 기능 확장",
+    "자동 외부 배포",
+    "데이터·인증·보안·비용 영향의 무승인 실행",
+    "현재 버전을 끝없이 진화시키는 반복",
+    "Paperthin 전체 런타임 또는 스킬 카탈로그 의존"
+  ],
+  "operatingBoundary": "LOCAL_COMPANY_INTERNAL",
+  "outcome": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남고, 버전 표기는 pyproject.toml 과 uv.lock 에 함께 반영된다.",
+  "primaryUser": "현재 저장소의 기존 사용자와 내부 운영자",
+  "project": "second-brain-app",
+  "proposalHash": "2587cdcc5beab2ead20acd7036fec4c6d81117edd0ac5af102f8d137a01bda38",
+  "proposalId": "proposal-2026-09-20T09-30-18-824Z-4cdc0366",
+  "proposalRevision": 1,
+  "release": "1.0.4",
+  "released": false,
+  "replanTriggers": [
+    "핵심 사용자 가치 변경",
+    "완료조건 약화 필요",
+    "외부·데이터·인증·보안·비용 영향 발견",
+    "저장소 구조와 계획의 중대한 불일치"
+  ],
+  "rollback": "현재 Git 기준선과 Shipping 영수증으로 되돌릴 수 있어야 한다.",
+  "schema": "shipping-harness/goal-charter-v1",
+  "status": "ACCEPTED",
+  "successCriteria": [
+    "저장소가 소유한 필수 검증 명령이 통과한다.",
+    "BLOCKER와 UNKNOWN이 0이다.",
+    "현재 Git SHA와 완료 증거가 일치한다."
+  ],
+  "value": "가장 중요한 사용자 흐름 하나를 현재 스택과 실제 완료조건으로 끝까지 제공한다."
+}

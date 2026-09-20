@@ -2639,7 +2639,7 @@ wheels = [
 
 [[package]]
 name = "second-brain"
-version = "1.0.4"
+version = "1.0.5"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -2651,12 +2651,12 @@ dependencies = [
     { name = "pypdf" },
     { name = "python-docx" },
     { name = "pyyaml" },
-    { name = "sqlite-vec" },
 ]
 
 [package.optional-dependencies]
 embeddings = [
     { name = "sentence-transformers" },
+    { name = "sqlite-vec" },
 ]
 
 [package.dev-dependencies]
@@ -2679,7 +2679,7 @@ requires-dist = [
     { name = "python-docx" },
     { name = "pyyaml" },
     { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = "==6.0.0" },
-    { name = "sqlite-vec", specifier = "==0.1.9" },
+    { name = "sqlite-vec", marker = "extra == 'embeddings'", specifier = "==0.1.9" },
 ]
 provides-extras = ["embeddings"]
 
