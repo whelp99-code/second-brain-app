@@ -1,0 +1,64 @@
+{
+  "acceptance": {
+    "failed": 0,
+    "passed": 2,
+    "requiredFailed": 0,
+    "total": 2
+  },
+  "agentRuns": 0,
+  "backlogCount": 0,
+  "baselineSha": "d145b5bf1325adf065109d1dd9941ed774ec5fda",
+  "closedAt": "2026-09-20T13:43:36.926Z",
+  "closedGitSha": "d768d2bc2947d6f9ce7a3530446e28d420f60f51",
+  "contractHash": "3c1a09ce5f9f5f936d06b2da4e605f7619a488047b61caa2b404440a0bb12718",
+  "evidenceRunId": "run-2026-09-20T13-36-21-596Z-097d427a",
+  "fixCycles": 0,
+  "goal": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
+  "integrations": null,
+  "issueCounts": {
+    "BLOCKER": 0,
+    "IGNORE": 0,
+    "NEXT": 0,
+    "UNKNOWN": 0
+  },
+  "planHash": "0ca9137d07f2fb9f81e7dd4d2aa4754c9d73e1b5d280636840735851b55e9518",
+  "planStage": {
+    "acceptanceRefs": [
+      "python-ruff",
+      "python-pytest"
+    ],
+    "dependsOn": [
+      "S-02B"
+    ],
+    "id": "S-04",
+    "outcome": "claude, codex, omo 세션이 수집되어 세션 세부까지 회상할 수 있다.",
+    "scopeExclude": [
+      "세션 외 자동화 복구"
+    ],
+    "scopeInclude": [
+      "세 계열 세션 수집기를 어댑터로 등록",
+      "계열별 수집을 저장소 테스트로 증명"
+    ],
+    "size": "MILESTONE",
+    "title": "AI 세션 직접 수집"
+  },
+  "planStageId": "S-04",
+  "postLockCommits": [
+    {
+      "paths": [
+        "tests/test_connectors_sessions_configured.py"
+      ],
+      "sha": "d768d2bc2947d6f9ce7a3530446e28d420f60f51",
+      "subject": "test(sessions): prove each session family collects from a configured source"
+    }
+  ],
+  "project": "post-reconnection-checks-1eadea",
+  "release": "1.0.6",
+  "schema": "shipping-harness/release-v1",
+  "telemetry": {
+    "totalAgentDurationMs": 0
+  },
+  "tier": "MILESTONE",
+  "verifyRuns": 1,
+  "worker": "shipping-harness"
+}
