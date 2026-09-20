@@ -1,0 +1,86 @@
+{
+  "acceptance": {
+    "failed": 0,
+    "passed": 2,
+    "requiredFailed": 0,
+    "total": 2
+  },
+  "agentRuns": 0,
+  "backlogCount": 0,
+  "baselineSha": "2ef759d82eb1a25185ce8e91eca25ca604c36493",
+  "closedAt": "2026-09-20T12:34:37.772Z",
+  "closedGitSha": "e110a0c902e00eb4a872abaca7e7408ef190a142",
+  "contractHash": "32c6316bd3999f582fd01135eb5cef2d25be6832ae288eab6a0d3f4abdce478a",
+  "evidenceRunId": "run-2026-09-20T12-26-23-518Z-25023d1e",
+  "fixCycles": 0,
+  "goal": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다.",
+  "integrations": null,
+  "issueCounts": {
+    "BLOCKER": 0,
+    "IGNORE": 0,
+    "NEXT": 0,
+    "UNKNOWN": 0
+  },
+  "planHash": "fdb4329240cce037a1daa066ae33f32460a6a89ac62f2ec267391201160e460f",
+  "planStage": {
+    "acceptanceRefs": [
+      "python-ruff",
+      "python-pytest"
+    ],
+    "dependsOn": [
+      "S-01"
+    ],
+    "id": "S-02B",
+    "outcome": "app/current가 현재 줄을 가리키고 상태 점검 경로가 응답하며, 백업 생성·검증과 이전 릴리스 relink 롤백이 증거로 남는다.",
+    "scopeExclude": [
+      "새 제품 기능",
+      "공개 또는 고객 배포",
+      "AI 세션 소스 추가(S-04)",
+      "LLM 상한 상향"
+    ],
+    "scopeInclude": [
+      "릴리스 빌드와 app/current 재연결",
+      "상태 점검 경로(웹 준비 엔드포인트, sb doctor, sb status) 확인",
+      "백업 생성·검증과 이전 릴리스 relink 롤백 증명",
+      "이 경로에서 드러난 수집·마스킹·브리핑 결함 수정",
+      "버전 표기를 pyproject.toml 과 uv.lock 에 함께 반영"
+    ],
+    "size": "MILESTONE",
+    "title": "운영 배포(relink)와 복구 경로 증명"
+  },
+  "planStageId": "S-02B",
+  "postLockCommits": [
+    {
+      "paths": [
+        "docs/PROGRESS-PLAN-2026-09-17.md",
+        "docs/shipping-plan.json"
+      ],
+      "sha": "e110a0c902e00eb4a872abaca7e7408ef190a142",
+      "subject": "docs(plan): record the 1.0.4 deployment, revision 11"
+    },
+    {
+      "paths": [
+        "clients/macos/SecondBrainMac/Resources/Info.plist"
+      ],
+      "sha": "9cd99532c0548bb279a6927a71f964968f691b8b",
+      "subject": "chore(release): carry 1.0.4 into the macOS bundle version"
+    },
+    {
+      "paths": [
+        "pyproject.toml",
+        "uv.lock"
+      ],
+      "sha": "92ea7f5541ea3e5588351bd314efcfa8e87d2d62",
+      "subject": "chore(release): 1.0.4, and make the acceptance command self-sufficient"
+    }
+  ],
+  "project": "second-brain-app",
+  "release": "1.0.4",
+  "schema": "shipping-harness/release-v1",
+  "telemetry": {
+    "totalAgentDurationMs": 0
+  },
+  "tier": "MILESTONE",
+  "verifyRuns": 5,
+  "worker": "shipping-harness"
+}
