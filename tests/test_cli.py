@@ -293,6 +293,28 @@ def test_collect_briefing_inputs_matches_fixture_when_vault_seeded(tmp_path: Pat
     assert got == expected
 
 
+def test_collect_briefing_inputs_ignores_a_date_shaped_string_that_is_not_a_date(
+    tmp_path: Path,
+) -> None:
+    """Given source text holding an impossible date, when inputs are collected, then it is not upcoming.
+
+    Source text is arbitrary and the upcoming scan reads every line of it. One
+    ingested note reading `2026-02-30` raised out of collect_briefing_inputs and
+    failed the whole brief stage of the operational refresh (2026-09-20).
+    """
+    _config, root = _ready(tmp_path)
+    digest = _put(root, b"Malformed digest-matched `2026-02-30` rejected.\n")
+    with Ledger(root) as ledger:
+        ledger.record_run(
+            Run("run-today", "2026-08-26T08:00:00+00:00", "2026-08-26T08:01:00+00:00", None, "ok")
+        )
+        ledger.upsert_source_item(
+            SourceItem("me-wiki", "notes/bad-date.md", "v1", digest, "run-today", "run-today")
+        )
+        got = collect_briefing_inputs(ledger, root, today=TODAY)
+    assert got.upcoming_items == ()
+
+
 def test_run_brief_passes_same_inputs_instance_to_generator(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:

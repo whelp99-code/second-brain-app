@@ -237,7 +237,16 @@ def collect_briefing_inputs(
             continue
         for raw in cas.get(item.content_hash).decode("utf-8", errors="replace").splitlines():
             matched = _ISO_DATE.search(raw)
-            if matched is not None and day <= date.fromisoformat(matched.group(0)) <= end:
+            if matched is None:
+                continue
+            # Source text is arbitrary: a date-shaped run of digits need not be a
+            # date. `2026-02-30` in one ingested note took the whole brief stage
+            # down with it, so a match that will not parse is simply not a date.
+            try:
+                upcoming_day = date.fromisoformat(matched.group(0))
+            except ValueError:
+                continue
+            if day <= upcoming_day <= end:
                 upcoming.append(
                     _cite_line(item.source_id, item.source_uri, item.content_hash, raw.strip())
                 )
