@@ -58,3 +58,26 @@ dsn = "postgresql://localhost:5433/unified"
 # adapter = "inbox-documents"
 # llm_policy = "allow"
 # sensitive = "mask"
+#
+# AI session JSONL logs. One root per source id; extra roots are extra rows.
+# Transcripts are unjudged, so new session sources stay deny until reviewed.
+# [[sources]]
+# id = "claude"
+# adapter = "claude-sessions"
+# root = "~/.claude/projects"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# [[sources]]
+# id = "codex"
+# adapter = "codex-sessions"
+# root = "~/.codex/sessions"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# [[sources]]
+# id = "omo"
+# adapter = "omo-sessions"
+# root = "~/.omo/agent/sessions"
+# llm_policy = "deny"
+# sensitive = "mask"
