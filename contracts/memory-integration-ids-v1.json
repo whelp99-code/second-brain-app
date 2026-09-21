@@ -1,0 +1,58 @@
+{
+  "digest_domain": "orca-jarvis/memory-integration-ids/v1",
+  "expected_digest": "sha256:9943a8317921cc4cb84911b64c87457c081b18e71b059258f8b7d01a7bb4864f",
+  "forbidden_client_permission_fields": [
+    "grants",
+    "permissions",
+    "roles",
+    "scopes",
+    "writes_authorized"
+  ],
+  "golden": {
+    "attempt_id": "memattempt:pos:v2:6f5dfa0560ecd083320577b17a27429078ed54b7bf0f096eb999afd726ba8a24",
+    "fence": {
+      "dispatch_fence": 1,
+      "tombstone_sequence": 0,
+      "tombstone_set_root": "sha256:b6d314980307e38899b0d65597aa19983602afb9e9112694ee5111a9dd3651d8"
+    },
+    "operation_id": "memop:v1:28cbb0fc1b999dfaf9ddfe822ac02c2bb9a0814e2efc075f02036fe5cdfb3d71",
+    "receipt_id": "c3bb9999257548151b93805af30ee8470dfb4be90ec390c79fe27ad02e9445cb",
+    "request_id": "memreq:scoped:v4:96509d7156ed7d9f614d92e22eea1ca5e701dae32c99006347aff11965b4a532",
+    "upload_id": "b9014af9445792b3a4c0d7bc92e43eafec8e11cb00bd55bd7899d924b664c87b"
+  },
+  "profile": "memory-integration-ids-v1",
+  "schema_version": 1,
+  "scoped_write_golden_sha256": "a54bedb04d520a0a7a19ac38a2955b6df534ded1535aad1e746903dff0837d39",
+  "semantics": {
+    "attempt_id": {
+      "encoding": "memattempt:pos:v2:<64-hex>",
+      "owner": "jarvis",
+      "role": "execution_attempt"
+    },
+    "fence": {
+      "encoding": "tombstone_sequence:int,tombstone_set_root:sha256,dispatch_fence:int",
+      "owner": "second_brain",
+      "role": "deletion_high_water"
+    },
+    "operation_id": {
+      "encoding": "memop:v1:<64-hex>",
+      "owner": "jarvis",
+      "role": "logical_operation"
+    },
+    "receipt_id": {
+      "encoding": "64_lowercase_hex_or_receipt:memory:<64-hex>",
+      "owner": "second_brain",
+      "role": "process_or_retract_result"
+    },
+    "request_id": {
+      "encoding": "memreq:<profile>:<64-hex>",
+      "owner": "jarvis",
+      "role": "jarvis_request"
+    },
+    "upload_id": {
+      "encoding": "64_lowercase_hex",
+      "owner": "phone_history",
+      "role": "upload_identity"
+    }
+  }
+}
