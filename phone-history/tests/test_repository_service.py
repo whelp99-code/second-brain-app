@@ -19,15 +19,20 @@ class RecordingSink:
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail
         self.calls: list[str] = []
+        self.retracts: list[str] = []
 
     def export(self, event: object) -> str:
         event_id = event.id
         self.calls.append(event_id)
         if self.fail:
             raise SinkError("synthetic_sink_failure")
-        return f"inbox/uploads/{event_id}.md"
+        return json.dumps(
+            {"inbox_path": f"inbox/uploads/{event_id}.md", "upload_id": event_id},
+            sort_keys=True,
+        )
 
     def retract(self, upload_id: str) -> str:
+        self.retracts.append(upload_id)
         if self.fail:
             raise SinkError("synthetic_sink_failure")
         return json.dumps({"deleted": True, "upload_id": upload_id}, sort_keys=True)
@@ -165,7 +170,8 @@ def test_candidates_are_noncanonical_and_decision_has_no_approval_effect(setting
 
 
 def test_delete_erases_content_attachment_candidate_and_is_idempotent(settings: object) -> None:
-    service = PhoneHistoryService(settings, sink=RecordingSink())
+    sink = RecordingSink()
+    service = PhoneHistoryService(settings, sink=sink)
     event_id = "phevt:delete:001"
     service.ingest(
         batch_from(event_dict(event_id=event_id, attachment=b"delete me")),
@@ -177,6 +183,7 @@ def test_delete_erases_content_attachment_candidate_and_is_idempotent(settings: 
 
     deleted = service.delete_event(event_id, reason="owner_requested")
     assert deleted["state"] == "deleted"
+    assert sink.retracts == [event_id]
     assert deleted["canonical_effect"] == "none"
     status = service.status()
     assert status["events"] == 0
@@ -190,6 +197,23 @@ def test_delete_erases_content_attachment_candidate_and_is_idempotent(settings: 
     original = batch_from(event_dict(event_id=event_id, attachment=b"delete me")).events[0]
     with pytest.raises(ConflictError, match="cannot be re-ingested"):
         service.repository.ingest_event("iphone-test-1", original, candidate_payload=None)
+
+
+def test_delete_keeps_event_when_second_brain_retract_fails(settings: object) -> None:
+    sink = RecordingSink()
+    service = PhoneHistoryService(settings, sink=sink)
+    event_id = "phevt:delete-pending:001"
+    service.ingest(
+        batch_from(event_dict(event_id=event_id)),
+        idempotency_key="request-delete-pending-0001",
+    )
+    sink.fail = True
+    result = service.delete_event(event_id, reason="owner_requested")
+    assert result["state"] == "pending"
+    assert result["second_brain_retract"] == "synthetic_sink_failure"
+    assert sink.retracts == [event_id]
+    assert service.status()["events"] == 1
+    assert service.repository.get_event(event_id).sink_state == "pending"
 
 
 def test_episode_grouping_is_deterministic(settings: object) -> None:
