@@ -11,6 +11,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts/operational-authority-up
 @pytest.mark.parametrize("difference", ["changed", "missing", "extra"])
 def test_mismatched_migrations_rejected_before_database_open(tmp_path, monkeypatch, difference):
     spec = importlib.util.spec_from_file_location("upgrade_rehearsal", SCRIPT)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     build = tmp_path / "build"

@@ -62,7 +62,9 @@ def test_legacy_candidate_cannot_be_reaccepted_under_scoped_key(tmp_path):
     try:
         with pytest.raises(ReplayConflict, match="REQUEST_REPLAY_CONFLICT"):
             store.accept(entry.identity, {"fixture": True}, now)
-        assert store.get(legacy.request_id).identity.schema_version == 3
+        restored = store.get(legacy.request_id)
+        assert restored is not None
+        assert restored.identity.schema_version == 3
         assert store.db.execute("SELECT count(*) FROM requests").fetchone()[0] == 1
         assert store.db.execute("PRAGMA foreign_key_check").fetchall() == []
     finally:

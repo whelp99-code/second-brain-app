@@ -49,7 +49,9 @@ def test_explicit_mcp_profile_exposes_only_write_and_preserves_replay(tmp_path, 
     store = RequestStore(Path(config.request_root), scoped_v4=True)
     try:
         assert store.db.execute("SELECT count(*) FROM requests").fetchone()[0] == 1
-        assert store.get(request.request_id).state == "pending"
+        stored = store.get(request.request_id)
+        assert stored is not None
+        assert stored.state == "pending"
     finally:
         store.close()
 

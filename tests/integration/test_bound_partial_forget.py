@@ -66,6 +66,8 @@ def test_partial_forget_rebinds_surviving_approved_body(tmp_path, monkeypatch, h
             executor.store.tombstone_high_water(), key, '8')
         accept_effect_request(config.request_root, request, NOW + timedelta(minutes=1, seconds=1),
             public_keys=config.jarvis_public_keys, provider_instance_id=config.provider_instance_id)
+        method = 'bind_knowledge'
+        original_binding = Ledger.bind_knowledge
         if binding_failure:
             def fail_binding(*_args):
                 raise RuntimeError('INJECTED_KNOWLEDGE_WRITE_FAILURE')

@@ -14,7 +14,7 @@ from tests.test_runtime_reliability import managed
 
 def test_runtime_backup_inventory_discards_archived_control_state(tmp_path):
     config = managed(tmp_path)
-    config.raw['knowledge_registry'] = str(tmp_path / 'registry.sqlite')
+    config = type(config)(raw={**config.raw, 'knowledge_registry': str(tmp_path / 'registry.sqlite')})
     service = GenerationMutationService.from_config(config)
     try:
         service.remember('Runtime backup retained fact', 'memory', datetime.now(UTC))
@@ -82,7 +82,7 @@ def test_real_forget_disposes_runtime_archive_inside_managed_backup_root(tmp_pat
         })
         archive.parent.mkdir(exist_ok=True, mode=0o700)
         other_config = managed(tmp_path / 'other')
-        other_config.raw['knowledge_registry'] = str(tmp_path / 'other-registry.sqlite')
+        other_config = type(other_config)(raw={**other_config.raw, 'knowledge_registry': str(tmp_path / 'other-registry.sqlite')})
         other = GenerationMutationService.from_config(other_config)
         try:
             now = datetime.now(UTC)

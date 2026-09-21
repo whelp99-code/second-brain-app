@@ -30,6 +30,7 @@ def test_other_process_cannot_restore_locked_destination(tmp_path):
         # Independent targets are not globally blocked.
         restore_backup(archive, tmp_path / "other")
     result = restore_backup(archive, destination, force=True)
+    assert result.previous is not None
     assert (result.previous / "original").read_text() == "old memory"
     assert (destination / "wiki" / "계약-일정.md").is_file()
 

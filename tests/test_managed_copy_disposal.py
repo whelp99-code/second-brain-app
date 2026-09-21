@@ -77,7 +77,9 @@ def test_actual_runtime_backup_and_export_disposed_before_pointer(tmp_path: Path
         assert phases.index("backup_disposal") < phases.index("pointer_rename")
         assert phases.index("export_disposal") < phases.index("pointer_rename")
         assert not base.root.exists()
-        assert executor.store.exports.get(export_dir.name).state == "invalidated"
+        export = executor.store.exports.get(export_dir.name)
+        assert export is not None
+        assert export.state == "invalidated"
         checkpoint = str(tuple(executor.store.db.execute("SELECT * FROM managed_copy_disposals").fetchone()))
         assert OLD not in checkpoint and str(tmp_path) not in checkpoint
     finally:

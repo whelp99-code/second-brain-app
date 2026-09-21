@@ -26,7 +26,9 @@ def classified(tmp_path: Path, request):
         "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(source)}],
         "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:a"], "policy_revision": "1"}}})
     if getattr(request, "param", True) is False:
-        config.raw.pop("source_access")
+        raw = dict(config.raw)
+        raw.pop("source_access", None)
+        config = Config(raw=raw)
     assert run_ingest(config, ["docs"]).exit_code == 0
     assert run_compile(config, llm_mode="fake").exit_code == 0
     root = vault.resolve()
@@ -98,6 +100,7 @@ def test_scoped_batch_closes_shared_connection_on_success_and_abort(classified, 
 
     root, name, generation = classified
     opened = []
+    reader = None
     connect = module.sqlite3.connect
 
     def observe(database, *args, **kwargs):
@@ -110,7 +113,8 @@ def test_scoped_batch_closes_shared_connection_on_success_and_abort(classified, 
     try:
         with module.classified_pages(root, generation,
                 scope=SourceAccess('principal:owner', ('project:a',), '1')) as read:
-            assert read(name) == read(name)
+            reader = read
+            assert reader(name) == reader(name)
             if aborted:
                 raise RuntimeError('caller aborted')
     except RuntimeError:
@@ -118,8 +122,9 @@ def test_scoped_batch_closes_shared_connection_on_success_and_abort(classified, 
     assert len(opened) == 1
     with pytest.raises(sqlite3.ProgrammingError, match='closed'):
         opened[0].execute('SELECT 1')
+    assert reader is not None
     with pytest.raises(MemoryAccessError, match='MEMORY_ACCESS_UNAVAILABLE'):
-        read(name)
+        reader(name)
 
 
 @pytest.mark.parametrize("owner,projects,revision", [

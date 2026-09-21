@@ -3,6 +3,7 @@ import multiprocessing
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sb.effect_values import is_json_object
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
 from sb.ops import status_snapshot
@@ -50,7 +51,9 @@ def test_unpublished_killed_batch_preserves_active_input_and_recovers(tmp_path: 
         assert run_all(config).status == 'ok'
         assert active.resolve() != before
         assert all((active / rel).read_bytes() == data for rel, data in pending.items())
-        assert status_snapshot(config)['last_batch']['status'] == 'ok'
+        snapshot = status_snapshot(config)
+        assert isinstance(snapshot['last_batch'], dict)
+        assert snapshot['last_batch']['status'] == 'ok'
         staging = Path(config.share_root) / 'vault-generations/.staging'
         assert staging.is_dir() and list(staging.iterdir()) == []
     finally:
@@ -95,6 +98,7 @@ def _published_crash_case(tmp_path: Path, phase: str):
         published = active.resolve()
         assert published != before
         completed = status_snapshot(config)['last_batch']
+        assert isinstance(completed, dict)
         assert completed['status'] == 'ok'
         child.kill()
         child.join(10)

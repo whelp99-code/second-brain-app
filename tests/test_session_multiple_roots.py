@@ -1,5 +1,6 @@
 """Ambiguous legacy root identities must not silently merge agent histories."""
 import pytest
+from sb.effect_values import is_json_object
 
 from tests.test_session_file_replacement import FACTORIES, record
 
@@ -15,7 +16,8 @@ def test_multiple_roots_hold_without_consuming_or_merging(tmp_path, kind, cursor
     rows = list(adapter.scan(cursor))
     assert len(rows) == 1
     assert rows[0][1] == b''
-    assert rows[0][2]['skip_reason'] == 'ambiguous-session-roots'
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'ambiguous-session-roots'
     assert adapter.next_cursor() == (cursor if cursor is not None else "0")
 
 
@@ -34,5 +36,6 @@ def test_opencode_multiple_roots_hold_without_consuming_or_merging(tmp_path, cur
     rows = list(adapter.scan(cursor))
     assert len(rows) == 1
     assert rows[0][1] == b''
-    assert rows[0][2]['skip_reason'] == 'ambiguous-session-roots'
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'ambiguous-session-roots'
     assert adapter.next_cursor() == (cursor if cursor is not None else '0')

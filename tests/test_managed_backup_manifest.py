@@ -51,6 +51,7 @@ def make_archive(root, alteration):
     if alteration == "hash":
         entry["sha256"] = "0" * 64
     elif alteration == "size":
+        assert isinstance(entry["size"], int)
         entry["size"] += 1
     elif alteration == "mode":
         entry["mode"] = 0o400

@@ -26,6 +26,7 @@ from sb.connectors.unified_db import (
     load_mapping,
 )
 from sb.connectors.unified_db_mapping import (
+    Scalar,
     DEFAULT_MAPPING,
     EmitCtx,
     emit_row,
@@ -419,7 +420,7 @@ def _is_source_select(sql: str) -> bool:
     return "SELECT" in upper and "CURRENT_SETTING" not in upper
 
 
-def _memory_row(*, summary: str) -> tuple[object, ...]:
+def _memory_row(*, summary: str) -> tuple[Scalar, ...]:
     """One `memory.events` row shaped as the connector selects it."""
     return (
         "e1",

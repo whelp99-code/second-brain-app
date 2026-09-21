@@ -163,12 +163,15 @@ def test_shared_cross_runtime_result_fixture():
     import json
 
     from cryptography.hazmat.primitives.serialization import load_pem_public_key
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
     from sb.effect_values import parse_instant
     fixture=json.loads(Path('contracts/cancellation-result-v1.json').read_text())
     intent=CorrectionCancellationIntentV1.model_validate(fixture['intent'])
+    public_key = load_pem_public_key(fixture['provider_public_key'].encode())
+    assert isinstance(public_key, Ed25519PublicKey)
     result=verify_cancellation_result(fixture['result'],intent,now=parse_instant(fixture['now']),
-        provider_keys={fixture['result']['signing_key_id']:load_pem_public_key(fixture['provider_public_key'].encode())})
+        provider_keys={fixture['result']['signing_key_id']:public_key})
     assert result.result_digest==fixture['result']['result_digest']
 
 
@@ -184,6 +187,7 @@ def test_key_revoked_during_absence_scan_prevents_activation(tmp_path: Path,monk
     monkeypatch.setattr('sb.correction_cancellation_executor.record_cancellation_absence',revoke)
     try:
         with pytest.raises(ValueError,match='MEMORY_CANCELLATION_INTENT_INVALID'):
+            assert isinstance(identity, str)
             apply_correction_cancellation(executor.mutations,executor.erasure,identity,now=NOW+timedelta(hours=1),
                 backup_root=executor.config.backup_root,historical_delegation_keys=executor.config.jarvis_public_keys,
                 current_cancellation_keys=keys)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sb.effect_values import format_instant
+from sb.effect_values import JsonObject, format_instant
 from sb.scoped_provider_decision import validate_scoped_provider_decision
 from sb.scoped_write_request import parse_scoped_write_request
 
@@ -14,7 +14,7 @@ def material():
     raw = json.loads((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
     at = datetime.fromisoformat(raw["created_at"])
     request = parse_scoped_write_request(raw, now=at, expected_provider="provider:fixture")
-    value = {"kind": "current_scoped_dispatch", "outbox_id": "memout:scoped:v4:" + "a" * 64,
+    value: JsonObject = {"kind": "current_scoped_dispatch", "outbox_id": "memout:scoped:v4:" + "a" * 64,
         "dispatch_fence": 1, "provider_instance_id": request.provider_instance_id,
         "request_id": request.request_id, "request_digest": request.request_digest,
         "scope_digest": request.preparation.identity.identity_digest,
@@ -27,7 +27,7 @@ def test_live_decision_is_bound_and_frozen():
     result = validate_scoped_provider_decision(value, request, started=at, now=at)
     assert result.dispatch_fence == 1
     with pytest.raises(FrozenInstanceError):
-        result.dispatch_fence = 2
+        setattr(result, 'dispatch_fence', 2)
 
 
 @pytest.mark.parametrize("mode", ["provider", "request", "scope", "outbox", "bool", "float", "overflow",
@@ -163,7 +163,9 @@ def test_composed_channel_gates_real_admission_and_execution(tmp_path, mode):
         else:
             assert result.state == "failed" and result.code == "SCOPED_WRITE_AUTHORITY_INVALID"
             assert not executor.generations.active_link.exists()
-            assert executor.store.get(accepted.request_id).proof_json is None
+            stored = executor.store.get(accepted.request_id)
+            assert stored is not None
+            assert stored.proof_json is None
             assert len(calls) == 3
     finally:
         executor.close()

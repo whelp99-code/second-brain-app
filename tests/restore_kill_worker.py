@@ -29,16 +29,16 @@ def main() -> None:
     if phase == 'extract':
         original = GenerationRestoreSanitizer._extract
 
-        def extract(source, destination):
-            original(source, destination)
+        def extract(archive: Path, destination: Path):
+            original(archive, destination)
             os.kill(os.getpid(), signal.SIGKILL)
 
         GenerationRestoreSanitizer._extract = staticmethod(extract)
     elif phase == 'materialize':
         original_materialize = ManagedRestoreInventory.materialize
 
-        def materialize(destination, inventory):
-            original_materialize(destination, inventory)
+        def materialize(destination: Path, result):
+            original_materialize(destination, result)
             os.kill(os.getpid(), signal.SIGKILL)
 
         ManagedRestoreInventory.materialize = staticmethod(materialize)
