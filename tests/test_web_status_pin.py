@@ -2,9 +2,9 @@
 
 from contextlib import contextmanager
 
+from sb.effect_values import is_json_object
 from sb.store import Run
 from sb.store.ledger import Ledger
-from sb.effect_values import is_json_object
 from tests.test_web import _ready, _request, _running
 
 

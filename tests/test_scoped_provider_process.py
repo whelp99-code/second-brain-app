@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from sb.scoped_provider_process import ScopedProviderChannelError, ScopedProviderProcess
 from sb.effect_values import is_json_object
+from sb.scoped_provider_process import ScopedProviderChannelError, ScopedProviderProcess
 
 
 def channel(tmp_path, script, **kwargs):

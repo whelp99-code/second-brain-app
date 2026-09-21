@@ -1,8 +1,8 @@
 """Explicit source configuration must bound implicit batch collection."""
 from sb.config import Config
-from sb.pipeline import _select_adapters
 from sb.connectors.base import SourceAdapter
 from sb.connectors.inbox_documents import InboxDocumentsAdapter
+from sb.pipeline import _select_adapters
 
 
 def test_implicit_selection_excludes_unconfigured_adapters(monkeypatch, tmp_path):

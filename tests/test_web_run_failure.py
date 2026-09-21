@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Never
 
-from sb.pipeline import RunOutcome
 from sb.effect_values import is_json_object
+from sb.pipeline import RunOutcome
 from tests.test_web import _ready, _request, _running
 
 

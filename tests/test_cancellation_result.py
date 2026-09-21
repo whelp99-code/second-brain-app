@@ -162,8 +162,8 @@ def test_missing_completion_evidence_cannot_be_replaced_by_a_signature(tmp_path:
 def test_shared_cross_runtime_result_fixture():
     import json
 
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
     from sb.effect_values import parse_instant
     fixture=json.loads(Path('contracts/cancellation-result-v1.json').read_text())

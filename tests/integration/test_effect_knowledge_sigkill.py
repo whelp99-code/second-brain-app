@@ -46,7 +46,7 @@ def _worker(root, ready, release, phase):
             raise RuntimeError('barrier timed out')
     sink = None
     if phase == 'before_bind':
-        setattr(Ledger, 'bind_knowledge', block)
+        Ledger.bind_knowledge = block
     elif phase == 'after_rebind':
         import sb.request_executor as module
         original = module.apply_with_prior_knowledge

@@ -1,7 +1,6 @@
 import json
 
 import pytest
-from sb.effect_values import is_json_object
 
 from sb.connectors.sessions_opencode import OpenCodeSessionsAdapter
 

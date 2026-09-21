@@ -54,7 +54,7 @@ def test_real_reset_during_response_keeps_server_healthy(tmp_path, monkeypatch):
     server = build_server(config, '127.0.0.1', 0)
     entered, finished = threading.Event(), threading.Event()
     handler_type = server.RequestHandlerClass
-    original = getattr(handler_type, '_get')
+    original = handler_type._get
     errors = Mock()
     monkeypatch.setattr(server, 'handle_error', errors)
 

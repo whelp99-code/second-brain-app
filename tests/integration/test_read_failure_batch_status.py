@@ -3,8 +3,6 @@ import os
 import subprocess
 import sys
 
-from sb.effect_values import is_json_object
-
 from sb.config import load_config
 from tests.test_web import _request, _running
 

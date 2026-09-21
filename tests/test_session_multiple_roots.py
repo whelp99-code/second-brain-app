@@ -1,6 +1,5 @@
 """Ambiguous legacy root identities must not silently merge agent histories."""
 import pytest
-from sb.effect_values import is_json_object
 
 from tests.test_session_file_replacement import FACTORIES, record
 

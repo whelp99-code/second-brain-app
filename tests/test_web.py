@@ -19,8 +19,8 @@ import pytest
 from pytest import MonkeyPatch
 
 from sb.config import Config
-from sb.effect_values import is_json_object
 from sb.contracts import PageSpec, SourceCite
+from sb.effect_values import is_json_object
 from sb.pipeline import RunOutcome
 from sb.store import Run
 from sb.store.cas import ContentAddressedStore

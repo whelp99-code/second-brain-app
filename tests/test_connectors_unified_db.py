@@ -26,9 +26,9 @@ from sb.connectors.unified_db import (
     load_mapping,
 )
 from sb.connectors.unified_db_mapping import (
-    Scalar,
     DEFAULT_MAPPING,
     EmitCtx,
+    Scalar,
     emit_row,
     is_low_value,
 )

@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 
 from sb.config import Config
+from sb.effect_values import is_json_object
 from sb.ops import status_snapshot
 from sb.pipeline import _run_all_mutable
 from sb.vault import init_vault
-from sb.effect_values import is_json_object
 
 
 def _blocked_batch(root: str, ready, release, after_ingest: bool):

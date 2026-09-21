@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from sb.effect_values import is_json_object
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
 from sb.ops import (

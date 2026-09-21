@@ -3,7 +3,6 @@ import multiprocessing
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sb.effect_values import is_json_object
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
 from sb.ops import status_snapshot

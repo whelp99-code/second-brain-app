@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from sb.effect_values import is_json_object
 
 from sb.generations import GenerationStore
 from sb.memory_access import MemoryAccessError, classified_page, require_scope
