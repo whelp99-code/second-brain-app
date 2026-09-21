@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -25,6 +26,11 @@ class RecordingSink:
         if self.fail:
             raise SinkError("synthetic_sink_failure")
         return f"inbox/uploads/{event_id}.md"
+
+    def retract(self, upload_id: str) -> str:
+        if self.fail:
+            raise SinkError("synthetic_sink_failure")
+        return json.dumps({"deleted": True, "upload_id": upload_id}, sort_keys=True)
 
 
 def _candidate(title: str, content: str) -> dict[str, object]:
