@@ -16,8 +16,9 @@ from tests.conftest import batch_from, event_dict
 
 
 class RecordingSink:
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(self, *, fail: bool = False, retract_error: str | None = None) -> None:
         self.fail = fail
+        self.retract_error = retract_error
         self.calls: list[str] = []
         self.retracts: list[str] = []
 
@@ -33,6 +34,8 @@ class RecordingSink:
 
     def retract(self, upload_id: str) -> str:
         self.retracts.append(upload_id)
+        if self.retract_error is not None:
+            raise SinkError(self.retract_error)
         if self.fail:
             raise SinkError("synthetic_sink_failure")
         return json.dumps({"deleted": True, "upload_id": upload_id}, sort_keys=True)
@@ -214,6 +217,36 @@ def test_delete_keeps_event_when_second_brain_retract_fails(settings: object) ->
     assert sink.retracts == [event_id]
     assert service.status()["events"] == 1
     assert service.repository.get_event(event_id).sink_state == "pending"
+
+
+def test_delete_stays_pending_on_retract_not_found(settings: object) -> None:
+    sink = RecordingSink()
+    service = PhoneHistoryService(settings, sink=sink)
+    event_id = "phevt:delete-404:001"
+    service.ingest(
+        batch_from(event_dict(event_id=event_id)),
+        idempotency_key="request-delete-404-0001",
+    )
+    sink.retract_error = "not_found"
+    result = service.delete_event(event_id, reason="owner_requested")
+    assert result["state"] == "pending"
+    assert result["second_brain_retract"] == "not_found"
+    assert service.status()["events"] == 1
+
+
+def test_delete_stays_pending_on_retract_receipt_delay(settings: object) -> None:
+    sink = RecordingSink()
+    service = PhoneHistoryService(settings, sink=sink)
+    event_id = "phevt:delete-delay:001"
+    service.ingest(
+        batch_from(event_dict(event_id=event_id)),
+        idempotency_key="request-delete-delay-0001",
+    )
+    sink.retract_error = "retract_receipt_pending"
+    result = service.delete_event(event_id, reason="owner_requested")
+    assert result["state"] == "pending"
+    assert result["second_brain_retract"] == "retract_receipt_pending"
+    assert service.status()["events"] == 1
 
 
 def test_episode_grouping_is_deterministic(settings: object) -> None:
