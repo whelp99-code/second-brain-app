@@ -1,0 +1,91 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "reviewed_at_utc": "2026-09-11T23:38:52.409247+00:00",
+  "submission": "713e453e69ef9bf0232d7cfc5ff04deca3b11509",
+  "pin": {
+    "sb_source": "8d80a3a2749824059a2beb919dbf4db537dd5c08",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-8d80a3a/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "f9e079148f25217ac5bc7c482482cd9d63053752",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-f9e0791/source/dist",
+    "jarvis_inventory_sha256": "650c79d62cba1c27c1db06cf403f8bd2ffa73dffd45f7290148dc86b655f826e",
+    "jarvis_inventory_entries": 34768,
+    "dispatch_js_sha256": "8d95e3d41880bdece0585a42242ccfa0ed82062c9e44577a63b523ff144d8456",
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "evidence_root": "/var/tmp/codex-night-713e453-azk05juq",
+  "findings": [
+    {
+      "id": "M12-B-F",
+      "severity": "P2",
+      "summary": "JARVIS own durable-state backup/loss/restore RPO remains unverified; final recovery instructions are incomplete",
+      "locations": [
+        "scripts/jarvis-restore-acceptance.mjs:30",
+        "scripts/jarvis-restore-acceptance.mjs:131",
+        "scripts/jarvis-restore-acceptance.mjs:138",
+        "GROK-PIN-RECOVERY-RUNBOOK.md"
+      ],
+      "evidence": "paired-restore-result.json; pinned harness preserves JARVIS database throughout and hardcodes crash_loss_after_last_durable=0",
+      "completion": "Exercise established JARVIS own backup and recovery in isolated fixtures; measure receipt/state loss, recovered high-water and accepted new work. Provide complete fixed-pin config/backup manifests, trusted fence inputs and tested safe rollback/refusal/recovery instructions."
+    },
+    {
+      "id": "native-session-integration",
+      "severity": "external_unverified",
+      "summary": "Explicit configured dispatch verified at synthetic provider/injected transport boundary; native authentication, actual model context compaction and copy lifetime remain unaccepted",
+      "completion": "Preserve A–F/M1–M14 scope; specify product/version and exact external input, prepared procedure and recovery path per unmet native requirement."
+    }
+  ],
+  "prior_findings_resolved": [
+    "V1-F"
+  ],
+  "prior_passing_scope_preserved": [
+    "V1-C",
+    "V1-D",
+    "V1-E",
+    "physical-send accepted-crash duplicate prevention",
+    "paired SB restore and scoped post-restore work"
+  ],
+  "direct_checks": {
+    "focused_tests": 30,
+    "focused_seconds": 24.95,
+    "ruff_exit": 0,
+    "tsc_exit": 0,
+    "revoked_keys_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_gates": [
+      0,
+      0,
+      0
+    ],
+    "paired_restore_exit": 0,
+    "restore_timings": {
+      "failure_began_ms": 1789169529955,
+      "restore_began_ms": 1789169535857,
+      "sb_first_read_ms": 1789169537436,
+      "scoped_available_ms": 1789169538665,
+      "new_write_available_ms": 1789169539986,
+      "restore_probe_ms": 524.309,
+      "restore_to_readable_ms": 1579,
+      "failure_to_first_read_ms": 7481,
+      "failure_to_work_available_ms": 10031,
+      "scenario_ms": 16758
+    },
+    "artifact_integrity": {
+      "sha256": "650c79d62cba1c27c1db06cf403f8bd2ffa73dffd45f7290148dc86b655f826e",
+      "entries": 34768,
+      "unchanged": true
+    },
+    "sb_python_files_identical": 182,
+    "jarvis_tracked_files_identical": 1137,
+    "rebuilt_js_identical": 1109
+  },
+  "final_acceptance": false,
+  "next_action": "Existing Grok: complete M12/B/F isolated recovery and concrete final-pin preparation, then consistent integrated resubmission; maintain30min automation."
+}

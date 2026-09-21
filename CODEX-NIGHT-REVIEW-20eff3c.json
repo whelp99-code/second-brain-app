@@ -1,0 +1,169 @@
+{
+  "submission": "20eff3cae87f271d81e7df141ad564dfd22a8380",
+  "reviewer": "existing designated monitor Codex term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "pin": {
+    "sb_source": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
+    "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "candidate": "/var/tmp/sb-candidate-e13cd3b/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "updated_at_utc": "2026-09-12T16:36:57.714576+00:00",
+  "evidence_root": "/var/tmp/codex-night-20eff3c-e0rs0m_6",
+  "verdict": "two_ordinary_followups_complete_overall_acceptance_incomplete",
+  "ordinary_followups": {
+    "M11_worker_exception_guarantee": "complete_with_direct_normal_and_expected_failure_checks",
+    "F_executed_archive_provenance": "complete_for_current_candidate; historical date header not a precise runtime timestamp"
+  },
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "identity": {
+    "head": "20eff3cae87f271d81e7df141ad564dfd22a8380",
+    "source": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
+    "archive_sha256": "75a5a4eaa97ba5d5995dc7561953948d5ac0e38e2d7a67b76512bcdc6ff9c16d",
+    "python_count": 182,
+    "mismatch": [],
+    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_entries": 34768,
+    "changed_harness": [
+      {
+        "path": "tests/test_mcp_generation_overlap.py",
+        "sha256": "6adc5589ca26e086606954d178c782acbf68a7cbae194c6a9c3ebe08138a2e03",
+        "same_as_executed_f7c1945": false
+      }
+    ],
+    "product_tracked_diff": "",
+    "product_diff_since_f7c1945": "",
+    "test_archive_equals_HEAD": true,
+    "gates_original_sha256": "a41a9ed1953a1ed7981356db1da49fb0415bd626faae07d26fe02a53a870fe36",
+    "manifest": {
+      "schema": 1,
+      "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+      "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
+      "source_tree": "af90652d31141c19fe4cca07abdd7209c8e97586",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    }
+  },
+  "direct_checks": {
+    "normal_M11": {
+      "passed": 1,
+      "seconds": 5.6,
+      "exit": 0,
+      "log": "ordinary-test.log",
+      "extra_warning_flag": false,
+      "scope": "synthetic current-unit cited model response; normal source ingest/compile; actual in-process MCP body/record/generation and old text exclusion"
+    },
+    "synthetic_worker_exception": {
+      "type": "TypeError",
+      "expected_failure": true,
+      "failed": 1,
+      "errors": 1,
+      "seconds": 5.49,
+      "exit": 1,
+      "log": "ordinary-worker-error.log",
+      "interpretation": "one deliberately failing test, assertion plus unhandled-thread warning escalated by submitted module marker; not product defect",
+      "injection": "test-module run_compile binding raises only on worker thread, no product file edit"
+    },
+    "ruff": {
+      "exit": 0,
+      "scope": "changed test"
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 54,
+      "exit": 1,
+      "same_warning_message_multiset_as_prior": true,
+      "comparison": "type-comparison.json"
+    }
+  },
+  "time_scope": {
+    "ingest_generation": "published before during read, Alpha record retained",
+    "compile_preparing_ns": 2682645840403001,
+    "reader_call_ns": 2682645840674970,
+    "reader_completed_before_release_ns": 2682645914245636,
+    "writer_return_after_compile_ns": 2682646612929442,
+    "latest": "Omega record in successor generation, Alpha search empty",
+    "not_demonstrated": "simultaneous publication while pinned reader held"
+  },
+  "prior_results_not_new_runs": [
+    "1fc3d7a normal1passed8.11s and types0errors54warnings",
+    "01cedbb related86passed19.82s and ordinary1passed4.78s",
+    "f7c1945 MAINT0 INTEG0 WORK0; unchanged actual historical log",
+    "whole suite/DR/performance/JARVIS regressions not repeated"
+  ],
+  "provenance": {
+    "gates_executed_pin": "f7c194594e21728678b118e7c0029cd3e1deb30b",
+    "gates_harness_commit": "f7c194594e21728678b118e7c0029cd3e1deb30b",
+    "current_archive_pin": "e13cd3b699695fa08fbde521f7a7866c9dfef6a0",
+    "deploy_scripts_bytes_match": true,
+    "gates_new_execution": false,
+    "ready_means": "submission handoff, not acceptance",
+    "native_observation": {
+      "at_utc": "2026-09-12T16:33:53.535000+00:00",
+      "cursor": "5836939",
+      "source": "screen",
+      "public_lines": [
+        " ╭─ eval py (3.14.4, /usr/bin/python3) done ✓ · <1s",
+        " │ Confirm no newer Codex review than 1fc3d7a",
+        " │ 2 earlier code lines",
+        " │ print([p.name for p in sorted(sb.glob(\"CODEX-NIGHT-REVIEW-*.md\"), key=lambda p:",
+        " │ p.stat().st_mtime, reverse=True)[:3]])",
+        " │ print((sb/\"CODEX-NIGHT-REVIEW-20eff3c.md\").exists())",
+        " │",
+        " ├─ output",
+        " │ ['CODEX-NIGHT-REVIEW-1fc3d7a.md', 'CODEX-NIGHT-REVIEW-01cedbb.md',",
+        " │ 'CODEX-NIGHT-REVIEW-d623089.md']",
+        " │ False",
+        " ╰─",
+        " Blocked. Archive e13cd3b, executed gates f7c1945. Ordinary Alpha→Omega MCP latest/exclude with",
+        "(😺 OmO Native) Goal blocked: 1fc3d7a ordinary M11 (Alpha→Omega MCP latest/exclude, worker-except..."
+      ]
+    },
+    "status_note": "native blocked waiting for review, not prior fakeCited technical blocker; resume date-only header is historical, use observed_at for runtime status"
+  },
+  "scope_provenance": "Ordinary-only scope originated in original Codex coordination after content notice; original user A-F/M1-M14 acceptance requirements not reduced. Original Codex did not duplicate review/product edits as relayed.",
+  "content_limitation": {
+    "triggering_test": "undetermined",
+    "observed_by": "original Codex coordination screen24954 as relayed",
+    "branch_status": "held_unverified",
+    "retries_or_delegation": false
+  },
+  "remaining_original": [
+    "A-F/M1-M14 unresolved scope inherited from CODEX-NIGHT-REVIEW-01cedbb and 1fc3d7a; bounded ordinary closure is not full acceptance",
+    "M13 full lifetime and boundary/deletion-related prior findings held without further reproduction",
+    "strong pinned-read simultaneous publication not demonstrated",
+    "M14 not implemented; not reclassified as operating permission blocker"
+  ],
+  "external_conditions": [
+    "native identity/session/compaction and per-client paths",
+    "real user work/corpus and curated Korean gold",
+    "operating cutover/backups/timer permission and material"
+  ],
+  "new_ordinary_defects": [],
+  "next_action": "Keep existing30min monitor; no additional Grok resume because two bounded ordinary followups complete. Preserve held branches and original incomplete acceptance.",
+  "grok_resume_sent": false,
+  "automation": {
+    "id": "c92a741e-d1ae-4591-8fd3-80d3f117cbc4",
+    "enabled": true,
+    "rrule": "*/30 * * * *",
+    "timezone": "Asia/Seoul",
+    "changed": false
+  }
+}

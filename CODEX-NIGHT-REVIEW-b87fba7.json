@@ -1,0 +1,117 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "created_at": "2026-09-13T08:39:43.812218+00:00",
+  "submission": "b87fba782f1c26fbd0ce77b9550615f65b2e91ea",
+  "verdict": "normal_scope_not_accepted",
+  "overall_acceptance": "incomplete",
+  "evidence_root": "/var/tmp/codex-night-b87fba7-hpq53ygw",
+  "identity": {
+    "sb": {
+      "pin": "7cc5fbc803451b24066546563b63b25f266a4998",
+      "archive_sha256": "3a4a1a10ef61e9217f60b2dd63d33e1041eb82eef83237befa2053b6c5e93d32",
+      "wheel_sha256": "b46f487973d11ca4cc8e80d749e0a50eac524a65972d22432f7d1da8682a5578",
+      "product_files": 183,
+      "wheel_mismatches": [],
+      "installed_mismatches": []
+    },
+    "jarvis": {
+      "pin": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+      "prior_evidence": "/var/tmp/codex-night-069aeaa-080q44i1",
+      "source_mismatches": [
+        "AGENTS.md"
+      ],
+      "artifact_source_mismatches": [],
+      "dist_files": 1216,
+      "dist_digest": "sha256:c64cfbf1c57f469927a453b1784b05508e33c9186f656a6546de86226e6aff36",
+      "dist_mismatches": [],
+      "runtime_files": 5787,
+      "runtime_mismatches": [],
+      "runtime_lock_equal": true,
+      "launcher_sha256": "b3742f4e511c651b515aaff67a3df069f0cdd60afd5d20862ad49ea4fe9700ce",
+      "reexecuted": false
+    }
+  },
+  "direct_tests": {
+    "passed": 14,
+    "deselected": 1,
+    "pytest_seconds": 3.73,
+    "ruff_exit": 0,
+    "type_errors": 0,
+    "type_warnings": 12,
+    "type_exit": 1,
+    "jarvis_new_executions": 0
+  },
+  "findings": [
+    {
+      "id": "N2",
+      "status": "fail",
+      "title": "bare metadata page ID changes provider record identity in final installed hook",
+      "code": [
+        "sb/postcompact_hook.py:223",
+        "tests/test_postcompact_hook.py:340",
+        "sb/mcp.py:581",
+        "sb/mcp.py:614"
+      ],
+      "evidence": [
+        "record-contract-probe.json",
+        "correction-probe.json",
+        "followup-probe.json"
+      ],
+      "completion": "Preserve canonical provider ID/digest and cite origin through managed Alpha/Omega and multiple citations."
+    },
+    {
+      "id": "N4",
+      "status": "incomplete_documentation",
+      "code": [
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:30",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:39",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:50"
+      ],
+      "completion": "Readonly writer activator/run.lock/pending constraints, known candidate operands and real service/config commands, partial transition and recovery pre-start stop conditions."
+    }
+  ],
+  "preserved": [
+    "source_ref docs:note.md fixed",
+    "multi citation correct target record",
+    "managed mutable state and confirmation/redelivery",
+    "old Alpha excluded after correction",
+    "explicit occurrence c1/c2",
+    "unchanged JARVIS original evidence",
+    "prior stdout retry/budget/long-summary evidence at original pins"
+  ],
+  "harness_error": {
+    "file": "sb-probe.log",
+    "reason": "Stale probe-state collection path; StopIteration; no sb-probe.json",
+    "product_failure": false,
+    "credited_new_pass": false
+  },
+  "boundaries": {
+    "provider_record_comparison": "existing derivation helper on real committed synthetic generation; not live MCP/native",
+    "held_content_related": "unverified; no retry or transfer",
+    "trigger_cause": "undetermined",
+    "N1": "native/in-turn public-contract limitation preserved",
+    "operating_acceptance": false
+  },
+  "delivery": {
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "message_accepted": true,
+    "after_message_cursor": "6076550",
+    "after_message_status": "Goal achieved",
+    "official_resume": "/goal resume",
+    "resume_accepted": true,
+    "active_cursor": "6076569",
+    "work_cursor": "6076664",
+    "status": "Goal active / Pursuing goal",
+    "observed_tools": [
+      "read CODEX-NIGHT-REVIEW-b87fba7.md:1-100",
+      "read sb/postcompact_hook.py:200-249"
+    ],
+    "distinctions": "ACK then actual report read then source investigation observed; implementation completion not observed",
+    "observed_at": "2026-09-13T08:41:51.633768+00:00"
+  },
+  "automation": {
+    "enabled_observed": true,
+    "timezone": "Asia/Seoul",
+    "configuration_changed": false
+  }
+}

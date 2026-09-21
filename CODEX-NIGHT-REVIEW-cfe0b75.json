@@ -1,0 +1,92 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "reviewed_at_utc": "2026-09-12T01:06:20.170356+00:00",
+  "submission": "cfe0b7553d51dc7f24485ad2e0d83cbc1da96610",
+  "pin": {
+    "sb_source": "2927afcb10290a180a66190048664bec48d340cd",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-2927afc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "dcf19bebf8863aeb17dd42e4b5a3da07416d89ee",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-dcf19be/source/dist",
+    "jarvis_inventory_sha256": "0e5267bf9d072d53726ee8b76e2665fa0dd46c48c385e83fe0c698158bb16af2",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "evidence_root": "/var/tmp/codex-night-cfe0b75-p1jxcr7c",
+  "findings": [
+    {
+      "id": "M12-restore-writer-gap",
+      "severity": "P1",
+      "location": "Orca-JARVIS src/personal-os-backup.ts:133-147,215-221",
+      "summary": "Exclusive checkpoint closes lock before parking/publishing; a real concurrent SQLite writer commits during restore but its write disappears",
+      "repro": "restore-writer-gap.mjs/.json",
+      "completion": "Maintain effective writer exclusion across all file replacement/verification/recovery stages, including writers entering after initial check. Preserve failure/rollback data and test real writer races with deterministic coordination."
+    },
+    {
+      "id": "B-F-after-harness-fence",
+      "severity": "P2",
+      "location": "scripts/jarvis-restore-acceptance.mjs:242-258,329; GROK-PIN-RECOVERY-RUNBOOK.md",
+      "summary": "Published recovery.env points to authority/key fixture deleted by harness finally; after-harness fresh fence command fails",
+      "repro": "after-harness-recovery-state.json; after-harness-fresh-fence.log",
+      "completion": "Provide persistent isolated recovery materials or a verified trusted bootstrap/restore path; execute exact published procedure after harness exits without operating credentials."
+    },
+    {
+      "id": "M12-evidence-boundaries",
+      "severity": "P2",
+      "summary": "Actual tombstone ID loss and SB receipt retention are now distinguished, but direct chain append is not accepted provider effect; tampered expiration and missing anchors do not prove genuine expiry/schema compatibility",
+      "completion": "Use actual accepted effect/proof path with post-backup revocation/highwater; genuinely signed expired/fresh fences; actual supported/unsupported schema with required synthetic anchors; label scoped durable row evidence accurately."
+    }
+  ],
+  "prior_findings_resolved": [
+    "orphan WAL existing reproduction",
+    "missing/junk backup destination preservation",
+    "SB request ID no longer claimed lost JARVIS proof",
+    "JARVIS tombstone ID set loss and SB receipt retention independently observed",
+    "original A-F/M1-M14 meanings restored; complete implementation still unaccepted"
+  ],
+  "direct_checks": {
+    "backup_tests": 6,
+    "backup_test_seconds": 0.496,
+    "ruff_exit": 0,
+    "tsc_exit": 0,
+    "revoked_keys_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_gates": [
+      0,
+      0,
+      0
+    ],
+    "paired_restore_exit": 0,
+    "after_harness_fresh_fence_exit": 1,
+    "restore_timings": {
+      "failure_began_ms": 1789174970640,
+      "restore_began_ms": 1789174978613,
+      "sb_first_read_ms": 1789174981541,
+      "scoped_available_ms": 1789174982730,
+      "new_write_available_ms": 1789174984061,
+      "restore_probe_ms": 446.653,
+      "restore_to_readable_ms": 2928,
+      "failure_to_first_read_ms": 10901,
+      "failure_to_work_available_ms": 13421,
+      "jarvis_crash_to_reopen_ms": 48,
+      "scenario_ms": 23203
+    },
+    "artifact_integrity": {
+      "sha256": "0e5267bf9d072d53726ee8b76e2665fa0dd46c48c385e83fe0c698158bb16af2",
+      "entries": 34768,
+      "unchanged": true
+    },
+    "sb_python_files_identical": 182,
+    "jarvis_tracked_files_identical": 1137,
+    "rebuilt_js_identical": 1109
+  },
+  "final_acceptance": false,
+  "next_action": "Same Grok approved goal: complete writer exclusion, after-harness recovery preparation and genuine effect/expiry/schema evidence together; maintain30min monitor."
+}

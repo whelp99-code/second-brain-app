@@ -186,9 +186,28 @@ public struct RememberReceipt: Codable, Equatable, Sendable {
     }
 }
 
+public struct RetractReceipt: Codable, Equatable, Sendable {
+    public let deleted: Bool
+    public let indexed: Bool
+    public let restored: Bool
+    public let receiptID: String
+    public let checkedAt: String
+    public let uploadID: String
+
+    enum CodingKeys: String, CodingKey {
+        case deleted
+        case indexed
+        case restored
+        case receiptID = "receipt_id"
+        case checkedAt = "checked_at"
+        case uploadID = "upload_id"
+    }
+}
+
 public struct DesktopCapabilities: Codable, Equatable, Sendable {
     public let fileUpload: Bool
     public let folderSync: Bool
+    public let fileRetract: Bool
     public let runNow: Bool
     public let latestBriefing: Bool
     public let supportedSuffixes: [String]
@@ -197,10 +216,22 @@ public struct DesktopCapabilities: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey {
         case fileUpload = "file_upload"
         case folderSync = "folder_sync"
+        case fileRetract = "file_retract"
         case runNow = "run_now"
         case latestBriefing = "latest_briefing"
         case supportedSuffixes = "supported_suffixes"
         case maxUploadBytes = "max_upload_bytes"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fileUpload = try container.decode(Bool.self, forKey: .fileUpload)
+        folderSync = try container.decode(Bool.self, forKey: .folderSync)
+        fileRetract = try container.decodeIfPresent(Bool.self, forKey: .fileRetract) ?? false
+        runNow = try container.decode(Bool.self, forKey: .runNow)
+        latestBriefing = try container.decode(Bool.self, forKey: .latestBriefing)
+        supportedSuffixes = try container.decode([String].self, forKey: .supportedSuffixes)
+        maxUploadBytes = try container.decode(Int.self, forKey: .maxUploadBytes)
     }
 }
 

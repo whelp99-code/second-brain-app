@@ -1,0 +1,234 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "updated_at": "2026-09-13T07:39:12.536649+00:00",
+  "submission": "069aeaa7c193dbdd177b004767ded559cec1a07f",
+  "overall_acceptance": false,
+  "ordinary_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-069aeaa-080q44i1",
+  "identity": {
+    "sb": {
+      "pin": "6b01c2e6d29b98196fe74ff862fb7ad063d2f137",
+      "archive_sha256": "980f6c6cccd978183fb031fead9202857c7f350370f54ccf9ce5b5e2cce97f2c",
+      "wheel_sha256": "c6278e7ee26dcfb0823b0ef51dcf6c3d57521712f04a6dcab28888eedba08694",
+      "product_files": 183,
+      "wheel_mismatches": [],
+      "installed_mismatches": []
+    },
+    "jarvis": {
+      "pin": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+      "archive_sha256": "1f1beaaf7a15abb645145a9c939a34b6fe13ceb37e1cfadf59aa36643c6eae36",
+      "submitted_source_mismatches": [],
+      "dist_metadata": {
+        "head": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+        "dirty": true,
+        "input_digest": "sha256:00ba6b6d4623d692713cde2bdf673d52914e9273def49adcbba384371a2e5588",
+        "input_file_count": 1407,
+        "toolchain": {
+          "node": "v24.19.0",
+          "modules": "137",
+          "platform": "linux",
+          "arch": "x64",
+          "typescript": "5.9.3"
+        }
+      },
+      "dist_digest": "sha256:c64cfbf1c57f469927a453b1784b05508e33c9186f656a6546de86226e6aff36",
+      "dist_files": 1216,
+      "dist_mismatches": [],
+      "runtime_files": 5787,
+      "runtime_mismatches": [],
+      "runtime_target": "/var/tmp/jarvis-artifact-78e7307/runtime",
+      "runtime_lock_equals_source": true,
+      "launcher_sha256": "b3742f4e511c651b515aaff67a3df069f0cdd60afd5d20862ad49ea4fe9700ce"
+    }
+  },
+  "post_source_check": {
+    "sb": {
+      "head": "069aeaa7c193dbdd177b004767ded559cec1a07f",
+      "mismatches": []
+    },
+    "jarvis": {
+      "head": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+      "mismatches": []
+    }
+  },
+  "checks": [
+    {
+      "name": "sb-tests",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/sb",
+      "exit": 0,
+      "seconds": 5.189135551452637
+    },
+    {
+      "name": "sb-ruff",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/ruff",
+        "check",
+        "--no-cache",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/sb",
+      "exit": 0,
+      "seconds": 0.022818565368652344
+    },
+    {
+      "name": "sb-types",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/basedpyright",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/sb",
+      "exit": 1,
+      "seconds": 1.9350028038024902
+    },
+    {
+      "name": "jarvis-tests",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/memory-postcompact.test.ts",
+        "--no-file-parallelism"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/jarvis",
+      "exit": 0,
+      "seconds": 10.70888090133667
+    },
+    {
+      "name": "jarvis-lint",
+      "argv": [
+        "node",
+        "node_modules/eslint/bin/eslint.js",
+        "src/cli-gjc-commands.ts",
+        "src/cli-control-commands.ts",
+        "src/cli-runtime.mts",
+        "src/cli-host-memory.ts",
+        "src/context-model-transport.ts",
+        "src/index.ts",
+        "tests/integration/memory-postcompact.test.ts",
+        "--max-warnings=0"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/jarvis",
+      "exit": 0,
+      "seconds": 1.5047733783721924
+    },
+    {
+      "name": "jarvis-build",
+      "argv": [
+        "npm",
+        "run",
+        "build:backend"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/jarvis",
+      "exit": 0,
+      "seconds": 9.9638352394104
+    },
+    {
+      "name": "dispatch-normal",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/gjc-dispatch-assemble.test.ts",
+        "--no-file-parallelism",
+        "-t",
+        "sends once from a nested envelope|does not send a duplicate idempotency key|sends once when two nested dispatches"
+      ],
+      "cwd": "/var/tmp/codex-night-069aeaa-080q44i1/jarvis",
+      "exit": 0,
+      "seconds": 5.327150106430054
+    }
+  ],
+  "direct_results": {
+    "sb_hook": "12 passed / 4.64s",
+    "jarvis_hook": "10 passed / 10.28s total",
+    "dispatch_normal": "3 passed / 21 name-excluded / 5.01s total",
+    "ruff": "EXIT0",
+    "sb_types": "0 errors / 12 warnings / EXIT1",
+    "eslint": "EXIT0",
+    "backend_build": "EXIT0 / 9.9638s wall"
+  },
+  "findings": [
+    {
+      "id": "N1",
+      "status": "preserved_limited_consumer_pass_native_unverified",
+      "remaining": "Public next UserPromptSubmit is not automatic in-turn next model request. Not a new implementation assignment."
+    },
+    {
+      "id": "N2",
+      "status": "partial_fix_two_ordinary_failures",
+      "passed": "SB single record exact digest; JARVIS final record_id/digest and synthetic corrected-generation reselect verified",
+      "findings": [
+        {
+          "case": "N2a",
+          "location": "sb/postcompact_hook.py:173-199,213-246",
+          "observed": "Normal two-citation page query OmegaUniqueTarget returns Alpha record_id/version/source_ref labeling snippet containing both Alpha and Omega.",
+          "evidence": "correction-probe.json:two_citation",
+          "completion": "Tie each final excerpt to its actual selected record and matching citation source; preserve selected records in a multi-record page and normal correction/reselect without arbitrary first-record fallback."
+        },
+        {
+          "case": "N2b",
+          "location": "sb/cli.py:295; sb/postcompact_hook.py:263-267",
+          "observed": "Normal source run_ingest/run_compile succeeds; installed PostCompact and UserPromptSubmit fail EXIT1 PermissionError creating generation/.sb/session-memory in standard managed vault, before and after normal correction.",
+          "evidence": "correction-scoped-probe.json",
+          "completion": "Use configured normal mutable session state outside immutable knowledge generations, retaining same-session delivery and ordinary correction/reselect. Do not chmod or modify sealed generations in place, and do not execute held boundary tests."
+        }
+      ]
+    },
+    {
+      "id": "N3",
+      "status": "verified_provided_occurrence_scope",
+      "passed": "Same prompt c1->c2 delivered in installed SB and product JARVIS consumer; exact redelivery suppressed, other session distinguished, consumer EXIT1 followed by EXIT0 succeeds.",
+      "remaining": "No occurrence ID means unresolved host distinction; actual native event contract remains separate."
+    },
+    {
+      "id": "N4",
+      "status": "artifact_pass_documentation_partial",
+      "passed": "Actual AUTH_DB fixed; pre-stop observation vs post-stop exclusion separated; old-binary restart prohibition restored; source-bound new dist and reused runtime verified.",
+      "remaining": "Operations success command still uses 78e7307. SB state/lock/request writer and timer mapping incomplete, PATH-based sb run not tied to selected release, candidate/start/restore command operands and partial switch failure steps not specified.",
+      "locations": [
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:17,31-36,45-46",
+        "deploy/systemd/second-brain.service:10-12",
+        "sb/cli.py:133-136",
+        "CUTOVER-RUNBOOK-14a6ed7-2026-09-10.md:18-25"
+      ],
+      "completion": "Read-only documentation repair from public service/config/parser and existing runbooks. Pin exact new artifact, state/lock/writer and invocation mapping, complete command templates/operands and phase-specific stopped-state/recovery constraints. Keep operating observations, backup hashes and authorization explicitly pending; no held restore/rollback execution."
+    }
+  ],
+  "held": "Original content trigger unknown; no held security/deletion/race/restore-lifetime retry, modification or transfer. Original A-F/M1-M14 unchanged. Scope follows original Codex continuation coordination, not user goal reduction.",
+  "external_inputs": [
+    "actual selected user work/task/source and sharing agents",
+    "isolated native profile/login and actual consumer/session configuration",
+    "real Korean gold and operating corpus/latency target",
+    "operational stop/cutover/backup/timer authorization and RPO/RTO"
+  ],
+  "delivery": {
+    "updated_at": "2026-09-13T07:41:01.384977+00:00",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "accepted": true,
+    "official_resume_command": "/goal resume",
+    "resume_accepted": true,
+    "native_active_observed": true,
+    "screen_cursor": 6070999,
+    "actual_tool_start": "read CODEX-NIGHT-REVIEW-069aeaa.md:1-150",
+    "following_stage_observed": "read sb/postcompact_hook.py:160-279 and correction-probe.json:1-80",
+    "implementation_complete": false,
+    "next": "existing Grok normal N2a/N2b implementation and read-only N4 documentation; one fixed candidate",
+    "evidence": [
+      "delivery-ack.json",
+      "grok-after-delivery.json",
+      "goal-resume-ack.json",
+      "grok-after-resume.json"
+    ]
+  }
+}

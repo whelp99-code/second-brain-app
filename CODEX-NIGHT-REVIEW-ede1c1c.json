@@ -1,0 +1,171 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "updated_at": "2026-09-13T08:07:58.423356+00:00",
+  "submission": "ede1c1ce6a9d354c50625e583d20c6edc3454dff",
+  "overall_acceptance": false,
+  "ordinary_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-ede1c1c-ac33gmxd",
+  "identity": {
+    "sb": {
+      "pin": "b9844efa06d0f9f2a5ea4168755b6621b93650ba",
+      "archive_sha256": "6ce15654f11c04f24f3b465236fadd7afb0c6dbbc80194e0a3305374cec632b6",
+      "wheel_sha256": "f9429a95ed68790c422a8e385aeff190ad49afb8b877c643c09f71e572f2e5fe",
+      "product_files": 183,
+      "wheel_mismatches": [],
+      "installed_mismatches": []
+    },
+    "jarvis": {
+      "pin": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+      "prior_evidence": "/var/tmp/codex-night-069aeaa-080q44i1",
+      "source_mismatches": [
+        "AGENTS.md"
+      ],
+      "artifact_source_mismatches": [],
+      "dist_files": 1216,
+      "dist_digest": "sha256:c64cfbf1c57f469927a453b1784b05508e33c9186f656a6546de86226e6aff36",
+      "dist_mismatches": [],
+      "runtime_files": 5787,
+      "runtime_mismatches": [],
+      "runtime_lock_equal": true,
+      "launcher_sha256": "b3742f4e511c651b515aaff67a3df069f0cdd60afd5d20862ad49ea4fe9700ce",
+      "reexecuted": false
+    }
+  },
+  "checks": [
+    {
+      "name": "sb-tests",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_postcompact_hook.py",
+        "-k",
+        "not test_session_state_uses_state_root_not_generation"
+      ],
+      "cwd": "/var/tmp/codex-night-ede1c1c-ac33gmxd/sb",
+      "exit": 0,
+      "seconds": 4.4470155239105225
+    },
+    {
+      "name": "sb-ruff",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/ruff",
+        "check",
+        "--no-cache",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-ede1c1c-ac33gmxd/sb",
+      "exit": 0,
+      "seconds": 0.021697282791137695
+    },
+    {
+      "name": "sb-types",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/basedpyright",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-ede1c1c-ac33gmxd/sb",
+      "exit": 1,
+      "seconds": 1.8681330680847168
+    }
+  ],
+  "post_source_check": {
+    "head": "ede1c1ce6a9d354c50625e583d20c6edc3454dff",
+    "mismatches": []
+  },
+  "direct_results": {
+    "sb_hook": "13 passed, 1 deselected / 4.05s",
+    "ruff": "EXIT0",
+    "types": "0 errors / 12 warnings / EXIT1",
+    "jarvis_new_tests": 0,
+    "jarvis_rebuild": false
+  },
+  "findings": [
+    {
+      "id": "N1",
+      "status": "preserved_limited_not_native",
+      "detail": "Same JARVIS bytes: preserve prior synthetic consumer/normal correction/dispatch evidence; no repeated build/tests. Native and automatic in-turn next model request remain outside completed scope."
+    },
+    {
+      "id": "N2a",
+      "status": "verified_two_record_matching",
+      "detail": "Corrected harness actual installed hook selects Omega text/record_id/digest/fixture:omega.md and excludes Alpha text/identity. Single record also preserved.",
+      "evidence": [
+        "followup-probe.json",
+        "sb-identity-probe.json"
+      ]
+    },
+    {
+      "id": "N2b",
+      "status": "state_split_verified_source_binding_failed",
+      "passed": "Normal source Alpha->Omega via run_ingest/run_compile succeeds; installed stage/prompt succeed with mutable state outside generation, new record version, old-query no_data and duplicate suppression.",
+      "remaining": "Normal compiled PageSpec frontmatter id is bare docs-note-87c681b2; SearchHit page_id wiki/docs-note-87c681b2 passed to read_page_spec returns None, so both Alpha and Omega context source_ref empty despite valid docs:note.md citations.",
+      "locations": [
+        "sb/postcompact_hook.py:177-200",
+        "sb/vault.py:333-334"
+      ],
+      "evidence": [
+        "correction-probe.json:corrections",
+        "followup-probe.json:source_binding"
+      ],
+      "completion": "Resolve normal compiled page identity/citation association consistently and preserve actual source with selected record at installed hook boundary for normal save/correction. Keep successful state separation, record binding/budgets/retry; do not chmod generations or run held branches."
+    },
+    {
+      "id": "N3",
+      "status": "preserved_and_SB_reverified",
+      "detail": "Same prompt explicit c1/c2, redelivery and normal output retry retained in SB probes; unchanged JARVIS prior evidence preserved."
+    },
+    {
+      "id": "N4",
+      "status": "partially_fixed_documentation_remaining",
+      "passed": "Current JARVIS64715ba command, actual AUTH_DB, PATH warning, session state path, requests writer and archive/destination restore operands added; no operating execution.",
+      "remaining": [
+        "Configured state_root does not dynamically change default request_root; docs claim otherwise. generation locks live under state_root, not generation.json location.",
+        "Timer observations added but stop step excludes timers; stopped service alone does not explain prevention of scheduled reactivation. Pending/lease and SB lock gate not connected to post-stop readiness.",
+        "Two current swaps are independent; first success and second failure contradicts failure row previous current unchanged/new current absent.",
+        "Candidate placeholders not bound to current SB release and J artifact, concrete service start/config and isolated recovery->service mapping still incomplete."
+      ],
+      "locations": [
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:20-23,35-40,49-50",
+        "sb/config.py:176,269-271",
+        "sb/generations.py:595",
+        "sb/generation_locks.py:59",
+        "deploy/systemd/second-brain.timer"
+      ],
+      "completion": "Read-only document repair: exact path derivation, candidate variable bindings, timer/service/writer/lease conditions, full command operands, partial transition matrix with stopped-state and existing no-old-binary constraint. External values should have named slots and stop conditions; no actual operating/restore/held checks."
+    }
+  ],
+  "harness_correction": "Initial plain-vault probes explicitly referenced an empty synthetic registry instead of seeded registry; empty results and IndexError are harness errors, not product failures. Preserved .initial logs. Final multi-record verdict uses followup-probe.json after pointing to existing synthetic seeded registry. Managed pipeline config was fully scoped and unaffected.",
+  "preserved_evidence": "069aeaa J10/dispatch3/build/launcher/consumer/correction; same actual bytes verified, not new executions. Original M11/full/DR/performance scopes and logs retained without rerun.",
+  "held": "Original content trigger unknown; no held security/deletion/race/restore-lifetime retries, modifications or transfer. Original A-F/M1-M14 retained, not user goal reduction.",
+  "external_inputs": [
+    "actual selected work/task/source and sharing agents",
+    "isolated native profile/session/consumer configuration",
+    "real Korean gold/corpus and latency target",
+    "operational stop/cutover/backup/timer authorization and RPO/RTO"
+  ],
+  "delivery": {
+    "updated_at": "2026-09-13T08:10:01.582481+00:00",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "accepted": true,
+    "official_resume_command": "/goal resume",
+    "resume_accepted": true,
+    "native_active_observed": true,
+    "screen_cursor": 6074216,
+    "actual_tool_start": "read CODEX-NIGHT-REVIEW-ede1c1c.md:1-120",
+    "following_stage_observed": "read sb/vault.py:310-339 after review document",
+    "implementation_complete": false,
+    "next": "existing Grok normal compiled source binding and read-only N4 documentation; submit one fixed candidate",
+    "evidence": [
+      "delivery-ack.json",
+      "grok-after-delivery.json",
+      "goal-resume-ack.json",
+      "grok-after-resume.json"
+    ]
+  }
+}

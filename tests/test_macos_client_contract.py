@@ -25,7 +25,7 @@ def _text(path: Path) -> str:
 
 def test_native_client_package_has_core_app_and_tests() -> None:
     manifest = _text(MAC / "Package.swift")
-    assert '.macOS(.v14)' in manifest
+    assert ".macOS(.v14)" in manifest
     assert 'name: "SecondBrainCore"' in manifest
     assert 'name: "SecondBrainMac"' in manifest
     assert 'name: "SecondBrainCoreTests"' in manifest
@@ -59,6 +59,8 @@ def test_mac_api_paths_match_server_paths() -> None:
     server = _text(ROOT / "sb" / "web.py")
     for path in (
         "/api/uploads",
+        "/api/uploads/retract",
+        "/api/retracts/",
         "/api/run",
         "/api/status",
         "/api/search",
@@ -161,8 +163,8 @@ def test_mac_client_imports_core_models_and_uses_dedicated_local_tunnel_port() -
     settings = _text(APP / "AppSettings.swift")
     services = _text(APP / "SystemServices.swift")
     ui = _text(APP / "SecondBrainMacApp.swift")
-    assert 'import SecondBrainCore' in services
+    assert "import SecondBrainCore" in services
     assert 'serverURL = "http://127.0.0.1:18765"' in settings
-    assert 'localPort = 18765' in settings
-    assert 'remotePort = 8765' in settings
-    assert 'Color.secondary' in ui and 'Color.red' in ui
+    assert "localPort = 18765" in settings
+    assert "remotePort = 8765" in settings
+    assert "Color.secondary" in ui and "Color.red" in ui

@@ -1,0 +1,99 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e under overnight independent-review delegation; not original Codex execution",
+  "submission": "c3e1d9f19dd9fd991dd9611b0935e5e78304ad87",
+  "pin": {
+    "sb_source": "f40291839792d6243996490e093dfdacd269c4cc",
+    "release_id": "0025ebe27ec7091c2a824d1594c51bc2537b1423",
+    "wheel_sha256": "ba7713566a93cea4bcee69a81d87e8560bb943efe897cc37269e1e2d7e3c860f",
+    "candidate": "/var/tmp/sb-candidate-missing-state/releases/0025ebe27ec7091c2a824d1594c51bc2537b1423",
+    "jarvis_source": "37b034f",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-37b034f/source/dist",
+    "jarvis_inventory_sha256": "020927977dce50e1f5dd98de59c2a5d70ae0ef7ec1ccbc0215b03f3c1ea0bc53",
+    "jarvis_inventory_entries": 34780,
+    "operational_current": "41f0751",
+    "production_activated": false
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-c3e1d9f-yhvbbfzq",
+  "finished_at_utc": "2026-09-11T16:40:19.865764+00:00",
+  "findings": [
+    {
+      "id": "N1-configured-authority",
+      "priority": "P1",
+      "code": "Orca-JARVIS/src/cli-gjc-commands.ts:195-208",
+      "evidence": [
+        "gjc-fence-confirmation.mjs",
+        "gjc-fence-confirmation.json",
+        "gjc-lifecycle.json"
+      ],
+      "actual": "Production fence with revoked synthetic key denies MEMORY_READ_FENCE_KEY_UNAVAILABLE; dispatch with same read_fence_config sends1 and returns ok. No operational credentials used.",
+      "completion": "Reuse the production authority construction in the public dispatch/session path, bind actual session and current authority/generation at each send, cover configured and callback surfaces, normal/denied/expired/revoked/no_data/compaction/retry and a publicly configured transport entry."
+    },
+    {
+      "id": "N1-concurrent-idempotency",
+      "priority": "P1",
+      "code": "Orca-JARVIS/src/cli-gjc-commands.ts:94-100",
+      "evidence": [
+        "gjc-lifecycle.mjs",
+        "gjc-lifecycle.json"
+      ],
+      "actual": "Two concurrent same-key calls send twice and return same intent_id; serial check is before async send and intent creation after send.",
+      "completion": "Integrate durable per-intent reservation and dispatch lifecycle/recovery; duplicate concurrent invocations must not each transmit unaccounted requests. Test rejection, failed/uncertain delivery, replay and restart with authoritative state."
+    },
+    {
+      "id": "N3-reader-writer-recovery",
+      "priority": "P2",
+      "code": "sb/revoked_keys.py:37-56,105-115,118-152",
+      "evidence": [
+        "reader-writer.py",
+        "reader-writer.json"
+      ],
+      "actual": "Reader lock .revoked.lock differs from writer lock revoked-jarvis-signing-key-ids.lock; reader recovery replaces shared marker temp during writer, writer gets FileNotFoundError. Both keys retained in this repro.",
+      "completion": "Use coherent ownership for readers/writers/recovery with safe temp lifecycle and durability. Cover process concurrency and crash/restart without nested-lock deadlock. Existing harness intentionally requires old reader to proceed during writer; adapt synchronization for corrected shared locking rather than counting harness timeout as product failure."
+    }
+  ],
+  "direct_checks": {
+    "sb_python_files_equal": 182,
+    "jarvis_tracked_files_equal": 1134,
+    "jarvis_rebuilt_js_equal": 585,
+    "focused_pytest": {
+      "passed": 24,
+      "seconds": 19.32
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "scope": "changed sb/revoked_keys.py",
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "jarvis_tsc_exit": 0,
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "normal_nested_dispatch_sends": 1,
+    "invalid_dispatch_sends": 0,
+    "retry_revoked_sends": 1,
+    "revoked_config_dispatch_sends": 1,
+    "concurrent_duplicate_sends": 2
+  },
+  "grok_log_observation": {
+    "path": "/var/tmp/sb-full-pytest-f402918.log",
+    "sha256": "20be799fae18a536fbf34f36f95bd4fdc948c4a793457b3c7e9b4f5f69530d1e",
+    "tail": "........... [ 98%]\n................................                                         [100%]\n1830 passed, 2 skipped in 632.33s (0:10:32)\nEXIT:0\n",
+    "execution": "Grok existing log inspected; not a Codex full rerun"
+  },
+  "inherited_gaps": [
+    "M6 integrated writer exclusion/cutover rollback rehearsal; compatibility helper test alone does not verify whole requirement",
+    "M12 cold original/control loss, RPO/RTO and post-restore ordinary business write",
+    "M5/native and M8 independent fixtures must be separated from real-user authentication external conditions",
+    "A-F and original M1-M14 evidence scope unchanged; prior reports retained"
+  ],
+  "preserved_prior_evidence": {
+    "CODEX-NIGHT-REVIEW-a7df330": "Actual browser failure/correction/re-run pages1 with retained failure on that fixed tree; harness in-memory config correction, not persistent GUI/operational config acceptance",
+    "CODEX-NIGHT-REVIEW-7d97af7": "MCP existing-page mutation stale needle0 and sampled server RSS; actual JARVIS isolated delete/restore/two clients/second delete+restore. Does not complete user correction lineage, full cold DR, or new ordinary write; not rerun here"
+  },
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}

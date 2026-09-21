@@ -1,0 +1,112 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e under overnight independent-review delegation; not original Codex execution",
+  "submission": "a005f59f2c321dd9f919fb43aa1ff0630f7bee53",
+  "pin": {
+    "sb_source": "8db46c59f249ff2da483336c0ec3318e2d317859",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-8db46c5/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "bcb47af",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-bcb47af/source/dist",
+    "jarvis_inventory_sha256": "964aeaa543b30c7bde6e2dfb988586261801979fd6669490052990dc5994d632",
+    "jarvis_inventory_entries": 34780,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-a005f59-0nyj9qkh",
+  "finished_at_utc": "2026-09-11T18:06:02.022831+00:00",
+  "findings": [
+    {
+      "id": "N1-reclaim-owner-fencing",
+      "priority": "P1",
+      "code": "Orca-JARVIS/src/gjc-intent-store.ts reserveGjcIntent prior-lease branch",
+      "evidence": [
+        "dispatch-reclaim-race.mjs",
+        "dispatch-reclaim-race.json",
+        "dispatch-live-expiry.mjs",
+        "dispatch-live-expiry.json"
+      ],
+      "actual": "Takeover writes old lease_owner due to shadowed owner variable; two requests after real child exit send twice. Alive owner with delayed first send plus command clock+61s also permits second send; both succeed same intent without fencing.",
+      "completion": "New owner identity and fencing/renewal/settlement must be coherent across initial reserve/takeover/expiry/late old-worker success/failure. Cover multiple processes and uncertain send/receipt before crash without blind repeats."
+    },
+    {
+      "id": "M6-recovery-not-successful",
+      "priority": "P2",
+      "evidence": [
+        "m6-observed.json",
+        "m6-corrected-config.json",
+        "source/scripts/isolated-m6-writer-cutover.py"
+      ],
+      "actual": "Busy exclusion passes; holder actually exits on stdin, not kill. After release run_all failed pages0/errors1/exit1. Test only asserts already_runningfalse. Store-blind previous remains a stub; actual failed switch/recovery not exercised.",
+      "completion": "Correct isolated fixture inputs and establish real successful product work after failure/recovery, verify committed output and preserved revocation/authority, exercise actual isolated transition failure and safe recovery. Do not generalize fixture setup failure to operational defect."
+    },
+    {
+      "id": "M12-cold-scope-insufficient",
+      "priority": "P2",
+      "evidence": [
+        "m12-observe.py",
+        "m12-observed.json",
+        "source/tests/test_cold_restore_write.py"
+      ],
+      "actual": "Only .sb/knowledge-registry.sqlite removed; no generation/request/control DB loss. New write is tests.knowledge.commit_page+stamp_knowledge. Timing starts before backup and ends before post-write, not usable-service RTO; RPO field only backup timestamp.",
+      "completion": "Create representative isolated runtime backup with real provider/control journals and tombstones, lose stated originals/control stores, restore via product recovery path, perform new normal write/read and verify no resurrection; measure actual data-loss bound and time until usable service."
+    }
+  ],
+  "direct_checks": {
+    "sb_python_files_equal": 182,
+    "sb_product_unchanged_since_f94d073": true,
+    "jarvis_product_tracked_equal": 1137,
+    "jarvis_tsc_exit": 0,
+    "jarvis_rebuilt_js_equal": 1109,
+    "jarvis_focused_tests": {
+      "passed": 8,
+      "duration_seconds": 7.88,
+      "test_seconds": 4.78
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "dead_worker_single_retry_sends": 1,
+    "reclaimed_worker_concurrent_sends": 2,
+    "alive_worker_expired_lease_sends": 2,
+    "m6_fixture_exit": 0,
+    "m6_actual_post_release_run_exit": 1,
+    "m12_fixture_exit": 0,
+    "m12_actual_removed_files": [
+      ".sb/knowledge-registry.sqlite"
+    ]
+  },
+  "existing_log_observations": {
+    "/var/tmp/sb-full-pytest-8db46c5.log": {
+      "sha256": "c95170632f5360e280b4f52005a47e77d2a804623a3466a62a385dd0be351bd5",
+      "tail": "....................................................................... [ 86%]\n........................................................................ [ 90%]\n........................................................................ [ 94%]\n........................................................................ [ 98%]\n..................................                                       [100%]\n1832 passed, 2 skipped in 608.01s (0:10:08)\nEXIT:0\n",
+      "existing_log_observed": true
+    },
+    "/var/tmp/m6-writer-cutover.json": {
+      "sha256": "1b60b84d6e8be50dbbdb7c8db8d08f67c7fa296483d95495aece5c4a491fd4c6",
+      "tail": "er_kill_busy\": false,\n  \"after_kill_status\": \"failed\",\n  \"denied_store_blind\": {\n    \"state_root\": \"/var/tmp/sb-m6w-fft91vh4/state\",\n    \"previous_release\": \"/var/tmp/sb-m6w-fft91vh4/store-blind\",\n    \"revocation_store_present\": true,\n    \"previous_reads_revocation_store\": false,\n    \"allowed\": false,\n    \"reason\": \"ROLLBACK_UNSAFE_REVOCATION_STORE\"\n  },\n  \"revocation_keys\": [\n    \"key:test\"\n  ],\n  \"lock_root\": \"/var/tmp/sb-m6w-fft91vh4/state\"\n}\n",
+      "existing_log_observed": true
+    },
+    "/var/tmp/m12-cold-restore-write.json": {
+      "sha256": "01d13758fbaf67c2ecda0c70edd77b51641842c8b36c319d3e1ebbd177a4812e",
+      "tail": "{\n  \"rpo_backup_at\": \"2026-09-11T17:52:51.302340+00:00\",\n  \"rto_seconds\": 0.0225,\n  \"pre_hits\": [\n    \"wiki/pre-backup\"\n  ],\n  \"post_hits\": [\n    \"wiki/post-restore\"\n  ],\n  \"live_sqlite_removed\": true,\n  \"cutover\": false\n}\n",
+      "existing_log_observed": true
+    }
+  },
+  "preserved_scope": [
+    "Previous normal/denied/configured-revocation/transport-correction/concurrent first lease pass repeated on submitted dist",
+    "SB unchanged wheel/product bytes; no needless repeated full or prior lock tests",
+    "Original A-F/M1-M14 and V1 actual session/compaction connection limits unchanged; earlier N2/N4/M11/M12 passes remain bounded to observed routes"
+  ],
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}

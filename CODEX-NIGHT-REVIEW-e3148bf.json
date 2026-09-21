@@ -1,0 +1,111 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "original_codex_direct_execution": false,
+  "submission": "e3148bf85f04e74b6474be90aae7b22821b053b6",
+  "pin": {
+    "sb_source": "32e58fe3031649221a8694ef967d036c2d2ece50",
+    "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
+    "candidate": "/var/tmp/sb-candidate-32e58fe/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "finished_at_utc": "2026-09-12T10:36:56.769971+00:00",
+  "verdict": "not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "closed_prior_findings": [
+    "F-frozen-harness-missing-seed",
+    "M12-final-state-stale-success",
+    "M12-cold-test-nondeterministic-brief"
+  ],
+  "findings": [
+    {
+      "id": "E-F-original-executable-remainder",
+      "severity": "P2",
+      "locations": [
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:55",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:117",
+        "CURSOR-HANDOFF-2026-09-10.md:156",
+        "GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md:115"
+      ],
+      "actual": "Original M13 whole GUI lifecycle still explicitly missing deletion path. Package declares executable remainder but worker completed. M11 concurrent read/correction is labeled operating input although isolated part can run without production data. Previously passed actual UI and read-surface cases are preserved; no new defect inferred for unchanged product.",
+      "completion": "Finish authorized isolated original GUI lifecycle and executable concurrency/read-surface remainder with product entry points and actual results; preserve scoped/native boundaries, previous passes and failure history. If a row is already covered, link exact prior evidence and unchanged bytes rather than rerun. Only actual missing external input remains external; do not wait for local commit permission or new Codex answer. No new unrelated UI/features."
+    },
+    {
+      "id": "F-final-handoff-reproducibility",
+      "severity": "P2",
+      "locations": [
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:69",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:82",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:97",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:117"
+      ],
+      "actual": "Package mixes qku1N6/harness36 with older kJ4UcY and timing numbers, still instructs uncommitted harness+gates on explicit request, uses mutable workspace JARVIS dist reproduction despite frozen artifact table. Runbook pin corrected in e3148bf but does not reconcile these main-entrypoint contradictions.",
+      "completion": "Reconcile the single final entrypoint with exact frozen source/harness/runtime/build/artifact commands, logs, measured phase-specific timing and remaining operational prerequisites. Preserve previous logs as historical, remove obsolete waiting text, distinguish third scoped read from provider request replay. No operations action required."
+    }
+  ],
+  "checks": {
+    "identity": "182 SB .py equal source/wheel/installed; JARVIS34768inventory before/after equal",
+    "paired": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-1bf7210-qoro55_0/paired.log"
+    },
+    "expired_required_recovery_fence": {
+      "exit": 1,
+      "expected": "TOMBSTONE_FENCE_REQUIRED",
+      "log": "/var/tmp/codex-night-1bf7210-qoro55_0/expired.log"
+    },
+    "cold_pytest": {
+      "exit": 0,
+      "summary": "1 passed in3.94s",
+      "log": "/var/tmp/codex-night-1bf7210-qoro55_0/cold.log",
+      "adaptation": "Only evidence output destination changed in archived review test; all original assertions maintained"
+    },
+    "ruff": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-1bf7210-qoro55_0/ruff.log"
+    },
+    "installed_gates": {
+      "standard": 0,
+      "work": 0,
+      "maintenance": 0
+    },
+    "final_fresh_scoped_sessions": {
+      "exit": 0,
+      "result": "/var/tmp/codex-night-1bf7210-qoro55_0/final-state-scopes.json",
+      "independent_revocations": 2
+    },
+    "request_replay": {
+      "exit": 0,
+      "result": "/var/tmp/codex-night-1bf7210-qoro55_0/retry-result.json",
+      "same_status_proof_generation": true,
+      "proved_count_before": 7,
+      "proved_count_after": 7,
+      "apply_state": "idle/NO_PENDING_REQUEST"
+    }
+  },
+  "prior_result_retained": {
+    "source_product_bytes": "unchanged from e68d5e5",
+    "full_pytest": "1837 passed,1 failed,2 skipped; no new full run; failed cold test focused correction now1pass",
+    "changed_types": "prior0errors0warnings; not rerun",
+    "actual_ui": "prior e68 actual remember400→201/conflict400→200 with inbox/git; not rerun",
+    "jarvis_tests": "prior8backup/tsc; not rerun"
+  },
+  "harness_error_excluded": "First review replay assertion wrongly expected None; actual API returns idle/NO_PENDING_REQUEST. Corrected assertion passes. Original log preserved. No product bug counted.",
+  "scope_limit": "Synthetic authority callback and fixture keys, actual product MCP/request executor path; no native/operational authentication. final_fresh_read submitted helper scans all generation files, so Codex used fresh actual2scoped sessions instead of treating file helper as active-generation proof.",
+  "provenance": {
+    "initial_archive": "1bf7210bdc1acaca6b33fc0a8049151562737e24",
+    "final_submission": "e3148bf85f04e74b6474be90aae7b22821b053b6",
+    "only_difference": [
+      "GROK-PIN-RECOVERY-RUNBOOK.md"
+    ],
+    "source_tests_harness_identical": true,
+    "note": "Checks exercise frozen32e58fe artifacts. Final submission adds runbook only; no source-change result carryover."
+  },
+  "evidence_root": "/var/tmp/codex-night-1bf7210-qoro55_0",
+  "monitor_evidence_note": "/var/tmp/codex-night-1bf7210-qoro55_0/monitor-provenance-note.json"
+}

@@ -1,0 +1,264 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "original_codex_direct_execution": false,
+  "submission": "b9fc3d40c5e156883e89bf2927a5623dda44483a",
+  "pin": {
+    "sb_source": "034804ecfd8bb7d7aaa44bb56817cd5b83e0c3d1",
+    "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
+    "candidate": "/var/tmp/sb-candidate-034804e/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "finished_at_utc": "2026-09-12T11:05:38.322966+00:00",
+  "verdict": "not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "findings": [
+    {
+      "id": "M13-http-test-is-not-GUI-deletion-lifetime",
+      "severity": "P2",
+      "locations": [
+        "tests/test_web.py:528",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:55",
+        "CURSOR-HANDOFF-2026-09-10.md:156"
+      ],
+      "actual": "New test passes9Python HTTP requests, including retention GET but no deletion or browser controls. OriginalM13 deletion/body/receipt/failure-recovery lifetime remains missing; package still says noGUIdeletecontrol. Prior realChrome remember/correct flows remain passed, not expanded.",
+      "completion": "Complete original authorized minimumGUIdeletion/body/receipt lifecycle through existing product request/execution/receipt contracts and actual browser in synthetic fixtures. Missing minimum control required by originalM13 is authorized implementation, not an unrelated new feature. Preserve failures and verify correction/deletion effects in source/search/scoped read. Keep live timer/native/real data separately blocked."
+    },
+    {
+      "id": "M11-read-batches-do-not-test-concurrent-correction",
+      "severity": "P2",
+      "locations": [
+        "tests/test_scoped_search.py:97",
+        "tests/test_scoped_search.py:111",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:53"
+      ],
+      "actual": "Observer recorded allowed4 then denied4; all allowed complete before any denied=True. Same-scope queries can run concurrently but no cross-scope overlap, writer/correction/generation update or actualMCP exists in this test. HTTP search before/after uses unchangedTERM.",
+      "evidence": "test-observation.json; observer.py forwards originals unchanged; no sleeps/mocked results",
+      "completion": "Use isolated realMCP clients and accepted product correction/update with deterministic synchronization to exercise reads while write commits; verify new generation/version/body and oldversion exclusion plus deniedscope invariants. Preserve existing helper scope checks as limited passes; no need operating corpus for this isolated contract."
+    },
+    {
+      "id": "F-source-log-and-timing-mismatch",
+      "severity": "P2",
+      "locations": [
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.json:18",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:84",
+        "GROK-RESUME-STATUS-2026-09-11.md:5"
+      ],
+      "actual": "Package gates.log is sb-gates-32e58fe.log but harness_commit declares034804e; qku1N6 actualRTO1958/9418/46 differs from reported2092/9740/48. Resume still32e58fe. WorkspaceJARVISdist and oldfixturelabel were improved, but source/log/timing mapping remains inconsistent.",
+      "completion": "Use one source of truth for frozen version/runtime/build/commands/logs and phase-specific measurements. Mark carried-forward unchanged-byte checks as historical, do not relabel their source. Incorporate new direct evidence with exact limits; reconcile status and operational runbook without operations execution."
+    }
+  ],
+  "checks": {
+    "identity": {
+      "manifest": {
+        "schema": 1,
+        "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+        "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
+        "release_id_scheme": "sb-release-inputs-v3",
+        "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+        "preparation_files_sha256": {
+          "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+          "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+          "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+        },
+        "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+        "source_commit": "034804ecfd8bb7d7aaa44bb56817cd5b83e0c3d1",
+        "source_tree": "b37d0fe6c60bd5c8c50bfbeea76528014b58540a",
+        "source_materialization": "git-archive",
+        "working_tree_modified": true,
+        "contract_profile": "task32-schema4",
+        "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+      },
+      "python_count": 182,
+      "mismatch": [],
+      "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
+      "jarvis_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+      "jarvis_entries": 34768
+    },
+    "new_tests": "2passed5.42s EXIT0",
+    "ruff": "EXIT0",
+    "installed_standard": "EXIT0",
+    "changed_test_types": "5errors122warnings EXIT1",
+    "same_baseline_test_types": "5errors106warnings EXIT1; same5errorlocations,16additionalwarnings",
+    "observation": {
+      "pytest_exit": 0,
+      "events": [
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/remember",
+          "method": "POST",
+          "start": 2662778000339551,
+          "thread": "MainThread",
+          "end": 2662778003668937
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/remember",
+          "method": "POST",
+          "start": 2662778003677998,
+          "thread": "MainThread",
+          "end": 2662778005117610
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/pages/wiki%2F%EA%B3%84%EC%95%BD-%EC%9D%BC%EC%A0%95",
+          "method": "GET",
+          "start": 2662778005300380,
+          "thread": "MainThread",
+          "end": 2662778008880364
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/conflicts/web-case/resolve",
+          "method": "POST",
+          "start": 2662778008885414,
+          "thread": "MainThread",
+          "end": 2662778009524131
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/conflicts/web-case/resolve",
+          "method": "POST",
+          "start": 2662778009532451,
+          "thread": "MainThread",
+          "end": 2662778021177710
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/retention",
+          "method": "GET",
+          "start": 2662778021181530,
+          "thread": "MainThread",
+          "end": 2662778023505699
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/changes?days=7",
+          "method": "GET",
+          "start": 2662778023509619,
+          "thread": "MainThread",
+          "end": 2662778026561235
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/search?q=%EC%9B%B9%EC%BD%98%EC%86%94%EA%B3%84%EC%95%BD%EA%B2%80%EC%83%89&kind=wiki",
+          "method": "GET",
+          "start": 2662778026591006,
+          "thread": "MainThread",
+          "end": 2662778058340645
+        },
+        {
+          "target": "_request",
+          "scope": null,
+          "url": "http://127.0.0.1:43805/api/search?q=%EC%9B%B9%EC%BD%98%EC%86%94%EA%B3%84%EC%95%BD%EA%B2%80%EC%83%89&kind=wiki",
+          "method": "GET",
+          "start": 2662778058376405,
+          "thread": "MainThread",
+          "end": 2662778061573730
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:a',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780082145071,
+          "thread": "ThreadPoolExecutor-0_2",
+          "end": 2662780111634601
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:a',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780080517169,
+          "thread": "ThreadPoolExecutor-0_0",
+          "end": 2662780113784052
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:a',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780082837799,
+          "thread": "ThreadPoolExecutor-0_3",
+          "end": 2662780115194915
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:a',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780081047467,
+          "thread": "ThreadPoolExecutor-0_1",
+          "end": 2662780118214552
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:b',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780119209968,
+          "thread": "ThreadPoolExecutor-0_3",
+          "end": 2662780150425630
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:b',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780118563510,
+          "thread": "ThreadPoolExecutor-0_0",
+          "end": 2662780152256741
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:b',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780119325298,
+          "thread": "ThreadPoolExecutor-0_1",
+          "end": 2662780152784389
+        },
+        {
+          "target": "search_scoped_records",
+          "scope": "SourceAccess(owner='principal:owner', projects=('project:b',), policy_revision='1')",
+          "url": null,
+          "method": null,
+          "start": 2662780118474731,
+          "thread": "ThreadPoolExecutor-0_2",
+          "end": 2662780152997858
+        }
+      ],
+      "allowed_count": 4,
+      "denied_count": 4,
+      "all_allowed_finished_before_any_denied": true,
+      "http_request_count": 9
+    }
+  },
+  "retained": "SBproduct/JARVIS/restoreharness unchanged: previous paired/expired/fresh2scopes/provider-retry/cold/UI/3gates/type scopes retained, no new fullsuite. Earlier full1837passed1failed2skipped not rewritten as pass.",
+  "new_product_regression_proven": false,
+  "evidence_root": "/var/tmp/codex-night-b9fc3d4-vhasiswh",
+  "external_inputs": [
+    "Live/native authenticated profile/session/copy/compaction paths",
+    "Real user work/source/gold Korean questions",
+    "Operational corpus/backups/cutover authorization and operating timer"
+  ],
+  "remaining_executable": [
+    "OriginalM13 isolatedGUIwholelifecycle",
+    "OriginalM11 actualMCPconcurrentcorrection",
+    "F exact current handoff evidence"
+  ]
+}

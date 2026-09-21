@@ -1,0 +1,253 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "updated_at": "2026-09-13T07:12:53.435459+00:00",
+  "submission": "b2790682dc9248ff3c3e9183981fb16e28897f5f",
+  "overall_acceptance": false,
+  "ordinary_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-b279068-zv9rn1hc",
+  "identity": {
+    "sb": {
+      "pin": "e02636e0c1ad8492b4698d39ce6723e97954e3bc",
+      "archive_sha256": "efbfd2d7f491a8b7ad8735aa24c1e56fc898ebdf79802f1a53f8b1756743dfa0",
+      "wheel_sha256": "b61a5b67ebf6a47df3b2ccc0add16a6bbb802ca391fdb3cada72ce0dfc7ad70c",
+      "product_files": 183,
+      "wheel_mismatches": [],
+      "installed_mismatches": []
+    },
+    "jarvis": {
+      "pin": "78e73077469d1d6067c46f9a7bb26966969fe570",
+      "archive_sha256": "907ef3da600d25202b758e6f02220f9df4daccb5fd9c50d749a08d1c96fcad42",
+      "submitted_source_mismatches": [],
+      "dist_metadata": {
+        "head": "78e73077469d1d6067c46f9a7bb26966969fe570",
+        "dirty": true,
+        "input_digest": "sha256:332451776c0dc131fa5b9153555aad0423472e3d36b1996dd4733a9807548ace",
+        "input_file_count": 1407,
+        "toolchain": {
+          "node": "v24.19.0",
+          "modules": "137",
+          "platform": "linux",
+          "arch": "x64",
+          "typescript": "5.9.3"
+        }
+      },
+      "dist_digest": "sha256:b5155a53b22c87eace13f72095a1f6b9f50df3164bb37200a17ef62c3959929a",
+      "dist_files": 1216,
+      "dist_mismatches": [],
+      "runtime_files": 5787,
+      "runtime_map_sha256": "fa4a8c9d972a0f86e8d03ad1283f9e409e996e5f0586aaf587ad5b59255de518",
+      "launcher_sha256": "b3742f4e511c651b515aaff67a3df069f0cdd60afd5d20862ad49ea4fe9700ce",
+      "lock_equal": true
+    }
+  },
+  "post_source_check": {
+    "sb": {
+      "head": "b2790682dc9248ff3c3e9183981fb16e28897f5f",
+      "mismatches": []
+    },
+    "jarvis": {
+      "head": "78e73077469d1d6067c46f9a7bb26966969fe570",
+      "mismatches": []
+    }
+  },
+  "checks": [
+    {
+      "name": "sb-tests",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/sb",
+      "exit": 0,
+      "seconds": 4.906302213668823
+    },
+    {
+      "name": "sb-ruff",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/ruff",
+        "check",
+        "--no-cache",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/sb",
+      "exit": 0,
+      "seconds": 0.009693622589111328
+    },
+    {
+      "name": "sb-types",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/basedpyright",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/sb",
+      "exit": 1,
+      "seconds": 1.7912359237670898
+    },
+    {
+      "name": "jarvis-tests",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/memory-postcompact.test.ts",
+        "--no-file-parallelism"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/jarvis",
+      "exit": 0,
+      "seconds": 9.956474304199219
+    },
+    {
+      "name": "jarvis-lint",
+      "argv": [
+        "node",
+        "node_modules/eslint/bin/eslint.js",
+        "src/cli-gjc-commands.ts",
+        "src/cli-control-commands.ts",
+        "src/cli-runtime.mts",
+        "src/cli-host-memory.ts",
+        "src/context-model-transport.ts",
+        "src/index.ts",
+        "tests/integration/memory-postcompact.test.ts",
+        "--max-warnings=0"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/jarvis",
+      "exit": 0,
+      "seconds": 1.373138189315796
+    },
+    {
+      "name": "jarvis-build",
+      "argv": [
+        "npm",
+        "run",
+        "build:backend"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/jarvis",
+      "exit": 0,
+      "seconds": 9.995603322982788
+    },
+    {
+      "name": "dispatch-normal",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/gjc-dispatch-assemble.test.ts",
+        "--no-file-parallelism",
+        "-t",
+        "sends once from a nested envelope|does not send a duplicate idempotency key|sends once when two nested dispatches"
+      ],
+      "cwd": "/var/tmp/codex-night-b279068-zv9rn1hc/jarvis",
+      "exit": 0,
+      "seconds": 5.112633466720581
+    }
+  ],
+  "direct_test_results": {
+    "sb_hook": "11 passed / 4.52s",
+    "jarvis_hook": "9 passed / 9.49s total",
+    "dispatch_normal": "3 passed, 21 deselected by name / 4.76s total",
+    "ruff": "EXIT0",
+    "sb_types": "0 errors / 12 warnings / EXIT1",
+    "eslint": "EXIT0",
+    "backend_build": "EXIT0 / 9.9956s wall"
+  },
+  "findings": [
+    {
+      "id": "N1",
+      "status": "ordinary_consumer_boundary_verified_native_unverified",
+      "evidence": [
+        "jarvis-probe.json",
+        "consumer-accepted.jsonl",
+        "sb-probe.json"
+      ],
+      "locations": [
+        "src/context-model-transport.ts:49",
+        "src/cli-host-memory.ts:5"
+      ],
+      "remaining": "Synthetic host command consumer accepts assembled same-session request after validating JSON; not native next model request. SB PostCompact -> next UserPromptSubmit is a supported limited path; automatic in-turn next request remains public-contract constraint. No forced implementation of undocumented event."
+    },
+    {
+      "id": "N2",
+      "status": "partially_fixed_not_accepted",
+      "evidence": [
+        "sb-identity-probe.json",
+        "jarvis-probe.json",
+        "sb-probe.json"
+      ],
+      "locations": [
+        "sb/postcompact_hook.py:169",
+        "src/cli-gjc-commands.ts:283",
+        "src/context-assembler.ts:182"
+      ],
+      "remaining": "SB version is first SourceCite CAS hash, not committed MemoryRecord digest. JARVIS normalized excerpt digest becomes version and sid becomes memory_ref; original record_id/digest lost at final consumer boundary.",
+      "completion": "Preserve actual selected record identity, source association and record version through final serialization, separately from source-content/excerpt hashes; normal correction/reselection changes record identity correctly. Preserve successful stdout retry, budget and no_data."
+    },
+    {
+      "id": "N3",
+      "status": "partially_fixed_not_accepted",
+      "evidence": [
+        "sb-identity-probe.json",
+        "jarvis-probe.json"
+      ],
+      "locations": [
+        "sb/postcompact_hook.py:155",
+        "src/cli-gjc-commands.ts:427"
+      ],
+      "remaining": "prompt_id takes precedence and discards distinct explicit compaction_id. Same session/prompt/summary c1 then c2 gets duplicate in SB installed CLI and JARVIS dispatcher.",
+      "completion": "Distinguish explicit occurrence ID within same prompt from redelivery; keep session separation and failed-consumer retry. Document no-occurrence-ID limitation without inventing native event ID."
+    },
+    {
+      "id": "N4",
+      "status": "artifact_fixed_operations_not_accepted",
+      "evidence": [
+        "identity.json",
+        "runtime-files.json",
+        "dist-rebuild-comparison.json",
+        "submitted-cli-help.json",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md"
+      ],
+      "locations": [
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:15",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:23",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:37",
+        "deploy/jm-jarvis.service:12 (JARVIS)",
+        "CUTOVER-RUNBOOK-3D36C40-2026-09-11.md:7"
+      ],
+      "remaining": "Wrong DB beneath binary release; old-binary restart instruction contradicts existing no-automatic-rollback constraint. SB state/writer/config paths and exact approved-later failure steps remain placeholders.",
+      "completion": "Read-only documentation repair from existing service/config/parser contracts: actual DB/state roots, before-stop observations vs after-stop exclusion, service/current/config mapping and stage-specific stop/recovery constraints; preserve held rollback lifetime as unverified. Do not run operating or held checks."
+    }
+  ],
+  "held_branches": "unverified; not retried/modified/transferred. Trigger of old content notice unknown. Original Codex continuation coordination, not user goal reduction. Original A-F/M1-M14 unchanged.",
+  "external_inputs": [
+    "selected actual user work/task/source and sharing agents",
+    "isolated native profile/login and actual session consumer configuration; no copying operating auth/config",
+    "real Korean gold/corpus and latency target",
+    "operational stop/cutover/backup/timer authorization and RPO/RTO"
+  ],
+  "preserved_prior": "16a5a18 normal budget/dispatch and older A-F/M1-M14 limited evidence retain original pins/logs. No unchanged full regression/DR/performance or held lifetime rerun.",
+  "delivery": {
+    "updated_at": "2026-09-13T07:14:27.972413+00:00",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "accepted": true,
+    "official_resume_command": "/goal resume",
+    "resume_accepted": true,
+    "native_active_observed": true,
+    "screen_cursor": 6067144,
+    "actual_tool_start": "read CODEX-NIGHT-REVIEW-b279068.md and .json",
+    "following_stage_observed": "read JARVIS deploy/jm-jarvis.service:1-25 and SB CUTOVER-RUNBOOK-3D36C40-2026-09-11.md:1-30",
+    "implementation_complete": false,
+    "next": "existing Grok addresses ordinary N2/N3 and documentation N4; fixed handoff required",
+    "evidence": [
+      "delivery-ack.json",
+      "grok-after-delivery.json",
+      "goal-resume-ack.json",
+      "grok-after-resume.json"
+    ]
+  }
+}

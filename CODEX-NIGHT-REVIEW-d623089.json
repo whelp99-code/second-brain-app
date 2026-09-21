@@ -1,0 +1,167 @@
+{
+  "submission": "d62308945e7905f72f9395861c60b6c4041674ef",
+  "pin": {
+    "sb_source": "cf1c021dfa9fb15ac5dffbe619e42f6d3cdf4186",
+    "release_id": "9680e4fe7f1ea81ea81031bebbea8700346c12c3",
+    "wheel_sha256": "8f7a8420bb790ef52dec3d557eb5c5a5bdda4bd5df9b312c9c7f7a088bf88948",
+    "candidate": "/var/tmp/sb-candidate-cf1c021/releases/9680e4fe7f1ea81ea81031bebbea8700346c12c3",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "reviewer": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "review_finished_at_utc": "2026-09-12T13:11:44.018134+00:00",
+  "verdict": "not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-d623089-cjrac1ji",
+  "findings": [
+    {
+      "id": "discard-race-fifo",
+      "priority": "P2",
+      "location": "sb/inbox.py:72",
+      "evidence": [
+        "race.json",
+        "discard-safety.json"
+      ],
+      "observed": "Original outside-vault P1 fixed; target replacement deleted, FIFO blocks before regular-file check",
+      "completion": "Safe race/refusal and nonblocking special-file validation plus recovery"
+    },
+    {
+      "id": "M13-delete-restore-lifetime",
+      "priority": "P2",
+      "location": "sb/vault.py:284; sb/web.py:502",
+      "evidence": [
+        "ui-result.json",
+        "scoped-forget.json"
+      ],
+      "observed": "Actual GUI400->200/commit/search0/reprocess0, newscoped0; pre-delete synthetic backup restore search1; tombstone0",
+      "completion": "Connect original deletion/source/receipt/scoped/reingress/restore contract; physical source retention alone not a bug"
+    },
+    {
+      "id": "M11-barrier-body-contract",
+      "priority": "P2",
+      "location": "tests/test_mcp_generation_overlap.py:64",
+      "evidence": [
+        "mcp-observation-first.json",
+        "mcp-observation.json",
+        "mcp-uninstrumented.log"
+      ],
+      "observed": "Observed twice writer0/barrier broken/samegeneration; original pass once; allowed assertion removed and no correctedbody assertion",
+      "completion": "Deterministic read/commit overlap with valid early deny, thread exception propagation, corrected body/version and old exclusion"
+    },
+    {
+      "id": "F-state-harness-gates",
+      "priority": "P2",
+      "location": "GROK-RESUME-STATUS-2026-09-11.md:5; scripts/isolated-browser-m13-lifetime.py:237",
+      "evidence": [
+        "ruff.log",
+        "submitted-browser/evidence.json"
+      ],
+      "observed": "RuffF841; stale16f pending/c519/noGUI state; ChromeEXIT0 despite conflict_fail=false",
+      "completion": "Exact pins/run provenance and required negative/positive actual response assertions"
+    }
+  ],
+  "closed_prior": [
+    "P1 outside-vault parent symlink unlink",
+    "actual GUI compiled forget and current owner/scoped search exclusion",
+    "Chrome run outcome assertions",
+    "a4b unchanged-product false statement corrected"
+  ],
+  "direct_checks": {
+    "related": {
+      "passed": 84,
+      "seconds": 21.37,
+      "exit": 0
+    },
+    "mcp_observed_first": {
+      "failed": 1,
+      "warnings": 1,
+      "seconds": 35.74
+    },
+    "mcp_original_confirmation": {
+      "passed": 1,
+      "seconds": 5.67
+    },
+    "mcp_observed_confirmation": {
+      "failed": 1,
+      "warnings": 1,
+      "seconds": 36.13
+    },
+    "scoped_diagnostic": {
+      "passed": 1,
+      "seconds": 3.0,
+      "scope": "current generation deletion only"
+    },
+    "ruff_exit": 1,
+    "types": {
+      "errors": 0,
+      "warnings": 6,
+      "exit": 1,
+      "baseline_same_three_files": "same0errors6warningsEXIT1"
+    },
+    "installed_standard_exit": 0,
+    "submitted_chrome_exit": 0,
+    "submitted_chrome_conflict_fail": false
+  },
+  "repeated_full_suite": false,
+  "repeated_unchanged_dr_2scope_retry": false,
+  "new_backup_scope": "Only new GUI-forget lifetime synthetic backup/restore; not repeated paired DR",
+  "provenance": [
+    "identity.json",
+    "post-identity.json",
+    "evidence-sha256.json"
+  ],
+  "external_conditions": [
+    "nativeauth/profile/copies/compaction",
+    "realwork/Korean gold/operatingcorpus",
+    "operatingbackup/cutover permission/timer"
+  ],
+  "delivery": {
+    "sent_at": "2026-09-12T13:12:40.807753+00:00",
+    "submission": "d62308945e7905f72f9395861c60b6c4041674ef",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "prompt_path": "/var/tmp/codex-night-d623089-cjrac1ji/integrated-prompt.txt",
+    "actual_start_confirmed": true,
+    "continuation_status": "actual_review_lookup_executed; product_patch_and_cross_stage_continuation_unverified",
+    "resume_receipt": {
+      "id": "a467f76d-ed54-4717-8d8a-65eeec12ebfa",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 13
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "receipt": {
+      "id": "54ec213b-a20e-4bee-8146-b7fc4cc362a6",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 4002
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "receipt_confirmed": true,
+    "native_goal_resume_confirmed": true,
+    "screen_cursor": "5825415",
+    "actual_start_scope": "review investigation: new integrated report existence confirmed by executed tool",
+    "implementation_start_confirmed": false,
+    "explicit_ack_observed": false,
+    "confirmed_at_utc": "2026-09-12T13:14:20.864451+00:00",
+    "public_evidence": "Rendered screen5825415: executed Find Codex reviews newer than36e86ab tool output d623 True; Working37s, nativePursuing7h. Review lookup executed. No completed patch or cross-stage continuation observed.",
+    "evidence_path": "/var/tmp/codex-night-d623089-cjrac1ji/worker-public-screen.json"
+  }
+}

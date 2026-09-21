@@ -1,0 +1,88 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "reviewed_at_utc": "2026-09-11T22:35:55.337471+00:00",
+  "submission": "dab1d983d86babc3305716a507bde66a152a560c",
+  "pin": {
+    "sb_source": "f191a8e24066c3e865036265efd998f2802f52a4",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-f191a8e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "4332390d9ae01b76ceb490c644ac6d9b19b0c470",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-4332390/source/dist",
+    "jarvis_inventory_sha256": "a2f1a336209b8edbe3809527a3b2cca0fe6779bc2599b97e786f1eca79f8702e",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "evidence_root": "/var/tmp/codex-night-dab1d98-9kedr5f5",
+  "findings": [
+    {
+      "id": "V1-C",
+      "severity": "P2",
+      "summary": "Final JSON2180 exceeds total2048; excerpt1876 exceeds128",
+      "repro": "dispatch-final-budget-2048.json"
+    },
+    {
+      "id": "V1-D",
+      "severity": "P2",
+      "summary": "Sent2memories but persisted snapshot0memories/0evidence and no_data capture",
+      "repro": "dispatch-persisted-lineage.json"
+    },
+    {
+      "id": "V1-E",
+      "severity": "P2",
+      "summary": "Before-send generation refusal sends0, corrected retry returns unknown_accepted with no send",
+      "repro": "dispatch-before-send-generation.json"
+    },
+    {
+      "id": "M12-B-F",
+      "severity": "P2",
+      "summary": "Restore-to-first-read boundaries improved; JARVIS RPO and full work recovery/preparation remain"
+    },
+    {
+      "id": "V1-session-integration",
+      "severity": "external_unverified",
+      "summary": "Explicit configured sessions tested; native/Orca compaction event connection remains unverified"
+    }
+  ],
+  "direct_checks": {
+    "focused_tests": 25,
+    "focused_seconds": 23.23,
+    "ruff_exit": 0,
+    "tsc_exit": 0,
+    "revoked_keys_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_gates": [
+      0,
+      0,
+      0
+    ],
+    "paired_restore_exit": 0,
+    "restore_timings": {
+      "failure_began_ms": 1789165917174,
+      "restore_began_ms": 1789165922790,
+      "sb_first_read_ms": 1789165924620,
+      "restore_probe_ms": 564.7990000000001,
+      "restore_to_readable_ms": 1830,
+      "failure_to_work_available_ms": 7446,
+      "scenario_ms": 17955
+    },
+    "artifact_integrity": {
+      "sha256": "a2f1a336209b8edbe3809527a3b2cca0fe6779bc2599b97e786f1eca79f8702e",
+      "entries": 34768,
+      "unchanged": true
+    }
+  },
+  "submitted_unverified_count": {
+    "restore_focused_passed": 13,
+    "directly_run": false,
+    "log_seen_this_run": false
+  },
+  "final_acceptance": false,
+  "next_action": "Resume same authorized Grok goal with integrated remaining delivery contract and recovery preparation"
+}

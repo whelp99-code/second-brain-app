@@ -1,0 +1,121 @@
+{
+  "submission": "01cedbb0ecde3e022066090ea9ee9dfc255b6846",
+  "pin": {
+    "sb_source": "f7c194594e21728678b118e7c0029cd3e1deb30b",
+    "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "candidate": "/var/tmp/sb-candidate-f7c1945/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "reviewer": "existing monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "verdict": "incomplete_not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "updated_at_utc": "2026-09-12T15:14:16.527910+00:00",
+  "evidence_root": "/var/tmp/codex-night-01cedbb-ngqqvboh",
+  "content_limitation": {
+    "notice_source": "User observed screen24954",
+    "triggering_test": "undetermined",
+    "branch_status": "held_unverified",
+    "retries_or_delegation": false,
+    "remaining_scope": "ordinary product functionality and provenance"
+  },
+  "prior_checks_not_new_runs": {
+    "related": "86passed19.82s",
+    "mcp": "1passed5.83s",
+    "ruff_exit": 0,
+    "types": "0errors6warningsEXIT1",
+    "installed_standard_exit": 0,
+    "normal_overlap": "1failed3.87s; initial scoped body empty",
+    "record_overlap": "pytest1passed33.47s but held_read failed; overlap success claim withdrawn"
+  },
+  "new_normal_check": {
+    "passed": 1,
+    "seconds": 4.78,
+    "original_log": "/var/tmp/codex-night-01cedbb-ngqqvboh/normal-continuation/run.log",
+    "result": "/var/tmp/codex-night-01cedbb-ngqqvboh/normal-continuation/result.json",
+    "scope": "source ingest/compile with cited synthetic model response; actual MCP latest MemoryRecord/body/version and Alpha exclusion; normal read during writer prepare; publish after read completion",
+    "live_model_auth": false
+  },
+  "harness_correction": {
+    "prior_record_overlap_pytest": "1passed33.47s",
+    "held_read_error": true,
+    "claim_withdrawn": "actual successful read/publication overlap",
+    "retained": "normal source/compiler produced Alpha then Omega record and old-after search0",
+    "reason": "missing held_read success assertion; reader pin held shared lock until timeout; writer publishes after release",
+    "new_run": "1passed4.78s",
+    "new_scope": "normal read succeeds during writer prepare; publication after reader completion",
+    "no_security_branch_retry": true
+  },
+  "open_ordinary": [
+    {
+      "id": "M11-submitted-normal-record-fixture",
+      "completion": "Integrate ordinary correct-body fixture, successful reader assertions, worker exception propagation and exact event/publication semantics"
+    },
+    {
+      "id": "F-source-status-provenance",
+      "completion": "Align current source/harness/logs/ready versus actual blocked state; classify unchanged old evidence correctly"
+    }
+  ],
+  "held_original_contracts": [
+    "Previously reported boundary/deletion-related branches; no further tests or delegated execution under latest instruction",
+    "M13 complete lifetime not accepted by renaming pre-delete restore exposure RPO",
+    "Strong pinned-read simultaneous publication not demonstrated"
+  ],
+  "external_conditions": [
+    "native auth/session/compaction",
+    "real work/gold/operating corpus",
+    "operating cutover/backups/timer permissions"
+  ],
+  "delivery": {
+    "sent_at": "2026-09-12T15:08:12.951886+00:00",
+    "submission": "01cedbb0ecde3e022066090ea9ee9dfc255b6846",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "scope": "ordinary correction and provenance only; restricted branches held",
+    "prompt_path": "/var/tmp/codex-night-01cedbb-ngqqvboh/normal-continuation/grok-ordinary-prompt.txt",
+    "actual_start_confirmed": true,
+    "continuation_status": "actual_ordinary_test_investigation_started; product_patch_and_cross_stage_continuation_unverified",
+    "receipt": {
+      "id": "2d76b133-93fa-4898-a788-cc533f35a6f1",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 3830
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "resume_receipt": {
+      "id": "95e86109-53c2-4e58-a61c-71d2f92ddfd4",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 13
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "receipt_confirmed": true,
+    "native_goal_resume_confirmed": true,
+    "confirmed_at_utc": "2026-09-12T15:11:37.869926+00:00",
+    "screen_cursor": "5832966",
+    "evidence_path": "/var/tmp/codex-night-01cedbb-ngqqvboh/worker-public-screen.json",
+    "actual_start_scope": "ordinary normal-MCP test read/copy",
+    "implementation_completion_confirmed": false,
+    "cross_stage_continuation_confirmed": false,
+    "explicit_ack_observed": false,
+    "public_evidence": "Completed tool: Copy Codex test locally and read in chunks; ordinary test output, Working4s and native Pursuing goal8h1m"
+  }
+}

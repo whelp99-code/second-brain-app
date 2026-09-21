@@ -8,7 +8,16 @@ from pathlib import Path
 
 import pytest
 
-from sb.uploads import MAX_UPLOAD_BYTES, UploadRejected, accept_upload, supported_suffixes
+from sb.connectors.inbox_documents import InboxDocumentsAdapter
+from sb.store.cas import ContentAddressedStore
+from sb.uploads import (
+    MAX_UPLOAD_BYTES,
+    UploadRejected,
+    accept_upload,
+    read_retract_receipt,
+    retract_upload,
+    supported_suffixes,
+)
 
 
 def test_accept_upload_stages_supported_file_under_vault_inbox(tmp_path: Path) -> None:
@@ -160,3 +169,50 @@ def test_supported_suffixes_match_document_intake_contract() -> None:
         ".xlsx",
         ".yaml",
     )
+
+
+def test_retract_deletes_inbox_tombstones_cas_and_is_idempotent(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    payload = b"retract me"
+    staged = accept_upload(root, "note.txt", payload, relative_path="note.txt")
+    cas = ContentAddressedStore(root)
+    digest = cas.put(payload)
+    assert (root / staged.inbox_path).is_file()
+
+    first = retract_upload(root, staged.upload_id)
+    second = retract_upload(root, staged.upload_id)
+
+    assert first.deleted is True
+    assert first.indexed is False
+    assert first.restored is False
+    assert first.receipt_id
+    assert first.checked_at
+    assert second.receipt_id == first.receipt_id
+    assert second.deleted is True
+    assert not (root / staged.inbox_path).exists()
+    assert cas.exists(digest) is False
+    assert cas.is_tombstoned(digest) is True
+    with pytest.raises(Exception, match="missing"):
+        _ = cas.get(digest)
+    assert cas.put(payload) == digest
+    assert cas.exists(digest) is False
+    loaded = read_retract_receipt(root, first.receipt_id)
+    assert loaded is not None
+    assert loaded.upload_id == staged.upload_id
+    with pytest.raises(UploadRejected, match="retracted"):
+        _ = accept_upload(root, "note.txt", payload, relative_path="note.txt")
+
+
+def test_retract_skips_restored_inbox_scan(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    payload = b"do not restore"
+    staged = accept_upload(root, "note.txt", payload, relative_path="note.txt")
+    path = root / staged.inbox_path
+    body = path.read_bytes()
+    _ = retract_upload(root, staged.upload_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _ = path.write_bytes(body)
+    adapter = InboxDocumentsAdapter(root / "inbox", "inbox")
+    items = list(adapter.scan(None))
+    skipped = [item for item in items if item[2].get("skip_reason") == "retracted"]
+    assert skipped

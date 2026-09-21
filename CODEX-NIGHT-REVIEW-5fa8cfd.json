@@ -1,0 +1,164 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "not_original_codex_execution": true,
+  "created_at_utc": "2026-09-11T20:37:22.320003+00:00",
+  "submission": "5fa8cfd001c3fe4dd78bb85a512e51dd7a9e3d29",
+  "source_full": "8a98324d31098728bc17f052d29f3cc690898dcd",
+  "pin": {
+    "sb_source": "8a98324",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-8a98324/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "86d3290",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-86d3290/source/dist",
+    "jarvis_inventory_sha256": "23a795e2d4a3aefa5d5c4408895f068074fdb05cc8d20d5327b5ae220c524e67",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-5fa8cfd-91uixhdq",
+  "findings": [
+    {
+      "id": "N1-physical-attempt-fence",
+      "priority": "P2",
+      "locations": [
+        "Orca-JARVIS/src/assembled-model-session.ts:40",
+        "Orca-JARVIS/src/cli-gjc-commands.ts:264",
+        "Orca-JARVIS/src/gjc-intent-store.ts:132"
+      ],
+      "evidence": "dispatch-inner-negative-crash.mjs/.json",
+      "actual": "Within one dispatch: first physical send explicitly rejected, second accepted then child exit99. Reopen repeats accepted request; remote_accept_count2. Both physical sends share lease_fence and old negative unlocks second unknown.",
+      "completion": "Track each physical transport attempt separately from reservation fence, durably before every actual send; latest known-negative must never describe later unknown attempt. Test negative->negative, negative->deny/correct, negative->accepted/crash/disconnect, restart and concurrency together."
+    },
+    {
+      "id": "M12-shipped-harness-invalid",
+      "priority": "acceptance_evidence_block",
+      "product_storage_bug": false,
+      "locations": [
+        "scripts/jarvis-restore-acceptance.mjs:97",
+        "scripts/jarvis-restore-acceptance.mjs:99"
+      ],
+      "evidence": [
+        "paired-restore.log",
+        "paired-restore-distinct.log",
+        "paired-restore-fresh-read.log"
+      ],
+      "actual": "Shipped acceptance reuses first request identity for new content (WRITE_REQUEST_REPLAY_CONFLICT); correcting identity then reveals stale pre-write generation target. Independent corrected request and fresh reread complete chain.",
+      "completion": "Repair and commit acceptance harness with distinct accepted request identity and freshly resolved target after generation-changing write. Publish directly executed full result and do not label these fixture mistakes as storage defects."
+    },
+    {
+      "id": "V1-compaction-integration",
+      "priority": "remaining_original_acceptance",
+      "actual": "Package explicitly still leaves automatic compaction trigger; no source change to selector/trigger integration.",
+      "completion": "Actual authorized product new-session/compaction trigger -> fresh bounded selection -> revoked/expired/no_data -> selected-session transport; identify only genuinely external native auth conditions."
+    },
+    {
+      "id": "M12-measurement-and-recovery-preparation",
+      "priority": "remaining_original_acceptance",
+      "actual": "Independent corrected fixture restores2journals frombackup before new deletion, verifies scoped readers and highwater2 plus accepted write. rpo_source_generation_id is not separate SB/JARVIS RPO;15.085s includes backup/tests and not full general cold recovery. Runbook still pins2782f1b/69d8c9b.",
+      "completion": "Finish original RPO/usable RTO and trusted recovery/rollback preparation; pin runbook8a98324/86d3290 or next final pair. Preserve bounded passes and avoid new arbitrary scope."
+    }
+  ],
+  "direct": {
+    "sb_identity_python": 182,
+    "jarvis_identity_product_files": 1137,
+    "jarvis_rebuild_js": 1109,
+    "jarvis_full_inventory_unchanged": true,
+    "tsc_exit": 0,
+    "ruff_exit": 0,
+    "python_type_errors": 0,
+    "python_type_warnings": 2,
+    "python_type_exit": 1,
+    "jarvis_focused_passed": 21,
+    "installed_gate_exits": [
+      0,
+      0,
+      0
+    ],
+    "paired_restore_shipped_harness_exit": 1,
+    "paired_restore_unique_request_only_exit": 1,
+    "paired_restore_unique_request_fresh_target_exit": 0
+  },
+  "observed_grok_focused": {
+    "path": "/var/tmp/sb-focused-restore-8a98324.log",
+    "sha256": "90eb8dcf4883ad97e8793ca4d65c62b0c6831672b50b1368b43b0f9b87db60e8",
+    "passed": 13,
+    "seconds": 10.27,
+    "exit": 0,
+    "direct_codex_run": false
+  },
+  "diagnostic_harness_changes": [
+    "fixed interpreter path in reviewer copy",
+    "new accepted request identity via existing _remember_request fixture",
+    "fresh read target after generation-changing write"
+  ],
+  "evidence_hashes": {
+    "dispatch-crash.mjs": "a7d294b92a29de9bdfadeeddabf65fba0832679e5fa1696a76403f7373e3dd4c",
+    "run-probes.py": "c9c5be79192ac8f6ae04a9048e05c98d05a3c513d6166e2ae04a5d3127286f44",
+    "dispatch-accepted-disconnect.mjs": "b7436fddf67275b5666f8e337c55bbea1da179e75f60b583d061ea2f39b922ab",
+    "gjc-fence-confirmation.log": "5df8d65b5b633c598379a3c5327aa4a8009cb2ddc8e70f68c2b158d6a1bde205",
+    "dispatch-inner-negative-crash.json": "91fbd31c025f74f32ad43d6746c4657147fb6dd3a460dd388159421bc4e4b1f2",
+    "dispatch-inner-negative-crash.mjs": "3141c373a16ecf65e3877d52a4b425e321d3fe99c2b5a1daab343c372a2411e0",
+    "dispatch-negative-then-deny.json": "759d1a0a59ecc30e8a08414193ef3e4f4948d0e0c79781cdb2c08b09acd2ec03",
+    "paired-restore-fresh-read.log": "6eb15b22f1971e8b6e624d5b588272a1a847c2c74a00011bda7d5977e1e584ee",
+    "ruff.log": "ebe9a79730ee44eb47f9c4e057b8ee334fce479afbcf5e46fe3c62dc30f94eba",
+    "dispatch-crash.log": "bacba607f068a88733cb8d3d17567b1df35897c72197686207e6d321228a55ea",
+    "dispatch-reconcile-accepted.log": "6e820dfbc8943d58e49c09bbacd923ea6bdee0b12228af734674772fdc518f6d",
+    "jarvis-identity.json": "4fc62c61e8a6b2ffe61c5c0bcf5309dc7732f7ded0e350061d348d15160557de",
+    "dispatch-accepted-timeout.json": "f34fe8539eca17310a1f7f704c1612061c276a2352a2046e54fff9779efbe555",
+    "dispatch-accepted-disconnect.json": "968ba5f6e5c01cc454824af81d29c073551b667df6666e02d1bdb9e01ad58370",
+    "jarvis-focused.log": "811026058f9e95043b16b907dc489bb38dd817f4400f762800b0d5440fe115a1",
+    "dispatch-empty-expired.mjs": "590369bff75251f5e6ba6184c1cf7fc00c1ea70ec5e4a316d2fc38ffa85ce140",
+    "dispatch-fail-accepted-crash.mjs": "5a89d55391f34f2e08f8001ed791f5d5f77c7fda901e46453ee740d840ca6703",
+    "dispatch-live-expiry.mjs": "4ab8735b8575023ddf0546d8e880115ad5151c4e682e3e0132f205468c8cd836",
+    "run-checks.py": "bf66155e99bb7c7c05ec8b8987bcc478cf467293948a3629e38a572b5d2bbc2e",
+    "submission.json": "5a763cdec987dfaa2a3e5f49b7bed54005b65023770d6ee6f6dc7ea6337f85ac",
+    "sb-identity.json": "5bfcf47ce7efcc80068817028be9e9f28f0aa51b6c09d3bcf0dea2ca0e952084",
+    "paired-restore.log": "1fe3bac086ef230af953cece0b43b1efd62bd6274b1bfb3c08b3bfc0fc58eda7",
+    "dispatch-accepted-crash.json": "4b09730b3a37e9e53a5ec61707040f387bc7a57d8247b729b4c2de9867b9fb2e",
+    "dispatch-boundaries.mjs": "ded6b566f04f45149377a2e270439aaefb99cdfde0242a20a3eb89f2653ce268",
+    "dispatch-selected-session.mjs": "f2ccfab4d515fbb99f337dc3b94d20223cb11ec4816a459c14cf2b23d43fd179",
+    "paired-restore-distinct.log": "3a8d306a2c6174886a0fa4d274bc31c8e29d70d2ae7a847cca72f3b1b1189a2f",
+    "dispatch-boundaries.log": "576a9ba50153954abd5b2d88665af4bfbf3c4ae18e5dfd0f957199384477ca44",
+    "installed-work.log": "9aa129e1edc4820717ccfe74a40f485cbf4b8b6e4bc279f134210b2c1b431abb",
+    "dispatch-recovery.mjs": "957183ab7e04ca597fb17f0dc860851903c4dd55f4e968138b87a7c15ba4e82d",
+    "python-types.log": "268fc2c8ef4bf6f616bdcb687dd5e7fe776a359a06fbe2c52e0ee818f841f49b",
+    "dispatch-live-expiry.log": "e06a3771e6f6d4f54f01d7f691351dc6c354a0be89d5ef19d09dab51bee8b17f",
+    "installed-maintenance.log": "38dd25976a55b62be34ceff92cfe69846058217c98a9ed078aaed0a2ba34b18a",
+    "dispatch-presend-deny.mjs": "1d63b1e09e3276efdfc9a11681b7ee2b7b787ba250d5456d70d956c73e13661e",
+    "dispatch-crash.json": "c90d2a3c8d486a646277d5ac6876d08875d23a14d0944075160da31d45f39eb8",
+    "dispatch-accepted-timeout.mjs": "b07a2e7bd712a5652269acd28c20162c587921fa133ba5fc4010048b548e75f0",
+    "gjc-fence-confirmation.mjs": "ca8972f214ba8be14d03bb663c543c6b81c083e3c1822d385d9078613a95f976",
+    "jarvis-inventory-before.json": "cd746235f8b41f4ca576552084ce664ba2b1ecda2a35651b47b74db737f25838",
+    "dispatch-recovery.json": "c1f872ee37870d8455c5f7cc07f3e214b4194d25f7bb0d9e97e7c201948ce373",
+    "dispatch-fail-accepted-crash.log": "0e5ce829289a7e4050784469c0b301faf978cf9aa36f1e2853f23d7036e5e769",
+    "installed-standard.log": "d7ef7cd22f1455ebd144e420429a77499411619ae59750fcb3ca37b625b44b35",
+    "paired-restore-result.json": "663e5e943d0a85c29e26fe8deb13992dd5f701c208fdcedf88f9ae48a6add63a",
+    "dispatch-fail-accepted-crash.json": "c915655d379aa1afbd4b10d8f4416f249b83d95a16b48ea51fa62ace08850174",
+    "dispatch-boundaries.json": "9f254e1281cdecac5304a203303064e002f62b0949125600fd9730154ab4827c",
+    "test_journal_observe.py": "f0879c266827be5200273c305517ead95b8e551cad58ef7a850ee4640440eca0",
+    "jarvis-inventory-after-proof.json": "e31fa742067b79ec098dadc8df85e79fe13042d3887c739129e5c5c72955ba44",
+    "dispatch-accepted-crash.mjs": "18a0b1997e5cfda1e11389aa928e304f3d09ca5f60ba41123906afb49cfab76c",
+    "dispatch-live-expiry.json": "42a661f19c1c603fcf46b2aee55182917cc102ceb98bcc46ec5e04768949d543",
+    "dispatch-accepted-timeout.log": "d319c0576836d7dfceca7974839f12cc3086c50948d5dc074273b03344b36398",
+    "dispatch-negative-then-deny.mjs": "7828c8f6ddef68b2400441348235fe9cfa1ae0ef9f647382286d2324f4f87706",
+    "gjc-fence-confirmation.json": "f91761f526c808fbe031e679273c29dfd6e7248190b7cc07274c6ac9819bdb3c",
+    "dispatch-accepted-crash.log": "07bf78996176b5b6e1fcf6578ca4e68ea4cd675e2e87e3ac372699f5083333f1",
+    "dispatch-reconcile-accepted.json": "303aa8d7a0e7e7b38121d185b933b752284c7cc638dbced039609b20e031b140",
+    "jarvis-tsc.log": "49815eb5a03461efcdc0b2d9af2d9615e3b8974e3d6a256e7865c0e6e6f6bad9",
+    "dispatch-reconcile-accepted.mjs": "a6348f91f72ed9511b9921e2601e19b1f4cc5db96cb455eaf6661a2ed2f65321",
+    "dispatch-recovery.log": "6ee444743d4dc83a35fe11bb5ea70beee64f24009b4f778a28e539adb7576711"
+  },
+  "diagnostic_harness_sha256": {
+    "codex-restore-distinct.mjs": "ad93c9cfa27368647139e32e88f43cc2e5d2038943f4a7a89bdbf67bea0f6ce8",
+    "codex-restore-observe.mjs": "ce19e97daaeea8117dce0da45b1161a6ddfdbe6911a73fb74e2e326317a9b665",
+    "codex-seed-distinct.py": "c7741aac40ad06ac487126d9c7de9d5d897dca5ad3079195579d5abcad94c516",
+    "codex-restore-fresh-read.mjs": "ddf06c28f14e5191b5aa11cf8bb5c5a6b4620b35e821797bc2a4d30f900abefa"
+  },
+  "final_head": "5fa8cfd001c3fe4dd78bb85a512e51dd7a9e3d29",
+  "next_action": "Existing Grok integrated remaining implementation; reconcile native goal completion criteria with open authorized work"
+}

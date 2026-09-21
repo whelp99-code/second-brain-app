@@ -84,8 +84,11 @@ class InboxDocumentsAdapter:
 
     def acknowledge(self, committed: Sequence[SourceRef]) -> None:
         """Move only the exact scanned versions whose CAS and ledger commits succeeded."""
-        versions = {(ref.source_uri, ref.source_version) for ref in committed
-                    if ref.source_id == self.source_id}
+        versions = {
+            (ref.source_uri, ref.source_version)
+            for ref in committed
+            if ref.source_id == self.source_id
+        }
         for rel, (path, token) in self._scanned.items():
             if (rel, token) not in versions or path.is_symlink() or not path.is_file():
                 continue
@@ -122,6 +125,12 @@ class InboxDocumentsAdapter:
             return self._resume_skip(rel, "unreadable", previous)
         token = f"{stat.st_mtime_ns}:{stat.st_size}:{sha256(body).hexdigest()}"
         self._scanned[rel] = (path, token)
+        identity = _upload_identity_from_rel(rel)
+        if (
+            identity is not None
+            and (self._root / ".requests" / "retract" / f"{identity}.json").is_file()
+        ):
+            return self._resume_skip(rel, "retracted", previous)
         if previous == token:
             return token, None
         parsed = _parse_body(path.suffix, body)
@@ -258,15 +267,25 @@ def _move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> 
         # when retrying after interruption between publication and unlink.
         archived = name
         try:
-            os.link(name, archived, src_dir_fd=source, dst_dir_fd=destination,
-                    follow_symlinks=False)
+            os.link(
+                name, archived, src_dir_fd=source, dst_dir_fd=destination, follow_symlinks=False
+            )
         except FileExistsError:
             prior = os.stat(archived, dir_fd=destination, follow_symlinks=False)
             if (prior.st_dev, prior.st_ino) != (original.st_dev, original.st_ino):
-                archived = "version-" + sha256((rel + "\0" + version).encode()).hexdigest() + Path(name).suffix
+                archived = (
+                    "version-"
+                    + sha256((rel + "\0" + version).encode()).hexdigest()
+                    + Path(name).suffix
+                )
                 try:
-                    os.link(name, archived, src_dir_fd=source, dst_dir_fd=destination,
-                            follow_symlinks=False)
+                    os.link(
+                        name,
+                        archived,
+                        src_dir_fd=source,
+                        dst_dir_fd=destination,
+                        follow_symlinks=False,
+                    )
                 except FileExistsError:
                     prior = os.stat(archived, dir_fd=destination, follow_symlinks=False)
                     if (prior.st_dev, prior.st_ino) != (original.st_dev, original.st_ino):
@@ -275,8 +294,10 @@ def _move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> 
         current = os.stat(name, dir_fd=source, follow_symlinks=False)
         # Creating the hard link changes ctime itself; the other verified fields
         # must remain stable through publication, including same-inode writes.
-        if any(_file_identity(entry)[:-1] != _file_identity(original)[:-1]
-               for entry in (published, current)):
+        if any(
+            _file_identity(entry)[:-1] != _file_identity(original)[:-1]
+            for entry in (published, current)
+        ):
             raise OSError("inbox acknowledgement source changed")
         os.unlink(name, dir_fd=source)
     finally:
@@ -285,8 +306,14 @@ def _move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> 
 
 
 def _file_identity(info: os.stat_result) -> tuple[int, ...]:
-    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
-            info.st_mtime_ns, info.st_ctime_ns)
+    return (
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
 
 
 def _read_regular(path: Path, expected: os.stat_result) -> bytes:
@@ -294,13 +321,18 @@ def _read_regular(path: Path, expected: os.stat_result) -> bytes:
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         before = os.fstat(fd)
-        if not stat_module.S_ISREG(before.st_mode) or _file_identity(before) != _file_identity(expected):
+        if not stat_module.S_ISREG(before.st_mode) or _file_identity(before) != _file_identity(
+            expected
+        ):
             raise OSError("inbox file changed or is not regular")
         with os.fdopen(os.dup(fd), "rb") as stream:
             body = stream.read(MAX_INBOX_BYTES + 1)
-        if (len(body) > MAX_INBOX_BYTES or len(body) != before.st_size
+        if (
+            len(body) > MAX_INBOX_BYTES
+            or len(body) != before.st_size
             or _file_identity(before) != _file_identity(os.fstat(fd))
-            or _file_identity(before) != _file_identity(path.lstat())):
+            or _file_identity(before) != _file_identity(path.lstat())
+        ):
             raise OSError("inbox file changed during read")
         return body
     finally:
@@ -309,3 +341,14 @@ def _read_regular(path: Path, expected: os.stat_result) -> bytes:
 
 def _skip(source_id: str, rel: str, reason: str) -> tuple[SourceRef, bytes, ItemMeta]:
     return SourceRef(source_id, rel, reason), b"", {"relative_path": rel, "skip_reason": reason}
+
+
+def _upload_identity_from_rel(rel: str) -> str | None:
+    parts = rel.split("/")
+    if len(parts) < 4 or parts[0] != "uploads":
+        return None
+    name = parts[-1]
+    identity = name.split("-", 1)[0]
+    if len(identity) != 64 or any(ch not in "0123456789abcdef" for ch in identity):
+        return None
+    return identity

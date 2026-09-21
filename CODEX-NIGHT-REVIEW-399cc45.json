@@ -1,0 +1,127 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e under overnight independent-review delegation; not original Codex execution",
+  "submission": "399cc45dd92f26c9cdeac484f14f144739d00aa2",
+  "pin": {
+    "sb_source": "f94d0733f84b23db03a053b4be513a257211c938",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-f94d073/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "0b8ace5",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-0b8ace5/source/dist",
+    "jarvis_inventory_sha256": "501d5ba5f7677c980bd121f9a5573b5451e68a82926667b8904c22cd46a0bd24",
+    "jarvis_inventory_entries": 34779,
+    "operational_current": "41f0751",
+    "production_activated": false
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-399cc45-wh2i5plf",
+  "finished_at_utc": "2026-09-11T17:08:15.143629+00:00",
+  "findings": [
+    {
+      "id": "N1-build-identity",
+      "priority": "P1",
+      "actual": "Submitted JARVIS dist four changed JS files equal previous37b034f; production fence and reservation fixes exist only in source. Submitted handler still sends1 with revoked read_fence_config.",
+      "code": [
+        "src/cli-gjc-commands.ts",
+        "src/gjc-configuration-store.ts:222",
+        "src/gjc-intent-store.ts"
+      ],
+      "evidence": [
+        "jarvis-identity.json",
+        "dist-difference.json",
+        "jarvis-tsc.log",
+        "gjc-fence-confirmation.json"
+      ],
+      "completion": "Resolve TS2339 missing reserveGjcIntent on base class, clean compile with exit0, compare source/compiled artifact bytes and test actual packaged candidate without old dist fallback."
+    },
+    {
+      "id": "N1-failed-reservation-recovery",
+      "priority": "P1",
+      "scope": "diagnostic emitted JavaScript from submitted source after failed tsc; not the submitted dist and not accepted build",
+      "actual": "Deny then correct sends0 total; transportfailure then correct sends2 total; options missing then correct sends0. Each retry returns oktrue duplicate while model_dispatched false and intent pending.",
+      "code": [
+        "src/cli-gjc-commands.ts:95-102",
+        "src/gjc-intent-store.ts:34-45"
+      ],
+      "evidence": [
+        "dispatch-recovery-rebuilt.mjs",
+        "dispatch-recovery-rebuilt.json"
+      ],
+      "completion": "Integrate durable reservation, authorization/preflight, failed/uncertain transport, current worker ownership, replay/restart/recovery. Retry after correctable no-send must reach actual send; duplicate pending must not represent delivery success. Preserve concurrency send1."
+    },
+    {
+      "id": "M6-M12-incomplete",
+      "priority": "P2",
+      "scope": "reported incomplete and bounded independent helper checks; not a claimed newly reproduced full product failure",
+      "actual": "Package admits isolated writer exclusion not proved and cold DR/ordinary write incomplete. Neither requires operational drain for fixture work.",
+      "evidence": [
+        "source/GROK-FINAL-ACCEPTANCE-PACKAGE.md",
+        "lock-processes.json"
+      ],
+      "completion": "Complete isolated actual writer exclusion->failed switch->safe recovery integrated rehearsal; cold loss of fixture originals/control stores->validated backup restore->new ordinary product write/read and RPO/RTO evidence; preserve original contracts."
+    }
+  ],
+  "direct_checks": {
+    "sb_python_files_equal": 182,
+    "jarvis_product_tracked_files_equal": 1137,
+    "jarvis_tsc_exit": 2,
+    "jarvis_dist_mismatch_files": [
+      "src/gjc-configuration-store.js",
+      "src/cli-gjc-commands.js",
+      "src/gjc-intent-store.js",
+      "tests/integration/gjc-dispatch-assemble.test.js"
+    ],
+    "focused_pytest": {
+      "passed": 14,
+      "seconds": 0.61
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "lock_processes": {
+      "revocation_reader_contention": "reader_busy",
+      "writer_exit": 0,
+      "writer_output": "writer_ok",
+      "reader_keys": [
+        "key:a",
+        "key:b"
+      ],
+      "concurrent_writers": 4,
+      "each_writes": 8,
+      "final_keys": 34,
+      "generation_writer_during_preparation": "busy",
+      "after_fixture_sigkill": "acquired",
+      "scope": "isolated real helper multi-process checks; not operational/full cutover acceptance"
+    },
+    "submitted_revoked_config_sends": 1,
+    "diagnostic_emitted_revoked_config_sends": 0,
+    "diagnostic_emitted_concurrent_same_key_sends": 1
+  },
+  "grok_log_observation": {
+    "path": "/var/tmp/sb-full-pytest-f94d073.log",
+    "sha256": "f2f463820e92ed1a4b2a2aff920fecc87fb501641525a40bd71e3a45eeeebc48",
+    "tail": "......................................... [ 98%]\n.................................                                        [100%]\n1831 passed, 2 skipped in 618.07s (0:10:18)\nEXIT:0\n",
+    "source": "Grok original log inspected; no Codex full rerun"
+  },
+  "preserved_prior_evidence": [
+    "N3 empty/truncated/unsafe markers and interruption recovery plus new reader/writer process pass",
+    "V2 mixed failure/success caps remain within cap in extended-result.json",
+    "Prior fixed-tree N2/N4/M11/M12 evidence preserved in earlier Codex reports; not blanket carried forward as current full acceptance"
+  ],
+  "harness_limitations": [
+    "Initial all-tracked identity read encountered absent historical evidence logs; product files then compared explicitly and matched",
+    "Initial dispatch-recovery expected new API absent in submitted old dist; subsequent diagnostic emitted JS used separate path",
+    "Initial concurrent probe awaited new reservation behavior absent in old dist; unsettled await exit13 is harness failure, not separately counted product defect",
+    "Diagnostic emitted build required migrations/config JSON resources; initial missing migrations was harness setup error, resolved",
+    "Diagnostic emitted JS exists despite tsc EXIT2; runtime probes are supplemental source diagnosis only"
+  ],
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}
