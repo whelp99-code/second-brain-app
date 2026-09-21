@@ -14,7 +14,7 @@ from sb.source_access import SourceAccess
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
-def _object(value: object, keys: str) -> dict:
+def _object(value: object, keys: str) -> dict[str, object]:
     if not isinstance(value, dict) or set(value) != set(keys.split()):
         raise ValueError("SCOPED_WRITE_PREPARATION_INVALID")
     return value
@@ -68,7 +68,10 @@ def decode_scoped_write_preparation(value: object, *, now: datetime) -> ScopedWr
         ):
             raise ValueError
         for key in ("proposal_digest", "command_digest"):
-            if not isinstance(binding[key], str) or not _DIGEST.fullmatch(binding[key]):
+            digest = binding[key]
+            if not isinstance(digest, str):
+                raise TypeError
+            if _DIGEST.fullmatch(digest) is None:
                 raise ValueError
         for key in ("control_request_id", "control_receipt_id"):
             item = binding[key]
@@ -79,12 +82,15 @@ def decode_scoped_write_preparation(value: object, *, now: datetime) -> ScopedWr
                 or any(ord(c) < 32 or ord(c) == 127 for c in item)
             ):
                 raise ValueError
-        expires = datetime.strptime(binding["expires_at"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(
+        expires_at = binding["expires_at"]
+        if not isinstance(expires_at, str):
+            raise TypeError
+        expires = datetime.strptime(expires_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
             tzinfo=UTC
         )
         if (
             expires.isoformat(timespec="milliseconds").replace("+00:00", "Z")
-            != binding["expires_at"]
+            != expires_at
             or now.tzinfo is None
             or now.utcoffset() is None
             or now >= expires

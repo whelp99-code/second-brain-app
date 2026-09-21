@@ -3,6 +3,7 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
+from sb.effect_values import is_json_object
 from sb.remember_contracts import MemoryWriteRequestV3
 from sb.request_store import RequestStatus
 from sb.scoped_request_acceptance import _replay
@@ -26,5 +27,8 @@ def load_scoped_execution(path: Path, status: RequestStatus, *, provider: str,
         raise ValueError("REQUEST_ENVELOPE_MISMATCH")
     # Historical decode is not renewed authority. The executor's mandatory live
     # verifier decides whether work may start/resume and switch the generation.
-    source = parse_request_v3(value["request"]["source_request"], accepted_at)
+    request = value["request"]
+    if not is_json_object(request):
+        raise ValueError("REQUEST_ENVELOPE_MISMATCH")
+    source = parse_request_v3(request["source_request"], accepted_at)
     return source, entry.request
