@@ -1,0 +1,138 @@
+{
+  "schema": "phone-history-predevice-gate-v1",
+  "generated_at": "2026-09-21T02:22:05.979786+00:00",
+  "host": {
+    "platform": "linux",
+    "python": "3.14.4"
+  },
+  "result": "PASS",
+  "checks": [
+    {
+      "name": "generate-ios-contract",
+      "command": [
+        "/usr/bin/python3",
+        "scripts/generate_ios_contract.py"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/generate-ios-contract.log"
+    },
+    {
+      "name": "generate-ios-api-paths",
+      "command": [
+        "/usr/bin/python3",
+        "scripts/generate_ios_api_paths.py"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/generate-ios-api-paths.log"
+    },
+    {
+      "name": "ruff-format",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "ruff",
+        "format",
+        "--check",
+        "server",
+        "tests",
+        "scripts"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/ruff-format.log"
+    },
+    {
+      "name": "ruff-check",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "ruff",
+        "check",
+        "server",
+        "tests",
+        "scripts"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/ruff-check.log"
+    },
+    {
+      "name": "pytest",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "pytest",
+        "-q",
+        "tests",
+        "--junitxml=/home/jm/orca/projects/second-brain-app/phone-history/evidence/pytest-junit.xml"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/pytest.log"
+    },
+    {
+      "name": "compileall",
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "compileall",
+        "-q",
+        "server",
+        "scripts"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/compileall.log"
+    },
+    {
+      "name": "ios-static",
+      "command": [
+        "/usr/bin/python3",
+        "scripts/verify_ios_static.py"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/ios-static.log"
+    },
+    {
+      "name": "bash-syntax",
+      "command": [
+        "bash",
+        "-n",
+        "/home/jm/orca/projects/second-brain-app/phone-history/scripts/generate_xcode_project.sh",
+        "/home/jm/orca/projects/second-brain-app/phone-history/scripts/mac_predevice_gate.sh",
+        "/home/jm/orca/projects/second-brain-app/phone-history/scripts/physical_device_gate.sh"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/bash-syntax.log"
+    },
+    {
+      "name": "git-diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "phone-history"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "log": "evidence/git-diff-check.log"
+    }
+  ],
+  "pytest": {
+    "tests": 36,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "device_gate": {
+    "status": "PENDING",
+    "reason": "No physical iPhone is attached to the macOS Xcode host.",
+    "script": "scripts/physical_device_gate.sh"
+  },
+  "closure": "READY_FOR_DEVICE_VALIDATION"
+}

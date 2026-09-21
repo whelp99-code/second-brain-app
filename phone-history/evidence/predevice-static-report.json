@@ -1,0 +1,111 @@
+{
+  "schema": "phone-history-predevice-static-report-v1",
+  "generated_at": "2026-09-21T02:22:05.967946+00:00",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "platform": "linux",
+  "result": "PASS",
+  "checks": [
+    {
+      "name": "generator:generate_ios_contract.py",
+      "passed": true,
+      "details": "generated"
+    },
+    {
+      "name": "generator:generate_ios_api_paths.py",
+      "passed": true,
+      "details": "generated"
+    },
+    {
+      "name": "required-files",
+      "passed": true,
+      "details": "missing="
+    },
+    {
+      "name": "entitlements:app-group-parity",
+      "passed": true,
+      "details": "app=['$(PHONE_HISTORY_APP_GROUP)'] share=['$(PHONE_HISTORY_APP_GROUP)']"
+    },
+    {
+      "name": "entitlements:keychain-parity",
+      "passed": true,
+      "details": "app=['$(PHONE_HISTORY_KEYCHAIN_GROUP)'] share=['$(PHONE_HISTORY_KEYCHAIN_GROUP)']"
+    },
+    {
+      "name": "entitlements:minimal-scope",
+      "passed": true,
+      "details": "used=['com.apple.security.application-groups', 'keychain-access-groups']"
+    },
+    {
+      "name": "privacy:no-arbitrary-http",
+      "passed": true,
+      "details": "{'NSAllowsLocalNetworking': True}"
+    },
+    {
+      "name": "privacy:no-sensitive-runtime-permissions",
+      "passed": true,
+      "details": "usageDescriptionKeys=[]"
+    },
+    {
+      "name": "share:bounded-activation-rule",
+      "passed": true,
+      "details": "{'NSExtensionActivationSupportsText': True, 'NSExtensionActivationSupportsWebURLWithMaxCount': 10, 'NSExtensionActivationSupportsImageWithMaxCount': 10, 'NSExtensionActivationSupportsFileWithMaxCount': 10, 'NSExtensionActivationSupportsMovieWithMaxCount': 5}"
+    },
+    {
+      "name": "privacy-manifest:app",
+      "passed": true,
+      "details": "explicit user content; linked=true; tracking=false; purpose=app functionality; App Group UserDefaults=1C8F.1"
+    },
+    {
+      "name": "privacy-manifest:share",
+      "passed": true,
+      "details": "explicit user content; linked=true; tracking=false; purpose=app functionality; App Group UserDefaults=1C8F.1"
+    },
+    {
+      "name": "source:no-surveillance-apis",
+      "passed": true,
+      "details": "[]"
+    },
+    {
+      "name": "source:no-canonical-auto-approval",
+      "passed": true,
+      "details": "canonical is initialized false only"
+    },
+    {
+      "name": "source:aes-gcm-queue",
+      "passed": true,
+      "details": "authenticated encryption and verification are present"
+    },
+    {
+      "name": "share:network-code-excluded-from-target",
+      "passed": true,
+      "details": "Share Extension compiles only capture and encrypted-queue Core files"
+    },
+    {
+      "name": "share:user-declared-adot-and-queue-only",
+      "passed": true,
+      "details": "A-dot classification is explicit; extension performs no network upload"
+    },
+    {
+      "name": "share:copies-provider-file-before-return",
+      "passed": true,
+      "details": "provider temporary file is copied, not memory-mapped"
+    },
+    {
+      "name": "swift:syntax-parse",
+      "passed": null,
+      "details": "swiftc unavailable on this Ubuntu host; xcodebuild gate remains device-host only"
+    },
+    {
+      "name": "xcodegen:project-generation",
+      "passed": null,
+      "details": "xcodegen unavailable on this Ubuntu host; generation script validates this on macOS"
+    }
+  ],
+  "device_only_gates": [
+    "xcodebuild for generic iOS and simulator",
+    "Apple Team signing and entitlement provisioning",
+    "Share Extension from Safari, Files, Photos, and A-dot",
+    "protected-data reboot/lock behavior",
+    "BGTask scheduling observation"
+  ]
+}

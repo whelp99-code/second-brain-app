@@ -31,6 +31,8 @@ class ContentAddressedStore:
         """Store `data` at raw/<h[:2]>/<h> (mode 0444). Idempotent on hash."""
         digest = hashlib.sha256(data).hexdigest()
         dest = self._blob_path(digest)
+        if self.is_tombstoned(digest):
+            return digest
         if dest.is_file():
             return digest
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -42,14 +44,35 @@ class ContentAddressedStore:
 
     def get(self, content_hash: str) -> bytes:
         """Return the stored bytes for `content_hash`."""
+        if self.is_tombstoned(content_hash):
+            raise CasBlobMissing(content_hash=content_hash)
         path = self._blob_path(content_hash)
         if not path.is_file():
             raise CasBlobMissing(content_hash=content_hash)
         return path.read_bytes()
 
     def exists(self, content_hash: str) -> bool:
-        """True when a blob file for `content_hash` is present."""
-        return self._blob_path(content_hash).is_file()
+        """True when a readable blob file for `content_hash` is present."""
+        return self._blob_path(content_hash).is_file() and not self.is_tombstoned(content_hash)
+
+    def tombstone(self, content_hash: str) -> None:
+        """Keep the blob bytes but make them unreadable and unrestorable."""
+        dest = self._blob_path(content_hash)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        marker = self._tombstone_path(content_hash)
+        if marker.is_file():
+            return
+        tmp = marker.with_name(f".{content_hash}.tombstone.tmp")
+        _ = tmp.write_bytes(b"")
+        tmp.chmod(0o444)
+        _ = tmp.replace(marker)
+
+    def is_tombstoned(self, content_hash: str) -> bool:
+        """True when retract left a CAS tombstone for this hash."""
+        return self._tombstone_path(content_hash).is_file()
 
     def _blob_path(self, content_hash: str) -> Path:
         return self._vault_root / "raw" / content_hash[:2] / content_hash
+
+    def _tombstone_path(self, content_hash: str) -> Path:
+        return self._vault_root / "raw" / content_hash[:2] / f"{content_hash}.tombstone"

@@ -10,15 +10,18 @@ idempotent.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Final, Literal, TypedDict, override
 
 from sb.connectors.inbox_documents import MAX_INBOX_BYTES
 from sb.parsers import UnsupportedSuffix, parser_for
+from sb.store.cas import ContentAddressedStore
 
 MAX_UPLOAD_BYTES: Final = MAX_INBOX_BYTES
 MAX_UPLOAD_REQUEST_BYTES: Final = ((MAX_UPLOAD_BYTES + 2) // 3) * 4 + 64 * 1024
@@ -39,6 +42,15 @@ class UploadReceiptDict(TypedDict):
     filename: str
     relative_path: str
     device_id: str
+
+
+class RetractReceiptDict(TypedDict):
+    deleted: bool
+    indexed: bool
+    restored: bool
+    receipt_id: str
+    checked_at: str
+    upload_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +130,9 @@ def accept_upload(
 
     identity = hashlib.sha256(f"{safe_device}\0{source_path}\0{digest}".encode()).hexdigest()
     vault = root.expanduser().resolve()
+    existing = read_retract_receipt(vault, _receipt_id(identity))
+    if existing is not None:
+        raise UploadRejected("upload identity retracted")
     inbox = (vault / "inbox").resolve()
     if not inbox.is_relative_to(vault):
         raise UploadRejected("inbox escapes vault")
@@ -209,3 +224,159 @@ def _component(value: str, fallback: str) -> str:
     normalized = unicodedata.normalize("NFC", value.strip())
     cleaned = _SAFE_COMPONENT.sub("-", normalized).strip("-.")
     return (cleaned or fallback)[:80]
+
+
+@dataclass(frozen=True, slots=True)
+class RetractReceipt:
+    deleted: bool
+    indexed: bool
+    restored: bool
+    receipt_id: str
+    checked_at: str
+    upload_id: str
+    content_sha256: str = ""
+
+    def as_dict(self) -> RetractReceiptDict:
+        return {
+            "deleted": self.deleted,
+            "indexed": self.indexed,
+            "restored": self.restored,
+            "receipt_id": self.receipt_id,
+            "checked_at": self.checked_at,
+            "upload_id": self.upload_id,
+        }
+
+
+def retract_upload(root: Path, upload_id: str) -> RetractReceipt:
+    """Delete one staged upload identity and tombstone leftover CAS refs."""
+    identity = _upload_identity(upload_id)
+    vault = root.expanduser().resolve()
+    receipt_id = _receipt_id(identity)
+    checked_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    staged = _staged_uploads(vault, identity)
+    digest = ""
+    for path in staged:
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        _unlink_inbox_file(path)
+    leftover = _staged_uploads(vault, identity)
+    for path in leftover:
+        _unlink_inbox_file(path)
+    prior = read_retract_receipt(vault, receipt_id)
+    if prior is not None and digest == "":
+        digest = prior.content_sha256
+    if digest:
+        ContentAddressedStore(vault).tombstone(digest)
+    deleted = not _staged_uploads(vault, identity)
+    receipt = RetractReceipt(
+        deleted=deleted,
+        indexed=False,
+        restored=False,
+        receipt_id=receipt_id,
+        checked_at=checked_at,
+        upload_id=identity,
+        content_sha256=digest,
+    )
+    if deleted:
+        _write_receipt(vault, receipt)
+    return receipt
+
+
+def read_retract_receipt(root: Path, receipt_id: str) -> RetractReceipt | None:
+    """Return a stored retract receipt, or None when it was never written."""
+    if _HEX_64.fullmatch(receipt_id) is None:
+        raise UploadRejected("receipt_id must be 64 lowercase hex characters")
+    path = _receipt_path(root.expanduser().resolve(), receipt_id)
+    if not path.is_file():
+        return None
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise UploadRejected("retract receipt is unreadable") from exc
+    if not isinstance(loaded, dict):
+        raise UploadRejected("retract receipt is unreadable")
+    upload_id = loaded.get("upload_id")
+    checked_at = loaded.get("checked_at")
+    digest = loaded.get("content_sha256", "")
+    if not isinstance(upload_id, str) or not isinstance(checked_at, str):
+        raise UploadRejected("retract receipt is unreadable")
+    if not isinstance(digest, str):
+        digest = ""
+    return RetractReceipt(
+        deleted=True,
+        indexed=False,
+        restored=False,
+        receipt_id=receipt_id,
+        checked_at=checked_at,
+        upload_id=upload_id,
+        content_sha256=digest,
+    )
+
+
+def is_retracted_upload(root: Path, upload_id: str) -> bool:
+    """True when this upload identity has a stored retract receipt."""
+    if _HEX_64.fullmatch(upload_id) is None:
+        return False
+    return read_retract_receipt(root, _receipt_id(upload_id)) is not None
+
+
+def _upload_identity(upload_id: str) -> str:
+    identity = upload_id.strip().lower()
+    if _HEX_64.fullmatch(identity) is None:
+        raise UploadRejected("upload_id must be 64 lowercase hex characters")
+    return identity
+
+
+def _receipt_id(upload_id: str) -> str:
+    return hashlib.sha256(f"retract\0{upload_id}".encode()).hexdigest()
+
+
+def _receipt_path(vault: Path, receipt_id: str) -> Path:
+    return vault / ".sb" / "retracts" / receipt_id[:2] / f"{receipt_id}.json"
+
+
+def _write_receipt(vault: Path, receipt: RetractReceipt) -> None:
+    path = _receipt_path(vault, receipt.receipt_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {**receipt.as_dict(), "content_sha256": receipt.content_sha256}
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        _ = temporary.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        _ = temporary.chmod(0o600)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    inbox_copy = vault / "inbox" / ".requests" / "retract" / f"{receipt.upload_id}.json"
+    inbox_copy.parent.mkdir(parents=True, exist_ok=True)
+    inbox_tmp = inbox_copy.with_name(f".{inbox_copy.name}.{os.getpid()}.tmp")
+    try:
+        _ = inbox_tmp.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        _ = inbox_tmp.chmod(0o600)
+        os.replace(inbox_tmp, inbox_copy)
+    finally:
+        if inbox_tmp.exists():
+            inbox_tmp.unlink()
+
+
+def _staged_uploads(vault: Path, identity: str) -> list[Path]:
+    found: list[Path] = []
+    inbox = vault / "inbox"
+    if not inbox.is_dir():
+        return found
+    for base in (inbox / "uploads", inbox / ".done" / "uploads"):
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*"):
+            if path.is_file() and not path.is_symlink() and path.name.startswith(f"{identity}-"):
+                found.append(path)
+    return found
+
+
+def _unlink_inbox_file(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError as exc:
+        raise UploadRejected("failed to delete staged upload") from exc
