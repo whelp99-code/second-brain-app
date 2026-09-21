@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import socket
+import sqlite3
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -13,6 +15,7 @@ from urllib.request import Request, urlopen
 from phone_history.api import build_server
 from phone_history.service import PhoneHistoryService
 from phone_history.transport import seal_transport_payload
+from sb.store.cas import ContentAddressedStore
 
 from tests.conftest import event_dict
 from tests.test_repository_service import RecordingSink
@@ -289,3 +292,85 @@ def test_http_encrypted_background_ingest(settings: object) -> None:
         )
         assert status == 400
         assert payload["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_http_delete_retracts_isolated_vault(settings: object, tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    configured = replace(settings, port=port, second_brain_vault=vault)
+    service = PhoneHistoryService(configured)
+    server = build_server(configured, service)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{port}"
+    event_id = "phevt:http-retract:001"
+    try:
+        status, _payload, _ = call(
+            base,
+            "/v1/events:batch",
+            method="POST",
+            token=settings.api_token,
+            headers={"Idempotency-Key": "http-retract-0001"},
+            payload=batch_payload(event_dict(event_id=event_id)),
+        )
+        assert status == 201
+        record = service.repository.get_event(event_id)
+        ref = json.loads(record.sink_ref or "{}")
+        digest = ref["content_sha256"]
+        staged = vault / ref["inbox_path"]
+        cas = ContentAddressedStore(vault)
+        cas.put(staged.read_bytes())
+        db = vault / ".sb" / "search.db"
+        db.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db)
+        conn.execute("CREATE TABLE search_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("INSERT INTO search_meta(key,value) VALUES ('schema_version','4')")
+        conn.execute(
+            "CREATE VIRTUAL TABLE docs USING fts5("
+            "page_id UNINDEXED, section, text, kind UNINDEXED, updated UNINDEXED, "
+            "status UNINDEXED, knowledge_status UNINDEXED, approval_status UNINDEXED, "
+            "canonical UNINDEXED, source_ref UNINDEXED, compact UNINDEXED, "
+            "normalize_id UNINDEXED, normalize_section UNINDEXED, tokenize='trigram')"
+        )
+        conn.execute(
+            "INSERT INTO docs(page_id,section,text,kind,updated,status,knowledge_status,"
+            "approval_status,canonical,source_ref,compact,normalize_id,normalize_section) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                "wiki/probe",
+                "body",
+                f"see {digest}",
+                "wiki",
+                "",
+                "",
+                "UNVERIFIED",
+                "UNREVIEWED",
+                "false",
+                digest,
+                "",
+                "",
+                "",
+            ),
+        )
+        conn.commit()
+        conn.close()
+        status, deleted, _ = call(
+            base,
+            f"/v1/events/{event_id}?reason=owner_requested",
+            method="DELETE",
+            token=settings.api_token,
+        )
+        assert status == 200
+        assert deleted["state"] == "deleted"
+        assert not staged.exists()
+        assert cas.exists(digest) is False
+        assert cas.is_tombstoned(digest) is True
+        conn = sqlite3.connect(db)
+        assert conn.execute("SELECT count(*) FROM docs").fetchone()[0] == 0
+        conn.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
