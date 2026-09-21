@@ -113,6 +113,17 @@ class PhoneHistoryService:
         exported = 0
         pending = 0
         for record in self.repository.pending_events(limit=limit):
+            upload_id = _upload_id(record.sink_ref)
+            if upload_id is not None:
+                try:
+                    self.sink.retract(upload_id)
+                except (SinkError, OSError, TimeoutError, ConnectionError) as exc:
+                    code = str(exc) or type(exc).__name__
+                    self.repository.mark_sink_pending(record.id, code)
+                    pending += 1
+                    continue
+                self.repository.delete_event(record.id, reason="owner_requested")
+                continue
             refreshed = self._export(record)
             if refreshed.sink_state == "exported":
                 exported += 1
