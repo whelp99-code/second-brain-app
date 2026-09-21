@@ -28,6 +28,8 @@ def test_internal_v4_execution_proves_and_preserves_scoped_records(tmp_path):
         result = executor.apply_once(worker="fixture:worker", now=now)
         assert result.state == "proved", result
         status = executor.store.get(accepted.request_id)
+        assert status is not None
+        assert status.proof_json is not None
         proof = json.loads(status.proof_json)
         assert proof["schema_version"] == 4
         assert proof["request_id"] == accepted.request_id
@@ -60,7 +62,9 @@ def test_execution_denies_revoked_authority_or_changed_envelope(tmp_path, tamper
         result = executor.apply_once(worker="fixture:worker", now=now)
         assert result.state == "failed", result
         assert not executor.generations.active_link.exists()
-        assert executor.store.get(accepted.request_id).proof_json is None
+        status = executor.store.get(accepted.request_id)
+        assert status is not None
+        assert status.proof_json is None
     finally:
         executor.close()
 
@@ -72,7 +76,9 @@ def test_expired_request_cannot_start_despite_a_true_authority_callback(tmp_path
         result = executor.apply_once(worker="fixture:worker", now=datetime.fromisoformat(raw["expires_at"]))
         assert result.state == "failed" and result.code == "SCOPED_WRITE_REQUEST_EXPIRED"
         assert not executor.generations.active_link.exists()
-        assert executor.store.get(accepted.request_id).proof_json is None
+        status = executor.store.get(accepted.request_id)
+        assert status is not None
+        assert status.proof_json is None
     finally:
         executor.close()
 
@@ -90,7 +96,9 @@ def test_revocation_after_sealing_prevents_activation(tmp_path):
         assert result.state == "failed", result
         assert not authorized[0]
         assert not executor.generations.active_link.exists()
-        assert executor.store.get(accepted.request_id).proof_json is None
+        status = executor.store.get(accepted.request_id)
+        assert status is not None
+        assert status.proof_json is None
     finally:
         executor.close()
 
@@ -128,6 +136,7 @@ executor.apply_once(worker="fixture:crash", now=datetime.fromisoformat(sys.argv[
     try:
         applied = barrier == "pointer_parent_fsync"
         before = executor.store.get(accepted.request_id)
+        assert before is not None
         generation_id = executor.generations.active().generation_id if applied else None
         generations = set(executor.generations.generations.iterdir())
         result = executor.apply_once(worker="fixture:resume", now=later)
@@ -135,7 +144,10 @@ executor.apply_once(worker="fixture:crash", now=datetime.fromisoformat(sys.argv[
             assert before.phase == "switch_intent"
             assert before.result_generation_id == generation_id
             assert result.state == "proved", result
-            proof = json.loads(executor.store.get(accepted.request_id).proof_json)
+            status = executor.store.get(accepted.request_id)
+            assert status is not None
+            assert status.proof_json is not None
+            proof = json.loads(status.proof_json)
             assert proof["generation_id"] == generation_id
             assert proof["request_id"] == raw["request_id"]
             assert proof["scope_digest"] == raw["preparation"]["binding"]["identity_digest"]
@@ -147,6 +159,8 @@ executor.apply_once(worker="fixture:crash", now=datetime.fromisoformat(sys.argv[
             expected = "SCOPED_WRITE_REQUEST_EXPIRED" if reason == "expired" else "SCOPED_WRITE_AUTHORITY_INVALID"
             assert result.code == expected
             assert not executor.generations.active_link.exists()
-            assert executor.store.get(accepted.request_id).proof_json is None
+            status = executor.store.get(accepted.request_id)
+            assert status is not None
+            assert status.proof_json is None
     finally:
         executor.close()
