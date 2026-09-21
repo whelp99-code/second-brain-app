@@ -27,7 +27,7 @@ def test_live_decision_is_bound_and_frozen():
     result = validate_scoped_provider_decision(value, request, started=at, now=at)
     assert result.dispatch_fence == 1
     with pytest.raises(FrozenInstanceError):
-        result.dispatch_fence = 2
+        setattr(result, 'dispatch_fence', 2)  # noqa: B010
 
 
 @pytest.mark.parametrize("mode", ["provider", "request", "scope", "outbox", "bool", "float", "overflow",
