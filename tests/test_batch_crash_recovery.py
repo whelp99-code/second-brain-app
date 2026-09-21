@@ -10,6 +10,7 @@ from sb.config import Config
 from sb.ops import status_snapshot
 from sb.pipeline import _run_all_mutable
 from sb.vault import init_vault
+from sb.effect_values import is_json_object
 
 
 def _blocked_batch(root: str, ready, release, after_ingest: bool):
@@ -40,6 +41,7 @@ def test_killed_batch_is_interrupted_only_after_next_writer_acquires_lock(tmp_pa
     try:
         assert ready.wait(10)
         first = status_snapshot(config)['last_batch']
+        assert isinstance(first, dict) and is_json_object(first)
         assert first['status'] == 'running' and first['finished_at'] is None
         assert first['stages_attempted'] == int(after_ingest)
         assert first['errors'] == int(after_ingest)
@@ -48,7 +50,9 @@ def test_killed_batch_is_interrupted_only_after_next_writer_acquires_lock(tmp_pa
         child.kill()
         child.join(10)
         assert child.exitcode is not None and child.exitcode != 0
-        assert status_snapshot(config)['last_batch']['status'] == 'running'
+        running = status_snapshot(config)['last_batch']
+        assert isinstance(running, dict) and is_json_object(running)
+        assert running['status'] == 'running'
         result = _run_all_mutable(config)
         assert result.status == 'ok'
         with closing(sqlite3.connect(root / '.sb/ledger.db')) as connection:
@@ -58,7 +62,9 @@ def test_killed_batch_is_interrupted_only_after_next_writer_acquires_lock(tmp_pa
         assert old[2] == int(after_ingest) and old[3] == int(after_ingest)
         if after_ingest:
             assert '"stage":"ingest"' in old[4] and '"status":"partial"' in old[4]
-        assert status_snapshot(config)['last_batch']['status'] == 'ok'
+        completed = status_snapshot(config)['last_batch']
+        assert isinstance(completed, dict) and is_json_object(completed)
+        assert completed['status'] == 'ok'
     finally:
         if child.is_alive():
             child.kill()

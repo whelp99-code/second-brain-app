@@ -1,6 +1,8 @@
 from pathlib import Path
+from typing import Never
 
 from sb.pipeline import RunOutcome
+from sb.effect_values import is_json_object
 from tests.test_web import _ready, _request, _running
 
 
@@ -13,9 +15,12 @@ def test_web_run_exposes_redacted_failure(tmp_path: Path, monkeypatch):
     with _running(config) as url:
         status, result = _request(url + '/api/run', method='POST', payload={})
     assert status == 200
+    assert isinstance(result, dict) and is_json_object(result)
     assert result['status'] == 'failed'
-    assert 'LLM egress denied' in result['failure']
-    assert 'private-value' not in result['failure']
+    failure = result['failure']
+    assert isinstance(failure, str)
+    assert 'LLM egress denied' in failure
+    assert 'private-value' not in failure
 
 
 def test_status_includes_stage_exception_history(tmp_path: Path):
@@ -23,18 +28,24 @@ def test_status_includes_stage_exception_history(tmp_path: Path):
 
     config, root = _ready(tmp_path)
 
-    def reject(*args):
+    def reject(ledger, vault, run_id: str) -> Never:
         raise RuntimeError('token=private-value policy denied')
 
     failed = _run_locked(root, reject, 'compile')
     with _running(config) as url:
         status, result = _request(url + '/api/status')
     assert status == 200
-    row = next(row for row in result['recent_stages'] if row['run_id'] == failed.run_id)
+    assert isinstance(result, dict) and is_json_object(result)
+    recent_stages = result['recent_stages']
+    assert isinstance(recent_stages, list)
+    row = next(row for row in recent_stages if is_json_object(row) and row['run_id'] == failed.run_id)
+    assert is_json_object(row)
     assert row['stage'] == 'compile'
     assert row['status'] == 'failed'
-    assert 'policy denied' in row['error']
-    assert 'private-value' not in row['error']
+    error = row['error']
+    assert isinstance(error, str)
+    assert 'policy denied' in error
+    assert 'private-value' not in error
 
 
 def test_web_search_uses_explicit_registry_over_environment(tmp_path: Path, monkeypatch):
@@ -49,5 +60,6 @@ def test_web_search_uses_explicit_registry_over_environment(tmp_path: Path, monk
     with _running(config) as url:
         status, result = _request(url + '/api/search?q=' + quote(TERM))
     assert status == 200
+    assert isinstance(result, dict) and is_json_object(result)
     assert result['results']
     assert not (tmp_path / 'unrelated.sqlite').exists()

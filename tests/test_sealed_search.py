@@ -272,11 +272,25 @@ def test_omitted_display_metadata_preserves_scope_and_explicit_filters(tmp_path:
         "wiki/b": ("SharedProbe", "conflict", "2026-08-01", "SharedProbe [^aaaaaaaa]"),
     }, approved=("wiki/a",))
     index = SearchIndex(root, registry_path=tmp_path / "registry.sqlite")
-    for filters in ({"scope": "reference"}, {"scope": "active"}, {"scope": "candidate"},
-                    {"status": "conflict"}, {"updated_from": "2026-09-01"},
-                    {"updated_to": "2026-08-31"}, {"kinds": ["conflicts"]}):
-        full = list(index.iter_lexical_hits("SharedProbe", **filters))
-        lean = list(index.iter_lexical_hits("SharedProbe", include_metadata=False, **filters))
+    def hits(*, kinds: list[str] | None = None, status: str | None = None,
+             updated_from: str | None = None, updated_to: str | None = None,
+             scope: str | None = None, include_metadata: bool = True):
+        return list(index.iter_lexical_hits(
+            "SharedProbe", kinds=kinds, status=status, updated_from=updated_from,
+            updated_to=updated_to, scope=scope, include_metadata=include_metadata,
+        ))
+
+    cases: list[tuple[list[str] | None, str | None, str | None, str | None, str | None]] = [
+        (None, None, None, None, "reference"), (None, None, None, None, "active"),
+        (None, None, None, None, "candidate"), (None, "conflict", None, None, None),
+        (None, None, "2026-09-01", None, None), (None, None, None, "2026-08-31", None),
+        (["conflicts"], None, None, None, None),
+    ]
+    for kinds, status, updated_from, updated_to, scope in cases:
+        full = hits(kinds=kinds, status=status, updated_from=updated_from,
+                    updated_to=updated_to, scope=scope)
+        lean = hits(kinds=kinds, status=status, updated_from=updated_from,
+                    updated_to=updated_to, scope=scope, include_metadata=False)
         assert [(hit.page_id, hit.knowledge_status, hit.approval_status) for hit in lean] == [
             (hit.page_id, hit.knowledge_status, hit.approval_status) for hit in full]
     assert len(list(index.iter_lexical_hits("SharedProbe", scope="active", include_metadata=False))) == 1

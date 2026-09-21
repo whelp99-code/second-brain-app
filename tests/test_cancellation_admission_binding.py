@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from sb.correction_cancellation_requests import accept_correction_cancellation
+from sb.effect_values import is_json_object
 from sb.generation_runtime_models import (
     GenerationAuthority,
     GenerationMutation,
@@ -50,7 +51,11 @@ def test_changed_or_unsafe_actual_page_is_not_admitted(tmp_path: Path, change: s
     import os
 
     executor, value, _original = prepare_unaccepted(tmp_path)
-    page = executor.generations.active().root / (value["target"]["page_id"] + ".md")
+    target = value["target"]
+    assert is_json_object(target)
+    page_id = target["page_id"]
+    assert isinstance(page_id, str)
+    page = executor.generations.active().root / (page_id + ".md")
     contents = page.read_bytes()
     # Deliberately corrupt an isolated sealed surface; never touch operational generations.
     page.parent.chmod(0o700)
