@@ -2,7 +2,7 @@
 
 The earlier `.git/index.lock` EROFS was Codex sandbox, not the disk. Host Git is writable. No push/merge/deploy.
 
-B01 measurement completed; B02 and B03 product fixes are implemented; B06 remains externally blocked.
+B01–B03 product fixes are implemented; B06 company/personal candidate flow is in `2e9f9ba` (not a live CRM/Mail/Shipping runtime integration).
 
 
 ## Unit results
@@ -11,7 +11,7 @@ B01 measurement completed; B02 and B03 product fixes are implemented; B06 remain
 - B02: signed scoped read/search/page/status/write paths remain fail-closed; `sb/scoped_surfaces.py` adds export and restore claim checks with generation and deletion high-water binding.
 - B03: `sb/parsers/docling_adapter.py` and its worker isolate optional Docling; deterministic parsers remain the fallback. `parse_document()` records source hash, locator, parser/model version, and partial state.
 - B04/B05: existing Korean evaluation and memory lifecycle suites pass against the current managed search and deletion/restore fences.
-- B06 blocker: CRM C04, Mail M03, and Shipping H04 are outside this checkout and are not available as callable dependencies. The personal memory lifecycle remains independently testable; company-flow integration is not claimed complete.
+- B06: in-repo `CompanyMemoryStore` is tested. Live cross-runtime company flow (CRM/Mail/Shipping processes) is not claimed complete.
 
 ## Host remasure 2026-09-22
 
