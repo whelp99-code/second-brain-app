@@ -1,0 +1,505 @@
+{
+  "reviewed_submission": "26cf158",
+  "reviewed_head": "770668984fd7ff4968e17713ef0758f9a1ef55d8",
+  "verdict": "not_accepted",
+  "operational_cutover": false,
+  "focused_tests": {
+    "passed": 70,
+    "seconds": 17.51,
+    "exit_code": 0
+  },
+  "ruff_exit": 0,
+  "installed_pair_exit": 0,
+  "installed_maintenance_exit": 0,
+  "boundary": {
+    "review_head": "770668984fd7ff4968e17713ef0758f9a1ef55d8",
+    "scope": "Synthetic fixtures only; source pipeline and SQLite predicates; operational releases inspected read-only.",
+    "managed_compile": [
+      {
+        "kind": "unmodified",
+        "edit_before": false,
+        "marker": "5de4a83e766f9de9fdfe0a49f129d556cec88e38969216d89f90e29ebb37c9a6",
+        "pages": 1,
+        "proposals": 0,
+        "exit_code": 0,
+        "edit_after": false,
+        "corrected": true,
+        "managed": true
+      },
+      {
+        "kind": "uncommitted_edit",
+        "edit_before": true,
+        "marker": "5de4a83e766f9de9fdfe0a49f129d556cec88e38969216d89f90e29ebb37c9a6",
+        "pages": 0,
+        "proposals": 1,
+        "exit_code": 0,
+        "edit_after": true,
+        "corrected": false,
+        "managed": true
+      },
+      {
+        "kind": "committed_edit",
+        "edit_before": true,
+        "marker": "d331d07785f6231e0fc5830718869156eb865aaf2ecde44e616967123bfa02ad",
+        "pages": 1,
+        "proposals": 0,
+        "exit_code": 0,
+        "edit_after": false,
+        "corrected": true,
+        "managed": true
+      },
+      {
+        "kind": "committed_human_page",
+        "edit_before": true,
+        "marker": "1b141e7ace8c240385f523857077dd045599caf6a185ae4f2fb821c7a43e0599",
+        "pages": 1,
+        "proposals": 0,
+        "exit_code": 0,
+        "edit_after": false,
+        "corrected": true,
+        "managed": true
+      }
+    ],
+    "search": [
+      {
+        "query": "은빛나침반",
+        "body": "은빛　나침반",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "STRASSE한글",
+        "body": "Straße한글",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "STRASSE",
+        "body": "Straße",
+        "sql": false,
+        "record": true,
+        "uses_fts": true
+      },
+      {
+        "query": "alphabeta",
+        "body": "alpha\nbeta",
+        "sql": false,
+        "record": true,
+        "uses_fts": true
+      },
+      {
+        "query": "\"north star\"",
+        "body": "north\nstar",
+        "sql": false,
+        "record": true,
+        "uses_fts": true
+      },
+      {
+        "query": "alphabeta",
+        "body": "alphabeta",
+        "sql": true,
+        "record": true,
+        "uses_fts": true
+      }
+    ],
+    "rollback": [
+      {
+        "kind": "absent",
+        "exit": 0,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-r89mcccf/rollback-absent",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": false,
+          "previous_reads_revocation_store": false,
+          "allowed": true,
+          "reason": null
+        }
+      },
+      {
+        "kind": "regular",
+        "exit": 2,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-r89mcccf/rollback-regular",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": true,
+          "previous_reads_revocation_store": false,
+          "allowed": false,
+          "reason": "ROLLBACK_UNSAFE_REVOCATION_STORE"
+        }
+      },
+      {
+        "kind": "empty",
+        "exit": 0,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-r89mcccf/rollback-empty",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": false,
+          "previous_reads_revocation_store": false,
+          "allowed": true,
+          "reason": null
+        }
+      },
+      {
+        "kind": "directory",
+        "exit": 0,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-r89mcccf/rollback-directory",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": false,
+          "previous_reads_revocation_store": false,
+          "allowed": true,
+          "reason": null
+        }
+      },
+      {
+        "kind": "symlink",
+        "exit": 0,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-r89mcccf/rollback-symlink",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": false,
+          "previous_reads_revocation_store": false,
+          "allowed": true,
+          "reason": null
+        }
+      }
+    ],
+    "candidate": {
+      "manifest": {
+        "schema": 1,
+        "release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+        "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc",
+        "release_id_scheme": "sb-release-inputs-v3",
+        "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+        "preparation_files_sha256": {
+          "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+          "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+          "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+        },
+        "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+        "source_commit": "63bdaf68e7f2079f320ad4c63574ed291fa4d5a2",
+        "source_tree": "cd2babee91a3c896779b202cef507a8f0ec63b30",
+        "source_materialization": "git-archive",
+        "working_tree_modified": true,
+        "contract_profile": "task32-schema4",
+        "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+      },
+      "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc",
+      "sb_python_files": 182,
+      "wheel_vs_review_source_mismatches": [],
+      "installed_vs_wheel_mismatches": [],
+      "installed_site_packages": "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages"
+    },
+    "harness_correction": "Initial installed-code comparison assumed Python 3.14; actual candidate uses Python 3.12. Independent artifact-identity.json verifies all 182 installed modules match. Initial result is preserved; no product defect was inferred from the wrong path."
+  },
+  "model_request": [
+    {
+      "kind": "baseline",
+      "memories": 1,
+      "snapshot_bytes": 1966,
+      "used_bytes": 71,
+      "remaining_bytes": 4025,
+      "max_total_bytes": 4096,
+      "serialized_request_bytes": 431,
+      "within_max_total_bytes": true
+    },
+    {
+      "kind": "query_and_two_bodies",
+      "memories": 2,
+      "snapshot_bytes": 5733,
+      "used_bytes": 4800,
+      "remaining_bytes": 3200,
+      "max_total_bytes": 8000,
+      "serialized_request_bytes": 8840,
+      "within_max_total_bytes": false
+    },
+    {
+      "kind": "expired",
+      "memories": 0,
+      "snapshot_bytes": 1769,
+      "used_bytes": 0,
+      "remaining_bytes": 4096,
+      "max_total_bytes": 4096,
+      "serialized_request_bytes": 210,
+      "within_max_total_bytes": true
+    },
+    {
+      "kind": "untrusted",
+      "memories": 0,
+      "snapshot_bytes": 1775,
+      "used_bytes": 0,
+      "remaining_bytes": 4096,
+      "max_total_bytes": 4096,
+      "serialized_request_bytes": 216,
+      "within_max_total_bytes": true
+    }
+  ],
+  "revocation": {
+    "initial_scoped_keys": [
+      "key:test"
+    ],
+    "scoped_denies_after_durable_revocation": true,
+    "cancellation_active_keys_after_durable_revocation": [
+      "key:test"
+    ],
+    "scoped_keys_after_store_loss": [
+      "key:test"
+    ],
+    "scope": "Policy key selection only; synthetic keys/config; no cancellation or unauthorized data read attempted."
+  },
+  "artifact_identity": [
+    {
+      "path": "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+      "manifest": {
+        "schema": 1,
+        "release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+        "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc",
+        "release_id_scheme": "sb-release-inputs-v3",
+        "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+        "preparation_files_sha256": {
+          "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+          "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+          "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+        },
+        "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+        "source_commit": "63bdaf68e7f2079f320ad4c63574ed291fa4d5a2",
+        "source_tree": "cd2babee91a3c896779b202cef507a8f0ec63b30",
+        "source_materialization": "git-archive",
+        "working_tree_modified": true,
+        "contract_profile": "task32-schema4",
+        "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+      },
+      "site_packages": "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages",
+      "module_files": 182,
+      "installed_vs_wheel_mismatch": [],
+      "source_vs_wheel_mismatch": [],
+      "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc"
+    },
+    {
+      "path": "/var/tmp/sb-candidate-159b611/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+      "manifest": {
+        "schema": 1,
+        "release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+        "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc",
+        "release_id_scheme": "sb-release-inputs-v3",
+        "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+        "preparation_files_sha256": {
+          "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+          "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+          "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+        },
+        "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+        "source_commit": "159b611484e7b2ae9b3654ff7643307161657d37",
+        "source_tree": "e4111b0455d79f06b85ed755a566b3a1f8d8b3e5",
+        "source_materialization": "git-archive",
+        "working_tree_modified": true,
+        "contract_profile": "task32-schema4",
+        "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+      },
+      "site_packages": "/var/tmp/sb-candidate-159b611/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages",
+      "module_files": 182,
+      "installed_vs_wheel_mismatch": [],
+      "source_vs_wheel_mismatch": [],
+      "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc"
+    }
+  ],
+  "independent_pair": {
+    "harness_commit": "63bdaf68e7f2079f320ad4c63574ed291fa4d5a2",
+    "provider_manifest": {
+      "schema": 1,
+      "release_id": "3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1",
+      "wheel_sha256": "2dd0ae860946b42daf2a4439c1f8fb02c6b6cdb920bfe5801c1a9e33aaf03afc",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "63bdaf68e7f2079f320ad4c63574ed291fa4d5a2",
+      "source_tree": "cd2babee91a3c896779b202cef507a8f0ec63b30",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "provider_imports": [
+      "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages/sb/mcp.py",
+      "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages/sb/cli.py",
+      "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages/sb/request_executor.py",
+      "/var/tmp/sb-candidate-63bdaf6/releases/3d36c4048c1f31f2c12b25c6bb9b8f23d88c5fb1/.venv/lib/python3.12/site-packages/sb/scoped_write_mcp.py"
+    ],
+    "jarvis_build": "/var/tmp/jarvis-artifact-eeac005/source/dist",
+    "acceptance": {
+      "gateway_configuration": "CLI parser and independently owned existing authority connection",
+      "admission_surface": "mcp",
+      "execution_surface": "cli",
+      "transport": "actual verified TLS, separate Python verifier children and live gateway sessions",
+      "identity_forwarder": "fixture",
+      "clock": "fixture",
+      "content_profile": "fixture",
+      "public_mcp_write": true,
+      "results": [
+        {
+          "mode": "valid",
+          "readback": {
+            "request_id": "memreq:scoped:v4:bddba0f541fa19bd758ea22e9e40f8018a4b952df2cc90c97bf8165f4d773d80",
+            "request_digest": "sha256:bddba0f541fa19bd758ea22e9e40f8018a4b952df2cc90c97bf8165f4d773d80",
+            "writer_agent": "agent:fixture",
+            "reader_agent": "agent:reader",
+            "fresh_login": true,
+            "provider_proved": true,
+            "jarvis_settled": true,
+            "control_completed": true,
+            "settlement_replay": true,
+            "settlements": 1,
+            "attempts": 1,
+            "same_generation": true,
+            "record_ids": [
+              "sbrecord:v1:92bafd349bdcb15486e4c3977cf9558371eb86caf15f13710fa00bcb11e85b40",
+              "sbrecord:v1:513e70b8036f1a09b02ea3448a7db01032c22cf5faaadd5456a678ceb2a573c7"
+            ],
+            "source_refs": [
+              "Second Brain",
+              "Second Brain"
+            ],
+            "context_records": 2,
+            "clients": {
+              "independent_stdio_clients": 2,
+              "records_each": 2,
+              "https_calls": 2,
+              "omo_engine_calls": 0,
+              "native_mode": "off",
+              "native_claude_calls": 0,
+              "native_codex_calls": 0,
+              "scope": "actual client/HTTPS/gateway/CLI/provider MCP; fixture forwarding identity, source, policy and clock; read only"
+            },
+            "reader_revocation": 403,
+            "limits": "fixture verified task and reviewed content; native submission is reported separately; not operational deployment"
+          },
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:bddba0f541fa19bd758ea22e9e40f8018a4b952df2cc90c97bf8165f4d773d80",
+            "request_digest": "sha256:bddba0f541fa19bd758ea22e9e40f8018a4b952df2cc90c97bf8165f4d773d80",
+            "idempotency_key": "memidem:scoped:v4:56e747f4e32596991c48a9b11ebf662d119f0549218525390a03634002497723",
+            "scope_digest": "sha256:e1595d8eb8d07dfc8a2812f001178222169e17b32e322b549fcc8c125bb5f16b",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:bddba0f541fa19bd758ea22e9e40f8018a4b952df2cc90c97bf8165f4d773d80.v4.json",
+            "request_file_digest": "sha256:cf29e280b666d2eae1360b16932b135f403eb432a945eadad95ff194f74808b1",
+            "replayed": false
+          },
+          "provider_state": "proved",
+          "active_generation": true,
+          "authority_https_calls": 5,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_during_accept",
+          "admission": "denied",
+          "accepted_row": false,
+          "authority_https_calls": 2,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "revoke_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:6a6affaa91ff1986114f862b2639a30252554828121e456a06867a700a7521dd",
+            "request_digest": "sha256:6a6affaa91ff1986114f862b2639a30252554828121e456a06867a700a7521dd",
+            "idempotency_key": "memidem:scoped:v4:4b346baeb194064a954b72ddfd360d492afaf77271c31179a914193f2838870c",
+            "scope_digest": "sha256:a32bc1d88cb86a57fbd7c8053063289133d15ca6a5b1631d783f0eb989351ec4",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:6a6affaa91ff1986114f862b2639a30252554828121e456a06867a700a7521dd.v4.json",
+            "request_file_digest": "sha256:78dc26f2b97ea32549ef282440c1de22428fca1717fa7be276d5862f37f047fd",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        },
+        {
+          "mode": "expire_before_execute",
+          "native_writer": null,
+          "admission": "accepted",
+          "accepted": {
+            "schema_version": 4,
+            "kind": "accepted",
+            "state": "pending",
+            "provider_instance_id": "provider:fixture",
+            "request_id": "memreq:scoped:v4:0b4f0e9d64ddfe965273d99e9c21336cfafc0613c6868f8eebaae6b6c01c90c9",
+            "request_digest": "sha256:0b4f0e9d64ddfe965273d99e9c21336cfafc0613c6868f8eebaae6b6c01c90c9",
+            "idempotency_key": "memidem:scoped:v4:7fa9e03efe8d25ef5aa7e0264f9b26568f59440fa76369f000dd9e2efa1a54b2",
+            "scope_digest": "sha256:294f5d0ed03e928e8148e38efe748bbf9865fb69301f78e0aec14a1c9c256963",
+            "accepted_at": "2026-08-28T12:00:00.000Z",
+            "inbox_path": "pending/memreq:scoped:v4:0b4f0e9d64ddfe965273d99e9c21336cfafc0613c6868f8eebaae6b6c01c90c9.v4.json",
+            "request_file_digest": "sha256:10b9f319bf22f4a4dbae564c843951e154a01aaba14a665799d9ff4fa749fe49",
+            "replayed": false
+          },
+          "provider_state": "failed",
+          "active_generation": false,
+          "authority_https_calls": 3,
+          "dispatch_attempts": 1,
+          "foreign_key_errors": 0
+        }
+      ]
+    },
+    "work_item": null,
+    "production_activated": false,
+    "candidate_contents": {
+      "provider": {
+        "inventory_sha256": "6effab33cc9d2b66e2034a4dfed778cdf1d9f0766fa0bad0ceac622c38e895c2",
+        "entries": 18476
+      },
+      "jarvis": {
+        "inventory_sha256": "d08bc4c9f96521e6c6f13ccb6e6eee48add658ec1249d6c62bb71977248b3462",
+        "entries": 36318
+      },
+      "node_executable": {
+        "path": "/home/jm/.nvm/versions/node/v24.19.0/bin/node",
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+        "size": 125989464,
+        "mode": 493
+      }
+    }
+  },
+  "limitations": [
+    "No full regression rerun after decisive acceptance failures.",
+    "No --work rerun; standard installed paired gate rerun.",
+    "No operational switch, native authenticated sessions or live model invocation.",
+    "Policy-key eligibility probe does not claim unauthorized payload access."
+  ],
+  "evidence_files": {
+    "/var/tmp/codex-final-26cf158-ufpeOW/model-request-result.json": "39f3234a430334896250dd570949d1fd09c7e9ba78dada649e0b22e227e4daa1",
+    "/var/tmp/codex-final-26cf158-ufpeOW/revocation-result.json": "90c111ba36cd2b74a8accc11fad7196121227b7683b98ac4731cfcabbc3f52d8",
+    "/var/tmp/codex-final-26cf158-ufpeOW/ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "/var/tmp/codex-final-26cf158-ufpeOW/boundary.log": "33be6e02779bf52cdd4b62290f521707c4edf39c0f6efce883b915313bd94c33",
+    "/var/tmp/codex-final-26cf158-ufpeOW/model_request_probe.mjs": "7a8b54fc03ff6119101f1e06f09546c7e60ef9456ca8bcf184bbe5dff217b873",
+    "/var/tmp/codex-final-26cf158-ufpeOW/boundary-result.json": "ce91dc01605154a8deeaec46a980654ac4351530b41e2e6072aaf73299660db9",
+    "/var/tmp/codex-final-26cf158-ufpeOW/model-request.log": "39f3234a430334896250dd570949d1fd09c7e9ba78dada649e0b22e227e4daa1",
+    "/var/tmp/codex-final-26cf158-ufpeOW/focused-pytest.log": "feead9c3ec547aa2535b85c51b415adc26828a708325af5a9afb95ee9afb7f26",
+    "/var/tmp/codex-final-26cf158-ufpeOW/installed-maintenance.log": "e661413f0c7ac39d764984ab93bc6fd67ae72ae57eb64988db71540123d60b5d",
+    "/var/tmp/codex-final-26cf158-ufpeOW/boundary_probe.py": "9f7ef27349046ec441953a676639fc6c31c6c8b4b28ff2bce7e0c8217418add3",
+    "/var/tmp/codex-final-26cf158-ufpeOW/artifact-identity.json": "8e5a9275b165baa348628100d041f5ebe026383fd56a9b1c3af71a027bf7cb81",
+    "/var/tmp/codex-final-26cf158-ufpeOW/installed-pair.json": "6cb10196d5820a6a58f68f273758d44f4c20d325fe7628fbd59c3678e9a77b81",
+    "/var/tmp/codex-final-26cf158-ufpeOW/revocation_probe.py": "a32cc3f1cd3b9ab95fb88a19e84b49d6541370ab581792b1c315f4a7899090c9",
+    "/var/tmp/codex-final-26cf158-ufpeOW/boundary-result-initial-harness.json": "30ef749b32eeb91f4c5dae17cae867489b05b7b78b1cd9667b067ae4ed1d8a30",
+    "/var/tmp/codex-final-26cf158-ufpeOW/installed-pair.log": "6cb10196d5820a6a58f68f273758d44f4c20d325fe7628fbd59c3678e9a77b81"
+  }
+}

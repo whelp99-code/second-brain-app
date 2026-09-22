@@ -1,0 +1,163 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "original_codex_direct_execution": false,
+  "finished_at_utc": "2026-09-12T10:18:41.293669+00:00",
+  "submission": "e68d5e5aab6f4bed6d84af8922179179feb8a4ac",
+  "pin": {
+    "sb_source": "a4b228f326c275cf0aeb05b6ce01d9f224697a2f",
+    "release_id": "7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "wheel_sha256": "c940cf6b936bb45f9d9c7b0220c03cf3d192c824e3c3b720843aa57080cb389f",
+    "candidate": "/var/tmp/sb-candidate-a4b228f/releases/7d2fdedd9d4934b809c674cc5ed6c88c068b9726",
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "verdict": "not_accepted",
+  "product_readiness_accepted": false,
+  "operational_acceptance": false,
+  "findings": [
+    {
+      "id": "F-frozen-harness-missing-seed",
+      "severity": "P2",
+      "kind": "submission_reproducibility",
+      "location": "scripts/jarvis-restore-acceptance.mjs:264",
+      "actual": "Frozen git archive lacks scripts/seed-scoped-v4.py. Direct paired harness fails at this invocation with Python status2, outer EXIT1. Working tree file is untracked.",
+      "evidence": [
+        "paired-restore.log",
+        "diagnostic-seed-provenance.json"
+      ],
+      "completion": "Commit all required fixture/harness inputs; build/execute using clean archived source and pinned installed/JARVIS artifacts. Do not rely on working tree file."
+    },
+    {
+      "id": "M12-final-state-stale-success",
+      "severity": "P2",
+      "kind": "acceptance_evidence_not_product_bug",
+      "location": "scripts/jarvis-restore-acceptance.mjs:286",
+      "actual": "Scoped success is recorded before restoredAgain, which restores an older archive after the new classified write. Supplemental diagnostic harness reports second_restore_records1 but fresh general read immediately after its final restore yields new needle0; actual two scoped sessions both denied.",
+      "evidence": [
+        "paired-supplemental.log",
+        "final-state.log",
+        "final-state-scopes.json"
+      ],
+      "diagnostic_fixture_root": "/var/tmp/sb-jarvis-restore-ZyYLVt",
+      "completion": "Keep mandatory restore/fence failure gate. Finish required restores before proving new classified write/retry and two independent scopes; verify final state with fresh processes, independent revocations and original lineage. If older-backup loss is intended, label measured RPO loss and recover actual work availability before reporting success. Do not carry pre-restore counters forward."
+    },
+    {
+      "id": "F-handoff-stale-and-M13-incomplete",
+      "severity": "P2",
+      "kind": "remaining_authorized_isolated_validation",
+      "location": "GROK-FINAL-ACCEPTANCE-PACKAGE.md:56",
+      "actual": "Submitted browser helper executes remember/resolve as Python POSTs; Chrome only renders DOM. Codex separately verified actual UI failure→input correction→same-button success for remember and conflict resolve, with inbox file and committed conflict. This limited UI flow is now directly passed. Full GUI lifecycle remains incomplete (package explicitly says deletion control absent), and package/resume documents retain old pins, previous gates and unnecessary explicit-commit waiting text.",
+      "evidence": [
+        "browser-submitted.log",
+        "browser-evidence/evidence.json",
+        "source/GROK-FINAL-ACCEPTANCE-PACKAGE.md",
+        "source/GROK-RESUME-STATUS-2026-09-11.md",
+        "actual-ui-result.json",
+        "actual-ui.log",
+        "actual-ui-failure.png",
+        "actual-ui-success.png"
+      ],
+      "completion": "Adopt and accurately link the new Codex actual UI evidence for this fixed tree; do not rerun these unchanged controls merely for counts. Keep other GUI lifecycle requirements explicit, complete authorized executable remainder and identify exact unimplemented/external portions. Reconcile final package/status commands, runtime/build inputs and original A–F/M1–M14 evidence with new frozen pin. Python POST is HTTP evidence, not actual UI evidence. No invented new scope or repeated approval gate."
+    },
+    {
+      "id": "M12-cold-test-nondeterministic-brief",
+      "severity": "P2",
+      "kind": "regression_test_isolation_not_proven_new_product_bug",
+      "location": "tests/test_cold_restore_write.py:46",
+      "actual": "Full regression 1 failed,1837 passed,2 skipped. Cold restore test fails before backup: ingest+compile okay; brief derivation fails unresolved [^uncited] three times. Default briefing cap10 invokes CLI, making this isolated DR test depend on external generation. Test, briefing, pipeline unchanged versus c0b4fce; not established as a new source regression.",
+      "evidence": [
+        "full-regression.log",
+        "cold-failure-ledger.json",
+        "cold-local.log",
+        "cold-local-result.json",
+        "cold-diagnostic-source.py"
+      ],
+      "completion": "Make the existing cold DR fixture deterministic through an explicit local configuration or deterministic provider fixture; keep full product run_all/backup/DB-loss/restore/new-write/revocation assertions. Record original failure and corrected focused result separately; do not delete or weaken assertions or mark the original full suite passed."
+    }
+  ],
+  "checks": {
+    "full-regression": {
+      "exit": 1,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/full-regression.log"
+    },
+    "ruff": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/ruff.log"
+    },
+    "changed-types-corrected": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/changed-types-corrected.log"
+    },
+    "installed-standard-corrected": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/installed-standard-corrected.log"
+    },
+    "installed-work-corrected": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/installed-work-corrected.log"
+    },
+    "installed-maintenance": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/installed-maintenance.log"
+    },
+    "paired-restore": {
+      "exit": 1,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/paired-restore.log"
+    },
+    "paired-supplemental": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/paired-supplemental.log"
+    },
+    "paired-expired-supplemental": {
+      "exit": 1,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/paired-expired-supplemental.log"
+    },
+    "browser-submitted": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/browser-submitted.log"
+    },
+    "actual-ui": {
+      "exit": 0,
+      "result": "/var/tmp/codex-night-e68d5e5-1wan26x9/actual-ui-result.json",
+      "scope": "Real Chrome controls remember400→201 and conflict400→200; inbox and git result; not full GUI deletion/native/operations"
+    },
+    "cold-local-diagnostic": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-e68d5e5-1wan26x9/cold-local.log",
+      "result": "/var/tmp/codex-night-e68d5e5-1wan26x9/cold-local-result.json",
+      "scope": "Review-only cap0 config, original DR assertions maintained. Does not turn original full-suite failure into pass."
+    }
+  },
+  "full_regression_summary": "1 failed, 1837 passed, 2 skipped in 607.24s (0:10:07)",
+  "identity": {
+    "python_files": 182,
+    "mismatches": [],
+    "jarvis_inventory": {
+      "sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+      "entries": 34768,
+      "prior_direct_evidence": "/var/tmp/codex-night-f637e0b-hldpso0f",
+      "new_JARVIS_test_run": false
+    }
+  },
+  "diagnostic_limit": "Missing untracked seed copied only into separately named diagnostic-source, provenance/hash recorded. Supplemental passes do not make frozen archive reproducible. Scope authority callback is fixture, not native auth.",
+  "harness_errors_excluded": [
+    "Initial installed checks used archive without git; CANDIDATE_SOURCE_COMMIT_INVALID. Corrected repo-hosted committed harness passes.",
+    "Initial type run lacked explicit pythonpath; corrected run0errors0warnings.",
+    "Post-final read denial is expected when older archive omits new data; reported1vsactual0 is acceptance-evidence defect, not new read authorization defect."
+  ],
+  "final_state": {
+    "root": "/var/tmp/sb-jarvis-restore-ZyYLVt",
+    "claimed_records": 1,
+    "actual_new_memory_records": 0,
+    "two_scoped_denials": "/var/tmp/codex-night-e68d5e5-1wan26x9/final-state-scopes.json"
+  },
+  "evidence_root": "/var/tmp/codex-night-e68d5e5-1wan26x9",
+  "retained_scope": "Earlier R1–R7/V1–V5 and original A–F/M1–M14 claims remain path-limited. Same JARVIS artifact, previous direct8backup tests/tsc retained; not rerun or recounted.",
+  "external_conditions": [
+    "Live/native authenticated sessions and product/version injection/compaction/copy lifecycle",
+    "Real user work item and Korean gold query set",
+    "Operational data/backups/cutover authorization and operating RPO/RTO; no production action in this review"
+  ]
+}

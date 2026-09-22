@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="35" time="3.108" timestamp="2026-09-04T21:47:02.981492+09:00" hostname="jm-acloud"><testcase classname="tests.test_api" name="test_health_is_public_but_product_routes_require_auth" time="0.527" /><testcase classname="tests.test_api" name="test_http_ingest_timeline_candidate_decision_and_delete" time="0.540" /><testcase classname="tests.test_api" name="test_http_idempotency_conflict_invalid_json_and_content_type" time="0.524" /><testcase classname="tests.test_api" name="test_http_request_size_limit_and_bad_query_are_safe" time="0.519" /><testcase classname="tests.test_api" name="test_http_encrypted_background_ingest" time="0.526" /><testcase classname="tests.test_crypto_models_redaction" name="test_secret_box_round_trip_and_aad_binding" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_secret_box_detects_ciphertext_tamper" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_batch_parser_normalizes_and_produces_stable_digest" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_batch_rejects_unknown_fields_and_duplicate_ids" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_event_rejects_unsafe_url_credentials_and_non_tls_host" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_event_rejects_invalid_time_and_empty_content" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_attachment_hash_path_and_size_guards" time="0.056" /><testcase classname="tests.test_crypto_models_redaction" name="test_attachment_base64_is_strict" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_attachment_round_trip_metadata_and_digest" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_redaction_masks_credentials_and_personal_identifiers" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_prompt_injection_is_flagged_but_not_executed_or_removed" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_background_transport_envelope_contains_no_plaintext_and_authenticates" time="0.000" /><testcase classname="tests.test_crypto_models_redaction" name="test_background_transport_rejects_tamper" time="0.000" /><testcase classname="tests.test_ios_contract_and_privacy" name="test_ios_contract_generation_matches_current_schema_and_fixture" time="0.025"><failure message="subprocess.CalledProcessError: Command '['/usr/bin/python3', '/home/jm/orca/projects/second-brain-app/phone-history/scripts/generate_ios_contract.py']' returned non-zero exit status 1.">def test_ios_contract_generation_matches_current_schema_and_fixture() -&gt; None:
+&gt;       run_generator("generate_ios_contract.py")
+
+tests/test_ios_contract_and_privacy.py:23: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_ios_contract_and_privacy.py:13: in run_generator
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['/usr/bin/python3', '/home/jm/orca/projects/second-brain-app/phone-history/scripts/generate_ios_contract.py'],)
+kwargs = {'cwd': PosixPath('/home/jm/orca/projects/second-brain-app/phone-history'), 'stderr': -1, 'stdout': -1, 'text': True}
+process = &lt;Popen: returncode: 1 args: ['/usr/bin/python3', '/home/jm/orca/projects/sec...&gt;
+stdout = '', stderr = 'could not locate PhoneEvent object in JSON Schema\n'
+retcode = 1
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output &amp; stderr attributes if those streams
+        were captured.
+    
+        If timeout (seconds) is given and the process takes too long,
+         a TimeoutExpired exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+&gt;               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['/usr/bin/python3', '/home/jm/orca/projects/second-brain-app/phone-history/scripts/generate_ios_contract.py']' returned non-zero exit status 1.
+
+/usr/lib/python3.14/subprocess.py:578: CalledProcessError</failure></testcase><testcase classname="tests.test_ios_contract_and_privacy" name="test_ios_api_generation_matches_current_openapi" time="0.039" /><testcase classname="tests.test_ios_contract_and_privacy" name="test_app_and_share_extension_use_the_same_minimal_groups" time="0.000" /><testcase classname="tests.test_ios_contract_and_privacy" name="test_share_extension_is_queue_only_and_adot_is_user_declared" time="0.000" /><testcase classname="tests.test_repository_service" name="test_repository_encrypts_sensitive_fields_and_attachment" time="0.017" /><testcase classname="tests.test_repository_service" name="test_repository_detects_tampered_event_ciphertext" time="0.015" /><testcase classname="tests.test_repository_service" name="test_repository_rejects_same_event_id_with_changed_content" time="0.016" /><testcase classname="tests.test_repository_service" name="test_service_idempotency_and_event_conflict" time="0.020" /><testcase classname="tests.test_repository_service" name="test_service_sink_failure_stays_pending_and_maintenance_recovers" time="0.038" /><testcase classname="tests.test_repository_service" name="test_candidates_are_noncanonical_and_decision_has_no_approval_effect" time="0.021" /><testcase classname="tests.test_repository_service" name="test_delete_erases_content_attachment_candidate_and_is_idempotent" time="0.024" /><testcase classname="tests.test_repository_service" name="test_episode_grouping_is_deterministic" time="0.020" /><testcase classname="tests.test_repository_service" name="test_attachment_retention_prunes_ciphertext_but_keeps_event" time="0.018" /><testcase classname="tests.test_repository_service" name="test_idempotency_response_is_encrypted_at_rest" time="0.015" /><testcase classname="tests.test_second_brain_sink" name="test_second_brain_sink_is_inbox_only_redacted_and_noncanonical" time="0.035" /><testcase classname="tests.test_second_brain_sink" name="test_second_brain_sink_retry_is_idempotent" time="0.016" /><testcase classname="tests.test_second_brain_sink" name="test_rendered_document_never_promotes_approval" time="0.016" /></testsuite></testsuites>

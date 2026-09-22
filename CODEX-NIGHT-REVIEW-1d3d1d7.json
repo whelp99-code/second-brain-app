@@ -1,0 +1,100 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e under overnight independent-review delegation; not original Codex execution",
+  "submission": "1d3d1d7d8d4bea93b0dfe994f5c6495974cb1edf",
+  "pin": {
+    "sb_source": "210226e1fe05bf1fae28f86238f0f4ecf3103f98",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-210226e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "aee8f1f",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-aee8f1f/source/dist",
+    "jarvis_inventory_sha256": "5e4de7e96fd435f2f988bca24fe267cfc30d4407c21e5b53569a2afb5e95ef32",
+    "jarvis_inventory_entries": 34780,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "dist_matches_37b034f": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-1d3d1d7-wxk5m5cn",
+  "finished_at_utc": "2026-09-11T17:36:13.252476+00:00",
+  "findings": [
+    {
+      "id": "N1-crash-restart",
+      "priority": "P1",
+      "code": [
+        "Orca-JARVIS/src/cli-gjc-commands.ts:96-109",
+        "Orca-JARVIS/src/gjc-intent-store.ts:49-60"
+      ],
+      "evidence": [
+        "dispatch-crash.mjs",
+        "dispatch-crash.json"
+      ],
+      "actual": "Synthetic child exits99 on entering transport before any delivery; real DB reopened in new process context: retry sends0/oktrue duplicate, model_dispatchedfalse, pending with null lease_owner and lease_expires_at.",
+      "completion": "Durable ownership/lease and restart recovery across reserve/pre-send/send/receipt commit. Distinguish provable no-send from uncertain accepted result; current authority/context on safe retry, no duplicate send or forever-pending. Recovery must use public product path, not manual DB edits."
+    },
+    {
+      "id": "M6-M12-executable-incomplete",
+      "priority": "P2",
+      "evidence": [
+        "source/scripts/isolated-m6-rollback-cutover.py",
+        "source/scripts/jarvis-restore-acceptance.mjs"
+      ],
+      "actual": "M6 new script uses fake previous Python which prints reads_revocation_storefalse; no writer exclusion/failed switch/recovery. M12 script unchanged, retains provider/control state and performs existing isolated delete/restore; no cold original/control loss or ordinary new write/RPO/RTO.",
+      "completion": "Complete previously requested integrated isolated recovery with real candidate entry points and actual fixtures, not another helper-only package. Record concrete implementation/fixture prerequisites and actual external-only conditions separately."
+    }
+  ],
+  "direct_checks": {
+    "sb_python_files_equal": 182,
+    "sb_product_source_changed_since_f94d073": false,
+    "jarvis_product_tracked_equal": 1137,
+    "jarvis_tsc_exit": 0,
+    "jarvis_rebuilt_js_equal": 1109,
+    "jarvis_focused_tests": {
+      "passed": 7,
+      "duration_seconds": 7.21,
+      "test_seconds": 4.42
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "dispatch_normal_sends": 1,
+    "configured_revocation_sends": 0,
+    "concurrent_same_key_sends": 1,
+    "denied_then_corrected_total_sends": 1,
+    "transport_failure_then_corrected_total_sends": 3,
+    "options_corrected_total_sends": 1,
+    "crash_restart_retry_sends": 0
+  },
+  "existing_log_observations": {
+    "/var/tmp/sb-full-pytest-210226e.log": {
+      "sha256": "f1e0607b26bc35c9e79f8317bb68644e3ff43490bdc47a93975c416b49e6cefc",
+      "tail": "....................................................................... [ 86%]\n........................................................................ [ 90%]\n........................................................................ [ 94%]\n........................................................................ [ 98%]\n.................................                                        [100%]\n1831 passed, 2 skipped in 610.70s (0:10:10)\nEXIT:0\n",
+      "observed_existing_log": true
+    },
+    "/var/tmp/m6-rollback-cutover.json": {
+      "sha256": "9ba4e77e487f8a8dbbd3198ed052dc71860cbbc766e87e096e25ee540f4e5d13",
+      "tail": "store\": false,\n    \"allowed\": false,\n    \"reason\": \"ROLLBACK_UNSAFE_REVOCATION_STORE\"\n  },\n  \"stay_on_current\": {\n    \"state_root\": \"/var/tmp/sb-m6-7p39smxs/state\",\n    \"previous_release\": \"/var/tmp/sb-candidate-f94d073/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1\",\n    \"revocation_store_present\": true,\n    \"previous_reads_revocation_store\": true,\n    \"allowed\": true,\n    \"reason\": null\n  },\n  \"revocation_keys_after\": [\n    \"key:test\"\n  ]\n}\n",
+      "observed_existing_log": true
+    },
+    "/var/tmp/m12-aee8f1f-restore.out": {
+      "sha256": "2cfc8833265ecb84a662a35db306be9189b03098922b64c29cf20c204622e02f",
+      "tail": "4e44cb95eb42425ae9b11018f9c14\",\"blocked_matches\":0,\"scan_errors\":0},\"second_restore_records\":0,\"concurrent_clients\":2,\"independent_revocations\":2,\"shared_restored_memory_equal\":true,\"jarvis_owned_high_water\":2,\"deleted_records\":0,\"first_restore_surviving_records\":1,\"model_calls\":0,\"scope\":\"Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance\"}\nRESTORE:0\nEXIT:0\n",
+      "observed_existing_log": true
+    }
+  },
+  "preserved_scope": [
+    "SB unchanged exact product bytes; prior14focused and revocation multiprocess/marker tests not rerun needlessly",
+    "Earlier N2/N4/M11/M12 fixed-tree independent evidence retained, not broad final acceptance",
+    "Default CLI lacks memoryReferenceOptions and capture session comes from timestamp rather than supplied task.session_id; actual selected-session/compaction/native connection acceptance remains bounded/unverified"
+  ],
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}

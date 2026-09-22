@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blro.local/contracts/phone-event-v1.schema.json",
+  "title": "Phone History Event Batch v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "device_id", "events"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "device_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {"$ref": "#/$defs/event"}
+    }
+  },
+  "$defs": {
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "media_type", "content_base64", "sha256"],
+      "properties": {
+        "filename": {"type": "string", "minLength": 1, "maxLength": 180},
+        "media_type": {"type": "string", "minLength": 1, "maxLength": 120},
+        "content_base64": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "occurred_at",
+        "source",
+        "event_type",
+        "capture_mode",
+        "sensitivity"
+      ],
+      "properties": {
+        "schema_version": {"const": 1},
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "source": {"type": "string", "minLength": 1, "maxLength": 64},
+        "event_type": {"type": "string", "minLength": 1, "maxLength": 64},
+        "capture_mode": {"enum": ["explicit", "share", "shortcut"]},
+        "title": {"type": ["string", "null"], "maxLength": 500},
+        "body": {"type": ["string", "null"], "maxLength": 100000},
+        "url": {"type": ["string", "null"], "maxLength": 4096},
+        "project_hint": {"type": ["string", "null"], "maxLength": 200},
+        "sensitivity": {"enum": ["public", "personal", "sensitive", "restricted"]},
+        "attachment": {
+          "anyOf": [
+            {"$ref": "#/$defs/attachment"},
+            {"type": "null"}
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "author": "existing Codex monitor under explicit overnight delegation",
+  "author_terminal": "term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "submission": "a7df3309b80329569cf13b6a8187f35f08720871",
+  "pin": {
+    "sb_source": "5b67bbad6d4c011e8bd6079242f3b1433e649a01",
+    "release_id": "e51b068d7601aa97279b96080faf20ae059c83a7",
+    "wheel_sha256": "646f0577070be044ae3412df56247cb307b4901ba72d3d7ba07e9288b7bb867e",
+    "candidate": "/var/tmp/sb-candidate-5b67bba/releases/e51b068d7601aa97279b96080faf20ae059c83a7",
+    "jarvis_source": "401f0c1",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-401f0c1/source/dist",
+    "jarvis_inventory_sha256": "f4f82237c2207534f32ffd7db05e859140eeed0828fa1ef1db7697ed334b55dd",
+    "jarvis_inventory_entries": 34776,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "preserves": [
+      "d564688",
+      "48686de",
+      "635b4b5"
+    ]
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-a7df330-zli4d5wc",
+  "finished_at_utc": "2026-09-11T14:39:19.312864+00:00",
+  "findings": [
+    {
+      "id": "N1/V1/R4",
+      "priority": "P1",
+      "status": "partial_fix_not_accepted",
+      "location": "Orca-JARVIS src/authority-progress-store.ts:29; src/personal-context-persistence.ts:55-61; src/context-model-transport.ts:17-27",
+      "evidence": [
+        "transport-entry-result.json",
+        "transport-positive.json",
+        "transport-references.txt"
+      ],
+      "observed": "Rejected evidence now sends0 and leaves no capture; valid helper sends1 into RecordingModelTransport. No production caller of assembled snapshot or sendAssembledModelRequest; synthetic transport accepted:false is ignored and persistence returns normally.",
+      "completion": "Real product/session entry must select/validate/build and await injectable transport result. Verify normal, rejected, failure/retry, fresh session/compaction, revoked/expired/no_data and final serialized budget at that entry. Do not substitute helper/recording for session integration."
+    },
+    {
+      "id": "N3/R2/M3",
+      "priority": "P1",
+      "status": "partial_fix_not_accepted",
+      "location": "sb/revoked_keys.py:28-42",
+      "evidence": [
+        "extended-result.json",
+        "partial-truncation.json"
+      ],
+      "observed": "Empty initialized store now fails closed. Nonempty truncation key:other\\nkey:test\\n to key:other\\nkey:te is accepted and key:test becomes eligible again. Pristine permits new/test, healthy revocation keeps only new, corrupted permits both.",
+      "completion": "Detect malformed/incomplete initialized state before accepting keys; preserve revocation across truncation, restart, initialization interruption and trusted recovery. Include partial-record and complete-record-loss cases; new valid key remains allowed. No real user-data read claimed."
+    }
+  ],
+  "direct_checks": {
+    "focused_pytest": {
+      "passed": 125,
+      "seconds": 26.78
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 7,
+      "exit": 1
+    },
+    "jarvis_tsc_exit": 0,
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "browser_recovery": "normal UI failed then fixture Config.raw corrected and new normal UI input, same button success pages1; git output present; no production/persistent configuration acceptance"
+  },
+  "prior_log_observation": {
+    "path": "/var/tmp/sb-full-pytest-5b67bba.log",
+    "sha256": "93e9822a82571295b43fe8a2214f0db8b4e97600da16898e2343619b54ec9414",
+    "tail": "......................................... [ 98%]\n...........................                                              [100%]\n1825 passed, 2 skipped in 599.98s (0:09:59)\nEXIT:0\n"
+  },
+  "preserved_requirements": "A-F/R1-R7/original M1-M14; actual MCP performance, DR/writer/rollback evidence remain required separately",
+  "product_source_modified_by_reviewer": false,
+  "operational_actions": false
+}

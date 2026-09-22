@@ -1,0 +1,194 @@
+{
+  "submission": "1fc3d7a3597e60e28a1b8f5edfa873e340b51afb",
+  "reviewer": "existing monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "pin": {
+    "sb_source": "8edb9d4f8806a802d2c391e459fa7f5960a57a8d",
+    "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "candidate": "/var/tmp/sb-candidate-8edb9d4/releases/d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "updated_at_utc": "2026-09-12T16:10:42.891045+00:00",
+  "verdict": "ordinary_function_observed_pass_provenance_and_test_assurance_incomplete",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-1fc3d7a-5o71nu5f",
+  "identity": {
+    "at_utc": "2026-09-12T16:03:49.954854+00:00",
+    "head": "1fc3d7a3597e60e28a1b8f5edfa873e340b51afb",
+    "source": "8edb9d4f8806a802d2c391e459fa7f5960a57a8d",
+    "archive_sha256": "a8569affc1a29777458f60aa93fdec29c070cc25f69a96e26781fd182c8d0afd",
+    "product_python_count": 182,
+    "mismatch": [],
+    "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_entries": 34768,
+    "product_tracked_diff": "",
+    "f7_to_source_product_diff": "",
+    "harness_changed": [
+      {
+        "path": "tests/test_mcp_generation_overlap.py",
+        "sha256": "07c8e625bb68168d9dedcbb65f37d73222bea6bb605c3047e36d69b4056a7f22",
+        "same_as_f7c1945": false
+      }
+    ],
+    "manifest": {
+      "schema": 1,
+      "release_id": "d9c6825b9a94cf6637ba01416562e4eb777db7a2",
+      "wheel_sha256": "1847b5994392cde8f76e21604a26ed2aee3bb4a43bd7eb04e783615465b317fb",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "8edb9d4f8806a802d2c391e459fa7f5960a57a8d",
+      "source_tree": "417177f44a269406a2f3badf1480e61d30c2b7a9",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "gates_original_sha256": "a41a9ed1953a1ed7981356db1da49fb0415bd626faae07d26fe02a53a870fe36",
+    "test_archive_equals_head": true
+  },
+  "new_runs": {
+    "ordinary_test": {
+      "passed": 1,
+      "seconds": 8.11,
+      "exit": 0,
+      "log": "/var/tmp/codex-night-1fc3d7a-5o71nu5f/ordinary-test.log",
+      "observer": "read-only test trace, no product monkeypatch added",
+      "warning_mode": "error::pytest.PytestUnhandledThreadExceptionWarning"
+    },
+    "ruff": {
+      "exit": 0,
+      "scope": "changed test only"
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 54,
+      "exit": 1,
+      "scope": "changed test only; no baseline equivalence claim"
+    }
+  },
+  "prior_runs_not_repeated": {
+    "01cedbb_related": "86passed19.82s",
+    "01cedbb_normal": "1passed4.78s",
+    "01cedbb_product_types": "0errors6warningsEXIT1; different scope",
+    "f7c1945_gates": "MAINT0 INTEG0 WORK0; actual old harness/source f7c1945; identical deploy/scripts bytes at8edb9d4"
+  },
+  "normal_scope": {
+    "latest_body": "Omega corrected unique memory.",
+    "old_body_results": 0,
+    "record_id_changed": true,
+    "generation_changed": true,
+    "thread_errors_observed": [],
+    "timing": "ingest generation before during read; compile prepares Omega while Alpha read succeeds; read_done releases compile then writer completes; fresh MCP observes Omega generation",
+    "not_claimed": "publish simultaneously with pinned read; native authentication; live model; large-corpus performance"
+  },
+  "open_ordinary": [
+    {
+      "id": "F-provenance",
+      "locations": [
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.json:23",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:53",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:70",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md:121",
+        "GROK-RESUME-STATUS-2026-09-11.md:3"
+      ],
+      "finding": "gate harness_commit differs from original log; stale M11 name; ambiguous this-source label; ready handoff versus native waiting-blocked not timestamped separately",
+      "completion": "original executed harness f7c1945 plus identical-byes reuse explicitly; current test name and exact scope; separate timestamped submission readiness/native waiting and held/unverified state"
+    },
+    {
+      "id": "M11-thread-assurance",
+      "location": "tests/test_mcp_generation_overlap.py:137",
+      "finding": "writer catches only AssertionError/OSError/RuntimeError/ValueError; other ordinary exceptions reach pytest thread warning, not errors collection. This run escalated warnings to errors and observed none. No product runtime failure reproduced.",
+      "completion": "propagate all ordinary worker exceptions or enforce unhandled-thread warnings as errors for this submitted test; retain join/alive/normal-body assertions and explicit compile-publication-after-reader wording"
+    }
+  ],
+  "scope_provenance": "Ordinary-only continuation was original Codex coordination after the content notice, not user reduction of original full acceptance scope. Original A-F/M1-M14 unchanged.",
+  "content_limitation": {
+    "observed_by": "original Codex coordination screen24954, as relayed",
+    "trigger": "undetermined",
+    "status": "held_unverified",
+    "retried_or_delegated": false
+  },
+  "held_original_requirements": [
+    "prior boundary/deletion-related findings, including M13 complete lifetime, preserved without further execution",
+    "pinned-read simultaneous publication not demonstrated",
+    "remaining A-F/M1-M14 and M14 not_implemented inherited; ordinary pass is not overall acceptance"
+  ],
+  "external_conditions": [
+    "native session/authentication/compaction paths",
+    "real user work and curated Korean gold/operating corpus",
+    "operating cutover permissions"
+  ],
+  "worker_before": {
+    "at_utc": "2026-09-12T16:04:39.726487+00:00",
+    "cursor": "5835095",
+    "source": "screen",
+    "public_lines": [
+      " │ {'text': '1fc3d7a docs: align A-F table to 8edb9d4 ordinary M11 pin\\nb9d38e0 docs: point resume",
+      " │ status at 8edb9d4 ordinary M11 pin', 'details': {'status': 'completed'}, 'images': [],",
+      "   ⚠ 01cedbb ordinary M11 (Alpha→Omega compile, MCP latest/exclude) is on pin 8edb9d4/84e2c43 with",
+      " Blocked. Ordinary M11 is on archive 8edb9d4/84e2c43, wheel/gates f7c1945. No newer Codex review.",
+      "(😺 OmO Native) Goal blocked: 01cedbb ordinary M11 (Alpha→Omega compile, MCP latest/exclude) is o..."
+    ]
+  },
+  "automation": {
+    "enabled": true,
+    "rrule": "*/30 * * * *",
+    "timezone": "Asia/Seoul",
+    "changed": false
+  },
+  "delivery": {
+    "at_utc": "2026-09-12T16:07:44.098198+00:00",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "scope": "ordinary test exception handling and provenance documents only; held branches excluded",
+    "prompt_receipt": {
+      "id": "9b6e039e-b1cc-4295-a97b-510b3ba37efd",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 3032
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "actual_start_confirmed": true,
+    "native_resume_confirmed": true,
+    "resume_receipt": {
+      "id": "f11e35b7-8fbd-4a79-af3a-96bc46df9489",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 13
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "confirmed_at_utc": "2026-09-12T16:10:42.891045+00:00",
+    "screen_cursor": "5835386",
+    "status": "ordinary provenance investigation started; changes/completion not yet confirmed",
+    "actual_start_scope": "ordinary package JSON gates/M11 and Markdown lines50-75 read; completed tool output",
+    "explicit_ack_observed": false,
+    "implementation_completion_confirmed": false,
+    "cross_stage_continuation_confirmed": false,
+    "evidence_path": "/var/tmp/codex-night-1fc3d7a-5o71nu5f/worker-after.json"
+  }
+}

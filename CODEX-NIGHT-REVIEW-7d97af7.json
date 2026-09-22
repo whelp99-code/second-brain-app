@@ -1,0 +1,293 @@
+{
+  "author": "existing Codex monitor under overnight independent-review delegation",
+  "submission": "7d97af74f3f75efad4d73a4ad9df88fc4e85ad0a",
+  "pin": {
+    "sb_source": "55a2dfd85d59efa4fba5f3ac78c2a1d90d369877",
+    "harness": "7bf4fa3",
+    "release_id": "8a85e133340baf66e58cedc517108d4529d44ba8",
+    "wheel_sha256": "7f591736d7b17384eb6fc0f88700f33e136688cf539d6b5f07429d890e6a9e7b",
+    "candidate": "/var/tmp/sb-candidate-55a2dfd/releases/8a85e133340baf66e58cedc517108d4529d44ba8",
+    "jarvis_source": "e3ca935",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-e3ca935/source/dist",
+    "jarvis_inventory_sha256": "b4d80e7c81b1a63c14c6368a0a32f5dee2fdb969a8bab24a95594fcce6331fd1",
+    "jarvis_inventory_entries": 34778,
+    "operational_current": "41f0751",
+    "production_activated": false
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-7d97af7-20yx1iji",
+  "finished_at_utc": "2026-09-11T15:39:03.699291+00:00",
+  "findings": [
+    {
+      "id": "N1-dispatch",
+      "priority": "P1",
+      "evidence": [
+        "dispatch-boundaries.json",
+        "dispatch-references.txt"
+      ],
+      "remaining": "send before dispatch schema/authority validation; added fields always fail exact schema; default CLI has no options wiring"
+    },
+    {
+      "id": "N1-retry",
+      "priority": "P1",
+      "evidence": [
+        "dispatch-boundaries.json"
+      ],
+      "remaining": "current revocation not checked before second send"
+    },
+    {
+      "id": "N3-concurrent-recovery",
+      "priority": "P2",
+      "evidence": [
+        "journal-concurrent.json"
+      ],
+      "remaining": "unlocked recovery competing readers raises FileNotFoundError; shared marker tmp/writer races must be covered"
+    }
+  ],
+  "direct_checks": {
+    "focused_pytest": {
+      "passed": 22,
+      "seconds": 14.22
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "jarvis_tsc_exit": 0,
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "mcp_corpus": {
+      "candidate": "/var/tmp/sb-candidate-55a2dfd/releases/8a85e133340baf66e58cedc517108d4529d44ba8",
+      "samples": 11,
+      "sizes": {
+        "small": {
+          "pages": 30,
+          "root": "/var/tmp/sb-m11-small-hbrduqd_",
+          "seconds": [
+            0.0995,
+            0.0562,
+            0.0543,
+            0.0559,
+            0.0523,
+            0.0593,
+            0.0558,
+            0.0575,
+            0.0583,
+            0.0529,
+            0.0547
+          ],
+          "p50": 0.0559,
+          "p95": 0.0995,
+          "max": 0.0995,
+          "hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "concurrent_seconds": [
+            0.0759,
+            0.081
+          ],
+          "retry": {
+            "lost_error": "ExceptionGroup",
+            "retry_seconds": 0.8098,
+            "retry_error": false,
+            "retry_hits": 1
+          },
+          "correction_of_existing_page": "M11Corrected-small",
+          "correction_seconds": 0.0633,
+          "correction_hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "stale_needle_hits_after_correction": [],
+          "mcp_server_rss_kib": 81972
+        },
+        "medium": {
+          "pages": 100,
+          "root": "/var/tmp/sb-m11-medium-nia45rp2",
+          "seconds": [
+            0.0901,
+            0.0824,
+            0.0862,
+            0.0823,
+            0.085,
+            0.0834,
+            0.0834,
+            0.0797,
+            0.0817,
+            0.0824,
+            0.0803
+          ],
+          "p50": 0.0824,
+          "p95": 0.0901,
+          "max": 0.0901,
+          "hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "concurrent_seconds": [
+            0.1332,
+            0.1375
+          ],
+          "retry": {
+            "lost_error": "ExceptionGroup",
+            "retry_seconds": 0.8223,
+            "retry_error": false,
+            "retry_hits": 1
+          },
+          "correction_of_existing_page": "M11Corrected-medium",
+          "correction_seconds": 0.0995,
+          "correction_hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "stale_needle_hits_after_correction": [],
+          "mcp_server_rss_kib": 83268
+        },
+        "large": {
+          "pages": 300,
+          "root": "/var/tmp/sb-m11-large-mebdm6t4",
+          "seconds": [
+            0.168,
+            0.1611,
+            0.1589,
+            0.1956,
+            0.1615,
+            0.1646,
+            0.162,
+            0.1674,
+            0.1638,
+            0.16,
+            0.1617
+          ],
+          "p50": 0.162,
+          "p95": 0.1956,
+          "max": 0.1956,
+          "hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "concurrent_seconds": [
+            0.2462,
+            0.2744
+          ],
+          "retry": {
+            "lost_error": "ExceptionGroup",
+            "retry_seconds": 0.9198,
+            "retry_error": false,
+            "retry_hits": 1
+          },
+          "correction_of_existing_page": "M11Corrected-large",
+          "correction_seconds": 0.1702,
+          "correction_hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "stale_needle_hits_after_correction": [],
+          "mcp_server_rss_kib": 84288
+        }
+      },
+      "live_model": false,
+      "client_peak_rss_kib": 84880
+    },
+    "isolated_restore": {
+      "root": "/var/tmp/sb-jarvis-restore-iuvgMk",
+      "backup": {
+        "source_generation_id": "sbgen:v1:dce5aa6a38142eb4631d2f425578f33c7f8b3b818cfe89ebbf562ce363d2dbfd",
+        "format": "runtime-backup",
+        "control_journals_present": true
+      },
+      "deleted": {
+        "request_id": "memeff:req:v2:0aa8ae973c38f901e982969426e11f3ec9d934ff90490df5333bbdfe3fe76ff9",
+        "provider_state": "proved",
+        "proof_id": "sbproof:v1:3a4b6b2ad90ad5e6a846146e644b75373615599658f26cc8ada61383b27cc6fe",
+        "observation_kind": "deletion",
+        "tombstone_sequence": 1
+      },
+      "restored": {
+        "generation_id": "sbgen:v1:21dfa931005ddac1707503e386268cad6b421c521365d07150662fb83eb0a36b",
+        "surviving_page_id": "wiki/memory-85498686fbeb4186e809ea0d51d8e0cb4dc74dea25dc8c787c94d5d947a37094",
+        "tombstone_sequence": 1,
+        "tombstone_set_root": "sha256:e5bead5dd3d6e5573dc40665e559007c8ae7bf03b7c3bec40311c59498abe3a7",
+        "blocked_matches": 0,
+        "scan_errors": 0
+      },
+      "scoped": {
+        "agent": "agent:restore",
+        "session": "session:restore",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:21dfa931005ddac1707503e386268cad6b421c521365d07150662fb83eb0a36b",
+          "generation_manifest_digest": "sha256:21dfa931005ddac1707503e386268cad6b421c521365d07150662fb83eb0a36b",
+          "vault_head": "76aba0378dcdfb5b9ed224cf4190fb420138ddc3",
+          "vault_tree": "eba4201db099a95277f6bd0723964055a614c8f3",
+          "tombstone_sequence": 1,
+          "tombstone_set_root": "sha256:e5bead5dd3d6e5573dc40665e559007c8ae7bf03b7c3bec40311c59498abe3a7"
+        },
+        "page_content_digest": "sha256:146e4fb997fcdb53c965f88cf14e00ffacc0b57e5bef167d879ad23047ad2771",
+        "profile": "scoped-record-read-v3",
+        "allowed_pages": 1,
+        "restricted_pages": 0,
+        "withdrawal_denied": true,
+        "post_response_withdrawal_denied": true,
+        "intercepted_response_count": 2,
+        "restored_policy_resumes": true
+      },
+      "peer": {
+        "agent": "agent:restore-peer",
+        "session": "session:restore-peer",
+        "generation": {
+          "provider_instance_id": "provider:fixture",
+          "generation_id": "sbgen:v1:21dfa931005ddac1707503e386268cad6b421c521365d07150662fb83eb0a36b",
+          "generation_manifest_digest": "sha256:21dfa931005ddac1707503e386268cad6b421c521365d07150662fb83eb0a36b",
+          "vault_head": "76aba0378dcdfb5b9ed224cf4190fb420138ddc3",
+          "vault_tree": "eba4201db099a95277f6bd0723964055a614c8f3",
+          "tombstone_sequence": 1,
+          "tombstone_set_root": "sha256:e5bead5dd3d6e5573dc40665e559007c8ae7bf03b7c3bec40311c59498abe3a7"
+        },
+        "page_content_digest": "sha256:146e4fb997fcdb53c965f88cf14e00ffacc0b57e5bef167d879ad23047ad2771",
+        "profile": "scoped-record-read-v3",
+        "allowed_pages": 1,
+        "restricted_pages": 0,
+        "withdrawal_denied": true,
+        "post_response_withdrawal_denied": true,
+        "intercepted_response_count": 2,
+        "restored_policy_resumes": true
+      },
+      "deleted_after_restore": {
+        "request_id": "memeff:req:v2:8352f42bc32e3d4815f0e042f7f5bcee1c998d89c329d911df48a48c476941fe",
+        "provider_state": "proved",
+        "proof_id": "sbproof:v1:dbb3b1884b78f3a87efd66c719878ed9539de4a24ddd3cb8dbcedc2c03baa012",
+        "observation_kind": "deletion",
+        "tombstone_sequence": 2
+      },
+      "restored_again": {
+        "generation_id": "sbgen:v1:bd1fdd763fd9b60ed988f523306ab3d2bb74e0a81775d7602afa4b140f1f8590",
+        "surviving_page_id": null,
+        "tombstone_sequence": 2,
+        "tombstone_set_root": "sha256:0b4f98136ac1cb849d7d7b021fd92df80e8f99cc49e5a231641ce0076e748f8c",
+        "blocked_matches": 0,
+        "scan_errors": 0
+      },
+      "second_restore_records": 0,
+      "concurrent_clients": 2,
+      "independent_revocations": 2,
+      "shared_restored_memory_equal": true,
+      "jarvis_owned_high_water": 2,
+      "deleted_records": 0,
+      "first_restore_surviving_records": 1,
+      "model_calls": 0,
+      "scope": "Actual JARVIS chain/effect proof/fence/reference reader with isolated fixtures; synthetic project scopes; not operational/native acceptance"
+    }
+  },
+  "grok_log_observation": {
+    "path": "/var/tmp/sb-full-pytest-55a2dfd.log",
+    "sha256": "48cb057764a6ec123d7bbc963840614a38a3120793f3c8532e8d1c71be6015e1",
+    "tail": "..................... [ 98%]\n..............................                                           [100%]\n1828 passed, 2 skipped in 605.57s (0:10:05)\nEXIT:0\n"
+  },
+  "inherited_gaps": [
+    "M6 actual writer/rollback entry",
+    "M12 cold source/control loss and full RPO/RTO/new ordinary write",
+    "all original A-F/M1-M14 evidence statuses and external boundaries"
+  ],
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}

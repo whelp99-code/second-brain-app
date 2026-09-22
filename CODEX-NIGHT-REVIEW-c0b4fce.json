@@ -1,0 +1,81 @@
+{
+  "author": "Existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e; delegated overnight review, not original Codex execution",
+  "reviewed_at_utc": "2026-09-12T03:38:32.765234+00:00",
+  "submission": "c0b4fcece90208fe983bfde6e1479608252a6ec1",
+  "pin": {
+    "sb_source": "12db06edc6760f8478e2d7c866b10a8d06430eb3",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-12db06e/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "product_readiness_accepted": false,
+  "operational_acceptance": false,
+  "findings": [
+    {
+      "id": "M12-post-recovery-scoped-evidence",
+      "priority": "P2",
+      "code": [
+        "scripts/jarvis-restore-acceptance.mjs:285",
+        "scripts/seed-extra-lost.py:28",
+        "sb/request_executor.py:277"
+      ],
+      "problem": "recovered_peer aliases recovered_scoped; both are general reference-reader counts, not two scoped client/session results after final JARVIS recovery. New PostRecoveryWrite uses legacy schema1 request lacking source_access; an independent use of same write surface with distinct content after fresh restore yielded proved but both real scoped clients refused MEMORY_SCOPED_READ_UNAVAILABLE. That refusal is expected for unclassified input, not a new product defect.",
+      "evidence": [
+        "post-recovery-scopes.json",
+        "post-recovery-diagnostic.log",
+        "source/scripts/jarvis-restore-acceptance.mjs"
+      ],
+      "completion": "Use accepted scoped/classified write surface after final authority restore; actual independent two scoped MCP sessions must read same record/digest, independently revoke/deny and recover, with post-recovery write/retry evidence. Never grant classification by hand or substitute duplicate result objects. Keep general-reader results separately."
+    },
+    {
+      "id": "F-integrated-acceptance-package",
+      "priority": "P2",
+      "code": [
+        "GROK-INTEGRATED-COMPLETION-HANDOFF-2026-09-11.md:152",
+        "GROK-FINAL-ACCEPTANCE-PACKAGE.md",
+        "IMPLEMENTATION-STATUS.md:12"
+      ],
+      "problem": "Current final package remains a short latest-DR-patch pin rather than the required complete A-F/M1-M14 evidence entrypoint. Status table says M7 all profiles/vector/raw paths incomplete and M13 full GUI unverified, with broad external labels and few concrete evidence/input links. These cannot be inferred complete from DR passes.",
+      "completion": "Complete the existing required final package with current pinned evidence/log/command links for original A-F/M1-M14, preserved independent passes, exact unimplemented/untested routes and concrete missing external inputs. Inventory and execute remaining authorized isolated work (including M7 read-policy surfaces and M13 GUI lifecycle where feasible); do not classify all as external merely because operational activation is unapproved. Do not invent new product requirements or repeat proven unchanged suites."
+    }
+  ],
+  "direct_and_retained_passes": [
+    "SB182 source/wheel/installed bytes identical and manifest/source/wheel hash valid",
+    "JARVIS source unchanged1672626 and full34768inventory identical to previous direct identity/tsc/tests; no new8test run or Ruff/type/tsc/fullsuite repetition",
+    "Changed harness node --check EXIT0; standard/work/maintenance3installed gates directly EXIT0",
+    "Normal paired harness EXIT0; current trusted high-water snapshot restores3 after measured old-backup rollback3→1; extra ID recovered; deleted content0 and general PostRecoveryWrite1",
+    "Mandatory recovery fence deliberately signed expired in review copy now yields TOMBSTONE_FENCE_REQUIRED and harness EXIT1; previous false-success fixed",
+    "After harness exit actual general reads KeepBeta0/ExtraLost0/PostRecoveryWrite1; new fresh fence3 and same-root restore3 EXIT0",
+    "New post-fresh-restore legacy remember through existing request executor proved; actual scoped denial diagnosed as missing classified input, not denied product regression"
+  ],
+  "prior_checks": "/var/tmp/codex-night-f637e0b-hldpso0f (prior8backup tests, Ruff0,tsc0,type0errors2warningsEXIT1; not newly rerun)",
+  "evidence_root": "/var/tmp/codex-night-c0b4fce-2zudy5aj",
+  "rto_first_recovery_only": {
+    "failure_began_ms": 1789183980683,
+    "restore_began_ms": 1789183986234,
+    "sb_first_read_ms": 1789183988411,
+    "scoped_available_ms": 1789183989666,
+    "new_write_available_ms": 1789183991013,
+    "restore_probe_ms": 541.664,
+    "restore_to_readable_ms": 2177,
+    "failure_to_first_read_ms": 7728,
+    "failure_to_work_available_ms": 10330,
+    "jarvis_crash_to_reopen_ms": 48,
+    "scenario_ms": 28380
+  },
+  "harness_sha256": {
+    "post-recovery-scopes.mjs": "2ca73b1cd37a58f3bd351f7f9094a0812dc78f07c81184027ee205e98bb35c74",
+    "post-recovery-diagnostic.mjs": "abcf1e986a6969717ce90e654203a61b2480d792a065c688a2300bede7205ed9",
+    "source/scripts/codex-restore-failure-probe.mjs": "7894c02959f6cd4a906268d25fd6403ac196e4003c4886805dcf37c5c8972b79",
+    "source/scripts/codex-restore-observe.mjs": "56885178254528f2bfa82495f38b1f01872276176faf30612e45c008ad364e06",
+    "source/scripts/codex-scoped-diagnostic.mjs": "0fd4cd0212501fb642239f6efacaf1285def79af19dfe82610aaedd602b3561c"
+  }
+}

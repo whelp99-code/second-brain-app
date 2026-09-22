@@ -1,0 +1,215 @@
+{
+  "author": "existing Codex monitor, delegated overnight independent verification",
+  "submission": "53c19c4ddf3b40a1ab7a46a557fb1d99fbd855f3",
+  "pin": {
+    "sb_source": "15f8933439bd272f5e60839a88d2609b1d005164",
+    "release_id": "caba60cb6c304151a1e5f8e593723dbac286fa1d",
+    "wheel_sha256": "ab258c894fd1827d569309dd05d66d50b345965391d184af1cbf2fbfb95979c2",
+    "candidate": "/var/tmp/sb-candidate-15f8933/releases/caba60cb6c304151a1e5f8e593723dbac286fa1d",
+    "jarvis_source": "ad2d645",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-ad2d645/source/dist",
+    "jarvis_inventory_sha256": "43438a602e055562ca8309857697264c5c2a187754c1da3b8d28d781bc2a1e98",
+    "jarvis_inventory_entries": 34778,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "preserves": [
+      "d564688",
+      "e51b068",
+      "401f0c1"
+    ]
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-53c19c4-9vv7ixka",
+  "finished_at_utc": "2026-09-11T15:07:27.179574+00:00",
+  "findings": [
+    {
+      "id": "N1/V1/R4",
+      "priority": "P1",
+      "status": "partial_fix",
+      "evidence": [
+        "factory-session.json",
+        "cli-entry.json",
+        "session-references.txt"
+      ],
+      "remaining": [
+        "no production consumer of deliverAssembled",
+        "current reader fence not invoked by delivery",
+        "thrown transport failure not handled by retry contract"
+      ]
+    },
+    {
+      "id": "N3/R2/M3",
+      "priority": "P1",
+      "status": "partial_fix",
+      "evidence": [
+        "marker-lifecycle.json",
+        "partial-truncation.json"
+      ],
+      "remaining": [
+        "legacy newline marker accepts complete-record loss",
+        "second store/marker update interruption remains unrecoverable by normal retry"
+      ]
+    },
+    {
+      "id": "M11/M6/M12",
+      "kind": "inherited_evidence_gap",
+      "remaining": [
+        "MCP add-new-page is not correction/old-version exclusion",
+        "MCP server RSS/operational corpus/ACK loss/timeout",
+        "writer rollback and end-to-end DR evidence"
+      ]
+    }
+  ],
+  "direct_checks": {
+    "focused_pytest": {
+      "passed": 20,
+      "seconds": 15.22
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 1,
+      "exit": 1
+    },
+    "jarvis_tsc_exit": 0,
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "mcp_corpus": {
+      "candidate": "/var/tmp/sb-candidate-15f8933/releases/caba60cb6c304151a1e5f8e593723dbac286fa1d",
+      "samples": 11,
+      "sizes": {
+        "small": {
+          "old_query_hits_after_claimed_correction": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "pages": 30,
+          "root": "/var/tmp/sb-m11-small-t98lh_2f",
+          "seconds": [
+            0.0854,
+            0.0565,
+            0.061,
+            0.06,
+            0.0572,
+            0.0555,
+            0.0578,
+            0.0529,
+            0.0536,
+            0.0555,
+            0.063
+          ],
+          "p50": 0.0572,
+          "p95": 0.0854,
+          "max": 0.0854,
+          "hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "concurrent_seconds": [
+            0.0799,
+            0.0863
+          ],
+          "retry": {
+            "lost_error": "ExceptionGroup",
+            "retry_seconds": 0.762,
+            "retry_error": false,
+            "retry_hits": 1
+          },
+          "correction_seconds": 0.0646,
+          "correction_hits": [
+            "wiki/memory-dca543d88f5e11e1b9485ec045ba224b758ea5695e5251367dfaab94d5119773"
+          ]
+        },
+        "medium": {
+          "old_query_hits_after_claimed_correction": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "pages": 100,
+          "root": "/var/tmp/sb-m11-medium-b1fqt4pl",
+          "seconds": [
+            0.0919,
+            0.0815,
+            0.0841,
+            0.0839,
+            0.0806,
+            0.0905,
+            0.0823,
+            0.0822,
+            0.0855,
+            0.0832,
+            0.0894
+          ],
+          "p50": 0.0839,
+          "p95": 0.0919,
+          "max": 0.0919,
+          "hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "concurrent_seconds": [
+            0.1274,
+            0.1348
+          ],
+          "retry": {
+            "lost_error": "ExceptionGroup",
+            "retry_seconds": 0.8132,
+            "retry_error": false,
+            "retry_hits": 1
+          },
+          "correction_seconds": 0.0924,
+          "correction_hits": [
+            "wiki/memory-f7bea627d0e5d10cf0829dbb27c162a89c8873defda755b962fb328cbdcc1f66"
+          ]
+        },
+        "large": {
+          "old_query_hits_after_claimed_correction": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "pages": 300,
+          "root": "/var/tmp/sb-m11-large-zesmovj3",
+          "seconds": [
+            0.1724,
+            0.177,
+            0.1832,
+            0.2036,
+            0.1603,
+            0.1619,
+            0.1732,
+            0.1835,
+            0.1757,
+            0.1614,
+            0.1771
+          ],
+          "p50": 0.1757,
+          "p95": 0.2036,
+          "max": 0.2036,
+          "hits": [
+            "wiki/memory-86288558c77076eaaef92583dfc14f7c593b0b5bd431546bc5bbe2726396e22c"
+          ],
+          "concurrent_seconds": [
+            0.2822,
+            0.283
+          ],
+          "retry": {
+            "lost_error": "ExceptionGroup",
+            "retry_seconds": 0.9219,
+            "retry_error": false,
+            "retry_hits": 1
+          },
+          "correction_seconds": 0.1696,
+          "correction_hits": [
+            "wiki/memory-7f28bfeb53fb11f34e93322bc552596bbcb8338d3a5eefba4722201883817af1"
+          ]
+        }
+      },
+      "live_model": false,
+      "peak_process_rss_kib": 85264
+    }
+  },
+  "grok_log_observation": {
+    "path": "/var/tmp/sb-full-pytest-15f8933.log",
+    "sha256": "4940f3f086761f85add84148ef11425272720e58808091114c8646c8df7af454",
+    "tail": "..................... [ 98%]\n............................                                             [100%]\n1826 passed, 2 skipped in 600.76s (0:10:00)\nEXIT:0\n"
+  },
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}

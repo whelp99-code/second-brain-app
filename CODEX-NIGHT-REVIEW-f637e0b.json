@@ -1,0 +1,102 @@
+{
+  "author": "Existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e; delegated overnight verification, not original Codex execution",
+  "reviewed_at_utc": "2026-09-12T03:06:23.164946+00:00",
+  "submission": "f637e0b858bb40cbf329a5248e983d3cf7bc41d0",
+  "pin": {
+    "sb_source": "4536718e68d8d65a24e1a459cb845d86f8c191f2",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-4536718/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "product_readiness_accepted": false,
+  "operational_acceptance": false,
+  "findings": [
+    {
+      "id": "M12-post-rollback-recovery",
+      "priority": "P2",
+      "code": [
+        "scripts/jarvis-restore-acceptance.mjs:230",
+        "scripts/jarvis-restore-acceptance.mjs:270",
+        "scripts/issue-restore-fence.mjs:26"
+      ],
+      "problem": "JARVIS restore rolls authoritative chain from3 back to1, while SB retains3. Preserved recovery authority issues fresh sequence1 fences. Exact post-harness restore rejects TOMBSTONE_SET_STALE; actual production reference reader rejects MEMORY_REFERENCE_GENERATION_CHANGED for all3queries. Fresh issue success does not establish paired recovery.",
+      "evidence": [
+        "after-harness-fresh-fence.log",
+        "after-harness-fresh-restore.log",
+        "after-restore-read.json",
+        "paired-restore-result.json"
+      ],
+      "completion": "Recover/verify current JARVIS authority high-water using a trusted durable snapshot or validated replay/reconciliation path without lowering SB high-water. After full JARVIS loss/restore execute fresh process issue/restore/read for2scopes, revoked denial, and new accepted write/retry. Persist exact recovery prerequisites and recovery evidence; cannot replace current state with stale snapshot or fabricate approval."
+    },
+    {
+      "id": "M12-recovery-gate-false-positive",
+      "priority": "P2",
+      "code": [
+        "scripts/jarvis-restore-acceptance.mjs:243",
+        "scripts/jarvis-restore-acceptance.mjs:249",
+        "scripts/jarvis-restore-acceptance.mjs:274",
+        "scripts/jarvis-restore-acceptance.mjs:276",
+        "scripts/jarvis-restore-acceptance.mjs:283"
+      ],
+      "problem": "Harness catches all second restore failures, substitutes a result with blocked_matches0, emits hardcoded second_restore_records0 and exits0 without fresh post-loss reader checks. Validly signed expired extraFence reproduces refusal and EXIT0/high-water3/fallback sequence1. SB RPO still refers to first restored generation although extra write occurs later.",
+      "evidence": [
+        "paired-expired-fence-control.log",
+        "paired-expired-fence-control.json",
+        "source/scripts/codex-restore-failure-probe.mjs"
+      ],
+      "completion": "Separate expected refusal scenarios from mandatory successful recovery; fail aggregate gate when recovery/read/retry assertions fail. Derive surviving records from actual queries; explicitly mark blocked/failed if recovery prerequisites missing. Record each system and interval with before/after timestamps and request/proof IDs; remove unsupported first-restore loss claims."
+    }
+  ],
+  "direct_passed": [
+    "SB archive/wheel/installed182Python byte-identical; manifest/source and wheel SHA checked",
+    "JARVIS1137 tracked product files and1109 emitted JS identical; tsc EXIT0; inventory34768 unchanged",
+    "8 backup integration tests directly passed;291ms total,53ms tests",
+    "Ruff EXIT0; installed standard/work/maintenance3gates EXIT0",
+    "Actual child SQLite writer created missing dest just before COPYFILE_EXCL: restore refused, COMMIT succeeded and value preserved; previous P1 fixed",
+    "Existing busy writer refusal/preservation and writer entering after exclusive COMMIT SQLITE_BUSY still pass",
+    "Existing clone actual child exit99 after DROP: original preserved; retry restores backup",
+    "Orphan WAL child exit99 restores backup rows; invalid/missing backup preserves existing dest; ordinary new-dest success",
+    "JARVIS actual accepted extra forget now precedes second authority restore: chain3→1 and lost ID absent confirmed; previous JARVIS RPO chronology corrected for this interval",
+    "First paired recovery:2scoped readers/2independent revocations, shared memory and new proved write; later extraFence3 sanitation succeeds using pre-crash fence; no claim of post-JARVIS-loss reader availability",
+    "After-harness fence issue EXIT0 only; follow-on restore/read fail separately as findings"
+  ],
+  "type_result": {
+    "errors": 0,
+    "warnings": 2,
+    "exit": 1,
+    "scope": "sb/revoked_keys.py"
+  },
+  "rto_first_recovery_only": {
+    "failure_began_ms": 1789182133396,
+    "restore_began_ms": 1789182138675,
+    "sb_first_read_ms": 1789182140800,
+    "scoped_available_ms": 1789182141943,
+    "new_write_available_ms": 1789182143204,
+    "restore_probe_ms": 470.829,
+    "restore_to_readable_ms": 2125,
+    "failure_to_first_read_ms": 7404,
+    "failure_to_work_available_ms": 9808,
+    "jarvis_crash_to_reopen_ms": 52,
+    "scenario_ms": 24321
+  },
+  "verification_limits": "Failure of stale fence is correct fail-closed behavior; finding is missing paired recovery. Injected expired-fence control diagnoses shipped harness false success, not a new product refusal defect. Prior A-F/M1-M14 unmet native/external scope remains. Unchanged SB full suite and dispatch suite not rerun.",
+  "evidence_root": "/var/tmp/codex-night-f637e0b-hldpso0f",
+  "harness_sha256": {
+    "after-restore-read.mjs": "89082a949f7c686ca94388a795eef40aacca8211f8485d119a865cf106089030",
+    "restore-races.mjs": "0afe56d2c14e1b441563552fd2e69fed966f075bf31f8e174f6cf76102d6871c",
+    "restore-own-schema.mjs": "404bf76d5e1837ce2b680a5689c0f216ab14959a75401b378f16e5894e083498",
+    "restore-crash-transaction.mjs": "7727c562c7ae76a3ce3bf6a410cdcf9b94e83540212df059c1f91251ef733a3b",
+    "restore-orphan-wal.mjs": "b8cb7129ddf54ffc82a5abf7c6f12a6ede0c75c5dbc67e6c6a1fb41e7b745578",
+    "restore-failure-preservation.mjs": "7d0a7ef37d4ec5c30994fd1489563accdb44d759f64f88717e62ab0cc21883a5",
+    "source/scripts/codex-restore-failure-probe.mjs": "97bf1d7abd40a941856200ed0ffaf5edc46a079fc06ef936982da76d77eca982",
+    "source/scripts/codex-restore-observe.mjs": "ec462bb2b5fbf58920ef53f6db3ef68769ab26091101230569f32161bb74ef29"
+  }
+}

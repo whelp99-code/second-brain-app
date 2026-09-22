@@ -29,8 +29,11 @@ from sb.search import SearchIndex, committed_paths, committed_text
 from sb.uploads import (
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_REQUEST_BYTES,
+    RetractReceiptDict,
     UploadRejected,
     accept_upload,
+    read_retract_receipt,
+    retract_upload,
     supported_suffixes,
 )
 from sb.vault import GitCommandError, PathEscapeError, Vault, VaultLintError
@@ -245,6 +248,36 @@ def _decode_upload(data: dict[str, object]) -> bytes:
         raise ValueError("content_base64 is invalid") from exc
 
 
+def _retract_upload(root: Path, upload_id: str, context: WebContext) -> RetractReceiptDict:
+    receipt = retract_upload(root, upload_id)
+    if receipt.content_sha256:
+        SearchIndex(
+            root,
+            hybrid=context.config.search_hybrid,
+            registry_path=Path(context.config.knowledge_registry)
+            if "knowledge_registry" in context.config.raw
+            else None,
+            min_similarity=context.config.search_min_similarity,
+        ).drop_content(receipt.content_sha256)
+        vault = Vault(root)
+        for folder in ("wiki", "daily", "conflicts"):
+            directory = root / folder
+            if not directory.is_dir():
+                continue
+            for path in directory.glob("*.md"):
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except OSError:
+                    continue
+                if receipt.content_sha256 in text:
+                    page_id = f"{folder}/{path.stem}"
+                    try:
+                        _ = vault.forget_page(page_id)
+                    except (FileNotFoundError, PathEscapeError):
+                        continue
+    return receipt.as_dict()
+
+
 def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         close_connection: bool
@@ -321,13 +354,20 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 from sb.readiness import readiness
 
                 result = readiness(context.config)
-                self._json(HTTPStatus.OK if result["status"] == "ready" else HTTPStatus.SERVICE_UNAVAILABLE, result)
+                self._json(
+                    HTTPStatus.OK
+                    if result["status"] == "ready"
+                    else HTTPStatus.SERVICE_UNAVAILABLE,
+                    result,
+                )
                 return
             if parsed.path == "/health":
                 self._json(HTTPStatus.OK, {"status": "ok"})
                 return
             if parsed.path == "/api/status":
-                pinned_config = replace(context.config, raw={**context.config.raw, "vault_root": str(root)})
+                pinned_config = replace(
+                    context.config, raw={**context.config.raw, "vault_root": str(root)}
+                )
                 snapshot = status_snapshot(pinned_config)
                 last_run = snapshot.get("last_run")
                 last_run_status: str | None = None
@@ -339,8 +379,10 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         summary = f"최근 단계 실행 {last_run.get('run_id')}: {candidate}"
                 last_batch = snapshot.get("last_batch")
                 if isinstance(last_batch, dict):
-                    summary += (f" · 최근 전체 배치 {last_batch.get('run_id')}: "
-                                f"{last_batch.get('status')} (오류 {last_batch.get('errors')})")
+                    summary += (
+                        f" · 최근 전체 배치 {last_batch.get('run_id')}: "
+                        f"{last_batch.get('status')} (오류 {last_batch.get('errors')})"
+                    )
                 self._json(
                     HTTPStatus.OK,
                     {
@@ -349,7 +391,9 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         "last_batch": last_batch,
                         "recent_stages": snapshot["recent_stages"],
                         "failures": {
-                            "total": sum(cast(dict[str, int], snapshot["failed_by_stage"]).values()),
+                            "total": sum(
+                                cast(dict[str, int], snapshot["failed_by_stage"]).values()
+                            ),
                             "by_stage": snapshot["failed_by_stage"],
                             "items": snapshot["failed_derivations"],
                             "omitted": snapshot["failed_details_omitted"],
@@ -364,6 +408,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         "desktop": {
                             "file_upload": True,
                             "folder_sync": True,
+                            "file_retract": True,
                             "run_now": True,
                             "latest_briefing": True,
                             "supported_suffixes": list(supported_suffixes()),
@@ -378,10 +423,14 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             if parsed.path == "/api/search":
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 query = values.get("q", [""])[0]
-                hits = SearchIndex(root, hybrid=context.config.search_hybrid,
-                                   registry_path=Path(context.config.knowledge_registry)
-                                   if "knowledge_registry" in context.config.raw else None,
-                                   min_similarity=context.config.search_min_similarity).search(
+                hits = SearchIndex(
+                    root,
+                    hybrid=context.config.search_hybrid,
+                    registry_path=Path(context.config.knowledge_registry)
+                    if "knowledge_registry" in context.config.raw
+                    else None,
+                    min_similarity=context.config.search_min_similarity,
+                ).search(
                     query,
                     _query_int(values, "limit", 10, 100),
                     kinds=_query_many(values, "kind"),
@@ -391,6 +440,14 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     scope=_query_optional(values, "scope"),
                 )
                 self._json(HTTPStatus.OK, {"results": [hit.as_dict() for hit in hits]})
+                return
+            if parsed.path.startswith("/api/retracts/"):
+                receipt_id = unquote(parsed.path.removeprefix("/api/retracts/")).strip("/")
+                receipt = read_retract_receipt(root, receipt_id)
+                if receipt is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                    return
+                self._json(HTTPStatus.OK, receipt.as_dict())
                 return
             if parsed.path.startswith("/api/pages/"):
                 page_id = unquote(parsed.path.removeprefix("/api/pages/"))
@@ -449,19 +506,51 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             parsed = urlsplit(self.path)
             maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
             data = self._body(maximum)
+            if parsed.path == "/api/uploads/retract":
+                upload_id = _string_field(data, "upload_id", required=True)
+                try:
+                    receipt = mutate_root(
+                        context.config,
+                        GenerationOperation.INBOX,
+                        lambda root: _retract_upload(root, upload_id, context),
+                    )
+                except (OSError, TimeoutError, ConnectionError):
+                    from datetime import UTC, datetime
+
+                    checked_at = (
+                        datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+                    )
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "deleted": False,
+                            "indexed": False,
+                            "restored": False,
+                            "receipt_id": "",
+                            "checked_at": checked_at,
+                            "upload_id": upload_id,
+                        },
+                    )
+                    return
+                self._json(HTTPStatus.OK, receipt)
+                return
             if parsed.path == "/api/uploads":
                 filename = _string_field(data, "filename", required=True)
                 relative_path = _string_field(data, "relative_path", default=filename)
                 device_id = _string_field(data, "device_id", default="mac")
                 declared = _string_field(data, "content_sha256", default="") or None
-                receipt = mutate_root(context.config, GenerationOperation.INBOX, lambda root: accept_upload(
-                    root,
-                    filename,
-                    _decode_upload(data),
-                    device_id=device_id,
-                    relative_path=relative_path,
-                    declared_sha256=declared,
-                ))
+                receipt = mutate_root(
+                    context.config,
+                    GenerationOperation.INBOX,
+                    lambda root: accept_upload(
+                        root,
+                        filename,
+                        _decode_upload(data),
+                        device_id=device_id,
+                        relative_path=relative_path,
+                        declared_sha256=declared,
+                    ),
+                )
                 status = HTTPStatus.CREATED if receipt.state == "queued" else HTTPStatus.OK
                 self._json(status, receipt.as_dict())
                 return
@@ -472,7 +561,11 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     raise ValueError("content is required")
                 if title is not None and not isinstance(title, str):
                     raise ValueError("title must be a string")
-                rel = mutate_root(context.config, GenerationOperation.INBOX, lambda root: write_inbox(root, content, title))
+                rel = mutate_root(
+                    context.config,
+                    GenerationOperation.INBOX,
+                    lambda root: write_inbox(root, content, title),
+                )
                 self._json(HTTPStatus.CREATED, {"inbox_path": rel.as_posix()})
                 return
             if parsed.path == "/api/inbox-discard":
@@ -480,7 +573,10 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 if not isinstance(inbox_path, str) or not inbox_path.strip():
                     raise ValueError("inbox_path is required")
                 discarded = mutate_root(
-                    context.config, GenerationOperation.INBOX, lambda root: discard_inbox(root, inbox_path))
+                    context.config,
+                    GenerationOperation.INBOX,
+                    lambda root: discard_inbox(root, inbox_path),
+                )
                 self._json(HTTPStatus.OK, {"discarded": discarded})
                 return
             if parsed.path == "/api/run":
@@ -495,7 +591,9 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                         "errors": outcome.errors,
                         "exit_code": outcome.exit_code,
                         "already_running": outcome.already_running,
-                        "failure": redact_credentials(outcome.failure)[:1000] if outcome.failure else None,
+                        "failure": redact_credentials(outcome.failure)[:1000]
+                        if outcome.failure
+                        else None,
                     },
                 )
                 return
@@ -505,7 +603,10 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     raise ValueError("page_id is required")
                 try:
                     commit = mutate_root(
-                        context.config, GenerationOperation.EFFECT, lambda root: Vault(root).forget_page(page_id))
+                        context.config,
+                        GenerationOperation.EFFECT,
+                        lambda root: Vault(root).forget_page(page_id),
+                    )
                 except FileNotFoundError as exc:
                     raise ValueError("compiled page missing") from exc
                 self._json(HTTPStatus.OK, {"forgotten": page_id, "commit": commit})
@@ -519,12 +620,16 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 if not isinstance(decision, str) or not isinstance(note, str):
                     raise ValueError("decision and note must be strings")
                 try:
-                    commit = mutate_root(context.config, GenerationOperation.EFFECT, lambda root: Vault(root).resolve_conflict(
-                        conflict_id,
-                        decision,
-                        note,
-                        f"web-{conflict_id}",
-                    ))
+                    commit = mutate_root(
+                        context.config,
+                        GenerationOperation.EFFECT,
+                        lambda root: Vault(root).resolve_conflict(
+                            conflict_id,
+                            decision,
+                            note,
+                            f"web-{conflict_id}",
+                        ),
+                    )
                 except FileNotFoundError as exc:
                     raise ValueError("conflict missing") from exc
                 self._json(HTTPStatus.OK, {"commit": commit})

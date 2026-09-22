@@ -1,0 +1,122 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "created_at": "2026-09-13T09:07:46.193376+00:00",
+  "submission": "e0b3445a49164ab7d4606b15d828581d29e6a2e1",
+  "verdict": "N2_normal_function_pass; N4_documentation_incomplete",
+  "overall_acceptance": "incomplete",
+  "identity": {
+    "submission": "e0b3445a49164ab7d4606b15d828581d29e6a2e1",
+    "product_pin": "a41b70dd165dda265fdc7d2b84df0da8d9fb9fb2",
+    "test_pin": "e0b3445a49164ab7d4606b15d828581d29e6a2e1",
+    "product_archive_sha256": "c811d67212c112f7759a7901cdab95a34788d2d80d5d23cd6ea50a8a0fe18cba",
+    "review_archive_sha256": "295b81fdf8b755f5646460ddd67b232b773bf71c4ee7e3027bfbb650357a6b33",
+    "wheel_sha256": "dc1be265f1c4eee10bda26e960ec085d2e7f83c052fd6b405c9c8656926c5fb0",
+    "sb_python_files": 183,
+    "wheel_mismatches": [],
+    "installed_mismatches": [],
+    "head_product_mismatches": [],
+    "test_file_sha256": {
+      "product_archive": "61d300f46f35627d85ed5b152bd85d5fb56abe2adbe7b782cf9752823afb7e47",
+      "review_archive": "5c3022574a4a621df8477f50a0ae5320d4425fc22c05058f0950198b598b3db8"
+    },
+    "runtime_files": 5787,
+    "runtime_mismatches": [],
+    "launcher_sha256": "b3742f4e511c651b515aaff67a3df069f0cdd60afd5d20862ad49ea4fe9700ce",
+    "jarvis": {
+      "pin": "64715bade176f5724bc4ebe8a40bc6f4c8f49a96",
+      "dist_file_count": 1222,
+      "dist_mismatches_vs_prior_rebuild": [
+        "dashboard/NOTICE-ARGO.txt",
+        "dashboard/index.html",
+        "dashboard/assets/index-BiyDD9Qq.css",
+        "build-metadata.json",
+        "dashboard/assets/index-D3vHCW5M.js"
+      ],
+      "source_mismatches": [],
+      "new_executions": 0,
+      "preserved_evidence": "/var/tmp/codex-night-069aeaa-080q44i1",
+      "backend_manifest_verification": {
+        "declared_entries": 1216,
+        "vs_prior_entry_mismatches": [],
+        "actual_byte_mismatches": [],
+        "declared_digest": "sha256:c64cfbf1c57f469927a453b1784b05508e33c9186f656a6546de86226e6aff36",
+        "outside_entries": [
+          ".backend-build-lock.sqlite",
+          "build-metadata.json",
+          "dashboard/NOTICE-ARGO.txt",
+          "dashboard/assets/index-BiyDD9Qq.css",
+          "dashboard/assets/index-D3vHCW5M.js",
+          "dashboard/index.html"
+        ]
+      }
+    }
+  },
+  "evidence_root": "/var/tmp/codex-night-e0b3445-f2vx7crf",
+  "direct_tests": {
+    "test_pin": "e0b3445a49164ab7d4606b15d828581d29e6a2e1",
+    "passed": 15,
+    "pytest_seconds": 1.38,
+    "ruff_exit": 0,
+    "type_errors": 0,
+    "type_warnings": 12,
+    "type_exit": 1,
+    "jarvis_new_executions": 0
+  },
+  "findings": [
+    {
+      "id": "N2",
+      "status": "passed_normal_scope",
+      "evidence": [
+        "provider-correction-probe.json",
+        "record-contract-probe.json",
+        "correction-probe.json",
+        "followup-probe.json",
+        "assertion-summary.json"
+      ],
+      "boundary": "synthetic source, real pipeline, installed CLI, provider derivation; not live MCP/native"
+    },
+    {
+      "id": "N4",
+      "status": "documentation_incomplete",
+      "locations": [
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:9",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:29",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:49",
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:61"
+      ],
+      "completion": [
+        "current candidate/product/test execution pin consistency",
+        "repo template vs installed observations vs proposal attribution and exact command/config operands",
+        "pending/lease unresolved stop rule and isolated recovery config/pre-start mapping"
+      ],
+      "implementation_requested": false,
+      "operation_execution_requested": false
+    }
+  ],
+  "held": "content-related branches unverified; no retry/transfer; exact trigger unknown",
+  "N1": "native/in-turn limitation unchanged",
+  "delivery": {
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "message_accepted": true,
+    "after_message_cursor": "6078983",
+    "official_resume": "/goal resume",
+    "resume_accepted": true,
+    "active_cursor": "6079002",
+    "work_cursor": "6079195",
+    "goal_status": "Goal active / Pursuing goal",
+    "observed": [
+      "review MD/JSON read",
+      "current operations document read",
+      "public installed request path/service definitions read",
+      "pending-state inspector and repo service/path templates read"
+    ],
+    "scope": "N4 documentation only; no product modification requested",
+    "implementation_or_document_completion_observed": false,
+    "observed_at": "2026-09-13T09:10:19.802184+00:00"
+  },
+  "automation": {
+    "enabled_observed": true,
+    "timezone": "Asia/Seoul",
+    "configuration_changed": false
+  }
+}

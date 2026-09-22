@@ -48,14 +48,18 @@ def test_status_exposes_held_brief_failures_without_changing_rows(tmp_path: Path
         assert failures["by_stage"] == {"brief": 23}
         assert failures["omitted"] == 3
         assert len(failures["items"]) == 20
-        assert all(item["retry_hold_reason"] == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
-                   for item in failures["items"])
+        assert all(
+            item["retry_hold_reason"] == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
+            for item in failures["items"]
+        )
         assert "secret-value" not in json.dumps(payload)
     with Ledger(root) as ledger:
         assert len(list(ledger.list_derivations(status="failed", stage="brief"))) == 23
 
 
-def test_web_run_does_not_clear_held_brief_failures(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_web_run_does_not_clear_held_brief_failures(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
     config, root = _ready(tmp_path)
     with Ledger(root) as ledger:
         for index in range(23):
@@ -376,6 +380,86 @@ def test_desktop_upload_endpoint_rejects_invalid_base64_and_path_escape(tmp_path
         assert "relative_path" in str(cast(dict[str, object], escaped).get("error"))
 
 
+def test_desktop_retract_endpoint_is_idempotent_and_lookupable(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    config, root = _ready(tmp_path)
+    token = "desktop-retract-token"
+    monkeypatch.setenv("SB_WEB_TOKEN", token)
+    payload = b"# retract\n"
+    request_body = {
+        "filename": "note.md",
+        "relative_path": "note.md",
+        "device_id": "mac",
+        "content_base64": base64.b64encode(payload).decode("ascii"),
+    }
+    with _running(config) as base:
+        status, uploaded = _request(
+            f"{base}/api/uploads", method="POST", payload=request_body, token=token
+        )
+        assert status == 201
+        assert isinstance(uploaded, dict)
+        upload_id = cast(dict[str, object], uploaded)["upload_id"]
+        assert isinstance(upload_id, str)
+        status, first = _request(
+            f"{base}/api/uploads/retract",
+            method="POST",
+            payload={"upload_id": upload_id},
+            token=token,
+        )
+        assert status == 200
+        assert isinstance(first, dict)
+        body = cast(dict[str, object], first)
+        assert body["deleted"] is True
+        assert body["indexed"] is False
+        assert body["restored"] is False
+        receipt_id = body["receipt_id"]
+        assert isinstance(receipt_id, str) and receipt_id
+        status, second = _request(
+            f"{base}/api/uploads/retract",
+            method="POST",
+            payload={"upload_id": upload_id},
+            token=token,
+        )
+        assert status == 200
+        assert isinstance(second, dict)
+        assert cast(dict[str, object], second)["receipt_id"] == receipt_id
+        status, looked = _request(f"{base}/api/retracts/{receipt_id}", token=token)
+        assert status == 200
+        assert isinstance(looked, dict)
+        assert cast(dict[str, object], looked)["upload_id"] == upload_id
+        inbox_path = cast(dict[str, object], uploaded).get("inbox_path")
+        assert isinstance(inbox_path, str)
+        assert not (root / inbox_path).exists()
+
+
+def test_desktop_retract_network_failure_returns_deleted_false(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    config, _root = _ready(tmp_path)
+    token = "desktop-retract-token"
+    monkeypatch.setenv("SB_WEB_TOKEN", token)
+
+    def boom(*_args: object, **_kwargs: object) -> object:
+        raise OSError("network down")
+
+    monkeypatch.setattr("sb.web.mutate_root", boom)
+    with _running(config) as base:
+        status, payload = _request(
+            f"{base}/api/uploads/retract",
+            method="POST",
+            payload={"upload_id": "a" * 64},
+            token=token,
+        )
+        assert status == 200
+        assert isinstance(payload, dict)
+        body = cast(dict[str, object], payload)
+        assert body["deleted"] is False
+        assert body["indexed"] is False
+        assert body["restored"] is False
+        assert body["receipt_id"] == ""
+
+
 def test_web_run_uses_only_explicitly_configured_sources(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
@@ -487,15 +571,15 @@ def test_request_body_budget_is_enforced(tmp_path: Path) -> None:
 def test_status_summary_uses_same_ledger_run_as_details(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     with Ledger(root) as ledger:
-        ledger.record_run(Run('latest-failed', '2099-01-01T00:00:00Z', None, None, 'failed'))
-    (root / 'log.md').write_text('old successful run\n')
+        ledger.record_run(Run("latest-failed", "2099-01-01T00:00:00Z", None, None, "failed"))
+    (root / "log.md").write_text("old successful run\n")
     with _running(config) as base:
-        status, payload = _request(base + '/api/status')
+        status, payload = _request(base + "/api/status")
     assert status == 200
-    assert payload['last_run_status'] == 'failed'
-    assert 'latest-failed' in payload['status']
-    assert 'failed' in payload['status']
-    assert 'old successful run' not in payload['status']
+    assert payload["last_run_status"] == "failed"
+    assert "latest-failed" in payload["status"]
+    assert "failed" in payload["status"]
+    assert "old successful run" not in payload["status"]
 
 
 def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> None:  # noqa: F811
@@ -504,15 +588,19 @@ def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> No
 
     root, name, generation = classified
     work = root.parent.parent
-    config = Config(raw={
-        "vault_root": str(root),
-        "share_root": str(work / "share"),
-        "state_root": str(work / "state"),
-        "knowledge_registry": str(work / "registry.db"),
-    })
+    config = Config(
+        raw={
+            "vault_root": str(root),
+            "share_root": str(work / "share"),
+            "state_root": str(work / "state"),
+            "knowledge_registry": str(work / "registry.db"),
+        }
+    )
     with _running(config) as base:
         status, searched = _request(f"{base}/api/search?q=Cited&kind=wiki")
-        page_status, page = _request(f"{base}/api/pages/" + urllib.parse.quote("wiki/" + name, safe=""))
+        page_status, page = _request(
+            f"{base}/api/pages/" + urllib.parse.quote("wiki/" + name, safe="")
+        )
     assert status == 200 and page_status == 200
     assert isinstance(searched, dict) and isinstance(page, dict)
     results = cast(dict[str, object], searched).get("results")
@@ -520,7 +608,8 @@ def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> No
     assert "Cited" in json.dumps(searched, ensure_ascii=False)
     assert "Cited" in str(cast(dict[str, object], page).get("body"))
     denied = search_scoped_records(
-        root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10)
+        root, generation, SourceAccess("principal:owner", ("project:b",), "1"), "Cited", 10
+    )
     assert denied == []
     assert "Cited" not in str(denied)
 
@@ -528,7 +617,9 @@ def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> No
 def test_existing_gui_entrypoints_lifetime_and_concurrent_search(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     with _running(config) as base:
-        fail_status, fail_body = _request(base + "/api/remember", method="POST", payload={"title": "x"})
+        fail_status, fail_body = _request(
+            base + "/api/remember", method="POST", payload={"title": "x"}
+        )
         assert fail_status == 400
         assert "content is required" in str(fail_body)
         ok_status, remembered = _request(
@@ -542,7 +633,9 @@ def test_existing_gui_entrypoints_lifetime_and_concurrent_search(tmp_path: Path)
         assert isinstance(inbox_path, str)
         inbox = root / inbox_path
         assert inbox.is_file() and "lifetime-receipt-needle" in inbox.read_text(encoding="utf-8")
-        page_status, page = _request(base + "/api/pages/" + urllib.parse.quote("wiki/계약-일정", safe=""))
+        page_status, page = _request(
+            base + "/api/pages/" + urllib.parse.quote("wiki/계약-일정", safe="")
+        )
         assert page_status == 200 and TERM in str(cast(dict[str, object], page).get("body"))
         bad_conflict, _ = _request(
             base + "/api/conflicts/web-case/resolve",
@@ -560,8 +653,12 @@ def test_existing_gui_entrypoints_lifetime_and_concurrent_search(tmp_path: Path)
         assert retention_status == 200 and isinstance(retention, dict)
         changes_status, _changes = _request(base + "/api/changes?days=7")
         assert changes_status == 200
-        before_search, before_hits = _request(base + "/api/search?q=" + urllib.parse.quote(TERM) + "&kind=wiki")
+        before_search, before_hits = _request(
+            base + "/api/search?q=" + urllib.parse.quote(TERM) + "&kind=wiki"
+        )
         assert before_search == 200 and TERM in json.dumps(before_hits, ensure_ascii=False)
-        after_search, after_hits = _request(base + "/api/search?q=" + urllib.parse.quote(TERM) + "&kind=wiki")
+        after_search, after_hits = _request(
+            base + "/api/search?q=" + urllib.parse.quote(TERM) + "&kind=wiki"
+        )
         assert after_search == 200 and TERM in json.dumps(after_hits, ensure_ascii=False)
     assert "status: resolved" in (root / "conflicts" / "web-case.md").read_text(encoding="utf-8")

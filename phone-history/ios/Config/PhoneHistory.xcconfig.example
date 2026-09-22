@@ -1,0 +1,9 @@
+// Copy values into PhoneHistory.xcconfig only when your Apple identifiers differ.
+PHONE_HISTORY_BUNDLE_ID = com.blro.phonehistory
+PHONE_HISTORY_SHARE_BUNDLE_ID = com.blro.phonehistory.share
+PHONE_HISTORY_TEST_BUNDLE_ID = com.blro.phonehistory.tests
+PHONE_HISTORY_APP_GROUP = group.com.blro.phonehistory
+PHONE_HISTORY_KEYCHAIN_GROUP = $(AppIdentifierPrefix)com.blro.phonehistory.shared
+// Set the 10-character Apple Developer Team ID before a signed device build.
+PHONE_HISTORY_DEVELOPMENT_TEAM =
+DEVELOPMENT_TEAM = $(PHONE_HISTORY_DEVELOPMENT_TEAM)

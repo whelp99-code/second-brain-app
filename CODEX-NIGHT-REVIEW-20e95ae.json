@@ -1,0 +1,114 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e under overnight independent-review delegation; not original Codex execution",
+  "submission": "20e95ae7908463ed7b72e6bc98ed9691517a9258",
+  "pin": {
+    "sb_source": "26b06ebaebfccfbb93b1366b5fb64376534777c2",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-26b06eb/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "dcd54e9",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-dcd54e9/source/dist",
+    "jarvis_inventory_sha256": "9bd9006c92d31aab75b874d827d0dedde8a8a63c16a4feb7ad1cace6ca7533dc",
+    "jarvis_inventory_entries": 34780,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "final_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-20e95ae-kbf1bmih",
+  "finished_at_utc": "2026-09-11T18:35:04.516674+00:00",
+  "findings": [
+    {
+      "id": "N1-uncertain-delivery",
+      "priority": "P2",
+      "evidence": [
+        "dispatch-accepted-crash.mjs",
+        "dispatch-accepted-crash.json"
+      ],
+      "actual": "Synthetic remote accepts request; child exits before local result/event. Reopened public dispatch blindly reclaims and remote accepts twice, model_dispatched once. Distinct from fixed no-send crash.",
+      "completion": "Define and implement durable delivery/reconciliation semantics: distinguish no-send and unknown accepted state, bind retry identity to actual transport or surface recoverable unknown instead of blind resend. Do not promise arbitrary remote exactly-once or block all safe no-send recovery."
+    },
+    {
+      "id": "M12-shared-runtime-dr",
+      "priority": "P2",
+      "evidence": [
+        "source/tests/test_cold_restore_write.py",
+        "m12-observed.json"
+      ],
+      "actual": "Legacy Config lacks share_root. Deletes search/ledger/reingress DB but no generation/request journals. Positive product write and revoked key restoration pass; no trusted generation/request journal loss plus tombstone high-water/deny/reingress test. Timing ends before new write.",
+      "completion": "Use representative synthetic shared-runtime backup/control journals with deletion high-water and trusted source anchors; lose originals/control DBs and validate actual restore, fresh scoped reader allowed/denied, deletion non-resurrection, new product write and separate SB/JARVIS RPO/full RTO."
+    }
+  ],
+  "direct_checks": {
+    "sb_python_files_equal": 182,
+    "sb_product_unchanged_since_f94d073": true,
+    "jarvis_product_tracked_equal": 1137,
+    "jarvis_tsc_exit": 0,
+    "jarvis_rebuilt_js_equal": 1109,
+    "jarvis_focused_tests": {
+      "passed": 9,
+      "duration_seconds": 8.91,
+      "test_seconds": 5.74
+    },
+    "ruff_exit": 0,
+    "python_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_standard_exit": 0,
+    "installed_work_exit": 0,
+    "installed_maintenance_exit": 0,
+    "reclaim_concurrent_sends": 1,
+    "alive_worker_expiry_sends": 1,
+    "accepted_before_crash_remote_accepts": 2,
+    "m6": {
+      "cutover": false,
+      "holder": "HELD",
+      "busy_while_held": true,
+      "after_sigkill_busy": false,
+      "after_sigkill_status": "ok",
+      "after_sigkill_exit": 0,
+      "after_sigkill_commit": "f754c3e0ee02488bc490ed04b6add8f86ce827b3",
+      "denied_store_blind_allowed": false,
+      "revocation_keys": [
+        "key:test"
+      ]
+    },
+    "m12": {
+      "rpo_backup_at": "2026-09-11T18:32:39.414680+00:00",
+      "rto_seconds": 0.0693,
+      "removed_sqlite": [
+        ".sb/search.db",
+        ".sb/ledger.db",
+        ".sb/runtime-state/reingress.db"
+      ],
+      "pre_hits": [
+        "wiki/inbox-pre-df5fe08e"
+      ],
+      "post_hits": [
+        "wiki/inbox-post-d375747f"
+      ],
+      "post_run_status": "ok",
+      "post_run_commit": "851e8d0c04794a06916558e3b33c79d564516cd6",
+      "revocation_keys": [
+        "key:test"
+      ],
+      "cutover": false
+    }
+  },
+  "grok_full_log_observation": {
+    "path": "/var/tmp/sb-full-pytest-26b06eb.log",
+    "sha256": "a303ac360daa1cdc1a89477aee12dafcddb3f632a4bb9fde5291d8c56eadd514",
+    "tail": "............................... [ 98%]\n..................................                                       [100%]\n1832 passed, 2 skipped in 660.98s (0:11:00)\nEXIT:0\n",
+    "observed_existing_log": true
+  },
+  "remaining_scope": [
+    "V1/M9 selected session and compaction/public transport beyond injected callbacks/Recording remains unverified",
+    "M6 local SIGKILL->pipeline commit passed; final pinned cutover/rollback runbook and real-state compatibility evidence remain; no operational drain authorization",
+    "Original A-F/M1-M14 and actual-user/native external conditions maintained; prior N2/N4/M11/M12 bounded passes preserved"
+  ],
+  "reviewer_product_source_edits": false,
+  "operational_actions": false
+}

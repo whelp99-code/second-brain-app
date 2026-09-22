@@ -1,0 +1,99 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "reviewed_at_utc": "2026-09-12T00:35:40.865442+00:00",
+  "submission": "d812e284af28a34a6ece5905caee6f8544577a92",
+  "pin": {
+    "sb_source": "a1a5ae2a7e0495117790bf03f14a42bbbe67760c",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-a1a5ae2/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "22b46139e312979e6ac81b41ef4b8c64a4d2d71a",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-22b4613/source/dist",
+    "jarvis_inventory_sha256": "6f30a34af67aec7587ef1bfdb046c29645cc0e5508030ce4be13d08711a7b868",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "evidence_root": "/var/tmp/codex-night-d812e28-p3dzqr9w",
+  "findings": [
+    {
+      "id": "M12-restore-orphan-wal",
+      "severity": "P1",
+      "location": "Orca-JARVIS src/personal-os-backup.ts:148-155",
+      "summary": "Successful main-file replacement leaves destination WAL; reopened SQLite reads old destination rows instead of backup",
+      "repro": "restore-orphan-wal.mjs/.json",
+      "completion": "Coordinate SQLite main/WAL/SHM and writer exclusion; safely refuse busy or unreconciled destination or implement validated recovery; verify reopened destination contents and preserve source/destination on failure."
+    },
+    {
+      "id": "M12-rpo-provenance",
+      "severity": "P2",
+      "location": "scripts/jarvis-restore-acceptance.mjs:68-77,238-241",
+      "summary": "SB accepted remember request is relabeled as lost JARVIS receipt; JARVIS counts unchanged and actual SB proved receipt persists",
+      "repro": "rpo-receipt-provenance.json; paired-restore-result.json",
+      "completion": "Use actual JARVIS durable accepted receipt/effect rows and measured restored ID sets; real proof IDs, fail on query errors, separate SB content loss from receipt loss; check post-backup revoke/authority freshness."
+    },
+    {
+      "id": "B-F-recovery-preparation",
+      "severity": "P2",
+      "summary": "Immediate current-fence same-root commands now pass, but fresh authorization after expiry and real schema/version compatibility or refusal remain unprepared",
+      "completion": "Document and execute fresh current fence issuance for later restore; validate actual supported/unsupported schema and revocation state before activation, do not use sentinel absence as compatibility proof."
+    },
+    {
+      "id": "requirements-mapping",
+      "severity": "P2",
+      "location": "IMPLEMENTATION-STATUS.md:9-32",
+      "summary": "A-F and M1/M2/M14 labels improved, but M4/M7/M8/M6 remain narrowed and M14 evidence is only generic isolated search",
+      "completion": "Preserve exact original M1-M14 requirements with evidence links, unimplemented scope and specific external inputs; M14 needs value/cost/deletion consistency evaluation or justified deferral."
+    }
+  ],
+  "prior_findings_resolved": [
+    "missing/invalid backup failure preserves existing destination",
+    "immediate final-highwater same-root restore",
+    "runbook BACKUP/DEST environment",
+    "journal pending count vs file count"
+  ],
+  "direct_checks": {
+    "backup_tests": 5,
+    "backup_test_seconds": 0.335,
+    "ruff_exit": 0,
+    "tsc_exit": 0,
+    "revoked_keys_types": {
+      "errors": 0,
+      "warnings": 2,
+      "exit": 1
+    },
+    "installed_gates": [
+      0,
+      0,
+      0
+    ],
+    "paired_restore_exit": 0,
+    "same_root_restore_exit": 0,
+    "runbook_jarvis_restore_exit": 0,
+    "restore_timings": {
+      "failure_began_ms": 1789173146650,
+      "restore_began_ms": 1789173153614,
+      "sb_first_read_ms": 1789173155938,
+      "scoped_available_ms": 1789173157183,
+      "new_write_available_ms": 1789173158487,
+      "restore_probe_ms": 475.63800000000003,
+      "restore_to_readable_ms": 2324,
+      "failure_to_first_read_ms": 9288,
+      "failure_to_work_available_ms": 11837,
+      "jarvis_crash_to_reopen_ms": 34,
+      "scenario_ms": 20800
+    },
+    "artifact_integrity": {
+      "sha256": "6f30a34af67aec7587ef1bfdb046c29645cc0e5508030ce4be13d08711a7b868",
+      "entries": 34768,
+      "unchanged": true
+    },
+    "sb_python_files_identical": 182,
+    "jarvis_tracked_files_identical": 1137,
+    "rebuilt_js_identical": 1109
+  },
+  "final_acceptance": false,
+  "next_action": "Same Grok approved goal: finish complete SQLite recovery contract and truthful paired RPO/preparation/requirements evidence; keep30min automation."
+}

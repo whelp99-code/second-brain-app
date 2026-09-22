@@ -1,0 +1,76 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "created_at": "2026-09-13T09:36:42.457905+00:00",
+  "submission": "e53dd6653658d7b0a061dc1e8c65316c6c3f4268",
+  "verdict": "N2_preserved; N4_documentation_incomplete",
+  "overall_acceptance": "incomplete",
+  "identity": {
+    "submission": "e53dd6653658d7b0a061dc1e8c65316c6c3f4268",
+    "time": "2026-09-13T09:34:41.732247+00:00",
+    "changed_files": [
+      "GROK-CLIENT-CONNECTION-READINESS-2026-09-13.json",
+      "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md",
+      "GROK-INTEGRATED-CANDIDATE-HANDOFF-2026-09-13.md"
+    ],
+    "product_pin": "a41b70dd165dda265fdc7d2b84df0da8d9fb9fb2",
+    "test_pin": "e0b3445a49164ab7d4606b15d828581d29e6a2e1",
+    "product_files": 183,
+    "source_mismatches": [],
+    "wheel_sha256": "dc1be265f1c4eee10bda26e960ec085d2e7f83c052fd6b405c9c8656926c5fb0",
+    "wheel_mismatches": [],
+    "installed_mismatches": [],
+    "test_sha256": "5c3022574a4a621df8477f50a0ae5320d4425fc22c05058f0950198b598b3db8",
+    "test_matches_e0b3445": true,
+    "jarvis_backend_digest": "sha256:c64cfbf1c57f469927a453b1784b05508e33c9186f656a6546de86226e6aff36",
+    "jarvis_backend_files": 1216,
+    "jarvis_backend_mismatches": [],
+    "jarvis_runtime_mismatches": [],
+    "jarvis_launcher_sha256": "b3742f4e511c651b515aaff67a3df069f0cdd60afd5d20862ad49ea4fe9700ce",
+    "new_tests_build_launcher": 0,
+    "prior_evidence": "/var/tmp/codex-night-e0b3445-f2vx7crf"
+  },
+  "new_tests_build_launcher": 0,
+  "prior_tests": {
+    "pin": "e0b3445a49164ab7d4606b15d828581d29e6a2e1",
+    "passed": 15,
+    "seconds": 1.38,
+    "ruff_exit": 0,
+    "type_errors": 0,
+    "type_warnings": 12,
+    "type_exit": 1,
+    "new_execution": false
+  },
+  "passed": [
+    "current product/test/candidate and old gate distinction",
+    "N2 normal provider identity and installed hook evidence preserved",
+    "writer/activator and partial transition stop constraints improved"
+  ],
+  "findings": [
+    {
+      "id": "D1",
+      "scope": "documentation",
+      "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:40",
+      "issue": "requests repo unit lacks claimed SB_CONFIG Environment; systemd %h differs from shell path",
+      "completion": "Actual/default/proposed config consumers separated with exact paths."
+    },
+    {
+      "id": "D2",
+      "scope": "documentation",
+      "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:64",
+      "issue": "states fixed-key aggregate is not empty even when each query result is empty",
+      "completion": "Per table/state/count unresolved classification, unknown/missing stop conditions, no drain implication."
+    },
+    {
+      "id": "D3",
+      "scope": "documentation",
+      "location": "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md:85",
+      "issue": "No explicit restored-root to verification config and command mapping",
+      "completion": "Named isolated slots, explicit SB_CONFIG consumer and query operand, stop before validation and no automatic operating start."
+    }
+  ],
+  "held": "Unverified; no retries or transfer; exact content trigger unknown",
+  "N1": "native/in-turn limitation preserved",
+  "delivery": {
+    "status": "pending"
+  }
+}

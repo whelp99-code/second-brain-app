@@ -1,0 +1,164 @@
+{
+  "submission": "36e86aba0587392d12ebefdffa7a90e68d272af9",
+  "pin": {
+    "sb_source": "bafb832dc0c86dc4c82be39d587f6356908d8ee5",
+    "release_id": "55a8b68b7039a355a1562b1b0b0c551c9f3d2a56",
+    "wheel_sha256": "a3679d532fc3bd591017d7dbc39056703d73581292c97c1025c45c32c1d1dc19",
+    "candidate": "/var/tmp/sb-candidate-27cb576/releases/55a8b68b7039a355a1562b1b0b0c551c9f3d2a56",
+    "git_archive_includes_seed_scoped_v4": true,
+    "jarvis_source": "1672626c5f2b0b06f7fb93c900cf8771536b58cd",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-1672626/source/dist",
+    "jarvis_inventory_sha256": "e9751dfaf955bab6a1ea15792733e0af576f7bac540ca5efeb0b69d9bccbf9cd",
+    "jarvis_inventory_entries": 34768
+  },
+  "reviewer": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "review_finished_at_utc": "2026-09-12T11:58:40.493457+00:00",
+  "verdict": "not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-36e86ab-b4ysfcvi",
+  "identity": "/var/tmp/codex-night-36e86ab-b4ysfcvi/identity.json",
+  "post_identity": "/var/tmp/codex-night-36e86ab-b4ysfcvi/post-identity.json",
+  "direct_tests": {
+    "related": {
+      "passed": 50,
+      "seconds": 18.24,
+      "exit": 0
+    },
+    "new_mcp": {
+      "passed": 1,
+      "seconds": 6.77,
+      "exit": 0
+    },
+    "ruff_exit": 0,
+    "installed_standard_exit": 0,
+    "changed_product_types": {
+      "errors": 0,
+      "warnings": 5,
+      "exit": 1
+    },
+    "baseline_same_files_types": {
+      "errors": 0,
+      "warnings": 5,
+      "exit": 1
+    },
+    "submitted_browser_exit": 1,
+    "actual_ui": "diagnostic_complete; pending success and compiled lifetime gap",
+    "safety": "outside synthetic canary deleted"
+  },
+  "new_full_suite": false,
+  "unchanged_dr_2scope_retry_repeated": false,
+  "prior_results": "Preserved b9fc3d4/e3148bf/e68d5e5/f637e0b with original byte scopes and counts; not added to51",
+  "findings": [
+    {
+      "id": "P1-inbox-parent-symlink-outside-unlink",
+      "priority": "P1",
+      "location": "sb/inbox.py:70; sb/web.py:477",
+      "evidence": "/var/tmp/codex-night-36e86ab-b4ysfcvi/discard-safety.json",
+      "outcome": "HTTP200 deletes synthetic outside-vault canary when inbox parent is symlink",
+      "completion": "Vault-root-anchored safe unlink; normal/refusal/recovery with file preservation"
+    },
+    {
+      "id": "M13-compiled-memory-lifetime",
+      "priority": "P2",
+      "location": "sb/web.py:140; sb/inbox.py:70",
+      "evidence": "/var/tmp/codex-night-36e86ab-b4ysfcvi/ui-result.json",
+      "outcome": "Actual buttons pending400->200 pass; compiled1 then receipt400 and same search1 remains",
+      "completion": "Original GUI correction/deletion/body/receipt/search and scoped lifetime through accepted product flow"
+    },
+    {
+      "id": "M11-no-read-write-overlap",
+      "priority": "P2",
+      "location": "tests/test_mcp_generation_overlap.py:94",
+      "evidence": "/var/tmp/codex-night-36e86ab-b4ysfcvi/mcp-observation.json",
+      "outcome": "Actual in-process MCP4 reads and2 writer stages; zero overlap; record_text Cited before and after",
+      "completion": "Deterministic actual MCP read/commit overlap; corrected body/version and stale-version exclusion with deny scopes"
+    },
+    {
+      "id": "F-provenance-and-harness-acceptance",
+      "priority": "P2",
+      "location": "GROK-FINAL-ACCEPTANCE-PACKAGE.md:13; scripts/isolated-browser-m13-lifetime.py:148",
+      "evidence": [
+        "/var/tmp/codex-night-36e86ab-b4ysfcvi/identity.json",
+        "/var/tmp/codex-night-36e86ab-b4ysfcvi/submitted-browser/evidence.json"
+      ],
+      "outcome": "a4b unchanged claim false;27manifest/bafb productbytes match; stale32resume; raw run failed but run_invoked true, overall harness EXIT1",
+      "completion": "Correct source/harness/log identity and real operation assertions; retain closed timing correction"
+    }
+  ],
+  "closed_prior_findings": [
+    "RTO reported numbers now1958/9418/46ms match original log; not remeasured"
+  ],
+  "hashes": {
+    "source/sb/inbox.py": "05e5b8f17d2731db887d08c9c26e9a90cd5037cc631b3f2887306187390b83f4",
+    "source/sb/web.py": "7d0f5b7f49a67a25107c2f61690339364cc5c48d7826b77c5bed320b614a25bd",
+    "source/tests/test_mcp_generation_overlap.py": "01c66a1aad4f222dbc08dc17b81100622605791322a3ba502fa89c4b8d16c6bf",
+    "source/scripts/isolated-browser-m13-lifetime.py": "9029dc047abc1642e35f1478814bfa920eea4ad60577d6680668a6b66ade2b5b",
+    "run.py": "ee009bfcc5f8b9cf875ee6518187ce53fc9502901b29d67b0de7aba2fc781510",
+    "mcp_observer.py": "ea4651d6bfc8ebbfbed4236a9fe907c0e209e9ab92c04b545878f57160661392",
+    "ui.py": "509cbb009cecfa7bfe4fdae6a1ee6ae06404a458eec3d45a103e586dc8e1e05c",
+    "ui.mjs": "3bf1cc5b7f54ce7772077497655ecbadaa1a725f19b6af965110b93da61d693a",
+    "discard-safety.py": "4953050258d4c4819345be8bb789052254254c6b075d5f2af536dc0d640fb142",
+    "source/scripts/codex-observed-browser.py": "407a3cc324c0016d879f6b17c181e87ecb97d8dd2bff34e0cbd1d9a26de48ddd",
+    "related-regression.log": "aa3d4f2e694e72d81dee2960a5dad5948b6f7724050bf6ca6750834f29c52d07",
+    "mcp-test.log": "662f74d7f250de7c13b683625217c603fd0456ed0c39c0f82b2800ed07d08595",
+    "ruff.log": "ebe9a79730ee44eb47f9c4e057b8ee334fce479afbcf5e46fe3c62dc30f94eba",
+    "changed-product-types.log": "796b91f1ec9ec6664b22749c79abeea77651a8185c55c28e939c08df36985baa",
+    "baseline-types.log": "2380d43c238d5db9c493f4aed489f33228e30a14c8c4e9541747ec5fc4f0c028",
+    "installed-standard.log": "59e031156890e45f938ac9f5a26abffdc8e2966568077ce3453300be5a45d974",
+    "ui-result.json": "33d0943c89f2b1774c4f46fcc72ab90c6c1d35de13a527e867a05e7b9d0643ae",
+    "discard-safety.json": "919615a6605342a21e265b983ed0faef3e9cd4b3ac9a7f510d2c9989b5dde533",
+    "mcp-observation.json": "8de0695b5385c3056143c62334242616db43673bff0cb95d6db1431d586c4f22",
+    "submitted-browser/evidence.json": "f66e97359654bbd420dd2239ca6e53114222f0beec98c0652f8f71d2eb020f25"
+  },
+  "external_conditions": [
+    "native auth/profile/copies/compaction",
+    "real work/Korean gold/operating corpus",
+    "operating backup/cutover permission/timer"
+  ],
+  "schedule": "*/30 * * * * Asia/Seoul unchanged",
+  "delivery": {
+    "sent_at": "2026-09-12T11:59:27.660577+00:00",
+    "submission": "36e86aba0587392d12ebefdffa7a90e68d272af9",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "prompt_path": "/var/tmp/codex-night-36e86ab-b4ysfcvi/integrated-prompt.txt",
+    "actual_start_confirmed": true,
+    "continuation_status": "P1_defect_investigation_started; completed_patch_and_cross_stage_continuation_unverified",
+    "resume_receipt": {
+      "id": "6558767a-810b-4b31-a5d0-0e27bbb428ca",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 13
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "receipt": {
+      "id": "1522b252-3a5b-40d8-a6c5-fa8bdda9d2fa",
+      "ok": true,
+      "result": {
+        "send": {
+          "handle": "term_dc97574f3e548cff6e25679d713ed8c2",
+          "accepted": true,
+          "bytesWritten": 3474
+        }
+      },
+      "_meta": {
+        "runtimeId": "ca42a722-d172-4156-ad7f-d409e84f0bbb"
+      }
+    },
+    "receipt_confirmed": true,
+    "native_goal_resume_confirmed": true,
+    "actual_start_scope": "P1 product defect investigation",
+    "implementation_start_confirmed": false,
+    "confirmed_at_utc": "2026-09-12T12:00:44.323174+00:00",
+    "screen_cursor": "5818200",
+    "public_evidence": "Rendered screen5818200: completed Find existing O_NOFOLLOW/unlink primitives in sb tool, current read running16s and nativePursuing6h12m. P1 defect investigation actual tools confirmed. No completed product patch or cross-stage continuation yet.",
+    "evidence_path": "/var/tmp/codex-night-36e86ab-b4ysfcvi/worker-public-screen.json"
+  }
+}

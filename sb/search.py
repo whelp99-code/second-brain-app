@@ -130,11 +130,19 @@ class HybridModule(Protocol):
 
 @runtime_checkable
 class SealedVectorModule(Protocol):
-    def query_sealed_cosine(self, root: Path, query: str, limit: int, *,
-                            filters: SearchFilters, states: tuple[KnowledgeState, ...]) -> tuple[SearchHit, ...]: ...
+    def query_sealed_cosine(
+        self,
+        root: Path,
+        query: str,
+        limit: int,
+        *,
+        filters: SearchFilters,
+        states: tuple[KnowledgeState, ...],
+    ) -> tuple[SearchHit, ...]: ...
 
-    def merge_ranked(self, lexical: tuple[SearchHit, ...], semantic: tuple[SearchHit, ...],
-                     limit: int) -> tuple[SearchHit, ...]: ...
+    def merge_ranked(
+        self, lexical: tuple[SearchHit, ...], semantic: tuple[SearchHit, ...], limit: int
+    ) -> tuple[SearchHit, ...]: ...
 
 
 def git_run(root: Path, *args: str) -> str | None:
@@ -168,8 +176,9 @@ def _git_run_bytes(root: Path, *args: str) -> bytes | None:
 
 
 def _blob_revision(revision: str) -> str:
-    if revision != "HEAD" and (len(revision) not in (40, 64)
-                               or any(ch not in "0123456789abcdef" for ch in revision)):
+    if revision != "HEAD" and (
+        len(revision) not in (40, 64) or any(ch not in "0123456789abcdef" for ch in revision)
+    ):
         raise ValueError("expected HEAD or full commit object ID")
     return revision
 
@@ -181,8 +190,9 @@ def committed_text(root: Path, rel: str, *, revision: str = "HEAD") -> str | Non
     return git_run(root, "show", f"{_blob_revision(revision)}:{rel}")
 
 
-def committed_paths(root: Path, prefixes: tuple[str, ...], *, revision: str = "HEAD",
-                    required: bool = False) -> tuple[str, ...]:
+def committed_paths(
+    root: Path, prefixes: tuple[str, ...], *, revision: str = "HEAD", required: bool = False
+) -> tuple[str, ...]:
     """Committed `*.md` paths under `prefixes`, excluding wiki/_proposed/."""
     raw = _git_run_bytes(root, "ls-tree", "-rz", "--name-only", _blob_revision(revision))
     if raw is None:
@@ -246,13 +256,24 @@ class SearchIndex:
         _ = LexicalQuery.parse(query)
         root = self.vault_root.resolve()
         if (root / "generation.json").is_file():
-            with closing(self.iter_lexical_hits(
-                query, kinds=kinds, status=status, updated_from=updated_from,
-                updated_to=updated_to, scope=scope,
-            )) as hits:
+            with closing(
+                self.iter_lexical_hits(
+                    query,
+                    kinds=kinds,
+                    status=status,
+                    updated_from=updated_from,
+                    updated_to=updated_to,
+                    scope=scope,
+                )
+            ) as hits:
                 lexical = tuple(islice(hits, max(0, limit)))
-            semantic = self.semantic_hits(query, limit, filters=SearchFilters(
-                tuple(kinds or ()), status, updated_from, updated_to, scope or "reference"))
+            semantic = self.semantic_hits(
+                query,
+                limit,
+                filters=SearchFilters(
+                    tuple(kinds or ()), status, updated_from, updated_to, scope or "reference"
+                ),
+            )
             if not semantic:
                 return lexical
             module = _sealed_vector_module()
@@ -272,14 +293,25 @@ class SearchIndex:
         )
         if not _wants_hybrid(self.hybrid):
             return hits
-        return _hybrid_or_lexical(hits, query, limit, root,
-                                  SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope,
-                                                self.min_similarity))
+        return _hybrid_or_lexical(
+            hits,
+            query,
+            limit,
+            root,
+            SearchFilters(
+                tuple(kinds or ()), status, updated_from, updated_to, scope, self.min_similarity
+            ),
+        )
 
     def iter_lexical_hits(
-        self, query: str, *, kinds: Sequence[str] | None = None,
-        status: str | None = None, updated_from: str | None = None,
-        updated_to: str | None = None, scope: str | None = None,
+        self,
+        query: str,
+        *,
+        kinds: Sequence[str] | None = None,
+        status: str | None = None,
+        updated_from: str | None = None,
+        updated_to: str | None = None,
+        scope: str | None = None,
         include_metadata: bool = True,
     ) -> Generator[SearchHit, None, None]:
         """Stream filtered hits so callers can limit after record selection/deduplication.
@@ -296,9 +328,17 @@ class SearchIndex:
             _refresh(db_path, root, registry)
             offset = 0
             while True:
-                rows = _lexical(db_path, query, 128, kinds=kinds, status=status,
-                                updated_from=updated_from, updated_to=updated_to, scope=scope,
-                                offset=offset)
+                rows = _lexical(
+                    db_path,
+                    query,
+                    128,
+                    kinds=kinds,
+                    status=status,
+                    updated_from=updated_from,
+                    updated_to=updated_to,
+                    scope=scope,
+                    offset=offset,
+                )
                 yield from rows
                 if len(rows) < 128:
                     return
@@ -307,9 +347,15 @@ class SearchIndex:
             from sb.sealed_knowledge import sealed_knowledge_states
             from sb.sealed_search import iter_sealed_rows
 
-            states = {state.page_id: state for state in sealed_knowledge_states(root, KnowledgeRegistry(
-                resolve_registry_path(root, self.registry_path)
-            ).read_snapshot())}
+            states = {
+                state.page_id: state
+                for state in sealed_knowledge_states(
+                    root,
+                    KnowledgeRegistry(
+                        resolve_registry_path(root, self.registry_path)
+                    ).read_snapshot(),
+                )
+            }
             chosen = _normalize_scope(scope or "reference")
             metadata: dict[str, tuple[str, str, str]] = {}
             with closing(iter_sealed_rows(root, query)) as rows:
@@ -332,18 +378,40 @@ class SearchIndex:
 
                             raise GenerationIndexError
                         fields = frontmatter_values(text)
-                        metadata[page] = (fields.get("status", ""), fields.get("updated", ""),
-                                          fields.get("source_ref", ""))
-                    index_status, updated, source_ref = metadata[page] if needs_metadata else ("", "", "")
+                        metadata[page] = (
+                            fields.get("status", ""),
+                            fields.get("updated", ""),
+                            fields.get("source_ref", ""),
+                        )
+                    index_status, updated, source_ref = (
+                        metadata[page] if needs_metadata else ("", "", "")
+                    )
                     if status and status != index_status:
                         continue
-                    if updated_from and updated < updated_from or updated_to and updated > updated_to:
+                    if (
+                        updated_from
+                        and updated < updated_from
+                        or updated_to
+                        and updated > updated_to
+                    ):
                         continue
-                    yield SearchHit(page, section, snippet, score, kind, index_status,
-                                    state.knowledge_status, state.approval_status, state.canonical,
-                                    source_ref, updated)
+                    yield SearchHit(
+                        page,
+                        section,
+                        snippet,
+                        score,
+                        kind,
+                        index_status,
+                        state.knowledge_status,
+                        state.approval_status,
+                        state.canonical,
+                        source_ref,
+                        updated,
+                    )
 
-    def semantic_hits(self, query: str, limit: int, *, filters: SearchFilters) -> tuple[SearchHit, ...]:
+    def semantic_hits(
+        self, query: str, limit: int, *, filters: SearchFilters
+    ) -> tuple[SearchHit, ...]:
         """Return exact cited-record candidates; caller retains the generation pin."""
         _ = LexicalQuery.parse(query)
         if limit <= 0 or not query.strip() or '"' in query or not _wants_hybrid(self.hybrid):
@@ -358,7 +426,10 @@ class SearchIndex:
             module = _sealed_vector_module()
             from sb.sealed_knowledge import sealed_knowledge_states
 
-            states = sealed_knowledge_states(root, KnowledgeRegistry(resolve_registry_path(root, self.registry_path)).read_snapshot())
+            states = sealed_knowledge_states(
+                root,
+                KnowledgeRegistry(resolve_registry_path(root, self.registry_path)).read_snapshot(),
+            )
             return module.query_sealed_cosine(root, query, limit, filters=filters, states=states)
         except (EmbeddingUnavailable, ImportError, OSError):
             _LOGGER.warning("sealed vector retrieval unavailable; using lexical results")
@@ -372,6 +443,21 @@ class SearchIndex:
             _ = registry.read_snapshot()
             return
         _refresh(_db_path(root), root, registry)
+
+    def drop_content(self, content_hash: str) -> None:
+        """Remove search rows that still cite a retracted content hash."""
+        if not content_hash:
+            return
+        db_path = _db_path(self.vault_root)
+        if not db_path.is_file():
+            return
+        with _connect(db_path) as conn:
+            if not _schema_is_current(conn):
+                return
+            _ = conn.execute(
+                "DELETE FROM docs WHERE source_ref LIKE ? OR text LIKE ?",
+                (f"%{content_hash}%", f"%{content_hash}%"),
+            )
 
 
 def _db_path(root: Path) -> Path:
@@ -648,7 +734,9 @@ def _lexical(
     where = [predicate]
     params: list[str | int] = list(score_params)
     params.extend(query_params)
-    metadata, metadata_params = SearchFilters(tuple(kinds or ()), status, updated_from, updated_to, scope).predicate()
+    metadata, metadata_params = SearchFilters(
+        tuple(kinds or ()), status, updated_from, updated_to, scope
+    ).predicate()
     where.append(metadata)
     params.extend(metadata_params)
     params.extend(order_params)
@@ -662,7 +750,9 @@ def _lexical(
         + f" ORDER BY {ordering} LIMIT ? OFFSET ?"
     )
     if not parsed.uses_fts:
-        sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace("bm25(docs)", f"({score_sql})")
+        sql = sql.replace("snippet(docs, 2, '', '', '...', 8)", "substr(text,1,400)").replace(
+            "bm25(docs)", f"({score_sql})"
+        )
     try:
         with _connect(db_path) as conn:
             rows = cast(

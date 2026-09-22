@@ -127,6 +127,14 @@ public actor SecondBrainAPIClient {
         return try await post(path: "/api/uploads", body: payload)
     }
 
+    public func retract(uploadID: String) async throws -> RetractReceipt {
+        try await post(path: "/api/uploads/retract", body: ["upload_id": uploadID])
+    }
+
+    public func retractReceipt(receiptID: String) async throws -> RetractReceipt {
+        try await get(path: "/api/retracts/\(receiptID)")
+    }
+
     private func get<Response: Decodable>(
         path: String,
         authenticated: Bool = true

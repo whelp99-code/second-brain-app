@@ -1,0 +1,236 @@
+{
+  "author": "existing designated Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "updated_at": "2026-09-13T06:39:18.750563+00:00",
+  "submission": "16a5a1855d09225de5ba74b882696b6e80caf6d4",
+  "overall_acceptance": false,
+  "ordinary_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-16a5a18-ryi0ca9x",
+  "identity": {
+    "sb": {
+      "pin": "f8c7bcd2c8f79e1f42d7eb7b5f6274edec7a02b8",
+      "archive_sha256": "b225b4ddb1a8778937fb87544f730bd1be0a242bec4feee659a724b42d31da16",
+      "product_files": 183,
+      "wheel_sha256": "3264d2c6d4baed7cdc31d99992d57a4eebb1068dcbc4c616aa91210bb3dce675",
+      "wheel_mismatches": [],
+      "installed_mismatches": []
+    },
+    "jarvis": {
+      "pin": "a3c111cd0774eedfd6e2015cb6f0a1c5fff56cfe",
+      "archive_sha256": "1703d2fbd5b891226efb423052b95177d915e5b99f1c4c09044de20d165f5407",
+      "submitted_mismatches": [],
+      "lock_equal": true,
+      "dist_metadata": {
+        "head": "a3c111cd0774eedfd6e2015cb6f0a1c5fff56cfe",
+        "dirty": true,
+        "input_digest": "sha256:426f902a69b7d0c17c536b0a821d727b84c27a8342db5d0e4613ef0c6eab90a4",
+        "input_file_count": 1407,
+        "toolchain": {
+          "node": "v24.19.0",
+          "modules": "137",
+          "platform": "linux",
+          "arch": "x64",
+          "typescript": "5.9.3"
+        }
+      },
+      "dist_digest": "sha256:f83a8cf44f0ef8fcfe2e4a89debeb3819cd65d3d0b5844481f03afc92ae904d8",
+      "dist_files": 1216,
+      "dist_byte_mismatches": []
+    }
+  },
+  "post_source_check": {
+    "sb": {
+      "head": "16a5a1855d09225de5ba74b882696b6e80caf6d4",
+      "mismatches": []
+    },
+    "jarvis": {
+      "head": "a3c111cd0774eedfd6e2015cb6f0a1c5fff56cfe",
+      "mismatches": []
+    }
+  },
+  "checks": [
+    {
+      "name": "sb-tests",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/sb",
+      "exit": 0,
+      "seconds": 5.009217977523804
+    },
+    {
+      "name": "sb-ruff",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/ruff",
+        "check",
+        "--no-cache",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/sb",
+      "exit": 0,
+      "seconds": 0.02359747886657715
+    },
+    {
+      "name": "sb-types",
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.venv/bin/basedpyright",
+        "sb/postcompact_hook.py",
+        "sb/cli.py",
+        "tests/test_postcompact_hook.py"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/sb",
+      "exit": 1,
+      "seconds": 2.0162060260772705
+    },
+    {
+      "name": "jarvis-tests",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/memory-postcompact.test.ts",
+        "--no-file-parallelism"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/jarvis",
+      "exit": 0,
+      "seconds": 9.511563301086426
+    },
+    {
+      "name": "jarvis-lint",
+      "argv": [
+        "node",
+        "node_modules/eslint/bin/eslint.js",
+        "src/cli-gjc-commands.ts",
+        "src/cli-control-commands.ts",
+        "src/cli-runtime.mts",
+        "src/cli-host-memory.ts",
+        "src/context-model-transport.ts",
+        "src/index.ts",
+        "tests/integration/memory-postcompact.test.ts",
+        "--max-warnings=0"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/jarvis",
+      "exit": 0,
+      "seconds": 1.3640010356903076
+    },
+    {
+      "name": "jarvis-build",
+      "argv": [
+        "npm",
+        "run",
+        "build:backend"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/jarvis",
+      "exit": 0,
+      "seconds": 9.980452060699463
+    },
+    {
+      "name": "dispatch-normal",
+      "argv": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "tests/integration/gjc-dispatch-assemble.test.ts",
+        "--no-file-parallelism",
+        "-t",
+        "sends once from a nested envelope|does not send a duplicate idempotency key|sends once when two nested dispatches"
+      ],
+      "cwd": "/var/tmp/codex-night-16a5a18-ryi0ca9x/jarvis",
+      "exit": 0,
+      "seconds": 5.765246868133545
+    }
+  ],
+  "findings": [
+    {
+      "id": "N1",
+      "status": "partially_fixed_not_accepted",
+      "remaining": "Actual next model request/session consumer not demonstrated; UserPromptSubmit supports next user prompt, FileModelTransport only appends captures",
+      "locations": [
+        "sb/postcompact_hook.py:98",
+        "src/context-model-transport.ts:33",
+        "src/cli-host-memory.ts:5"
+      ],
+      "evidence": [
+        "sb-probe.json",
+        "jarvis-probe.json",
+        "public-contract.json"
+      ]
+    },
+    {
+      "id": "N2",
+      "status": "partially_fixed_not_accepted",
+      "remaining": "Final normal serialization budget and page dedupe fixed; source_ref empty/snippet hash not MemoryRecord version; stdout failure consumes pending delivery",
+      "locations": [
+        "sb/postcompact_hook.py:126",
+        "sb/postcompact_hook.py:151",
+        "sb/cli.py:291"
+      ],
+      "evidence": [
+        "sb-probe.json",
+        "probe-sb.py"
+      ]
+    },
+    {
+      "id": "N3",
+      "status": "partially_fixed_not_accepted",
+      "remaining": "New compaction with same summary/session suppressed as duplicate in SB and JARVIS; host test still injects reader options; file acceptance is not model consumption",
+      "locations": [
+        "sb/postcompact_hook.py:146",
+        "src/cli-gjc-commands.ts:418",
+        "src/cli-gjc-commands.ts:443"
+      ],
+      "evidence": [
+        "sb-probe.json",
+        "jarvis-probe.json"
+      ]
+    },
+    {
+      "id": "N4",
+      "status": "partially_fixed_not_accepted",
+      "remaining": "New source-bound dist byte verified but submitted direct --help fails missing dependency; operational commands omit required database and recovery steps remain unspecified",
+      "locations": [
+        "GROK-CURRENT-OPERATIONS-REVIEW-2026-09-13.md",
+        "deploy/check-jarvis-pending-state.py:61",
+        "deploy/check-database-handles.py:85"
+      ],
+      "evidence": [
+        "identity.json",
+        "dist-rebuild-comparison.json",
+        "submitted-cli-help.json"
+      ]
+    }
+  ],
+  "held_branches": "unverified; not retried/modified/transferred; original content-trigger unknown; original A-F/M1-M14 unchanged",
+  "external_inputs": [
+    "selected user work/project/sharing agents",
+    "native isolated profile and public host session contract",
+    "real Korean gold/corpus and latency target",
+    "operational cutover/backup/timer authorization and RPO/RTO"
+  ],
+  "delivery": {
+    "updated_at": "2026-09-13T06:42:50.480943+00:00",
+    "target": "term_dc97574f3e548cff6e25679d713ed8c2",
+    "accepted": true,
+    "official_resume_command": "/goal resume",
+    "resume_accepted": true,
+    "native_active_observed": true,
+    "screen_cursor": 6039041,
+    "actual_tool_start": "read consolidated MD and JSON",
+    "implementation_complete": false,
+    "continued_following_stage": "source inspection observed after report read: sb/postcompact_hook.py:90-169 and sb/cli.py:285-309",
+    "next": "existing Grok addresses permitted normal N1-N4 and submits a single fixed candidate; held branches excluded",
+    "following_screen_cursor": 6039300,
+    "evidence": [
+      "delivery-ack.json",
+      "grok-after-delivery.json",
+      "goal-resume-ack.json",
+      "grok-after-resume.json",
+      "grok-following-stage.json"
+    ]
+  }
+}

@@ -1,0 +1,707 @@
+{
+  "author": "existing Codex monitor / delegated overnight independent reviewer",
+  "owner_terminal": "term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "submission": "d5646882708055134b64ce14be890cac772727d6",
+  "reviewed_at_utc": "2026-09-11T13:47:47.253455+00:00",
+  "verdict": "not_accepted",
+  "product_readiness_accepted": false,
+  "operational_acceptance": false,
+  "evidence_dir": "/var/tmp/codex-night-d564688-crclh2ha",
+  "candidate": {
+    "manifest": {
+      "schema": 1,
+      "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
+      "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
+      "release_id_scheme": "sb-release-inputs-v3",
+      "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+      "preparation_files_sha256": {
+        "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+        "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+        "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+      },
+      "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+      "source_commit": "bda08041771859e129ec59c325d7fe259560ed4d",
+      "source_tree": "c8be71e9e9311d9fd81c381b748e45a31036cd15",
+      "source_materialization": "git-archive",
+      "working_tree_modified": true,
+      "contract_profile": "task32-schema4",
+      "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+    },
+    "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
+    "sb_python_files": 182,
+    "wheel_vs_review_source_mismatches": [],
+    "installed_vs_wheel_mismatches": []
+  },
+  "jarvis_identity": {
+    "source_files_compared": 1132,
+    "source_mismatches": [],
+    "rebuilt_src_js_files": 584,
+    "dist_mismatches": [],
+    "typecheck_exit": 0
+  },
+  "boundary": {
+    "review_head": "d5646882708055134b64ce14be890cac772727d6",
+    "scope": "Synthetic fixtures only; source pipeline and SQLite predicates; operational releases inspected read-only.",
+    "managed_compile": [
+      {
+        "kind": "unmodified",
+        "edit_before": false,
+        "marker": "5de4a83e766f9de9fdfe0a49f129d556cec88e38969216d89f90e29ebb37c9a6",
+        "pages": 1,
+        "proposals": 0,
+        "exit_code": 0,
+        "edit_after": false,
+        "corrected": true,
+        "managed": true
+      },
+      {
+        "kind": "uncommitted_edit",
+        "edit_before": true,
+        "marker": "5de4a83e766f9de9fdfe0a49f129d556cec88e38969216d89f90e29ebb37c9a6",
+        "pages": 0,
+        "proposals": 1,
+        "exit_code": 0,
+        "edit_after": true,
+        "corrected": false,
+        "managed": true
+      },
+      {
+        "kind": "committed_edit",
+        "edit_before": true,
+        "marker": "5de4a83e766f9de9fdfe0a49f129d556cec88e38969216d89f90e29ebb37c9a6",
+        "pages": 0,
+        "proposals": 1,
+        "exit_code": 0,
+        "edit_after": true,
+        "corrected": false,
+        "managed": true
+      },
+      {
+        "kind": "committed_human_page",
+        "edit_before": true,
+        "marker": "5de4a83e766f9de9fdfe0a49f129d556cec88e38969216d89f90e29ebb37c9a6",
+        "pages": 0,
+        "proposals": 1,
+        "exit_code": 0,
+        "edit_after": true,
+        "corrected": false,
+        "managed": true
+      }
+    ],
+    "search": [
+      {
+        "query": "은빛나침반",
+        "body": "은빛　나침반",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "STRASSE한글",
+        "body": "Straße한글",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "STRASSE",
+        "body": "Straße",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "alphabeta",
+        "body": "alpha\nbeta",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "\"north star\"",
+        "body": "north\nstar",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      },
+      {
+        "query": "alphabeta",
+        "body": "alphabeta",
+        "sql": true,
+        "record": true,
+        "uses_fts": false
+      }
+    ],
+    "rollback": [
+      {
+        "kind": "absent",
+        "exit": 0,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-bi8kgt9w/rollback-absent",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": false,
+          "previous_reads_revocation_store": false,
+          "allowed": true,
+          "reason": null
+        }
+      },
+      {
+        "kind": "regular",
+        "exit": 2,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-bi8kgt9w/rollback-regular",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": true,
+          "previous_reads_revocation_store": false,
+          "allowed": false,
+          "reason": "ROLLBACK_UNSAFE_REVOCATION_STORE"
+        }
+      },
+      {
+        "kind": "empty",
+        "exit": 2,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-bi8kgt9w/rollback-empty",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": true,
+          "previous_reads_revocation_store": false,
+          "allowed": false,
+          "reason": "ROLLBACK_UNSAFE_REVOCATION_STORE"
+        }
+      },
+      {
+        "kind": "directory",
+        "exit": 2,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-bi8kgt9w/rollback-directory",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": true,
+          "previous_reads_revocation_store": false,
+          "allowed": false,
+          "reason": "ROLLBACK_UNSAFE_REVOCATION_STORE"
+        }
+      },
+      {
+        "kind": "symlink",
+        "exit": 2,
+        "result": {
+          "state_root": "/var/tmp/sb-final-fixtures-bi8kgt9w/rollback-symlink",
+          "previous_release": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+          "revocation_store_present": true,
+          "previous_reads_revocation_store": false,
+          "allowed": false,
+          "reason": "ROLLBACK_UNSAFE_REVOCATION_STORE"
+        }
+      }
+    ],
+    "candidate": {
+      "manifest": {
+        "schema": 1,
+        "release_id": "48686de7744355ac51fa7a91807ce3160860b4d5",
+        "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
+        "release_id_scheme": "sb-release-inputs-v3",
+        "preparation_recipe_sha256": "4742bcc1cbc897082e1e44a5f7fdf7580767ba42aaa46405fbd8058b334ab775",
+        "preparation_files_sha256": {
+          "prepare-release.py": "bec6ed7485a255bf1e39579431706a3dfcfa54c1a67376e0d57e935f132c0bf5",
+          "bundle_python_runtime.py": "15533d128ce49e162e6929e2e2a123847af91fd1ba55e9a3fd3613d1a4f0f27d",
+          "check-release-contents.py": "90c53c2197eadf2f0ef355d0bb594e28c9b4a644e52c83c0300fd39bd6697436"
+        },
+        "python_runtime_input_sha256": "f58cbec1d5c0281f4ec1c1a85a5b449f5bc13d33304b97acca4a342b92a6d3dd",
+        "source_commit": "bda08041771859e129ec59c325d7fe259560ed4d",
+        "source_tree": "c8be71e9e9311d9fd81c381b748e45a31036cd15",
+        "source_materialization": "git-archive",
+        "working_tree_modified": true,
+        "contract_profile": "task32-schema4",
+        "requirements_sha256": "75ce0da3bace37b8e20a733acd1b1cc7db5c30c77586baa59eef8bdf18245177"
+      },
+      "wheel_sha256": "23025b89dd82d3022d291088d915f0eb6ad69fea21f3cd649c011ddcd7fb8c7b",
+      "sb_python_files": 182,
+      "wheel_vs_review_source_mismatches": [],
+      "installed_vs_wheel_mismatches": []
+    }
+  },
+  "extended_boundaries": {
+    "caps": [
+      {
+        "scenario": "failure_success",
+        "cap": 2,
+        "calls": 2,
+        "capped": true,
+        "pages": 1,
+        "retry_calls": 2,
+        "retry_pages": 1,
+        "retry_capped": true
+      },
+      {
+        "scenario": "success_failure",
+        "cap": 2,
+        "calls": 2,
+        "capped": true,
+        "pages": 1,
+        "retry_calls": 2,
+        "retry_pages": 1,
+        "retry_capped": true
+      },
+      {
+        "scenario": "success",
+        "cap": 1,
+        "calls": 1,
+        "capped": true,
+        "pages": 1,
+        "retry_calls": 1,
+        "retry_pages": 1,
+        "retry_capped": true
+      }
+    ],
+    "marker_cases": [
+      {
+        "kind": "dangling",
+        "result": {
+          "ok": false,
+          "type": "RevocationStoreError",
+          "error": "REVOCATION_STORE_UNSAFE"
+        },
+        "outside_exists": false,
+        "outside_text": null,
+        "store_exists": false,
+        "marker_exists": false,
+        "read_after": {
+          "ok": false,
+          "type": "RevocationStoreError",
+          "error": "REVOCATION_STORE_UNSAFE"
+        }
+      },
+      {
+        "kind": "existing_symlink",
+        "result": {
+          "ok": false,
+          "type": "RevocationStoreError",
+          "error": "REVOCATION_STORE_UNSAFE"
+        },
+        "outside_exists": true,
+        "outside_text": "preserve",
+        "store_exists": false,
+        "marker_exists": true,
+        "read_after": {
+          "ok": false,
+          "type": "RevocationStoreError",
+          "error": "REVOCATION_STORE_UNSAFE"
+        }
+      },
+      {
+        "kind": "directory",
+        "result": {
+          "ok": false,
+          "type": "RevocationStoreError",
+          "error": "REVOCATION_STORE_UNSAFE"
+        },
+        "outside_exists": false,
+        "outside_text": null,
+        "store_exists": false,
+        "marker_exists": true,
+        "read_after": {
+          "ok": false,
+          "type": "RevocationStoreError",
+          "error": "REVOCATION_STORE_UNSAFE"
+        }
+      },
+      {
+        "kind": "missing_after_init",
+        "result": {
+          "ok": true,
+          "value": [
+            "key:test"
+          ]
+        },
+        "outside_exists": false,
+        "outside_text": null,
+        "store_exists": true,
+        "marker_exists": false,
+        "read_after": {
+          "ok": true,
+          "value": [
+            "key:test"
+          ]
+        }
+      },
+      {
+        "kind": "empty_store_after_init",
+        "result": {
+          "ok": true,
+          "value": []
+        },
+        "outside_exists": false,
+        "outside_text": null,
+        "store_exists": true,
+        "marker_exists": true,
+        "read_after": {
+          "ok": true,
+          "value": []
+        },
+        "active_policy_keys": {
+          "ok": true,
+          "value": [
+            "key:test"
+          ]
+        }
+      },
+      {
+        "kind": "interrupted_initialization",
+        "result": {
+          "ok": false,
+          "type": "OSError",
+          "error": "synthetic interruption before marker create"
+        },
+        "outside_exists": false,
+        "outside_text": null,
+        "store_exists": true,
+        "marker_exists": false,
+        "read_after": {
+          "ok": true,
+          "value": [
+            "key:test"
+          ]
+        }
+      }
+    ],
+    "ranking": [
+      {
+        "focused_id": "a-focused",
+        "long_count": 30,
+        "long_query_count": 4,
+        "short_query_count": 3,
+        "actual_top5": [
+          "z-long-00",
+          "z-long-01",
+          "z-long-02",
+          "z-long-03",
+          "z-long-04"
+        ],
+        "bm25_top5": [
+          "a-focused",
+          "z-long-00",
+          "z-long-01",
+          "z-long-02",
+          "z-long-03"
+        ]
+      },
+      {
+        "focused_id": "z-focused",
+        "long_count": 30,
+        "long_query_count": 4,
+        "short_query_count": 3,
+        "actual_top5": [
+          "a-long-00",
+          "a-long-01",
+          "a-long-02",
+          "a-long-03",
+          "a-long-04"
+        ],
+        "bm25_top5": [
+          "z-focused",
+          "a-long-00",
+          "a-long-01",
+          "a-long-02",
+          "a-long-03"
+        ]
+      }
+    ]
+  },
+  "model_request": [
+    {
+      "kind": "baseline",
+      "memories": 1,
+      "snapshot_bytes": 1966,
+      "used_bytes": 80,
+      "remaining_bytes": 4016,
+      "max_total_bytes": 4096,
+      "serialized_request_bytes": 431,
+      "within_max_total_bytes": true
+    },
+    {
+      "kind": "query_and_two_bodies",
+      "memories": 1,
+      "snapshot_bytes": 5733,
+      "used_bytes": 5900,
+      "remaining_bytes": 2100,
+      "max_total_bytes": 8000,
+      "serialized_request_bytes": 6268,
+      "within_max_total_bytes": true
+    },
+    {
+      "kind": "expired",
+      "memories": 0,
+      "snapshot_bytes": 1769,
+      "used_bytes": 9,
+      "remaining_bytes": 4087,
+      "max_total_bytes": 4096,
+      "serialized_request_bytes": 210,
+      "within_max_total_bytes": true
+    },
+    {
+      "kind": "untrusted",
+      "memories": 0,
+      "snapshot_bytes": 1775,
+      "used_bytes": 9,
+      "remaining_bytes": 4087,
+      "max_total_bytes": 4096,
+      "serialized_request_bytes": 216,
+      "within_max_total_bytes": true
+    }
+  ],
+  "transport_entry": [
+    {
+      "kind": "baseline",
+      "error": "PERSONAL_CONTEXT_MEMORY_EVIDENCE_CONFLICT",
+      "transport_send_calls": 0,
+      "record_calls": 1,
+      "capture": {
+        "session_id": "session:2026-08-28T12:00:00.000Z",
+        "bytes": 431,
+        "no_data": false,
+        "json": "{\"query\":\"what now?\",\"memories\":[{\"memory_ref\":\"sid:principle:customer-first\",\"source_id\":\"src:pos:v1:second-brain:primary\",\"version\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"excerpt\":\"Prioritize confirmed customer obligations before internal improvements.\",\"bytes\":71}],\"omitted\":[],\"budgets\":{\"max_items\":16,\"max_excerpt_bytes\":128,\"max_total_bytes\":4096},\"used_bytes\":80,\"remaining_bytes\":4016}"
+      }
+    },
+    {
+      "kind": "expired",
+      "error": "PERSONAL_CONTEXT_INVALID",
+      "transport_send_calls": 0,
+      "record_calls": 1,
+      "capture": {
+        "session_id": "session:2026-08-28T12:00:00.000Z",
+        "bytes": 210,
+        "no_data": true,
+        "json": "{\"query\":\"what now?\",\"memories\":[],\"omitted\":[\"MEMORY_REQUIRED:062807f0\",\"STALE_MEMORY:2b2ad5ca\"],\"budgets\":{\"max_items\":16,\"max_excerpt_bytes\":128,\"max_total_bytes\":4096},\"used_bytes\":9,\"remaining_bytes\":4087}"
+      }
+    },
+    {
+      "kind": "no_data",
+      "error": "PERSONAL_CONTEXT_INVALID",
+      "transport_send_calls": 0,
+      "record_calls": 1,
+      "capture": {
+        "session_id": "session:2026-08-28T12:00:00.000Z",
+        "bytes": 186,
+        "no_data": true,
+        "json": "{\"query\":\"what now?\",\"memories\":[],\"omitted\":[\"MEMORY_REQUIRED:062807f0\"],\"budgets\":{\"max_items\":16,\"max_excerpt_bytes\":128,\"max_total_bytes\":4096},\"used_bytes\":9,\"remaining_bytes\":4087}"
+      }
+    }
+  ],
+  "browser": {
+    "submitted_evidence": {
+      "failed_run_id": "a8288512756b40f49d8f9cb5ec4c2454",
+      "status_get": 200,
+      "status_after": 200,
+      "run_body_status": "ok",
+      "failure_row_after_run": true,
+      "success_row_present": true,
+      "home_mentions_console": true,
+      "fix_hash_used": true,
+      "preinserted_success_stage": false,
+      "chrome": "google-chrome --headless=new --dump-dom #fix="
+    },
+    "actual_run_result": {
+      "run_id": "08e9bee3aaac4ce5a80842db202361b3",
+      "status": "failed",
+      "pages": 0,
+      "conflicts": 0,
+      "errors": 1,
+      "exit_code": 1,
+      "already_running": false,
+      "failure": "SafeSourceFilesystemError: source mutation observed: ."
+    },
+    "normal_ui": {
+      "url": "http://127.0.0.1:39533",
+      "actions": [
+        "fill title/content and click rememberButton",
+        "click normal data-run-button",
+        "click normal data-run-button"
+      ],
+      "responses": [
+        {
+          "run_id": "e351aefda786454685ee0b808ccf6f5a",
+          "status": "failed",
+          "pages": 0,
+          "conflicts": 0,
+          "errors": 1,
+          "exit_code": 1,
+          "already_running": false,
+          "failure": "SafeSourceFilesystemError: source mutation observed: ."
+        },
+        {
+          "run_id": "e76a0f02da9548bcaa6880252039bb94",
+          "status": "failed",
+          "pages": 0,
+          "conflicts": 0,
+          "errors": 1,
+          "exit_code": 1,
+          "already_running": false,
+          "failure": "SafeSourceFilesystemError: source mutation observed: ."
+        }
+      ],
+      "before": "[\n  {\n    \"run_id\": \"7eb3cd40342f47fa991c6794d3273f01\",\n    \"stage\": \"compile\",\n    \"status\": \"failed\",\n    \"errors\": 1,\n    \"error\": \"RuntimeError: synthetic prior failure retained\",\n    \"detail\": \"\"\n  }\n]",
+      "remember": {
+        "inbox_path": "inbox/2026-09-11T134443805112-night-isolated-recovery.md"
+      },
+      "after": "[\n  {\n    \"run_id\": \"ffaf2db2571d497e93f786804c6fe106\",\n    \"stage\": \"compile\",\n    \"status\": \"ok\",\n    \"errors\": 0,\n    \"error\": \"\",\n    \"detail\": \"\"\n  },\n  {\n    \"run_id\": \"e76a0f02da9548bcaa6880252039bb94\",\n    \"stage\": \"ingest\",\n    \"status\": \"failed\",\n    \"errors\": 1,\n    \"error\": \"SafeSourceFilesystemError: source mutation observed: .\",\n    \"detail\": \"\"\n  },\n  {\n    \"run_id\": \"734b955e91a343dc80a33e70e5b7a448\",\n    \"stage\": \"batch\",\n    \"status\": \"failed\",\n    \"errors\": 1,\n    \"error\": \"\",\n    \"detail\": \"{\\\"selected_run_id\\\":\\\"e76a0f02da9548bcaa6880252039bb94\\\",\\\"stages\\\":[{\\\"stage\\\":\\\"ingest\\\",\\\"run_id\\\":\\\"e76a0f02da9548bcaa6880252039bb94\\\",\\\"status\\\":\\\"failed\\\"},{\\\"stage\\\":\\\"compile\\\",\\\"run_id\\\":\\\"ffaf2db2571d497e93f786804c6fe106\\\",\\\"status\\\":\\\"ok\\\"}]}\"\n  },\n  {\n    \"run_id\": \"f1ef177f744e49e58ffb6fcdd2211bec\",\n    \"stage\": \"brief\",\n    \"status\": \"ok\",\n    \"errors\": 0,\n    \"error\": \"\",\n    \"detail\": \"\"\n  },\n  {\n    \"run_id\": \"dbf4eefd80504090a47e305ba2568d29\",\n    \"stage\": \"compile\",\n    \"status\": \"partial\",\n    \"errors\": 1,\n    \"error\": \"\",\n    \"detail\": \"\"\n  },\n  {\n    \"run_id\": \"e351aefda786454685ee0b808ccf6f5a\",\n    \"stage\": \"ingest\",\n    \"status\": \"failed\",\n    \"errors\": 1,\n    \"error\": \"SafeSourceFilesystemError: source mutation observed: .\",\n    \"detail\": \"\"\n  },\n  {\n    \"run_id\": \"699d95a4eef64920b0fac20e44891eae\",\n    \"stage\": \"batch\",\n    \"status\": \"failed\",\n    \"errors\": 2,\n    \"error\": \"\",\n    \"detail\": \"{\\\"selected_run_id\\\":\\\"e351aefda786454685ee0b808ccf6f5a\\\",\\\"stages\\\":[{\\\"stage\\\":\\\"ingest\\\",\\\"run_id\\\":\\\"e351aefda786454685ee0b808ccf6f5a\\\",\\\"status\\\":\\\"failed\\\"},{\\\"stage\\\":\\\"compile\\\",\\\"run_id\\\":\\\"dbf4eefd80504090a47e305ba2568d29\\\",\\\"status\\\":\\\"partial\\\"},{\\\"stage\\\":\\\"b…\"\n  },\n  {\n    \"run_id\": \"7eb3cd40342f47fa991c6794d3273f01\",\n    \"stage\": \"compile\",\n    \"status\": \"failed\",\n    \"errors\": 1,\n    \"error\": \"RuntimeError: synthetic prior failure retained\",\n    \"detail\": \"\"\n  }\n]",
+      "runSummary": "처리에 실패했습니다. 아래 결과와 처리 실패 목록을 확인하세요."
+    }
+  },
+  "tests": {
+    "direct_focused": {
+      "passed": 123,
+      "seconds": 23.1,
+      "exit": 0
+    },
+    "direct_ruff": {
+      "exit": 0,
+      "scope": "sb tests"
+    },
+    "direct_python_types": {
+      "exit": 1,
+      "errors": 0,
+      "warnings": 7,
+      "scope": [
+        "sb/compile.py",
+        "sb/revoked_keys.py",
+        "sb/search_query.py",
+        "sb/web.py"
+      ]
+    },
+    "direct_jarvis_tsc": {
+      "exit": 0
+    },
+    "grok_full_log_read": {
+      "passed": 1823,
+      "skipped": 2,
+      "seconds": 604.65,
+      "log": "/var/tmp/sb-full-pytest-bda0804.log",
+      "executed_by": "Grok",
+      "not_repeated_reason": "Decisive unresolved acceptance failures; candidate full regression already recorded."
+    }
+  },
+  "gates": {
+    "standard": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-d564688-crclh2ha/installed-pair-fixed.log"
+    },
+    "work": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-d564688-crclh2ha/installed-work.log"
+    },
+    "maintenance": {
+      "exit": 0,
+      "log": "/var/tmp/codex-night-d564688-crclh2ha/installed-maintenance.log"
+    }
+  },
+  "findings": [
+    {
+      "id": "N1/V1/R4",
+      "priority": "P1",
+      "title": "No production session caller; capture stored before evidence rejection; send not called",
+      "source": [
+        "Orca-JARVIS/src/authority-progress-store.ts:29",
+        "Orca-JARVIS/src/personal-context-persistence.ts:55",
+        "Orca-JARVIS/src/context-model-transport.ts:18"
+      ],
+      "evidence": [
+        "transport-entry-result.json",
+        "transport-references.txt"
+      ],
+      "acceptance": "Actual product/session entry to selected memory and validated transport.send; isolate transport, verify complete payload and new session/compaction/revocation/expiry/no_data. Failed evidence must not be recorded as successful delivery."
+    },
+    {
+      "id": "N2/V3/R5",
+      "priority": "P2",
+      "title": "Raw count ranking drops focused documents in longer repeated-text corpus",
+      "source": [
+        "sb/search_query.py:96",
+        "sb/search.py:663"
+      ],
+      "evidence": [
+        "extended-result.json"
+      ],
+      "acceptance": "Normalization parity plus relevance ranking robust to length/repetition and path/title renaming; actual MCP latency and correction/version exclusion evidence."
+    },
+    {
+      "id": "N3/R2/M3",
+      "priority": "P1",
+      "title": "Empty previously initialized revocation store re-enables revoked policy key",
+      "source": [
+        "sb/revoked_keys.py:28"
+      ],
+      "evidence": [
+        "extended-result.json"
+      ],
+      "acceptance": "Differentiate pristine from existing corrupted/truncated store; fail closed, safe authorized recovery and fresh valid-key positive path; marker/store interrupted-init consistency."
+    },
+    {
+      "id": "N4/V5/R6",
+      "priority": "P1",
+      "title": "Browser report counts an ok substage although real run failed; normal UI retries also fail",
+      "source": [
+        "scripts/isolated-browser-fail-recover.py:57",
+        "sb/web.py:164"
+      ],
+      "evidence": [
+        "submitted-browser/evidence.json",
+        "submitted-browser-actual-run.json",
+        "normal-browser-result.json",
+        "normal-browser.html",
+        "normal-browser.png"
+      ],
+      "acceptance": "Real UI failure to input/config correction and same UI rerun success tied to successful batch/run and actual output; preserve history, no hidden hash shortcuts and no guard bypass."
+    }
+  ],
+  "limits": [
+    "No product source or product tests modified by reviewer.",
+    "Initial installed-pair invocation in git archive failed CANDIDATE_SOURCE_COMMIT_INVALID because archive has no git metadata; preserved as harness error; actual repository entry rerun uses candidate-pinned harness and passed.",
+    "Fixtures only; no operational authorization or native authenticated sessions used.",
+    "Policy-key reactivation is demonstrated; no unauthorized user-record read is claimed.",
+    "JARVIS dynamic probe calls the submitted public helper to test its claim; it is not proof of an actual product-session path."
+  ],
+  "external_conditions": [
+    "Real work identifier/source and sharing project/agents with actual authenticated sessions",
+    "Native client version/profile/session and copy lifecycle inputs; no auth copying authorized",
+    "Operational writer/drain authorization with exact candidate/rollback/runbook",
+    "User-curated Korean questions100-300 and ground truth"
+  ],
+  "operational_current_readlink": "/home/jm/.local/state/second-brain/app/releases/41f0751aca8906d612961e704bc60dd0855fdabd",
+  "head_at_review_end": "4ef03347b2eced690f4ab48b85f8b129be3f03e4",
+  "evidence_sha256": {
+    "new-boundaries.log": "dab6dcfb35f56bc30407e462bc9dc9a7bcecda37c50163a15f189d5e76d4d7fb",
+    "transport-entry.log": "1316aa07e8f0d7649636ea5e583ec47e2c7c4982188ffe288d131654bff2fb23",
+    "model-request-result.json": "c3161569da0e495ed81e2050854c65ed191fd9090360f7a7301511bfeec38492",
+    "extended.py": "25cfd0835ee624ba9f9f004bc3cc06a49f173bc3a90458031fd2ecba21795128",
+    "ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "submitted-browser-actual-run.json": "2ffe08b38c68c8e5cdba7acd849c724d76f0f5f46c2110f7041acfea8dab5bc2",
+    "jarvis-identity.json": "904562b5f9598bf99d7347ab0d8dac58d3b9cfe5c1b5aa14aba36bd129af92c4",
+    "new-boundaries-result.json": "dab6dcfb35f56bc30407e462bc9dc9a7bcecda37c50163a15f189d5e76d4d7fb",
+    "installed-pair-fixed.log": "2ab194dc3d0e1c791753c9ab2469818ba6ff5b76607224a04a9e9ed5dbbfe575",
+    "boundary.log": "da0af6b264f17bf1416779a68ba6c04f5db8e6d73fd6094a4b419962a9d678d5",
+    "repo-status-end.txt": "d951534e9abcbc6d890fd489d084f598a7e9f7b0a4752d28125d542605bdb7ac",
+    "normal-browser.py": "7cc4cc4d8a66c649ae5f0710bb09168c1dc0e0c024ae5478d4638281cf851851",
+    "model_request_probe.mjs": "4983448a0c436b1d4db94001cc4e2f7094f95eec788c6785c1df7457d2b59875",
+    "transport-entry-result.json": "2a49108838192b24140f27460dd6863efa483eb3842ea3ed5f6cd64ca198c061",
+    "boundary-result.json": "46d82a41a62d84cbeb9ce69bad1ca52f23e34e8af8e49580fe4058e066deb420",
+    "model-request.log": "c3161569da0e495ed81e2050854c65ed191fd9090360f7a7301511bfeec38492",
+    "extended-result.json": "1d3cd874bad0552f5fc3310a8b6881f211bf930cc6402f376433a318c10d250e",
+    "transport-entry.mjs": "efdc9aa146cb8ff0a2e89fcd0acf28ee888848e1b891f72a202ec20f707a8b99",
+    "installed-work.log": "68351aa767967c3b42f52f22d302cc4502cc00ce6b82ec773369d5322ff3580f",
+    "python-types.log": "2f47154d6cc644acf43c0c19bff769e1dfd33f7cb889427ef41caf3f8b441677",
+    "focused-pytest.log": "9b806cd442ffd032242290302e0028687c70ce1d137966c23b7b162164ff66f4",
+    "installed-maintenance.log": "b4db8ec5a570542655ebe47761d5e3a2deb1739d20847d732c12e6e08e2a9a9e",
+    "normal-browser.mjs": "c8d94b00ed76986c7e9f9c671a3026d07b5623ecf2992118061ea541f13e6b3e",
+    "extended.log": "383b4188a9f8c73ac84c77e90214c58480a7b24f802fb06328c3961d565655d1",
+    "normal-browser.html": "9f1aa80fc9f792fcedcae355f7fea82cb2d582ed08dd1121adececa581a1941a",
+    "boundary_probe.py": "0e33c97fb0a0247c69b4eab5f4166608ef651986b79083cd4c38789f4a0495f3",
+    "submitted-browser.log": "939ce09a9d29fa45311aa3b31a2c07bcdc0813070c935f4a5d1f5c607fe54102",
+    "normal-browser.png": "1bb85dfefff2a0d3ed2dd07bf688c0253c75db2dbd9bc4551cb82dc6a357bdf9",
+    "normal-browser-result.json": "a9280779a6f528a841ed2f3b39b54eb8989232741e006a1f9803be1a70aeff33",
+    "normal-browser.log": "b88b260e294fbca2b9cf86ad52a50b870c49621c2518987fbd2d41aea1c212c4",
+    "new_boundaries.py": "f74bdb95e1386540048361351e54034a8152fe7a38a6100183e640e0f7f73318",
+    "transport-references.txt": "5e7bc0c32094a0b0cc993e4a5756eee1a81298ef3b8476b929d8fedc00b52265",
+    "installed-pair.log": "3ef79b158049184ea65979305c5e0cd9ae5d1f3d90c6559ff309a74d545ed998",
+    "jarvis-tsc.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

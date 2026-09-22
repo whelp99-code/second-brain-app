@@ -1,0 +1,85 @@
+{
+  "author": "Existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e; delegated overnight independent verification, not original Codex execution",
+  "reviewed_at_utc": "2026-09-12T02:07:05.881751+00:00",
+  "submission": "16d4db331533915ac47b31ec2b10a2bc9d232e2f",
+  "pin": {
+    "sb_source": "d4759bcf67749ada6b3bd354bf48429c8f08a0fb",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-d4759bc/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "b9ccc546ab9d4d537e17918a68eacf4ecb98f94c",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-b9ccc54/source/dist",
+    "jarvis_inventory_sha256": "1d041d0acd2bc10d24c2491dee9835d231a0f6e63dd14b75f8db886cc6a8721d",
+    "jarvis_inventory_entries": 34768,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "product_readiness_accepted": false,
+  "operational_acceptance": false,
+  "findings": [
+    {
+      "id": "M12-restore-absent-dest-race",
+      "priority": "P1",
+      "code": "Orca-JARVIS/src/personal-os-backup.ts:228,235",
+      "problem": "Destination absence is checked once, then staging rename replaces a destination created by a concurrent writer. Restore and actual writer COMMIT both return success but the committed value is lost.",
+      "reproduction": "node /var/tmp/codex-night-16d4db3-x4w54h5y/restore-races.mjs",
+      "evidence": "/var/tmp/codex-night-16d4db3-x4w54h5y/restore-races.json",
+      "completion": "Cover both existing and absent destination ownership for the whole restore. A concurrent creation/write after absence check must not be overwritten. Preserve valid committed work; include busy, late entry, crash, refusal and corrected retry in one contract."
+    },
+    {
+      "id": "M12-rpo-chronology",
+      "priority": "P2",
+      "code": "scripts/jarvis-restore-acceptance.mjs:82,206,215,280,296",
+      "problem": "Extra accepted remember/forget is generated after JARVIS crash/restore and after first SB restore; earlier restored counts are subtracted from later extra counts and called crash loss. The claimed lost tombstone remains in preserved final authority. No later JARVIS restore exercises loss of that effect.",
+      "evidence": [
+        "/var/tmp/codex-night-16d4db3-x4w54h5y/paired-restore-result.json",
+        "/var/tmp/codex-night-16d4db3-x4w54h5y/rpo-chronology-proof.json"
+      ],
+      "completion": "Create an actual accepted effect/proof after backup and before the relevant crash, record timestamps and IDs, then restore that system and query those IDs. Test latest deletion high-water and safe reconciliation/retry without resurrection. Separate SB first/second restore from JARVIS restore and report actual losses only."
+    }
+  ],
+  "direct_passed": [
+    "SB182 Python files archive/wheel/installed byte-identical; pinned manifest/source and wheel SHA verified",
+    "JARVIS1137 tracked product files and1109 rebuilt JS identical; tsc EXIT0; inventory34768 unchanged",
+    "7 backup integration tests directly passed;334ms total,43ms tests; fixture-only",
+    "Ruff EXIT0; installed standard/work/maintenance each EXIT0",
+    "Existing busy writer refused and writer COMMIT preserved; child entering after initial exclusive COMMIT refused SQLITE_BUSY while restore succeeds",
+    "Existing-dest mid-transaction actual process exit99 after DROP preserves original; normal retry restores backup",
+    "Previous orphan WAL exit99 reproduction now returns backup-approved; missing/junk backup retains existing dest; normal new-dest restore passes",
+    "Current synthetic full authority backup restored into an existing synthetic authority successfully; no view collision observed",
+    "Paired harness EXIT0;2scoped readers and2independent revocations,new proved write,high-water3 and second restore0records",
+    "After harness exit, exact issue-restore-fence command using exported preserved authority succeeds EXIT0",
+    "Signed expired fence now issued via authorize(past), refused; corrupted migration checksum gives MIGRATION_CHECKSUM_MISMATCH with synthetic anchors, supported copy opens; limited fixture compatibility evidence"
+  ],
+  "type_result": {
+    "errors": 0,
+    "warnings": 2,
+    "exit": 1,
+    "scope": "sb/revoked_keys.py"
+  },
+  "rto": {
+    "failure_began_ms": 1789178563350,
+    "restore_began_ms": 1789178568577,
+    "sb_first_read_ms": 1789178570689,
+    "scoped_available_ms": 1789178571756,
+    "new_write_available_ms": 1789178572972,
+    "restore_probe_ms": 410.815,
+    "restore_to_readable_ms": 2112,
+    "failure_to_first_read_ms": 7339,
+    "failure_to_work_available_ms": 9622,
+    "jarvis_crash_to_reopen_ms": 45,
+    "scenario_ms": 26149
+  },
+  "prior_scope": "Prior V1/V2 dispatch fixes and R1-R7 passes remain restricted to exact tested bytes and entrypoints. No unchanged full SB or dispatch suite rerun. Original A-F/M1-M14 and native/external unmet conditions retained.",
+  "harnesses": {
+    "restore-races.mjs": "9202c3d4baf4894256f602785b0219207fb77c60cf2f99a8491c40cf1e200ac6",
+    "restore-own-schema.mjs": "29a020d5cc5488500e494c56285657aa774a37e10ccdda0f6a1ba5b534f8b9d0",
+    "restore-crash-transaction.mjs": "49a160bb2b780b410f64ddda9e5e831bf21fce778aff6407170396dd5c1db59f",
+    "restore-orphan-wal.mjs": "199053b4e95ba234d0c1b44c631bf206af90e0a4f3efda1a3d72acd9cd7f074d",
+    "restore-writer-gap.mjs": "f031a521f38a87f93b2bbe030f82877e2abaa67fa7a445d1dc0d32cad639a193",
+    "restore-failure-preservation.mjs": "21cb9c2da7fdd94dbcaba01d51546dc2d2399b9d23fcf32ab2357236c8cfc45e"
+  },
+  "evidence_root": "/var/tmp/codex-night-16d4db3-x4w54h5y"
+}

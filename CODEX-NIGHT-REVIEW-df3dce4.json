@@ -1,0 +1,149 @@
+{
+  "author": "existing Codex monitor term_6bf51058-3b29-40e2-a25b-b751fab0c24e",
+  "not_original_codex_execution": true,
+  "created_at_utc": "2026-09-11T19:05:03.308945+00:00",
+  "submission": "df3dce40e63452059101862b39a3753fb3112877",
+  "pin": {
+    "sb_source": "537ec9be03320e941b699c9655da406a3556bddb",
+    "docs": "400a29d",
+    "release_id": "0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "wheel_sha256": "0e32b787c97a42d922132e93e3c67ab375d06154b433d23a042283112cbf0b57",
+    "candidate": "/var/tmp/sb-candidate-537ec9b/releases/0ecdb5617a1fe95697e55366f631ee4373f407b1",
+    "jarvis_source": "a935751",
+    "jarvis_dist": "/var/tmp/jarvis-artifact-a935751/source/dist",
+    "jarvis_inventory_sha256": "e0e5c22adbdca1b7a7b44a08068a46f35d90c0359b06599924402c2314c4a0a9",
+    "jarvis_inventory_entries": 34780,
+    "operational_current": "41f0751",
+    "production_activated": false,
+    "tsc_exit": 0
+  },
+  "verdict": "not_accepted",
+  "product_acceptance": false,
+  "operational_acceptance": false,
+  "evidence_root": "/var/tmp/codex-night-df3dce4-hmjxkqph",
+  "findings": [
+    {
+      "id": "N1-attempt-and-outcome-recovery",
+      "priority": "P2",
+      "files": [
+        "Orca-JARVIS/src/gjc-intent-store.ts:107",
+        "Orca-JARVIS/src/cli-gjc-commands.ts:123"
+      ],
+      "evidence": [
+        "dispatch-fail-accepted-crash.json",
+        "dispatch-accepted-timeout.json"
+      ],
+      "actual": "Earlier explicit negative response then later accepted/exit99 yields 2 synthetic remote acceptances; accepted then timeout exception also yields 2 calls/acceptances. Any historical model_send_failed unlocks a later unknown attempt; generic catch labels uncertain exception as failed.",
+      "completion": "Attempt/fence-bound durable outcomes. Proven not-sent/explicit rejection retry safely; unknown accepted outcome does not blindly resend. Cover prior failure -> later accepted/crash, accepted/timeout, retry correction and concurrency together; no universal remote exactly-once demand."
+    },
+    {
+      "id": "N1-reconcile-not-recorded",
+      "priority": "P2",
+      "files": [
+        "Orca-JARVIS/src/cli-gjc-commands.ts:105",
+        "Orca-JARVIS/src/gjc-intent-store.ts:59"
+      ],
+      "evidence": [
+        "dispatch-reconcile-accepted.json"
+      ],
+      "actual": "Dead-worker reopened dispatch receives reconcile accepted:true and returns recovered:remote_accepted, yet model_dispatched remains false: recording silently fails dead owner check.",
+      "completion": "Guarded authorized reconciliation persists a durable receipt under a valid fence; return success only if recorded. Bind delivery identity to actual transport; repeat/restart resolves once without defeating owner checks."
+    },
+    {
+      "id": "M12-unrelated-new-vault",
+      "priority": "P2",
+      "files": [
+        "tests/test_restore_journal_loss.py:32",
+        "tests/test_restore_journal_loss.py:34"
+      ],
+      "evidence": [
+        "m12-pytest.log",
+        "m12-journal-write.json"
+      ],
+      "actual": "Missing-anchor rejection and original trusted journal verification pass. Code then init_vault(tmp_path/writable) and writes a fresh independent legacy vault; no archive restore into that target or shared runtime/journal recovery.",
+      "completion": "Use existing shared runtime paired backup/restore fixtures and explicit trusted recovery material. In isolated lost-runtime fixture actually restore, verify retained/deleted scoped data and high-water/reingress, perform new product write on same restored system, measure separate SB/JARVIS RPO and full usable RTO. Missing anchor stays safe denied; do not invent trust."
+    },
+    {
+      "id": "V1-and-pinned-recovery-preparation",
+      "priority": "remaining_original_acceptance",
+      "files": [
+        "Orca-JARVIS/src/personal-context-persistence.ts:58",
+        "GROK-PIN-RECOVERY-RUNBOOK.md"
+      ],
+      "actual": "No selected task.session_id/compaction transport implementation changed. New runbook restates nested envelope and unknown receipt, not session proof or final B/F rollback/recovery evidence.",
+      "completion": "Finish original authorized session/compaction/revocation/expiry/no_data transport path without live auth where possible; document precise external-only acceptance. Pin recovery commands/services/settings/backup hashes and success/failure criteria; validate old-state compatibility or explicit no-old-rollback recovery. No operational activation."
+    }
+  ],
+  "direct": {
+    "sb_identity_python": 182,
+    "jarvis_identity_product_files": 1137,
+    "jarvis_rebuild_js": 1109,
+    "tsc_exit": 0,
+    "ruff_exit": 0,
+    "python_type_errors": 0,
+    "python_type_warnings": 2,
+    "python_type_exit": 1,
+    "jarvis_focused_passed": 10,
+    "m12_focused_passed": 1,
+    "installed_gate_exits": [
+      0,
+      0,
+      0
+    ]
+  },
+  "observed_grok_log": {
+    "path": "/var/tmp/sb-full-pytest-537ec9b.log",
+    "sha256": "ed061a2a0c07b305fc87c916b94dcd80667b1fdc86c177f34913d580551f1659",
+    "passed": 1833,
+    "skipped": 2,
+    "seconds": 649.28,
+    "exit": 0,
+    "direct_codex_run": false
+  },
+  "evidence_hashes": {
+    "dispatch-crash.mjs": "208ec5186d545d1eb6ada2fce64bf2b46d0e11959a79f6371065576b446cbe3f",
+    "run-probes.py": "c9c5be79192ac8f6ae04a9048e05c98d05a3c513d6166e2ae04a5d3127286f44",
+    "gjc-fence-confirmation.log": "5df8d65b5b633c598379a3c5327aa4a8009cb2ddc8e70f68c2b158d6a1bde205",
+    "ruff.log": "ebe9a79730ee44eb47f9c4e057b8ee334fce479afbcf5e46fe3c62dc30f94eba",
+    "dispatch-crash.log": "9497a93f1da713188dbf75bb30b3c8ebe27b17cdaac8c2531ede984d28b6b610",
+    "dispatch-reconcile-accepted.log": "3e8edfce51b5977df6018c5fc26ef6f3f1081beeb9ac6f5e614ae1de15575f50",
+    "jarvis-identity.json": "4fc62c61e8a6b2ffe61c5c0bcf5309dc7732f7ded0e350061d348d15160557de",
+    "m12-pytest.log": "c3c4e62a359be7b1e7cc454c708ac29d430dda6b67153d368635a4f6b12d0304",
+    "dispatch-accepted-timeout.json": "db039275b3b5d9b9f9a0e3f7d40c6c52344f4ce833b82c3f7600b0b69074a033",
+    "jarvis-focused.log": "b5785cadd0811f6382502be415aae116d0c12be590f3d875aacc5986331ae828",
+    "m12-journal-write.json": "9db0e557d0c8d486b4147351123b3d8fb75fabccadc66ec1925ae6441b4daf14",
+    "dispatch-fail-accepted-crash.mjs": "d207f137dded4ecc7dd349327945d038a7fb23ca886437b89da5bab31a538798",
+    "dispatch-live-expiry.mjs": "75f053f97fcd535de27d29b524589f8f7e175f76e4e09e6a8862499b241a5331",
+    "run-checks.py": "1c82bfc055e37b0c13f34d6b4ea35a82fb19e3a85e81063524b02cb34ed776c8",
+    "submission.json": "0500fd21e6395fbddf3d952f9e8c5ada0cf92ec839f3f08d6a48f8a07b3c91ad",
+    "sb-identity.json": "0539e3c38b41295c6b400f3ab87d3d7b94858816afc32a323190762dee3d11df",
+    "dispatch-accepted-crash.json": "efbba32d460a1407ba3b41e8bfd3d376b9885200f83ff1c1e7d72af96f71c2ce",
+    "dispatch-boundaries.mjs": "e1a2d7651a2c6a50c194ba9e05e4c13104fb0d0d182a240744419138c6f8a59a",
+    "dispatch-boundaries.log": "576a9ba50153954abd5b2d88665af4bfbf3c4ae18e5dfd0f957199384477ca44",
+    "installed-work.log": "cf9265376a969abf80ffb22d4824230487ea0a14f9659aa384511e9180dd83f9",
+    "dispatch-recovery.mjs": "9010d1ec46d074b715e9ba326c1ca4522d58836c21bf89f88dc91289873e2f28",
+    "python-types.log": "43e8e47dae231f41cd939a27c0ebf60971baa9fe6b6ace3dbf1f710dcaba44fb",
+    "dispatch-live-expiry.log": "9bfdb73734f585e6e063b71d8f954dd043e33ceea101271f0faebddc13d802f5",
+    "installed-maintenance.log": "b783443a540e86760c05a3be89dcc87c54a5596161f5b5847f4e184685148d3f",
+    "dispatch-crash.json": "cfe9bdc611c026a0811e2493db257c66236ccac1a1675a5e2dfb37366b7ee68b",
+    "dispatch-accepted-timeout.mjs": "2d291b95645f1dde413572c5c1d328e2eb4c5402ef512e63ca4d0e84edc4f5e1",
+    "gjc-fence-confirmation.mjs": "cd21924a0210b443e54dd06002184de34aa70c88c40f30b741fff06b77f5024f",
+    "dispatch-recovery.json": "8e1852e8b0e54711ce7d43d01acd6061fbaed03d89afc8bf4d837fed0aef5d3d",
+    "dispatch-fail-accepted-crash.log": "19ec7bbac6be0b296b6a4b04856662aad156ab043160d09c24a17996ec332126",
+    "installed-standard.log": "e1f49d371817e38ef1f9311ae6aa79bc117178cdf971354d1b3fc2bbdccfba80",
+    "dispatch-fail-accepted-crash.json": "21b224a2f13268d07489800e64c2708ea297c585386d9f3283fdfb0e864fe4a5",
+    "dispatch-boundaries.json": "9f254e1281cdecac5304a203303064e002f62b0949125600fd9730154ab4827c",
+    "test_journal_observe.py": "13129bfe2be4b3423097555696bc46222e37f65547240e7b8b72340b9cf2b493",
+    "dispatch-accepted-crash.mjs": "dd279bfacb6b7652c9ce70e52be90252e1403ca7bb503d103d4fe20ee576c194",
+    "dispatch-live-expiry.json": "ea57cc76d004487c3fd213436c6fe45e4066370b278288e3de8e323de90c2a19",
+    "dispatch-accepted-timeout.log": "58a55396d09b85359b591a6d6d7c613ca94af9ffcd009eacdd5464b0089b5b3d",
+    "gjc-fence-confirmation.json": "f91761f526c808fbe031e679273c29dfd6e7248190b7cc07274c6ac9819bdb3c",
+    "dispatch-accepted-crash.log": "8e228fa362fbdd9f0f54607dd5b5c1b32bdf2cfe617dd8a3ff0defb8946787f6",
+    "dispatch-reconcile-accepted.json": "ac5ae6127684c7953d9ea6c9aef1117234be4d3b45d9c359ebe5170505314226",
+    "jarvis-tsc.log": "49815eb5a03461efcdc0b2d9af2d9615e3b8974e3d6a256e7865c0e6e6f6bad9",
+    "dispatch-reconcile-accepted.mjs": "56da8eaa6a12ea58043baea69f1baf855bf5f098080fc3a2eb6f3dd53ca40798",
+    "dispatch-recovery.log": "d1b5b0352834b104514c22bb3530d4957261299fa7a99ca2e05df70b8fbaa8a6"
+  },
+  "final_head": "df3dce40e63452059101862b39a3753fb3112877",
+  "next_action": "Integrated existing Grok implementation/native goal resume; keep 30-minute monitor"
+}

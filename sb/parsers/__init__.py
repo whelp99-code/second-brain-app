@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Final, Protocol, override
+from typing import Final, Protocol, cast, override
+
+
+class DocumentParseResult(Protocol):
+    """Provenance-bearing parser result implemented by the optional adapter."""
+
+    body: str
+    source_hash: str
+    locator: dict[str, str | int]
+    parser_version: str
+    model_version: str
+    partial: bool
 
 
 class ParseError(Exception):
@@ -69,40 +79,35 @@ class _StructuredParse(Protocol):
     def __call__(self, kind: str, payload: bytes) -> str: ...
 
 
-class _DoclingDocument(Protocol):
-    def export_to_markdown(self) -> str: ...
-
-
-class _DoclingConversion(Protocol):
-    @property
-    def document(self) -> _DoclingDocument: ...
-
-
-class _DoclingConverter(Protocol):
-    def convert(self, source: Path) -> _DoclingConversion: ...
-
-
-class _DoclingConverterType(Protocol):
-    def __call__(self) -> _DoclingConverter: ...
-
-
 def _try_docling(payload: bytes, suffix: str) -> str | None:
-    try:
-        module = importlib.import_module("docling.document_converter")
-    except ImportError:
-        return None
-    converter_cls: _DoclingConverterType | None = getattr(module, "DocumentConverter", None)
-    if converter_cls is None:
-        return None
-    with TemporaryDirectory() as tmp:
-        path = Path(tmp) / f"input{suffix}"
-        _ = path.write_bytes(payload)
-        try:
-            converted: _DoclingConversion = converter_cls().convert(path)
-        except (OSError, RuntimeError, TypeError, ValueError):
-            return None
-    markdown = converted.document.export_to_markdown().strip()
-    return markdown or None
+    adapter = importlib.import_module("sb.parsers.docling_adapter")
+    result = adapter.parse_isolated(payload, suffix)
+    return None if result is None else result.body
+
+
+def parse_document(payload: bytes, suffix: str) -> DocumentParseResult:
+    """Parse one document and retain provenance for derived memory records."""
+    adapter = importlib.import_module("sb.parsers.docling_adapter")
+
+    normalized = suffix if suffix.startswith(".") else f".{suffix}"
+    isolated = (
+        adapter.parse_isolated(payload, normalized.lower())
+        if normalized.lower() in {".pdf", ".docx"}
+        else None
+    )
+    if isolated is not None:
+        return cast(DocumentParseResult, isolated)
+    parser = parser_for(normalized)
+    body = parser(payload)
+    result_type = adapter.DocumentParseResult
+    return cast(DocumentParseResult, result_type(
+        body=body,
+        source_hash="sha256:" + hashlib.sha256(payload).hexdigest(),
+        locator={"kind": "document", "ordinal": 1},
+        parser_version=f"builtin:{normalized.lower()}",
+        model_version="none",
+        partial=False,
+    ))
 
 
 def _bound_parse(module_name: str, class_name: str) -> Callable[[bytes], str]:
@@ -192,5 +197,6 @@ __all__ = (
     "OcrRequired",
     "ParseError",
     "UnsupportedSuffix",
+    "parse_document",
     "parser_for",
 )
