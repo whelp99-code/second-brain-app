@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "artifact": "memory-surface-matrix",
+  "measured_at": "2026-09-22T06:54:22.074179Z",
+  "repository": {
+    "name": "second-brain-app",
+    "head": "16b2104589279fdd2a589806e81be173d3a77715",
+    "branch": "codex/pre-integration-snapshot-20260921"
+  },
+  "measurement_method": "source-backed live MCPServer tool registration with isolated temporary roots; no production credentials or data read",
+  "provider": {
+    "provider_instance_id": "provider:second-brain",
+    "provider_release_sha": "development (Config default; release config not present in checkout)",
+    "issuer": "server-side Config.provider_instance_id plus configured mcp_scoped_read identity; caller claims cannot establish issuer",
+    "signing_keys": "Config.jarvis_public_keys, filtered through revoked_jarvis_signing_key_ids and durable revoked-key store",
+    "read_fence": "Ed25519 MemoryReadFenceV1 verified by sb.delegations.verify_read_fence; purpose/operation/provider/time are checked",
+    "deletion_fence": "RequestStore.tombstone_high_water() -> (tombstone_sequence, tombstone_set_root), rebound in generation_read_binding",
+    "generation_fence": "GenerationIdentityV1 plus active generation manifest; stale tombstone or split-brain generation fails closed"
+  },
+  "surfaces": [
+    {
+      "id": "stdio-legacy",
+      "transport": "stdio",
+      "profile": "legacy (no SB_MCP_CONTRACT_PROFILE)",
+      "tools": [
+        "sb_search",
+        "sb_read_page",
+        "sb_recent_changes",
+        "sb_open_conflicts",
+        "sb_remember",
+        "sb_write_request"
+      ],
+      "scope": "genesis-only; no scoped claim; tombstone fence required after deletion",
+      "issuer": "none (legacy compatibility)",
+      "measured": "live registration with isolated SB_CONFIG"
+    },
+    {
+      "id": "stdio-task30",
+      "transport": "stdio",
+      "profile": "task30-schema3 / task32-schema4 / remember-schema5 / cancellation-schema6/7",
+      "tools": [
+        "sb_search",
+        "sb_read_page",
+        "sb_recent_changes",
+        "sb_open_conflicts",
+        "sb_remember",
+        "sb_write_request",
+        "sb_generation_status",
+        "sb_request_status",
+        "sb_resolve_memory_target"
+      ],
+      "scope": "provider read fence; schema 4+ binds generation and tombstone high-water",
+      "issuer": "configured JARVIS keys when configured; otherwise legacy-compatible keyless test path",
+      "measured": "live registration with isolated SB_CONFIG"
+    },
+    {
+      "id": "desktop",
+      "transport": "stdio embedded desktop config",
+      "profile": "Config(config=...)",
+      "tools": [
+        "sb_run",
+        "sb_search",
+        "sb_read_page",
+        "sb_recent_changes",
+        "sb_open_conflicts",
+        "sb_remember",
+        "sb_write_request"
+      ],
+      "scope": "local desktop owner; legacy search/page path unless explicit scoped profile selected",
+      "issuer": "local Config; no multi-user verifier",
+      "measured": "live registration with isolated temporary Config"
+    },
+    {
+      "id": "scoped-read-v1",
+      "transport": "stdio",
+      "profile": "scoped-record-read-v1",
+      "tools": [
+        "sb_read_page",
+        "sb_search"
+      ],
+      "scope": "configured principal + agent + session + policy_revision; signed claim and read/deletion fence"
+    },
+    {
+      "id": "scoped-read-v2",
+      "transport": "stdio",
+      "profile": "scoped-record-read-v2",
+      "tools": [
+        "sb_generation_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "scope": "scoped-read-v1 plus metadata status under memory_status/status fence"
+    },
+    {
+      "id": "scoped-read-v3",
+      "transport": "stdio",
+      "profile": "scoped-record-read-v3",
+      "tools": [
+        "sb_generation_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "scope": "v2 plus page access projection"
+    },
+    {
+      "id": "scoped-read-v4",
+      "transport": "stdio",
+      "profile": "scoped-record-read-v4",
+      "tools": [
+        "sb_generation_status",
+        "sb_request_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "scope": "v3 plus metadata-only request status; no write authority"
+    },
+    {
+      "id": "scoped-read-v5",
+      "transport": "stdio",
+      "profile": "scoped-record-read-v5",
+      "tools": [
+        "sb_generation_status",
+        "sb_request_status",
+        "sb_read_page",
+        "sb_search"
+      ],
+      "scope": "v4 plus acceptance metadata; no artifact availability claim"
+    },
+    {
+      "id": "scoped-status-v1",
+      "transport": "stdio",
+      "profile": "scoped-request-status-v1",
+      "tools": [
+        "sb_request_status"
+      ],
+      "scope": "issuer-authenticated status claim; request journal only; current artifact availability is not inferred"
+    },
+    {
+      "id": "scoped-write-v1",
+      "transport": "stdio",
+      "profile": "scoped-request-write-v1",
+      "tools": [
+        "sb_write_request"
+      ],
+      "scope": "provider scoped authority callback + scoped V4 request validation; acceptance is not completion"
+    }
+  ],
+  "trust_path": [
+    {
+      "step": 1,
+      "component": "Config / mcp_scoped_read",
+      "provides": "principal, agent, session or issuer_authenticated mode, policy_revision, trusted key set"
+    },
+    {
+      "step": 2,
+      "component": "access_request_digest",
+      "provides": "method + semantic arguments binding (transport signatures excluded)"
+    },
+    {
+      "step": 3,
+      "component": "MemoryAccessClaimV1",
+      "provides": "Ed25519 signature, issuer/provider, scope, purpose, request digest, fence digest, validity"
+    },
+    {
+      "step": 4,
+      "component": "MemoryReadFenceV1",
+      "provides": "provider, purpose, operation, issued/not-before/expiry, signing key, tombstone sequence/root"
+    },
+    {
+      "step": 5,
+      "component": "classified_page/search_scoped_records/request status",
+      "provides": "scope check before result construction and recheck after read"
+    },
+    {
+      "step": 6,
+      "component": "generation_read_binding",
+      "provides": "generation and current deletion revision on returned scoped results"
+    }
+  ],
+  "ownership": {
+    "measured": "single configured owner/principal and bounded project tuple only",
+    "single_owner_supported": true,
+    "multi_user_verified": false,
+    "multi_user_status": "not measured; no shared-directory or tenant isolation claim",
+    "fail_closed_rule": "missing/malformed claim, key, session, policy, fence, classification, or current tombstone state denies access"
+  },
+  "gaps_for_B02": [
+    "scoped export/restore adapters are implemented in sb.scoped_surfaces.py and restore sanitizer accepts optional claim/context; transport profiles remain unchanged for compatibility",
+    "desktop profile is local and does not prove multi-user authentication"
+  ]
+}

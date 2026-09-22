@@ -14,8 +14,9 @@ from typing import BinaryIO, Final, final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from sb.access_claims import AccessContext
 from sb.delegations import DelegationRejected, verify_read_fence
-from sb.effect_values import JsonInput, digest
+from sb.effect_values import JsonInput, JsonValue, digest
 from sb.effect_write_values import model_object
 from sb.generation_runtime import (
     GenerationAuthority,
@@ -37,6 +38,7 @@ from sb.restore_models import (
 )
 from sb.restore_source import read_restore_knowledge
 from sb.restore_workspace import restore_workspace
+from sb.scoped_surfaces import authorize_restore, require_restore_scope
 from sb.store.ledger import Ledger
 
 _MAX_RESTORE_MEMBERS: Final = 100_000
@@ -212,6 +214,9 @@ class GenerationRestoreSanitizer:
         self,
         request: RestoreRequest,
         mutations: GenerationMutationService,
+        *,
+        access_claim: JsonValue | None = None,
+        access_context: AccessContext | None = None,
     ) -> tuple[Generation, RestoreProofV1]:
         snapshot = mutations.requests.verified_tombstone_snapshot()
         try:
@@ -227,6 +232,22 @@ class GenerationRestoreSanitizer:
             raise RestoreError(str(exc)) from exc
         if fence.purpose != "memory_status" or fence.operation != "status":
             raise RestoreError("TOMBSTONE_FENCE_REQUIRED")
+        scoped_scope = None
+        if (access_claim is None) != (access_context is None):
+            raise RestoreError("MEMORY_SCOPED_RESTORE_DENIED")
+        if access_claim is not None and access_context is not None:
+            try:
+                scoped_scope = authorize_restore(
+                    request.archive_manifest,
+                    read_fence=model_object(request.jarvis_fence),
+                    access_claim=access_claim,
+                    keys=self.jarvis_public_keys,
+                    context=access_context,
+                    now=request.now,
+                    current_high_water=(snapshot.sequence, snapshot.set_root),
+                )
+            except (ValueError, TypeError) as exc:
+                raise RestoreError("MEMORY_SCOPED_RESTORE_DENIED") from exc
         source = mutations.requests.tombstone_root_at(
             request.archive_manifest.source_tombstone_sequence
         )
@@ -245,6 +266,11 @@ class GenerationRestoreSanitizer:
             knowledge = matching_restore_knowledge(states, inventory, snapshot)
             access = (read_restore_access(staging, request.archive_manifest, mutations.store, inventory, snapshot)
                       if (staging / "generation.json").is_file() else ())
+            if scoped_scope is not None:
+                try:
+                    require_restore_scope(access, scoped_scope)
+                except ValueError as exc:
+                    raise RestoreError("MEMORY_SCOPED_RESTORE_DENIED") from exc
 
             def materialize(root: Path) -> None:
                 ManagedRestoreInventory.materialize(root, inventory)
