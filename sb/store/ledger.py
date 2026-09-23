@@ -14,6 +14,7 @@ from types import TracebackType
 from typing import Final, Self, cast
 
 from sb.bound_knowledge import BoundKnowledge
+from sb.config import Config
 from sb.effect_values import parse_instant
 from sb.page_access import PageAccess
 from sb.source_access import (
@@ -187,9 +188,13 @@ class Ledger:
     _tables: LedgerTables
     _journal_mode: str
     _transaction_depth: int
+    _max_derivation_attempts: int
 
-    def __init__(self, vault_root: Path | str) -> None:
+    def __init__(self, vault_root: Path | str, *, config: Config | None = None) -> None:
         self._vault_root = Path(vault_root)
+        self._max_derivation_attempts = (config if config is not None else Config()).caps[
+            "max_derivation_attempts"
+        ]
         self._conn = None
         self._tables = LedgerTables()
         self._journal_mode = "delete"
@@ -560,10 +565,15 @@ class Ledger:
             closed += 1
         return closed
 
-    def requeue_failed(self, key: str, *, reset_attempts: bool = False) -> bool:
-        """Move a failed derivation back to pending for an explicit retry."""
+    def requeue_failed(
+        self, key: str, *, reset_attempts: bool = False, max_attempts: int | None = None
+    ) -> bool:
+        """Requeue within the stage budget; an explicit reset starts a new budget."""
         row = self._need(key)
         if row.status not in {DerivStatus.FAILED.value, DerivStatus.SUPERSEDED.value}:
+            return False
+        budget = self._max_derivation_attempts if max_attempts is None else max_attempts
+        if not reset_attempts and row.attempts >= budget:
             return False
         require_transition(row.deriv_key, DerivStatus(row.status), DerivStatus.PENDING)
         attempts = 0 if reset_attempts else row.attempts
