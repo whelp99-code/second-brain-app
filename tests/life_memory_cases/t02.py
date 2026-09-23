@@ -12,6 +12,29 @@ from pydantic import TypeAdapter
 from sb.runtime_identity import IdentityReport
 
 
+class McpServerInfo(TypedDict):
+    name: str
+    description: str
+
+
+class McpResult(TypedDict):
+    protocolVersion: str
+    serverInfo: McpServerInfo
+
+
+class McpInitialize(TypedDict):
+    jsonrpc: str
+    id: int
+    result: McpResult
+
+
+class McpIdentity(TypedDict):
+    source_commit: str | None
+    wheel_sha: str | None
+    contract_profile_digest: str
+    process_entrypoint: str
+
+
 class ReadyPayload(TypedDict):
     status: str
     reasons: list[str]
@@ -32,7 +55,7 @@ class IdentityFailure(RuntimeError):
 
 
 def run(artifacts: Artifacts, scenario: Literal["happy", "failure"]) -> list[str]:
-    """Observe installed processes through their actual CLI and HTTP surfaces."""
+    """Observe installed CLI, MCP, and HTTP processes through their actual surfaces."""
     fixture = artifacts.fixture_root / "T02"
     fixture.mkdir(parents=True, exist_ok=True)
     wheel = fixture / artifacts.wheel.name
@@ -49,11 +72,30 @@ def run(artifacts: Artifacts, scenario: Literal["happy", "failure"]) -> list[str
     cli = subprocess.run([str(artifacts.installed_sb), "identity"], env=env,
         cwd=fixture, capture_output=True, text=True, timeout=20, check=False)
     identity = TypeAdapter(IdentityReport).validate_json(cli.stdout)
-    mcp = subprocess.run([str(artifacts.interpreter), "-c",
-        "from sb.mcp import TASK32_CONTRACT_DIGEST; print(TASK32_CONTRACT_DIGEST)"],
-        env=env, cwd=fixture, capture_output=True, text=True, timeout=20, check=False)
-    if mcp.returncode != 0 or identity["contract_profile_digest"] != mcp.stdout.strip():
-        raise IdentityFailure("MCP_CONTRACT_DIGEST_MISMATCH")
+    request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "life-memory-acceptance", "version": "1"}}}
+    mcp = subprocess.run([str(artifacts.interpreter), "-m", "sb.mcp"],
+        input=json.dumps(request) + "\n", env=env, cwd=fixture,
+        capture_output=True, text=True, timeout=20, check=False)
+    if mcp.returncode != 0:
+        raise IdentityFailure("MCP_INITIALIZE_FAILED")
+    response = TypeAdapter(McpInitialize).validate_json(mcp.stdout.splitlines()[0])
+    # Retain the protocol response, omitting untrusted optional server metadata.
+    server_info = response["result"]["serverInfo"]
+    mcp_identity = TypeAdapter(McpIdentity).validate_json(server_info["description"])
+    _ = (fixture / f"mcp-initialize-{scenario}.json").write_text(json.dumps({
+        "jsonrpc": response["jsonrpc"], "id": response["id"],
+        "result": {"protocolVersion": response["result"]["protocolVersion"],
+                   "serverInfo": {"name": server_info["name"],
+                                  "description": server_info["description"]}},
+        "redacted_fields": "other server metadata omitted",
+    }, indent=2) + "\n")
+    for key in ("source_commit", "wheel_sha", "contract_profile_digest"):
+        if identity[key] != mcp_identity[key]:
+            raise IdentityFailure("MCP_ARTIFACT_IDENTITY_MISMATCH")
+    if mcp_identity["process_entrypoint"] == identity["process_entrypoint"]:
+        raise IdentityFailure("MCP_PROCESS_ENTRYPOINT_NOT_DISTINCT")
     if scenario == "failure":
         if cli.returncode == 0 or "CONTRACT_PROFILE_DIGEST_MISMATCH" not in identity["reasons"]:
             raise IdentityFailure("CONTRACT_PROFILE_DIGEST_MISMATCH missing from CLI")
@@ -77,7 +119,10 @@ def run(artifacts: Artifacts, scenario: Literal["happy", "failure"]) -> list[str
         try:
             connection.request("GET", "/ready")
             response = connection.getresponse()
-            report = TypeAdapter(ReadyPayload).validate_json(response.read())
+            ready_body = response.read()
+            report = TypeAdapter(ReadyPayload).validate_json(ready_body)
+            _ = (fixture / f"http-ready-{scenario}.json").write_text(
+                json.dumps(report, indent=2) + "\n")
         finally:
             connection.close()
         observed = report["identity"]
@@ -91,8 +136,8 @@ def run(artifacts: Artifacts, scenario: Literal["happy", "failure"]) -> list[str
             raise IdentityFailure("CONTRACT_PROFILE_DIGEST_MISMATCH")
         if observed["status"] != "ok" or identity["process_entrypoint"] == observed["process_entrypoint"]:
             raise IdentityFailure("PROCESS_ENTRYPOINT_NOT_DISTINCT")
-        return ["installed CLI and HTTP share verified artifact identities",
-                "CLI and HTTP process entrypoints stay distinct", "installed MCP contract digest matches CLI and HTTP"]
+        return ["installed CLI, HTTP, and MCP share verified artifact identities",
+                "process entrypoints stay distinct", "installed MCP protocol digest matches CLI and HTTP"]
     finally:
         process.terminate()
         try:

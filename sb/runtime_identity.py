@@ -13,6 +13,7 @@ from typing import ClassVar, Literal, TypedDict
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sb.config import Config
+from sb.contract_digest import TASK32_CONTRACT_DIGEST
 
 
 class ReleaseManifest(BaseModel):
@@ -42,8 +43,6 @@ class IdentityReport(TypedDict):
 
 def runtime_identity(config: Config, *, manifest_path: Path | None = None) -> IdentityReport:
     """Bind the current imported package to a release manifest and wheel."""
-    from sb.mcp import TASK32_CONTRACT_DIGEST
-
     path = manifest_path or Path(os.environ.get("SB_RELEASE_MANIFEST", str(Path(sys.prefix).parent / "release-manifest.json")))
     distribution = metadata.distribution("second-brain")
     package = Path(__file__).resolve().parent

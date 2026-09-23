@@ -2,12 +2,35 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
 from sb.config import Config
 from sb.readiness import readiness
+from tests.life_memory_cases.t02 import McpIdentity, McpInitialize
+
+
+def test_mcp_initialize_when_started_as_process(tmp_path: Path) -> None:
+    # Given an isolated configuration; When MCP initialize is sent over stdio;
+    # Then serverInfo reports the shipped contract digest through the protocol.
+    config = tmp_path / "config.toml"
+    _ = config.write_text(f'vault_root = "{tmp_path / "vault"}"\n')
+    request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "identity-test", "version": "1"}}}
+    process = subprocess.run([sys.executable, "-m", "sb.mcp"],
+        input=json.dumps(request) + "\n", text=True, capture_output=True,
+        env={**os.environ, "SB_CONFIG": str(config)}, cwd=tmp_path, timeout=20, check=False)
+    assert process.returncode == 0, process.stderr
+    response = TypeAdapter(McpInitialize).validate_json(process.stdout.splitlines()[0])
+    identity = TypeAdapter(McpIdentity).validate_json(response["result"]["serverInfo"]["description"])
+    assert identity["contract_profile_digest"] == (
+        "ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0")
 
 
 def test_ready_shape_when_identity_is_not_yet_separated(tmp_path: Path) -> None:

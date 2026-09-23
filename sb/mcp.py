@@ -37,6 +37,7 @@ from sb.cancellation_result import CancellationResultError
 from sb.cancellation_status import CancellationStatusError, read_cancellation_status
 from sb.cancellation_submission import CancellationSubmissionError, submit_correction_cancellation
 from sb.config import Config, load_config
+from sb.contract_digest import TASK32_CONTRACT_DIGEST
 from sb.contracts import MemoryWriteResultV1
 from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.delegations import DelegationRejected, MemoryReadFenceV1, verify_read_fence
@@ -131,8 +132,7 @@ _CANCELLATION_SUBMIT_CONTRACT_DIGEST: Final = "d137a7a7b0e4a577abef04d6ecb276863
 _CANCELLATION_PROFILE: Final = "cancellation-schema6"
 _CANCELLATION_CONTRACT_DIGEST: Final = "8be1ca195f60cb73f05c989d3d5f3e62053020988ccd8bb028cd4d8b442063b4"
 _REMEMBER_CONTRACT_DIGEST: Final = "78def950055c108a11790ea9d2f6f7729d1084114b09e89fef6a735e04e65d5e"
-_TASK32_CONTRACT_DIGEST: Final = "ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0"
-TASK32_CONTRACT_DIGEST: Final = _TASK32_CONTRACT_DIGEST
+_TASK32_CONTRACT_DIGEST: Final = TASK32_CONTRACT_DIGEST
 
 
 class ContractProfileError(RuntimeError):
@@ -321,7 +321,12 @@ def build_server(
         }
     )
     initial_scoped_policy = scoped_policy(config) if config.raw.get("mcp_scoped_read") is not None else None
-    server = MCPServer("second-brain")
+    from sb.runtime_identity import runtime_identity
+
+    identity = runtime_identity(config)
+    server = MCPServer("second-brain", description=json.dumps({
+        key: identity[key] for key in ("source_commit", "wheel_sha", "contract_profile_digest", "process_entrypoint")
+    }))
     public_keys: dict[str, Ed25519PublicKey] | None = None
     configured_keys = config.jarvis_public_keys
     if configured_keys:
