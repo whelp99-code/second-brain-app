@@ -19,6 +19,7 @@ import json
 import re
 import subprocess
 import sys
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar, Literal, Protocol, runtime_checkable
@@ -50,6 +51,7 @@ class Artifacts(BaseModel):
     fixture_root: Path
     help_sha256: str
     case_sha256: str
+    runner_sha256: dict[str, str]
     installed_version: str
     failure_probe: Path | None = None
 
@@ -58,6 +60,15 @@ class Artifacts(BaseModel):
     def valid_sha(cls, value: str) -> str:
         if re.fullmatch(r"[0-9a-f]{64}", value) is None:
             raise DigestError("SHA must be a lowercase sha256 digest")
+        return value
+
+    @field_validator("runner_sha256")
+    @classmethod
+    def valid_runner_hashes(cls, value: dict[str, str]) -> dict[str, str]:
+        expected = {"scripts/life-memory-acceptance.py", "tests/life_memory_cases/t01.py"}
+        if set(value) != expected or any(re.fullmatch(r"[0-9a-f]{64}", sha) is None
+                                         for sha in value.values()):
+            raise DigestError("runner SHA manifest must contain both source-side git blobs")
         return value
 
 
@@ -101,6 +112,7 @@ def main() -> int:
     source_commit: str | None = None
     wheel_sha: str | None = None
     case_sha: str | None = None
+    runner_sha: dict[str, str] | None = None
     command: list[str] = []
     try:
         if re.fullmatch(r"T[0-9]{2}", args.case) is None:
@@ -114,6 +126,17 @@ def main() -> int:
         wheel_sha = artifact.wheel_sha256
         if case_sha != artifact.case_sha256:
             raise AcceptanceFailure("source case SHA mismatch")
+        runner_sha = artifact.runner_sha256
+        head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True, timeout=20).stdout.strip()
+        if artifact.source_commit != head:
+            raise AcceptanceFailure("source commit mismatch")
+        for path, expected_sha in runner_sha.items():
+            committed = subprocess.run(["git", "show", f"HEAD:{path}"],
+                                       capture_output=True, check=True, timeout=20).stdout
+            if (hashlib.sha256(committed).hexdigest() != expected_sha
+                    or digest(Path.cwd() / path) != expected_sha):
+                raise AcceptanceFailure("runner SHA mismatch")
         fixture_root = artifact.fixture_root.resolve()
         if fixture_root == evidence_dir.parent.resolve() or not fixture_root.is_relative_to(
             evidence_dir.parent.resolve()
@@ -123,15 +146,6 @@ def main() -> int:
             raise AcceptanceFailure("missing fixture root")
         if Path(sys.executable) != artifact.interpreter:
             raise AcceptanceFailure("installed interpreter mismatch")
-        if digest(artifact.wheel) != artifact.wheel_sha256:
-            raise AcceptanceFailure("artifact SHA mismatch")
-        metadata = subprocess.run(
-            [str(artifact.interpreter), "-c",
-             "from importlib.metadata import version; print(version('second-brain'))"],
-            capture_output=True, text=True, check=False, timeout=20,
-        )
-        if metadata.returncode != 0 or metadata.stdout.strip() != artifact.installed_version:
-            raise AcceptanceFailure("installed metadata mismatch")
         command = [str(artifact.installed_sb), "--help"]
         spec = importlib.util.spec_from_file_location(f"life_memory_{args.case}", case_path)
         if spec is None or spec.loader is None:
@@ -144,6 +158,20 @@ def main() -> int:
         assertions = case.run(artifact, scenario)
         if not assertions or not all(assertion.strip() for assertion in assertions):
             raise AcceptanceFailure("empty assertions")
+        if digest(artifact.wheel) != artifact.wheel_sha256:
+            raise AcceptanceFailure("artifact SHA mismatch")
+        with zipfile.ZipFile(artifact.wheel) as package:
+            source_cli = subprocess.run(["git", "show", "HEAD:sb/cli.py"],
+                                        capture_output=True, check=True, timeout=20).stdout
+            if package.read("sb/cli.py") != source_cli:
+                raise AcceptanceFailure("wheel source commit mismatch")
+        metadata = subprocess.run(
+            [str(artifact.interpreter), "-c",
+             "from importlib.metadata import version; print(version('second-brain'))"],
+            capture_output=True, text=True, check=False, timeout=20,
+        )
+        if metadata.returncode != 0 or metadata.stdout.strip() != artifact.installed_version:
+            raise AcceptanceFailure("installed metadata mismatch")
     except (OSError, ValueError, TypeError, RuntimeError, KeyError, subprocess.TimeoutExpired) as exc:
         reasons.append(type(exc).__name__ if isinstance(exc, ValidationError) else str(exc))
     status = "PASS" if assertions and not reasons and scenario == "happy" else "BLOCKED"
@@ -151,12 +179,12 @@ def main() -> int:
     receipt = {
         "case": args.case, "scenario": scenario, "mode": args.mode, "status": status,
         "source_commit": source_commit, "source_case_sha256": case_sha,
-        "artifact_sha256": wheel_sha, "artifacts_file_sha256": (
+        "runner_sha256": runner_sha, "artifact_sha256": wheel_sha, "artifacts_file_sha256": (
             digest(args.artifacts) if args.artifacts.is_file() else None
         ),
         "command": command, "exit_code": exit_code,
         "observed_at_utc": datetime.now(UTC).isoformat(),
-        "surface": "isolated fixture / installed CLI; not production",
+        "surface": "installed wheel sb console script; source-side acceptance runner is not a wheel entrypoint; not production",
         "assertions": assertions, "omitted_or_blocked": reasons,
     }
     _ = result_path.write_text(json.dumps(receipt, indent=2) + "\n")
