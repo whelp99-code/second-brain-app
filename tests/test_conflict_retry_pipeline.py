@@ -100,3 +100,22 @@ def test_pipeline_holds_failed_conflict_without_success_log(tmp_path: Path, monk
         row = next(iter(ledger.list_derivations(status='failed', stage='conflict')))
         assert row.attempts == 1
         assert ledger.requeue_failed(row.deriv_key, max_attempts=config.caps['max_derivation_attempts']) is False
+
+
+def test_requeue_failed_without_override_honors_configured_cap(tmp_path: Path) -> None:
+    """Given a failed conflict at cap one, when requeued by key, then it remains held."""
+    root = tmp_path / 'vault'
+    config = Config(raw={'vault_root': str(root), 'caps': {'max_derivation_attempts': 1}})
+    key = 'failed-conflict'
+    with Ledger(root, config=config) as ledger:
+        ledger.ensure_derivation(key, 'conflict', 'run-1')
+        ledger.mark_running(key, 'run-1')
+        ledger.mark_failed(key, 'CONFLICT_ENUM_INVALID')
+
+        requeued = ledger.requeue_failed(key)
+
+        assert requeued is False
+        row = ledger.get_derivation(key)
+        assert row is not None
+        assert row.status == 'failed'
+        assert row.attempts == 1
