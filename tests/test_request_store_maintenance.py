@@ -5,7 +5,7 @@ import pytest
 
 from sb.config import load_config
 from sb.generation_runtime import GenerationMutationService
-from sb.request_store import RequestStore, RequestStoreError
+from sb.request_store import RequestIdentity, RequestStore, RequestStoreError
 from sb.runtime_access import read_root
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
@@ -27,7 +27,8 @@ def test_maintenance_recognizes_existing_versions_without_upgrading(scoped, tmp_
         with pytest.raises(RequestStoreError, match='REQUEST_STORE_MAINTENANCE_ONLY'):
             reader.claim('fixture:worker', NOW)
         with pytest.raises(RequestStoreError, match='REQUEST_STORE_MAINTENANCE_ONLY'):
-            reader.accept(None, {}, NOW)
+            reader.accept(RequestIdentity(1, 'request', 'digest', None, 'idem', 'lane', 'op',
+                                         None, None, None, None, None, None, 0, 'root'), {}, NOW)
         with pytest.raises(RequestStoreError, match='REQUEST_STORE_MAINTENANCE_ONLY'):
             reader.accept_cancellation(lambda: pytest.fail('must not validate a new cancellation'))
         assert reader.list_states(['pending', 'processing', 'proved']) == ()

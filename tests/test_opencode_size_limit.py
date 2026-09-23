@@ -54,5 +54,7 @@ def test_default_limit_rejects_sparse_file_without_opening(tmp_path, monkeypatch
 
     monkeypatch.setattr(adapter, '_read_snapshot', unexpected)
     rows = list(adapter.scan(None))
-    assert rows[0][2]['skip_reason'] == 'size-limit'
+    assert isinstance(rows[0][2], dict)
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'size-limit'
     assert json.loads(adapter.next_cursor())['snapshot.json'] == 0

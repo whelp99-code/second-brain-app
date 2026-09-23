@@ -10,6 +10,7 @@ from mcp.client import Client
 from sb.access_claims import access_claim_binding, access_request_digest
 from sb.config import Config
 from sb.delegations import create_read_fence
+from sb.effect_values import is_json_object
 from sb.effect_write_values import model_object
 from sb.mcp import build_server
 from tests.test_access_claims import KEY, signed
@@ -31,10 +32,14 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
         "provider_instance_id": generation.provider_instance_id,
         "jarvis_public_keys": {"key:test": base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b"=").decode()},
         "mcp_scoped_read": {"principal": "principal:owner", "agent": "agent:test", "session": "session:test", "policy_revision": "1"}})
+    raw = config.raw
+    assert isinstance(raw, dict)
+    scoped_read = raw["mcp_scoped_read"]
+    assert isinstance(scoped_read, dict)
     monkeypatch.setattr("sb.mcp.datetime", FrozenDate)
     if issuer_sessions:
-        del config.raw["mcp_scoped_read"]["session"]
-        config.raw["mcp_scoped_read"]["session_mode"] = "issuer_authenticated"
+        del scoped_read["session"]
+        scoped_read["session_mode"] = "issuer_authenticated"
         monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v1")
         with pytest.raises(ValueError, match="MEMORY_SCOPED_CONFIG_INVALID"):
             build_server(config=config)
@@ -50,6 +55,7 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
         "request_digest": access_request_digest("sb_read_page", {"id": name}), "read_fence_digest": fence.fence_digest,
         "issued_at": "2026-09-09T00:00:00.000Z", "expires_at": "2026-09-09T00:00:30.000Z",
         "nonce": "nonce:claim", "signing_key_id": "key:test"})
+    assert is_json_object(claim)
 
     async def run():
         async with Client(server, mode="legacy", cache=None) as client:
@@ -139,14 +145,13 @@ def test_scoped_mcp_has_no_unscoped_bypass_and_checks_request(classified, monkey
             original_reader = module.classified_page
             def revoke_during_read(*args):
                 result = original_reader(*args)
-                config.raw["revoked_jarvis_signing_key_ids"] = ["key:test"]
+                raw["revoked_jarvis_signing_key_ids"] = ["key:test"]
                 return result
             monkeypatch.setattr(module, "classified_page", revoke_during_read)
             changed = await client.call_tool("sb_read_page", args)
             assert changed.is_error
             assert "Alpha fixture" not in str(changed)
-            if isinstance(config.raw, dict):
-                config.raw.pop("revoked_jarvis_signing_key_ids", None)
+            raw.pop("revoked_jarvis_signing_key_ids", None)
             class ExpiredDate(datetime):
                 @classmethod
                 def now(cls, tz=None):

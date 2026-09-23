@@ -42,6 +42,7 @@ def test_runtime_uses_fixed_channel_and_rechecks_every_time(tmp_path, monkeypatc
     credential_path.chmod(0o600)
     config = Config(raw={"scoped_provider_verifier": {"credentials_path": str(credential_path)}})
     authorize = configured_scoped_provider_authority(config)
+    assert authorize is not None
     assert captured == [tmp_path / "credentials.json"]
     assert authorize(request) is True
     assert authorize(request) is False

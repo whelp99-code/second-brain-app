@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sb.effect_values import (
+    JsonObject,
     canonical_bytes,
     format_instant,
     is_json_object,
@@ -37,12 +38,15 @@ class ScopedPendingPublication:
     accepted_at: str
 
 
-def _envelope(raw: bytes, provider: str):
+def _envelope(raw: bytes, provider: str) -> tuple[JsonObject, datetime, ScopedJournalEntry]:
     value = strict_loads(raw, MAX_SCOPED_ENVELOPE_BYTES)
     if not is_json_object(value) or set(value) != {"schema_version", "state", "accepted_at", "request"} or type(value["schema_version"]) is not int or value["schema_version"] != 4 or value["state"] != "pending" or not isinstance(value["accepted_at"], str):
         raise ValueError("SCOPED_REQUEST_ENVELOPE_INVALID")
+    request = value["request"]
+    if not is_json_object(request):
+        raise ValueError("SCOPED_REQUEST_ENVELOPE_INVALID")
     at = parse_instant(value["accepted_at"])
-    entry = prepare_scoped_journal_entry(value["request"], now=at, expected_provider=provider)
+    entry = prepare_scoped_journal_entry(request, now=at, expected_provider=provider)
     if canonical_bytes(value) + b"\n" != raw:
         raise ValueError("SCOPED_REQUEST_ENVELOPE_INVALID")
     return value, at, entry
@@ -56,7 +60,15 @@ def publish_scoped_pending(directory: Path, value: object, *, now: datetime,
     and journal replay checks. No request row, receipt consumption or effect occurs.
     """
     entry = prepare_scoped_journal_entry(value, now=now, expected_provider=expected_provider)
-    envelope = {"schema_version": 4, "state": "pending", "accepted_at": format_instant(now), "request": value}
+    request = strict_loads(entry.request.canonical, MAX_SCOPED_ENVELOPE_BYTES)
+    if not is_json_object(request):
+        raise ValueError("SCOPED_REQUEST_ENVELOPE_INVALID")
+    envelope: JsonObject = {
+        "schema_version": 4,
+        "state": "pending",
+        "accepted_at": format_instant(now),
+        "request": request,
+    }
     payload = canonical_bytes(envelope) + b"\n"
 
     def compare(original: bytes, expected: bytes) -> None:

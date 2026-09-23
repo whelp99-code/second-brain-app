@@ -93,6 +93,7 @@ def test_live_authority_change_before_activation_holds_execution(tmp_path, chang
 def test_cli_dispatch_and_error_boundary(tmp_path, monkeypatch, capsys):
     from sb.cli import main
     executor, identity, path = setup(tmp_path)
+    assert isinstance(identity, str)
     try:
         monkeypatch.setenv('SB_CONFIG', str(path))
         assert main(['apply-cancellation', '--intent-id', identity]) == 0

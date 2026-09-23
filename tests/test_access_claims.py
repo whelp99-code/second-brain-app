@@ -14,7 +14,7 @@ from sb.access_claims import (
     verify_access_claim,
 )
 from sb.delegations import create_read_fence
-from sb.effect_values import canonical_bytes
+from sb.effect_values import canonical_bytes, is_json_object
 from sb.effect_write_values import model_object
 
 NOW = datetime(2026, 9, 9, tzinfo=UTC)
@@ -88,6 +88,7 @@ def test_tampering_expiry_revocation_and_stale_high_water(claim_case):
         (claim, {"key:test": KEY.public_key()}, context, NOW + timedelta(seconds=30)),
         (claim, {"key:test": KEY.public_key()}, replace(context, tombstone_sequence=1), NOW)]
     for value, keys, expected, now in cases:
+        assert is_json_object(value)
         with pytest.raises(AccessClaimRejected):
             verify_access_claim(value, fence, keys, expected, now)
 

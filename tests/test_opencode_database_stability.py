@@ -41,7 +41,9 @@ def test_database_changed_before_publication_is_rejected_then_retried(tmp_path, 
 
     monkeypatch.setattr(module, '_parts_from_rows', change)
     rows = list(adapter.scan(cursor))
-    assert len(rows) == 1 and rows[0][2]['skip_reason'] == 'unstable-session-file'
+    assert len(rows) == 1
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'unstable-session-file'
     assert rows[0][1] == b''
     assert adapter.next_cursor() == cursor
     monkeypatch.setattr(module, '_parts_from_rows', original)
@@ -64,7 +66,9 @@ def test_referenced_wal_database_is_held_until_export_is_stable(tmp_path):
         db.commit()
         assert path.with_name(path.name + '-wal').exists()
         rows = list(adapter.scan(cursor))
-        assert len(rows) == 1 and rows[0][2]['skip_reason'] == 'live-store'
+        assert len(rows) == 1
+        metadata = dict(rows[0][2])
+        assert metadata['skip_reason'] == 'live-store'
         assert rows[0][1] == b'' and adapter.next_cursor() == cursor
     recovered = list(adapter.scan(cursor))
     assert len(recovered) == 1 and recovered[0][1] == b'after!'

@@ -1,14 +1,14 @@
 {
   "schema": "phone-history-predevice-static-report-v1",
-  "generated_at": "2026-09-04T12:47:06.342773+00:00",
-  "python": "3.14.4 (main, Jun 18 2026, 14:25:02) [GCC 15.2.0]",
+  "generated_at": "2026-09-23T12:56:34.054347+00:00",
+  "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
   "platform": "linux",
-  "result": "FAIL",
+  "result": "PASS",
   "checks": [
     {
       "name": "generator:generate_ios_contract.py",
-      "passed": false,
-      "details": "could not locate PhoneEvent object in JSON Schema"
+      "passed": true,
+      "details": "generated"
     },
     {
       "name": "generator:generate_ios_api_paths.py",
@@ -17,8 +17,8 @@
     },
     {
       "name": "required-files",
-      "passed": false,
-      "details": "missing=ios/Core/GeneratedContract.swift"
+      "passed": true,
+      "details": "missing="
     },
     {
       "name": "entitlements:app-group-parity",
@@ -53,12 +53,12 @@
     {
       "name": "privacy-manifest:app",
       "passed": true,
-      "details": "tracking=false collected=[]"
+      "details": "explicit user content; linked=true; tracking=false; purpose=app functionality; App Group UserDefaults=1C8F.1"
     },
     {
       "name": "privacy-manifest:share",
       "passed": true,
-      "details": "tracking=false collected=[]"
+      "details": "explicit user content; linked=true; tracking=false; purpose=app functionality; App Group UserDefaults=1C8F.1"
     },
     {
       "name": "source:no-surveillance-apis",
@@ -74,6 +74,11 @@
       "name": "source:aes-gcm-queue",
       "passed": true,
       "details": "authenticated encryption and verification are present"
+    },
+    {
+      "name": "share:network-code-excluded-from-target",
+      "passed": true,
+      "details": "Share Extension compiles only capture and encrypted-queue Core files"
     },
     {
       "name": "share:user-declared-adot-and-queue-only",

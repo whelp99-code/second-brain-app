@@ -44,7 +44,9 @@ def test_invalid_database_is_not_silently_empty(tmp_path):
     (tmp_path / 'export.db').write_bytes(b'not sqlite')
     adapter = module.OpenCodeSessionsAdapter((tmp_path,), 'fixture')
     rows = list(adapter.scan(None))
-    assert len(rows) == 1 and rows[0][2]['skip_reason'] == 'unreadable-session-file'
+    assert len(rows) == 1
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'unreadable-session-file'
     assert json.loads(adapter.next_cursor())['snapshot.json'] == 0
 
 
@@ -60,7 +62,9 @@ def test_small_database_view_cannot_expand_past_output_budget(tmp_path, monkeypa
     monkeypatch.setattr(module, 'MAX_DATABASE_BYTES', 24000)
     adapter = module.OpenCodeSessionsAdapter((tmp_path,), 'fixture')
     rows = list(adapter.scan(None))
-    assert len(rows) == 1 and rows[0][2]['skip_reason'] == 'database-limit'
+    assert len(rows) == 1
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'database-limit'
     assert rows[0][1] == b''
     assert json.loads(adapter.next_cursor())['snapshot.json'] == 0
 
@@ -78,6 +82,7 @@ def test_success_cursor_survives_database_budget_failure(tmp_path, monkeypatch):
     with monkeypatch.context() as patch:
         patch.setattr(module, 'MAX_DATABASE_ROWS', 1)
         rows = list(adapter.scan(cursor))
-    assert rows[0][2]['skip_reason'] == 'database-limit'
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'database-limit'
     assert adapter.next_cursor() == cursor
     assert len(list(adapter.scan(cursor))) == 2

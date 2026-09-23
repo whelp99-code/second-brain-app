@@ -42,6 +42,7 @@ def test_conflict_retry_without_recompilation(tmp_path: Path, monkeypatch):
     with Ledger(root) as ledger:
         for previous in failed:
             current = ledger.get_derivation(previous.deriv_key)
+            assert current is not None
             assert current.status == 'done'
             assert current.attempts == previous.attempts + 1
     calls_after_recovery = model.calls

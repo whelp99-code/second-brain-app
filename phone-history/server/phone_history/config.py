@@ -24,6 +24,8 @@ class Settings:
     api_token: str
     master_key: bytes
     second_brain_vault: Path | None = None
+    second_brain_base_url: str | None = None
+    second_brain_token_env: str = "SB_WEB_TOKEN"
     host: str = "127.0.0.1"
     port: int = 8787
     max_request_bytes: int = _DEFAULT_MAX_REQUEST_BYTES
@@ -61,6 +63,10 @@ class Settings:
         key = _decode_key(encoded_key)
         raw_vault = os.environ.get("PHONE_HISTORY_SECOND_BRAIN_VAULT", "").strip()
         vault = Path(raw_vault).expanduser() if raw_vault else None
+        raw_base = os.environ.get("PHONE_HISTORY_SECOND_BRAIN_BASE_URL", "").strip()
+        token_env = os.environ.get("PHONE_HISTORY_SECOND_BRAIN_TOKEN_ENV", "SB_WEB_TOKEN").strip()
+        if not token_env:
+            token_env = "SB_WEB_TOKEN"
         try:
             port = int(os.environ.get("PHONE_HISTORY_PORT", "8787"))
             maximum = int(
@@ -79,6 +85,8 @@ class Settings:
             api_token=token,
             master_key=key,
             second_brain_vault=vault,
+            second_brain_base_url=raw_base or None,
+            second_brain_token_env=token_env,
             host=os.environ.get("PHONE_HISTORY_HOST", "127.0.0.1"),
             port=port,
             max_request_bytes=maximum,

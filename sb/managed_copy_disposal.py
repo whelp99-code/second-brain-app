@@ -8,15 +8,19 @@ import stat
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import Protocol, cast
 
 from sb.effect_values import JsonValue, digest, format_instant
 from sb.managed_backup_manifest import validate_managed_backups
 from sb.managed_copy_files import purge_matching_managed_copies
 from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
 
-if TYPE_CHECKING:
-    from sb.exports import ExportPublisher
+
+class _ExportSurface(Protocol):
+    @property
+    def root(self) -> Path: ...
+
+    def invalidate(self, identities: set[str], now: datetime) -> tuple[str, ...]: ...
 
 
 def initialize_copy_disposals(db: sqlite3.Connection) -> None:
@@ -66,7 +70,7 @@ def require_copy_disposal(
 
 def prepare_copy_disposal(
     db: sqlite3.Connection, operation_id: str, binding: str, *, backup_root: Path,
-    exports: ExportPublisher, identities: set[str], needles: tuple[bytes, ...] | None,
+    exports: _ExportSurface, identities: set[str], needles: tuple[bytes, ...] | None,
     now: datetime, authority: Callable[[], None], barrier: Callable[[str], None],
 ) -> None:
     """Caller holds the generation writer. None means the original generation is gone."""

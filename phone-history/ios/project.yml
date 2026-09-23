@@ -59,7 +59,13 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - path: Core
+      - path: Core/AppPreferences.swift
+      - path: Core/CaptureService.swift
+      - path: Core/CaptureServices.swift
+      - path: Core/KeychainStore.swift
+      - path: Core/PhoneEvent.swift
+      - path: Core/RuntimeConstants.swift
+      - path: Core/SecureEventQueue.swift
       - path: ShareExtension
         excludes:
           - Info.plist

@@ -103,6 +103,7 @@ def test_same_request_publication_and_cancellation_have_one_winner(tmp_path: Pat
             assert replay.replayed
             assert restarted.apply_once(now=STAMP).state == "proved"
         else:
+            assert isinstance(request['request_id'], str)
             accepted, replayed = admit(restarted, intent)
             assert replayed
             assert execute(restarted, accepted["intent_id"])["state"] == "generation_active"
@@ -148,6 +149,7 @@ def test_exit_after_request_file_publication_blocks_cancellation_and_recovers(tm
     assert process.exitcode == 77
     restarted = RequestExecutor(_config(tmp_path))
     try:
+        assert isinstance(request['request_id'], str)
         assert restarted.store.get(request["request_id"]) is None
         assert restarted.store.tombstone_high_water()[0] == 0
         assert list(restarted.config.request_root.joinpath("pending").glob("*.v2.json"))

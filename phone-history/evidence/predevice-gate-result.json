@@ -1,26 +1,26 @@
 {
   "schema": "phone-history-predevice-gate-v1",
-  "generated_at": "2026-09-04T12:47:06.352432+00:00",
+  "generated_at": "2026-09-23T12:56:34.066927+00:00",
   "host": {
     "platform": "linux",
-    "python": "3.14.4"
+    "python": "3.12.13"
   },
-  "result": "FAIL",
+  "result": "PASS",
   "checks": [
     {
       "name": "generate-ios-contract",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "scripts/generate_ios_contract.py"
       ],
-      "exit_code": 1,
-      "passed": false,
+      "exit_code": 0,
+      "passed": true,
       "log": "evidence/generate-ios-contract.log"
     },
     {
       "name": "generate-ios-api-paths",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "scripts/generate_ios_api_paths.py"
       ],
       "exit_code": 0,
@@ -30,7 +30,7 @@
     {
       "name": "ruff-format",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "-m",
         "ruff",
         "format",
@@ -46,7 +46,7 @@
     {
       "name": "ruff-check",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "-m",
         "ruff",
         "check",
@@ -54,28 +54,28 @@
         "tests",
         "scripts"
       ],
-      "exit_code": 1,
-      "passed": false,
+      "exit_code": 0,
+      "passed": true,
       "log": "evidence/ruff-check.log"
     },
     {
       "name": "pytest",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "-m",
         "pytest",
         "-q",
         "tests",
         "--junitxml=/home/jm/orca/projects/second-brain-app/phone-history/evidence/pytest-junit.xml"
       ],
-      "exit_code": 1,
-      "passed": false,
+      "exit_code": 0,
+      "passed": true,
       "log": "evidence/pytest.log"
     },
     {
       "name": "compileall",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "-m",
         "compileall",
         "-q",
@@ -89,11 +89,11 @@
     {
       "name": "ios-static",
       "command": [
-        "/usr/bin/python3",
+        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
         "scripts/verify_ios_static.py"
       ],
-      "exit_code": 1,
-      "passed": false,
+      "exit_code": 0,
+      "passed": true,
       "log": "evidence/ios-static.log"
     },
     {
@@ -124,8 +124,8 @@
     }
   ],
   "pytest": {
-    "tests": 35,
-    "failures": 1,
+    "tests": 47,
+    "failures": 0,
     "errors": 0,
     "skipped": 0
   },
@@ -134,5 +134,5 @@
     "reason": "No physical iPhone is attached to the macOS Xcode host.",
     "script": "scripts/physical_device_gate.sh"
   },
-  "closure": "NOT_READY"
+  "closure": "READY_FOR_DEVICE_VALIDATION"
 }

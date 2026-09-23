@@ -23,7 +23,8 @@ def main() -> int:
 
 - 결과: **{report.get("result", "UNKNOWN")}**
 - 생성 시각(UTC): `{report.get("generated_at", "")}`
-- 호스트: `{report.get("host", {}).get("platform", "")}` / Python `{report.get("host", {}).get("python", "")}`
+        - 호스트: `{report.get("host", {}).get("platform", "")}` / Python
+          `{report.get("host", {}).get("python", "")}`
 - Closure: **{report.get("closure", "UNKNOWN")}**
 - 실기기 Gate: **{report.get("device_gate", {}).get("status", "PENDING")}**
 
@@ -42,9 +43,11 @@ def main() -> int:
 
 ## 판정
 
-`PASS`이면 Ubuntu에서 재현 가능한 구현·계약·보안 Gate가 끝났으며 macOS Xcode/실기기 검증으로 넘길 수 있다. 이 문서는 iPhone 서명·설치·A닷 공유 완료를 의미하지 않는다.
+`PASS`이면 Ubuntu에서 재현 가능한 구현·계약·보안 Gate가 끝났으며 macOS Xcode/실기기
+검증으로 넘길 수 있다. 이 문서는 iPhone 서명·설치·A닷 공유 완료를 의미하지 않는다.
 
-실기기 결과는 `DEVICE-VALIDATION-HANDOFF.md` D1-D12와 `evidence/device-*/result.json`으로 별도 판정한다.
+실기기 결과는 `DEVICE-VALIDATION-HANDOFF.md` D1-D12와
+`evidence/device-*/result.json`으로 별도 판정한다.
 """
     OUTPUT.write_text(text, encoding="utf-8")
     return 0 if report.get("result") == "PASS" else 1

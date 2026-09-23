@@ -147,7 +147,10 @@ def main() -> int:
             and collection_is_bounded
             and app_group_defaults_declared,
             f"privacy-manifest:{name}",
-            "explicit user content; linked=true; tracking=false; purpose=app functionality; App Group UserDefaults=1C8F.1",
+            (
+                "explicit user content; linked=true; tracking=false; purpose=app "
+                "functionality; App Group UserDefaults=1C8F.1"
+            ),
             results,
         )
 
@@ -223,7 +226,10 @@ def main() -> int:
             {
                 "name": "swift:syntax-parse",
                 "passed": None,
-                "details": "swiftc unavailable on this Ubuntu host; xcodebuild gate remains device-host only",
+                "details": (
+                    "swiftc unavailable on this Ubuntu host; xcodebuild gate remains "
+                    "device-host only"
+                ),
             }
         )
 
@@ -248,7 +254,10 @@ def main() -> int:
             {
                 "name": "xcodegen:project-generation",
                 "passed": None,
-                "details": "xcodegen unavailable on this Ubuntu host; generation script validates this on macOS",
+                "details": (
+                    "xcodegen unavailable on this Ubuntu host; generation script "
+                    "validates this on macOS"
+                ),
             }
         )
 

@@ -82,7 +82,9 @@ def test_failed_read_retains_successful_content_cursor_then_recovers(tmp_path, m
 
     monkeypatch.setattr(adapter, '_read_snapshot', fail)
     rows = list(adapter.scan(cursor))
-    assert rows[0][2]['skip_reason'] == 'unreadable-session-file'
+    assert isinstance(rows[0][2], dict)
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'unreadable-session-file'
     assert adapter.next_cursor() == cursor
     monkeypatch.setattr(adapter, '_read_snapshot', original)
     recovered = list(adapter.scan(adapter.next_cursor()))

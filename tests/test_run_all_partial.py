@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import is_json_object
 from sb.pipeline import RunOutcome, _run_all_mutable
 from tests.test_cli import _ready
 
@@ -45,11 +46,14 @@ def test_partial_ingest_survives_real_stage_recording(tmp_path: Path, monkeypatc
 
 
 def test_stage_exception_returns_recorded_failure(tmp_path: Path):
-    from sb.pipeline import _run_locked
+    from sb.pipeline import StageReport, _run_locked
+    from sb.store.ledger import Ledger
+    from sb.vault import Vault
 
     _, root = _ready(tmp_path)
 
-    def rejected(*args):
+    def rejected(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, vault, run_id
         raise RuntimeError('source test: LLM egress denied by source policy')
 
     result = _run_locked(root, rejected, 'compile')
@@ -71,13 +75,21 @@ def test_batch_result_persists_after_successful_later_stage(tmp_path: Path, monk
                         lambda *stage_args: StageReport((), 0, 0, 0, False))
     outcome = _run_all_mutable(config)
     snapshot = status_snapshot(config)
-    assert snapshot['last_run']['status'] == 'ok'
+    last_run = snapshot['last_run']
+    assert isinstance(last_run, dict) and is_json_object(last_run)
+    assert last_run['status'] == 'ok'
     batch = snapshot['last_batch']
+    assert isinstance(batch, dict) and is_json_object(batch)
     assert batch['status'] == 'partial' and batch['errors'] == 1
     assert batch['finished_at'] and batch['stages_attempted'] == 2
-    history = next(row for row in snapshot['recent_stages'] if row['stage'] == 'batch')
+    recent_stages = snapshot['recent_stages']
+    assert isinstance(recent_stages, list)
+    history = next(row for row in recent_stages
+                   if is_json_object(row) and row['stage'] == 'batch')
     assert history['error'] == ''
-    assert 'selected_run_id' in history['detail']
+    history_detail = history['detail']
+    assert isinstance(history_detail, str)
+    assert 'selected_run_id' in history_detail
     with sqlite3.connect(root / '.sb/ledger.db') as conn:
         detail = json.loads(conn.execute("SELECT detail FROM run_stage WHERE stage='batch'").fetchone()[0])
     assert detail['selected_run_id'] == outcome.run_id
@@ -95,6 +107,7 @@ def test_batch_exception_is_recorded_and_lock_released(tmp_path: Path, monkeypat
     with pytest.raises(RuntimeError, match='private exception detail'):
         _run_all_mutable(config)
     batch = status_snapshot(config)['last_batch']
+    assert isinstance(batch, dict) and is_json_object(batch)
     assert batch['status'] == 'failed' and batch['errors'] == 1
     assert batch['finished_at'] and batch['stages_attempted'] == 0
     fd = _try_lock(root)

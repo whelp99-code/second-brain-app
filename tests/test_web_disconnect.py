@@ -14,6 +14,7 @@ def test_json_disconnect_does_not_retry_or_escape(tmp_path, error, at_headers):
     config, _ = _ready(tmp_path)
     server = build_server(config, '127.0.0.1', 0)
     try:
+        assert isinstance(server.RequestHandlerClass, type)
         handler = object.__new__(server.RequestHandlerClass)
         handler.send_response = Mock()
         handler.send_header = Mock()
@@ -33,6 +34,7 @@ def test_json_other_io_errors_are_not_silenced(tmp_path):
     config, _ = _ready(tmp_path)
     server = build_server(config, '127.0.0.1', 0)
     try:
+        assert isinstance(server.RequestHandlerClass, type)
         handler = object.__new__(server.RequestHandlerClass)
         handler.send_response = Mock(side_effect=OSError('unrelated IO failure'))
         with pytest.raises(OSError, match='unrelated IO failure'):
@@ -52,7 +54,7 @@ def test_real_reset_during_response_keeps_server_healthy(tmp_path, monkeypatch):
     server = build_server(config, '127.0.0.1', 0)
     entered, finished = threading.Event(), threading.Event()
     handler_type = server.RequestHandlerClass
-    original = handler_type._get
+    original = getattr(handler_type, '_get')  # noqa: B009
     errors = Mock()
     monkeypatch.setattr(server, 'handle_error', errors)
 
@@ -75,7 +77,9 @@ def test_real_reset_during_response_keeps_server_healthy(tmp_path, monkeypatch):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        with socket.create_connection(server.server_address, timeout=5) as client:
+        address = server.server_address
+        assert isinstance(address[0], str) and isinstance(address[1], int)
+        with socket.create_connection((address[0], address[1]), timeout=5) as client:
             client.sendall(b'GET /health?disconnect HTTP/1.0\r\nHost: localhost\r\n\r\n')
             assert entered.wait(5)
             client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))

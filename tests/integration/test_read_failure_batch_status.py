@@ -37,6 +37,9 @@ root = "{source}"
         with _running(load_config(config)) as base:
             code, payload = _request(base + '/api/status')
         assert code == 200
+        assert isinstance(payload, dict)
+        assert isinstance(payload['last_batch'], dict)
         assert payload['last_batch']['status'] == 'failed'
         assert payload['last_batch']['errors'] == 1
+        assert isinstance(payload['status'], str)
         assert 'failed' in payload['status']

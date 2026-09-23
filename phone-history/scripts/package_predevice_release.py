@@ -67,9 +67,11 @@ def main() -> int:
 
     DIST.mkdir(parents=True, exist_ok=True)
     archive_path = DIST / f"{prefix}.tar.gz"
-    with archive_path.open("wb") as target:
-        with gzip.GzipFile(filename="", mode="wb", fileobj=target, mtime=0) as compressed:
-            compressed.write(tar_buffer.getvalue())
+    with (
+        archive_path.open("wb") as target,
+        gzip.GzipFile(filename="", mode="wb", fileobj=target, mtime=0) as compressed,
+    ):
+        compressed.write(tar_buffer.getvalue())
     archive_hash = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     checksum_path = archive_path.with_suffix(archive_path.suffix + ".sha256")
     checksum_path.write_text(f"{archive_hash}  {archive_path.name}\n", encoding="utf-8")

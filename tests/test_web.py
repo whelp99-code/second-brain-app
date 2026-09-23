@@ -20,6 +20,7 @@ from pytest import MonkeyPatch
 
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
+from sb.effect_values import is_json_object
 from sb.pipeline import RunOutcome
 from sb.store import Run
 from sb.store.cas import ContentAddressedStore
@@ -43,15 +44,18 @@ def test_status_exposes_held_brief_failures_without_changing_rows(tmp_path: Path
     with _running(config) as base:
         status, payload = _request(f"{base}/api/status")
         assert status == 200
+        assert isinstance(payload, dict) and is_json_object(payload)
         failures = payload["failures"]
+        assert isinstance(failures, dict) and is_json_object(failures)
         assert failures["total"] == 23
         assert failures["by_stage"] == {"brief": 23}
         assert failures["omitted"] == 3
-        assert len(failures["items"]) == 20
-        assert all(
-            item["retry_hold_reason"] == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
-            for item in failures["items"]
-        )
+        items = failures["items"]
+        assert isinstance(items, list)
+        assert len(items) == 20
+        for item in items:
+            assert isinstance(item, dict) and is_json_object(item)
+            assert item["retry_hold_reason"] == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
         assert "secret-value" not in json.dumps(payload)
     with Ledger(root) as ledger:
         assert len(list(ledger.list_derivations(status="failed", stage="brief"))) == 23
@@ -576,10 +580,13 @@ def test_status_summary_uses_same_ledger_run_as_details(tmp_path: Path) -> None:
     with _running(config) as base:
         status, payload = _request(base + "/api/status")
     assert status == 200
+    assert isinstance(payload, dict) and is_json_object(payload)
     assert payload["last_run_status"] == "failed"
-    assert "latest-failed" in payload["status"]
-    assert "failed" in payload["status"]
-    assert "old successful run" not in payload["status"]
+    status_text = payload["status"]
+    assert isinstance(status_text, str)
+    assert "latest-failed" in status_text
+    assert "failed" in status_text
+    assert "old successful run" not in status_text
 
 
 def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> None:  # noqa: F811

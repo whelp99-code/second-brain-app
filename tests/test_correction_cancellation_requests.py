@@ -6,12 +6,13 @@ from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
 from sb.correction_cancellation_requests import accept_correction_cancellation
-from sb.effect_values import parse_instant
+from sb.effect_values import JsonObject, JsonValue, is_json_object, parse_instant
 from sb.effect_write_models import MemoryEffectWriteRequestV2
 from sb.effect_write_requests import _identity, accept_effect_request
 from sb.effect_write_values import frozen_correction_vector
@@ -29,16 +30,22 @@ from tests.test_correction_cancellation import (
 NOW = parse_instant("2026-08-31T00:00:01.000Z")
 
 
+def _object(value: JsonValue) -> JsonObject:
+    assert is_json_object(value)
+    return value
+
+
 def intent():
     return resign({**cancellation_fixture(), "issued_at": "2026-08-31T00:00:01.000Z",
         "not_before": "2026-08-31T00:00:01.000Z", "expires_at": "2026-08-31T00:05:00.000Z"})
 
 
-def journal_only_generations(root):
+def journal_only_generations(root) -> Any:
     """These unit tests isolate journal/file serialization; real target binding is tested separately."""
+    tombstone = _object(intent()["tombstone"])
     return SimpleNamespace(requests=SimpleNamespace(root=root), provider_instance_id="provider:fixture",
         exclusive=nullcontext, active=lambda: SimpleNamespace(manifest=SimpleNamespace(
-            tombstone_sequence=0, tombstone_set_root=intent()["tombstone"]["previous_root"])))
+            tombstone_sequence=0, tombstone_set_root=tombstone["previous_root"])))
 
 
 def accept(root, value=None, clock=lambda: NOW):
@@ -68,7 +75,8 @@ def test_accept_replay_and_restart_block_all_original_aliases(tmp_path: Path) ->
                 delegation_id=None, delegation_digest=None, delegation_nonce=None)
             with pytest.raises(ReplayConflict, match="MEMORY_REQUEST_CANCELLED"):
                 store.replay_status(changed)
-        payload = frozen_correction_vector()["request"]["payload"]["content"]
+        request = _object(frozen_correction_vector()["request"])
+        payload = _object(request["payload"])["content"]
         row = store.db.execute("SELECT intent_json FROM correction_cancellations").fetchone()[0]
         assert payload not in row
     finally:
@@ -100,7 +108,8 @@ def test_original_receipt_wins_and_does_not_get_cancellation_marker(tmp_path: Pa
 ])
 def test_orphan_publication_is_not_evidence_of_non_receipt(tmp_path, directory, suffix, symlink):
     RequestStore(tmp_path).close()
-    request_id = intent()["original_delegation"]["request_id"]
+    request_id = _object(intent()["original_delegation"])["request_id"]
+    assert isinstance(request_id, str)
     path = tmp_path / directory / ("." + request_id + suffix)
     if symlink:
         path.symlink_to(tmp_path / "missing")
@@ -127,7 +136,7 @@ def test_changed_intent_is_not_exact_replay(tmp_path: Path) -> None:
 def test_stale_chain_rolls_back_cancellation_and_preserves_prior_replica(tmp_path: Path) -> None:
     store = RequestStore(tmp_path)
     try:
-        store.apply_tombstones([intent()["tombstone"]], "prior-request", NOW)
+        store.apply_tombstones([_object(intent()["tombstone"])], "prior-request", NOW)
     finally:
         store.close()
     with pytest.raises(ValueError, match="TOMBSTONE_SET_STALE"):
@@ -203,7 +212,7 @@ def test_sql_guard_and_immutable_cancellation(tmp_path: Path) -> None:
     accept(tmp_path)
     store = RequestStore(tmp_path)
     try:
-        alias = intent()["original_delegation"]["nonce"]
+        alias = _object(intent()["original_delegation"])["nonce"]
         with pytest.raises(sqlite3.IntegrityError, match="MEMORY_REQUEST_CANCELLED"):
             store.db.execute("INSERT INTO request_aliases VALUES(?,?,?,?,?)", ("lane_id", alias, "other", "other", "now"))
         columns = ",".join(original_row.keys())

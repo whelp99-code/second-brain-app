@@ -96,8 +96,9 @@ def find_event_schema(root: dict[str, Any], node: Any) -> dict[str, Any] | None:
             id_like = {"id", "event_id"} & names
             source_like = {"source", "source_app"} & names
             event_like = {"event_type", "type", "kind"} & names
-            device_like = {"device_id", "device"} & names
-            if id_like and source_like and event_like and device_like:
+            # device_id belongs to the batch envelope in v1; event objects do
+            # not repeat it. Keep event discovery independent of that envelope.
+            if id_like and source_like and event_like:
                 return node
         for value in node.values():
             found = find_event_schema(root, value)
@@ -159,7 +160,7 @@ def main() -> int:
     combined_properties = dict(event_properties)
     combined_properties.update(event_template)
     event_fields = field_map(combined_properties, EVENT_ALIASES)
-    required = {"id", "device_id", "occurred_at", "source", "event_type", "capture_mode"}
+    required = {"id", "occurred_at", "source", "event_type", "capture_mode"}
     missing = sorted(required - event_fields.keys())
     if missing:
         raise SystemExit(f"contract is missing semantic fields: {', '.join(missing)}")

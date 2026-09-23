@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from sb.effect_values import is_json_object
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
 from sb.scoped_request_status import read_scoped_request_status
@@ -37,7 +38,9 @@ def test_status_survives_write_expiry_and_missing_receipt_without_mutation(tmp_p
         assert result["receipt"] == expected
         assert tuple(store.db.iterdump()) == before
         assert not receipt.exists()
-        result["proof"]["head"] = "mutated response"
+        proof = result["proof"]
+        assert is_json_object(proof)
+        proof["head"] = "mutated response"
         assert read_scoped_request_status(store, raw, expected_provider=config.provider_instance_id,
             clock=lambda: later, resolve_scope=lambda _: scope)["receipt"] == expected
     finally:
@@ -90,14 +93,19 @@ def test_opt_in_status_recovers_original_acceptance_without_republication(tmp_pa
     try:
         later = datetime.fromisoformat(raw["expires_at"]) + timedelta(days=1)
         before = tuple(store.db.iterdump())
-        kwargs = {"expected_provider": config.provider_instance_id, "clock": lambda: later, "resolve_scope": lambda _: scope}
-        assert "acceptance" not in read_scoped_request_status(store, raw, **kwargs)
-        recovered = read_scoped_request_status(store, raw, include_acceptance=True, **kwargs)
+        assert "acceptance" not in read_scoped_request_status(store, raw,
+            expected_provider=config.provider_instance_id, clock=lambda: later,
+            resolve_scope=lambda _: scope)
+        recovered = read_scoped_request_status(store, raw,
+            expected_provider=config.provider_instance_id, clock=lambda: later,
+            resolve_scope=lambda _: scope, include_acceptance=True)
         assert recovered["acceptance"] == {**asdict(accepted), "replayed": True}
         assert recovered["state"] == ("proved" if execute else "pending")
         assert tuple(store.db.iterdump()) == before
         store.db.execute("UPDATE requests SET result_json='{}'")
         with pytest.raises(ValueError, match="SCOPED_ACCEPTANCE_INTEGRITY_FAILURE"):
-            read_scoped_request_status(store, raw, include_acceptance=True, **kwargs)
+            read_scoped_request_status(store, raw,
+                expected_provider=config.provider_instance_id, clock=lambda: later,
+                resolve_scope=lambda _: scope, include_acceptance=True)
     finally:
         store.close()

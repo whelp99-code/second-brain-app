@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from sb.cancellation_result import CancellationResultError
 from sb.cancellation_status import CancellationStatusError, read_cancellation_status
 from sb.delegations import DelegationRejected, create_read_fence
-from sb.effect_values import canonical_bytes, format_instant
+from sb.effect_values import JsonValue, canonical_bytes, format_instant
 from sb.effect_write_values import model_object
 from tests.test_cancellation_result import intent_for, issue
 from tests.test_correction_cancellation import CURRENT
@@ -19,7 +20,18 @@ from tests.test_request_executor import NOW
 OBSERVED = NOW + timedelta(hours=2)
 
 
-def arguments(executor, identity):
+class _StatusArgs(TypedDict):
+    journal_path: Path
+    intent_id: str
+    intent_digest: str
+    provider_instance_id: str
+    now: datetime
+    read_fence: JsonValue
+    reader_keys: dict[str, Ed25519PublicKey]
+    provider_keys: dict[str, Ed25519PublicKey]
+
+
+def arguments(executor, identity) -> _StatusArgs:
     intent = intent_for(executor, identity)
     seq, root = executor.store.tombstone_high_water()
     fence = create_read_fence(provider_instance_id=executor.config.provider_instance_id,

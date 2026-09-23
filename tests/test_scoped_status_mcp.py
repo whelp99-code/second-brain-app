@@ -13,6 +13,7 @@ from mcp.client import Client
 from sb.access_claims import access_request_digest
 from sb.config import Config
 from sb.delegations import create_read_fence
+from sb.effect_values import is_json_object
 from sb.effect_write_values import GENESIS_TOMBSTONE_ROOT, model_object
 from sb.mcp import build_server
 from sb.request_executor import RequestExecutor
@@ -84,11 +85,18 @@ def test_journal_status_rejects_wrong_or_changed_authority(tmp_path, monkeypatch
     if change in ("project", "session"):
         args["access_claim"] = signed({**args["access_claim"], **({"projects": ["project:other"]} if change == "project" else {"session_id": "session:other"})})
     if change == "request":
-        args["request"]["preparation"]["payload"]["content"] = "substitution"
+        request = args["request"]
+        assert is_json_object(request)
+        preparation = request["preparation"]
+        assert is_json_object(preparation)
+        payload = preparation["payload"]
+        assert is_json_object(payload)
+        payload["content"] = "substitution"
     original = module.read_scoped_request_status
     def mutate(*pos, **kw):
         result = original(*pos, **kw)
         if change == "revoked_during":
+            assert isinstance(config.raw, dict)
             config.raw["revoked_jarvis_signing_key_ids"] = ["key:test"]
         if change == "expiry_during":
             class Expired(Clock):
@@ -144,6 +152,7 @@ def test_real_stdio_restart_recovers_pending_with_frozen_contract(tmp_path, monk
 def test_absent_journal_is_unavailable_without_creating_storage(tmp_path, monkeypatch):
     config, args = material(tmp_path, monkeypatch)
     missing = tmp_path / "missing"
+    assert isinstance(config.raw, dict)
     config.raw["request_root"] = str(missing)
     async def run():
         async with Client(build_server(config=config), mode="legacy", cache=None) as client:
@@ -154,6 +163,7 @@ def test_absent_journal_is_unavailable_without_creating_storage(tmp_path, monkey
 
 def test_not_found_in_existing_journal_has_no_acceptance_or_mutation(tmp_path, monkeypatch):
     config, args = material(tmp_path, monkeypatch)
+    assert isinstance(config.raw, dict)
     config.raw["request_root"] = str(tmp_path / "empty-journal")
     store = RequestStore(Path(config.request_root), maintenance_only=True)
     try:

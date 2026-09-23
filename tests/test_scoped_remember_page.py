@@ -99,9 +99,12 @@ def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path):
             for candidate, scope in zip(candidates, scopes, strict=True):
                 rows = search_scoped_records(generation.root, identity, scope, 'SharedLineage', 10)
                 assert len(rows) == 1
+                assert isinstance(rows[0], dict)
                 record = rows[0]['record']
+                assert isinstance(record, dict)
                 expected = hashlib.sha256(f'memory-candidate:{candidate}'.encode()).hexdigest()
                 assert record['source_identity_full'] == expected
+                assert isinstance(rows[0]['page_id'], str)
                 page = classified_page(generation.root, rows[0]['page_id'], identity)
                 assert page.requirements == (scope,)
                 assert len(page.source_refs) == 1

@@ -16,7 +16,7 @@ def server(tmp_path, mode="valid"):
     cert, key = certificate(tmp_path)
     calls = []
     class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *_args):
+        def log_message(self, format: str, *args: object) -> None:
             pass
 
         def do_POST(self):

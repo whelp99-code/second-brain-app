@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import is_json_object
 from sb.scoped_provider_process import ScopedProviderChannelError, ScopedProviderProcess
 
 
@@ -20,12 +21,16 @@ print(json.dumps({'request':request,'pid':os.getpid()},sort_keys=True,separators
 ''')
     first = verify(b'{"request":1}')
     second = verify(b'{"request":2}')
+    assert isinstance(first, dict) and is_json_object(first)
+    assert isinstance(second, dict) and is_json_object(second)
     assert first["request"] == {"request": 1}
     assert second["request"] == {"request": 2}
     assert first["pid"] != second["pid"]
     for result in [first, second]:
+        pid = result["pid"]
+        assert isinstance(pid, int)
         with pytest.raises(ProcessLookupError):
-            os.kill(result["pid"], 0)
+            os.kill(pid, 0)
 
 
 @pytest.mark.parametrize("script,code", [

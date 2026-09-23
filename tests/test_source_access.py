@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sb.config import Config
+from sb.config import Config, TomlValue
 from sb.pipeline import run_ingest
 from sb.source_access import SourceAccess
 from sb.store import SourceItem
@@ -45,7 +45,7 @@ def test_real_ingest_uses_config_not_source_frontmatter_and_rejects_reclassifica
     source = tmp_path / "source"
     source.mkdir()
     (source / "notes.md").write_text("---\nproject: project:beta\nowner: principal:other\n---\nAlpha 기억\n")
-    raw = {"vault_root": str(tmp_path / "vault"), "state_root": str(tmp_path / "state"),
+    raw: dict[str, TomlValue] = {"vault_root": str(tmp_path / "vault"), "state_root": str(tmp_path / "state"),
         "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(source)}],
         "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:alpha"], "policy_revision": "policy:1"}}}
     result = run_ingest(Config(raw=raw), ["docs"])
@@ -55,7 +55,8 @@ def test_real_ingest_uses_config_not_source_frontmatter_and_rejects_reclassifica
         assert len(items) == 1
         assert ledger.source_access_for(items[0]) == ACCESS
     assert run_ingest(Config(raw=raw), ["docs"]).exit_code == 0
-    changed = {**raw, "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:beta"], "policy_revision": "policy:2"}}}
+    changed_access: dict[str, TomlValue] = {"owner": "principal:owner", "projects": ["project:beta"], "policy_revision": "policy:2"}
+    changed: dict[str, TomlValue] = {**raw, "source_access": {"docs": changed_access}}
     denied = run_ingest(Config(raw=changed), ["docs"])
     assert denied.exit_code != 0
     assert denied.failure == "SOURCE_ACCESS_RECLASSIFICATION_REQUIRED"

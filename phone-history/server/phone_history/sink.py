@@ -19,6 +19,8 @@ class SinkError(Exception):
 class EventSink(Protocol):
     def export(self, event: EventRecord) -> str: ...
 
+    def retract(self, upload_id: str) -> str: ...
+
 
 @dataclass(frozen=True, slots=True)
 class DisabledSink:
@@ -26,6 +28,10 @@ class DisabledSink:
 
     def export(self, event: EventRecord) -> str:
         del event
+        raise SinkError(self.reason)
+
+    def retract(self, upload_id: str) -> str:
+        del upload_id
         raise SinkError(self.reason)
 
 
@@ -59,7 +65,38 @@ class SecondBrainSink:
             )
         except Exception as exc:
             raise SinkError(type(exc).__name__) from exc
-        return receipt.inbox_path.as_posix()
+        return json.dumps(
+            {
+                "content_sha256": receipt.content_sha256,
+                "inbox_path": receipt.inbox_path.as_posix(),
+                "upload_id": receipt.upload_id,
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+
+    def retract(self, upload_id: str) -> str:
+        try:
+            from sb.search import SearchIndex
+            from sb.uploads import UploadRejected, retract_upload
+        except ImportError as exc:
+            raise SinkError("second_brain_runtime_unavailable") from exc
+        try:
+            receipt = retract_upload(self.vault_root, upload_id)
+        except UploadRejected as exc:
+            reason = str(exc)
+            if "not found" in reason.lower() or "unreadable" in reason.lower():
+                raise SinkError("not_found") from exc
+            raise SinkError(type(exc).__name__) from exc
+        except (OSError, TimeoutError, ConnectionError) as exc:
+            raise SinkError(type(exc).__name__) from exc
+        except Exception as exc:
+            raise SinkError(type(exc).__name__) from exc
+        if not receipt.deleted:
+            raise SinkError("retract_receipt_pending")
+        if receipt.content_sha256:
+            SearchIndex(self.vault_root).drop_content(receipt.content_sha256)
+        return json.dumps(receipt.as_dict(), separators=(",", ":"), sort_keys=True)
 
 
 def render_second_brain_document(event: EventRecord) -> str:

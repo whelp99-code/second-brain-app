@@ -28,31 +28,37 @@ def main() -> int:
     payload = sys.stdin.buffer.read(64 * 1024 * 1024 + 1)
     if len(payload) > 64 * 1024 * 1024:
         return 2
-    handle = tempfile.NamedTemporaryFile(prefix="sb-docling-", suffix=suffix, delete=False)
-    path = handle.name
-    try:
-        handle.write(payload)
-        handle.close()
-        converted = DocumentConverter().convert(path)
-        body = converted.document.export_to_markdown()
-        parser_version = f"docling:{version('docling')}"
-    except (OSError, RuntimeError, TypeError, ValueError, PackageNotFoundError):
-        return 2
-    finally:
+    with tempfile.NamedTemporaryFile(prefix="sb-docling-", suffix=suffix, delete=False) as handle:
+        path = handle.name
         try:
-            import os
-            os.unlink(path)
-        except OSError:
-            pass
+            handle.write(payload)
+            handle.close()
+            converted = DocumentConverter().convert(path)
+            body = converted.document.export_to_markdown()
+            parser_version = f"docling:{version('docling')}"
+        except (OSError, RuntimeError, TypeError, ValueError, PackageNotFoundError):
+            return 2
+        finally:
+            try:
+                import os
+
+                os.unlink(path)
+            except OSError:
+                pass
     if not body.strip():
         return 2
-    json.dump({
-        "body": body,
-        "locator": {"kind": "document", "ordinal": 1},
-        "parser_version": parser_version,
-        "model_version": "docling-default",
-        "partial": False,
-    }, sys.stdout, ensure_ascii=False, separators=(",", ":"))
+    json.dump(
+        {
+            "body": body,
+            "locator": {"kind": "document", "ordinal": 1},
+            "parser_version": parser_version,
+            "model_version": "docling-default",
+            "partial": False,
+        },
+        sys.stdout,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     return 0
 
 

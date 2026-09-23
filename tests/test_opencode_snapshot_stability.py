@@ -30,7 +30,9 @@ def test_changed_snapshot_during_read_is_retried_without_partial_publication(tmp
 
     monkeypatch.setattr(adapter, '_read_snapshot', changed)
     rows = list(adapter.scan(None))
-    assert len(rows) == 1 and rows[0][2]['skip_reason'] == 'unstable-session-file'
+    assert len(rows) == 1
+    metadata = dict(rows[0][2])
+    assert metadata['skip_reason'] == 'unstable-session-file'
     assert rows[0][1] == b''
     cursor = adapter.next_cursor()
     assert json.loads(cursor)['snapshot.json'] == 0

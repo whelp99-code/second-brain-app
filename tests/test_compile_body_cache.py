@@ -4,10 +4,27 @@ import gc
 import weakref
 
 import sb.compile as compiler
+from sb.store import Derivation, DerivationOutput
 
 
 class LedgerIdentity:
-    pass
+    def get_derivation(self, key: str) -> Derivation | None:
+        return None
+
+    def ensure_derivation(self, key: str, stage: str, run_id: str) -> None:
+        pass
+
+    def mark_running(self, key: str, run_id: str) -> None:
+        pass
+
+    def mark_done(self, key: str, output: DerivationOutput) -> None:
+        pass
+
+    def mark_failed(self, key: str, error: str) -> None:
+        pass
+
+    def requeue_failed(self, key: str) -> bool:
+        return False
 
 
 def test_reused_identity_does_not_return_another_ledgers_body(monkeypatch):

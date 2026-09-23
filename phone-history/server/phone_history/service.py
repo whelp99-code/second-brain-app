@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Final, Literal, cast
 
 from phone_history.config import Settings
-from phone_history.errors import ValidationError
+from phone_history.errors import NotFoundError, ValidationError
 from phone_history.models import EventBatch, PhoneEvent
 from phone_history.redaction import redact_fields
 from phone_history.repository import CandidateState, EventRecord, Repository
-from phone_history.sink import DisabledSink, EventSink, SecondBrainSink
+from phone_history.sink import DisabledSink, EventSink, SecondBrainSink, SinkError
 
 _IDEMPOTENCY_RE: Final = re.compile(r"^[A-Za-z0-9._:-]{8,200}$")
 CandidateDecision = Literal["queue_for_owner_review", "dismiss"]
@@ -112,6 +113,17 @@ class PhoneHistoryService:
         exported = 0
         pending = 0
         for record in self.repository.pending_events(limit=limit):
+            upload_id = _upload_id(record.sink_ref)
+            if upload_id is not None:
+                try:
+                    self.sink.retract(upload_id)
+                except (SinkError, OSError, TimeoutError, ConnectionError) as exc:
+                    code = str(exc) or type(exc).__name__
+                    self.repository.mark_sink_pending(record.id, code)
+                    pending += 1
+                    continue
+                self.repository.delete_event(record.id, reason="owner_requested")
+                continue
             refreshed = self._export(record)
             if refreshed.sink_state == "exported":
                 exported += 1
@@ -171,6 +183,24 @@ class PhoneHistoryService:
         return result
 
     def delete_event(self, event_id: str, *, reason: str) -> dict[str, object]:
+        try:
+            record = self.repository.get_event(event_id)
+        except NotFoundError:
+            record = None
+        upload_id = _upload_id(None if record is None else record.sink_ref)
+        if upload_id is not None:
+            try:
+                self.sink.retract(upload_id)
+            except (SinkError, OSError, TimeoutError, ConnectionError) as exc:
+                code = str(exc) or type(exc).__name__
+                if record is not None:
+                    self.repository.mark_sink_pending(record.id, code)
+                return {
+                    "state": "pending",
+                    "event_digest": None,
+                    "canonical_effect": "none",
+                    "second_brain_retract": code,
+                }
         result = self.repository.delete_event(event_id, reason=reason)
         return {**result.as_dict(), "canonical_effect": "none"}
 
@@ -232,3 +262,18 @@ class PhoneHistoryService:
             "approval_status": "UNREVIEWED",
             "canonical": False,
         }
+
+
+def _upload_id(sink_ref: str | None) -> str | None:
+    if sink_ref is None:
+        return None
+    try:
+        payload = json.loads(sink_ref)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    upload_id = payload.get("upload_id")
+    if isinstance(upload_id, str) and upload_id:
+        return upload_id
+    return None

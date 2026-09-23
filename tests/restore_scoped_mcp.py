@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from mcp.client import Client
 
 from sb.access_claims import access_request_digest
-from sb.config import Config
+from sb.config import Config, TomlValue
 from sb.delegations import create_read_fence
 from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_values import model_object
@@ -33,15 +33,19 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
     now = fixture.request.now
     executor.generations.activate(generation, executor.generations.active(), now)
     root = executor.config.state_root.parent
-    config = Config(raw={
+    jarvis_public_keys = {
+        'key:test': base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b'=').decode()
+    }
+    config_raw: dict[str, TomlValue] = {
         'vault_root': str(executor.config.share_root / 'vault'),
         'share_root': str(executor.config.share_root), 'state_root': str(executor.config.state_root),
         'request_root': str(executor.config.request_root), 'knowledge_registry': str(root / 'absent-registry.sqlite'),
         'provider_instance_id': executor.config.provider_instance_id,
-        'jarvis_public_keys': {'key:test': base64.urlsafe_b64encode(KEY.public_key().public_bytes_raw()).rstrip(b'=').decode()},
+        'jarvis_public_keys': jarvis_public_keys,
         'mcp_scoped_read': {'principal': 'principal:owner', 'agent': 'agent:test',
                             'session': 'session:test', 'policy_revision': 'policy:1'},
-    })
+    }
+    config = Config(raw=config_raw)
     class FrozenDate(datetime):
         @classmethod
         def now(cls, tz=None):
@@ -74,12 +78,12 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
                 denied = await client.call_tool('sb_read_page', {**args, 'access_claim': signed({**claim, **changes})})
                 assert denied.is_error
                 assert keep not in str(denied)
-            config.raw['revoked_jarvis_signing_key_ids'] = ['key:test']
+            config_raw['revoked_jarvis_signing_key_ids'] = ['key:test']
             revoked = await client.call_tool('sb_read_page', args)
             assert revoked.is_error
             assert keep not in str(revoked)
     anyio.run(run)
-    config.raw.pop('revoked_jarvis_signing_key_ids')
+    config_raw.pop('revoked_jarvis_signing_key_ids')
     path = root / 'restore-stdio-config.json'
     path.write_text(json.dumps({'config': config.raw, 'now': now.isoformat()}))
 
@@ -93,7 +97,7 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
         assert b'MEMORY_SCOPED_CONFIG_INVALID' in result.stderr
         assert keep.encode() not in result.stdout + result.stderr
     encoded_next = base64.urlsafe_b64encode(NEXT.public_key().public_bytes_raw()).rstrip(b'=').decode()
-    config.raw['jarvis_public_keys']['key:next'] = encoded_next
+    jarvis_public_keys['key:next'] = encoded_next
     fence_next = create_read_fence(provider_instance_id=executor.config.provider_instance_id,
         purpose='memory_read', operation='read', sequence=sequence, set_root=set_root,
         issued_at=format_instant(now), not_before=format_instant(now),
