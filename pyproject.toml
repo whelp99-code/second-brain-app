@@ -33,6 +33,7 @@ dev = [
 
 [project.scripts]
 sb = "sb.cli:main"
+sb-company = "sb.company_memory_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.17,<0.13.0"]
