@@ -28,7 +28,7 @@ _REASONS = {
     "readable": "VAULT_UNREADABLE", "initialized": "VAULT_UNINITIALIZED",
     "ledger_schema": "LEDGER_SCHEMA_INVALID", "generation_index": "GENERATION_INDEX_INVALID",
     "last_run_success": "LAST_RUN_UNSUCCESSFUL", "last_run_recent": "LAST_RUN_STALE_OR_INVALID",
-    "derivations_healthy": "DERIVATIONS_FAILED", "recent_backup": "VERIFIED_BACKUP_UNAVAILABLE",
+    "derivations_healthy": "DERIVATIONS_FAILED", "derivations_held": "DERIVATIONS_HELD", "recent_backup": "VERIFIED_BACKUP_UNAVAILABLE",
     "request_journal": "REQUEST_JOURNAL_UNREADABLE", "request_times": "REQUEST_TIME_INVALID",
     "requests_progressing": "REQUESTS_STALLED", "requests_healthy": "RECENT_REQUEST_FAILURES",
     "generation_journal": "GENERATION_JOURNAL_UNREADABLE", "generation_cleanup": "GENERATION_CLEANUP_STALLED",
@@ -65,7 +65,7 @@ def readiness(config: Config, *, now: datetime | None = None) -> dict[str, objec
         if checks.get("request_journal") is False or checks.get("generation_journal") is False:
             raise ValueError("control journal unavailable")
         with read_root(config) as root:
-            flags, summary = ledger_checks(root, at, policy)
+            flags, summary = ledger_checks(root, at, policy, config.caps["max_derivation_attempts"])
             checks.update(flags)
             details.update(summary)
             if (root / "generation.json").is_file():

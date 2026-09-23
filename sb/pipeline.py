@@ -517,14 +517,14 @@ def _fail_pending(
             ledger.mark_failed(key, error)
 
 
-def _reopen_failed(ledger: Ledger, key: str) -> None:
+def _reopen_failed(ledger: Ledger, key: str, max_attempts: int) -> bool:
     """Return a failed or superseded brief key to pending so mark_running can run."""
     row = ledger.get_derivation(key)
     if row is None or row.status not in {
         DerivStatus.FAILED.value, DerivStatus.SUPERSEDED.value,
     }:
-        return
-    _ = ledger.requeue_failed(key)
+        return True
+    return ledger.requeue_failed(key, max_attempts=max_attempts)
 
 
 def _append_run_log(root: Path, line: str) -> None:
@@ -1013,6 +1013,12 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
 
             explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
             SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+        held = any(
+            row.attempts >= config.caps["max_derivation_attempts"]
+            for stage_name in ("compile", "conflict")
+            for status in (DerivStatus.FAILED.value, DerivStatus.PENDING.value)
+            for row in ledger.list_derivations(status=status, stage=stage_name)
+        )
         return StageReport(
             tuple(page for page in kept if page.page_id not in committed_ids),
             sum(1 for page in kept if page.page_id.startswith("conflicts/")),
@@ -1022,6 +1028,7 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
             written=len(committed_pages),
             derivations=tuple(derivations),
             compiled_by=(config.llm.prompt_version, config.llm.model_id),
+            failure="DERIVATIONS_HELD" if held else None,
         )
 
     return stage
@@ -1040,10 +1047,12 @@ def _brief_stage(config: Config, generator: BriefGenerator | None, llm_mode: str
         existing = ledger.get_derivation(key)
         if existing is not None and existing.status == DerivStatus.DONE.value:
             return StageReport((), 0, 0, 0, False)
-        if existing is not None and existing.status in {
+        if (existing is not None and existing.status in {
             DerivStatus.FAILED.value, DerivStatus.SUPERSEDED.value,
-        }:
-            _reopen_failed(ledger, key)
+        } and not _reopen_failed(ledger, key, config.caps["max_derivation_attempts"])):
+            return StageReport((), 0, 1, 1, False, failure="DERIVATIONS_HELD")
+        if existing is not None and existing.status == DerivStatus.PENDING.value and existing.attempts >= config.caps["max_derivation_attempts"]:
+            return StageReport((), 0, 1, 1, False, failure="DERIVATIONS_HELD")
         ledger.ensure_derivation(key, "brief", run_id)
         try:
             ledger.mark_running(key, run_id)

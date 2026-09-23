@@ -32,7 +32,7 @@ __all__ = (
     "lexical_top",
 )
 
-_INPUT_PROFILE: Final = "conflict-inputs-v4"
+_INPUT_PROFILE: Final = "conflict-inputs-v5"
 CONTRADICTION_FLOOR: Final = 0.8
 SUPERSEDE_FLOOR: Final = 0.9
 SECTIONS: Final = ("주장A", "주장B", "판정", "status")
@@ -66,6 +66,10 @@ class ConflictFinding:
     failure: str | None = None
 
 
+class DuplicateJudgmentKey(ValueError):
+    """The model emitted the same JSON object field twice."""
+
+
 def check(
     units: Sequence[Unit], pages: Sequence[PageSpec], ledger: Ledger, llm: LLMClient, config: Config,
     *, finalize: bool = True, on_capped: Callable[[], None] | None = None,
@@ -94,10 +98,20 @@ def check(
     for pair in matches:
         # Stable page IDs survive edits; bind cached judgments to the actual
         # text, temporal routing inputs, and citation provenance as well.
+        source_ids = {cite.origin.partition(":")[0] for item_id in (pair.left_id, pair.unit_id)
+                      for cite in evidence.get(item_id, ())}
+        raw_sources = config.raw.get("sources", [])
+        policies = sorted(
+            (str(row.get("id")), str(row.get("llm_policy")), str(row.get("sensitive")))
+            for row in raw_sources if isinstance(row, Mapping) and row.get("id") in source_ids
+        ) if isinstance(raw_sources, list) else []
         input_digest = hashlib.sha256(json.dumps(
-            [[item_id, texts.get(item_id, ""), stamps.get(item_id),
-              [asdict(cite) for cite in evidence.get(item_id, ())]]
-             for item_id in (pair.left_id, pair.unit_id)],
+            [policies,
+             [[item_id, texts.get(item_id, ""), stamps.get(item_id),
+              [asdict(cite) for cite in evidence.get(item_id, ())],
+              [source_llm_policy(config, cite.origin.partition(":")[0] or "unknown")
+               for cite in evidence.get(item_id, ())]]
+              for item_id in (pair.left_id, pair.unit_id)]],
             ensure_ascii=False, sort_keys=True, separators=(",", ":"),
         ).encode()).hexdigest()
         key = deriv_key((_INPUT_PROFILE, pair.left_id, pair.unit_id, input_digest),
@@ -110,8 +124,14 @@ def check(
                 on_capped()
             continue
         else:
+            if (row is not None and row.status in {DerivStatus.FAILED.value, DerivStatus.PENDING.value}
+                    and row.attempts >= config.caps["max_derivation_attempts"]):
+                findings.append(replace(_open(pair), failure="DERIVATIONS_HELD"))
+                continue
             if row is not None and row.status == DerivStatus.FAILED.value:
-                _ = ledger.requeue_failed(key)
+                if not ledger.requeue_failed(key, max_attempts=config.caps["max_derivation_attempts"]):
+                    findings.append(replace(_open(pair), failure="DERIVATIONS_HELD"))
+                    continue
             elif row is not None and row.status != DerivStatus.PENDING.value:
                 continue
             findings.append(
@@ -225,14 +245,19 @@ def _judge(
     ledger.mark_running(key, "conflict")
     try:
         raw = llm.generate(prompt, json_mode=True)
-    except (LLMUnavailable, LLMBadJson) as exc:
-        ledger.mark_failed(key, str(exc))
-        return replace(_open(pair), failure=str(exc))
-    else:
-        out = _parse(raw, pair, texts, stamps, evidence)
-    if out.warning is True and out.route == "unrelated" and out.verdict.confidence == 0.0:
-        ledger.mark_failed(key, "invalid conflict verdict")
-        return replace(out, failure="invalid conflict verdict")
+    except LLMBadJson as exc:
+        code = "CONFLICT_JSON_INVALID"
+        diagnostic = f"{code} hash={hashlib.sha256(exc.raw.encode()).hexdigest()} length={len(exc.raw)}"
+        ledger.mark_failed(key, diagnostic)
+        return replace(_open(pair), failure=code)
+    except LLMUnavailable as exc:
+        code = "CONFLICT_TIMEOUT" if exc.reason.startswith("timeout after ") else "CONFLICT_PROVIDER_FAILED"
+        ledger.mark_failed(key, f"{code} hash={hashlib.sha256(b'').hexdigest()} length=0")
+        return replace(_open(pair), failure=code)
+    out = _parse(raw, pair, texts, stamps, evidence)
+    if out.failure is not None:
+        ledger.mark_failed(key, f"{out.failure} hash={hashlib.sha256(raw.encode()).hexdigest()} length={len(raw)}")
+        return out
     payload = _dump(out)
     output = DerivationOutput(hashlib.sha256(payload.encode()).hexdigest(), payload)
     if finalize:
@@ -245,7 +270,7 @@ def _unique_fields(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
-            raise ValueError("duplicate conflict field")
+            raise DuplicateJudgmentKey
         result[key] = value
     return result
 
@@ -259,25 +284,31 @@ def _parse(
 ) -> ConflictFinding:
     try:
         decoded = cast(object, json.loads(raw, object_pairs_hook=_unique_fields))
-        if not isinstance(decoded, dict):
-            return _open(pair)
-        value = cast(dict[str, object], decoded)
-        relation, rationale, score = value.get("relation"), value.get("rationale"), value.get("confidence")
-        raw_cites = value.get("cites", [])
-        if (not isinstance(relation, str) or not isinstance(rationale, str)
-                or not isinstance(score, (int, float)) or isinstance(score, bool)
-                or not math.isfinite(score) or not 0 <= score <= 1
-                or not isinstance(raw_cites, list)):
-            return _open(pair)
-        rows = cast(list[object], raw_cites)
-        if any(not isinstance(item, str) for item in rows):
-            return _open(pair)
-        cites = tuple(cast(list[str], rows))
-        if any(cite not in {pair.left_id, pair.unit_id} for cite in cites):
-            return _open(pair)
-        verdict = ConflictVerdict(relation=relation, confidence=float(score), rationale=rationale)
+    except DuplicateJudgmentKey:
+        return replace(_open(pair), failure="CONFLICT_DUPLICATE_KEY")
     except (ValueError, OverflowError):
-        return _open(pair)
+        return replace(_open(pair), failure="CONFLICT_JSON_INVALID")
+    if not isinstance(decoded, dict):
+        return replace(_open(pair), failure="CONFLICT_JSON_INVALID")
+    value = cast(dict[str, object], decoded)
+    relation, rationale, score = value.get("relation"), value.get("rationale"), value.get("confidence")
+    raw_cites = value.get("cites", [])
+    if not isinstance(relation, str) or relation not in {"unrelated", "supports", "contradicts", "supersedes"}:
+        return replace(_open(pair), failure="CONFLICT_ENUM_INVALID")
+    if (not isinstance(score, (int, float)) or isinstance(score, bool)
+            or not math.isfinite(score) or not 0 <= score <= 1):
+        return replace(_open(pair), failure="CONFLICT_CONFIDENCE_INVALID")
+    if not isinstance(rationale, str):
+        return replace(_open(pair), failure="CONFLICT_JSON_INVALID")
+    if not isinstance(raw_cites, list):
+        return replace(_open(pair), failure="CONFLICT_CITATION_INVALID")
+    rows = cast(list[object], raw_cites)
+    if any(not isinstance(item, str) for item in rows):
+        return replace(_open(pair), failure="CONFLICT_CITATION_INVALID")
+    cites = tuple(cast(list[str], rows))
+    if any(cite not in {pair.left_id, pair.unit_id} for cite in cites):
+        return replace(_open(pair), failure="CONFLICT_CITATION_INVALID")
+    verdict = ConflictVerdict(relation=relation, confidence=float(score), rationale=rationale)
     filled = cites or (pair.left_id, pair.unit_id)
     soft = {"unrelated": "unrelated", "supports": "note"}.get(relation)
     if soft is not None:

@@ -322,6 +322,21 @@ class _FailingLLM:
         raise LLMUnavailable(1, "fixture-unavailable")
 
 
+def test_failed_compile_holds_at_derivation_budget(tmp_path: Path) -> None:
+    """Given failed compilation, when retried at cap, then no model call is made."""
+    unit = _unit("u1", HASH_A, "0-1", "one", ORIGIN_ONE)
+    llm = _FailingLLM()
+    config = Config(raw={"caps": {"max_derivation_attempts": 1},
+                         "llm": {"prompt_version": "v1", "model_id": "fake"}})
+    with Ledger(tmp_path) as ledger:
+        _ = compile_pending([unit], ledger, llm, config, on_error=lambda exc: None)
+        pending, held = compile_pending([unit], ledger, llm, config, on_error=lambda exc: None)
+        assert pending == [] and held
+        assert llm.calls == 1
+        row = next(iter(ledger.list_derivations(status="failed", stage="compile")))
+        assert row.attempts == 1
+
+
 def test_failed_llm_calls_count_toward_compile_cap(tmp_path: Path) -> None:
     units = [
         _unit("u1", HASH_A, "0-1", "one", ORIGIN_ONE),

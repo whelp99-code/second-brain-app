@@ -332,6 +332,101 @@ def test_invalid_verdict_never_creates_conflict(ledger, config, unit, raw):
     assert all(item.page is None and item.failure for item in found)
 
 
+def test_invalid_judgment_holds_at_stage_budget_until_explicit_retry(
+    ledger: Ledger, unit: Unit, tmp_path: Path
+) -> None:
+    """Given unchanged input, when retries exhaust, then the key stays held until retry."""
+    from sb.readiness import readiness
+
+    config = Config(raw={"vault_root": str(tmp_path), "caps": {"max_derivation_attempts": 2},
+                         "llm": {"prompt_version": "v1", "model_id": "fake"}})
+    units = [unit, _unit("c1", TEXT_DYNAMIC)]
+    bad = RecordingLLM(_verdict("invented", 0.8, "untrusted", []))
+    first = check(units, EMPTY_PAGES, ledger, bad, config)
+    key = first[0].deriv_key
+    assert key is None  # failures do not expose pending output
+    rows = list(ledger.list_derivations(status="failed", stage="conflict"))
+    assert len(rows) == 1
+    key = rows[0].deriv_key
+    _ = check(units, EMPTY_PAGES, ledger, bad, config)
+    current = ledger.get_derivation(key)
+    assert current is not None and current.attempts == 2
+    _ = check(units, EMPTY_PAGES, ledger, bad, config)
+    assert bad.calls == 2
+    current = ledger.get_derivation(key)
+    assert current is not None and current.status == "failed"
+    reasons = readiness(config)["reasons"]
+    assert isinstance(reasons, list) and "DERIVATIONS_HELD" in reasons
+    assert ledger.requeue_failed(key, reset_attempts=True)
+    good = RecordingLLM(_verdict("supports", 0.8, "valid", []))
+    found = check(units, EMPTY_PAGES, ledger, good, config)
+    assert good.calls == 1
+    assert found[0].route == "note"
+    current = ledger.get_derivation(key)
+    assert current is not None and current.status == "done"
+
+
+def test_policy_and_model_changes_open_new_judgment_key(
+    ledger: Ledger, unit: Unit
+) -> None:
+    """Given a held comparison, when its policy or model changes, then a new key runs."""
+    units = [unit, _unit("c1", TEXT_DYNAMIC)]
+    llm = RecordingLLM(_verdict("invented", 0.8, "x", []))
+    configs = [
+        Config(raw={"caps": {"max_derivation_attempts": 1}, "llm": {"model_id": model},
+                    "sources": [{"id": "me-wiki", "llm_policy": policy}]})
+        for model, policy in (("fake", "allow"), ("fake", "local-only"), ("test", "local-only"))
+    ]
+    for config in configs:
+        found = check(units, EMPTY_PAGES, ledger, llm, config)
+        assert found[0].failure == "CONFLICT_ENUM_INVALID"
+    assert llm.calls == 3
+    assert len(list(ledger.list_derivations(status="failed", stage="conflict"))) == 3
+
+
+@pytest.mark.parametrize(("raw", "code"), [
+    ('{broken', 'CONFLICT_JSON_INVALID'),
+    ('{"relation":"supports","relation":"unrelated","confidence":0.8,"rationale":"x"}',
+     'CONFLICT_DUPLICATE_KEY'),
+    (_verdict('invented', 0.8, 'x', []), 'CONFLICT_ENUM_INVALID'),
+    ('{"relation":"supports","confidence":NaN,"rationale":"x"}',
+     'CONFLICT_CONFIDENCE_INVALID'),
+    (_verdict('supports', 0.8, 'x', ['invented']), 'CONFLICT_CITATION_INVALID'),
+])
+def test_invalid_verdict_has_specific_code_without_raw_text(
+    ledger: Ledger, config: Config, unit: Unit, raw: str, code: str
+) -> None:
+    """Given untrusted verdict bytes, when judged, then only a coded digest survives."""
+    found = check([unit, _unit('c1', TEXT_DYNAMIC)], EMPTY_PAGES,
+                  ledger, RecordingLLM(raw), config)
+    assert found[0].failure == code
+    row = next(iter(ledger.list_derivations(status='failed', stage='conflict')))
+    assert row.error is not None and row.error.startswith(code + ' hash=')
+    assert f'length={len(raw)}' in row.error
+    assert raw not in row.error
+
+
+@pytest.mark.parametrize(("reason", "code"), [
+    ("timeout after 120s", "CONFLICT_TIMEOUT"),
+    ("provider unavailable: untrusted payload", "CONFLICT_PROVIDER_FAILED"),
+])
+def test_provider_failure_uses_only_safe_code(
+    ledger: Ledger, config: Config, unit: Unit, reason: str, code: str
+) -> None:
+    """Given a provider exception, when judged, then its raw reason is not persisted."""
+    from sb.llm import LLMUnavailable
+
+    class FailingModel:
+        def generate(self, prompt: str, **kwargs: object) -> str:
+            raise LLMUnavailable(1, reason)
+
+    found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, FailingModel(), config)
+    assert found[0].failure == code
+    row = next(iter(ledger.list_derivations(status="failed", stage="conflict")))
+    assert row.error is not None and row.error.startswith(code + " hash=")
+    assert reason not in row.error
+
+
 def test_json_whitespace_exponent_and_escaped_rationale(ledger, config, unit):
     raw = '{"relation" : "contradicts", "confidence" : 1e-1, "rationale" : "line\\nnext"}'
     found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, RecordingLLM(raw), config)

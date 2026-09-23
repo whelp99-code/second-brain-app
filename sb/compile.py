@@ -37,7 +37,7 @@ class CompileLedger(Protocol):
 
     def mark_failed(self, key: str, error: str) -> None: ...
 
-    def requeue_failed(self, key: str) -> bool: ...
+    def requeue_failed(self, key: str, *, max_attempts: int | None = None) -> bool: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,7 +147,12 @@ def compile_pending(
     remaining = False
     for page_id, grouped in _group_by_page(units):
         key = compile_page_key(page_id, [unit.unit_id for unit in grouped], prompt_version, model_id)
-        if not _prepare_compile(ledger, key):
+        row = ledger.get_derivation(key)
+        if (row is not None and row.status in {DerivStatus.FAILED.value, DerivStatus.PENDING.value}
+                and row.attempts >= config.caps["max_derivation_attempts"]):
+            remaining = True
+            continue
+        if not _prepare_compile(ledger, key, config.caps["max_derivation_attempts"]):
             continue
         policies = {
             source_llm_policy(config, unit.origin.partition(":")[0] or "unknown")
@@ -268,11 +273,10 @@ def compile_page_key(page_id: str, unit_ids: Sequence[str], prompt_version: str,
     return deriv_key(["compile-page-v1:" + page_id, *unit_ids], COMPILE_STAGE, prompt_version, model_id)
 
 
-def _prepare_compile(ledger: CompileLedger, key: str) -> bool:
+def _prepare_compile(ledger: CompileLedger, key: str, max_attempts: int) -> bool:
     row = ledger.get_derivation(key)
     if row is not None and row.status == DerivStatus.FAILED.value:
-        _ = ledger.requeue_failed(key)
-        return True
+        return ledger.requeue_failed(key, max_attempts=max_attempts)
     return row is None or row.status == DerivStatus.PENDING.value
 
 

@@ -7,7 +7,7 @@ import re
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Final, Protocol, override
+from typing import Final, Protocol, cast, override
 
 ATTEMPT_LIMIT: Final = 2
 _WS: Final = frozenset(" \t\n\r")
@@ -209,11 +209,35 @@ def _parse_array(text: str, index: int) -> tuple[list[JsonValue], int] | None:
 def _extract_first_json_object(text: str) -> str:
     start = text.find("{")
     while start != -1:
-        parsed = _parse_object(text, start)
-        if parsed is not None:
-            return json.dumps(parsed[0], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        try:
+            parsed, end = cast(tuple[JsonValue, int], json.JSONDecoder().raw_decode(text, start))
+        except json.JSONDecodeError:
+            start = text.find("{", start + 1)
+            continue
+        if isinstance(parsed, dict):
+            raw = text[start:end]
+            try:
+                value = cast(JsonValue, json.loads(raw, object_pairs_hook=_unique_json_fields,
+                                                   parse_constant=_invalid_json_constant))
+            except ValueError:
+                return raw  # Preserve invalid semantics for the conflict boundary.
+            return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         start = text.find("{", start + 1)
     raise LLMBadJson(raw=text)
+
+
+def _unique_json_fields(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    fields: dict[str, JsonValue] = {}
+    for key, value in pairs:
+        if key in fields:
+            raise ValueError("duplicate JSON key")
+        fields[key] = value
+    return fields
+
+
+def _invalid_json_constant(value: str) -> JsonValue:
+    del value
+    raise ValueError("nonfinite JSON constant")
 
 
 def _render_invocation(

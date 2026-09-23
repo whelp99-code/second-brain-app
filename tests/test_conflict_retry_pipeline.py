@@ -2,6 +2,8 @@
 import subprocess
 from pathlib import Path
 
+from pytest import MonkeyPatch
+
 from sb.config import Config
 from sb.pipeline import _CitedFake, run_compile, run_ingest
 from sb.store.ledger import Ledger
@@ -56,3 +58,45 @@ def test_conflict_retry_without_recompilation(tmp_path: Path, monkeypatch):
     assert subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD']) == head
     with Ledger(root) as ledger:
         assert list(ledger.list_derivations(stage='conflict')) == recovered
+
+
+def test_pipeline_holds_failed_conflict_without_success_log(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    """Given repeated invalid judgments, when compiled again, then no retry or success occurs."""
+    root = tmp_path / 'vault'
+    _ = init_vault(root)
+    source = tmp_path / 'source'
+    source.mkdir()
+    _ = (source / 'note.md').write_text('검증기억 충돌 비교용 사실입니다.')
+    config = Config(raw={'vault_root': str(root), 'sources': [
+        {'id': 'notes', 'adapter': 'markdown-vault', 'root': str(source)}],
+        'caps': {'max_derivation_attempts': 1},
+        'llm': {'model_id': 'test', 'prompt_version': 'v1'}})
+
+    class InvalidModel:
+        def __init__(self) -> None:
+            self.calls: int = 0
+
+        def generate(self, prompt: str, **kwargs: object) -> str:
+            self.calls += 1
+            if kwargs.get('json_mode'):
+                return '{"relation":"invented","confidence":0.8,"rationale":"x"}'
+            return '검증기억 ' + _CitedFake().generate(prompt)
+
+    model = InvalidModel()
+    def installed_model(config: Config, llm_mode: str) -> InvalidModel:
+        del config, llm_mode
+        return model
+
+    monkeypatch.setattr('sb.pipeline._llm', installed_model)
+    assert run_ingest(config, ('notes',)).exit_code == 0
+    first = run_compile(config)
+    calls = model.calls
+    second = run_compile(config)
+    assert first.status == second.status == 'failed'
+    assert second.failure == 'DERIVATIONS_HELD'
+    assert model.calls == calls
+    assert ' run ' + second.run_id + ' ok ' not in (root / '.sb' / 'runs.log').read_text()
+    with Ledger(root) as ledger:
+        row = next(iter(ledger.list_derivations(status='failed', stage='conflict')))
+        assert row.attempts == 1
+        assert ledger.requeue_failed(row.deriv_key, max_attempts=config.caps['max_derivation_attempts']) is False

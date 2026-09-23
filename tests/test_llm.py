@@ -72,6 +72,16 @@ def test_generate_reserializes_first_object_when_json_mode_and_bare() -> None:
     assert fake.generate("q", json_mode=True) == '{"a":1,"b":2}'
 
 
+@pytest.mark.parametrize("response", [
+    '{"relation":"supports","relation":"unrelated"}',
+    '{"relation":"supports","confidence":NaN}',
+])
+def test_json_mode_preserves_invalid_semantics_for_boundary(response: str) -> None:
+    """Given ambiguous model JSON, when extracted, then downstream parsing still sees it."""
+    fake = FakeLLM([response])
+    assert fake.generate("q", json_mode=True) == response
+
+
 def test_generate_raises_bad_json_when_json_mode_and_no_object() -> None:
     fake = FakeLLM(["not json at all"])
     with pytest.raises(LLMBadJson) as excinfo:
