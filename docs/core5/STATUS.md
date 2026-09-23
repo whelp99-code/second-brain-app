@@ -2,7 +2,7 @@
 
 The earlier `.git/index.lock` EROFS was Codex sandbox, not the disk. Host Git is writable. No push/merge/deploy.
 
-B01–B03 product fixes are implemented; B06 company/personal candidate flow is in `2e9f9ba` (not a live CRM/Mail/Shipping runtime integration).
+B01–B03 product fixes are implemented. B06 now has a package-owned `sb-company` composition surface in source; it is not deployed, and the CRM/Mail donor publisher remains a distinct pending integration.
 
 
 ## Unit results
@@ -11,7 +11,7 @@ B01–B03 product fixes are implemented; B06 company/personal candidate flow is 
 - B02: signed scoped read/search/page/status/write paths remain fail-closed; `sb/scoped_surfaces.py` adds export and restore claim checks with generation and deletion high-water binding.
 - B03: `sb/parsers/docling_adapter.py` and its worker isolate optional Docling; deterministic parsers remain the fallback. `parse_document()` records source hash, locator, parser/model version, and partial state.
 - B04/B05: existing Korean evaluation and memory lifecycle suites pass against the current managed search and deletion/restore fences.
-- B06: in-repo `CompanyMemoryStore` is tested. Live cross-runtime company flow (CRM/Mail/Shipping processes) is not claimed complete.
+- B06: `CompanyMemoryStore` and the separate packaged `sb-company` CLI are tested with signed workspace authority and durable receipts. Live donor publication from CRM/Mail/Shipping and deployment are not claimed complete.
 
 ## Host remasure 2026-09-22
 
@@ -34,7 +34,9 @@ rc=0; 114 passed, 6 warnings in 47.98s.
 ## B06 company/personal separation
 
 - Read-only donor inputs: CRM C04 `1b0122d` (migration 0023 and follow-up state) and Mail M03 `2ffe7aa` (`CwosWorkSystemAdapter` candidate-only boundary).
-- This repository now has `sb.company_memory.CompanyMemoryStore`: sourced mail/CWOS candidates retain source event, locator, parser version, content digest, scope, and deletion revision. `candidate -> accepted -> processed_complete` transitions are separate and idempotent; processing without acceptance is rejected.
-- Candidate reads and transitions require the current `SourceAccess` and exact deletion high-water. No CRM write, mail send, or personal-vault mutation occurs.
+- `sb.company_memory.CompanyMemoryStore` now requires a canonical workspace UUID, keeps company records and receipts in a separately configured SQLite database, and exposes explicit `candidate -> accepted -> processed_complete` or `candidate -> rejected` transitions. Invalid transitions fail closed.
+- New `sb-company` packaging metadata points to `sb.company_memory_cli:main`. Its company-only Ed25519 authority binds provider, workspace, principal, agent/session, project scope, policy, operation-specific purpose, request digest, expiry, current deletion high-water, and a trusted non-revoked key. Frozen personal profiles and the personal `sb` runtime are unchanged.
+- Every authorized operation and its idempotent receipt commit atomically. A company DB equal to or below a configured personal-data root is refused; company code does not import the vault, inbox, pipeline, personal search, web, or MCP runtime.
+- [Bounded design](COMPANY-MEMORY-PRODUCT-DESIGN.md) and [donor contract](COMPANY-MEMORY-DONOR-CONTRACT.md) define the installed boundary. Donor outbox publication/acknowledgement is pending and must not be inferred from CRM schema or Mail's read-only adapter.
+- Current increment verification: 19 focused tests passed; an isolated wheel install invoked the generated `sb-company` executable in a separate process through receive/read/accept/process and denied wrong workspace, unsigned authority, and stale deletion fence while preserving a personal marker. This is source/package evidence, not deployment evidence.
 - Personal remember/search/correct/delete remains on the existing inbox, search, correction, and deletion-fence paths and has independent regression coverage.
-- B06 focused verification: 63 passed for company/scoped/access/search/restore; 12 passed for personal remember/search/delete coverage.
