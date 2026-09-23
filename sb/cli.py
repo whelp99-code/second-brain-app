@@ -45,6 +45,7 @@ from sb.vault import Vault, VaultLintError, init_vault
 
 class Command(StrEnum):
     INIT = "init"
+    IDENTITY = "identity"
     INGEST = "ingest"
     COMPILE = "compile"
     BRIEF = "brief"
@@ -76,6 +77,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sb")
     sub = parser.add_subparsers(dest="command")
     _ = sub.add_parser(Command.INIT.value)
+    _ = sub.add_parser(Command.IDENTITY.value)
     ingest = sub.add_parser(Command.INGEST.value)
     _ = ingest.add_argument("--source")
     _ = ingest.add_argument("--limit", type=int,
@@ -613,6 +615,12 @@ def main(argv: list[str] | None = None) -> int:
     if not tokens:
         _ = parser.print_help()
         return 2
+    if tokens[0] == Command.IDENTITY.value:
+        from sb.runtime_identity import runtime_identity
+
+        result = runtime_identity(load_config())
+        print(json.dumps(result))
+        return 0 if result["status"] == "ok" else 1
     try:
         return _dispatch(Command(tokens[0]), ns)
     except (OperationError, VaultLintError, GovernanceError, SearchQueryError, ConfigValueError,

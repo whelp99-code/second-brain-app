@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -113,5 +115,13 @@ def readiness(config: Config, *, now: datetime | None = None) -> dict[str, objec
     except _ERRORS:
         details["backup_error"] = "BACKUP_DIRECTORY_UNREADABLE"
     reasons = [_REASONS[name] for name, passed in checks.items() if not passed]
+    manifest = Path(os.environ.get("SB_RELEASE_MANIFEST", str(Path(sys.prefix).parent / "release-manifest.json")))
+    if manifest.exists() or "SB_RELEASE_MANIFEST" in os.environ:
+        from sb.runtime_identity import runtime_identity
+
+        identity = runtime_identity(config, manifest_path=manifest)
+        details["identity"] = identity
+        checks["runtime_identity"] = identity["status"] == "ok"
+        reasons.extend(identity["reasons"])
     return {"status": "ready" if not reasons else "degraded", "checks": checks,
         "reasons": reasons, **details}

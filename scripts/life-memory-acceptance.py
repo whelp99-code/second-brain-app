@@ -65,10 +65,10 @@ class Artifacts(BaseModel):
     @field_validator("runner_sha256")
     @classmethod
     def valid_runner_hashes(cls, value: dict[str, str]) -> dict[str, str]:
-        expected = {"scripts/life-memory-acceptance.py", "tests/life_memory_cases/t01.py"}
-        if set(value) != expected or any(re.fullmatch(r"[0-9a-f]{64}", sha) is None
-                                         for sha in value.values()):
-            raise DigestError("runner SHA manifest must contain both source-side git blobs")
+        if "scripts/life-memory-acceptance.py" not in value or any(
+            re.fullmatch(r"[0-9a-f]{64}", sha) is None for sha in value.values()
+        ):
+            raise DigestError("runner SHA manifest must contain source-side git blobs")
         return value
 
 
@@ -127,6 +127,8 @@ def main() -> int:
         if case_sha != artifact.case_sha256:
             raise AcceptanceFailure("source case SHA mismatch")
         runner_sha = artifact.runner_sha256
+        if set(runner_sha) != {"scripts/life-memory-acceptance.py", f"tests/life_memory_cases/{args.case.lower()}.py"}:
+            raise AcceptanceFailure("runner SHA manifest missing invoked case")
         head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                               text=True, check=True, timeout=20).stdout.strip()
         if artifact.source_commit != head:
