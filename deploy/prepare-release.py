@@ -104,6 +104,7 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     base = '#!/bin/sh\nset -eu\nexport HOME="${HOME:-' + str(Path.home()) + '}"\nexport PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"\nexport SB_CONFIG="${SB_CONFIG:-$HOME/.config/second-brain/config.toml}"\ncd ' + shlex.quote(str(release)) + '\n'
     scripts = {
         'sb': 'exec ' + shlex.quote(str(python)) + ' -m sb.cli "$@"\n',
+        'sb-company': 'exec ' + shlex.quote(str(python)) + ' -m sb.company_memory_cli "$@"\n',
         'second-brain-mcp': 'export SB_MCP_CONTRACT_PROFILE="${SB_MCP_CONTRACT_PROFILE:-task32-schema4}"\nexec ' + shlex.quote(str(python)) + ' -m sb.mcp "$@"\n',
         'second-brain-agent-mcp': 'exec ' + shlex.quote(str(python)) + ' -c ' + shlex.quote('import anyio; from sb.config import load_config; from sb.mcp import build_server; anyio.run(build_server(config=load_config()).run_stdio_async)') + '\n',
     }
