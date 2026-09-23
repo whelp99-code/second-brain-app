@@ -5,7 +5,9 @@ release *is* and what a gate is *not allowed* to do, and no parent file covers i
 it wrong activates an unverified release on the operator's machine.
 
 ## OVERVIEW
-14 stdlib-only Python scripts plus one installer shell script. Not a package — there is no
+Release scripts are standalone Python CLIs; `prepare-release.py` and
+`check-release-compatibility.py` use the project's Pydantic dependency to parse release inputs.
+Not a package — there is no
 `__init__.py`; tests load these via `runpy.run_path` or
 `importlib.util.spec_from_file_location`, and ops runs them as CLIs.
 
@@ -15,6 +17,7 @@ it wrong activates an unverified release on the operator's machine.
 | Build a release from committed HEAD | `prepare-release.py` → `<app-root>/releases/<release_id>/` |
 | Bundle the Python runtime into a release | `bundle_python_runtime.py` — `bundle_runtime`, `runtime_digest`, `release_identity` |
 | Byte-identity manifest | `check-release-contents.py` — `inventory`, `verify`, `file_digest` |
+| Committed input and wheel compatibility | `check-release-compatibility.py` — `verify`; never activates |
 | JARVIS pairing gate | `check-release-integration.py` — `unchanged_candidates` |
 | Rollback safety | `check-rollback-compat.py` — `check_rollback`, `RollbackCompatError` |
 | Unit drain audit (18 units, both naming schemes) | `check-transition-units.py` — `assess_unit` |
@@ -22,8 +25,8 @@ it wrong activates an unverified release on the operator's machine.
 | Installed unit templates | `deploy/systemd/second-brain{,-web,-backup}.service`, `.timer` |
 
 ## CONVENTIONS
-- `prepare-release.py` builds from `git archive` of **committed HEAD**. Dirty and untracked
-  worktree content never enters an artifact. Staging is `/var/tmp/sb-release-*` with
+- `prepare-release.py` builds from `git archive` of **committed HEAD** and refuses a dirty
+  worktree as a production candidate. Staging is `/var/tmp/sb-release-*` with
   `os.umask(0o077)`; release dirs land mode `0700`.
 - Release identity schema `sb-release-inputs-v3` binds the wheel, the requirements export,
   the bundled runtime digest, and `preparation_recipe_sha256` — the hash of
@@ -56,7 +59,7 @@ it wrong activates an unverified release on the operator's machine.
 ## COMMANDS
 ```bash
 ./deploy/install-systemd-user.sh --dry-run      # needs an executable sb at $SB_BIN
-python deploy/prepare-release.py --offline
+uv run --no-sync python deploy/prepare-release.py --offline
 python deploy/check-release-contents.py verify <release> <inventory.json> --expected-sha256 <sha>
 TMPDIR=/var/tmp python deploy/check-release-integration.py <release> <jarvis-dist>
 ```

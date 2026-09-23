@@ -15,15 +15,32 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import tomllib
 from pathlib import Path
+from typing import ClassVar
 
 from bundle_python_runtime import bundle_runtime, release_identity, runtime_digest
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ReleaseProject(BaseModel):
+    """Committed launcher and optional-extra declarations."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+    scripts: dict[str, str]
+    optional_extras: dict[str, list[str]] = Field(default_factory=dict, alias='optional-dependencies')
+
+
+class ReleaseOptions(argparse.Namespace):
+    app_root: Path = Path.home() / '.local/state/second-brain/app'
+    offline: bool = False
+
 
 repo = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('app_root', nargs='?', type=Path, default=Path.home() / '.local/state/second-brain/app')
 parser.add_argument('--offline', action='store_true', help='require existing local build/dependency caches; disable uv network access')
-args = parser.parse_args()
+args: ReleaseOptions = parser.parse_args(namespace=ReleaseOptions())
 app = args.app_root.expanduser().absolute()
 execution_env = dict(os.environ)
 if args.offline:
@@ -36,6 +53,8 @@ def run(*args):
 source_commit = run("git", "rev-parse", "HEAD").strip()
 source_tree = run("git", "rev-parse", source_commit + "^{tree}").strip()
 working_tree_modified = bool(run("git", "status", "--porcelain"))
+if working_tree_modified:
+    raise SystemExit('DIRTY_SOURCE: commit all release inputs before preparing a production candidate')
 
 with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as temporary:
     temp = Path(temporary)
@@ -51,6 +70,12 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
     build_env = {**execution_env, 'SOURCE_DATE_EPOCH': run('git', 'show', '-s', '--format=%ct', source_commit).strip()}
     def build_run(*args):
         return subprocess.run(args, cwd=source, env=build_env, check=True, text=True, capture_output=True).stdout
+    project = ReleaseProject.model_validate(tomllib.loads((source / 'pyproject.toml').read_text())['project'])
+    compatibility_inventory = {
+        'commands': project.scripts,
+        'profiles': ['task32-schema4'],
+        'optional_extras': sorted(project.optional_extras),
+    }
     build_run('uv', 'build', '--wheel', '--out-dir', str(temp))
     wheel = next(temp.glob('*.whl'))
     requirements = temp / 'requirements.txt'
@@ -120,6 +145,8 @@ with tempfile.TemporaryDirectory(prefix='sb-release-', dir='/var/tmp') as tempor
                 'source_commit': source_commit, 'source_tree': source_tree, 'source_materialization': 'git-archive',
                 'working_tree_modified': working_tree_modified,
                 'contract_profile': 'task32-schema4',
+                'compatibility_inventory': compatibility_inventory,
                 'requirements_sha256': hashlib.sha256(requirements.read_bytes()).hexdigest()}
     (release / 'release-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    _ = run(str(python), str(repo / 'deploy/check-release-compatibility.py'), str(release))
     print(release)
