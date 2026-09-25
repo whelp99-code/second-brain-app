@@ -19,7 +19,6 @@ def settings(tmp_path: Path) -> Settings:
         master_key=bytes(range(32)),
         host="127.0.0.1",
         port=8787,
-        attachment_retention_days=30,
     )
 
 

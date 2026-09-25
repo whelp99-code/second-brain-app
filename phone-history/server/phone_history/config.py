@@ -10,7 +10,6 @@ from pathlib import Path
 from phone_history.errors import ConfigurationError
 
 _DEFAULT_MAX_REQUEST_BYTES = 15 * 1024 * 1024
-_DEFAULT_ATTACHMENT_RETENTION_DAYS = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,7 +28,7 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8787
     max_request_bytes: int = _DEFAULT_MAX_REQUEST_BYTES
-    attachment_retention_days: int = _DEFAULT_ATTACHMENT_RETENTION_DAYS
+    attachment_retention_days: int | None = None
 
     def __post_init__(self) -> None:
         if len(self.api_token) < 32:
@@ -40,7 +39,7 @@ class Settings:
             raise ConfigurationError("PHONE_HISTORY_PORT is invalid")
         if self.max_request_bytes < 1024:
             raise ConfigurationError("PHONE_HISTORY_MAX_REQUEST_BYTES is too small")
-        if not (1 <= self.attachment_retention_days <= 3650):
+        if self.attachment_retention_days is not None and not (1 <= self.attachment_retention_days <= 3650):
             raise ConfigurationError("attachment retention must be between 1 and 3650 days")
 
     @property
@@ -72,12 +71,8 @@ class Settings:
             maximum = int(
                 os.environ.get("PHONE_HISTORY_MAX_REQUEST_BYTES", str(_DEFAULT_MAX_REQUEST_BYTES))
             )
-            retention = int(
-                os.environ.get(
-                    "PHONE_HISTORY_ATTACHMENT_RETENTION_DAYS",
-                    str(_DEFAULT_ATTACHMENT_RETENTION_DAYS),
-                )
-            )
+            raw_retention = os.environ.get("PHONE_HISTORY_ATTACHMENT_RETENTION_DAYS", "").strip()
+            retention = int(raw_retention) if raw_retention else None
         except ValueError as exc:
             raise ConfigurationError("numeric Phone History setting is invalid") from exc
         return cls(

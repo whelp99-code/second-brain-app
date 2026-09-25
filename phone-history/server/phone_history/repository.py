@@ -184,7 +184,7 @@ class Repository:
                     size_bytes INTEGER NOT NULL CHECK (size_bytes > 0),
                     metadata_enc BLOB NOT NULL,
                     storage_path TEXT NOT NULL UNIQUE,
-                    expires_at TEXT NOT NULL,
+                    expires_at TEXT,
                     created_at TEXT NOT NULL
                 );
 
@@ -246,8 +246,36 @@ class Repository:
                 )
             elif cast(str, existing["value"]) != _SCHEMA_VERSION:
                 raise StorageError("unsupported Phone History database schema")
+            self._migrate_attachment_expiry(connection)
+
         with suppress(OSError):
             self.settings.database_path.chmod(0o600)
+
+    def _migrate_attachment_expiry(self, connection: sqlite3.Connection) -> None:
+        """Remove legacy original-attachment deadlines without touching attachment files."""
+        columns = connection.execute("PRAGMA table_info(attachments)").fetchall()
+        if any(row["name"] == "expires_at" and row["notnull"] for row in columns):
+            connection.execute(
+                "CREATE TABLE attachments_retained ("
+                "id TEXT PRIMARY KEY,"
+                "event_id TEXT NOT NULL UNIQUE REFERENCES events(id) ON DELETE CASCADE,"
+                "content_sha256 TEXT NOT NULL,"
+                "size_bytes INTEGER NOT NULL CHECK (size_bytes > 0),"
+                "metadata_enc BLOB NOT NULL,"
+                "storage_path TEXT NOT NULL UNIQUE,"
+                "expires_at TEXT,"
+                "created_at TEXT NOT NULL)"
+            )
+            connection.execute(
+                "INSERT INTO attachments_retained "
+                "(id,event_id,content_sha256,size_bytes,metadata_enc,storage_path,expires_at,created_at) "
+                "SELECT id,event_id,content_sha256,size_bytes,metadata_enc,storage_path,"
+                "NULL,created_at FROM attachments"
+            )
+            connection.execute("DROP TABLE attachments")
+            connection.execute("ALTER TABLE attachments_retained RENAME TO attachments")
+        else:
+            connection.execute("UPDATE attachments SET expires_at = NULL WHERE expires_at IS NOT NULL")
 
     def get_idempotency(self, key: str, request_digest: str) -> IdempotencyReceipt | None:
         key_digest = _sha256_text(key)
@@ -372,9 +400,6 @@ class Repository:
                         event.attachment.metadata_dict(),
                         aad=f"attachment-metadata:{attachment_id}",
                     )
-                    expires = datetime.now(UTC) + timedelta(
-                        days=self.settings.attachment_retention_days
-                    )
                     connection.execute(
                         "INSERT INTO attachments("
                         "id,event_id,content_sha256,size_bytes,metadata_enc,storage_path,"
@@ -386,7 +411,7 @@ class Repository:
                             len(event.attachment.content),
                             metadata_enc,
                             relative.as_posix(),
-                            _format_datetime(expires),
+                            None,
                             now,
                         ),
                     )
@@ -689,19 +714,8 @@ class Repository:
         return DeleteResult("deleted", event_digest)
 
     def prune_expired_attachments(self, *, now: datetime | None = None) -> int:
-        reference = datetime.now(UTC) if now is None else now.astimezone(UTC)
-        removed = 0
-        with self._write_lock, self._connect() as connection:
-            rows = connection.execute(
-                "SELECT id,storage_path FROM attachments WHERE expires_at <= ?",
-                (_format_datetime(reference),),
-            ).fetchall()
-            for row in rows:
-                target = self._attachment_path(cast(str, row["storage_path"]))
-                target.unlink(missing_ok=True)
-                connection.execute("DELETE FROM attachments WHERE id = ?", (row["id"],))
-                removed += 1
-        return removed
+        """Legacy maintenance hook; original attachments are never pruned by time."""
+        return 0
 
     def status(self) -> dict[str, object]:
         with self._connect() as connection:
@@ -747,7 +761,7 @@ class Repository:
                 aad=f"attachment-metadata:{attachment_id}",
             )
             attachment = cast(dict[str, object], metadata)
-            attachment["retained_until"] = cast(str, attachment_row["expires_at"])
+            attachment["retained_until"] = cast(str | None, attachment_row["expires_at"])
         candidate_row = connection.execute(
             "SELECT id FROM candidates WHERE event_id = ?", (event_id,)
         ).fetchone()

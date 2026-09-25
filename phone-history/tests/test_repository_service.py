@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import base64
 import json
 import sqlite3
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from phone_history.config import Settings
 from phone_history.crypto import SecretBox
 from phone_history.errors import ConflictError, CryptoError, NotFoundError
 from phone_history.repository import Repository
@@ -352,18 +354,66 @@ def test_episode_grouping_is_deterministic(settings: object) -> None:
     assert repository.episodes() == snapshot
 
 
-def test_attachment_retention_prunes_ciphertext_but_keeps_event(settings: object) -> None:
-    short_settings = replace(settings, attachment_retention_days=1)
-    repository = Repository(short_settings)
-    event = batch_from(event_dict(event_id="phevt:retention:001", attachment=b"temporary")).events[
-        0
-    ]
+def test_original_attachments_have_no_default_expiry(settings: object, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PHONE_HISTORY_API_TOKEN", settings.api_token)
+    monkeypatch.setenv(
+        "PHONE_HISTORY_MASTER_KEY_B64", base64.urlsafe_b64encode(settings.master_key).decode()
+    )
+    monkeypatch.delenv("PHONE_HISTORY_ATTACHMENT_RETENTION_DAYS", raising=False)
+    assert Settings.from_environment().attachment_retention_days is None
+    assert settings.attachment_retention_days is None
+    repository = Repository(settings)
+    event = batch_from(event_dict(event_id="phevt:retention:001", attachment=b"permanent")).events[0]
     repository.ingest_event("iphone", event, candidate_payload=None)
+    with sqlite3.connect(settings.database_path) as connection:
+        assert connection.execute("SELECT expires_at FROM attachments").fetchone()[0] is None
+    assert repository.get_event(event.id).attachment["retained_until"] is None
+    assert repository.prune_expired_attachments(now=datetime.max.replace(tzinfo=UTC)) == 0
     assert repository.status()["attachments"] == 1
-    removed = repository.prune_expired_attachments(now=datetime.now(UTC) + timedelta(days=2))
-    assert removed == 1
-    assert repository.status()["attachments"] == 0
-    assert repository.status()["events"] == 1
+
+
+def test_migration_clears_legacy_expiry_without_deleting_original_or_derived_rows(
+    settings: object,
+) -> None:
+    repository = Repository(replace(settings, attachment_retention_days=1))
+    event = batch_from(event_dict(event_id="phevt:legacy:001", attachment=b"keep original")).events[0]
+    repository.ingest_event("iphone", event, candidate_payload=_candidate("Derived", "Keep"))
+    with sqlite3.connect(settings.database_path) as connection:
+        relative = connection.execute("SELECT storage_path FROM attachments").fetchone()[0]
+        connection.execute("ALTER TABLE attachments RENAME TO attachments_old")
+        connection.execute(
+            "CREATE TABLE attachments ("
+            "id TEXT PRIMARY KEY, event_id TEXT NOT NULL UNIQUE REFERENCES events(id) ON DELETE CASCADE,"
+            "content_sha256 TEXT NOT NULL, size_bytes INTEGER NOT NULL CHECK (size_bytes > 0),"
+            "metadata_enc BLOB NOT NULL, storage_path TEXT NOT NULL UNIQUE,"
+            "expires_at TEXT NOT NULL, created_at TEXT NOT NULL)"
+        )
+        deadline = "2000-01-01T00:00:00.000Z"
+        connection.execute(
+            "INSERT INTO attachments SELECT id,event_id,content_sha256,size_bytes,metadata_enc,"
+            "storage_path,?,created_at FROM attachments_old",
+            (deadline,),
+        )
+        connection.execute("DROP TABLE attachments_old")
+        connection.execute("CREATE TABLE derived_cache (payload TEXT, expires_at TEXT)")
+        connection.execute(
+            "INSERT INTO derived_cache VALUES (?, ?)", ("push payload", deadline)
+        )
+    original = settings.attachment_dir / relative
+    encrypted = original.read_bytes()
+
+    migrated = Repository(settings)
+    with sqlite3.connect(settings.database_path) as connection:
+        assert connection.execute("SELECT expires_at FROM attachments").fetchone()[0] is None
+        assert connection.execute("SELECT payload,expires_at FROM derived_cache").fetchone() == (
+            "push payload", deadline
+        )
+        assert connection.execute("SELECT COUNT(*) FROM candidates").fetchone()[0] == 1
+    assert original.read_bytes() == encrypted
+    assert migrated.get_event(event.id).attachment["retained_until"] is None
+    assert migrated.prune_expired_attachments(now=datetime.now(UTC)) == 0
+    assert original.read_bytes() == encrypted
+    assert migrated.status()["attachments"] == 1
 
 
 def test_idempotency_response_is_encrypted_at_rest(settings: object) -> None:
