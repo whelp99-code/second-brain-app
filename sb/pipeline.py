@@ -780,6 +780,27 @@ def _prepare_adapter_ingest(
     )
 
 
+def _note_source_unavailable(
+    ledger: Ledger, root: Path, source_id: str, run_id: str, exc: Exception
+) -> None:
+    code = type(exc).__name__
+    digest = hashlib.sha256(f"SOURCE_UNAVAILABLE:{source_id}:{code}".encode()).hexdigest()
+    with ledger.transaction():
+        _ = ledger.upsert_source_items(
+            (
+                SourceItem(
+                    source_id,
+                    "connection-unavailable",
+                    code,
+                    digest,
+                    run_id,
+                    run_id,
+                ),
+            )
+        )
+    _append_run_log(root, f"SOURCE_UNAVAILABLE: {source_id}: {code}")
+
+
 def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) -> StageFn:
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         from sb.connectors import discover_adapters
@@ -830,9 +851,10 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     )
                 finally:
                     reingress.close()
-            except (OSError, RuntimeError):
+            except Exception as exc:  # noqa: BLE001 - one unreachable source must not abort the batch
                 errors += 1
                 attempted += 1
+                _note_source_unavailable(ledger, vault.root, adapter.source_id, run_id, exc)
                 continue
             with ledger.transaction():
                 _ = ledger.upsert_source_items(prepared.source_items)
