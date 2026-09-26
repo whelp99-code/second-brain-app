@@ -44,6 +44,7 @@ from sb.vault import Vault, VaultLintError, init_vault
 
 
 class Command(StrEnum):
+    LIFE = "life"
     INIT = "init"
     IDENTITY = "identity"
     INGEST = "ingest"
@@ -76,6 +77,8 @@ class Command(StrEnum):
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sb")
     sub = parser.add_subparsers(dest="command")
+    from sb.life_cli import configure_parser
+    configure_parser(sub.add_parser(Command.LIFE.value, help="개인 생활기록·질문·브리핑·복구"))
     _ = sub.add_parser(Command.INIT.value)
     _ = sub.add_parser(Command.IDENTITY.value)
     ingest = sub.add_parser(Command.INGEST.value)
@@ -197,6 +200,11 @@ def _mcp() -> int:
 
 def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     config = load_config()
+    if command == Command.LIFE:
+        from sb.life_cli import run
+        from sb.pipeline import run_life_import, run_life_maintenance, run_life_workflow
+        return run(ns, config, workflow=run_life_workflow, importer=run_life_import,
+                   ingest=run_ingest, maintainer=run_life_maintenance)
 
     def init() -> int:
         _ = init_vault(config.vault_root)

@@ -92,7 +92,7 @@ struct PhoneEventRecord: Codable, Identifiable, Hashable, Sendable {
         var event = try ContractJSON.object(fromBase64: GeneratedPhoneHistoryContract.eventTemplateBase64)
         let eventID = id.uuidString.lowercased()
         try ContractJSON.set("id", eventID, in: &event, required: true)
-        try ContractJSON.set("device_id", deviceID, in: &event, required: true)
+        // Device identity belongs to the batch envelope, not the v1 event schema.
         try ContractJSON.set(
             "occurred_at",
             PhoneHistoryDateCodec.string(from: draft.occurredAt),
@@ -146,6 +146,9 @@ enum PhoneEventBatchEncoder {
     static func encode(_ records: [PhoneEventRecord]) throws -> Data {
         guard !records.isEmpty, records.count <= PhoneHistoryRuntime.maximumBatchCount else {
             throw PhoneHistoryClientError.invalidContract("batch size must be 1...50")
+        }
+        guard Set(records.map(\.deviceID)).count == 1 else {
+            throw PhoneHistoryClientError.invalidContract("mixed devices in one batch")
         }
         var root = try ContractJSON.object(
             fromBase64: GeneratedPhoneHistoryContract.batchTemplateBase64

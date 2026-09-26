@@ -40,6 +40,12 @@ def read_config(config: Config) -> Generator[Config, None, None]:
 
 
 def mutate_root[T](config: Config, operation: GenerationOperation, apply: Callable[[Path], T]) -> T:
+    from sb.life_lock import publication_lock
+    with publication_lock(Path(config.vault_root)):
+        return _mutate_under_publication_lock(config, operation, apply)
+
+
+def _mutate_under_publication_lock[T](config: Config, operation: GenerationOperation, apply: Callable[[Path], T]) -> T:
     root = Path(config.vault_root)
     if not root.is_symlink() and "share_root" not in config.raw:
         return apply(root)

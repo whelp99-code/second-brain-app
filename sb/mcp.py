@@ -217,6 +217,10 @@ def read_page(root: Path, page_id: str) -> PageRead:
     text = committed_text(root, rel)
     if text is None:
         raise PageNotFoundError(page_id=page_id)
+    if rel.startswith("wiki/life-event-"):
+        from sb.life_visibility import allowed
+        if not allowed(root, page_id, raw=text):
+            raise PageNotFoundError(page_id=page_id)
     block, body = _split_md(text)
     return PageRead(frontmatter=_frontmatter(block), body=body)
 

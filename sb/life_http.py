@@ -17,8 +17,8 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from sb.config import Config
 from sb.life_config import policies, settings
 from sb.life_contracts import LifeEventV1, LifeInputError
-from sb.life_values import canonical_bytes
-from sb.life_views import brief, obsidian_manifest, timeline
+from sb.life_values import canonical_bytes, zone
+from sb.life_views import brief, timeline
 from sb.store.life import read_life_store
 
 PREFIX = "/api/life/v1/"
@@ -29,23 +29,47 @@ class LifeActor:
     source_ids: tuple[str, ...]
     scopes: tuple[str, ...]
     client: bool
+    device_id: str = "owner"
+    can_write: bool = False
 
 
 def authorize(config: Config, supplied: str, admin_token: str | None) -> LifeActor | None:
+    from sb.life_auth import device
+
     opts = settings(config)
     available = policies(config)
-    admin = admin_token is None or hmac.compare_digest(supplied, "Bearer " + admin_token)
+    if not isinstance(supplied, str) or len(supplied) > 1024:
+        return None
+    admin = (admin_token is None and not supplied) or (
+        admin_token is not None
+        and hmac.compare_digest(supplied.encode(), ("Bearer " + admin_token).encode())
+    )
     if admin:
         selected = tuple(available)
     else:
+        registered = device(config, supplied, available)
+        if registered is not None:
+            device_id, selected, can_write = registered
+            scopes = tuple(sorted({s for name in selected for s in available[name].scopes}))
+            return LifeActor(
+                selected, scopes, client=True, device_id=device_id, can_write=can_write
+            )
         token = os.environ.get(opts.client_token_env, "") if opts.client_token_env else ""
-        if len(token) < 32 or not hmac.compare_digest(supplied, "Bearer " + token):
+        if len(token) < 32 or not hmac.compare_digest(
+            supplied.encode(), ("Bearer " + token).encode()
+        ):
             return None
         selected = tuple(s for s in opts.client_source_ids if s in available)
         if not selected:
             return None
     scope = tuple(sorted({scope for name in selected for scope in available[name].scopes}))
-    return LifeActor(selected, scope, client=not admin)
+    return LifeActor(
+        selected,
+        scope,
+        client=not admin,
+        device_id="owner" if admin else "legacy-life-client",
+        can_write=admin or opts.client_can_write,
+    )
 
 
 def require_source(actor: LifeActor, source_id: object) -> str:
@@ -112,10 +136,28 @@ def read_endpoint(
     if any(len(value) != 1 for value in args.values()):
         raise LifeInputError("LIFE_QUERY_INVALID")
     timezone = args.get("timezone", [opts.timezone])[0]
-    from sb.life_values import zone
 
     day = args.get("day", [clock.astimezone(zone(timezone)).date().isoformat()])[0]
     if route == "health":
+        from sb.life_api_reads import health
+
+        try:
+            events, _complete = visible_events(config, root, actor, clock)
+            if actor.client:
+                events = tuple(e for e in events if e.sensitivity in opts.view_sensitivities)
+            with read_life_store(root) as store:
+                return health(
+                    config,
+                    store,
+                    events=events,
+                    scopes=actor.scopes,
+                    source_ids=actor.source_ids,
+                    now=clock,
+                    credential_kind="life_client" if actor.client else "owner",
+                )
+        except LifeInputError as exc:
+            if exc.code != "LIFE_NOT_INITIALIZED":
+                raise
         available = policies(config)
         sources = [
             {
@@ -133,6 +175,31 @@ def read_endpoint(
             "device_acceptance": "NOT_RUN",
             "observed_status": "not_polled",
             "credential_kind": "life_client" if actor.client else "owner",
+        }
+    if route.startswith("attachments/"):
+        import base64
+        from hashlib import sha256
+
+        parts = route.split("/")
+        if len(parts) != 3 or not parts[2].isdigit():
+            raise LifeInputError("LIFE_ATTACHMENT_NOT_FOUND")
+        event = _event(config, root, actor, parts[1], clock)
+        index = int(parts[2])
+        if index >= len(event.attachments):
+            raise LifeInputError("LIFE_ATTACHMENT_NOT_FOUND")
+        attachment = event.attachments[index]
+        with read_life_store(root) as store:
+            raw = store.cas.get(attachment.sha256)
+        if len(raw) != attachment.size or sha256(raw).hexdigest() != attachment.sha256:
+            raise LifeInputError("LIFE_RAW_UNAVAILABLE")
+        return {
+            "event_id": event.event_id,
+            "revision": event.revision,
+            "name": attachment.name,
+            "content_type": attachment.mime,
+            "size": attachment.size,
+            "sha256": attachment.sha256,
+            "content_base64": base64.b64encode(raw).decode(),
         }
     if route.startswith("evidence/"):
         event = _event(config, root, actor, route[len("evidence/") :], clock)
@@ -154,6 +221,57 @@ def read_endpoint(
         _event(config, root, actor, receipt.event_id, clock)
         return receipt.as_dict()
     if route == "timeline":
+        from sb.life_timeline_query import query
+        opts.require("life_timeline")
+        day = args.get("day", [clock.astimezone(zone(opts.timezone)).date().isoformat()])[0]
+        timezone = args.get("timezone", [opts.timezone])[0]
+        try:
+            limit = int(args.get("limit", ["200"])[0])
+        except ValueError as exc:
+            raise LifeInputError("LIFE_LIMIT_INVALID") from exc
+        undated = args.get("undated", ["false"])[0]
+        if undated not in {"true", "false"}:
+            raise LifeInputError("LIFE_INPUT_INVALID")
+        with read_life_store(root) as store:
+            result = query(store, config, actor, day=day, timezone=timezone, limit=limit,
+                           cursor=args.get("cursor", [None])[0], undated=undated == "true",
+                           status=args.get("status", [None])[0], now=clock)
+            if undated == "false" and "cursor" not in args:
+                unknown = query(store, config, actor, day=day, timezone=timezone, limit=limit,
+                                undated=True, status=args.get("status", [None])[0], now=clock)
+                result["undated"] = unknown["events"]
+                result["undated_next_cursor"] = unknown["next_cursor"]
+            else:
+                result["undated"] = []
+        return result
+    object_routes = {
+        "questions": ("question", "gap_questions"),
+        "relations": ("relation", "life_timeline"),
+        "entity-aliases": ("entity_alias", "life_timeline"),
+        "predictions": ("prediction", "prediction"),
+        "actuals": ("actual", "prediction"),
+        "deliveries": ("delivery", "life_briefing"),
+        "briefings/persisted": ("briefing", "life_briefing"),
+    }
+    if route in object_routes:
+        from sb.store.life_journal import LifeJournal
+
+        kind, flag = object_routes[route]
+        opts.require(flag)
+        events, complete = visible_events(config, root, actor, clock)
+        if actor.client:
+            events = tuple(e for e in events if e.sensitivity in opts.view_sensitivities)
+        with read_life_store(root) as store:
+            rows = LifeJournal(store).list(
+                kind,
+                scopes=actor.scopes,
+                source_ids=actor.source_ids,
+                events=events,
+                limit=1000,
+                require_current=kind not in {"prediction", "delivery"},
+            )
+        return {"items": rows, "complete_snapshot": complete}
+    if route == "timeline":
         opts.require("life_timeline")
     elif route == "views/obsidian/manifest":
         opts.require("obsidian_view")
@@ -165,13 +283,26 @@ def read_endpoint(
     if actor.client:
         events = tuple(e for e in events if e.sensitivity in opts.view_sensitivities)
     if route == "views/obsidian/manifest":
-        result = obsidian_manifest(
-            events,
-            day=day,
-            timezone=timezone,
-            sensitivities=opts.view_sensitivities,
-            complete=complete,
-        )
+        from sb.life_api_reads import view
+        from sb.life_projection import page
+
+        with read_life_store(root) as store:
+            result = view(
+                config,
+                store,
+                events,
+                day=day,
+                timezone=timezone,
+                scopes=actor.scopes,
+                source_ids=actor.source_ids,
+                complete=complete,
+            )
+        if "page_size" in args or "cursor" in args:
+            try:
+                size = int(args.get("page_size", ["100"])[0])
+            except ValueError as exc:
+                raise LifeInputError("LIFE_LIMIT_INVALID") from exc
+            result = page(result, limit=size, cursor=args.get("cursor", [None])[0])
     elif route == "timeline":
         result = {**timeline(events, day, timezone), "complete_snapshot": complete}
     else:
@@ -185,6 +316,10 @@ def read_endpoint(
 
 
 def error_status(code: str) -> int:
+    if code == "LIFE_DEVICE_EXPIRED_OR_REVOKED":
+        return 401
+    if code.startswith("LIFE_AUTH_CONFIG_"):
+        return 503
     if "NOT_FOUND" in code:
         return 404
     if code in {"LIFE_SOURCE_NOT_ALLOWED", "LIFE_SOURCE_DISABLED", "LIFE_FEATURE_DISABLED"}:

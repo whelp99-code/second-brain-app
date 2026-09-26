@@ -386,6 +386,12 @@ def _restore_backup_locked(archive: Path, destination_path: Path, *, force: bool
         ledger = temporary / ".sb" / "ledger.db"
         if ledger.is_file():
             assert_ledger_integrity(ledger)
+        from sb.life_contracts import LifeInputError
+        from sb.life_restore import preserve_current
+        try:
+            preserve_current(destination_path, temporary)
+        except LifeInputError as exc:
+            raise OperationError(exc.code) from exc
         reasons = audit_citations(temporary)
         if reasons:
             raise OperationError("restored vault citation audit failed: " + "; ".join(reasons[:5]))

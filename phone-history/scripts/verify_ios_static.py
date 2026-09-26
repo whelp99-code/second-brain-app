@@ -78,7 +78,6 @@ def main() -> int:
     forbidden_entitlements = {
         "com.apple.developer.family-controls",
         "com.apple.developer.networking.networkextension",
-        "com.apple.developer.healthkit",
         "com.apple.developer.homekit",
     }
     used_entitlements = set(app_entitlements) | set(share_entitlements)
@@ -98,8 +97,9 @@ def main() -> int:
     )
     usage_keys = [key for key in app_info if key.endswith("UsageDescription")]
     check(
-        not usage_keys,
-        "privacy:no-sensitive-runtime-permissions",
+        usage_keys == ["NSHealthShareUsageDescription"]
+        and bool(app_info.get("NSHealthShareUsageDescription")),
+        "privacy:only-health-read-permission",
         f"usageDescriptionKeys={usage_keys}",
         results,
     )
@@ -143,7 +143,15 @@ def main() -> int:
         )
         check(
             manifest.get("NSPrivacyTracking") is False
-            and collected_types == expected_collected_types
+            and collected_types
+            == (
+                expected_collected_types
+                | (
+                    {"NSPrivacyCollectedDataTypeHealth", "NSPrivacyCollectedDataTypeFitness"}
+                    if name == "app"
+                    else set()
+                )
+            )
             and collection_is_bounded
             and app_group_defaults_declared,
             f"privacy-manifest:{name}",
@@ -153,6 +161,11 @@ def main() -> int:
             ),
             results,
         )
+
+    from life_privacy import health_boundary_errors
+
+    health_errors = health_boundary_errors(IOS)
+    check(not health_errors, "life:opt-in-health-and-target-boundary", repr(health_errors), results)
 
     swift_files = sorted(IOS.rglob("*.swift"))
     swift_text = "\n".join(path.read_text(encoding="utf-8") for path in swift_files)

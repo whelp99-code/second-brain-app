@@ -1,21 +1,27 @@
+PYTHON ?= python3
+
 .PHONY: verify test lint contracts ios-static compile smoke
 
-verify: compile lint contracts test ios-static smoke
+# One authoritative pre-device gate; this never claims native/device acceptance.
+verify:
+	$(PYTHON) scripts/run_predevice_gate.py
 
 compile:
-	python3 -m compileall -q server scripts tests
+	$(PYTHON) -m compileall -q server scripts tests
 
 lint:
-	python3 -m ruff check server tests scripts
+	$(PYTHON) -m ruff format --check server tests scripts
+	$(PYTHON) -m ruff check server tests scripts
 
 contracts:
-	python3 scripts/verify-contracts.py
+	$(PYTHON) scripts/generate_ios_contract.py
+	$(PYTHON) scripts/generate_ios_api_paths.py
 
 test:
-	python3 -m pytest -q
+	$(PYTHON) -m pytest -q
 
 ios-static:
-	python3 scripts/verify-ios-static.py
+	$(PYTHON) scripts/verify_ios_static.py
 
 smoke:
-	python3 scripts/smoke-test.py
+	$(PYTHON) -m pytest -q tests/test_api.py tests/test_second_brain_sink.py

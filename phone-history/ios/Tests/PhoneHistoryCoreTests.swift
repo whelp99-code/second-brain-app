@@ -46,15 +46,17 @@ final class PhoneHistoryCoreTests: XCTestCase {
             JSONSerialization.jsonObject(with: record.canonicalJSON) as? [String: Any]
         )
         XCTAssertEqual(object[GeneratedPhoneHistoryContract.fields["id"]!] as? String, record.id)
-        XCTAssertEqual(object[GeneratedPhoneHistoryContract.fields["device_id"]!] as? String, "iphone-test")
-        XCTAssertEqual(object[GeneratedPhoneHistoryContract.fields["canonical"] ?? ""] as? Bool, false)
-        XCTAssertEqual(
-            object[GeneratedPhoneHistoryContract.fields["knowledge_status"] ?? ""] as? String,
-            "UNVERIFIED"
-        )
+        XCTAssertEqual(record.deviceID, "iphone-test")
+        XCTAssertNil(object["device_id"])
+        // The server owns review/canonical state; the v1 wire rejects extra fields.
+        XCTAssertNil(object["canonical"])
+        XCTAssertNil(object["knowledge_status"])
+        XCTAssertNil(object["approval_status"])
         let batch = try PhoneEventBatchEncoder.encode([record])
         let root = try XCTUnwrap(JSONSerialization.jsonObject(with: batch) as? [String: Any])
         XCTAssertEqual((root[GeneratedPhoneHistoryContract.eventArrayKey] as? [Any])?.count, 1)
+        let deviceKey = try XCTUnwrap(GeneratedPhoneHistoryContract.batchFields["device_id"])
+        XCTAssertEqual(root[deviceKey] as? String, "iphone-test")
         if let urlKey = GeneratedPhoneHistoryContract.fields["url"] {
             XCTAssertTrue(object[urlKey] == nil || object[urlKey] is NSNull)
         }

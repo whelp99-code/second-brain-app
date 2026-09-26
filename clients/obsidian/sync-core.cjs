@@ -4,7 +4,7 @@
 'use strict';
 const encoder = new TextEncoder();
 const HASH = /^[a-f0-9]{64}$/;
-const PATH = /^Auto\/(?:Home\.md|(?:Daily|People|Companies|Projects|Places|Events|Decisions|Questions|Evidence|System)\/[A-Za-z0-9_-]+\.md)$/;
+const PATH = /^Auto\/(?:(?:Home|History|Questions|Relations|Predictions)\.md|(?:Daily|People|Companies|Projects|Places|Events|Decisions|Questions|Evidence|System|Predictions)\/[A-Za-z0-9_-]+\.md)$/;
 
 function canonical(value) {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
@@ -95,4 +95,50 @@ async function applyManifest(host, manifest, originalState = emptyState()) {
   await host.save(structuredClone(state));
   return state;
 }
-module.exports = {digest, canonical, validatePath, validateManifest, emptyState, applyManifest, WITHDRAWN};
+async function collectManifest(fetchPage, options = {}) {
+  const pageSize = options.pageSize || 100;
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 500) throw new Error('INVALID_PAGE_SIZE');
+  let next = null, first = null, totalBytes = 0;
+  const files = [], seen = new Set(), cursors = new Set();
+  for (let count = 0; count < 400; count++) {
+    const query = new URLSearchParams({page_size: String(pageSize)});
+    if (options.day) query.set('day', options.day);
+    if (options.timezone) query.set('timezone', options.timezone);
+    if (next !== null) query.set('cursor', next);
+    const response = await fetchPage('views/obsidian/manifest?' + query.toString());
+    if (!response || !Array.isArray(response.files) || response.page_offset !== files.length ||
+        !Number.isInteger(response.total_files) || response.total_files < 0 || response.total_files > 20000 ||
+        typeof response.snapshot_complete !== 'boolean' || !HASH.test(response.generation) ||
+        response.cursor !== response.generation || response.managed_prefix !== 'Auto/')
+      throw new Error('INVALID_MANIFEST_PAGE');
+    if (!first) first = response;
+    if (response.generation !== first.generation || response.total_files !== first.total_files ||
+        response.snapshot_complete !== first.snapshot_complete || response.day !== first.day ||
+        response.timezone !== first.timezone) throw new Error('VIEW_GENERATION_CHANGED_RETRY');
+    for (const row of response.files) {
+      validatePath(row.path); validContent(row.content);
+      if (seen.has(row.path) || !HASH.test(row.sha256)) throw new Error('INVALID_MANIFEST_PAGE');
+      seen.add(row.path);
+      totalBytes += encoder.encode(row.content).length;
+      if (totalBytes > 8 * 1024 * 1024) throw new Error('VIEW_BATCH_TOO_LARGE');
+      if (await digest(row.content) !== row.sha256) throw new Error('VIEW_HASH_MISMATCH');
+      files.push(row);
+    }
+    if (files.length > first.total_files) throw new Error('INVALID_MANIFEST_PAGE');
+    next = response.next_cursor;
+    if (next === null) {
+      if (files.length !== first.total_files || response.page_complete !== true)
+        throw new Error('INCOMPLETE_MANIFEST');
+      const complete = {...first, files, complete:first.snapshot_complete, next_cursor:null,
+                        page_offset:0, page_complete:true};
+      await validateManifest(complete);
+      return complete;
+    }
+    if (typeof next !== 'string' || !next || next.length > 1000 || cursors.has(next) || !response.files.length)
+      throw new Error('INVALID_MANIFEST_CURSOR');
+    cursors.add(next);
+  }
+  throw new Error('MANIFEST_PAGE_LIMIT');
+}
+
+module.exports = {digest, canonical, validatePath, validateManifest, emptyState, applyManifest, collectManifest, WITHDRAWN};

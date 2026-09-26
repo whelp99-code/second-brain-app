@@ -34,7 +34,11 @@ actor SyncService {
             sawExplicitReceipt = sawExplicitReceipt || receipt.responseHadExplicitReceipts
             rejected.merge(receipt.rejected) { _, newest in newest }
             let idsInBatch = Set(snapshot.records.map(\.id))
-            let safeToRemove = receipt.confirmedIDs.intersection(idsInBatch)
+            let phoneConfirmed = receipt.confirmedIDs.intersection(idsInBatch)
+            let lifeConfirmed = try await LifeMemoryBridge.shared.mirror(
+                snapshot.records.filter { phoneConfirmed.contains($0.id) }
+            )
+            let safeToRemove = phoneConfirmed.intersection(lifeConfirmed)
             if !safeToRemove.isEmpty {
                 try await queue.remove(ids: Array(safeToRemove))
                 confirmed += safeToRemove.count

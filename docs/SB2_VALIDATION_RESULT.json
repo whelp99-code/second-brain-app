@@ -1,0 +1,239 @@
+{
+  "schema": "sb2-candidate-validation-v1",
+  "verdict": "AUTOMATED_DEVELOPMENT_CANDIDATE_PASS",
+  "release_acceptance": "NO_GO_PENDING_NATIVE_DEVICE_AND_OPERATIONAL_GATES",
+  "branch": "feat/sb2-life-intelligence-20260926-6c57b834",
+  "base_commit": "ab6a1db7270d45065622696e1f4207647144cc41",
+  "verified_at": "2026-09-26T15:37:48.688347+00:00",
+  "source_digest": "4fc362cf3748efadd299a0b9da63011cfe855f9b6258d6b3b665b2843df9d885",
+  "source_unchanged": true,
+  "checks": [
+    {
+      "name": "ruff",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.114,
+      "argv": [
+        "uv",
+        "run",
+        "--offline",
+        "ruff",
+        "check",
+        "sb",
+        "tests"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/ruff.log",
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "core",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 412.618,
+      "argv": [
+        "uv",
+        "run",
+        "--offline",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "--junitxml=/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.chatgpt2codex/sb2-completion-20260926/verification/core.xml"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/core.log",
+      "suite": {
+        "tests": 2203,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "skip_reasons": [
+          {
+            "test": "test_live_scan_yields_orca_jarvis_when_database_reachable",
+            "reason": "SB_LIVE_DB!=1"
+          },
+          {
+            "test": "test_live_warmup_and_korean_english_query",
+            "reason": "optional live smoke"
+          },
+          {
+            "test": "test_live_cli_smoke_when_enabled",
+            "reason": "optional live smoke"
+          }
+        ]
+      },
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "phone-predevice",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 4.232,
+      "argv": [
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
+        "scripts/run_predevice_gate.py"
+      ],
+      "log": "phone-predevice.log",
+      "suite": {
+        "tests": 56,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "device_gate": "PENDING",
+      "evidence_origin": "supplemental execution"
+    },
+    {
+      "name": "obsidian-tests",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.266,
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/obsidian-tests.log",
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "obsidian-check",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.165,
+      "argv": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/obsidian-check.log",
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "obsidian-build",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.114,
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/obsidian-build.log",
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "obsidian-bundle",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.032,
+      "argv": [
+        "node",
+        "--check",
+        "dist/main.js"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/obsidian-bundle.log",
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "wheel",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.117,
+      "argv": [
+        "uv",
+        "build",
+        "--offline",
+        "--out-dir",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.chatgpt2codex/sb2-completion-20260926/verification/dist"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/wheel.log",
+      "evidence_origin": "unchanged-source full run"
+    },
+    {
+      "name": "diff-check",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.016,
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "log": ".chatgpt2codex/sb2-completion-20260926/verification/diff-check.log",
+      "evidence_origin": "unchanged-source full run"
+    }
+  ],
+  "obsidian": {
+    "tests": 36,
+    "pass": 36,
+    "fail": 0,
+    "skipped": 0
+  },
+  "installed_wheel_smoke": {
+    "state": "PASS",
+    "package_origin": "isolated installed wheel, not checkout",
+    "module_path": "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/install-check/venv/lib/python3.12/site-packages/sb/__init__.py",
+    "checks": [
+      "cli:init",
+      "cli:life import",
+      "cli:life recall",
+      "http:/api/life/v1/timeline",
+      "http:/api/life/v1/views/obsidian/manifest",
+      "http:/api/life/v1/evidence/f09428b2-f314-54d2-b67f-5f6cd5164bfe",
+      "http:unauthenticated-denied"
+    ],
+    "fixture_data": "synthetic",
+    "production_changed": false,
+    "wheel_sha256": {
+      "second_brain-1.0.7-py3-none-any.whl": "acd7f9b46214bf3442a7f6bcf497868ead583905b7abfb1ea69931e4043d8f5e"
+    }
+  },
+  "local_model_subprocess_smoke": {
+    "state": "PASS",
+    "installed_wheel": true,
+    "provider": "synthetic local subprocess, not real AI quality",
+    "calls": 1,
+    "first": "generated",
+    "replay": "already_reserved",
+    "charged_reservation": true,
+    "external_requests": 0
+  },
+  "recall": {
+    "dataset_origin": "synthetic-generated-contract-fixtures",
+    "question_count": 300,
+    "passed": 300,
+    "failed": 0,
+    "scope_leaks": 0,
+    "wrong_revision_cases": 0,
+    "p95_ms": 7.331,
+    "limitations": [
+      "Not actual user questions or independent human relevance judgments",
+      "Spacing/case contract coverage, not semantic synonym quality",
+      "All fixtures were predeclared; topic groups are disjoint across splits",
+      "No real-model quality, production latency, or mobile acceptance claim"
+    ]
+  },
+  "blocked": {
+    "native_build": "Mac connector registered workspace paths did not exist; no Xcode/iOS build executed",
+    "phone_standalone_wheel": "Declared hatchling dependency unavailable offline; network acquisition requires connector owner approval",
+    "real_devices": "NOT_RUN",
+    "live_model_quality": "NOT_RUN",
+    "production_activation": "NOT_PERFORMED",
+    "seven_day_observation": "NOT_RUN"
+  },
+  "preserved_original_user_paths": [
+    ".gitignore",
+    "docs/second-brain-guide.html"
+  ],
+  "preserved_concurrent_rule_paths": [
+    "AGENTS.md",
+    "clients/macos/SecondBrainMac/AGENTS.md",
+    "deploy/AGENTS.md",
+    "phone-history/AGENTS.md",
+    "phone-history/ios/AGENTS.md",
+    "sb/AGENTS.md",
+    "sb/connectors/AGENTS.md",
+    "sb/store/AGENTS.md",
+    "scripts/AGENTS.md",
+    "tests/AGENTS.md"
+  ],
+  "commit_record": "Actual commit and artifact checksums are written to BUILD_MANIFEST.json after commit"
+}

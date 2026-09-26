@@ -613,6 +613,15 @@ def _run_locked(root: Path, stage: StageFn, stage_name: str, config: Config | No
 
 
 def _execute(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
+    from sb.life_lock import VaultPublicationBusy, publication_lock
+    try:
+        with publication_lock(Path(config.vault_root)):
+            return _execute_under_publication_lock(config, stage, stage_name)
+    except VaultPublicationBusy:
+        return RunOutcome("", "ok", 0, 0, 0, 0, None, True)
+
+
+def _execute_under_publication_lock(config: Config, stage: StageFn, stage_name: str) -> RunOutcome:
     root = Path(config.vault_root)
     managed = root.is_symlink() or "share_root" in config.raw
     lock_root = generation_runtime_paths(config).state if managed else root
@@ -835,6 +844,27 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
         used_units = 0
         failure: str | None = None
         for adapter in adapters:
+            if getattr(adapter, "supports_life_events", False):
+                from sb.life_ingest import complete_exports, prepare_exports
+                try:
+                    life_result = prepare_exports(config, ledger, adapter, run_id=run_id,
+                        now=datetime.now(UTC), maximum=max(cap - attempted, 0))
+                    life_written = _publish_life_events(config, ledger, vault, run_id, life_result.events)
+                    complete_exports(ledger, adapter, life_result, config=config, now=datetime.now(UTC))
+                    errors += life_result.errors
+                    attempted += life_result.attempted
+                    written += life_written
+                    capped = capped or life_result.capped
+                    if life_result.errors:
+                        failure = failure or "LIFE_EXPORT_PARTIAL_FAILURE"
+                except (OSError, ValueError, RuntimeError, GitCommandError, VaultLintError) as exc:
+                    errors += 1
+                    attempted += 1
+                    failure = failure or "LIFE_EXPORT_FAILED"
+                    _note_source_unavailable(ledger, vault.root, adapter.source_id, run_id, exc)
+                if capped and attempted >= cap:
+                    break
+                continue
             try:
                 reingress = ReingressGate(Path(config.state_root) / "reingress.db")
                 try:
@@ -1121,6 +1151,255 @@ def run_ingest(
     )
 
 
+def _publish_life_events(config: Config, ledger: Ledger, vault: Vault, run_id: str,
+                         events: Sequence[object]) -> int:
+    """Publish workflow changes through the existing writer and record identity boundary."""
+    from sb.life_views import page_for_event, source_uri
+    from sb.memory_records import parse_page_records
+    from sb.store.life_journal import LifeJournal
+
+    compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+    journal = LifeJournal(ledger.life_store())
+    count = 0
+    for event in events:
+        source = SourceItem(event.source_id, source_uri(event), event.source_version,
+                            event.raw_digest, run_id, run_id)
+        ledger.upsert_source_item(source)
+        ledger.bind_source_access(source, config.source_access[event.source_id])
+        page = page_for_event(event)
+        access = ledger.compiled_page_access(tuple((cite.origin, cite.hash) for cite in page.sources))
+        report = StageReport((page,), 0, 0, 1, False,
+                             compiled_by=("life-v1", "deterministic-v1"))
+        committed, _, _ = _commit_pages(config=config, root=vault.root, vault=vault,
+            run_id=run_id, report=report, line=f"{run_id} life {page.page_id}",
+            compiled=compiled, ledger=ledger, project=False)
+        raw = subprocess.check_output(["git", "-C", str(vault.root), "show",
+                                       f"{committed or 'HEAD'}:{git_rel(page.page_id)}"])
+        ledger.bind_page_access(git_rel(page.page_id).removesuffix(".md"),
+                               "sha256:" + hashlib.sha256(raw).hexdigest(), access)
+        journal.bind_records(event, parse_page_records(raw, page.page_id))
+        count += 1
+    if count and ".staging" not in vault.root.parts:
+        from sb.search import SearchIndex
+        explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+        SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+    return count
+
+
+def run_life_workflow(config: Config, command: str, data: dict[str, object], *,
+                      source_ids: tuple[str, ...], scopes: tuple[str, ...],
+                      now: datetime | None = None, client: bool = False,
+                      device_id: str = "owner", client_can_write: bool | None = None) -> tuple[RunOutcome, dict[str, object]]:
+    """Commit one workflow operation; never send a network request inside the stage."""
+    from sb.life_workflow import perform
+
+    clock = now if now is not None else datetime.now(UTC)
+    result: dict[str, object] = {}
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        store = ledger.life_store()
+        with ledger.transaction():
+            response, events = perform(config, store, command=command, data=data,
+                source_ids=source_ids, scopes=scopes, now=clock, client=client, device_id=device_id,
+                client_can_write=client_can_write)
+        written = _publish_life_events(config, ledger, vault, run_id, events)
+        result.update(response)
+        return StageReport((), 0, 0, 1, False, written=written)
+
+    outcome = _execute(config, stage, "compile")
+    return outcome, result if outcome.exit_code == 0 and not outcome.already_running else {}
+
+
+def run_life_import(config: Config, source_id: str, kind: str, raw: bytes, *,
+                    filename: str = "export.json", now: datetime | None = None
+                    ) -> tuple[RunOutcome, dict[str, object]]:
+    """Explicit export/sensor ingress. Acknowledgement follows durable publication."""
+    from uuid import NAMESPACE_URL, uuid5
+
+    from sb.life_config import policy_for
+    from sb.life_contracts import LifeInputError
+    from sb.life_imports import prepare
+    from sb.life_values import parse_event
+    from sb.life_views import core_page_id
+    from sb.store.life_journal import LifeJournal, identity
+
+    clock = now if now is not None else datetime.now(UTC)
+    prepared = prepare(config, source_id, kind, raw, filename=filename, now=clock)
+    policy = policy_for(config, source_id, admission=False)
+    result: dict[str, object] = {}
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        store = ledger.life_store()
+        journal = LifeJournal(store)
+        iid = identity("import_receipt", [source_id, kind, prepared.input_digest])
+        previous = journal.raw("import_receipt", iid)
+        original_digest = store.cas.put(raw)
+        if original_digest != prepared.input_digest or not store.cas.exists(original_digest):
+            raise LifeInputError("LIFE_RAW_UNAVAILABLE")
+        original_source = SourceItem(source_id, "life-import/" + prepared.input_digest,
+                                    prepared.input_digest, original_digest, run_id, run_id)
+        ledger.upsert_source_item(original_source)
+        ledger.bind_source_access(original_source, config.source_access[source_id])
+        changed = {}
+        receipts = []
+        deleted_ids = []
+        with ledger.transaction():
+            for payload in prepared.payloads:
+                event = parse_event(payload, policy, recorded_at=clock)
+                if store.connection.execute("SELECT 1 FROM life_tombstones WHERE event_id=?",
+                                            (event.event_id,)).fetchone():
+                    continue
+                current = store.connection.execute(
+                    "SELECT current_revision,deleted FROM life_events WHERE event_id=?",
+                    (event.event_id,),
+                ).fetchone()
+                expected = None if current is None else current[0]
+                if current is not None:
+                    prior_event = store.get(event.event_id, scopes=policy.scopes, now=clock)
+                    known_version = store.connection.execute(
+                        "SELECT 1 FROM life_event_revisions WHERE event_id=? AND source_version=?",
+                        (event.event_id, event.source_version),
+                    ).fetchone()
+                    if (known_version is None and prior_event.evidence_level == "user_asserted"
+                            and event.evidence_level != "user_asserted"):
+                        raise LifeInputError("LIFE_SOURCE_USER_CORRECTION_CONFLICT")
+                receipt = store.accept(payload, policy, key="import-" + event.raw_digest,
+                                       expected_revision=expected, now=clock)
+                receipts.append(receipt.as_dict())
+                current_event = store.get(receipt.event_id, scopes=policy.scopes, now=clock)
+                changed[current_event.event_id] = current_event
+            for source_item in prepared.deleted_source_items:
+                event_id = str(uuid5(NAMESPACE_URL, "sb-life:v1:" + source_id + "\0" + source_item))
+                row = store.connection.execute("SELECT current_revision FROM life_events WHERE event_id=?",
+                                               (event_id,)).fetchone()
+                revision = row[0] if row else 1
+                store.connection.execute("UPDATE life_events SET deleted=1 WHERE event_id=?", (event_id,))
+                store.connection.execute(
+                    "INSERT OR IGNORE INTO life_tombstones(event_id,revision,scopes_json,deleted_at) VALUES(?,?,?,?)",
+                    (event_id, revision, json.dumps(policy.scopes), clock.isoformat()),
+                )
+                deleted_ids.append(event_id)
+                changed.pop(event_id, None)
+        written = _publish_life_events(config, ledger, vault, run_id, tuple(changed.values()))
+        for event_id in deleted_ids:
+            page_id = core_page_id(event_id)
+            if (vault.root / git_rel(page_id)).exists():
+                vault.forget_page(page_id, life_owned=True)
+        if deleted_ids and ".staging" not in vault.root.parts:
+            from sb.search import SearchIndex
+            explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+            SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+        body = {"source_id": source_id, "kind": kind, "input_digest": prepared.input_digest,
+                "receipts": receipts, "removed_event_ids": deleted_ids,
+                "anchor": prepared.anchor, "state": "published",
+                "device_projected": False, "physical_erasure": False}
+        # Omit volatile receipt replay flags from the immutable import identity.
+        for receipt in body["receipts"]:
+            receipt.pop("replayed", None)
+        if previous is not None:
+            body = previous["body"]
+        record = journal.put("import_receipt", iid, body, events=(), scopes=policy.scopes,
+                             source_ids=(source_id,), now=clock)
+        result.update(record["body"])
+        result["import_receipt_id"] = iid
+        if prepared.anchor is not None and previous is None:
+            ledger.set_cursor("life-health:" + source_id + ":" + str(json.loads(raw).get("type")),
+                              prepared.anchor, clock.isoformat())
+        return StageReport((), 0, 0, len(receipts) + len(deleted_ids), False, written=written)
+
+    outcome = _execute(config, stage, "compile")
+    return outcome, result if not outcome.exit_code and not outcome.already_running else {}
+
+
+def run_life_maintenance(config: Config, *, source_ids: tuple[str, ...],
+                         scopes: tuple[str, ...], now: datetime | None = None,
+                         limit: int = 1000) -> tuple[RunOutcome, dict[str, object]]:
+    """Bounded lifecycle repair, even when new capture is OFF.
+
+    Only selected source-owned pages are repaired or withdrawn. This does not
+    erase shared original bytes or run arbitrary recovery/deployment commands.
+    """
+    from sb.life_config import policies
+    from sb.life_contracts import LifeInputError
+    from sb.life_values import instant
+    from sb.life_views import core_page_id
+    from sb.store.life import _decode
+
+    configured = policies(config)
+    if (type(limit) is not int or not 1 <= limit <= 1000 or not source_ids
+            or any(s not in configured for s in source_ids)
+            or not {v for s in source_ids for v in configured[s].scopes}.issubset(scopes)):
+        raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+    clock = now if now is not None else datetime.now(UTC)
+    result: dict[str, object] = {}
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        store = ledger.life_store()
+        placeholders = ",".join("?" for _ in source_ids)
+        rows = store.connection.execute(
+            "SELECT e.event_id,e.current_revision,e.deleted,e.expires_at,r.body_json,r.body_digest "
+            "FROM life_events e JOIN life_event_revisions r ON r.event_id=e.event_id "
+            "AND r.revision=e.current_revision WHERE e.source_id IN (" + placeholders + ") "
+            "ORDER BY e.event_id", source_ids,
+        )
+        repaired = removed = expired = 0
+        work = []
+        for row in rows:
+            event = _decode((row[4], row[5]))
+            if not set(event.scopes).issubset(scopes):
+                continue
+            policy = configured[event.source_id]
+            live = (not row[2] and instant(row[3]) > clock and policy.enabled
+                    and policy.scopes == event.scopes and policy.sensitivity == event.sensitivity
+                    and policy.policy_revision == event.policy_revision
+                    and policy.external_processing == event.external_processing
+                    and not store.cas.is_tombstoned(event.raw_digest)
+                    and store.cas.exists(event.raw_digest))
+            page_id = core_page_id(event.event_id)
+            path = vault.root / git_rel(page_id)
+            must_expire = not row[2] and instant(row[3]) <= clock
+            if live:
+                from sb.life_visibility import allowed
+                try:
+                    raw = subprocess.check_output(["git", "-C", str(vault.root), "show", "HEAD:" + git_rel(page_id)], stderr=subprocess.DEVNULL)
+                except subprocess.CalledProcessError:
+                    raw = None
+                if raw is not None and allowed(vault.root, page_id, raw=raw, config=config, now=clock):
+                    continue
+            elif not path.exists() and not must_expire:
+                continue
+            work.append((event, live, must_expire))
+            if len(work) > limit:
+                break
+        more = len(work) > limit
+        for event, live, must_expire in work[:limit]:
+            if must_expire:
+                with ledger.transaction():
+                    store.connection.execute("UPDATE life_events SET deleted=1 WHERE event_id=?", (event.event_id,))
+                    store.connection.execute(
+                        "INSERT OR IGNORE INTO life_tombstones(event_id,revision,scopes_json,deleted_at) VALUES(?,?,?,?)",
+                        (event.event_id, event.revision, json.dumps(event.scopes), clock.isoformat()),
+                    )
+                expired += 1
+            if live:
+                repaired += _publish_life_events(config, ledger, vault, run_id, (event,))
+            else:
+                page_id = core_page_id(event.event_id)
+                if (vault.root / git_rel(page_id)).exists():
+                    vault.forget_page(page_id, life_owned=True)
+                    removed += 1
+        if removed and ".staging" not in vault.root.parts:
+            from sb.search import SearchIndex
+            explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+            SearchIndex(vault.root, registry_path=explicit).project()
+        result.update(repaired=repaired, withdrawn_pages=removed, expired_events=expired,
+                      more_pending=more, shared_raw_physically_erased=False)
+        return StageReport((), 0, 0, min(len(work), limit), more, written=repaired + removed)
+
+    outcome = _execute(config, stage, "compile")
+    return outcome, result if not outcome.exit_code and not outcome.already_running else {}
+
+
 def run_life_batch(
     config: Config, source_id: str, items: Sequence[Mapping[str, object]], *,
     now: datetime | None = None,
@@ -1137,7 +1416,7 @@ def run_life_batch(
 
     policy = policy_for(config, source_id)
     clock = now if now is not None else datetime.now(UTC)
-    if not 1 <= len(items) <= 100 or len(canonical_bytes(items)) > 2 * 1024 * 1024:
+    if not 1 <= len(items) <= 100 or len(canonical_bytes(items)) > 24 * 1024 * 1024:
         raise LifeInputError("LIFE_BATCH_INVALID")
     prepared: list[tuple[str, Mapping[str, object], int | None]] = []
     for item in items:
@@ -1185,6 +1464,12 @@ def run_life_batch(
                                            f"{committed or 'HEAD'}:{git_rel(page.page_id)}"])
             ledger.bind_page_access(git_rel(page.page_id).removesuffix(".md"),
                                    "sha256:" + hashlib.sha256(raw).hexdigest(), access)
+            from sb.memory_records import parse_page_records
+            from sb.store.life_journal import LifeJournal
+            page_event = next(store.get(receipt["event_id"], scopes=policy.scopes, now=clock)
+                              for receipt in receipts
+                              if page.page_id == "wiki/life-event-" + receipt["event_id"])
+            LifeJournal(store).bind_records(page_event, parse_page_records(raw, page.page_id))
         if pages and ".staging" not in vault.root.parts:
             from sb.search import SearchIndex
             explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
@@ -1228,7 +1513,7 @@ def run_life_forget(
             raise LifeInputError("LIFE_REVISION_CONFLICT")
         page_id = core_page_id(event_id)
         if (vault.root / git_rel(page_id)).exists():
-            vault.forget_page(page_id)
+            vault.forget_page(page_id, life_owned=True)
         if ".staging" not in vault.root.parts:
             from sb.search import SearchIndex
             explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
@@ -1379,6 +1664,12 @@ def audit_citations(root: Path) -> tuple[str, ...]:
             text = path.read_text(encoding="utf-8")
             facts = parse_page_frontmatter(text)
             known = {digest[:8] for _origin, digest in (facts.sources if facts is not None else ())}
+            # A SourceCite sid may bind origin+hash rather than hash[:8]. Use
+            # the actual declared citation identities; never rewrite records
+            # merely to satisfy an obsolete shortcut in the audit.
+            spec = read_page_spec(root, path.relative_to(root).as_posix().removesuffix(".md"))
+            if spec is not None:
+                known = {cite.sid for cite in spec.sources}
             if facts is not None:
                 for _origin, digest in facts.sources:
                     if len(digest) != 64 or not (root / "raw" / digest[:2] / digest).is_file():

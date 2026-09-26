@@ -86,7 +86,12 @@ def test_privacy_manifests_declare_explicit_user_content_without_tracking() -> N
         manifest = plistlib.loads((ROOT / relative).read_bytes())
         assert manifest["NSPrivacyTracking"] is False
         collected = manifest["NSPrivacyCollectedDataTypes"]
-        assert {item["NSPrivacyCollectedDataType"] for item in collected} == expected
+        permitted = expected | (
+            {"NSPrivacyCollectedDataTypeHealth", "NSPrivacyCollectedDataTypeFitness"}
+            if relative.startswith("ios/App/")
+            else set()
+        )
+        assert {item["NSPrivacyCollectedDataType"] for item in collected} == permitted
         assert all(item["NSPrivacyCollectedDataTypeTracking"] is False for item in collected)
         assert all(
             item["NSPrivacyCollectedDataTypePurposes"]

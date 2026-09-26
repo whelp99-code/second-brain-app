@@ -12,6 +12,10 @@ from typing import Final
 
 EVENT_TYPES: Final = frozenset(
     {
+        "mail_message",
+        "document_saved",
+        "ai_conversation",
+        "audio_transcript",
         "note_saved",
         "link_saved",
         "calendar_event",
@@ -24,6 +28,8 @@ EVENT_TYPES: Final = frozenset(
         "health_sample",
         "health_deleted",
         "decision",
+        "task_started",
+        "activity_started",
         "task_completed",
         "question_answer",
     }
@@ -69,7 +75,9 @@ class SourcePolicyV1:
     policy_revision: str = "v1"
 
     def __post_init__(self) -> None:
-        if not isinstance(self.policy_revision, str) or not IDENTIFIER.fullmatch(self.policy_revision):
+        if not isinstance(self.policy_revision, str) or not IDENTIFIER.fullmatch(
+            self.policy_revision
+        ):
             raise LifeInputError("LIFE_POLICY_INVALID")
         if not isinstance(self.source_id, str) or not IDENTIFIER.fullmatch(self.source_id):
             raise LifeInputError("LIFE_SOURCE_INVALID")
@@ -109,6 +117,14 @@ class EntityRefV1:
 
 
 @dataclass(frozen=True, slots=True)
+class AttachmentRefV1:
+    name: str
+    mime: str
+    size: int
+    sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class LifeEventV1:
     schema_version: int
     event_id: str
@@ -142,6 +158,7 @@ class LifeEventV1:
     confidence: float | None = None
     change_reason: str | None = None
     policy_revision: str = "v1"
+    attachments: tuple[AttachmentRefV1, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         result = asdict(self)

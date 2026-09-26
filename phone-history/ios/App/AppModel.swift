@@ -53,6 +53,10 @@ final class AppModel: ObservableObject {
 
     private func handleForegroundActivation() async {
         await reloadLocal()
+        if !isPaused, LifeHealthBridge.shared.automatic, LifeMemoryBridge.shared.enabled {
+            do { _ = try await LifeHealthBridge.shared.syncSelected() }
+            catch { presentedError = error.localizedDescription }
+        }
         guard let services else { return }
         if services.preferences.foregroundSyncRequested {
             services.preferences.foregroundSyncRequested = false

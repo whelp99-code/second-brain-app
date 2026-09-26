@@ -2,7 +2,7 @@
 
 # Agent notes
 
-Work in `/Volumes/DevSpace/second-brain-app`. The vault at `/Volumes/DevSpace/second-brain` is a different repo. Do not push either, and leave `/Volumes/DevSpace/me-wiki` and `/Volumes/DevSpace/orca/Wiki-spike` untouched.
+Use the selected app repository root: Ubuntu `/home/jm/orca/projects/second-brain-app`; the historical Mac path is `/Volumes/DevSpace/second-brain-app` and must be verified before use. The vault at `/Volumes/DevSpace/second-brain` is a different repo. Do not push either, and leave `/Volumes/DevSpace/me-wiki` and `/Volumes/DevSpace/orca/Wiki-spike` untouched.
 
 ## Module boundaries
 

@@ -281,19 +281,12 @@ class SearchIndex:
         db_path = _db_path(root)
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(db_path, root, registry)
-        hits = _lexical(
-            db_path,
-            query,
-            limit,
-            kinds=kinds,
-            status=status,
-            updated_from=updated_from,
-            updated_to=updated_to,
-            scope=scope,
-        )
+        with closing(self.iter_lexical_hits(query, kinds=kinds, status=status,
+                updated_from=updated_from, updated_to=updated_to, scope=scope)) as visible_hits:
+            hits = tuple(islice(visible_hits, max(0, limit)))
         if not _wants_hybrid(self.hybrid):
             return hits
-        return _hybrid_or_lexical(
+        combined = _hybrid_or_lexical(
             hits,
             query,
             limit,
@@ -302,6 +295,7 @@ class SearchIndex:
                 tuple(kinds or ()), status, updated_from, updated_to, scope, self.min_similarity
             ),
         )
+        return tuple(hit for hit in combined if _life_hit_allowed(root, hit.page_id))
 
     def iter_lexical_hits(
         self,
@@ -339,7 +333,9 @@ class SearchIndex:
                     scope=scope,
                     offset=offset,
                 )
-                yield from rows
+                for hit in rows:
+                    if _life_hit_allowed(root, hit.page_id):
+                        yield hit
                 if len(rows) < 128:
                     return
                 offset += len(rows)
@@ -360,6 +356,8 @@ class SearchIndex:
             metadata: dict[str, tuple[str, str, str]] = {}
             with closing(iter_sealed_rows(root, query)) as rows:
                 for page, section, snippet, score in rows:
+                    if not _life_hit_allowed(root, page):
+                        continue
                     kind = page.split("/")[0]
                     if kinds and kind not in kinds:
                         continue
@@ -430,7 +428,8 @@ class SearchIndex:
                 root,
                 KnowledgeRegistry(resolve_registry_path(root, self.registry_path)).read_snapshot(),
             )
-            return module.query_sealed_cosine(root, query, limit, filters=filters, states=states)
+            semantic = module.query_sealed_cosine(root, query, limit, filters=filters, states=states)
+            return tuple(hit for hit in semantic if _life_hit_allowed(root, hit.page_id))
         except (EmbeddingUnavailable, ImportError, OSError):
             _LOGGER.warning("sealed vector retrieval unavailable; using lexical results")
             return ()
@@ -458,6 +457,14 @@ class SearchIndex:
                 "DELETE FROM docs WHERE source_ref LIKE ? OR text LIKE ?",
                 (f"%{content_hash}%", f"%{content_hash}%"),
             )
+
+
+def _life_hit_allowed(root: Path, page_id: str) -> bool:
+    if not page_id.startswith("wiki/life-event-"):
+        return True
+    from sb.life_visibility import allowed
+    raw = committed_text(root, page_id.removesuffix(".md") + ".md")
+    return raw is not None and allowed(root, page_id, raw=raw)
 
 
 def _db_path(root: Path) -> Path:

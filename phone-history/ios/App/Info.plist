@@ -14,6 +14,7 @@
   <key>CFBundleURLTypes</key>
   <array><dict><key>CFBundleTypeRole</key><string>Editor</string><key>CFBundleURLSchemes</key><array><string>phonehistory</string></array></dict></array>
   <key>LSRequiresIPhoneOS</key><true/>
+  <key>NSHealthShareUsageDescription</key><string>사용자가 선택한 수면·걸음 수·심박·HRV 기록을 개인 세컨드브레인에 보관하고, 실제 근거가 있는 하루 기록을 제공합니다.</string>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>BGTaskSchedulerPermittedIdentifiers</key><array><string>com.blro.phonehistory.refresh</string></array>
   <key>UIBackgroundModes</key><array><string>fetch</string></array>

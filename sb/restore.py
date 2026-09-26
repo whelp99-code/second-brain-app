@@ -273,6 +273,10 @@ class GenerationRestoreSanitizer:
                     raise RestoreError("MEMORY_SCOPED_RESTORE_DENIED") from exc
 
             def materialize(root: Path) -> None:
+                from sb.life_restore import capture, has_life
+                from sb.life_restore import materialize as restore_current_life
+                latest_life = capture(root)
+                archive_has_life = has_life(staging)
                 ManagedRestoreInventory.materialize(root, inventory)
                 if knowledge or access:
                     with Ledger(root) as ledger, ledger.transaction():
@@ -282,6 +286,7 @@ class GenerationRestoreSanitizer:
                             for identity, requirement in page.sources:
                                 ledger.bind_source_classification(identity, requirement)
                             ledger.bind_page_access(page.page_id, page.content_digest, page.requirements)
+                restore_current_life(latest_life, root, old_archive_has_life=archive_has_life)
 
             result = mutations.mutate(
                 GenerationMutation(

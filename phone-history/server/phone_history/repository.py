@@ -268,14 +268,17 @@ class Repository:
             )
             connection.execute(
                 "INSERT INTO attachments_retained "
-                "(id,event_id,content_sha256,size_bytes,metadata_enc,storage_path,expires_at,created_at) "
+                "(id,event_id,content_sha256,size_bytes,metadata_enc,"
+                "storage_path,expires_at,created_at) "
                 "SELECT id,event_id,content_sha256,size_bytes,metadata_enc,storage_path,"
                 "NULL,created_at FROM attachments"
             )
             connection.execute("DROP TABLE attachments")
             connection.execute("ALTER TABLE attachments_retained RENAME TO attachments")
         else:
-            connection.execute("UPDATE attachments SET expires_at = NULL WHERE expires_at IS NOT NULL")
+            connection.execute(
+                "UPDATE attachments SET expires_at = NULL WHERE expires_at IS NOT NULL"
+            )
 
     def get_idempotency(self, key: str, request_digest: str) -> IdempotencyReceipt | None:
         key_digest = _sha256_text(key)

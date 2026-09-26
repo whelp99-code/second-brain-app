@@ -288,6 +288,19 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             del format, args
 
         def _json(self, status: HTTPStatus, payload: object) -> None:
+            if (200 <= int(status) < 300 and hasattr(self, "life_actor")
+                    and urlsplit(self.path).path.startswith("/api/life/v1/")):
+                from sb.life_auth import admin_token, current_config
+                from sb.life_contracts import LifeInputError
+                from sb.life_http import authorize
+                try:
+                    fresh = current_config(context.config)
+                    actor = authorize(fresh, self.headers.get("Authorization", ""),
+                                      admin_token(fresh, context.config, context.token))
+                    if actor != self.life_actor or fresh.raw != self.life_config.raw:
+                        status, payload = HTTPStatus.FORBIDDEN, {"error": "LIFE_AUTH_CHANGED_RETRY"}
+                except LifeInputError:
+                    status, payload = HTTPStatus.SERVICE_UNAVAILABLE, {"error": "LIFE_AUTH_CONFIG_UNAVAILABLE"}
             body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
             try:
                 self.send_response(status)
@@ -302,11 +315,14 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
 
         def _authorized(self) -> bool:
             if urlsplit(self.path).path.startswith("/api/life/v1/"):
+                from sb.life_auth import admin_token, current_config
                 from sb.life_contracts import LifeInputError
                 from sb.life_http import authorize, error_status
                 try:
+                    self.life_config = current_config(context.config)
                     self.life_actor = authorize(
-                        context.config, self.headers.get("Authorization", ""), context.token
+                        self.life_config, self.headers.get("Authorization", ""),
+                        admin_token(self.life_config, context.config, context.token)
                     )
                 except LifeInputError as exc:
                     self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
@@ -359,7 +375,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 from sb.life_contracts import LifeInputError
                 from sb.life_http import error_status, read_endpoint
                 try:
-                    result = read_endpoint(context.config, root, self.life_actor, self.path)
+                    result = read_endpoint(self.life_config, root, self.life_actor, self.path)
                     self._json(HTTPStatus.OK, result)
                 except LifeInputError as exc:
                     self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
@@ -528,6 +544,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
         def _post(self) -> None:
             parsed = urlsplit(self.path)
             maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
+            if parsed.path in {"/api/life/v1/events:batch", "/api/life/v1/exports/import"} or parsed.path.startswith(("/api/life/v1/overland/", "/api/life/v1/health/")):
+                maximum = 24 * 1024 * 1024
             data = self._body(maximum)
             if parsed.path.startswith("/api/life/v1/"):
                 self._life_post(parsed.path, data)
@@ -662,11 +680,112 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
+        def _life_import_request(self, path: str, data: dict[str, object]) -> bool:
+            import base64
+            import binascii
+
+            from sb.life_contracts import LifeInputError
+            from sb.life_http import error_status, require_source
+            from sb.life_values import canonical_bytes, text
+            from sb.pipeline import run_life_import
+
+            route = path.removeprefix("/api/life/v1/")
+            if not (route == "exports/import" or route.startswith(("overland/", "health/"))):
+                return False
+            try:
+                if self.life_actor.client and not self.life_actor.can_write:
+                    raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+                if route == "exports/import":
+                    if set(data) != {"source_id", "format", "filename", "content_base64"}:
+                        raise LifeInputError("LIFE_IMPORT_INVALID")
+                    source = require_source(self.life_actor, data["source_id"])
+                    kind = text(data["format"], maximum=64)
+                    filename = text(data["filename"], maximum=512)
+                    try:
+                        raw = base64.b64decode(data["content_base64"], validate=True)
+                    except (binascii.Error, ValueError, TypeError) as exc:
+                        raise LifeInputError("LIFE_IMPORT_INVALID") from exc
+                else:
+                    kind, _, name = route.partition("/")
+                    source = require_source(self.life_actor, unquote(name))
+                    filename = kind + ".json"
+                    raw = canonical_bytes(data)
+                outcome, result = run_life_import(self.life_config, source, kind, raw, filename=filename)
+                if outcome.already_running:
+                    self._json(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY"})
+                elif outcome.exit_code:
+                    code = (outcome.failure or "LIFE_IMPORT_FAILED").split(": ")[-1]
+                    code = code if code.startswith("LIFE_") and len(code) <= 100 else "LIFE_IMPORT_FAILED"
+                    self._json(HTTPStatus(error_status(code)) if code != "LIFE_IMPORT_FAILED" else HTTPStatus.SERVICE_UNAVAILABLE,
+                               {"error": code, "run_id": outcome.run_id})
+                else:
+                    # Overland removes its local queue only for this result.
+                    self._json(HTTPStatus.OK if kind == "overland" else HTTPStatus.ACCEPTED,
+                               {"result": "ok", **result, "run_id": outcome.run_id})
+            except LifeInputError as exc:
+                self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+            return True
+
+        def _life_workflow_request(self, path: str, data: dict[str, object]) -> bool:
+            from datetime import UTC, datetime
+
+            from sb.life_api_reads import recall_request
+            from sb.life_contracts import LifeInputError
+            from sb.life_http import error_status
+            from sb.pipeline import run_life_workflow
+
+            route = path.removeprefix("/api/life/v1/")
+            routes = {
+                "questions/generate": "questions_generate",
+                "briefings/generate": "briefing_generate", "tick": "tick",
+                "deliveries/prepare": "delivery_prepare", "deliveries/state": "delivery_finish",
+                "deliveries/opened": "delivery_opened", "relations": "relation_put",
+                "entity-aliases": "entity_alias", "predictions/issue": "prediction_issue",
+                "predictions/evaluate": "prediction_evaluate", "models/reserve": "model_reserve",
+                "models/settle": "model_settle", "views/obsidian/ack": "view_ack",
+                "collection/status": "collection_status",
+            }
+            command = routes.get(route)
+            if route.startswith("questions/") and route.endswith("/response"):
+                command = "question_response"
+                data = {**data, "question_id": unquote(route[len("questions/"):-len("/response")])}
+            if route != "recall" and command is None:
+                return False
+            clock = datetime.now(UTC)
+            try:
+                if route == "recall":
+                    with read_root(context.config) as root:
+                        result = recall_request(self.life_config, root, self.life_actor, data, now=clock)
+                    self._json(HTTPStatus.OK, result)
+                    return True
+                outcome, result = run_life_workflow(self.life_config, command, data,
+                    source_ids=self.life_actor.source_ids, scopes=self.life_actor.scopes,
+                    now=clock, client=self.life_actor.client, device_id=self.life_actor.device_id,
+                    client_can_write=self.life_actor.can_write)
+                if outcome.already_running:
+                    self._json(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY", "retryable": True})
+                elif outcome.exit_code:
+                    detail = outcome.failure or "LIFE_WORKFLOW_FAILED"
+                    code = detail.split(": ")[-1]
+                    if not code.startswith("LIFE_") or len(code) > 100:
+                        code = "LIFE_WORKFLOW_FAILED"
+                    status = error_status(code) if code != "LIFE_WORKFLOW_FAILED" else 503
+                    self._json(HTTPStatus(status), {"error": code, "run_id": outcome.run_id})
+                else:
+                    self._json(HTTPStatus.ACCEPTED, {"state": "recorded", "result": result,
+                                                   "run_id": outcome.run_id})
+            except LifeInputError as exc:
+                self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+            return True
+
         def _life_post(self, path: str, data: dict[str, object]) -> None:
+            if self._life_import_request(path, data):
+                return
+            if self._life_workflow_request(path, data):
+                return
             from datetime import UTC, datetime
             from hashlib import sha256
 
-            from sb.life_config import settings
             from sb.life_contracts import LifeInputError
             from sb.life_http import current_event, error_status, require_source
             from sb.life_values import text
@@ -675,13 +794,13 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
 
             clock = datetime.now(UTC)
             try:
-                if self.life_actor.client and not settings(context.config).client_can_write:
+                if self.life_actor.client and not self.life_actor.can_write:
                     raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
                 if path == "/api/life/v1/events:batch":
                     if set(data) != {"source_id", "items"} or not isinstance(data["items"], list):
                         raise LifeInputError("LIFE_BATCH_INVALID")
                     source = require_source(self.life_actor, data["source_id"])
-                    outcome, receipts = run_life_batch(context.config, source, data["items"], now=clock)
+                    outcome, receipts = run_life_batch(self.life_config, source, data["items"], now=clock)
                 elif path == "/api/life/v1/corrections":
                     allowed = {"event_id", "expected_revision", "replacement", "reason",
                                "idempotency_key", "event_status"}
@@ -695,7 +814,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     if type(expected) is not int or expected < 1:
                         raise LifeInputError("LIFE_REVISION_INVALID")
                     with read_root(context.config) as root:
-                        event = current_event(context.config, root, self.life_actor, identity, clock)
+                        event = current_event(self.life_config, root, self.life_actor, identity, clock)
                         with read_life_store(root) as store:
                             original = json.loads(store.evidence(identity,
                                 scopes=self.life_actor.scopes, now=clock, revision=expected))
@@ -704,7 +823,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                                     evidence_level="user_asserted", review_state="confirmed")
                     if "event_status" in data:
                         original["event_status"] = data["event_status"]
-                    outcome, receipts = run_life_batch(context.config, event.source_id, [{
+                    outcome, receipts = run_life_batch(self.life_config, event.source_id, [{
                         "idempotency_key": key, "payload": original, "expected_revision": expected,
                     }], now=clock)
                 elif path == "/api/life/v1/withdrawals":
@@ -717,7 +836,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     expected = data.get("expected_revision")
                     if type(expected) is not int or expected < 1:
                         raise LifeInputError("LIFE_REVISION_INVALID")
-                    outcome = run_life_forget(context.config, source, identity, expected, now=clock)
+                    outcome = run_life_forget(self.life_config, source, identity, expected, now=clock)
                     receipts = ()
                 else:
                     raise LifeInputError("LIFE_ROUTE_NOT_FOUND")

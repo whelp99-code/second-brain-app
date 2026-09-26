@@ -118,6 +118,8 @@ class ErasureEngine:
         erased_hashes: set[str] = set()
         prior_records: list[bytes] = []
         for index, target in enumerate(plan.targets):
+            if target.page_id.removesuffix(".md").startswith("wiki/life-event-"):
+                raise ErasureError("LIFE_EVENT_API_REQUIRED")
             page = self._page(root, target.page_id)
             try:
                 body = page.read_bytes()

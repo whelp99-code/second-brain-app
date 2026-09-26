@@ -11,6 +11,8 @@ struct RootView: View {
                 .tabItem { Label("기록", systemImage: "plus.circle") }
             NavigationStack { ReviewView(model: model) }
                 .tabItem { Label("검토", systemImage: "checklist") }
+            NavigationStack { LifeMemoryView() }
+                .tabItem { Label("기억", systemImage: "brain") }
             NavigationStack { SettingsView(model: model) }
                 .tabItem { Label("설정", systemImage: "gearshape") }
         }

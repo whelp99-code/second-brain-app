@@ -1,6 +1,6 @@
 {
   "schema": "phone-history-predevice-gate-v1",
-  "generated_at": "2026-09-23T12:56:34.066927+00:00",
+  "generated_at": "2026-09-26T15:37:48.607180+00:00",
   "host": {
     "platform": "linux",
     "python": "3.12.13"
@@ -10,7 +10,7 @@
     {
       "name": "generate-ios-contract",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "scripts/generate_ios_contract.py"
       ],
       "exit_code": 0,
@@ -20,7 +20,7 @@
     {
       "name": "generate-ios-api-paths",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "scripts/generate_ios_api_paths.py"
       ],
       "exit_code": 0,
@@ -30,7 +30,7 @@
     {
       "name": "ruff-format",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "-m",
         "ruff",
         "format",
@@ -46,7 +46,7 @@
     {
       "name": "ruff-check",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "-m",
         "ruff",
         "check",
@@ -61,12 +61,12 @@
     {
       "name": "pytest",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "-m",
         "pytest",
         "-q",
         "tests",
-        "--junitxml=/home/jm/orca/projects/second-brain-app/phone-history/evidence/pytest-junit.xml"
+        "--junitxml=/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/phone-history/evidence/pytest-junit.xml"
       ],
       "exit_code": 0,
       "passed": true,
@@ -75,7 +75,7 @@
     {
       "name": "compileall",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "-m",
         "compileall",
         "-q",
@@ -89,7 +89,7 @@
     {
       "name": "ios-static",
       "command": [
-        "/home/jm/orca/projects/second-brain-app/phone-history/../.venv312/bin/python",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/.venv/bin/python",
         "scripts/verify_ios_static.py"
       ],
       "exit_code": 0,
@@ -101,9 +101,9 @@
       "command": [
         "bash",
         "-n",
-        "/home/jm/orca/projects/second-brain-app/phone-history/scripts/generate_xcode_project.sh",
-        "/home/jm/orca/projects/second-brain-app/phone-history/scripts/mac_predevice_gate.sh",
-        "/home/jm/orca/projects/second-brain-app/phone-history/scripts/physical_device_gate.sh"
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/phone-history/scripts/generate_xcode_project.sh",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/phone-history/scripts/mac_predevice_gate.sh",
+        "/home/jm/orca/projects/second-brain-app/.chatgpt2codex/sb2-completion-20260926/candidate-snapshot/phone-history/scripts/physical_device_gate.sh"
       ],
       "exit_code": 0,
       "passed": true,
@@ -124,7 +124,7 @@
     }
   ],
   "pytest": {
-    "tests": 47,
+    "tests": 56,
     "failures": 0,
     "errors": 0,
     "skipped": 0

@@ -47,6 +47,7 @@ INPUT_FIELDS = frozenset(
         "unit",
         "confidence",
         "change_reason",
+        "attachments",
     }
 )
 MAX_INPUT_BYTES = 1024 * 1024
@@ -168,8 +169,10 @@ def parse_event(
         raise LifeInputError("LIFE_SOURCE_DISABLED")
     if not isinstance(payload, Mapping) or set(payload) - INPUT_FIELDS:
         raise LifeInputError("LIFE_UNKNOWN_FIELD")
+    from sb.life_attachments import MAX_ENVELOPE_BYTES, decode_attachments
+
     raw = canonical_bytes(dict(payload))
-    if len(raw) > MAX_INPUT_BYTES:
+    if len(raw) > (MAX_ENVELOPE_BYTES if payload.get("attachments") else MAX_INPUT_BYTES):
         raise LifeInputError("LIFE_INPUT_TOO_LARGE")
     if (
         not isinstance(recorded_at, datetime)
@@ -254,6 +257,7 @@ def parse_event(
         external_processing=policy.external_processing,
         retention_days=policy.retention_days,
         policy_revision=policy.policy_revision,
+        attachments=tuple(ref for ref, _raw in decode_attachments(payload.get("attachments"))),
         raw_digest=sha256(raw).hexdigest(),
         value=value,
         value_status=value_status,

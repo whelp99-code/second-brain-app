@@ -39,7 +39,9 @@ class Settings:
             raise ConfigurationError("PHONE_HISTORY_PORT is invalid")
         if self.max_request_bytes < 1024:
             raise ConfigurationError("PHONE_HISTORY_MAX_REQUEST_BYTES is too small")
-        if self.attachment_retention_days is not None and not (1 <= self.attachment_retention_days <= 3650):
+        if self.attachment_retention_days is not None and not (
+            1 <= self.attachment_retention_days <= 3650
+        ):
             raise ConfigurationError("attachment retention must be between 1 and 3650 days")
 
     @property

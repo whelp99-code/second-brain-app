@@ -9,7 +9,7 @@ import os
 import re
 import stat
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
@@ -282,8 +282,39 @@ class Vault:
             [path],
         )
 
-    def forget_page(self, page_id: str) -> str | None:
+    def restore_life_pages(self, pages: Mapping[str, bytes]) -> str | None:
+        """Exact current life bytes in an unpublished restore candidate.
+
+        Called by life_restore only after archive validation and current-ledger
+        capture. Identity, citation offsets and original record digests survive.
+        Other wiki pages and every user MyNotes path are outside this boundary.
+        """
+        prefix = "wiki/life-event-"
+        valid = re.compile(r"wiki/life-event-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.md\Z")
+        if any(valid.fullmatch(path) is None or not isinstance(content, bytes)
+               for path, content in pages.items()):
+            raise VaultLintError(("LIFE_RESTORE_PAGE_INVALID",))
+        current = tuple((self.root / "wiki").glob("life-event-*.md"))
+        touched: list[Path] = []
+        for path in current:
+            relative = path.relative_to(self.root).as_posix()
+            if valid.fullmatch(relative) is None or path.is_symlink():
+                raise VaultLintError(("LIFE_RESTORE_PAGE_INVALID",))
+            if relative not in pages:
+                path.unlink()
+                touched.append(path)
+        for relative, content in pages.items():
+            destination = _safe_rel(self.root, Path(relative))
+            _atomic_write(destination, content.decode("utf-8"))
+            touched.append(destination)
+            _write_compiled_marker(self.root, relative.removesuffix(".md"), destination)
+        del prefix
+        return _commit_if_changed(self.root, "sb: preserve current life state on restore", touched)
+
+    def forget_page(self, page_id: str, *, life_owned: bool = False) -> str | None:
         """Remove one compiled page through the existing git commit boundary."""
+        if page_id.removesuffix(".md").startswith("wiki/life-event-") and not life_owned:
+            raise VaultLintError(("LIFE_EVENT_API_REQUIRED",))
         rel = _rel_for(page_id)
         if rel.parts[0] not in {"wiki", "daily", "conflicts"} or len(rel.parts) != 2:
             raise PathEscapeError(page_id=page_id)

@@ -354,7 +354,9 @@ def test_episode_grouping_is_deterministic(settings: object) -> None:
     assert repository.episodes() == snapshot
 
 
-def test_original_attachments_have_no_default_expiry(settings: object, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_original_attachments_have_no_default_expiry(
+    settings: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("PHONE_HISTORY_API_TOKEN", settings.api_token)
     monkeypatch.setenv(
         "PHONE_HISTORY_MASTER_KEY_B64", base64.urlsafe_b64encode(settings.master_key).decode()
@@ -363,7 +365,9 @@ def test_original_attachments_have_no_default_expiry(settings: object, monkeypat
     assert Settings.from_environment().attachment_retention_days is None
     assert settings.attachment_retention_days is None
     repository = Repository(settings)
-    event = batch_from(event_dict(event_id="phevt:retention:001", attachment=b"permanent")).events[0]
+    event = batch_from(event_dict(event_id="phevt:retention:001", attachment=b"permanent")).events[
+        0
+    ]
     repository.ingest_event("iphone", event, candidate_payload=None)
     with sqlite3.connect(settings.database_path) as connection:
         assert connection.execute("SELECT expires_at FROM attachments").fetchone()[0] is None
@@ -376,14 +380,17 @@ def test_migration_clears_legacy_expiry_without_deleting_original_or_derived_row
     settings: object,
 ) -> None:
     repository = Repository(replace(settings, attachment_retention_days=1))
-    event = batch_from(event_dict(event_id="phevt:legacy:001", attachment=b"keep original")).events[0]
+    event = batch_from(event_dict(event_id="phevt:legacy:001", attachment=b"keep original")).events[
+        0
+    ]
     repository.ingest_event("iphone", event, candidate_payload=_candidate("Derived", "Keep"))
     with sqlite3.connect(settings.database_path) as connection:
         relative = connection.execute("SELECT storage_path FROM attachments").fetchone()[0]
         connection.execute("ALTER TABLE attachments RENAME TO attachments_old")
         connection.execute(
             "CREATE TABLE attachments ("
-            "id TEXT PRIMARY KEY, event_id TEXT NOT NULL UNIQUE REFERENCES events(id) ON DELETE CASCADE,"
+            "id TEXT PRIMARY KEY, event_id TEXT NOT NULL UNIQUE "
+            "REFERENCES events(id) ON DELETE CASCADE,"
             "content_sha256 TEXT NOT NULL, size_bytes INTEGER NOT NULL CHECK (size_bytes > 0),"
             "metadata_enc BLOB NOT NULL, storage_path TEXT NOT NULL UNIQUE,"
             "expires_at TEXT NOT NULL, created_at TEXT NOT NULL)"
@@ -396,9 +403,7 @@ def test_migration_clears_legacy_expiry_without_deleting_original_or_derived_row
         )
         connection.execute("DROP TABLE attachments_old")
         connection.execute("CREATE TABLE derived_cache (payload TEXT, expires_at TEXT)")
-        connection.execute(
-            "INSERT INTO derived_cache VALUES (?, ?)", ("push payload", deadline)
-        )
+        connection.execute("INSERT INTO derived_cache VALUES (?, ?)", ("push payload", deadline))
     original = settings.attachment_dir / relative
     encrypted = original.read_bytes()
 
@@ -406,7 +411,8 @@ def test_migration_clears_legacy_expiry_without_deleting_original_or_derived_row
     with sqlite3.connect(settings.database_path) as connection:
         assert connection.execute("SELECT expires_at FROM attachments").fetchone()[0] is None
         assert connection.execute("SELECT payload,expires_at FROM derived_cache").fetchone() == (
-            "push payload", deadline
+            "push payload",
+            deadline,
         )
         assert connection.execute("SELECT COUNT(*) FROM candidates").fetchone()[0] == 1
     assert original.read_bytes() == encrypted

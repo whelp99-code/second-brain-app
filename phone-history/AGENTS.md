@@ -42,10 +42,7 @@ These rules apply only under `phone-history/`.
   `phone-history` from the repo root — so regenerated Swift must already be committed-clean.
 
 ## ANTI-PATTERNS
-- **`make verify` is broken.** The `Makefile` calls `scripts/verify-contracts.py`,
-  `scripts/verify-ios-static.py` and `scripts/smoke-test.py`, none of which exist (the real
-  files are `generate_ios_contract.py` and `verify_ios_static.py`). Use
-  `python3 scripts/run_predevice_gate.py`; fix the Makefile before relying on it.
+- `make verify` delegates to `scripts/run_predevice_gate.py`; set `PYTHON` when using an existing environment. Static PASS is not an Xcode build or device PASS.
 - Do not hand-edit `ios/Core/Generated*.swift` (rule 2). `GeneratedAPIPaths.swift` pins
   `openAPISHA256` — changing `contracts/openapi.yaml` without regenerating breaks the gate.
 - Do not treat an HTTP 2xx as delivery (rule 8): local queue deletion requires an explicit

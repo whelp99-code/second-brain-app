@@ -59,6 +59,8 @@ targets:
     type: app-extension
     platform: iOS
     sources:
+      - path: Core/GeneratedContract.swift
+      - path: Core/GeneratedAPIPaths.swift
       - path: Core/AppPreferences.swift
       - path: Core/CaptureService.swift
       - path: Core/CaptureServices.swift
@@ -89,7 +91,6 @@ targets:
     platform: iOS
     hostApplication: PhoneHistory
     sources:
-      - path: Core
       - path: Tests
     dependencies:
       - target: PhoneHistory

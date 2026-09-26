@@ -134,6 +134,10 @@ def records_for_page(
     raw = _git(root, "cat-file", "blob", f"HEAD:{rel}", binary=True)
     if not isinstance(raw, bytes):
         raise MemoryRecordError("EFFECT_TARGET_INVALID")
+    if page_id.startswith("wiki/life-event-"):
+        from sb.life_visibility import allowed
+        if not allowed(root, page_id, raw=raw):
+            return ()
     return parse_page_records(raw, page_id)
 
 

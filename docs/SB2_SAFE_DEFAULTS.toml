@@ -1,0 +1,47 @@
+# SB2 candidate configuration. Not an operational configuration or activation.
+# Copy to an isolated directory and set SB_CONFIG to that copy before sb init.
+vault_root = "./sb2-candidate-vault"
+
+[source_access.demo-notes]
+owner = "principal:owner"
+projects = []
+policy_revision = "sb2-example-v1"
+
+[life]
+life_events = false
+life_timeline = false
+obsidian_view = false
+life_briefing = false
+gap_questions = false
+contextual_recall = false
+location_capture = false
+health_capture = false
+prediction = false
+timezone = "Asia/Seoul"
+question_budget = 3
+question_cooldown_hours = 72
+quiet_start = 22
+quiet_end = 8
+client_source_ids = ["demo-notes"]
+client_can_write = false
+view_sensitivities = ["public", "personal"]
+
+[life.sources.demo-notes]
+enabled = false
+allowed_types = ["note_saved", "link_saved", "calendar_event"]
+sensitivity = "personal"
+external_processing = "local_only"
+retention_days = 365
+
+# Only define life_devices after choosing the actual source and expiry.
+# Its token_env names an existing environment variable containing a distinct
+# device token, not the administrator SB_WEB_TOKEN. Never store token values here.
+# [life_devices.example-device]
+# token_env = "SB_LIFE_EXAMPLE_DEVICE_TOKEN"
+# source_ids = ["demo-notes"]
+# can_write = false
+# expires_at = "<explicit future RFC3339 timestamp>"
+# revoked = false
+
+# Model invocation and external notification delivery remain unconfigured.
+# This file does not install a timer or enable any sensor.

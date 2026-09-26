@@ -131,8 +131,10 @@ def test_managed_generation_preserves_events_and_corrected_search(tmp_path):
 
     base, active = _config(tmp_path / "managed")
     source, _ = life_config(tmp_path / "config-only")
-    config = replace(base, raw={**base.raw,
-        "life": source.raw["life"], "source_access": source.raw["source_access"]})
+    config = replace(
+        base,
+        raw={**base.raw, "life": source.raw["life"], "source_access": source.raw["source_access"]},
+    )
     first, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
     assert first.exit_code == 0, first
     assert active.is_symlink()
@@ -141,10 +143,18 @@ def test_managed_generation_preserves_events_and_corrected_search(tmp_path):
     with read_root(config) as root, read_life_store(root) as store:
         assert len(store.events(scopes=("principal:owner",), now=NOW)) == 1
         assert SearchIndex(root).search("실제 메모", 10)
-    corrected, _ = run_life_batch(config, "test-notes", [{
-        "idempotency_key": "correct", "expected_revision": 1,
-        "payload": payload(source_version="v2", body="관리형 정정 내용"),
-    }], now=NOW + timedelta(minutes=1))
+    corrected, _ = run_life_batch(
+        config,
+        "test-notes",
+        [
+            {
+                "idempotency_key": "correct",
+                "expected_revision": 1,
+                "payload": payload(source_version="v2", body="관리형 정정 내용"),
+            }
+        ],
+        now=NOW + timedelta(minutes=1),
+    )
     assert corrected.exit_code == 0, corrected
     assert active.resolve() != original_generation
     with read_root(config) as root, read_life_store(root) as store:

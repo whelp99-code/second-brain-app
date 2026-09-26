@@ -291,9 +291,13 @@ class FakeLLM:
 
 
 class CliLLM:
-    def __init__(self, argv_template: list[str], *, runner: ProcessRunner | None = None) -> None:
+    def __init__(self, argv_template: list[str], *, runner: ProcessRunner | None = None,
+                 attempt_limit: int = ATTEMPT_LIMIT) -> None:
+        if type(attempt_limit) is not int or not 1 <= attempt_limit <= ATTEMPT_LIMIT:
+            raise ValueError("invalid model attempt limit")
         self._argv_template: list[str] = list(argv_template)
         self._runner: ProcessRunner = _run_subprocess if runner is None else runner
+        self._attempt_limit = attempt_limit
 
     def generate(
         self,
@@ -305,7 +309,7 @@ class CliLLM:
     ) -> str:
         argv, stdin_text = _render_invocation(self._argv_template, prompt, system)
         last_reason = "no attempt"
-        for _attempt in range(ATTEMPT_LIMIT):
+        for _attempt in range(self._attempt_limit):
             try:
                 completed = self._runner(argv, stdin_text=stdin_text, timeout=timeout)
             except subprocess.TimeoutExpired:
@@ -326,4 +330,4 @@ class CliLLM:
                 if text:
                     last_reason = f"{last_reason}: {text[:200]}"
                     break
-        raise LLMUnavailable(attempts=ATTEMPT_LIMIT, reason=last_reason)
+        raise LLMUnavailable(attempts=self._attempt_limit, reason=last_reason)

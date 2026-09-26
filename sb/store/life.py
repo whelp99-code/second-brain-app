@@ -26,30 +26,45 @@ from sb.life_contracts import (
 )
 from sb.life_values import canonical_bytes, parse_event, text
 from sb.store.cas import ContentAddressedStore
+from sb.store.life_journal import LifeJournal
 
 SCHEMA_VERSION = 1
 SCHEMA = (
-    ("CREATE TABLE IF NOT EXISTS life_events (event_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
-    "source_item_id TEXT NOT NULL, current_revision INTEGER NOT NULL, deleted INTEGER NOT NULL "
-    "DEFAULT 0 CHECK(deleted IN (0,1)), scopes_json TEXT NOT NULL, policy_digest TEXT NOT NULL, "
-    "expires_at TEXT NOT NULL, UNIQUE(source_id,source_item_id))"),
-    ("CREATE TABLE IF NOT EXISTS life_event_revisions (event_id TEXT NOT NULL, revision INTEGER "
-    "NOT NULL CHECK(revision>0), source_version TEXT NOT NULL, raw_digest TEXT NOT NULL, "
-    "body_json TEXT NOT NULL, body_digest TEXT NOT NULL, recorded_at TEXT NOT NULL, "
-    "PRIMARY KEY(event_id,revision), UNIQUE(event_id,source_version))"),
-    ("CREATE TRIGGER IF NOT EXISTS life_revisions_no_update BEFORE UPDATE ON life_event_revisions "
-    "BEGIN SELECT RAISE(ABORT,'immutable life revision'); END"),
-    ("CREATE TRIGGER IF NOT EXISTS life_revisions_no_replace BEFORE INSERT ON life_event_revisions "
-    "WHEN EXISTS(SELECT 1 FROM life_event_revisions WHERE event_id=NEW.event_id AND revision=NEW.revision) "
-    "BEGIN SELECT RAISE(ABORT,'immutable life revision'); END"),
-    ("CREATE TABLE IF NOT EXISTS life_receipts (receipt_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
-    "request_key TEXT NOT NULL, request_digest TEXT NOT NULL, event_id TEXT NOT NULL, revision "
-    "INTEGER NOT NULL, accepted_at TEXT NOT NULL, UNIQUE(source_id,request_key))"),
-    ("CREATE TABLE IF NOT EXISTS life_tombstones (sequence INTEGER PRIMARY KEY AUTOINCREMENT, "
-    "event_id TEXT NOT NULL UNIQUE, revision INTEGER NOT NULL, scopes_json TEXT NOT NULL, "
-    "deleted_at TEXT NOT NULL)"),
-    ("CREATE TRIGGER IF NOT EXISTS life_events_no_resurrection BEFORE UPDATE ON life_events "
-    "WHEN OLD.deleted=1 AND NEW.deleted=0 BEGIN SELECT RAISE(ABORT,'life event deleted'); END"),
+    (
+        "CREATE TABLE IF NOT EXISTS life_events (event_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
+        "source_item_id TEXT NOT NULL, current_revision INTEGER NOT NULL, deleted INTEGER NOT NULL "
+        "DEFAULT 0 CHECK(deleted IN (0,1)), scopes_json TEXT NOT NULL, policy_digest TEXT NOT NULL, "
+        "expires_at TEXT NOT NULL, UNIQUE(source_id,source_item_id))"
+    ),
+    (
+        "CREATE TABLE IF NOT EXISTS life_event_revisions (event_id TEXT NOT NULL, revision INTEGER "
+        "NOT NULL CHECK(revision>0), source_version TEXT NOT NULL, raw_digest TEXT NOT NULL, "
+        "body_json TEXT NOT NULL, body_digest TEXT NOT NULL, recorded_at TEXT NOT NULL, "
+        "PRIMARY KEY(event_id,revision), UNIQUE(event_id,source_version))"
+    ),
+    (
+        "CREATE TRIGGER IF NOT EXISTS life_revisions_no_update BEFORE UPDATE ON life_event_revisions "
+        "BEGIN SELECT RAISE(ABORT,'immutable life revision'); END"
+    ),
+    (
+        "CREATE TRIGGER IF NOT EXISTS life_revisions_no_replace BEFORE INSERT ON life_event_revisions "
+        "WHEN EXISTS(SELECT 1 FROM life_event_revisions WHERE event_id=NEW.event_id AND revision=NEW.revision) "
+        "BEGIN SELECT RAISE(ABORT,'immutable life revision'); END"
+    ),
+    (
+        "CREATE TABLE IF NOT EXISTS life_receipts (receipt_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
+        "request_key TEXT NOT NULL, request_digest TEXT NOT NULL, event_id TEXT NOT NULL, revision "
+        "INTEGER NOT NULL, accepted_at TEXT NOT NULL, UNIQUE(source_id,request_key))"
+    ),
+    (
+        "CREATE TABLE IF NOT EXISTS life_tombstones (sequence INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "event_id TEXT NOT NULL UNIQUE, revision INTEGER NOT NULL, scopes_json TEXT NOT NULL, "
+        "deleted_at TEXT NOT NULL)"
+    ),
+    (
+        "CREATE TRIGGER IF NOT EXISTS life_events_no_resurrection BEFORE UPDATE ON life_events "
+        "WHEN OLD.deleted=1 AND NEW.deleted=0 BEGIN SELECT RAISE(ABORT,'life event deleted'); END"
+    ),
     "CREATE INDEX IF NOT EXISTS life_revisions_recorded ON life_event_revisions(recorded_at,event_id)",
 )
 
@@ -84,6 +99,9 @@ def _decode(row: tuple) -> LifeEventV1:
         data = json.loads(encoded)
         data["scopes"] = tuple(data["scopes"])
         data["entities"] = tuple(EntityRefV1(**item) for item in data["entities"])
+        from sb.life_contracts import AttachmentRefV1
+
+        data["attachments"] = tuple(AttachmentRefV1(**item) for item in data.get("attachments", []))
         event = LifeEventV1(**data)
         if event.schema_version != 1:
             raise ValueError("schema")
@@ -117,6 +135,7 @@ class LifeStore:
                 "INSERT OR IGNORE INTO schema_meta(key,value) VALUES('life_schema_version',?)",
                 (str(SCHEMA_VERSION),),
             )
+            LifeJournal(self).initialize()
 
     def accept(
         self,
@@ -134,6 +153,13 @@ class LifeStore:
         ):
             raise LifeInputError("LIFE_REVISION_INVALID")
         event = parse_event(payload, policy, recorded_at=now)
+        if (
+            self.connection.execute(
+                "SELECT 1 FROM life_tombstones WHERE event_id=?", (event.event_id,)
+            ).fetchone()
+            is not None
+        ):
+            raise LifeInputError("LIFE_EVENT_DELETED")
         pdigest = sha256(canonical_bytes(asdict(policy))).hexdigest()
         with self.transaction():
             current = self.connection.execute(
@@ -169,6 +195,13 @@ class LifeStore:
                     raise LifeInputError("LIFE_REVISION_CONFLICT")
                 revision = actual_revision + 1
                 event = replace(event, revision=revision)
+                from sb.life_attachments import decode_attachments
+
+                for attachment, content in decode_attachments(payload.get("attachments")):
+                    if self.cas.put(content) != attachment.sha256 or not self.cas.exists(
+                        attachment.sha256
+                    ):
+                        raise LifeInputError("LIFE_RAW_UNAVAILABLE")
                 raw_digest = self.cas.put(canonical_bytes(dict(payload)))
                 if raw_digest != event.raw_digest or not self.cas.exists(raw_digest):
                     raise LifeInputError("LIFE_RAW_UNAVAILABLE")
