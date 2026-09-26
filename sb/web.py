@@ -301,6 +301,20 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 self.close_connection = True
 
         def _authorized(self) -> bool:
+            if urlsplit(self.path).path.startswith("/api/life/v1/"):
+                from sb.life_contracts import LifeInputError
+                from sb.life_http import authorize, error_status
+                try:
+                    self.life_actor = authorize(
+                        context.config, self.headers.get("Authorization", ""), context.token
+                    )
+                except LifeInputError as exc:
+                    self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+                    return False
+                if self.life_actor is not None:
+                    return True
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+                return False
             if context.token is None or not self.path.startswith("/api/"):
                 return True
             supplied = self.headers.get("Authorization", "")
@@ -341,6 +355,15 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
 
         def _get(self, root: Path) -> None:
             parsed = urlsplit(self.path)
+            if parsed.path.startswith("/api/life/v1/"):
+                from sb.life_contracts import LifeInputError
+                from sb.life_http import error_status, read_endpoint
+                try:
+                    result = read_endpoint(context.config, root, self.life_actor, self.path)
+                    self._json(HTTPStatus.OK, result)
+                except LifeInputError as exc:
+                    self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+                return
             if parsed.path == "/":
                 body = _INDEX_HTML.encode("utf-8")
                 self.send_response(HTTPStatus.OK)
@@ -506,6 +529,9 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             parsed = urlsplit(self.path)
             maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
             data = self._body(maximum)
+            if parsed.path.startswith("/api/life/v1/"):
+                self._life_post(parsed.path, data)
+                return
             if parsed.path == "/api/uploads/retract":
                 upload_id = _string_field(data, "upload_id", required=True)
                 try:
@@ -635,6 +661,84 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 self._json(HTTPStatus.OK, {"commit": commit})
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+
+        def _life_post(self, path: str, data: dict[str, object]) -> None:
+            from datetime import UTC, datetime
+            from hashlib import sha256
+
+            from sb.life_config import settings
+            from sb.life_contracts import LifeInputError
+            from sb.life_http import current_event, error_status, require_source
+            from sb.life_values import text
+            from sb.pipeline import run_life_batch, run_life_forget
+            from sb.store.life import read_life_store
+
+            clock = datetime.now(UTC)
+            try:
+                if self.life_actor.client and not settings(context.config).client_can_write:
+                    raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+                if path == "/api/life/v1/events:batch":
+                    if set(data) != {"source_id", "items"} or not isinstance(data["items"], list):
+                        raise LifeInputError("LIFE_BATCH_INVALID")
+                    source = require_source(self.life_actor, data["source_id"])
+                    outcome, receipts = run_life_batch(context.config, source, data["items"], now=clock)
+                elif path == "/api/life/v1/corrections":
+                    allowed = {"event_id", "expected_revision", "replacement", "reason",
+                               "idempotency_key", "event_status"}
+                    if set(data) - allowed:
+                        raise LifeInputError("LIFE_UNKNOWN_FIELD")
+                    identity = text(data.get("event_id"), maximum=160)
+                    key = text(data.get("idempotency_key"), maximum=256)
+                    replacement = text(data.get("replacement"), maximum=100000, empty=True)
+                    reason = text(data.get("reason"), maximum=2000)
+                    expected = data.get("expected_revision")
+                    if type(expected) is not int or expected < 1:
+                        raise LifeInputError("LIFE_REVISION_INVALID")
+                    with read_root(context.config) as root:
+                        event = current_event(context.config, root, self.life_actor, identity, clock)
+                        with read_life_store(root) as store:
+                            original = json.loads(store.evidence(identity,
+                                scopes=self.life_actor.scopes, now=clock, revision=expected))
+                    original.update(body=replacement, change_reason=reason,
+                                    source_version="correction-" + sha256(key.encode()).hexdigest(),
+                                    evidence_level="user_asserted", review_state="confirmed")
+                    if "event_status" in data:
+                        original["event_status"] = data["event_status"]
+                    outcome, receipts = run_life_batch(context.config, event.source_id, [{
+                        "idempotency_key": key, "payload": original, "expected_revision": expected,
+                    }], now=clock)
+                elif path == "/api/life/v1/withdrawals":
+                    if self.life_actor.client:
+                        raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+                    if set(data) != {"source_id", "event_id", "expected_revision"}:
+                        raise LifeInputError("LIFE_INPUT_INVALID")
+                    source = require_source(self.life_actor, data["source_id"])
+                    identity = text(data.get("event_id"), maximum=160)
+                    expected = data.get("expected_revision")
+                    if type(expected) is not int or expected < 1:
+                        raise LifeInputError("LIFE_REVISION_INVALID")
+                    outcome = run_life_forget(context.config, source, identity, expected, now=clock)
+                    receipts = ()
+                else:
+                    raise LifeInputError("LIFE_ROUTE_NOT_FOUND")
+                if outcome.already_running:
+                    self._json(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY", "retryable": True})
+                elif outcome.exit_code != 0:
+                    detail = outcome.failure or "LIFE_PUBLICATION_FAILED"
+                    code = detail.split(": ")[-1]
+                    if not code.startswith("LIFE_"):
+                        code = "LIFE_PUBLICATION_FAILED"
+                    self._json(HTTPStatus(error_status(code)) if code != "LIFE_PUBLICATION_FAILED"
+                               else HTTPStatus.SERVICE_UNAVAILABLE,
+                               {"error": code, "run_id": outcome.run_id, "state": "not_confirmed"})
+                else:
+                    result = {"receipts": list(receipts), "run_id": outcome.run_id,
+                              "state": "published", "device_projected": False}
+                    if path.endswith("withdrawals"):
+                        result.update(physical_raw_erasure=False, offline_copies_recalled=False)
+                    self._json(HTTPStatus.ACCEPTED, result)
+            except LifeInputError as exc:
+                self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
 
     return Handler
 

@@ -1121,6 +1121,123 @@ def run_ingest(
     )
 
 
+def run_life_batch(
+    config: Config, source_id: str, items: Sequence[Mapping[str, object]], *,
+    now: datetime | None = None,
+) -> tuple[RunOutcome, tuple[dict[str, object], ...]]:
+    """Explicit SB2 capture/compile through the existing writer and generation boundary.
+
+    The HTTP layer may acknowledge only a successful returned outcome. Receipts
+    remain accepted, not 'read by the user'; View ACK and delivery are separate.
+    """
+    from sb.life_config import policy_for, settings
+    from sb.life_contracts import LifeInputError
+    from sb.life_values import canonical_bytes, parse_event, text
+    from sb.life_views import page_for_event, source_uri
+
+    policy = policy_for(config, source_id)
+    clock = now if now is not None else datetime.now(UTC)
+    if not 1 <= len(items) <= 100 or len(canonical_bytes(items)) > 2 * 1024 * 1024:
+        raise LifeInputError("LIFE_BATCH_INVALID")
+    prepared: list[tuple[str, Mapping[str, object], int | None]] = []
+    for item in items:
+        if not isinstance(item, Mapping) or set(item) - {"idempotency_key", "payload", "expected_revision"}:
+            raise LifeInputError("LIFE_BATCH_INVALID")
+        payload = item.get("payload")
+        if not isinstance(payload, dict):
+            raise LifeInputError("LIFE_BATCH_INVALID")
+        key = text(item.get("idempotency_key"), maximum=256)
+        expected = item.get("expected_revision")
+        if expected is not None and (type(expected) is not int or expected < 0):
+            raise LifeInputError("LIFE_REVISION_INVALID")
+        event = parse_event(payload, policy, recorded_at=clock)
+        if event.event_type.startswith("location_"):
+            settings(config).require("location_capture")
+        if event.event_type.startswith("health_"):
+            settings(config).require("health_capture")
+        prepared.append((key, payload, expected))
+    receipts: list[dict[str, object]] = []
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        store = ledger.life_store()
+        pages: dict[str, PageSpec] = {}
+        with ledger.transaction():
+            for key, payload, expected in prepared:
+                receipt = store.accept(payload, policy, key=key, now=clock, expected_revision=expected)
+                receipts.append(receipt.as_dict())
+                event = store.get(receipt.event_id, scopes=policy.scopes, now=clock)
+                source = SourceItem(event.source_id, source_uri(event), event.source_version,
+                                    event.raw_digest, run_id, run_id)
+                ledger.upsert_source_item(source)
+                ledger.bind_source_access(source, config.source_access[source_id])
+                page = page_for_event(event)
+                pages[page.page_id] = page
+        compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+        for page in pages.values():
+            access = ledger.compiled_page_access(tuple((cite.origin, cite.hash) for cite in page.sources))
+            report = StageReport((page,), 0, 0, 1, False,
+                                 compiled_by=("life-v1", "deterministic-v1"))
+            committed, _, _ = _commit_pages(
+                vault.root, vault, run_id, report, f"{run_id} life {page.page_id}",
+                compiled, ledger=ledger, project=False, config=config,
+            )
+            raw = subprocess.check_output(["git", "-C", str(vault.root), "show",
+                                           f"{committed or 'HEAD'}:{git_rel(page.page_id)}"])
+            ledger.bind_page_access(git_rel(page.page_id).removesuffix(".md"),
+                                   "sha256:" + hashlib.sha256(raw).hexdigest(), access)
+        if pages and ".staging" not in vault.root.parts:
+            from sb.search import SearchIndex
+            explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+            SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+        return StageReport((), 0, 0, len(prepared), False, written=len(pages))
+
+    outcome = _execute(config, stage, "compile")
+    if outcome.exit_code != 0 or outcome.already_running:
+        return outcome, ()
+    return outcome, tuple(receipts)
+
+
+def run_life_forget(
+    config: Config, source_id: str, event_id: str, expected_revision: int, *,
+    now: datetime | None = None,
+) -> RunOutcome:
+    """Withdraw one event and its current core page; retained raw/history is explicit.
+
+    This is not physical erasure of shared CAS or external/offline copies.
+    Withdrawal remains available when creation flags or the source are OFF.
+    """
+    from sb.life_config import policy_for
+    from sb.life_contracts import LifeInputError
+    from sb.life_views import core_page_id
+
+    policy = policy_for(config, source_id, admission=False)
+    clock = now if now is not None else datetime.now(UTC)
+
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del run_id
+        store = ledger.life_store()
+        prior = next((t for t in store.tombstones(scopes=policy.scopes)
+                      if t["event_id"] == event_id), None)
+        if prior is None:
+            event = store.get(event_id, scopes=policy.scopes, now=clock)
+            if event.source_id != source_id:
+                raise LifeInputError("LIFE_EVENT_NOT_FOUND")
+            store.forget(event_id, scopes=policy.scopes,
+                         expected_revision=expected_revision, now=clock)
+        elif prior["revision"] != expected_revision:
+            raise LifeInputError("LIFE_REVISION_CONFLICT")
+        page_id = core_page_id(event_id)
+        if (vault.root / git_rel(page_id)).exists():
+            vault.forget_page(page_id)
+        if ".staging" not in vault.root.parts:
+            from sb.search import SearchIndex
+            explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+            SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+        return StageReport((), 0, 0, 1, False, written=1)
+
+    return _execute(config, stage, "effect")
+
+
 def run_compile(
     config: Config, *, compiler: StageFn | None = None, llm_mode: str = "cli"
 ) -> RunOutcome:

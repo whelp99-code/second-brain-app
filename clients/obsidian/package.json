@@ -1,0 +1,12 @@
+{
+  "name": "second-brain-memory-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Session-authenticated, conflict-preserving Second Brain view for Obsidian",
+  "scripts": {
+    "build": "node build.cjs",
+    "test": "node --test test/*.test.cjs",
+    "check": "node --check main.src.cjs && node --check sync-core.cjs"
+  },
+  "engines": {"node": ">=20"}
+}

@@ -23,6 +23,8 @@ from sb.source_access import (
     source_access_digest,
     source_access_identity,
 )
+from sb.store.cas import ContentAddressedStore
+from sb.store.life import LifeStore
 
 from . import (
     Derivation,
@@ -306,6 +308,16 @@ class Ledger:
                     raise
         finally:
             self._transaction_depth -= 1
+
+    def life_store(self) -> LifeStore:
+        """Initialize the optional SB2 extension on this same ledger connection.
+
+        Mutating runtime callers must already hold the pipeline writer boundary.
+        Existing callers never invoke this method, so disabled SB2 adds no tables.
+        """
+        store = LifeStore(self._db(), self.transaction, ContentAddressedStore(self._vault_root))
+        store.initialize()
+        return store
 
     def journal_mode(self) -> str:
         return self._journal_mode

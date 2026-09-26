@@ -1,0 +1,317 @@
+"""L4 pure event/timeline/Obsidian projections. Only sb.vault writes core pages."""
+
+from __future__ import annotations
+
+import html
+from collections import defaultdict
+from collections.abc import Sequence
+from datetime import datetime
+from hashlib import sha256
+from urllib.parse import quote
+
+from sb.contracts import PageSpec, SourceCite
+from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_values import canonical_bytes, day_window, instant, zone
+from sb.redaction import redact_credentials
+
+
+def safe_text(value: str) -> str:
+    """Render input as literal Markdown text, not commands, HTML, images or links."""
+    return (
+        html.escape(redact_credentials(value), quote=True)
+        .replace("[", "&#91;")
+        .replace("]", "&#93;")
+        .replace("|", "&#124;")
+        .replace("`", "&#96;")
+        .replace("!", "&#33;")
+    )
+
+
+def source_uri(event: LifeEventV1) -> str:
+    return "life/" + quote(event.source_item_id, safe="")
+
+
+def core_page_id(event_id: str) -> str:
+    # Keep the existing Vault.forget_page no-follow, single-folder boundary.
+    return f"wiki/life-event-{event_id}"
+
+
+def page_for_event(event: LifeEventV1) -> PageSpec:
+    origin = event.source_id + ":" + source_uri(event)
+    sid = sha256((origin + "\0" + event.raw_digest).encode()).hexdigest()[:8]
+    facts = [
+        "사건 ID: " + event.event_id,
+        "개정: " + str(event.revision),
+        "제목: " + safe_text(event.title),
+        "사건 상태: " + event.event_status,
+        "근거 수준: " + event.evidence_level + " / 검토: " + event.review_state,
+        "발생 시각: " + (event.occurred_start or "알 수 없음"),
+        "접수 시각: " + event.recorded_at,
+    ]
+    if event.value_status != "not_applicable":
+        facts.append(
+            "측정값: "
+            + ("알 수 없음" if event.value is None else str(event.value))
+            + " / 상태: "
+            + event.value_status
+            + " / 단위: "
+            + safe_text(event.unit or "")
+        )
+    excerpt = event.body[:6000]
+    facts.extend(safe_text(line) for line in excerpt.splitlines()[:24] if line.strip())
+    omitted = len(event.body) > 6000 or len(event.body.splitlines()) > 24
+    bounded: list[str] = []
+    for fact in facts:
+        encoded = fact.encode("utf-8")
+        if len(encoded) > 2800:
+            bounded.append(encoded[:2800].decode("utf-8", errors="ignore") + "…")
+            omitted = True
+        else:
+            bounded.append(fact)
+    facts = bounded
+    if omitted:
+        facts.append("표시 한도로 원문 일부를 생략했습니다. 원문 근거를 확인하세요.")
+    body = "# " + safe_text(event.title) + "\n\n" + "\n".join(f"- {line}[^{sid}]" for line in facts)
+    return PageSpec(
+        page_id=core_page_id(event.event_id),
+        title=redact_credentials(event.title),
+        body_md=body,
+        sources=[SourceCite(sid=sid, origin=origin, hash=event.raw_digest)],
+        status="active",
+        prompt_version="life-v1",
+        model_id="deterministic-v1",
+        sensitivity=event.sensitivity,
+    )
+
+
+def on_day(event: LifeEventV1, day: str, timezone: str) -> bool:
+    start, end = day_window(day, timezone)
+    if event.occurred_start is None:
+        return False
+    occurred = instant(event.occurred_start)
+    stopped = instant(event.occurred_end) if event.occurred_end else occurred
+    if stopped == occurred:
+        return start <= occurred < end
+    return occurred < end and stopped > start
+
+
+def timeline(events: Sequence[LifeEventV1], day: str, timezone: str) -> dict[str, object]:
+    day_window(day, timezone)
+    selected = sorted(
+        (event for event in events if on_day(event, day, timezone)),
+        key=lambda event: (event.occurred_start or "", event.event_id),
+    )
+    undated = [event for event in events if event.occurred_start is None]
+    return {
+        "schema_version": 1,
+        "day": day,
+        "timezone": timezone,
+        "events": [event.as_dict() for event in selected],
+        "undated": [event.as_dict() for event in undated],
+        "coverage": "source_records_only",
+        "complete_day_observed": False,
+    }
+
+
+def brief(events: Sequence[LifeEventV1], day: str, timezone: str, slot: str) -> dict[str, object]:
+    if slot not in {"morning", "evening"}:
+        raise LifeInputError("LIFE_SLOT_INVALID")
+    selected = [e for e in events if on_day(e, day, timezone)]
+    selected.sort(key=lambda e: (e.occurred_start or "", e.event_id))
+    if slot == "morning":
+        selected.sort(key=lambda e: (e.event_status != "planned", e.occurred_start or ""))
+    cards = [
+        {
+            "event_id": e.event_id,
+            "revision": e.revision,
+            "title": e.title,
+            "event_status": e.event_status,
+            "evidence_level": e.evidence_level,
+            "reason": "오늘의 예정 기록" if e.event_status == "planned" else "오늘의 사건 기록",
+            "raw_digest": e.raw_digest,
+        }
+        for e in selected[:5]
+    ]
+    snapshot = {"day": day, "timezone": timezone, "slot": slot, "cards": cards}
+    return {
+        **snapshot,
+        "input_version": sha256(canonical_bytes(snapshot)).hexdigest(),
+        "mode": "facts_only",
+        "delivery_state": "not_attempted",
+        "omitted": max(0, len(selected) - 5),
+    }
+
+
+def _entity_path(event: LifeEventV1, kind: str, entity_id: str) -> str:
+    folders = {
+        "person": "People",
+        "company": "Companies",
+        "project": "Projects",
+        "place": "Places",
+        "event": "Events",
+        "decision": "Decisions",
+    }
+    stable = sha256((event.source_id + "\0" + kind + "\0" + entity_id).encode()).hexdigest()[:24]
+    return "Auto/" + folders[kind] + "/entity-" + stable + ".md"
+
+
+def _wikilink(path: str, label: str) -> str:
+    return "[[" + path.removesuffix(".md") + "|" + safe_text(label).replace("\n", " ") + "]]"
+
+
+def obsidian_manifest(
+    events: Sequence[LifeEventV1],
+    *,
+    day: str,
+    timezone: str,
+    sensitivities: tuple[str, ...] = ("public", "personal"),
+    complete: bool = True,
+) -> dict[str, object]:
+    """A bounded, complete authorized snapshot. No private source paths or credentials.
+
+    Callers enforce scope/source policies BEFORE passing records to this function.
+    Revoked/deleted/expired records must be excluded, including their graph nodes.
+    Only previously-owned generated paths may be pruned by the client.
+    """
+    day_window(day, timezone)
+    visible = tuple(
+        sorted((e for e in events if e.sensitivity in sensitivities), key=lambda e: e.event_id)
+    )
+    files: dict[str, str] = {}
+    entity_events: dict[str, list[tuple[str, LifeEventV1]]] = defaultdict(list)
+    local_zone = zone(timezone)
+    day_lines = []
+    for event in visible:
+        path = f"Auto/Events/{event.event_id}.md"
+        evidence_path = f"Auto/Evidence/{event.event_id}.md"
+        lines = [
+            "---",
+            "sb_view_schema: 1",
+            f'sb_object_id: "{event.event_id}"',
+            f"sb_revision: {event.revision}",
+            "sb_managed: true",
+            "sb_event_state: " + event.event_status,
+            "sb_evidence_state: " + event.evidence_level,
+            "---",
+            "# " + safe_text(event.title),
+            "",
+            "발생: " + (event.occurred_start or "알 수 없음"),
+            "접수: " + event.recorded_at,
+            "",
+            "상태: " + event.event_status + " / " + event.evidence_level,
+            "",
+            safe_text(event.body),
+            "",
+            _wikilink(evidence_path, "원문 근거"),
+            "",
+            f"[정정 요청](obsidian://sb-life-correct?event={event.event_id}&revision={event.revision})",
+        ]
+        for entity in event.entities:
+            ep = _entity_path(event, entity.kind, entity.entity_id)
+            lines.append(_wikilink(ep, entity.label))
+            entity_events[ep].append((entity.label, event))
+        files[path] = "\n".join(lines) + "\n"
+        files[evidence_path] = (
+            "# 원문 근거\n\n"
+            + _wikilink(path, event.title)
+            + "\n\n"
+            + "출처 버전: "
+            + safe_text(event.source_version)
+            + "\n\n"
+            + f"[인증하여 원문 열기](obsidian://sb-life-evidence?event={event.event_id})\n"
+        )
+        if on_day(event, day, timezone):
+            stamp = instant(event.occurred_start).astimezone(local_zone).strftime("%H:%M")
+            day_lines.append(
+                (
+                    event.occurred_start,
+                    event.event_id,
+                    f"- {stamp} · {event.event_status} · " + _wikilink(path, event.title),
+                )
+            )
+    for path, linked in sorted(entity_events.items()):
+        files[path] = (
+            "# "
+            + safe_text(linked[0][0])
+            + "\n\n"
+            + "자동 병합이 아닌 출처의 명시적 연결입니다.\n\n"
+            + "\n".join(
+                "- " + _wikilink(f"Auto/Events/{e.event_id}.md", e.title) for _, e in linked
+            )
+            + "\n"
+        )
+    morning = brief(visible, day, timezone, "morning")
+    evening = brief(visible, day, timezone, "evening")
+    daily = [
+        "# " + day,
+        "",
+        "## 오늘의 요점",
+        "실제 수집 기록만 표시합니다.",
+        "",
+        "## 시간순 기록",
+        *[row[2] for row in sorted(day_lines)],
+        "",
+        "## 아침 참고",
+        *["- " + safe_text(c["title"]) for c in morning["cards"]],
+        "",
+        "## 저녁 정리",
+        *["- " + safe_text(c["title"]) + " · " + c["event_status"] for c in evening["cards"]],
+        "",
+        "## 내 메모",
+        f"[[MyNotes/{day}]]",
+        "",
+        "## 수집 상태",
+        "기록이 없는 시간을 실제 활동 없음으로 해석하지 않습니다.",
+        "[[Auto/System/Sync-Status]]",
+    ]
+    files[f"Auto/Daily/{day}.md"] = "\n".join(daily) + "\n"
+    files["Auto/Home.md"] = "# 나의 기억\n\n" + _wikilink(f"Auto/Daily/{day}.md", "오늘") + "\n"
+    files["Auto/System/Sync-Status.md"] = (
+        "# 동기화 상태\n\n허용된 기록의 복제 뷰입니다. MyNotes는 자동 갱신하지 않습니다.\n"
+        + ("전체 스냅샷\n" if complete else "부분 스냅샷 — 누락된 파일을 삭제하지 않습니다.\n")
+    )
+    rows = [
+        {"path": path, "content": content, "sha256": sha256(content.encode()).hexdigest()}
+        for path, content in sorted(files.items())
+    ]
+    generation = sha256(canonical_bytes(rows)).hexdigest()
+    return {
+        "schema_version": 1,
+        "generation": generation,
+        "complete": complete,
+        "files": rows,
+        "managed_prefix": "Auto/",
+        "cursor": generation,
+    }
+
+
+def gap_candidates(
+    events: Sequence[LifeEventV1], *, now: datetime
+) -> tuple[dict[str, object], ...]:
+    candidates = []
+    for event in events:
+        if event.event_type != "calendar_event" or event.event_status == "cancelled":
+            continue
+        if (
+            event.occurred_start is None
+            or instant(event.occurred_end or event.occurred_start) > now
+        ):
+            continue
+        if event.review_state in {"rejected", "disputed"}:
+            continue
+        if event.event_status == "planned":
+            question = "예정된 일정이 실제로 진행됐나요?"
+        elif event.event_status == "occurred" and not event.body.strip():
+            question = "확인된 일정의 결과로 기억할 내용이 있나요?"
+        else:
+            continue
+        candidates.append(
+            {
+                "event_id": event.event_id,
+                "revision": event.revision,
+                "title": event.title,
+                "question": question,
+                "evidence_digest": event.raw_digest,
+            }
+        )
+    return tuple(sorted(candidates, key=lambda c: c["event_id"]))
