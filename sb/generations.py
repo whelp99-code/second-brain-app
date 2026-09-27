@@ -42,6 +42,7 @@ from sb.generation_vectors import VectorContent, prepare_vectors
 from sb.generation_walk import surface_files
 from sb.request_store import RequestStore
 from sb.search_query import normalize
+from sb.sqlite_values import SQL_ROWS
 
 
 class GenerationError(RuntimeError):
@@ -637,14 +638,14 @@ class GenerationStore:
     def sweep_orphan_activations(self, now: datetime, current_id: str | None) -> int:
         pinned: set[str] = set()
         if self.requests is not None:
-            rows = self.requests.db.execute(
+            rows = SQL_ROWS.validate_python(self.requests.db.execute(
                 "SELECT DISTINCT generation_id FROM reader_leases",
-            ).fetchall()
+            ).fetchall(), strict=True)
             pinned = {str(row[0]) for row in rows if row[0]}
         changed = 0
-        rows = self.journal.execute(
+        rows = SQL_ROWS.validate_python(self.journal.execute(
             "SELECT generation_id, pointer_target FROM activations WHERE phase='activated'",
-        ).fetchall()
+        ).fetchall(), strict=True)
         for generation_id, pointer in rows:
             if not isinstance(generation_id, str):
                 continue
@@ -955,7 +956,7 @@ class GenerationStore:
             raise
 
     @staticmethod
-    def _read_manifest(root: Path) -> GenerationManifestV1:
+    def read_manifest(root: Path) -> GenerationManifestV1:
         try:
             value = load_verified_manifest(root)
             manifest = TypeAdapter(GenerationManifestV1).validate_python(value)
@@ -963,6 +964,8 @@ class GenerationStore:
             return manifest
         except (OSError, TypeError, ValueError) as exc:
             raise GenerationError("GENERATION_SPLIT_BRAIN") from exc
+
+    _read_manifest = read_manifest
 
     def generation(self, generation_id: str) -> Generation:
         if not generation_id.startswith("sbgen:v1:") or "/" in generation_id:
