@@ -8,16 +8,18 @@ import re
 import selectors
 import stat
 import subprocess
+import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from sb.managed_file_inspection import ManagedInspectionError, fingerprint
+from sb.managed_inspection_stream import ManagedInspectionError, fingerprint
 
 _MAX_BYTES: Final = 64 * 1024 * 1024
 _MAX_OBJECTS: Final = 100_000
+_MAX_PACKS: Final = 128
 _HEADER: Final = re.compile(rb"[0-9a-f]{40}(?:[0-9a-f]{24})? (blob|tree|commit|tag) ([0-9]+)")
 DISPOSING_PREFIX: Final = ".sb-disposing-git-"
 
@@ -62,11 +64,12 @@ def git_directories(root: Path) -> tuple[Path, ...]:
     return tuple(path for path in found if not any(parent in found for parent in path.parents))
 
 
-def _object_stream(root: Path) -> bytes:
+def _git_output(root: Path, arguments: Sequence[str]) -> bytes:
+    """Bound every Git inspection command by output bytes and a hard deadline."""
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull,
                GIT_CONFIG_NOSYSTEM="1", GIT_NO_REPLACE_OBJECTS="1", GIT_NO_LAZY_FETCH="1")
-    with subprocess.Popen(["git", f"--git-dir={root}", "cat-file", "--batch-all-objects", "--batch"],
+    with subprocess.Popen([sys.executable, "-m", "sb.managed_git_command", f"--git-dir={root}", *arguments],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env) as process:
         if process.stdout is None:
             raise ManagedInspectionError("MANAGED_GIT_SCAN_FAILED")
@@ -96,7 +99,44 @@ def _object_stream(root: Path) -> bytes:
         return bytes(output)
 
 
-def inspect_git_directory(root: Path, needles: Sequence[bytes]) -> GitInspection:
+def _object_stream(root: Path) -> bytes:
+    return _git_output(root, ("cat-file", "--batch-all-objects", "--batch"))
+
+
+def _pack_inventory(root: Path) -> set[bytes]:
+    """Git verifies both pack/index checksums before any batch inventory is trusted."""
+    folder = root / "objects/pack"
+    if not folder.exists():
+        return set()
+    paths = tuple(folder.iterdir())
+    packs = {path.stem for path in paths if path.suffix == ".pack"}
+    indexes = {path.stem for path in paths if path.suffix == ".idx"}
+    if packs != indexes:
+        raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
+    if len(packs) > _MAX_PACKS:
+        raise ManagedInspectionError("MANAGED_GIT_BUDGET")
+    objects: set[bytes] = set()
+    for name in sorted(packs):
+        output = _git_output(root, ("verify-pack", "-v", str(folder / (name + ".idx"))))
+        inventory = {line.split(b" ", 1)[0] for line in output.splitlines()
+                     if re.match(rb"^[0-9a-f]{40}(?:[0-9a-f]{24})? ", line)}
+        with (folder / (name + ".pack")).open("rb") as source:
+            header = source.read(12)
+            hash_size = 32 if len(name) == 69 else 20
+            _ = source.seek(-hash_size, os.SEEK_END)
+            checksum = source.read(hash_size).hex()
+        if (len(header) != 12 or header[:4] != b"PACK" or name != "pack-" + checksum
+                or int.from_bytes(header[8:12], "big") != len(inventory)):
+            raise ManagedInspectionError("MANAGED_GIT_STREAM_INVALID")
+        objects.update(inventory)
+        if len(objects) > _MAX_OBJECTS:
+            raise ManagedInspectionError("MANAGED_GIT_BUDGET")
+    return objects
+
+
+def inspect_git_directory(
+    root: Path, needles: Sequence[bytes], *, decoded: Callable[[bytes], int] | None = None,
+) -> GitInspection:
     """Require a complete batch framing and stable private files, including unreachable objects."""
     if root.name.startswith(DISPOSING_PREFIX):
         raise ManagedInspectionError("MANAGED_GIT_DISPOSAL_INCOMPLETE")
@@ -126,9 +166,13 @@ def inspect_git_directory(root: Path, needles: Sequence[bytes]) -> GitInspection
         sha.update(path.relative_to(root).as_posix().encode() + b"\0" + raw)
         matches += sum(raw.count(needle) for needle in needles if needle)
         files.append((path, fingerprint(metadata)))
+    packed = _pack_inventory(root)
     stream = _object_stream(root)
+    if len(stream) > max(total, 1) * 1000:
+        raise ManagedInspectionError("MANAGED_GIT_BUDGET")
     offset = 0
     objects = 0
+    seen: set[bytes] = set()
     while offset < len(stream):
         end = stream.find(b"\n", offset, offset + 128)
         header = _HEADER.fullmatch(stream[offset:end]) if end >= 0 else None
@@ -144,7 +188,17 @@ def inspect_git_directory(root: Path, needles: Sequence[bytes]) -> GitInspection
         objects += 1
         if objects > _MAX_OBJECTS:
             raise ManagedInspectionError("MANAGED_GIT_BUDGET")
+        oid = header.group(0).split(b" ", 1)[0]
+        framed = header.group(1) + b" " + str(length).encode() + b"\0" + payload
+        actual = hashlib.sha1(framed).hexdigest() if len(oid) == 40 else hashlib.sha256(framed).hexdigest()
+        if oid in seen or actual.encode() != oid:
+            raise ManagedInspectionError("MANAGED_GIT_STREAM_INVALID")
+        seen.add(oid)
         matches += sum(payload.count(needle) for needle in needles if needle)
+        if decoded is not None:
+            matches += decoded(payload)
+    if not packed.issubset(seen):
+        raise ManagedInspectionError("MANAGED_GIT_STREAM_INVALID")
     sha.update(stream)
     if tuple(path for path in sorted(root.rglob("*")) if path.is_file()) != tuple(path for path, _ in files):
         raise ManagedInspectionError("MANAGED_SURFACE_CHANGED")

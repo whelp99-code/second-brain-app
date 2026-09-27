@@ -16,6 +16,22 @@ from sb.store.cas import ContentAddressedStore
 from tests.test_ops import _seed_vault
 
 
+def test_invalid_outer_container_raises_without_unlinking(tmp_path: Path) -> None:
+    # Given: a tar.gz name whose bytes are not a canonical product backup, plus a match.
+    backups = tmp_path / "backups"
+    backups.mkdir()
+    archive = backups / "not-a-backup.tar.gz"
+    _ = archive.write_bytes(b"PK\x03\x04 damaged outer container")
+    matching = backups / "matching"
+    _ = matching.write_bytes(b"independent-match")
+    before = {path.name: path.read_bytes() for path in backups.iterdir()}
+    # When: inspection fails and the container cannot validate for disposal.
+    with pytest.raises(ManagedInspectionError):
+        _ = purge_matching_managed_copies((backups,), (b"independent-match",))
+    # Then: neither the invalid container nor the independent match is unlinked.
+    assert {path.name: path.read_bytes() for path in backups.iterdir()} == before
+
+
 def test_legacy_originless_backup_can_be_disposed_not_retained(tmp_path: Path) -> None:
     root, _ = _seed_vault(tmp_path)
     ContentAddressedStore(root).put(b"PK\x03\x04 damaged document")
