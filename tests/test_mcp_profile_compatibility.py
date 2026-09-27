@@ -34,7 +34,7 @@ class SearchHitDict(TypedDict):
     score: float
 
 
-def _configured_runtime(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def configured_runtime(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     public_key = base64.urlsafe_b64encode(key.public_key().public_bytes_raw()).rstrip(b"=").decode()
     vault = tmp_path / "vault"
@@ -178,7 +178,7 @@ def test_absent_contract_profile_exposes_exact_legacy_tool_set(
     monkeypatch: MonkeyPatch,
 ) -> None:
     # Given: a fully Task-30-configured provider launched by an old client.
-    _configured_runtime(tmp_path, monkeypatch)
+    configured_runtime(tmp_path, monkeypatch)
     monkeypatch.delenv("SB_MCP_CONTRACT_PROFILE", raising=False)
 
     async def listed_names() -> tuple[str, ...]:
@@ -198,7 +198,7 @@ def test_real_stdio_process_selects_legacy_and_strict_profiles(
     monkeypatch: MonkeyPatch,
 ) -> None:
     # Given: one configured provider release launched twice through real stdio children.
-    _configured_runtime(tmp_path, monkeypatch)
+    configured_runtime(tmp_path, monkeypatch)
     config_path = os.environ["SB_CONFIG"]
 
     async def listed(profile: str | None) -> tuple[tuple[str, ...], str]:
@@ -239,9 +239,12 @@ def test_unknown_contract_profile_fails_before_server_composition(
     monkeypatch: MonkeyPatch,
 ) -> None:
     # Given: a configured provider with an unrecognized selector.
-    _configured_runtime(tmp_path, monkeypatch)
+    configured_runtime(tmp_path, monkeypatch)
     monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "task30-schema4")
 
     # When / Then: server composition fails closed before MCP initialization.
     with pytest.raises(RuntimeError, match="SECOND_BRAIN_CONTRACT_PROFILE_INVALID"):
         _ = build_server()
+
+
+_configured_runtime = configured_runtime

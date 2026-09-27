@@ -28,7 +28,7 @@ def test_unrelated_canonical_backup_survives_correction_and_restores(tmp_path: P
         executor.close()
 
 
-def make_archive(root, alteration):
+def make_archive(root: Path, alteration: str) -> Path:
     payload = b"unrelated memory"
     entry = {
         "path": "wiki/page.md",
@@ -82,7 +82,7 @@ def make_archive(root, alteration):
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
     if alteration == "checksum":
         checksum = "0" * 64
-    archive.with_name(archive.name + ".sha256").write_text(f"{checksum}  {archive.name}\n")
+    _ = archive.with_name(archive.name + ".sha256").write_text(f"{checksum}  {archive.name}\n")
     return archive
 
 
@@ -101,7 +101,7 @@ def make_archive(root, alteration):
         "checksum",
     ],
 )
-def test_forged_or_incomplete_manifest_is_rejected_without_mutation(tmp_path: Path, alteration):
+def test_forged_or_incomplete_manifest_is_rejected_without_mutation(tmp_path: Path, alteration: str):
     archive = make_archive(tmp_path, alteration)
     before = archive.read_bytes()
     code = ("BACKUP_CHECKSUM_MISMATCH" if alteration == "checksum" else
@@ -113,23 +113,23 @@ def test_forged_or_incomplete_manifest_is_rejected_without_mutation(tmp_path: Pa
 
 
 @pytest.mark.parametrize("variant", ["valid", "unicode_origin", "spaced_json"])
-def test_canonical_manifest_and_optional_receipt_are_read_only(tmp_path: Path, variant):
+def test_canonical_manifest_and_optional_receipt_are_read_only(tmp_path: Path, variant: str):
     archive = make_archive(tmp_path, variant)
     receipt = archive.with_name(archive.name + ".verified.json")
-    receipt.write_text('{"historic_receipt":true}')
+    _ = receipt.write_text('{"historic_receipt":true}')
     before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
     validate_managed_backups(tmp_path)
     assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}
 
 
 def test_duplicate_json_key_is_rejected(tmp_path: Path):
-    make_archive(tmp_path, "duplicate_json_key")
+    _ = make_archive(tmp_path, "duplicate_json_key")
     with pytest.raises(ManagedInspectionError, match="BACKUP_MANIFEST_INVALID"):
         validate_managed_backups(tmp_path)
 
 
 def test_orphan_sidecar_cannot_represent_a_backup(tmp_path: Path):
-    (tmp_path / "missing.tar.gz.sha256").write_text("orphan")
+    _ = (tmp_path / "missing.tar.gz.sha256").write_text("orphan")
     with pytest.raises(ManagedInspectionError, match="UNMANIFESTED_BACKUP"):
         validate_managed_backups(tmp_path)
 
@@ -149,11 +149,11 @@ def test_bad_retained_manifest_prevents_pointer_switch(tmp_path: Path):
 
 
 @pytest.mark.parametrize("kind", ["missing", "invalid"])
-def test_legacy_manifest_errors_do_not_expose_paths(tmp_path: Path, kind):
+def test_legacy_manifest_errors_do_not_expose_paths(tmp_path: Path, kind: str):
     legacy = tmp_path / "legacy"
     legacy.mkdir()
     if kind == "invalid":
-        (legacy / "manifest.json").write_text("invalid JSON")
+        _ = (legacy / "manifest.json").write_text("invalid JSON")
     with pytest.raises(ManagedInspectionError) as failure:
         validate_managed_backups(tmp_path)
     assert str(failure.value) == "UNMANIFESTED_BACKUP"
@@ -162,12 +162,12 @@ def test_legacy_manifest_errors_do_not_expose_paths(tmp_path: Path, kind):
 def test_legacy_manifest_directory_remains_supported(tmp_path: Path):
     legacy = tmp_path / "legacy"
     legacy.mkdir()
-    (legacy / "manifest.json").write_text('{"schema_version":1}')
+    _ = (legacy / "manifest.json").write_text('{"schema_version":1}')
     validate_managed_backups(tmp_path)
 
 
-def test_enumeration_errors_do_not_expose_paths(tmp_path: Path, monkeypatch):
-    def denied(_path):
+def test_enumeration_errors_do_not_expose_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def denied(_path: Path) -> None:
         raise PermissionError(str(tmp_path))
     with monkeypatch.context() as context:
         context.setattr(Path, "iterdir", denied)

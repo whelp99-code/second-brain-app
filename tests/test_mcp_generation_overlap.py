@@ -5,11 +5,17 @@ import json
 import re
 import threading
 import traceback
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
+from pathlib import Path
+from typing import override
 
 import anyio
 import pytest
 from mcp.client import Client
+
+from sb.delegations import MemoryReadFenceV1
+from sb.effect_values import JsonObject
+from tests.mcp_test_support import json_content
 
 pytestmark = pytest.mark.filterwarnings("error::pytest.PytestUnhandledThreadExceptionWarning")
 
@@ -26,11 +32,12 @@ from tests.test_access_claims import KEY, signed
 
 class FrozenDate(datetime):
     @classmethod
-    def now(cls, tz=None):
+    @override
+    def now(cls, tz: tzinfo | None = None) -> datetime:
         return datetime(2026, 9, 9, tzinfo=UTC)
 
 
-def _mcp_config(work, generation):
+def _mcp_config(work: Path, generation: GenerationIdentityV1) -> Config:
     return Config(raw={
         "llm": {"model_id": "fake"},
         "vault_root": str(work / "share" / "vault"),
@@ -50,7 +57,7 @@ def _mcp_config(work, generation):
     })
 
 
-def _fence(generation):
+def _fence(generation: GenerationIdentityV1) -> MemoryReadFenceV1:
     return create_read_fence(
         provider_instance_id=generation.provider_instance_id, purpose="memory_read", operation="read",
         sequence=0, set_root=GENESIS_TOMBSTONE_ROOT, issued_at="2026-09-09T00:00:00.000Z",
@@ -59,14 +66,15 @@ def _fence(generation):
     )
 
 
-def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
+def test_normal_correction_and_reader_during_compile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     preparing = threading.Event()
     read_done = threading.Event()
     errors: list[str] = []
 
     class Response:
-        def generate(self, prompt, **kwargs):
-            if kwargs.get("json_mode"):
+        def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+            del system, timeout
+            if json_mode:
                 return json.dumps({"relation": "unrelated", "confidence": 0, "rationale": "fixture", "cites": []})
             match = re.search(r"sid=([0-9a-f]{8}) origin=[^\n]+\n((?:Alpha|Omega)[^\n]+)", prompt)
             assert match is not None
@@ -75,11 +83,13 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
                 assert read_done.wait(15), "normal reader did not finish"
             return match.group(2) + "[^" + match.group(1) + "]"
 
-    monkeypatch.setattr("sb.pipeline._llm", lambda *_: Response())
+    def llm(_config: Config, _mode: str) -> Response:
+        return Response()
+    monkeypatch.setattr("sb.pipeline._llm", llm)
     source = tmp_path / "source"
     source.mkdir()
     page = source / "a.md"
-    page.write_text("Alpha original unique memory.")
+    _ = page.write_text("Alpha original unique memory.")
     config = Config(raw={
         "llm": {"model_id": "fake"},
         "vault_root": str(tmp_path / "share" / "vault"),
@@ -92,7 +102,7 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
         "caps": {"max_llm_calls_briefing": 0},
     })
 
-    def generation():
+    def generation() -> GenerationIdentityV1:
         manifest = load_verified_manifest((tmp_path / "share" / "vault").resolve())
         return GenerationIdentityV1(*(str(manifest[name]) for name in (
             "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
@@ -105,7 +115,7 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
     server = build_server(config=_mcp_config(tmp_path, current))
     fence = _fence(current)
 
-    async def query(needle: str):
+    async def query(needle: str) -> JsonObject:
         claim = signed({
             "schema_version": 1,
             "provider_instance_id": current.provider_instance_id,
@@ -127,16 +137,20 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
                 "query": needle, "limit": 5, "read_fence": model_object(fence), "access_claim": claim,
             })
             assert not searched.is_error, searched
-            return searched.structured_content
+            return json_content(searched)
 
     initial = anyio.run(query, "Alpha")
-    assert initial["results"][0]["record"]["record_text"] == "Alpha original unique memory."
-    initial_record_id = initial["results"][0]["record"]["record_id"]
+    initial_rows = initial["results"]
+    assert isinstance(initial_rows, list) and isinstance(initial_rows[0], dict)
+    initial_record = initial_rows[0]["record"]
+    assert isinstance(initial_record, dict)
+    assert initial_record["record_text"] == "Alpha original unique memory."
+    initial_record_id = initial_record["record_id"]
     initial_generation = initial["generation_id"]
 
     def writer() -> None:
         try:
-            page.write_text("Omega corrected unique memory.")
+            _ = page.write_text("Omega corrected unique memory.")
             assert run_ingest(config, ["docs"]).exit_code == 0
             assert run_compile(config).exit_code == 0
         except BaseException:
@@ -150,16 +164,24 @@ def test_normal_correction_and_reader_during_compile(tmp_path, monkeypatch):
         assert preparing.wait(15), "writer did not enter prepare"
         assert errors == []
         during = anyio.run(query, "Alpha")
-        assert during["results"][0]["record"]["record_text"] == "Alpha original unique memory."
+        during_rows = during["results"]
+        assert isinstance(during_rows, list) and isinstance(during_rows[0], dict)
+        during_record = during_rows[0]["record"]
+        assert isinstance(during_record, dict)
+        assert during_record["record_text"] == "Alpha original unique memory."
         read_done.set()
         worker.join(20)
         assert not worker.is_alive()
         assert errors == []
         latest = anyio.run(query, "Omega")
         old_after = anyio.run(query, "Alpha")
-        assert latest["results"][0]["record"]["record_text"] == "Omega corrected unique memory."
+        latest_rows = latest["results"]
+        assert isinstance(latest_rows, list) and isinstance(latest_rows[0], dict)
+        latest_record = latest_rows[0]["record"]
+        assert isinstance(latest_record, dict)
+        assert latest_record["record_text"] == "Omega corrected unique memory."
         assert old_after["results"] == []
-        assert latest["results"][0]["record"]["record_id"] != initial_record_id
+        assert latest_record["record_id"] != initial_record_id
         published = generation().generation_id
         assert latest["generation_id"] == published != initial_generation
     finally:
