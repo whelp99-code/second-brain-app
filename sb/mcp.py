@@ -717,7 +717,11 @@ def build_server(
         """Return active generation and permanent tombstone high-water without content."""
         with pin_generation() as (_current_root, generation):
             current = high_water()
-            fence = require_read_fence(read_fence, "memory_status", "status", current)
+            # The frozen schema-4 readiness call bootstraps with read_fence=null.
+            # This global metadata discloses no records or request proofs. Content
+            # reads still need a current fence; supplied fences are always verified.
+            fence = (None if contract_schema_version == 4 and read_fence is None else
+                     require_read_fence(read_fence, "memory_status", "status", current))
             sequence, set_root = current
             pointer_health = "healthy"
             if generation_store is not None:

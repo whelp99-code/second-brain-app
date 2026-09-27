@@ -1479,6 +1479,11 @@ sb verify-backup <방금_생성한_아카이브>
 폐기되어 더 이상 활성화할 수 없는 옛 sealed 사본도 유지보수가 기존 staging 폐기 경로로 정리한다.
 활성 세대의 자식이나 읽기 lease가 있는 세대는 폐기하지 않는다.
 
+`task32-schema4`의 `sb_generation_status({"read_fence": null})`는 정정 후에도 내용 없는 전역 상태와
+현재 high-water·계약 digest를 반환한다. JARVIS readiness의 고정 bootstrap 호출이다. 이것은 본문·검색·
+개별 요청 proof의 읽기 fence를 대신하지 않는다. 명시한 fence가 잘못됐으면 status도 거절하며,
+scoped 프로필의 서명 검증 및 실제 쓰기 승인 경로는 바뀌지 않는다.
+
 사본 검사는 backup-v1/PAX gzip 안의 Git pack 및 정상 ZIP 원본도 해석한다. 손상되거나 지원하지
 않는 내부 원본 때문에 부재를 증명할 수 없는 **정상 백업 컨테이너**는 매니페스트의 모든 파일·해시와
 체크섬을 확인한 뒤 제품의 사본 폐기 경로로 통째로 폐기한다. 부재로 간주해 보존하지 않는다.
