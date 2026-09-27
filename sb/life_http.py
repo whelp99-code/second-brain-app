@@ -20,7 +20,7 @@ from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_http_auth import authorize, error_status, require_source
 from sb.life_read_visibility import visible_events
 from sb.life_values import canonical_bytes, zone
-from sb.life_views import brief, timeline
+from sb.life_views import brief
 from sb.store.life import read_life_store
 
 __all__ = [
@@ -36,7 +36,7 @@ __all__ = [
 PREFIX = "/api/life/v1/"
 
 
-def _event(
+def current_event(
     config: Config, root: Path, actor: LifeActor, identity: str, now: datetime
 ) -> LifeEventV1:
     with read_life_store(root) as store:
@@ -55,12 +55,6 @@ def _event(
     if actor.client and event.sensitivity not in settings(config).view_sensitivities:
         raise LifeInputError("LIFE_EVENT_NOT_FOUND")
     return event
-
-
-def current_event(
-    config: Config, root: Path, actor: LifeActor, identity: str, now: datetime
-) -> LifeEventV1:
-    return _event(config, root, actor, identity, now)
 
 
 def read_endpoint(
@@ -121,7 +115,7 @@ def read_endpoint(
         parts = route.split("/")
         if len(parts) != 3 or not parts[2].isdigit():
             raise LifeInputError("LIFE_ATTACHMENT_NOT_FOUND")
-        event = _event(config, root, actor, parts[1], clock)
+        event = current_event(config, root, actor, parts[1], clock)
         index = int(parts[2])
         if index >= len(event.attachments):
             raise LifeInputError("LIFE_ATTACHMENT_NOT_FOUND")
@@ -140,7 +134,7 @@ def read_endpoint(
             "content_base64": base64.b64encode(raw).decode(),
         }
     if route.startswith("evidence/"):
-        event = _event(config, root, actor, route[len("evidence/") :], clock)
+        event = current_event(config, root, actor, route[len("evidence/") :], clock)
         with read_life_store(root) as store:
             raw = store.evidence(event.event_id, scopes=actor.scopes, now=clock)
         return {
@@ -152,11 +146,11 @@ def read_endpoint(
             "external_images_loaded": False,
         }
     if route.startswith("events/"):
-        return _event(config, root, actor, route[len("events/") :], clock).as_dict()
+        return current_event(config, root, actor, route[len("events/") :], clock).as_dict()
     if route.startswith("receipts/"):
         with read_life_store(root) as store:
             receipt = store.receipt(route[len("receipts/") :], scopes=actor.scopes, now=clock)
-        _ = _event(config, root, actor, receipt.event_id, clock)
+        _ = current_event(config, root, actor, receipt.event_id, clock)
         return receipt.as_dict()
     if route == "timeline":
         from sb.life_timeline_query import query
@@ -228,9 +222,7 @@ def read_endpoint(
                 require_current=kind not in {"prediction", "delivery"},
             )
         return {"items": rows, "complete_snapshot": complete}
-    if route == "timeline":
-        opts.require("life_timeline")
-    elif route == "views/obsidian/manifest":
+    if route == "views/obsidian/manifest":
         opts.require("obsidian_view")
     elif route == "briefings":
         opts.require("life_briefing")
@@ -260,8 +252,6 @@ def read_endpoint(
             except ValueError as exc:
                 raise LifeInputError("LIFE_LIMIT_INVALID") from exc
             result = page(result, limit=size, cursor=args.get("cursor", [None])[0])
-    elif route == "timeline":
-        result = {**timeline(events, day, timezone), "complete_snapshot": complete}
     else:
         result = {
             **brief(events, day, timezone, args.get("slot", ["morning"])[0]),
@@ -270,3 +260,6 @@ def read_endpoint(
     if len(canonical_bytes(result)) > 8 * 1024 * 1024:
         raise LifeInputError("LIFE_VIEW_TOO_LARGE")
     return result
+
+
+_event = current_event
