@@ -79,3 +79,94 @@ GUI 상태, 단계 이력, 소스·보존(metrics 포함)에 timer, OnCalendar, 
 
 - GUI 정정 흐름이 없다. 그래서 M13을 통과로 적지 않는다.
 - `daily/2026-09-27` 「오늘의 추천」에 시험 문장 한 줄이 남는다. GUI `지금 처리`의 브리핑이 넣었다. 그 페이지를 지우면 다른 브리핑이 같이 지워지므로 지우지 않았다. 정정 GUI가 없어 그 줄만 되돌리지 못했다.
+
+## R2 (배포 13ff2cf3)
+
+판정: **미통과.** 운영 콘솔에 정정 컨트롤은 있다. 시험 문장 1건을 골라 정정 저장을 한 번 눌렀고, GUI는 `ManagedInspectionError`를 돌려줬다. 그 클릭은 서버에서 끝나 있었고 처리 중이 아니었다. 활성 페이지는 바뀌지 않았고 센티널 검색은 0이 아니다. 같은 영수증을 다시 제출하지 않았다. 새 시험 기억은 만들지 않았다. `verified`로 적지 않는다.
+
+### 대상
+
+- 운영 웹: `http://127.0.0.1:8765` (`second-brain-web.service` active, MainPID 2231615, 릴리스 `13ff2cf32660677b35e9e96cd1db3fd04234a3a2`). 유닛은 2026-09-27 22:04:33 KST에 시작됐다. NRestarts=0.
+- 릴리스 매니페스트 `source_commit`은 `fbccedb0a519976414cd398c8babd82e9290106a`다. 그 커밋은 `7e84605` 다음 문서 커밋이다. 배포된 `sb/web.py`에는 `정정 저장`과 `correctPageButton`이 있다.
+- `[web] token`은 없다. 토큰을 넣지 않았다.
+- 브라우저: owned engine (`connectPipe`, `/opt/google/chrome/chrome`, `--headless=new`, `/tmp/omowright-m13-r2-a4drXx`). 사용자 프로필을 쓰지 않았다. 세션은 `browser.close()`로 닫혔고 그 프로필 프로세스는 남지 않았다.
+- 지우려던 센티널: `M13SENT0cced706`. 페이지 삭제는 누르지 않았다.
+
+### 단계
+
+| 단계 | 판정 | 사실 |
+|---|---|---|
+| GUI 검색 | 통과 | 결과 2건. page_id는 `daily/2026-09-27`뿐. |
+| 전체 열기·영수증 | 통과 | `page_content_digest=sha256:01552f1339d27f0aa2b2da9b2bf602609071f6ac3615155029794ca5bb8b137e`. 문장 6개 중 센티널 문장 1개. |
+| 문장 선택 | 통과 | 선택지 6개 중 센티널을 포함한 선택지 1개. 본문 48자. |
+| 정정 저장 | 실패 | 22:15:18 KST 클릭, 22:15:59 KST GUI `ManagedInspectionError`. HTTP 본문은 예외 클래스 이름만이다. |
+| 검색 0 | 실패 | 읽기 전용 CLI `sb search M13SENT0cced706` exit 0, 센티널 1, page_id `daily/2026-09-27`. |
+| 다른 브리핑 유지 | 통과(활성 페이지 불변) | 아래 건수. 활성 파일을 고치지 않았다. |
+| 새 수명주기 1건 | 실행 안 함 | 같은 정정·삭제 경로가 백업 검사에서 닫힌다. 두 번째 센티널을 남기지 않으려고 기억하기를 하지 않았다. |
+| 빈 정정·낡은 영수증 409 | 실행 안 함 | 미완료 영수증이 있다. 두 번째 effect는 우회다. |
+| 삭제 후 404 | 실행 안 함 | 삭제를 누르지 않았다. |
+| 390 화면 | 없음 | 정정 응답 뒤 검색 대기에서 클라이언트 관찰이 끊겨 390 캡처 전에 세션이 닫혔다. |
+
+활성 `daily/2026-09-27`은 정정 전과 같다. 바이트 2566, 줄 43, 시험 표지 줄 4, 그 외 줄 39, 센티널 정확 일치 2. GUI가 연 본문만 따로 세면 문자 1406, 줄 25, 시험 표지 줄 3, 그 외 줄 22, 센티널 정확 일치 2다. 다른 브리핑 문장은 인용하지 않는다.
+
+### 서버는 처리 중이 아니었다
+
+정정 클릭의 응답은 약 41초 뒤에 왔다. 그 다음 GUI 검색이 3분 넘도록 안 바뀐 것은 클라이언트 관찰기다. 같은 검색 JSON이라 결과 칸이 다시 안 그려졌고, 서버 대기가 아니다. 확인 시각에 웹 프로세스는 `poll_schedule_timeout`이고 `/health`는 HTTP 200이다. `journalctl --user -u second-brain-web`의 22:14:50–22:17:30 KST 창은 0줄이다. 핸들러가 트레이스를 남기지 않는다.
+
+영수증 `owner-effects/9e7fde4ef2abba379fe0e6fed128f93f2498ea23514208c1ac0fd19429421e72.json`:
+
+- `operation=correct`, `page_id=daily/2026-09-27`, `result=null`.
+- `result_generation_id=sbgen:v1:bbfa04a9c54f88c03c3b893320a4b1181e38d79235e4cba4ac54905e6cb3ee05`. 이 세대는 디스크에 있으나 `vault` current가 아니다.
+- 대체 본문 14자가 남아 있다. 성공 뒤 지우는 스크럽이 실행되지 않았다.
+- 요청 저널 `tombstone_replica` 1행, sequence 1, 같은 request_id, `effective_at=2026-09-27T13:15:21.881Z`. `managed_copy_disposals` 0행. `requests` 0행. `pending`·`processing` 파일 0.
+- current는 여전히 `sbgen:v1:ce3a9b2d2188f4995855cfff1839479b4ff23f8ebc7f9b57c3eb194f36880bc7`.
+
+활성화되지 않은 후속 세대의 `daily/2026-09-27`은 바이트 2605, 줄 44, 시험 표지 줄 1, 그 외 줄 43, 센티널 정확 일치 1이다. 운영 검색은 이 세대를 보지 않는다.
+
+읽기 전용으로 백업 루트 108개 파일을 같은 검사기에 넣었다. `.tar.gz` 40개가 모두 `MANAGED_ARCHIVE_UNSUPPORTED`다. 일치 0. 정정 활성화는 이 검사 뒤에서 멈춘다. GUI는 코드 문자열이 아니라 클래스 이름만 보여 준다. 백업 파일은 지우거나 고치지 않았다.
+
+### 운영 타이머
+
+`systemctl --user list-timers` (기록 시각 약 22:24 KST, `XDG_RUNTIME_DIR=/run/user/1000`):
+
+| 유닛 | NEXT | LAST |
+|---|---|---|
+| `jm-second-brain-maintenance.timer` | 2026-09-27 23:00:00 KST | 2026-09-27 22:00:03 KST |
+| `jm-second-brain-refresh.timer` | 2026-09-27 23:00:12 KST | 2026-09-27 22:00:30 KST |
+| `second-brain-backup.timer` | 2026-09-28 03:28:42 KST | 2026-09-27 03:17:59 KST |
+
+전체 출력: `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/systemd-timers.txt`. refresh/maintenance 유닛은 이번에 시작하지 않았다.
+
+### 스크린샷
+
+너비 1440은 CSS viewport 1440x900 PNG다. 390 캡처는 없다.
+
+| 단계 | 경로 |
+|---|---|
+| 콘솔 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/01-console-1440.png` |
+| 정정 전 검색 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/02-search-before-1440.png` |
+| 원문·영수증 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/03-original-receipt-1440.png` |
+| 문장 선택 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/04-correction-ready-1440.png` |
+| `ManagedInspectionError` | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/05-correction-result-1440.png` |
+| 실패 후 화면 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/99-cleanup-failure-1440.png` |
+
+행동 기록: `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r2/action-log.jsonl`. 서버 상태: 같은 디렉터리의 `server-state.json`.
+
+### 준비 상태
+
+(a) 이 세션은 `second-brain-web`을 재시작하지 않았고, 위 복구 지시 전에는 `sb backup`을 실행하지 않았다. 웹 `ActiveEnterTimestamp`는 2026-09-27 22:04:33 KST, `NRestarts=0`이다. 그 시각 저널은 옛 릴리스 `1e7a7fef`의 PID 1732103을 멈추고 현재 유닛을 시작했다. 타이머와 path 유닛도 같이 재시작됐다. 배포 쪽 재시작이지 이 세션의 `systemctl restart`가 아니다. `second-brain-backup.service`의 마지막 실행은 03:17:59 KST다. `second-brain-20260927T220247+0900.tar.gz`는 22:02:54 KST에 만들어졌고 22:03:49 KST에 검증 영수증이 붙었다. 이 세션의 첫 CLI 검색은 22:15:10 KST다.
+
+22:03:17과 22:03:47의 `sqlite3.OperationalError: database is locked`는 옛 웹 PID 1732103의 `do_GET` → `initialize_cancellations` `BEGIN IMMEDIATE`다. 같은 분에 MCP `sb_generation_status`와 `second-brain-cli-broker`도 같은 잠금으로 실패했다. 이 세션의 CLI와 웹이 겹친 기록이 아니다.
+
+(b) `/ready` degraded는 백업 폐기가 아니다. `managed_copy_disposals`는 0행이고 `220247` 아카이브와 `.verified.json`은 그대로다. 결함이다. 검증 영수증의 tombstone은 sequence 0, `sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3`다. 활성 세대 `generation.json`도 sequence 0이다. 요청 저널과 `/ready`의 `tombstone_high_water`는 정정 클릭이 남긴 sequence 1, `sha256:20c5fadd19f18ea81861e7a4cabeedab3a22d2545207387866c4923eb916e193`다. 세대는 활성화되지 않았는데 high-water만 올라갔다. 그래서 있는 검증 백업이 `BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH`다. 기대된 삭제 의미(사본 폐기 후 새 백업)와 다르다.
+
+복구 전 `/ready`: HTTP 503, `status=degraded`, reasons `VERIFIED_BACKUP_UNAVAILABLE`, `LATEST_BACKUP_UNVERIFIED`, `backup_error=BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH`, `latest_backup=second-brain-20260927T220247+0900.tar.gz`. 저장: `m13-r2/ready-before.json`.
+
+(c) 문서 경로만 사용했다. 백업 파일을 손으로 지우지 않았다. `sb verify-backup` `second-brain-20260927T220247+0900.tar.gz`는 exit 1, `BACKUP_TOMBSTONE_OR_PROVIDER_MISMATCH`. 이어서 `sb backup` 1회도 exit 1, 같은 코드다. 새 아카이브 `second-brain-20260927T222918+0900.tar.gz`와 `.sha256`만 남고 `.verified.json`은 없다. 활성 세대 sequence 0을 담은 아카이브가 저널 sequence 1과 맞지 않는다. 복구 후 `/ready`는 여전히 HTTP 503, `degraded`, 같은 두 reason이다. `latest_backup`은 `second-brain-20260927T222918+0900.tar.gz`, `backup_error=BACKUP_VERIFICATION_MISSING`으로 바뀌었다. `ready`로 되돌리지 못했다. 저장: `m13-r2/ready-after.json`, `verify-backup-latest.txt`, `sb-backup.txt`.
+
+### 남는 것
+
+- 활성 `daily/2026-09-27`에 `M13SENT0cced706`이 남는다. 검색 건수는 0이 아니다.
+- 미완료 영수증과 접수된 tombstone sequence 1, 활성화되지 않은 후속 세대가 남는다. 다시 정정 저장을 누르지 않았다.
+- 새 시험 기억은 없다.
+- `/ready`는 `ready`가 아니다. 문서의 `sb backup`은 이 split에서는 검증 영수증을 만들지 못한다.
