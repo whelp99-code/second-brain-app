@@ -207,7 +207,7 @@ def test_invalid_query_vectors_fall_back(
 ) -> None:
     root = _ready(tmp_path)
     lexical = _lexical(root)
-    def invalid_encode(_self: FakeEncoder, _texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+    def invalid_encode(_self: FakeEncoder, _texts: Sequence[str]) -> tuple[tuple[float, ...], ...]:
         return vectors
     monkeypatch.setattr(FakeEncoder, "encode", invalid_encode)
     assert hybrid_search(lexical, EN_TERM, 3, vault_root=root, encoder=FakeEncoder()) == lexical

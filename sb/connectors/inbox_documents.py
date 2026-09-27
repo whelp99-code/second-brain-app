@@ -54,7 +54,7 @@ class InboxDocumentsAdapter:
 
     def __init__(self, root: Path, source_id: str) -> None:
         self.source_id: str = source_id
-        self._root: Path = root
+        self.root: Path = root
         self._next_cursor: str = "0"
         self._scanned: dict[str, tuple[Path, str]] = {}
 
@@ -62,7 +62,7 @@ class InboxDocumentsAdapter:
         self._scanned.clear()
         previous = _token_map(cursor)
         current: dict[str, str] = {}
-        if not self._root.exists() or not self._root.is_dir() or self._root.is_symlink():
+        if not self.root.exists() or not self.root.is_dir() or self.root.is_symlink():
             self._next_cursor = "0"
             yield (
                 SourceRef(self.source_id, "", "absent-root"),
@@ -71,7 +71,7 @@ class InboxDocumentsAdapter:
             )
             return
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
-        for path, rel in _inbox_files(self._root):
+        for path, rel in _inbox_files(self.root):
             outcome = self._ingest(path, rel, previous.get(rel))
             current[rel] = outcome[0]
             if outcome[1] is not None:
@@ -99,7 +99,7 @@ class InboxDocumentsAdapter:
                 continue
             observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(body).hexdigest()}"
             if observed == token:
-                move_done(self._root, rel, token, metadata)
+                move_done(self.root, rel, token, metadata)
 
     def _ingest(
         self, path: Path, rel: str, previous: str | None
@@ -107,7 +107,7 @@ class InboxDocumentsAdapter:
         if path.is_symlink():
             return self._resume_skip(rel, "symlink", previous)
         try:
-            _ = path.resolve().relative_to(self._root.resolve())
+            _ = path.resolve().relative_to(self.root.resolve())
         except ValueError:
             return self._resume_skip(rel, "outside-root", previous)
         try:
@@ -128,7 +128,7 @@ class InboxDocumentsAdapter:
         identity = _upload_identity_from_rel(rel)
         if (
             identity is not None
-            and (self._root / ".requests" / "retract" / f"{identity}.json").is_file()
+            and (self.root / ".requests" / "retract" / f"{identity}.json").is_file()
         ):
             return self._resume_skip(rel, "retracted", previous)
         if previous == token:

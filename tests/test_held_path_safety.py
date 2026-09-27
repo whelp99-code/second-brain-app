@@ -10,7 +10,8 @@ import pytest
 from sb.postcompact_hook import PostCompactHookError, handle_postcompact
 from sb.revoked_keys import RevocationStoreError, record_revoked_key_ids, revoked_key_path
 from sb.search import SearchIndex
-from tests.test_postcompact_hook import _event, _seed
+from tests.test_postcompact_hook import event as _event
+from tests.test_postcompact_hook import seed as _seed
 
 
 def _fifo(path: Path) -> None:
@@ -51,7 +52,7 @@ def test_stage_file_unsafe_kinds_fail_closed(tmp_path: Path, kind: str) -> None:
     folder.mkdir(parents=True)
     _plant(kind, folder / "sess-omega.json")
     with pytest.raises(PostCompactHookError, match="HOOK_STAGE_UNSAFE"):
-        handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
+        _ = handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
     outside = folder / "outside-target"
     assert not outside.exists() or outside.is_dir() is False or kind != "symlink"
 
@@ -64,7 +65,7 @@ def test_stage_directory_unsafe_kinds_fail_closed(tmp_path: Path, kind: str) -> 
     sb_dir.mkdir(parents=True)
     _plant(kind, sb_dir / "session-memory")
     with pytest.raises(PostCompactHookError, match="HOOK_STAGE_UNSAFE"):
-        handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
+        _ = handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
 
 
 @pytest.mark.parametrize("kind", ["fifo", "dir", "symlink", "dangling"])
@@ -80,7 +81,7 @@ def test_revocation_store_unsafe_kinds_fail_closed(tmp_path: Path, kind: str) ->
 def test_stage_regular_file_still_writes(tmp_path: Path) -> None:
     root, _digest = _seed(tmp_path)
     state = tmp_path / "state"
-    handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
+    _ = handle_postcompact(_event(), SearchIndex(root, hybrid=False), state)
     staged = state / ".sb" / "session-memory" / "sess-omega.json"
     assert staged.is_file()
     assert not staged.is_symlink()
