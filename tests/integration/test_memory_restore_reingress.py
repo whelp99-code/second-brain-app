@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Unpack
+from typing import Never, Unpack
 
 import pytest
 
@@ -127,20 +127,21 @@ def test_verified_full_backup_restores_only_surviving_exact_knowledge(tmp_path: 
             before = hashlib.sha256((active.root / '.sb/ledger.db').read_bytes()).hexdigest()
             high_water = fixture.executor.store.tombstone_high_water()
 
+            def fail_after_write(method: str) -> Never:
+                writes.append(method)
+                raise ValueError("RESTORE_INJECTED_WRITE_FAILURE")
+
             def fail_knowledge(ledger: Ledger, state: BoundKnowledge) -> None:
                 original_knowledge(ledger, state)
-                writes.append("bind_knowledge")
-                raise ValueError("RESTORE_INJECTED_WRITE_FAILURE")
+                fail_after_write("bind_knowledge")
 
             def fail_source(ledger: Ledger, identity: str, access: SourceAccess) -> None:
                 original_source(ledger, identity, access)
-                writes.append("bind_source_classification")
-                raise ValueError("RESTORE_INJECTED_WRITE_FAILURE")
+                fail_after_write("bind_source_classification")
 
             def fail_page(ledger: Ledger, page_id: str, content_digest: str, access: PageAccess) -> None:
                 original_page(ledger, page_id, content_digest, access)
-                writes.append("bind_page_access")
-                raise ValueError("RESTORE_INJECTED_WRITE_FAILURE")
+                fail_after_write("bind_page_access")
 
             original_knowledge = Ledger.bind_knowledge
             original_source = Ledger.bind_source_classification

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, tzinfo
 from pathlib import Path
-from typing import cast, override
+from typing import override
 
 import pytest
 
@@ -140,8 +140,8 @@ def test_status_snapshot_omits_superseded_from_failed_list(tmp_path: Path) -> No
         ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
         _ = ledger.supersede_historical_brief_failures()
     snapshot = status_snapshot(Config(raw={"vault_root": str(tmp_path)}))
-    failed_items = cast(list[object], snapshot["failed_derivations"])
-    counts = cast(dict[str, int], snapshot["derivation_counts"])
+    failed_items = snapshot["failed_derivations"]
+    counts = snapshot["derivation_counts"]
     assert failed_items == []
     assert counts[DerivStatus.SUPERSEDED.value] == 1
     assert counts[DerivStatus.FAILED.value] == 0

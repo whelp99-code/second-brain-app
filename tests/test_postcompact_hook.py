@@ -170,7 +170,7 @@ def test_same_page_sections_dedupe_to_one_record() -> None:
         SearchHit("wiki/omega", f"s{index}", "OmegaCompiledBody", 1.0 - index / 10)
         for index in range(8)
     )
-    from sb.postcompact_hook import serialize, parse_postcompact_event
+    from sb.postcompact_hook import parse_postcompact_event, serialize
 
     event = parse_postcompact_event(_event())
     records, _context = serialize(event, hits)
@@ -183,7 +183,7 @@ def test_final_json_stays_within_budget() -> None:
         SearchHit(f"wiki/p{index}", "body", "x" * 2048, 1.0)
         for index in range(8)
     )
-    from sb.postcompact_hook import inject_payload, serialize, parse_postcompact_event
+    from sb.postcompact_hook import inject_payload, parse_postcompact_event, serialize
 
     event = parse_postcompact_event(_event())
     records, context = serialize(event, hits)
