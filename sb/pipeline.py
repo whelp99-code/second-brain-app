@@ -1667,7 +1667,7 @@ def audit_citations(root: Path) -> tuple[str, ...]:
             # A SourceCite sid may bind origin+hash rather than hash[:8]. Use
             # the actual declared citation identities; never rewrite records
             # merely to satisfy an obsolete shortcut in the audit.
-            spec = read_page_spec(root, path.relative_to(root).as_posix().removesuffix(".md"))
+            spec = read_page_spec(root, path.relative_to(root).as_posix().removesuffix(".md"), rendered_text=text)
             if spec is not None:
                 known = {cite.sid for cite in spec.sources}
             if facts is not None:

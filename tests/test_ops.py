@@ -337,6 +337,25 @@ def test_doctor_returns_machine_readable_pass_warn_fail_checks(tmp_path: Path) -
     assert all(set(check.as_dict()) == {"name", "status", "detail"} for check in checks)
 
 
+def test_doctor_citation_audit_reads_each_page_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root, config = _seed_vault(tmp_path)
+    page = root / "wiki" / "계약-일정.md"
+    original_read_text = Path.read_text
+    reads = 0
+
+    def count_page_reads(path: Path, *args: object, **kwargs: object) -> str:
+        nonlocal reads
+        if path == page:
+            reads += 1
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", count_page_reads)
+    checks = doctor(config)
+
+    assert any(check.name == "citations" and check.status == "pass" for check in checks)
+    assert reads == 1
+
+
 def test_migrate_status_backs_up_legacy_database_before_apply(tmp_path: Path) -> None:
     root = tmp_path / "legacy"
     db = root / ".sb" / "ledger.db"

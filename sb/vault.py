@@ -342,18 +342,18 @@ class Vault:
         return _commit_if_changed(self.root, f"sb: forget {page_id}", [self.root / rel])
 
 
-def read_page_spec(root: Path | str, page_id: str) -> PageSpec | None:
+def read_page_spec(root: Path | str, page_id: str, *, rendered_text: str | None = None) -> PageSpec | None:
     """Read one current rendered page as a PageSpec for persistent merge input."""
     root_path = Path(root)
     path = _safe_rel(root_path, _rel_for(page_id))
     if not path.is_file():
         return None
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8") if rendered_text is None else rendered_text
     split = _split_rendered(text)
     if split is None:
         return None
     block, body = split
-    loaded = cast(object, yaml.safe_load(block))
+    loaded = cast(object, yaml.load(block, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader)))
     if not isinstance(loaded, dict):
         return None
     fields = cast(dict[str, object], loaded)
