@@ -61,7 +61,14 @@ class ManagedTarInfo(tarfile.TarInfo):
     @classmethod
     @override
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
-        value = super().frombuf(buf, encoding, errors)
+        try:
+            value = super().frombuf(buf, encoding, errors)
+        except tarfile.HeaderError as exc:
+            # TarFile.next() otherwise treats consumed invalid headers as EOF after a member.
+            # Preserve its end-marker signal only for an entire zero block.
+            if buf == b"\0" * tarfile.BLOCKSIZE:
+                raise
+            raise ManagedInspectionError("MANAGED_ARCHIVE_INVALID") from exc
         if value.type == tarfile.GNUTYPE_SPARSE:
             raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
         if (value.type in (tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.GNUTYPE_LONGNAME, tarfile.GNUTYPE_LONGLINK)

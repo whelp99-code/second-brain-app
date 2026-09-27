@@ -141,5 +141,5 @@ def members(source: Source, budget: Budget) -> Iterator[tuple[str, bytes]]:
                 yield member.filename, _payload(member, compressed)
             if offset != central:
                 raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
-    except (BadZipFile, UnicodeError, zlib.error) as exc:
+    except (BadZipFile, NotImplementedError, UnicodeError, zlib.error) as exc:
         raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED") from exc

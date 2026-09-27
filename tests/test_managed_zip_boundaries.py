@@ -59,6 +59,29 @@ def test_ambiguous_member_inventory_cannot_certify_absence(tmp_path: Path, body:
     assert archive.read_bytes() == body and matching.read_bytes() == SENTINEL
 
 
+def test_agreeing_but_wrong_crcs_cannot_certify_decoded_payload(tmp_path: Path) -> None:
+    # Given: both redundant CRC fields agree, but neither describes the unchanged payload.
+    wrong = (int.from_bytes(_GOOD[14:18], "little") ^ 1).to_bytes(4, "little")
+    body = replaced(replaced(_GOOD, 14, wrong), _CENTRAL + 16, wrong)
+    archive = tmp_path / "wrong-crc.zip"
+    _ = archive.write_bytes(body)
+    # When / Then: payload integrity, not local/central disagreement, causes rejection.
+    with pytest.raises(ManagedInspectionError, match="MANAGED_ARCHIVE_UNSUPPORTED"):
+        _ = inspect_managed_file(archive, (OTHER,))
+
+
+@pytest.mark.parametrize("version", [21, 63, 64, 100, 255])
+def test_unsupported_extraction_versions_have_typed_rejection(tmp_path: Path, version: int) -> None:
+    # Given: both version fields agree, including versions rejected by ZipFile itself.
+    encoded = version.to_bytes(2, "little")
+    body = replaced(replaced(_GOOD, 4, encoded), _CENTRAL + 6, encoded)
+    archive = tmp_path / "unsupported-version.zip"
+    _ = archive.write_bytes(body)
+    # When / Then: scanner callers receive their supported typed error, not NotImplementedError.
+    with pytest.raises(ManagedInspectionError, match="MANAGED_ARCHIVE_UNSUPPORTED"):
+        _ = inspect_managed_file(archive, (OTHER,))
+
+
 @pytest.mark.parametrize("constant", ["MAX_ZIP_BYTES", "MAX_MEMBER_BYTES", "MAX_RATIO"])
 def test_zip_limits_are_enforced_before_allocation(
     tmp_path: Path, monkeypatch: MonkeyPatch, constant: str,
