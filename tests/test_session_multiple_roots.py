@@ -1,4 +1,6 @@
 """Ambiguous legacy root identities must not silently merge agent histories."""
+from pathlib import Path
+
 import pytest
 
 from tests.test_session_file_replacement import FACTORIES, record
@@ -6,11 +8,11 @@ from tests.test_session_file_replacement import FACTORIES, record
 
 @pytest.mark.parametrize('kind', list(FACTORIES))
 @pytest.mark.parametrize('cursor', [None, '{"session.jsonl":7}'])
-def test_multiple_roots_hold_without_consuming_or_merging(tmp_path, kind, cursor):
+def test_multiple_roots_hold_without_consuming_or_merging(tmp_path: Path, kind: str, cursor: str | None):
     roots = (tmp_path / 'agent-a', tmp_path / 'agent-b')
     for root in roots:
         root.mkdir()
-        (root / 'session.jsonl').write_bytes(record(kind, 'same-id'))
+        _ = (root / 'session.jsonl').write_bytes(record(kind, 'same-id'))
     adapter = FACTORIES[kind](roots, 'fixture')
     rows = list(adapter.scan(cursor))
     assert len(rows) == 1
@@ -21,7 +23,7 @@ def test_multiple_roots_hold_without_consuming_or_merging(tmp_path, kind, cursor
 
 
 @pytest.mark.parametrize('cursor', [None, '{"snapshot.json":7}'])
-def test_opencode_multiple_roots_hold_without_consuming_or_merging(tmp_path, cursor):
+def test_opencode_multiple_roots_hold_without_consuming_or_merging(tmp_path: Path, cursor: str | None):
     import json
 
     from sb.connectors.sessions_opencode import OpenCodeSessionsAdapter
@@ -29,7 +31,7 @@ def test_opencode_multiple_roots_hold_without_consuming_or_merging(tmp_path, cur
     roots = (tmp_path / 'agent-a', tmp_path / 'agent-b')
     for root in roots:
         root.mkdir()
-        (root / 'snapshot.json').write_text(json.dumps({'parts': [
+        _ = (root / 'snapshot.json').write_text(json.dumps({'parts': [
             {'id': 'same-id', 'data': {'type': 'text', 'text': 'same body'}}]}))
     adapter = OpenCodeSessionsAdapter(roots, 'fixture')
     rows = list(adapter.scan(cursor))
