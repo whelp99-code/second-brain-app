@@ -227,6 +227,8 @@ def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> 
         assert "Second Brain" in html
         assert "기억 추가" in html
         assert "파일 업로드" in html
+        # Long correction records must not widen the page past a phone viewport.
+        assert "select{box-sizing:border-box;max-width:100%}" in html
 
         status, health = _request(f"{base}/health")
         assert status == 200 and health == {"status": "ok"}

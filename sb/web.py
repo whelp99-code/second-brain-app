@@ -55,7 +55,7 @@ _INDEX_HTML: Final = """<!doctype html>
 body{max-width:980px;margin:0 auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:12px}
 section{background:#fff;border:1px solid #d8dee4;border-radius:14px;padding:18px;margin:16px 0;box-shadow:0 2px 8px #0000000a}
 h1,h2{margin-top:0}input,textarea,select,button{font:inherit;border-radius:8px;border:1px solid #aeb7c2;padding:9px}
-input,textarea{box-sizing:border-box;width:100%}textarea{min-height:100px;resize:vertical}button{background:#24292f;color:#fff;cursor:pointer}
+input,textarea{box-sizing:border-box;width:100%}select{box-sizing:border-box;max-width:100%}textarea{min-height:100px;resize:vertical}button{background:#24292f;color:#fff;cursor:pointer}
 button.secondary{background:#fff;color:#24292f}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row button{flex:0 0 auto}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f8fa;border-radius:8px;padding:12px;min-height:40px}.muted{color:#66707b}
 label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
