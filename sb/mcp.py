@@ -143,7 +143,7 @@ class ContractProfileError(RuntimeError):
         super().__init__(self.code)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class PageNotFoundError(Exception):
     page_id: str
 

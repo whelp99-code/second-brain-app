@@ -22,6 +22,7 @@ from sb.inbox import RememberRejected, discard_inbox, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
 from sb.ops import status_snapshot
+from sb.owner_effects import OwnerEffectError, apply_page_effect, page_receipt
 from sb.pipeline import run_all
 from sb.redaction import redact_credentials
 from sb.runtime_access import mutate_root, read_root
@@ -112,6 +113,12 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <pre id="searchResult" class="muted"></pre>
 <label for="pageId">페이지 ID</label><div class="row"><input id="pageId" placeholder="검색 결과의 page_id"><button class="secondary" onclick="readPage()">전체 열기</button><button class="secondary" id="forgetPageButton" onclick="forgetPage()">페이지 삭제</button></div>
 <pre id="pageResult" class="muted"></pre>
+<h3>기억 정정</h3>
+<p class="muted">전체 열기로 현재 영수증을 받은 뒤 정정할 문장을 선택하세요. 삭제는 이 페이지의 기억과 관련 파생본·관리 백업을 지우고 재유입을 차단합니다.</p>
+<label for="correctionRecord">정정할 문장</label><select id="correctionRecord" onchange="selectCorrection()"></select>
+<label for="correctionContent">정정 내용</label><textarea id="correctionContent"></textarea>
+<p><button id="correctPageButton" onclick="correctPage()">정정 저장</button></p>
+<pre id="correctionResult" class="muted"></pre>
 </section>
 <section>
 <h2>열린 충돌</h2>
@@ -133,7 +140,7 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <script>
 const byId=(id)=>document.getElementById(id);
 function authHeaders(){const token=localStorage.getItem('sb_token')||'';return {'Content-Type':'application/json',...(token?{'Authorization':'Bearer '+token}:{})}}
-async function api(path,options={}){const response=await fetch(path,{...options,headers:{...authHeaders(),...(options.headers||{})}});const payload=await response.json();if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
+async function api(path,options={}){const response=await fetch(path,{...options,headers:{...authHeaders(),...(options.headers||{})}});const payload=await response.json();if(!response.ok)throw new Error((response.status===404?'404: ':'')+(payload.error||response.statusText));return payload}
 function show(id,value){byId(id).textContent=typeof value==='string'?value:JSON.stringify(value,null,2)}
 function saveToken(){localStorage.setItem('sb_token',byId('token').value);show('rememberResult','토큰을 이 브라우저에 저장했습니다.')}
 async function loadReadiness(){try{const response=await fetch('/ready',{headers:authHeaders()});const data=await response.json();if(![200,503].includes(response.status)||!['ready','degraded'].includes(data.status))throw new Error('준비 상태 응답을 확인하지 못했습니다.');show('readinessSummary',data.status==='ready'?'운영 준비 점검 통과':'운영 준비 미완료 — 아래 항목을 확인하세요.');show('readinessDetails',data.reasons||[])}catch(error){show('readinessSummary','운영 준비 상태를 확인하지 못했습니다.');show('readinessDetails',error.message)}}
@@ -159,10 +166,29 @@ function readBase64(file){return new Promise((resolve,reject)=>{const reader=new
 async function uploadFiles(files){const results=[];for(const file of files){try{const payload={filename:file.name,relative_path:file.webkitRelativePath||file.name,device_id:'mac-web',content_base64:await readBase64(file)};results.push(await api('/api/uploads',{method:'POST',body:JSON.stringify(payload)}))}catch(error){results.push({filename:file.name,error:error.message})}}show('uploadResult',results)}
 let searchRequestId=0;
 let pageRequestId=0;
-async function search(){const requestId=++searchRequestId;pageRequestId++;byId('pageId').value='';show('pageResult','');show('searchResult','검색 중…');try{const params=new URLSearchParams({q:byId('query').value});if(byId('kind').value)params.append('kind',byId('kind').value);if(byId('searchStatus').value)params.set('status',byId('searchStatus').value);const data=await api('/api/search?'+params.toString());if(requestId!==searchRequestId)return;show('searchResult',data);if(data.results&&data.results.length)byId('pageId').value=data.results[0].page_id}catch(error){if(requestId===searchRequestId)show('searchResult',error.message)}}
-async function readPage(){const requestId=++pageRequestId;const pageId=byId('pageId').value;show('pageResult','불러오는 중…');try{const data=await api('/api/pages/'+encodeURIComponent(pageId));if(requestId===pageRequestId&&byId('pageId').value===pageId)show('pageResult',data)}catch(error){if(requestId===pageRequestId&&byId('pageId').value===pageId)show('pageResult',error.message)}}
-async function forgetPage(){const pageId=byId('pageId').value;show('pageResult','삭제 중…');try{const data=await api('/api/pages/'+encodeURIComponent(pageId)+'/forget',{method:'POST',body:'{}'});show('pageResult',data)}catch(error){show('pageResult',error.message)}}
-byId('pageId').addEventListener('input',()=>{pageRequestId++;show('pageResult','')});
+let pageReceipt=null;
+let pageRecords=[];
+let editingPage=false;
+function clearPageReceipt(){pageReceipt=null;pageRecords=[];byId('correctionRecord').replaceChildren()}
+function selectCorrection(){const record=pageRecords.find(row=>row.record_id===byId('correctionRecord').value);if(record)byId('correctionContent').value=record.record_text}
+async function search(){const requestId=++searchRequestId;pageRequestId++;clearPageReceipt();byId('pageId').value='';show('pageResult','');show('searchResult','검색 중…');try{const params=new URLSearchParams({q:byId('query').value});if(byId('kind').value)params.append('kind',byId('kind').value);if(byId('searchStatus').value)params.set('status',byId('searchStatus').value);const data=await api('/api/search?'+params.toString());if(requestId!==searchRequestId)return;show('searchResult',data);if(data.results&&data.results.length)byId('pageId').value=data.results[0].page_id}catch(error){if(requestId===searchRequestId)show('searchResult',error.message)}}
+async function readPage(){const requestId=++pageRequestId;const pageId=byId('pageId').value;clearPageReceipt();show('pageResult','불러오는 중…');try{const data=await api('/api/pages/'+encodeURIComponent(pageId));if(requestId!==pageRequestId||byId('pageId').value!==pageId)return;show('pageResult',data);pageReceipt=data.receipt;pageRecords=data.records||[];for(const record of pageRecords){const option=document.createElement('option');option.value=record.record_id;option.textContent=record.record_text;byId('correctionRecord').append(option)}selectCorrection()}catch(error){if(requestId===pageRequestId&&byId('pageId').value===pageId)show('pageResult',error.message)}}
+async function editPage(operation){
+ if(editingPage)return;
+ const output=operation==='correct'?'correctionResult':'pageResult';
+ const pageId=byId('pageId').value;
+ if(!pageReceipt||pageReceipt.page_id!==pageId){show(output,'전체 열기로 현재 페이지 영수증을 먼저 확인하세요.');return}
+ const draft={receipt:pageReceipt,...(operation==='correct'?{record_id:byId('correctionRecord').value,content:byId('correctionContent').value}:{})};
+ const requestId=++pageRequestId;
+ editingPage=true;byId('correctPageButton').disabled=true;byId('forgetPageButton').disabled=true;
+ show(output,operation==='correct'?'정정 중…':'삭제 중…');
+ try{const data=await api('/api/pages/'+encodeURIComponent(pageId)+'/'+operation,{method:'POST',body:JSON.stringify(draft)});if(requestId===pageRequestId&&byId('pageId').value===pageId){show(output,data);clearPageReceipt();show('searchResult','검색을 다시 실행해 변경 결과를 확인하세요.');if(operation==='correct')show('pageResult','정정됐습니다. 전체 열기로 새 영수증을 확인하세요.')}}
+ catch(error){if(requestId===pageRequestId&&byId('pageId').value===pageId)show(output,error.message)}
+ finally{editingPage=false;byId('correctPageButton').disabled=false;byId('forgetPageButton').disabled=false}
+}
+async function forgetPage(){await editPage('forget')}
+async function correctPage(){await editPage('correct')}
+byId('pageId').addEventListener('input',()=>{pageRequestId++;clearPageReceipt();show('pageResult','')});
 async function loadConflicts(){try{const data=await api('/api/conflicts');show('conflictResult',data);if(data.conflicts&&data.conflicts.length)byId('conflictId').value=data.conflicts[0].conflict_id}catch(error){show('conflictResult',error.message)}}
 async function resolveConflict(){try{const id=byId('conflictId').value;const data=await api('/api/conflicts/'+encodeURIComponent(id)+'/resolve',{method:'POST',body:JSON.stringify({decision:byId('decision').value,note:byId('resolutionNote').value})});show('conflictResult',data);await loadConflicts()}catch(error){show('conflictResult',error.message)}}
 async function loadChanges(){try{show('changeResult',await api('/api/changes?days=7'))}catch(error){show('changeResult',error.message)}}
@@ -362,7 +388,9 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 else:
                     with read_root(context.config) as pinned:
                         self._get(pinned)
-            except (ValueError, PageNotFoundError, PathEscapeError) as exc:
+            except PageNotFoundError as exc:
+                self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            except (ValueError, PathEscapeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             except (BrokenPipeError, ConnectionResetError):
                 self.close_connection = True
@@ -490,7 +518,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path.startswith("/api/pages/"):
                 page_id = unquote(parsed.path.removeprefix("/api/pages/"))
-                self._json(HTTPStatus.OK, read_page(root, page_id).as_dict())
+                page = read_page(root, page_id).as_dict()
+                self._json(HTTPStatus.OK, {**page, **page_receipt(root, page_id)})
                 return
             if parsed.path == "/api/changes":
                 values = parse_qs(parsed.query, keep_blank_values=True)
@@ -527,6 +556,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 self._post()
+            except OwnerEffectError as exc:
+                self._json(HTTPStatus.CONFLICT, {"error": str(exc)})
             except (
                 ValueError,
                 TypeError,
@@ -641,19 +672,17 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     },
                 )
                 return
-            if parsed.path.startswith("/api/pages/") and parsed.path.endswith("/forget"):
-                page_id = unquote(parsed.path[len("/api/pages/") : -len("/forget")]).strip("/")
+            if parsed.path.startswith("/api/pages/") and parsed.path.endswith(("/forget", "/correct")):
+                prefix, _, operation = parsed.path.rpartition("/")
+                page_id = unquote(prefix.removeprefix("/api/pages/")).strip("/")
                 if not page_id:
                     raise ValueError("page_id is required")
-                try:
-                    commit = mutate_root(
-                        context.config,
-                        GenerationOperation.EFFECT,
-                        lambda root: Vault(root).forget_page(page_id),
-                    )
-                except FileNotFoundError as exc:
-                    raise ValueError("compiled page missing") from exc
-                self._json(HTTPStatus.OK, {"forgotten": page_id, "commit": commit})
+                result = apply_page_effect(
+                    context.config, page_id, "correct" if operation == "correct" else "forget",
+                    data.get("receipt"), record_id=_string_field(data, "record_id"),
+                    content=_string_field(data, "content"),
+                )
+                self._json(HTTPStatus.OK, result)
                 return
             prefix = "/api/conflicts/"
             suffix = "/resolve"

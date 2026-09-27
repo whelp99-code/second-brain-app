@@ -80,8 +80,12 @@ class ReingressGate:
 
     def block_targets(
         self, targets: Sequence[ResolvedMemoryTargetModel], high_water: tuple[int, str], now: datetime,
+        *, content_hashes: Sequence[str] = (),
     ) -> None:
-        rows: list[tuple[str, str, int, str, str]] = []
+        rows: list[tuple[str, str, int, str, str]] = [
+            ("content", value, high_water[0], high_water[1], format_instant(now))
+            for value in content_hashes
+        ]
         for target in targets:
             rows.extend(
                 (
