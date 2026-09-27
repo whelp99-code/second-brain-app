@@ -16,7 +16,7 @@ from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Final, Literal, TypedDict, cast, override
+from typing import Annotated, Final, Literal, cast, override
 
 import anyio
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
+from typing_extensions import TypedDict
 
 from sb.access_claims import (
     AccessContext,
@@ -58,10 +59,12 @@ from sb.effect_write_values import model_object
 from sb.erasure import ErasureError, ReingressGate
 from sb.export_status import sign_export_status
 from sb.exports import ExportPublisher
+from sb.generation_changes import ChangeRow, generation_recent_changes
 from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import RememberRejected, write_inbox
+from sb.legacy_search_values import SearchHitDict as LegacySearchHitDict
 from sb.mcp_remember_models import MemoryRememberWriteRequest
 from sb.mcp_write_models import (
     MemoryWriteRequest,
@@ -162,16 +165,6 @@ class PageRead:
 
 
 @dataclass(frozen=True, slots=True)
-class ChangeRow:
-    page_id: str
-    change: str
-    date: str
-
-    def as_dict(self) -> dict[str, str]:
-        return {"page_id": self.page_id, "change": self.change, "date": self.date}
-
-
-@dataclass(frozen=True, slots=True)
 class ConflictRow:
     conflict_id: str
     page_id: str
@@ -185,7 +178,7 @@ class ConflictRow:
         }
 
 
-class RunOutcomeDict(TypedDict):
+class RunOutcomeDict(TypedDict, closed=True):
     run_id: str
     status: str
     pages: int
@@ -225,8 +218,10 @@ def read_page(root: Path, page_id: str) -> PageRead:
     return PageRead(frontmatter=_frontmatter(block), body=body)
 
 
-def recent_changes(root: Path, days: int = 7) -> tuple[ChangeRow, ...]:
-    """Committed wiki/daily/conflicts name-status rows since `days` ago."""
+def recent_changes(root: Path, days: int = 7, *, journal_path: Path | None = None) -> tuple[ChangeRow, ...]:
+    """Committed page deltas; MCP supplies its activation journal for sealed roots."""
+    if journal_path is not None and (root / "generation.json").exists():
+        return generation_recent_changes(root, journal_path, days)
     raw = git_run(
         root,
         "log",
@@ -588,7 +583,7 @@ def build_server(
         parsed = query_plan(query)
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             if limit <= 0 or not query.strip():
                 return bind_read({"results": []}, generation, current)
@@ -636,7 +631,7 @@ def build_server(
         """Read one committed page from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             try:
                 page = read_page(current_root, id)
@@ -656,9 +651,10 @@ def build_server(
         """List committed changes from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
-            payload = {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
+            payload = {"changes": [row.as_dict() for row in recent_changes(
+                current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
             return bind_read(payload, generation, current)
 
     def sb_open_conflicts(
@@ -667,7 +663,7 @@ def build_server(
         """List unresolved conflicts from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             conflicts: list[ToolResult] = []
             for row in open_conflicts(current_root):
@@ -763,7 +759,7 @@ def build_server(
         """Return metadata-only global request status and a proof only after proved."""
         with pin_generation() as (_current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_status", "status", current)
+            _ = require_read_fence(read_fence, "memory_status", "status", current)
             store = RequestStore(requests, maintenance_only=True)
             try:
                 status = store.get(request_id)
@@ -883,7 +879,7 @@ def build_server(
         """Resolve one exact citation under one shared generation pin."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            _ = require_read_fence(read_fence, "memory_resolve", "resolve", current)
             require_active_high_water(generation, current)
             if sensitivity not in {"public", "personal", "sensitive", "restricted"}:
                 raise ToolError("EFFECT_TARGET_INVALID")
@@ -924,7 +920,7 @@ def build_server(
         """Resolve only a schema-4 record identity under its exact generation pin."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            _ = require_read_fence(read_fence, "memory_resolve", "resolve", current)
             require_active_high_water(generation, current)
             if (generation.generation_id != generation_id
                     or generation.generation_manifest_digest != generation_manifest_digest):
@@ -1009,7 +1005,7 @@ def build_server(
         if high_water()[0] != 0:
             raise ToolError("TOMBSTONE_FENCE_REQUIRED")
 
-    def legacy_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
+    def legacy_search(query: str, limit: int = 10) -> dict[str, list[LegacySearchHitDict]]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
         Use this to answer questions about what the user has recorded before.
@@ -1022,7 +1018,8 @@ def build_server(
             hits = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid,
                                registry_path=Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None,
                                 min_similarity=config.search_min_similarity).search(query, limit, scope="reference")
-            return {"results": [hit.as_dict() for hit in hits]}
+            return {"results": [{"page_id": hit.page_id, "section": hit.section,
+                "snippet": hit.snippet, "score": hit.score} for hit in hits]}
 
     def legacy_read_page(id: str) -> dict[str, dict[str, str] | str]:
         """Read one committed page whole, with its citation frontmatter.
@@ -1047,7 +1044,8 @@ def build_server(
         """
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            return {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
+            return {"changes": [row.as_dict() for row in recent_changes(
+                current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
 
     def legacy_open_conflicts() -> dict[str, list[dict[str, str]]]:
         """List unresolved contradictions between recorded sources.

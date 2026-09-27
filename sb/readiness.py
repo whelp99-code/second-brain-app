@@ -17,6 +17,7 @@ from sb.backup_verification import (
     read_verification,
 )
 from sb.config import Config
+from sb.effect_values import JsonInput
 from sb.ops import OperationError
 from sb.readiness_checks import ReadinessPolicy, generation_checks, ledger_checks, request_checks
 from sb.runtime_access import read_root
@@ -36,10 +37,10 @@ _REASONS = {
 }
 
 
-def readiness(config: Config, *, now: datetime | None = None) -> dict[str, object]:
+def readiness(config: Config, *, now: datetime | None = None) -> dict[str, JsonInput]:
     at = datetime.now(UTC) if now is None else now
     checks: dict[str, bool] = {}
-    details: dict[str, object] = {"provider_release": config.provider_release_sha}
+    details: dict[str, JsonInput] = {"provider_release": config.provider_release_sha}
     try:
         policy = ReadinessPolicy.from_config(config)
         if at.tzinfo is None:
@@ -111,7 +112,29 @@ def readiness(config: Config, *, now: datetime | None = None) -> dict[str, objec
             latest = max(valid, key=lambda receipt: instant(receipt.backup_created_at))
             checks["recent_backup"] = True
             details["last_verified_backup"] = latest.archive_name
-            details["backup_verification"] = latest.model_dump(mode="json")
+            details["backup_verification"] = {
+                "schema_version": latest.schema_version,
+                "validation": latest.validation,
+                "archive_name": latest.archive_name,
+                "origin": latest.origin,
+                "generation": None if latest.generation is None else {
+                    "provider_instance_id": latest.generation.provider_instance_id,
+                    "tombstone_sequence": latest.generation.tombstone_sequence,
+                    "tombstone_set_root": latest.generation.tombstone_set_root,
+                },
+                "archive_sha256": latest.archive_sha256,
+                "archive_identity": {
+                    "device": latest.archive_identity.device,
+                    "inode": latest.archive_identity.inode,
+                    "size": latest.archive_identity.size,
+                    "mtime_ns": latest.archive_identity.mtime_ns,
+                    "ctime_ns": latest.archive_identity.ctime_ns,
+                },
+                "backup_created_at": latest.backup_created_at,
+                "verified_at": latest.verified_at,
+                "files": latest.files,
+                "bytes": latest.bytes,
+            }
     except _ERRORS:
         details["backup_error"] = "BACKUP_DIRECTORY_UNREADABLE"
     reasons = [_REASONS[name] for name, passed in checks.items() if not passed]

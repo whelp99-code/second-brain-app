@@ -23,6 +23,7 @@ from sb.source_access import (
     source_access_digest,
     source_access_identity,
 )
+from sb.sqlite_values import OPTIONAL_SQL_ROW
 from sb.store.cas import ContentAddressedStore
 from sb.store.life import LifeStore
 
@@ -643,9 +644,9 @@ class Ledger:
                 (state.page_id, state.content_digest, state.knowledge_status, state.approval_status))
 
     def knowledge_for(self, page_id: str, content_digest: str) -> BoundKnowledge | None:
-        row = self._db().execute(
+        row = OPTIONAL_SQL_ROW.validate_python(self._db().execute(
             "SELECT page_id,content_digest,knowledge_status,approval_status FROM bound_knowledge "
-            "WHERE page_id=? AND content_digest=?", (page_id, content_digest)).fetchone()
+            + "WHERE page_id=? AND content_digest=?", (page_id, content_digest)).fetchone(), strict=True)
         return None if row is None else BoundKnowledge(*row)
 
     def record_run(self, run: Run) -> None:
@@ -669,7 +670,7 @@ class Ledger:
         """Retire unfinished batches; caller must own the pipeline writer lock."""
         _ = self._exec(
             "UPDATE run_stage SET status='interrupted',finished_at=?,detail=COALESCE(detail,?) "
-            "WHERE stage='batch' AND status='running' AND finished_at IS NULL",
+            + "WHERE stage='batch' AND status='running' AND finished_at IS NULL",
             (finished_at, "previous writer ended before batch completion"),
         )
 

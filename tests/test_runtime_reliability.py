@@ -16,6 +16,7 @@ from sb.pipeline import run_compile, run_ingest
 from sb.runtime_access import mutate_root
 from sb.runtime_backup import backup_runtime
 from sb.search import SearchIndex
+from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import load_ledger_tables
 from sb.uploads import accept_upload
 
@@ -50,12 +51,15 @@ def test_managed_capture_compile_short_search_backup_restore(tmp_path: Path, mon
     class CitedKorean:
         def generate(self, prompt: str, *, system: str | None = None,
                      json_mode: bool = False, timeout: int = 120) -> str:
+            del system, timeout
             if json_mode:
                 return '{"relation":"unrelated","confidence":1,"rationale":"independent facts","cites":[]}'
             sid = re.search(r"sid=([0-9a-f]{8})", prompt)
             assert sid is not None
             return f"업무 기억 보존 검증.[^{sid.group(1)}]"
-    monkeypatch.setattr("sb.pipeline._llm", lambda *_args: CitedKorean())
+    def llm(_config: Config, _mode: str) -> CitedKorean:
+        return CitedKorean()
+    monkeypatch.setattr("sb.pipeline._llm", llm)
     assert run_compile(config, llm_mode="fake").exit_code == 0
     index = active / ".sb" / "search.db"
     before = hashlib.sha256(index.read_bytes()).hexdigest()
@@ -81,9 +85,12 @@ def test_llm_outage_is_failed_and_retryable(tmp_path: Path, monkeypatch: MonkeyP
     class Offline:
         def generate(self, prompt: str, *, system: str | None = None,
                      json_mode: bool = False, timeout: int = 120) -> str:
+            del prompt, system, json_mode, timeout
             raise LLMUnavailable(attempts=1, reason="synthetic outage")
 
-    monkeypatch.setattr("sb.pipeline._llm", lambda *_args: Offline())
+    def llm(_config: Config, _mode: str) -> Offline:
+        return Offline()
+    monkeypatch.setattr("sb.pipeline._llm", llm)
     outcome = run_compile(config)
     assert outcome.status == "failed" and outcome.exit_code == 1 and outcome.errors > 0
     tables = load_ledger_tables(Path(config.vault_root) / ".sb" / "ledger.db")
@@ -147,7 +154,7 @@ def test_cas_failure_preserves_input_for_later_ingest(tmp_path: Path, monkeypatc
     active = Path(config.vault_root)
     expected = {p.name: p.read_bytes() for p in (active / "inbox").glob("*.md")}
 
-    def fail_put(_self: object, _data: bytes) -> str:
+    def fail_put(_self: ContentAddressedStore, _data: bytes) -> str:
         raise OSError("synthetic CAS failure")
 
     with monkeypatch.context() as patch:

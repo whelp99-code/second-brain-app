@@ -4,6 +4,7 @@ import hashlib
 import signal
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -13,13 +14,13 @@ from tests.task30_restore_factory import OLD, restore_fixture
 
 
 @pytest.mark.parametrize('phase', ['extract', 'materialize'])
-def test_restore_sigkill_preserves_active_and_allows_fresh_process_retry(tmp_path, phase):
+def test_restore_sigkill_preserves_active_and_allows_fresh_process_retry(tmp_path: Path, phase: str):
     fixture = restore_fixture(tmp_path, full_source=True)
     config = fixture.executor.config
     active = fixture.executor.generations.active()
     before = hashlib.sha256((active.root / '.sb/ledger.db').read_bytes()).hexdigest()
     high_water = fixture.executor.store.tombstone_high_water()
-    (tmp_path / 'restore-request.json').write_text(fixture.request.model_dump_json())
+    _ = (tmp_path / 'restore-request.json').write_text(fixture.request.model_dump_json())
     fixture.executor.close()
     command = [sys.executable, '-m', 'tests.restore_kill_worker', str(tmp_path)]
     killed = subprocess.run([*command, phase], capture_output=True, text=True, timeout=30, check=False)

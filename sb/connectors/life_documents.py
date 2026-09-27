@@ -12,6 +12,7 @@ from typing import Final, Protocol
 
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.contracts import SourceRef
+from sb.life_json import decode_json
 
 ADAPTER_ID: Final = "life-documents"
 _ADAPTERS: Final = frozenset({ADAPTER_ID, "life", "life_documents", "mail", "kakao", "calls"})
@@ -114,7 +115,7 @@ def _part_text(part: Message) -> str:
 def _cursor_map(cursor: str | None) -> dict[str, str]:
     if not cursor or cursor == "0":
         return {}
-    loaded = json.loads(cursor)
+    loaded = decode_json(cursor)
     if not isinstance(loaded, dict):
         return {}
     return {str(key): str(value) for key, value in loaded.items()}

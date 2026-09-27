@@ -11,16 +11,20 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonObject
 from sb.life_contracts import EVENT_TYPES, LifeInputError
 from sb.life_phone import TYPES, phone_event
 from sb.pipeline import run_life_import
 from sb.store.ledger import Ledger
+from tests.life_test_support import (
+    config_table,
+)
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import life_config
 
 
-def sample(event_type: str, attachment: dict | None = None) -> dict:
-    result = {
+def sample(event_type: str, attachment: JsonObject | None = None) -> JsonObject:
+    result: JsonObject = {
         "schema_version": 1,
         "id": "shipping-case",
         "device_id": "fixture-iphone",
@@ -37,7 +41,7 @@ def sample(event_type: str, attachment: dict | None = None) -> dict:
     return result
 
 
-def attachment(mime: str, raw: bytes, filename: str) -> dict:
+def attachment(mime: str, raw: bytes, filename: str) -> JsonObject:
     return {
         "filename": filename,
         "media_type": mime,
@@ -46,7 +50,7 @@ def attachment(mime: str, raw: bytes, filename: str) -> dict:
     }
 
 
-def test_all_shipping_capture_names_are_supported():
+def test_all_shipping_capture_names_are_supported() -> None:
     source = Path("phone-history/ios/Core/CaptureService.swift").read_text()
     names = set(re.findall(r'eventType:\s*"([a-z_]+)"', source))
     names.update({"file_shared", "call_recording_imported"})
@@ -83,14 +87,16 @@ def test_all_shipping_capture_names_are_supported():
         ),
     ],
 )
-def test_shipping_names_publish_and_replay_without_duplication(tmp_path, kind, expected, file):
+def test_shipping_names_publish_and_replay_without_duplication(
+    tmp_path: Path, kind: str, expected: str, file: JsonObject | None
+) -> None:
     config, root = life_config(tmp_path)
     config = replace(
         config,
         raw={
             **config.raw,
             "life": {
-                **config.raw["life"],
+                **config_table(config.raw["life"]),
                 "sources": {
                     "test-notes": {
                         "enabled": True,
@@ -118,21 +124,21 @@ def test_shipping_names_publish_and_replay_without_duplication(tmp_path, kind, e
         assert events[0].evidence_level == "user_asserted"
 
 
-def test_shared_file_without_bytes_is_not_a_success():
+def test_shared_file_without_bytes_is_not_a_success() -> None:
     with pytest.raises(LifeInputError, match="LIFE_PHONE_FILE_REQUIRED"):
-        phone_event(sample("file_shared"))
+        _ = phone_event(sample("file_shared"))
 
 
 @pytest.mark.parametrize("version", [2, True, "1"])
-def test_phone_unknown_wire_version_is_rejected(version):
+def test_phone_unknown_wire_version_is_rejected(version: int | bool | str) -> None:
     data = sample("quick_note")
     data["schema_version"] = version
     with pytest.raises(LifeInputError, match="LIFE_PHONE_EVENT_INVALID"):
-        phone_event(data)
+        _ = phone_event(data)
 
 
-def test_restricted_phone_capture_cannot_be_downgraded_to_personal_source(tmp_path):
+def test_restricted_phone_capture_cannot_be_downgraded_to_personal_source(tmp_path: Path) -> None:
     config, _ = life_config(tmp_path)
     raw = json.dumps(sample("quick_note")).encode()
     with pytest.raises(LifeInputError, match="LIFE_SOURCE_SENSITIVITY_TOO_LOW"):
-        run_life_import(config, "test-notes", "phone-event", raw, now=NOW)
+        _ = run_life_import(config, "test-notes", "phone-event", raw, now=NOW)

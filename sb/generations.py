@@ -30,6 +30,11 @@ from sb.effect_values import (
 )
 from sb.generation_access import access_bound_ledger_digest
 from sb.generation_access_inheritance import inherit_generation_access
+from sb.generation_changes import (
+    activate_generation_changes,
+    initialize_generation_changes,
+    record_generation_changes,
+)
 from sb.generation_cleanup import discard_staging
 from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
@@ -37,6 +42,7 @@ from sb.generation_vectors import VectorContent, prepare_vectors
 from sb.generation_walk import surface_files
 from sb.request_store import RequestStore
 from sb.search_query import normalize
+from sb.sqlite_values import SQL_ROWS
 
 
 class GenerationError(RuntimeError):
@@ -605,6 +611,7 @@ class GenerationStore:
         _ = self.journal.execute("PRAGMA journal_mode=DELETE")
         _ = self.journal.execute("PRAGMA synchronous=FULL")
         _ = self.journal.executescript(_JOURNAL_SCHEMA)
+        initialize_generation_changes(self.journal)
         self.journal_path.chmod(0o600)
 
     def close(self) -> None:
@@ -631,14 +638,14 @@ class GenerationStore:
     def sweep_orphan_activations(self, now: datetime, current_id: str | None) -> int:
         pinned: set[str] = set()
         if self.requests is not None:
-            rows = self.requests.db.execute(
+            rows = SQL_ROWS.validate_python(self.requests.db.execute(
                 "SELECT DISTINCT generation_id FROM reader_leases",
-            ).fetchall()
+            ).fetchall(), strict=True)
             pinned = {str(row[0]) for row in rows if row[0]}
         changed = self._discard_obsolete_sealed(now, current_id, pinned)
-        rows = self.journal.execute(
+        rows = SQL_ROWS.validate_python(self.journal.execute(
             "SELECT generation_id, pointer_target FROM activations WHERE phase='activated'",
-        ).fetchall()
+        ).fetchall(), strict=True)
         for generation_id, pointer in rows:
             if not isinstance(generation_id, str):
                 continue
@@ -665,17 +672,23 @@ class GenerationStore:
             self.journal.commit()
         return changed
 
-    def _discard_obsolete_sealed(self, now: datetime, current_id: str | None,
-                                 pinned: set[str]) -> int:
+    def _discard_obsolete_sealed(
+        self, now: datetime, current_id: str | None, pinned: set[str],
+    ) -> int:
+        """Retire only unpinned sealed siblings whose base was already disposed."""
         if current_id is None:
             return 0
         changed = 0
-        rows = cast(list[tuple[str, str | None]], self.journal.execute(
+        rows = SQL_ROWS.validate_python(self.journal.execute(
             "SELECT generation_id,parent_generation_id FROM activations WHERE phase='sealed'",
-        ).fetchall())
+        ).fetchall(), strict=True)
         for generation_id, parent_id in rows:
             # A child of current may still resume. Only a sibling whose base was
             # already disposed is impossible to activate through the state machine.
+            if not isinstance(generation_id, str) or (
+                parent_id is not None and not isinstance(parent_id, str)
+            ):
+                continue
             if (generation_id == current_id or generation_id in pinned or parent_id is None
                     or parent_id == current_id or (self.generations / parent_id).exists()):
                 continue
@@ -694,11 +707,11 @@ class GenerationStore:
             _ = self.discard_abandoned_staging()
             disposal = digest("generation", {"reason": "obsolete-sealed",
                 "generation_id": generation_id, "disposed": True})
-            changed += self.journal.execute(
+            changed += int(self.journal.execute(
                 "UPDATE activations SET phase='proved',disposal_digest=?,updated_at=? "
                 + "WHERE generation_id=? AND phase='sealed'",
                 (disposal, format_instant(now), generation_id),
-            ).rowcount
+            ).rowcount)
         return changed
 
     @contextmanager
@@ -966,6 +979,7 @@ class GenerationStore:
             os.replace(staging, final)
             _directory_fsync(self.generations)
             _seal_modes(final)
+            record_generation_changes(self.journal, Generation(manifest, final), parent)
             _ = self.journal.execute(
                 "INSERT INTO activations VALUES(?,?, 'sealed', ?,NULL,NULL,NULL,?,?)",
                 (
@@ -984,7 +998,7 @@ class GenerationStore:
             raise
 
     @staticmethod
-    def _read_manifest(root: Path) -> GenerationManifestV1:
+    def read_manifest(root: Path) -> GenerationManifestV1:
         try:
             value = load_verified_manifest(root)
             manifest = TypeAdapter(GenerationManifestV1).validate_python(value)
@@ -992,6 +1006,8 @@ class GenerationStore:
             return manifest
         except (OSError, TypeError, ValueError) as exc:
             raise GenerationError("GENERATION_SPLIT_BRAIN") from exc
+
+    _read_manifest = read_manifest
 
     def generation(self, generation_id: str) -> Generation:
         if not generation_id.startswith("sbgen:v1:") or "/" in generation_id:
@@ -1056,6 +1072,7 @@ class GenerationStore:
                     ).rowcount
                     if changed != 1:
                         raise GenerationError("GENERATION_SPLIT_BRAIN")
+                    activate_generation_changes(self.journal, generation.generation_id, now)
                     self.journal.commit()
                     phase = "activated"
                     emit("activation_verify")
@@ -1084,6 +1101,7 @@ class GenerationStore:
                 ).rowcount
                 if changed != 1:
                     raise GenerationError("GENERATION_SPLIT_BRAIN")
+                activate_generation_changes(self.journal, generation.generation_id, now)
                 self.journal.commit()
                 emit("activation_verify")
                 self._complete_disposal(generation, current, now, emit)
@@ -1121,6 +1139,7 @@ class GenerationStore:
             ).rowcount
             if changed != 1:
                 raise GenerationError("GENERATION_SPLIT_BRAIN")
+            activate_generation_changes(self.journal, generation.generation_id, now)
             self.journal.commit()
             emit("activation_verify")
             self._complete_disposal(generation, current, now, emit)

@@ -1,5 +1,6 @@
 import os
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -8,11 +9,11 @@ from sb.effect_values import is_json_object
 from sb.scoped_provider_process import ScopedProviderChannelError, ScopedProviderProcess
 
 
-def channel(tmp_path, script, **kwargs):
-    return ScopedProviderProcess([sys.executable, "-I", "-c", script], cwd=tmp_path, env={}, **kwargs)
+def channel(tmp_path: Path, script: str, *, timeout_seconds: float = 20.0) -> ScopedProviderProcess:
+    return ScopedProviderProcess([sys.executable, "-I", "-c", script], cwd=tmp_path, env={}, timeout_seconds=timeout_seconds)
 
 
-def test_actual_channel_is_fresh_and_does_not_inherit_environment(tmp_path, monkeypatch):
+def test_actual_channel_is_fresh_and_does_not_inherit_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("SB_PRIVATE_TEST_SECRET", "must-not-be-inherited")
     verify = channel(tmp_path, '''import json,os,sys
 request=json.loads(sys.stdin.buffer.read())
@@ -41,46 +42,50 @@ print(json.dumps({'request':request,'pid':os.getpid()},sort_keys=True,separators
     ("import sys; sys.stdin.buffer.read(); print('NaN')", "INVALID"),
     ("import sys; sys.stdin.buffer.read()", "INVALID"),
 ])
-def test_actual_channel_rejects_failed_or_malformed_response(tmp_path, script, code):
+def test_actual_channel_rejects_failed_or_malformed_response(tmp_path: Path, script: str, code: str):
     with pytest.raises(ScopedProviderChannelError, match=f"SCOPED_PROVIDER_CHANNEL_{code}$"):
-        channel(tmp_path, script)(b"{}")
+        _ = channel(tmp_path, script)(b"{}")
 
 
-def test_actual_timeout_reaps_child(tmp_path, monkeypatch):
+def test_actual_timeout_reaps_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import subprocess
     real = subprocess.Popen
-    children = []
-    def start(*args, **kwargs):
-        child = real(*args, **kwargs)
+    children: list[subprocess.Popen[bytes]] = []
+    def start(
+        args: Sequence[str], *, cwd: Path, env: Mapping[str, str], stdin: int, stdout: int,
+        stderr: int, bufsize: int, close_fds: bool, start_new_session: bool,
+    ) -> subprocess.Popen[bytes]:
+        child = real(args, cwd=cwd, env=env, stdin=stdin, stdout=stdout, stderr=stderr,
+                     bufsize=bufsize, close_fds=close_fds, start_new_session=start_new_session)
         children.append(child)
         return child
     monkeypatch.setattr("sb.scoped_provider_process.subprocess.Popen", start)
     with pytest.raises(ScopedProviderChannelError, match="CHANNEL_TIMEOUT"):
-        channel(tmp_path, "import select; select.select([],[],[])", timeout_seconds=0.1)(b"{}")
+        _ = channel(tmp_path, "import select; select.select([],[],[])", timeout_seconds=0.1)(b"{}")
     assert len(children) == 1 and children[0].poll() is not None
 
 
 @pytest.mark.parametrize("payload", [b"", b"x" * 32769, "{}"])
-def test_invalid_input_never_starts_program(tmp_path, payload):
+def test_invalid_input_never_starts_program(tmp_path: Path, payload: str | bytes):
     verify = ScopedProviderProcess(["/nonexistent/program"], cwd=tmp_path, env={})
     with pytest.raises(ScopedProviderChannelError, match="CHANNEL_INPUT_INVALID"):
-        verify(payload)
+        _ = verify(payload)
 
 
 @pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), 21, True])
-def test_invalid_deadline_rejected(tmp_path, timeout):
+def test_invalid_deadline_rejected(tmp_path: Path, timeout: float):
     with pytest.raises(ValueError, match="CHANNEL_CONFIG_INVALID"):
-        channel(tmp_path, "", timeout_seconds=timeout)
+        _ = channel(tmp_path, "", timeout_seconds=timeout)
 
 
-def test_relative_program_or_workdir_rejected(tmp_path):
+def test_relative_program_or_workdir_rejected(tmp_path: Path):
     with pytest.raises(ValueError, match="CHANNEL_CONFIG_INVALID"):
-        ScopedProviderProcess(["python"], cwd=tmp_path, env={})
+        _ = ScopedProviderProcess(["python"], cwd=tmp_path, env={})
     with pytest.raises(ValueError, match="CHANNEL_CONFIG_INVALID"):
-        ScopedProviderProcess([sys.executable], cwd=Path("."), env={})
+        _ = ScopedProviderProcess([sys.executable], cwd=Path("."), env={})
 
 
-def test_maximum_input_and_noisy_stderr_do_not_deadlock(tmp_path):
+def test_maximum_input_and_noisy_stderr_do_not_deadlock(tmp_path: Path):
     verify = channel(tmp_path, '''import sys
 sys.stderr.buffer.write(b'x' * 131072)
 sys.stderr.buffer.flush()
@@ -91,8 +96,8 @@ sys.stdout.buffer.write(b'{}')
     assert verify(b"x" * 32768) == {}
 
 
-def test_missing_executable_fails_without_exposing_payload(tmp_path):
+def test_missing_executable_fails_without_exposing_payload(tmp_path: Path):
     verify = ScopedProviderProcess(["/nonexistent/scoped-provider"], cwd=tmp_path, env={})
     with pytest.raises(ScopedProviderChannelError, match="CHANNEL_UNAVAILABLE") as raised:
-        verify(b"secret request material")
+        _ = verify(b"secret request material")
     assert "secret" not in str(raised.value)

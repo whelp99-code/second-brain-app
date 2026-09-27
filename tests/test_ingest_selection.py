@@ -10,10 +10,10 @@ from sb.store.ledger import Ledger
 
 
 @pytest.mark.parametrize("selection", [("missing",), ("docs", "missing")])
-def test_unresolved_selection_fails_before_any_source_is_collected(tmp_path: Path, selection):
+def test_unresolved_selection_fails_before_any_source_is_collected(tmp_path: Path, selection: tuple[str, ...]):
     source = tmp_path / "source"
     source.mkdir()
-    (source / "note.md").write_text("Must not be partially collected.")
+    _ = (source / "note.md").write_text("Must not be partially collected.")
     config = Config(raw={"vault_root": str(tmp_path / "vault"), "state_root": str(tmp_path / "state"),
         "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(source)}]})
     outcome = run_ingest(config, selection)

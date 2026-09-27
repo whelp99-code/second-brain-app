@@ -12,11 +12,14 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from time import monotonic
-from typing import cast
+from typing import Final
+
+from pydantic import TypeAdapter
 
 from sb.cli_cancellation import apply_cancellation
 from sb.cli_requests import apply_requests_once
 from sb.config import ConfigValueError, load_config
+from sb.effect_values import JsonObject, JsonValue
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
@@ -41,6 +44,8 @@ from sb.search import SearchIndex
 from sb.search_errors import GenerationIndexError, SearchQueryError
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import Vault, VaultLintError, init_vault
+
+_ARG_VALUE: Final = TypeAdapter[JsonValue](JsonValue)
 
 
 class Command(StrEnum):
@@ -78,13 +83,17 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sb")
     sub = parser.add_subparsers(dest="command")
     from sb.life_cli import configure_parser
+
     configure_parser(sub.add_parser(Command.LIFE.value, help="개인 생활기록·질문·브리핑·복구"))
     _ = sub.add_parser(Command.INIT.value)
     _ = sub.add_parser(Command.IDENTITY.value)
     ingest = sub.add_parser(Command.INGEST.value)
     _ = ingest.add_argument("--source")
-    _ = ingest.add_argument("--limit", type=int,
-                           help="maximum source items attempted; the configured unit budget also applies")
+    _ = ingest.add_argument(
+        "--limit",
+        type=int,
+        help="maximum source items attempted; the configured unit budget also applies",
+    )
     compile_cmd = sub.add_parser(Command.COMPILE.value)
     _ = compile_cmd.add_argument("--llm")
     _ = compile_cmd.add_argument("--dry-run", action="store_true")
@@ -128,7 +137,9 @@ def _parser() -> argparse.ArgumentParser:
     maintain = sub.add_parser(Command.MAINTAIN.value)
     _ = sub.add_parser(Command.POSTCOMPACT_HOOK.value)
     _ = maintain.add_argument("--once", action="store_true")
-    _ = maintain.add_argument("--restore-workspace", help="explicit private restore workspace to clean")
+    _ = maintain.add_argument(
+        "--restore-workspace", help="explicit private restore workspace to clean"
+    )
     retry = sub.add_parser(Command.RETRY.value)
     _ = retry.add_argument("--stage", choices=("compile", "conflict", "brief"))
     _ = retry.add_argument("--limit", type=int)
@@ -201,10 +212,17 @@ def _mcp() -> int:
 def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     config = load_config()
     if command == Command.LIFE:
-        from sb.life_cli import run
+        from sb.life_cli import run as run_life
         from sb.pipeline import run_life_import, run_life_maintenance, run_life_workflow
-        return run(ns, config, workflow=run_life_workflow, importer=run_life_import,
-                   ingest=run_ingest, maintainer=run_life_maintenance)
+
+        return run_life(
+            ns,
+            config,
+            workflow=run_life_workflow,
+            importer=run_life_import,
+            ingest=run_ingest,
+            maintainer=run_life_maintenance,
+        )
 
     def init() -> int:
         _ = init_vault(config.vault_root)
@@ -244,7 +262,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             # the run's exit code - the refresh already succeeded or failed.
             try:
                 _ = publish_refresh_receipt(
-                    config, run_id=outcome.run_id, status=outcome.status,
+                    config,
+                    run_id=outcome.run_id,
+                    status=outcome.status,
                     exit_code=outcome.exit_code,
                 )
             except (RefreshReceiptError, OSError) as exc:
@@ -282,22 +302,29 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if query is None or not query.strip():
             print("search requires a query", file=sys.stderr)
             return 2
-        raw_kinds = vars(ns).get("kind")
+        raw_kinds = _ARG_VALUE.validate_python(vars(ns).get("kind"), strict=True)
         kinds = (
-            tuple(item for item in cast(list[object], raw_kinds) if isinstance(item, str))
+            tuple(item for item in raw_kinds if isinstance(item, str))
             if isinstance(raw_kinds, list)
             else None
         )
         explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
-        hits = SearchIndex(vault_root=Path(config.vault_root), registry_path=explicit, hybrid=config.search_hybrid,
-                           min_similarity=config.search_min_similarity).search(
+        hits = SearchIndex(
+            vault_root=Path(config.vault_root),
+            registry_path=explicit,
+            hybrid=config.search_hybrid,
+            min_similarity=config.search_min_similarity,
+        ).search(
             query,
             _opt_int(ns, "limit") or 10,
             kinds=kinds,
             status=_opt_str(ns, "status"),
             updated_from=_opt_str(ns, "updated_from"),
             updated_to=_opt_str(ns, "updated_to"),
-            scope=_opt_str(ns, "scope") or ("reference" if (Path(config.vault_root) / "generation.json").is_file() else "active"),
+            scope=_opt_str(ns, "scope")
+            or (
+                "reference" if (Path(config.vault_root) / "generation.json").is_file() else "active"
+            ),
         )
         if _opt_flag(ns, "json"):
             print(json.dumps([hit.as_dict() for hit in hits], ensure_ascii=False, indent=2))
@@ -328,8 +355,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             print(str(exc), file=sys.stderr)
             return 2
         try:
-            sys.stdout.write(json.dumps(result.hook_payload, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+            _ = sys.stdout.write(json.dumps(result.hook_payload, ensure_ascii=False) + "\n")
+            _ = sys.stdout.flush()
         except BrokenPipeError:
             return 1
         if result.pending_confirm:
@@ -367,7 +394,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         finally:
             mutations.close()
         workspace = _opt_str(ns, "restore_workspace")
-        restore_report: dict[str, object] = {}
+        restore_report: JsonObject = {}
         if workspace is not None:
             from sb.restore_workspace import clean_restore_workspace
 
@@ -376,13 +403,18 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             except (OSError, RuntimeError) as exc:
                 print(str(exc), file=sys.stderr)
                 return 1
-            restore_report = {"disposed_restore_workspaces": count or 0,
-                              "restore_workspace_busy": count is None}
+            restore_report = {
+                "disposed_restore_workspaces": count or 0,
+                "restore_workspace_busy": count is None,
+            }
         print(
             json.dumps(
-                {"disposed_exports": len(result.disposed_export_digests),
-                 "disposed_staging": len(result.disposed_staging_keys),
-                 "recovered_owner_effects": recovered, **restore_report},
+                {
+                    "disposed_exports": len(result.disposed_export_digests),
+                    "disposed_staging": len(result.disposed_staging_keys),
+                    "recovered_owner_effects": recovered,
+                    **restore_report,
+                },
                 sort_keys=True,
                 separators=(",", ":"),
             )
@@ -396,9 +428,15 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return apply_requests_once(config, _opt_str(ns, "test_control_socket"))
 
     def retry() -> int:
-        changed = mutate_root(config, GenerationOperation.EFFECT, lambda root: retry_failed(
-            root, stage=_opt_str(ns, "stage"), limit=_opt_int(ns, "limit"),
-        ))
+        changed = mutate_root(
+            config,
+            GenerationOperation.EFFECT,
+            lambda root: retry_failed(
+                root,
+                stage=_opt_str(ns, "stage"),
+                limit=_opt_int(ns, "limit"),
+            ),
+        )
         print(f"requeued={changed}")
         return 0
 
@@ -406,9 +444,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         destination = _opt_str(ns, "destination")
         if destination is None:
             stamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%z")
-            destination_path = (
-                Path(config.backup_root) / f"second-brain-{stamp}.tar.gz"
-            )
+            destination_path = Path(config.backup_root) / f"second-brain-{stamp}.tar.gz"
         else:
             destination_path = Path(destination)
         from sb.runtime_backup import backup_runtime, verify_runtime_backup
@@ -444,8 +480,15 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             print("restore requires archive", file=sys.stderr)
             return 2
         destination = _opt_str(ns, "to") or config.vault_root
-        if Path(destination).is_symlink() or Path(destination).absolute() == Path(config.vault_root).absolute() and "share_root" in config.raw:
-            print("RESTORE_REQUIRES_ISOLATED_DESTINATION: use --to with a new directory", file=sys.stderr)
+        if (
+            Path(destination).is_symlink()
+            or Path(destination).absolute() == Path(config.vault_root).absolute()
+            and "share_root" in config.raw
+        ):
+            print(
+                "RESTORE_REQUIRES_ISOLATED_DESTINATION: use --to with a new directory",
+                file=sys.stderr,
+            )
             return 1
         result = restore_backup(archive, destination, force=_opt_flag(ns, "force"))
         print(
@@ -462,9 +505,13 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     def migrate() -> int:
-        result = (mutate_root(config, GenerationOperation.EFFECT,
-                              lambda root: migrate_status(root, apply=True))
-                  if _opt_flag(ns, "apply") else migrate_status(config.vault_root, apply=False))
+        result = (
+            mutate_root(
+                config, GenerationOperation.EFFECT, lambda root: migrate_status(root, apply=True)
+            )
+            if _opt_flag(ns, "apply")
+            else migrate_status(config.vault_root, apply=False)
+        )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
@@ -476,9 +523,13 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             print("resolve requires conflict_id and decision", file=sys.stderr)
             return 2
         try:
-            commit = mutate_root(config, GenerationOperation.EFFECT,
-                                 lambda root: Vault(root=root).resolve_conflict(
-                                     conflict_id, decision, note, f"manual-{conflict_id}"))
+            commit = mutate_root(
+                config,
+                GenerationOperation.EFFECT,
+                lambda root: Vault(root=root).resolve_conflict(
+                    conflict_id, decision, note, f"manual-{conflict_id}"
+                ),
+            )
         except (FileNotFoundError, ValueError, VaultLintError) as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -533,11 +584,15 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     def gc() -> int:
-        report = (mutate_root(config, GenerationOperation.EFFECT,
-                              lambda root: collect_orphans(root, apply=True,
-                                                           confirmed=_opt_flag(ns, "confirm")))
-                  if _opt_flag(ns, "apply") else collect_orphans(config.vault_root, apply=False,
-                                                               confirmed=_opt_flag(ns, "confirm")))
+        report = (
+            mutate_root(
+                config,
+                GenerationOperation.EFFECT,
+                lambda root: collect_orphans(root, apply=True, confirmed=_opt_flag(ns, "confirm")),
+            )
+            if _opt_flag(ns, "apply")
+            else collect_orphans(config.vault_root, apply=False, confirmed=_opt_flag(ns, "confirm"))
+        )
         if _opt_flag(ns, "json"):
             print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
         else:
@@ -583,23 +638,32 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         Command.RETENTION: retention,
         Command.GC: gc,
         Command.METRICS: metrics,
-        Command.APPLY_CANCELLATION: lambda: apply_cancellation(config, _opt_str(ns, "intent_id") or ""),
+        Command.APPLY_CANCELLATION: lambda: apply_cancellation(
+            config, _opt_str(ns, "intent_id") or ""
+        ),
         Command.APPLY_REQUESTS: apply_requests,
         Command.MAINTAIN: maintain,
     }
     started = monotonic()
     exit_code = 1
     try:
-        read_only = command in {
-            Command.STATUS, Command.SEARCH, Command.POSTCOMPACT_HOOK, Command.SOURCES,
-            Command.RETENTION, Command.METRICS,
-        } or (
-            command == Command.DOCTOR and not _opt_flag(ns, "rebuild_ledger")
-        ) or (
-            command in {Command.GC, Command.MIGRATE} and not _opt_flag(ns, "apply")
-        ) or (command == Command.COMPILE and (
-            _opt_flag(ns, "dry_run") or _opt_flag(ns, "state_report")
-        ))
+        read_only = (
+            command
+            in {
+                Command.STATUS,
+                Command.SEARCH,
+                Command.POSTCOMPACT_HOOK,
+                Command.SOURCES,
+                Command.RETENTION,
+                Command.METRICS,
+            }
+            or (command == Command.DOCTOR and not _opt_flag(ns, "rebuild_ledger"))
+            or (command in {Command.GC, Command.MIGRATE} and not _opt_flag(ns, "apply"))
+            or (
+                command == Command.COMPILE
+                and (_opt_flag(ns, "dry_run") or _opt_flag(ns, "state_report"))
+            )
+        )
         if read_only:
             with read_config(config) as snapshot:
                 config = snapshot
@@ -635,8 +699,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if result["status"] == "ok" else 1
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except (OperationError, VaultLintError, GovernanceError, SearchQueryError, ConfigValueError,
-            GenerationError, GenerationIndexError, PostCompactHookError) as exc:
+    except (
+        OperationError,
+        VaultLintError,
+        GovernanceError,
+        SearchQueryError,
+        ConfigValueError,
+        GenerationError,
+        GenerationIndexError,
+        PostCompactHookError,
+    ) as exc:
         print(str(exc), file=sys.stderr)
         return 1
 

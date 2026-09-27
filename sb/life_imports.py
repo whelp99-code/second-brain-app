@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,13 +11,14 @@ from sb.config import Config
 from sb.life_config import policy_for, settings
 from sb.life_contracts import SENSITIVITIES, LifeInputError
 from sb.life_exports import parse_export
+from sb.life_json import LifePayload, decode_json
 from sb.life_sensors import HEALTH_TYPES, health_batch, parse_overland, point_payload, segments
 from sb.life_values import canonical_bytes, text
 
 
 @dataclass(frozen=True, slots=True)
 class PreparedImport:
-    payloads: tuple[dict[str, object], ...]
+    payloads: tuple[LifePayload, ...]
     deleted_source_items: tuple[str, ...]
     input_digest: str
     anchor: str | None
@@ -30,11 +30,11 @@ def prepare(
 ) -> PreparedImport:
     opts = settings(config)
     policy = policy_for(config, source_id, admission=False)
-    if not isinstance(raw, bytes) or len(raw) > 16 * 1024 * 1024:
+    if type(raw) is not bytes or len(raw) > 16 * 1024 * 1024:
         raise LifeInputError("LIFE_IMPORT_TOO_LARGE")
     if kind == "health":
         try:
-            value = json.loads(raw)
+            value = decode_json(raw)
         except (ValueError, UnicodeError, RecursionError) as exc:
             raise LifeInputError("LIFE_HEALTH_BATCH_INVALID") from exc
         sensor_config = config.raw.get("life_sensor_sources", {})
@@ -54,18 +54,21 @@ def prepare(
                 raise LifeInputError("LIFE_SENSOR_POLICY_REQUIRED")
         else:
             opts.require("health_capture")
-            policy_for(config, source_id)
+            _ = policy_for(config, source_id)
         rows, removed, anchor = health_batch(
-            value, allowed_types=allowed, timezone=opts.timezone, now=now
+            value,
+            allowed_types=[t for t in allowed if isinstance(t, str)],
+            timezone=opts.timezone,
+            now=now,
         )
         return PreparedImport(rows, removed, sha256(raw).hexdigest(), anchor, kind)
-    policy_for(config, source_id)
+    _ = policy_for(config, source_id)
     if kind == "overland":
         opts.require("location_capture")
         if policy.sensitivity != "restricted" or policy.external_processing != "local_only":
             raise LifeInputError("LIFE_SENSOR_POLICY_REQUIRED")
         try:
-            value = json.loads(raw)
+            value = decode_json(raw)
         except (ValueError, UnicodeError, RecursionError) as exc:
             raise LifeInputError("LIFE_LOCATION_BATCH_INVALID") from exc
         points = parse_overland(value, now=now)
@@ -78,7 +81,7 @@ def prepare(
         return PreparedImport(rows + derived, (), sha256(raw).hexdigest(), None, kind)
     if kind == "phone-event":
         try:
-            original = json.loads(raw)
+            original = decode_json(raw)
         except (ValueError, UnicodeError, RecursionError) as exc:
             raise LifeInputError("LIFE_PHONE_EVENT_INVALID") from exc
         if (

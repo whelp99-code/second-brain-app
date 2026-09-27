@@ -8,17 +8,24 @@ import hashlib
 import hmac
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Final, cast, override
+from socket import socket
+from socketserver import BaseServer
+from typing import ClassVar, Final, override
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from sb.config import Config, load_config
+from sb.effect_values import JsonInput, JsonObject
 from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, discard_inbox, write_inbox
+from sb.life_actor import LifeActor
+from sb.life_contracts import LifeInputError
+from sb.life_json import decode_json
 from sb.managed_file_inspection import ManagedInspectionError
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
@@ -209,9 +216,22 @@ class WebContext:
     token: str | None
 
 
+class WebHandlerContractError(TypeError):
+    """The configured native server handler no longer implements this API."""
+
+
 class SecondBrainHTTPServer(ThreadingHTTPServer):
     daemon_threads: bool = True
     allow_reuse_address: bool = True
+
+    @property
+    def handler_class(self) -> type[Handler]:
+        handler = self.RequestHandlerClass
+        if not isinstance(handler, type) or not issubclass(handler, Handler):
+            raise WebHandlerContractError(
+                "configured request handler must implement the web Handler"
+            )
+        return handler
 
 
 def _query_int(values: dict[str, list[str]], key: str, default: int, maximum: int) -> int:
@@ -238,7 +258,7 @@ def _is_loopback(host: str) -> bool:
     return normalized in {"localhost", "127.0.0.1", "::1"}
 
 
-def _latest_briefing(root: Path) -> dict[str, object] | None:
+def _latest_briefing(root: Path) -> Mapping[str, JsonInput] | None:
     paths = committed_paths(root, ("daily/",))
     if not paths:
         return None
@@ -257,7 +277,7 @@ def _latest_briefing(root: Path) -> dict[str, object] | None:
 
 
 def _string_field(
-    data: dict[str, object], key: str, *, required: bool = False, default: str = ""
+    data: Mapping[str, JsonInput], key: str, *, required: bool = False, default: str = ""
 ) -> str:
     value = data.get(key, default)
     if not isinstance(value, str):
@@ -267,7 +287,7 @@ def _string_field(
     return value
 
 
-def _decode_upload(data: dict[str, object]) -> bytes:
+def _decode_upload(data: Mapping[str, JsonInput]) -> bytes:
     encoded = _string_field(data, "content_base64", required=True)
     try:
         return base64.b64decode(encoded, validate=True)
@@ -305,593 +325,711 @@ def _retract_upload(root: Path, upload_id: str, context: WebContext) -> RetractR
     return receipt.as_dict()
 
 
-def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
-    class Handler(BaseHTTPRequestHandler):
-        close_connection: bool
-        server_version: str = "SecondBrain/1"
+class Handler(BaseHTTPRequestHandler):
+    connection: socket
+    _life_actor: LifeActor | None = None
+    context: ClassVar[WebContext]
+    life_config: Config
 
-        @override
-        def log_message(self, format: str, *args: object) -> None:
-            del format, args
+    def __init__(
+        self, request: socket, client_address: tuple[str, int], server: BaseServer
+    ) -> None:
+        self.life_config = self.context.config
+        super().__init__(request, client_address, server)
 
-        def _json(self, status: HTTPStatus, payload: object) -> None:
-            if (200 <= int(status) < 300 and hasattr(self, "life_actor")
-                    and urlsplit(self.path).path.startswith("/api/life/v1/")):
-                from sb.life_auth import admin_token, current_config
-                from sb.life_contracts import LifeInputError
-                from sb.life_http import authorize
-                try:
-                    fresh = current_config(context.config)
-                    actor = authorize(fresh, self.headers.get("Authorization", ""),
-                                      admin_token(fresh, context.config, context.token))
-                    if actor != self.life_actor or fresh.raw != self.life_config.raw:
-                        status, payload = HTTPStatus.FORBIDDEN, {"error": "LIFE_AUTH_CHANGED_RETRY"}
-                except LifeInputError:
-                    status, payload = HTTPStatus.SERVICE_UNAVAILABLE, {"error": "LIFE_AUTH_CONFIG_UNAVAILABLE"}
-            body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    @property
+    def life_actor(self) -> LifeActor:
+        if self._life_actor is None:
+            raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+        return self._life_actor
+
+    close_connection: bool
+    server_version: str = "SecondBrain/1"
+
+    @override
+    def log_message(self, format: str, *args: JsonInput) -> None:
+        del format, args
+
+    def json_response(self, status: HTTPStatus, payload: JsonInput) -> None:
+        if (
+            200 <= int(status) < 300
+            and self._life_actor is not None
+            and urlsplit(self.path).path.startswith("/api/life/v1/")
+        ):
+            from sb.life_auth import admin_token, current_config
+            from sb.life_contracts import LifeInputError
+            from sb.life_http import authorize
+
             try:
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("X-Content-Type-Options", "nosniff")
-                self.end_headers()
-                _ = self.wfile.write(body)
-            except (BrokenPipeError, ConnectionResetError):
-                self.close_connection = True
+                fresh = current_config(self.context.config)
+                actor = authorize(
+                    fresh,
+                    self.headers.get("Authorization", ""),
+                    admin_token(fresh, self.context.config, self.context.token),
+                )
+                if actor != self.life_actor or fresh.raw != self.life_config.raw:
+                    status, payload = HTTPStatus.FORBIDDEN, {"error": "LIFE_AUTH_CHANGED_RETRY"}
+            except LifeInputError:
+                status, payload = (
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": "LIFE_AUTH_CONFIG_UNAVAILABLE"},
+                )
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            _ = self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
 
-        def _authorized(self) -> bool:
-            if urlsplit(self.path).path.startswith("/api/life/v1/"):
-                from sb.life_auth import admin_token, current_config
-                from sb.life_contracts import LifeInputError
-                from sb.life_http import authorize, error_status
-                try:
-                    self.life_config = current_config(context.config)
-                    self.life_actor = authorize(
-                        self.life_config, self.headers.get("Authorization", ""),
-                        admin_token(self.life_config, context.config, context.token)
-                    )
-                except LifeInputError as exc:
-                    self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
-                    return False
-                if self.life_actor is not None:
-                    return True
-                self._json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+    def _authorized(self) -> bool:
+        if urlsplit(self.path).path.startswith("/api/life/v1/"):
+            from sb.life_auth import admin_token, current_config
+            from sb.life_contracts import LifeInputError
+            from sb.life_http import authorize, error_status
+
+            try:
+                self.life_config = current_config(self.context.config)
+                principal = authorize(
+                    self.life_config,
+                    self.headers.get("Authorization", ""),
+                    admin_token(self.life_config, self.context.config, self.context.token),
+                )
+            except LifeInputError as exc:
+                self.json_response(HTTPStatus(error_status(exc.code)), {"error": exc.code})
                 return False
-            if context.token is None or not self.path.startswith("/api/"):
+            self._life_actor = principal
+            if principal is not None:
                 return True
-            supplied = self.headers.get("Authorization", "")
-            expected = f"Bearer {context.token}"
-            if hmac.compare_digest(supplied, expected):
-                return True
-            self._json(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+            self.json_response(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             return False
+        if self.context.token is None or not self.path.startswith("/api/"):
+            return True
+        supplied = self.headers.get("Authorization", "")
+        expected = f"Bearer {self.context.token}"
+        if hmac.compare_digest(supplied, expected):
+            return True
+        self.json_response(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
+        return False
 
-        def _body(self, maximum: int = MAX_BODY_BYTES) -> dict[str, object]:
-            raw_length = self.headers.get("Content-Length", "0")
+    def _body(self, maximum: int = MAX_BODY_BYTES) -> JsonObject:
+        raw_length = self.headers.get("Content-Length", "0")
+        try:
+            length = int(raw_length)
+        except ValueError as exc:
+            raise ValueError("invalid Content-Length") from exc
+        if length < 0 or length > maximum:
+            raise ValueError("request body too large")
+        loaded = decode_json(self.rfile.read(length) or b"{}")
+        if not isinstance(loaded, dict):
+            raise TypeError("JSON object required")
+        return loaded
+
+    def do_GET(self) -> None:
+        if not self._authorized():
+            return
+        try:
+            if urlsplit(self.path).path in {"/", "/health", "/ready"}:
+                self._get(self.context.root)
+            else:
+                with read_root(self.context.config) as pinned:
+                    self._get(pinned)
+        except PageNotFoundError as exc:
+            self.json_response(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+        except (ValueError, PathEscapeError) as exc:
+            self.json_response(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+        except (OSError, GitCommandError, RuntimeError) as exc:
+            self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
+
+    def get_response(self, root: Path) -> None:
+        parsed = urlsplit(self.path)
+        if parsed.path.startswith("/api/life/v1/"):
+            from sb.life_contracts import LifeInputError
+            from sb.life_http import error_status, read_endpoint
+
             try:
-                length = int(raw_length)
-            except ValueError as exc:
-                raise ValueError("invalid Content-Length") from exc
-            if length < 0 or length > maximum:
-                raise ValueError("request body too large")
-            loaded = cast(object, json.loads(self.rfile.read(length) or b"{}"))
-            if not isinstance(loaded, dict):
-                raise TypeError("JSON object required")
-            return cast(dict[str, object], loaded)
+                result = read_endpoint(self.life_config, root, self.life_actor, self.path)
+                self.json_response(HTTPStatus.OK, result)
+            except LifeInputError as exc:
+                self.json_response(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+            return
+        if parsed.path == "/":
+            body = _INDEX_HTML.encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            _ = self.wfile.write(body)
+            return
+        if parsed.path == "/ready":
+            from sb.readiness import readiness
 
-        def do_GET(self) -> None:
-            if not self._authorized():
-                return
-            try:
-                if urlsplit(self.path).path in {"/", "/health", "/ready"}:
-                    self._get(context.root)
-                else:
-                    with read_root(context.config) as pinned:
-                        self._get(pinned)
-            except PageNotFoundError as exc:
-                self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
-            except (ValueError, PathEscapeError) as exc:
-                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except (BrokenPipeError, ConnectionResetError):
-                self.close_connection = True
-            except (OSError, GitCommandError, RuntimeError) as exc:
-                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
-
-        def _get(self, root: Path) -> None:
-            parsed = urlsplit(self.path)
-            if parsed.path.startswith("/api/life/v1/"):
-                from sb.life_contracts import LifeInputError
-                from sb.life_http import error_status, read_endpoint
-                try:
-                    result = read_endpoint(self.life_config, root, self.life_actor, self.path)
-                    self._json(HTTPStatus.OK, result)
-                except LifeInputError as exc:
-                    self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
-                return
-            if parsed.path == "/":
-                body = _INDEX_HTML.encode("utf-8")
-                self.send_response(HTTPStatus.OK)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Cache-Control", "no-store")
-                self.end_headers()
-                _ = self.wfile.write(body)
-                return
-            if parsed.path == "/ready":
-                from sb.readiness import readiness
-
-                result = readiness(context.config)
-                self._json(
-                    HTTPStatus.OK
-                    if result["status"] == "ready"
-                    else HTTPStatus.SERVICE_UNAVAILABLE,
-                    result,
+            result = readiness(self.context.config)
+            self.json_response(
+                HTTPStatus.OK if result["status"] == "ready" else HTTPStatus.SERVICE_UNAVAILABLE,
+                result,
+            )
+            return
+        if parsed.path == "/health":
+            self.json_response(HTTPStatus.OK, {"status": "ok"})
+            return
+        if parsed.path == "/api/status":
+            pinned_config = replace(
+                self.context.config, raw={**self.context.config.raw, "vault_root": str(root)}
+            )
+            snapshot = status_snapshot(pinned_config)
+            last_run = snapshot.get("last_run")
+            last_run_status: str | None = None
+            summary = "원장에 기록된 실행 없음"
+            if last_run is not None:
+                candidate = last_run["status"]
+                last_run_status = candidate
+                summary = f"최근 단계 실행 {last_run.get('run_id')}: {candidate}"
+            last_batch = snapshot.get("last_batch")
+            if last_batch is not None:
+                summary += (
+                    f" · 최근 전체 배치 {last_batch.get('run_id')}: "
+                    f"{last_batch.get('status')} (오류 {last_batch.get('errors')})"
                 )
-                return
-            if parsed.path == "/health":
-                self._json(HTTPStatus.OK, {"status": "ok"})
-                return
-            if parsed.path == "/api/status":
-                pinned_config = replace(
-                    context.config, raw={**context.config.raw, "vault_root": str(root)}
-                )
-                snapshot = status_snapshot(pinned_config)
-                last_run = snapshot.get("last_run")
-                last_run_status: str | None = None
-                summary = "원장에 기록된 실행 없음"
-                if isinstance(last_run, dict):
-                    candidate = cast(dict[str, object], last_run).get("status")
-                    if isinstance(candidate, str):
-                        last_run_status = candidate
-                        summary = f"최근 단계 실행 {last_run.get('run_id')}: {candidate}"
-                last_batch = snapshot.get("last_batch")
-                if isinstance(last_batch, dict):
-                    summary += (
-                        f" · 최근 전체 배치 {last_batch.get('run_id')}: "
-                        f"{last_batch.get('status')} (오류 {last_batch.get('errors')})"
-                    )
-                self._json(
-                    HTTPStatus.OK,
-                    {
-                        "status": summary,
-                        "last_run_status": last_run_status,
-                        "last_batch": last_batch,
-                        "recent_stages": snapshot["recent_stages"],
-                        "failures": {
-                            "total": sum(
-                                cast(dict[str, int], snapshot["failed_by_stage"]).values()
-                            ),
-                            "by_stage": snapshot["failed_by_stage"],
-                            "items": snapshot["failed_derivations"],
-                            "omitted": snapshot["failed_details_omitted"],
-                        },
+            self.json_response(
+                HTTPStatus.OK,
+                {
+                    "status": summary,
+                    "last_run_status": last_run_status,
+                    "last_batch": last_batch,
+                    "recent_stages": snapshot["recent_stages"],
+                    "failures": {
+                        "total": sum(snapshot["failed_by_stage"].values()),
+                        "by_stage": snapshot["failed_by_stage"],
+                        "items": snapshot["failed_derivations"],
+                        "omitted": snapshot["failed_details_omitted"],
                     },
-                )
+                },
+            )
+            return
+        if parsed.path == "/api/capabilities":
+            self.json_response(
+                HTTPStatus.OK,
+                {
+                    "desktop": {
+                        "file_upload": True,
+                        "folder_sync": True,
+                        "file_retract": True,
+                        "run_now": True,
+                        "latest_briefing": True,
+                        "supported_suffixes": list(supported_suffixes()),
+                        "max_upload_bytes": MAX_UPLOAD_BYTES,
+                    }
+                },
+            )
+            return
+        if parsed.path == "/api/briefing/latest":
+            self.json_response(HTTPStatus.OK, {"briefing": _latest_briefing(root)})
+            return
+        if parsed.path == "/api/search":
+            values = parse_qs(parsed.query, keep_blank_values=True)
+            query = values.get("q", [""])[0]
+            hits = SearchIndex(
+                root,
+                hybrid=self.context.config.search_hybrid,
+                registry_path=Path(self.context.config.knowledge_registry)
+                if "knowledge_registry" in self.context.config.raw
+                else None,
+                min_similarity=self.context.config.search_min_similarity,
+            ).search(
+                query,
+                _query_int(values, "limit", 10, 100),
+                kinds=_query_many(values, "kind"),
+                status=_query_optional(values, "status"),
+                updated_from=_query_optional(values, "updated_from"),
+                updated_to=_query_optional(values, "updated_to"),
+                scope=_query_optional(values, "scope"),
+            )
+            self.json_response(HTTPStatus.OK, {"results": [hit.as_dict() for hit in hits]})
+            return
+        if parsed.path.startswith("/api/retracts/"):
+            receipt_id = unquote(parsed.path.removeprefix("/api/retracts/")).strip("/")
+            receipt = read_retract_receipt(root, receipt_id)
+            if receipt is None:
+                self.json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 return
-            if parsed.path == "/api/capabilities":
-                self._json(
-                    HTTPStatus.OK,
-                    {
-                        "desktop": {
-                            "file_upload": True,
-                            "folder_sync": True,
-                            "file_retract": True,
-                            "run_now": True,
-                            "latest_briefing": True,
-                            "supported_suffixes": list(supported_suffixes()),
-                            "max_upload_bytes": MAX_UPLOAD_BYTES,
-                        }
-                    },
-                )
-                return
-            if parsed.path == "/api/briefing/latest":
-                self._json(HTTPStatus.OK, {"briefing": _latest_briefing(root)})
-                return
-            if parsed.path == "/api/search":
-                values = parse_qs(parsed.query, keep_blank_values=True)
-                query = values.get("q", [""])[0]
-                hits = SearchIndex(
-                    root,
-                    hybrid=context.config.search_hybrid,
-                    registry_path=Path(context.config.knowledge_registry)
-                    if "knowledge_registry" in context.config.raw
-                    else None,
-                    min_similarity=context.config.search_min_similarity,
-                ).search(
-                    query,
-                    _query_int(values, "limit", 10, 100),
-                    kinds=_query_many(values, "kind"),
-                    status=_query_optional(values, "status"),
-                    updated_from=_query_optional(values, "updated_from"),
-                    updated_to=_query_optional(values, "updated_to"),
-                    scope=_query_optional(values, "scope"),
-                )
-                self._json(HTTPStatus.OK, {"results": [hit.as_dict() for hit in hits]})
-                return
-            if parsed.path.startswith("/api/retracts/"):
-                receipt_id = unquote(parsed.path.removeprefix("/api/retracts/")).strip("/")
-                receipt = read_retract_receipt(root, receipt_id)
-                if receipt is None:
-                    self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
-                    return
-                self._json(HTTPStatus.OK, receipt.as_dict())
-                return
-            if parsed.path.startswith("/api/pages/"):
-                page_id = unquote(parsed.path.removeprefix("/api/pages/"))
-                page = read_page(root, page_id).as_dict()
-                self._json(HTTPStatus.OK, {**page, **page_receipt(root, page_id)})
-                return
-            if parsed.path == "/api/changes":
-                values = parse_qs(parsed.query, keep_blank_values=True)
-                days = _query_int(values, "days", 7, 3650)
-                self._json(
-                    HTTPStatus.OK,
-                    {"changes": [row.as_dict() for row in recent_changes(root, days)]},
-                )
-                return
-            if parsed.path == "/api/conflicts":
-                self._json(
-                    HTTPStatus.OK,
-                    {"conflicts": [row.as_dict() for row in open_conflicts(root)]},
-                )
-                return
-            if parsed.path == "/api/sources":
-                self._json(
-                    HTTPStatus.OK,
-                    {"sources": list(source_status(context.config))},
-                )
-                return
-            if parsed.path == "/api/retention":
-                self._json(HTTPStatus.OK, retention_report(root).as_dict())
-                return
-            if parsed.path == "/api/metrics":
-                values = parse_qs(parsed.query, keep_blank_values=True)
-                limit = _query_int(values, "limit", 1000, 10_000)
-                self._json(HTTPStatus.OK, metrics_summary(root, limit).as_dict())
-                return
-            self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            self.json_response(HTTPStatus.OK, receipt.as_dict())
+            return
+        if parsed.path.startswith("/api/pages/"):
+            page_id = unquote(parsed.path.removeprefix("/api/pages/"))
+            page = read_page(root, page_id).as_dict()
+            self.json_response(HTTPStatus.OK, {**page, **page_receipt(root, page_id)})
+            return
+        if parsed.path == "/api/changes":
+            values = parse_qs(parsed.query, keep_blank_values=True)
+            days = _query_int(values, "days", 7, 3650)
+            self.json_response(
+                HTTPStatus.OK,
+                {"changes": [row.as_dict() for row in recent_changes(root, days)]},
+            )
+            return
+        if parsed.path == "/api/conflicts":
+            self.json_response(
+                HTTPStatus.OK,
+                {"conflicts": [row.as_dict() for row in open_conflicts(root)]},
+            )
+            return
+        if parsed.path == "/api/sources":
+            self.json_response(
+                HTTPStatus.OK,
+                {"sources": list(source_status(self.context.config))},
+            )
+            return
+        if parsed.path == "/api/retention":
+            self.json_response(HTTPStatus.OK, retention_report(root).as_dict())
+            return
+        if parsed.path == "/api/metrics":
+            values = parse_qs(parsed.query, keep_blank_values=True)
+            limit = _query_int(values, "limit", 1000, 10_000)
+            self.json_response(HTTPStatus.OK, metrics_summary(root, limit).as_dict())
+            return
+        self.json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
-        def do_POST(self) -> None:
-            if not self._authorized():
-                return
+    def do_POST(self) -> None:
+        if not self._authorized():
+            return
+        try:
+            self._post()
+        except OwnerEffectError as exc:
+            self.json_response(HTTPStatus.CONFLICT, {"error": str(exc)})
+        except ManagedInspectionError as exc:
+            self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        except (
+            ValueError,
+            TypeError,
+            RememberRejected,
+            UploadRejected,
+            FileNotFoundError,
+            VaultLintError,
+        ) as exc:
+            self.json_response(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+        except (OSError, GitCommandError, RuntimeError) as exc:
+            self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
+
+    def _post(self) -> None:
+        parsed = urlsplit(self.path)
+        maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
+        if parsed.path in {
+            "/api/life/v1/events:batch",
+            "/api/life/v1/exports/import",
+        } or parsed.path.startswith(("/api/life/v1/overland/", "/api/life/v1/health/")):
+            maximum = 24 * 1024 * 1024
+        data = self._body(maximum)
+        if parsed.path.startswith("/api/life/v1/"):
+            self._life_post(parsed.path, data)
+            return
+        if parsed.path == "/api/uploads/retract":
+            upload_id = _string_field(data, "upload_id", required=True)
             try:
-                self._post()
-            except OwnerEffectError as exc:
-                self._json(HTTPStatus.CONFLICT, {"error": str(exc)})
-            except ManagedInspectionError as exc:
-                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
-            except (
-                ValueError,
-                TypeError,
-                RememberRejected,
-                UploadRejected,
-                FileNotFoundError,
-                VaultLintError,
-            ) as exc:
-                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-            except (BrokenPipeError, ConnectionResetError):
-                self.close_connection = True
-            except (OSError, GitCommandError, RuntimeError) as exc:
-                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
-
-        def _post(self) -> None:
-            parsed = urlsplit(self.path)
-            maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
-            if parsed.path in {"/api/life/v1/events:batch", "/api/life/v1/exports/import"} or parsed.path.startswith(("/api/life/v1/overland/", "/api/life/v1/health/")):
-                maximum = 24 * 1024 * 1024
-            data = self._body(maximum)
-            if parsed.path.startswith("/api/life/v1/"):
-                self._life_post(parsed.path, data)
-                return
-            if parsed.path == "/api/uploads/retract":
-                upload_id = _string_field(data, "upload_id", required=True)
-                try:
-                    receipt = mutate_root(
-                        context.config,
-                        GenerationOperation.INBOX,
-                        lambda root: _retract_upload(root, upload_id, context),
-                    )
-                except (OSError, TimeoutError, ConnectionError):
-                    from datetime import UTC, datetime
-
-                    checked_at = (
-                        datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-                    )
-                    self._json(
-                        HTTPStatus.OK,
-                        {
-                            "deleted": False,
-                            "indexed": False,
-                            "restored": False,
-                            "receipt_id": "",
-                            "checked_at": checked_at,
-                            "upload_id": upload_id,
-                        },
-                    )
-                    return
-                self._json(HTTPStatus.OK, receipt)
-                return
-            if parsed.path == "/api/uploads":
-                filename = _string_field(data, "filename", required=True)
-                relative_path = _string_field(data, "relative_path", default=filename)
-                device_id = _string_field(data, "device_id", default="mac")
-                declared = _string_field(data, "content_sha256", default="") or None
                 receipt = mutate_root(
-                    context.config,
+                    self.context.config,
                     GenerationOperation.INBOX,
-                    lambda root: accept_upload(
-                        root,
-                        filename,
-                        _decode_upload(data),
-                        device_id=device_id,
-                        relative_path=relative_path,
-                        declared_sha256=declared,
+                    lambda root: _retract_upload(root, upload_id, self.context),
+                )
+            except (OSError, TimeoutError, ConnectionError):
+                from datetime import UTC, datetime
+
+                checked_at = (
+                    datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+                )
+                self.json_response(
+                    HTTPStatus.OK,
+                    {
+                        "deleted": False,
+                        "indexed": False,
+                        "restored": False,
+                        "receipt_id": "",
+                        "checked_at": checked_at,
+                        "upload_id": upload_id,
+                    },
+                )
+                return
+            self.json_response(HTTPStatus.OK, receipt)
+            return
+        if parsed.path == "/api/uploads":
+            filename = _string_field(data, "filename", required=True)
+            relative_path = _string_field(data, "relative_path", default=filename)
+            device_id = _string_field(data, "device_id", default="mac")
+            declared = _string_field(data, "content_sha256", default="") or None
+            receipt = mutate_root(
+                self.context.config,
+                GenerationOperation.INBOX,
+                lambda root: accept_upload(
+                    root,
+                    filename,
+                    _decode_upload(data),
+                    device_id=device_id,
+                    relative_path=relative_path,
+                    declared_sha256=declared,
+                ),
+            )
+            status = HTTPStatus.CREATED if receipt.state == "queued" else HTTPStatus.OK
+            self.json_response(status, receipt.as_dict())
+            return
+        if parsed.path == "/api/remember":
+            content = data.get("content")
+            title = data.get("title")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("content is required")
+            if title is not None and not isinstance(title, str):
+                raise ValueError("title must be a string")
+            rel = mutate_root(
+                self.context.config,
+                GenerationOperation.INBOX,
+                lambda root: write_inbox(root, content, title),
+            )
+            self.json_response(HTTPStatus.CREATED, {"inbox_path": rel.as_posix()})
+            return
+        if parsed.path == "/api/inbox-discard":
+            inbox_path = data.get("inbox_path")
+            if not isinstance(inbox_path, str) or not inbox_path.strip():
+                raise ValueError("inbox_path is required")
+            discarded = mutate_root(
+                self.context.config,
+                GenerationOperation.INBOX,
+                lambda root: discard_inbox(root, inbox_path),
+            )
+            self.json_response(HTTPStatus.OK, {"discarded": discarded})
+            return
+        if parsed.path == "/api/run":
+            outcome = run_all(self.context.config, self.context.config.configured_source_ids)
+            self.json_response(
+                HTTPStatus.OK,
+                {
+                    "run_id": outcome.run_id,
+                    "status": outcome.status,
+                    "pages": outcome.pages,
+                    "conflicts": outcome.conflicts,
+                    "errors": outcome.errors,
+                    "exit_code": outcome.exit_code,
+                    "already_running": outcome.already_running,
+                    "failure": redact_credentials(outcome.failure)[:1000]
+                    if outcome.failure
+                    else None,
+                },
+            )
+            return
+        if parsed.path.startswith("/api/pages/") and parsed.path.endswith(("/forget", "/correct")):
+            prefix, _, operation = parsed.path.rpartition("/")
+            page_id = unquote(prefix.removeprefix("/api/pages/")).strip("/")
+            if not page_id:
+                raise ValueError("page_id is required")
+            result = apply_page_effect(
+                self.context.config,
+                page_id,
+                "correct" if operation == "correct" else "forget",
+                data.get("receipt"),
+                record_id=_string_field(data, "record_id"),
+                content=_string_field(data, "content"),
+            )
+            self.json_response(HTTPStatus.OK, result)
+            return
+        prefix = "/api/conflicts/"
+        suffix = "/resolve"
+        if parsed.path.startswith(prefix) and parsed.path.endswith(suffix):
+            conflict_id = unquote(parsed.path[len(prefix) : -len(suffix)]).strip("/")
+            decision = data.get("decision")
+            note = data.get("note", "")
+            if not isinstance(decision, str) or not isinstance(note, str):
+                raise ValueError("decision and note must be strings")
+            try:
+                commit = mutate_root(
+                    self.context.config,
+                    GenerationOperation.EFFECT,
+                    lambda root: Vault(root).resolve_conflict(
+                        conflict_id,
+                        decision,
+                        note,
+                        f"web-{conflict_id}",
                     ),
                 )
-                status = HTTPStatus.CREATED if receipt.state == "queued" else HTTPStatus.OK
-                self._json(status, receipt.as_dict())
-                return
-            if parsed.path == "/api/remember":
-                content = data.get("content")
-                title = data.get("title")
-                if not isinstance(content, str) or not content.strip():
-                    raise ValueError("content is required")
-                if title is not None and not isinstance(title, str):
-                    raise ValueError("title must be a string")
-                rel = mutate_root(
-                    context.config,
-                    GenerationOperation.INBOX,
-                    lambda root: write_inbox(root, content, title),
-                )
-                self._json(HTTPStatus.CREATED, {"inbox_path": rel.as_posix()})
-                return
-            if parsed.path == "/api/inbox-discard":
-                inbox_path = data.get("inbox_path")
-                if not isinstance(inbox_path, str) or not inbox_path.strip():
-                    raise ValueError("inbox_path is required")
-                discarded = mutate_root(
-                    context.config,
-                    GenerationOperation.INBOX,
-                    lambda root: discard_inbox(root, inbox_path),
-                )
-                self._json(HTTPStatus.OK, {"discarded": discarded})
-                return
-            if parsed.path == "/api/run":
-                outcome = run_all(context.config, context.config.configured_source_ids)
-                self._json(
-                    HTTPStatus.OK,
-                    {
-                        "run_id": outcome.run_id,
-                        "status": outcome.status,
-                        "pages": outcome.pages,
-                        "conflicts": outcome.conflicts,
-                        "errors": outcome.errors,
-                        "exit_code": outcome.exit_code,
-                        "already_running": outcome.already_running,
-                        "failure": redact_credentials(outcome.failure)[:1000]
-                        if outcome.failure
-                        else None,
-                    },
-                )
-                return
-            if parsed.path.startswith("/api/pages/") and parsed.path.endswith(("/forget", "/correct")):
-                prefix, _, operation = parsed.path.rpartition("/")
-                page_id = unquote(prefix.removeprefix("/api/pages/")).strip("/")
-                if not page_id:
-                    raise ValueError("page_id is required")
-                result = apply_page_effect(
-                    context.config, page_id, "correct" if operation == "correct" else "forget",
-                    data.get("receipt"), record_id=_string_field(data, "record_id"),
-                    content=_string_field(data, "content"),
-                )
-                self._json(HTTPStatus.OK, result)
-                return
-            prefix = "/api/conflicts/"
-            suffix = "/resolve"
-            if parsed.path.startswith(prefix) and parsed.path.endswith(suffix):
-                conflict_id = unquote(parsed.path[len(prefix) : -len(suffix)]).strip("/")
-                decision = data.get("decision")
-                note = data.get("note", "")
-                if not isinstance(decision, str) or not isinstance(note, str):
-                    raise ValueError("decision and note must be strings")
+            except FileNotFoundError as exc:
+                raise ValueError("conflict missing") from exc
+            self.json_response(HTTPStatus.OK, {"commit": commit})
+            return
+        self.json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
+
+    def _life_import_request(self, path: str, data: JsonObject) -> bool:
+        import base64
+        import binascii
+
+        from sb.life_contracts import LifeInputError
+        from sb.life_http import error_status, require_source
+        from sb.life_values import canonical_bytes, text
+        from sb.pipeline import run_life_import
+
+        route = path.removeprefix("/api/life/v1/")
+        if not (route == "exports/import" or route.startswith(("overland/", "health/"))):
+            return False
+        try:
+            if self.life_actor.client and not self.life_actor.can_write:
+                raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+            if route == "exports/import":
+                if set(data) != {"source_id", "format", "filename", "content_base64"}:
+                    raise LifeInputError("LIFE_IMPORT_INVALID")
+                source = require_source(self.life_actor, data["source_id"])
+                kind = text(data["format"], maximum=64)
+                filename = text(data["filename"], maximum=512)
                 try:
-                    commit = mutate_root(
-                        context.config,
-                        GenerationOperation.EFFECT,
-                        lambda root: Vault(root).resolve_conflict(
-                            conflict_id,
-                            decision,
-                            note,
-                            f"web-{conflict_id}",
-                        ),
-                    )
-                except FileNotFoundError as exc:
-                    raise ValueError("conflict missing") from exc
-                self._json(HTTPStatus.OK, {"commit": commit})
-                return
-            self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
-
-        def _life_import_request(self, path: str, data: dict[str, object]) -> bool:
-            import base64
-            import binascii
-
-            from sb.life_contracts import LifeInputError
-            from sb.life_http import error_status, require_source
-            from sb.life_values import canonical_bytes, text
-            from sb.pipeline import run_life_import
-
-            route = path.removeprefix("/api/life/v1/")
-            if not (route == "exports/import" or route.startswith(("overland/", "health/"))):
-                return False
-            try:
-                if self.life_actor.client and not self.life_actor.can_write:
-                    raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
-                if route == "exports/import":
-                    if set(data) != {"source_id", "format", "filename", "content_base64"}:
+                    encoded = data["content_base64"]
+                    if not isinstance(encoded, str):
                         raise LifeInputError("LIFE_IMPORT_INVALID")
-                    source = require_source(self.life_actor, data["source_id"])
-                    kind = text(data["format"], maximum=64)
-                    filename = text(data["filename"], maximum=512)
-                    try:
-                        raw = base64.b64decode(data["content_base64"], validate=True)
-                    except (binascii.Error, ValueError, TypeError) as exc:
-                        raise LifeInputError("LIFE_IMPORT_INVALID") from exc
-                else:
-                    kind, _, name = route.partition("/")
-                    source = require_source(self.life_actor, unquote(name))
-                    filename = kind + ".json"
-                    raw = canonical_bytes(data)
-                outcome, result = run_life_import(self.life_config, source, kind, raw, filename=filename)
-                if outcome.already_running:
-                    self._json(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY"})
-                elif outcome.exit_code:
-                    code = (outcome.failure or "LIFE_IMPORT_FAILED").split(": ")[-1]
-                    code = code if code.startswith("LIFE_") and len(code) <= 100 else "LIFE_IMPORT_FAILED"
-                    self._json(HTTPStatus(error_status(code)) if code != "LIFE_IMPORT_FAILED" else HTTPStatus.SERVICE_UNAVAILABLE,
-                               {"error": code, "run_id": outcome.run_id})
-                else:
-                    # Overland removes its local queue only for this result.
-                    self._json(HTTPStatus.OK if kind == "overland" else HTTPStatus.ACCEPTED,
-                               {"result": "ok", **result, "run_id": outcome.run_id})
-            except LifeInputError as exc:
-                self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
-            return True
+                    raw = base64.b64decode(encoded, validate=True)
+                except (binascii.Error, ValueError, TypeError) as exc:
+                    raise LifeInputError("LIFE_IMPORT_INVALID") from exc
+            else:
+                kind, _, name = route.partition("/")
+                source = require_source(self.life_actor, unquote(name))
+                filename = kind + ".json"
+                raw = canonical_bytes(data)
+            outcome, result = run_life_import(
+                self.life_config, source, kind, raw, filename=filename
+            )
+            if outcome.already_running:
+                self.json_response(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY"})
+            elif outcome.exit_code:
+                code = (outcome.failure or "LIFE_IMPORT_FAILED").split(": ")[-1]
+                code = (
+                    code if code.startswith("LIFE_") and len(code) <= 100 else "LIFE_IMPORT_FAILED"
+                )
+                self.json_response(
+                    HTTPStatus(error_status(code))
+                    if code != "LIFE_IMPORT_FAILED"
+                    else HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": code, "run_id": outcome.run_id},
+                )
+            else:
+                # Overland removes its local queue only for this result.
+                self.json_response(
+                    HTTPStatus.OK if kind == "overland" else HTTPStatus.ACCEPTED,
+                    {"result": "ok", **result, "run_id": outcome.run_id},
+                )
+        except LifeInputError as exc:
+            self.json_response(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+        return True
 
-        def _life_workflow_request(self, path: str, data: dict[str, object]) -> bool:
-            from datetime import UTC, datetime
+    def _life_workflow_request(self, path: str, data: JsonObject) -> bool:
+        from datetime import UTC, datetime
 
-            from sb.life_api_reads import recall_request
-            from sb.life_contracts import LifeInputError
-            from sb.life_http import error_status
-            from sb.pipeline import run_life_workflow
+        from sb.life_api_reads import recall_request
+        from sb.life_contracts import LifeInputError
+        from sb.life_http import error_status
+        from sb.pipeline import run_life_workflow
 
-            route = path.removeprefix("/api/life/v1/")
-            routes = {
-                "questions/generate": "questions_generate",
-                "briefings/generate": "briefing_generate", "tick": "tick",
-                "deliveries/prepare": "delivery_prepare", "deliveries/state": "delivery_finish",
-                "deliveries/opened": "delivery_opened", "relations": "relation_put",
-                "entity-aliases": "entity_alias", "predictions/issue": "prediction_issue",
-                "predictions/evaluate": "prediction_evaluate", "models/reserve": "model_reserve",
-                "models/settle": "model_settle", "views/obsidian/ack": "view_ack",
-                "collection/status": "collection_status",
+        route = path.removeprefix("/api/life/v1/")
+        routes = {
+            "questions/generate": "questions_generate",
+            "briefings/generate": "briefing_generate",
+            "tick": "tick",
+            "deliveries/prepare": "delivery_prepare",
+            "deliveries/state": "delivery_finish",
+            "deliveries/opened": "delivery_opened",
+            "relations": "relation_put",
+            "entity-aliases": "entity_alias",
+            "predictions/issue": "prediction_issue",
+            "predictions/evaluate": "prediction_evaluate",
+            "models/reserve": "model_reserve",
+            "models/settle": "model_settle",
+            "views/obsidian/ack": "view_ack",
+            "collection/status": "collection_status",
+        }
+        command = routes.get(route)
+        if route.startswith("questions/") and route.endswith("/response"):
+            command = "question_response"
+            data = {
+                **data,
+                "question_id": unquote(route[len("questions/") : -len("/response")]),
             }
-            command = routes.get(route)
-            if route.startswith("questions/") and route.endswith("/response"):
-                command = "question_response"
-                data = {**data, "question_id": unquote(route[len("questions/"):-len("/response")])}
-            if route != "recall" and command is None:
+        if route != "recall" and command is None:
+            return False
+        clock = datetime.now(UTC)
+        try:
+            if route == "recall":
+                with read_root(self.context.config) as root:
+                    result = recall_request(
+                        self.life_config, root, self.life_actor, data, now=clock
+                    )
+                self.json_response(HTTPStatus.OK, result)
+                return True
+            if command is None:
                 return False
-            clock = datetime.now(UTC)
-            try:
-                if route == "recall":
-                    with read_root(context.config) as root:
-                        result = recall_request(self.life_config, root, self.life_actor, data, now=clock)
-                    self._json(HTTPStatus.OK, result)
-                    return True
-                outcome, result = run_life_workflow(self.life_config, command, data,
-                    source_ids=self.life_actor.source_ids, scopes=self.life_actor.scopes,
-                    now=clock, client=self.life_actor.client, device_id=self.life_actor.device_id,
-                    client_can_write=self.life_actor.can_write)
-                if outcome.already_running:
-                    self._json(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY", "retryable": True})
-                elif outcome.exit_code:
-                    detail = outcome.failure or "LIFE_WORKFLOW_FAILED"
-                    code = detail.split(": ")[-1]
-                    if not code.startswith("LIFE_") or len(code) > 100:
-                        code = "LIFE_WORKFLOW_FAILED"
-                    status = error_status(code) if code != "LIFE_WORKFLOW_FAILED" else 503
-                    self._json(HTTPStatus(status), {"error": code, "run_id": outcome.run_id})
-                else:
-                    self._json(HTTPStatus.ACCEPTED, {"state": "recorded", "result": result,
-                                                   "run_id": outcome.run_id})
-            except LifeInputError as exc:
-                self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
-            return True
+            outcome, result = run_life_workflow(
+                self.life_config,
+                command,
+                data,
+                source_ids=self.life_actor.source_ids,
+                scopes=self.life_actor.scopes,
+                now=clock,
+                client=self.life_actor.client,
+                device_id=self.life_actor.device_id,
+                client_can_write=self.life_actor.can_write,
+            )
+            if outcome.already_running:
+                self.json_response(
+                    HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY", "retryable": True}
+                )
+            elif outcome.exit_code:
+                detail = outcome.failure or "LIFE_WORKFLOW_FAILED"
+                code = detail.split(": ")[-1]
+                if not code.startswith("LIFE_") or len(code) > 100:
+                    code = "LIFE_WORKFLOW_FAILED"
+                status = error_status(code) if code != "LIFE_WORKFLOW_FAILED" else 503
+                self.json_response(HTTPStatus(status), {"error": code, "run_id": outcome.run_id})
+            else:
+                self.json_response(
+                    HTTPStatus.ACCEPTED,
+                    {"state": "recorded", "result": result, "run_id": outcome.run_id},
+                )
+        except LifeInputError as exc:
+            self.json_response(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+        return True
 
-        def _life_post(self, path: str, data: dict[str, object]) -> None:
-            if self._life_import_request(path, data):
-                return
-            if self._life_workflow_request(path, data):
-                return
-            from datetime import UTC, datetime
-            from hashlib import sha256
+    def _life_post(self, path: str, data: JsonObject) -> None:
+        if self._life_import_request(path, data):
+            return
+        if self._life_workflow_request(path, data):
+            return
+        from datetime import UTC, datetime
+        from hashlib import sha256
 
-            from sb.life_contracts import LifeInputError
-            from sb.life_http import current_event, error_status, require_source
-            from sb.life_values import text
-            from sb.pipeline import run_life_batch, run_life_forget
-            from sb.store.life import read_life_store
+        from sb.life_contracts import LifeInputError
+        from sb.life_http import current_event, error_status, require_source
+        from sb.life_values import text
+        from sb.pipeline import run_life_batch, run_life_forget
+        from sb.store.life import read_life_store
 
-            clock = datetime.now(UTC)
-            try:
-                if self.life_actor.client and not self.life_actor.can_write:
+        clock = datetime.now(UTC)
+        try:
+            if self.life_actor.client and not self.life_actor.can_write:
+                raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
+            if path == "/api/life/v1/events:batch":
+                if set(data) != {"source_id", "items"} or not isinstance(data["items"], list):
+                    raise LifeInputError("LIFE_BATCH_INVALID")
+                source = require_source(self.life_actor, data["source_id"])
+                outcome, receipts = run_life_batch(
+                    self.life_config, source, data["items"], now=clock
+                )
+            elif path == "/api/life/v1/corrections":
+                allowed = {
+                    "event_id",
+                    "expected_revision",
+                    "replacement",
+                    "reason",
+                    "idempotency_key",
+                    "event_status",
+                }
+                if set(data) - allowed:
+                    raise LifeInputError("LIFE_UNKNOWN_FIELD")
+                identity = text(data.get("event_id"), maximum=160)
+                key = text(data.get("idempotency_key"), maximum=256)
+                replacement = text(data.get("replacement"), maximum=100000, empty=True)
+                reason = text(data.get("reason"), maximum=2000)
+                expected = data.get("expected_revision")
+                if type(expected) is not int or expected < 1:
+                    raise LifeInputError("LIFE_REVISION_INVALID")
+                with read_root(self.context.config) as root:
+                    event = current_event(self.life_config, root, self.life_actor, identity, clock)
+                    with read_life_store(root) as store:
+                        original = decode_json(
+                            store.evidence(
+                                identity,
+                                scopes=self.life_actor.scopes,
+                                now=clock,
+                                revision=expected,
+                            )
+                        )
+                if not isinstance(original, dict):
+                    raise LifeInputError("LIFE_RECORD_CORRUPT")
+                original.update(
+                    body=replacement,
+                    change_reason=reason,
+                    source_version="correction-" + sha256(key.encode()).hexdigest(),
+                    evidence_level="user_asserted",
+                    review_state="confirmed",
+                )
+                if "event_status" in data:
+                    original["event_status"] = data["event_status"]
+                outcome, receipts = run_life_batch(
+                    self.life_config,
+                    event.source_id,
+                    [
+                        {
+                            "idempotency_key": key,
+                            "payload": original,
+                            "expected_revision": expected,
+                        }
+                    ],
+                    now=clock,
+                )
+            elif path == "/api/life/v1/withdrawals":
+                if self.life_actor.client:
                     raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
-                if path == "/api/life/v1/events:batch":
-                    if set(data) != {"source_id", "items"} or not isinstance(data["items"], list):
-                        raise LifeInputError("LIFE_BATCH_INVALID")
-                    source = require_source(self.life_actor, data["source_id"])
-                    outcome, receipts = run_life_batch(self.life_config, source, data["items"], now=clock)
-                elif path == "/api/life/v1/corrections":
-                    allowed = {"event_id", "expected_revision", "replacement", "reason",
-                               "idempotency_key", "event_status"}
-                    if set(data) - allowed:
-                        raise LifeInputError("LIFE_UNKNOWN_FIELD")
-                    identity = text(data.get("event_id"), maximum=160)
-                    key = text(data.get("idempotency_key"), maximum=256)
-                    replacement = text(data.get("replacement"), maximum=100000, empty=True)
-                    reason = text(data.get("reason"), maximum=2000)
-                    expected = data.get("expected_revision")
-                    if type(expected) is not int or expected < 1:
-                        raise LifeInputError("LIFE_REVISION_INVALID")
-                    with read_root(context.config) as root:
-                        event = current_event(self.life_config, root, self.life_actor, identity, clock)
-                        with read_life_store(root) as store:
-                            original = json.loads(store.evidence(identity,
-                                scopes=self.life_actor.scopes, now=clock, revision=expected))
-                    original.update(body=replacement, change_reason=reason,
-                                    source_version="correction-" + sha256(key.encode()).hexdigest(),
-                                    evidence_level="user_asserted", review_state="confirmed")
-                    if "event_status" in data:
-                        original["event_status"] = data["event_status"]
-                    outcome, receipts = run_life_batch(self.life_config, event.source_id, [{
-                        "idempotency_key": key, "payload": original, "expected_revision": expected,
-                    }], now=clock)
-                elif path == "/api/life/v1/withdrawals":
-                    if self.life_actor.client:
-                        raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
-                    if set(data) != {"source_id", "event_id", "expected_revision"}:
-                        raise LifeInputError("LIFE_INPUT_INVALID")
-                    source = require_source(self.life_actor, data["source_id"])
-                    identity = text(data.get("event_id"), maximum=160)
-                    expected = data.get("expected_revision")
-                    if type(expected) is not int or expected < 1:
-                        raise LifeInputError("LIFE_REVISION_INVALID")
-                    outcome = run_life_forget(self.life_config, source, identity, expected, now=clock)
-                    receipts = ()
-                else:
-                    raise LifeInputError("LIFE_ROUTE_NOT_FOUND")
-                if outcome.already_running:
-                    self._json(HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY", "retryable": True})
-                elif outcome.exit_code != 0:
-                    detail = outcome.failure or "LIFE_PUBLICATION_FAILED"
-                    code = detail.split(": ")[-1]
-                    if not code.startswith("LIFE_"):
-                        code = "LIFE_PUBLICATION_FAILED"
-                    self._json(HTTPStatus(error_status(code)) if code != "LIFE_PUBLICATION_FAILED"
-                               else HTTPStatus.SERVICE_UNAVAILABLE,
-                               {"error": code, "run_id": outcome.run_id, "state": "not_confirmed"})
-                else:
-                    result = {"receipts": list(receipts), "run_id": outcome.run_id,
-                              "state": "published", "device_projected": False}
-                    if path.endswith("withdrawals"):
-                        result.update(physical_raw_erasure=False, offline_copies_recalled=False)
-                    self._json(HTTPStatus.ACCEPTED, result)
-            except LifeInputError as exc:
-                self._json(HTTPStatus(error_status(exc.code)), {"error": exc.code})
+                if set(data) != {"source_id", "event_id", "expected_revision"}:
+                    raise LifeInputError("LIFE_INPUT_INVALID")
+                source = require_source(self.life_actor, data["source_id"])
+                identity = text(data.get("event_id"), maximum=160)
+                expected = data.get("expected_revision")
+                if type(expected) is not int or expected < 1:
+                    raise LifeInputError("LIFE_REVISION_INVALID")
+                outcome = run_life_forget(self.life_config, source, identity, expected, now=clock)
+                receipts = ()
+            else:
+                raise LifeInputError("LIFE_ROUTE_NOT_FOUND")
+            if outcome.already_running:
+                self.json_response(
+                    HTTPStatus.CONFLICT, {"error": "LIFE_WRITER_BUSY", "retryable": True}
+                )
+            elif outcome.exit_code != 0:
+                detail = outcome.failure or "LIFE_PUBLICATION_FAILED"
+                code = detail.split(": ")[-1]
+                if not code.startswith("LIFE_"):
+                    code = "LIFE_PUBLICATION_FAILED"
+                self.json_response(
+                    HTTPStatus(error_status(code))
+                    if code != "LIFE_PUBLICATION_FAILED"
+                    else HTTPStatus.SERVICE_UNAVAILABLE,
+                    {"error": code, "run_id": outcome.run_id, "state": "not_confirmed"},
+                )
+            else:
+                result = {
+                    "receipts": list(receipts),
+                    "run_id": outcome.run_id,
+                    "state": "published",
+                    "device_projected": False,
+                }
+                if path.endswith("withdrawals"):
+                    result.update(physical_raw_erasure=False, offline_copies_recalled=False)
+                self.json_response(HTTPStatus.ACCEPTED, result)
+        except LifeInputError as exc:
+            self.json_response(HTTPStatus(error_status(exc.code)), {"error": exc.code})
 
-    return Handler
+    def _json(self, status: HTTPStatus, payload: JsonInput) -> None:
+        self.json_response(status, payload)
+
+    def _get(self, root: Path) -> None:
+        # Keep the original fault-injection seam while dispatching the public method.
+        self.get_response(root)
+
+
+def _handler(web_context: WebContext) -> type[Handler]:
+    class ConfiguredHandler(Handler):
+        context: ClassVar[WebContext] = web_context
+
+    return ConfiguredHandler
 
 
 def build_server(

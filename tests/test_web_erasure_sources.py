@@ -20,7 +20,7 @@ from sb.runtime_backup import backup_runtime
 from sb.store.cas import ContentAddressedStore
 from sb.vault import Vault
 from tests.knowledge import stamp_knowledge
-from tests.test_web import _NoPreviousHash, _request, _running
+from tests.test_web import NoPreviousHash, request, running
 from tests.test_web_lifecycle import NOW, PAGE, URL, ready
 
 
@@ -36,29 +36,29 @@ def test_delete_follows_source_citations_and_blocks_original_raw(tmp_path: Path)
         # Avoid the human-edit/proposal path when replacing fixture pages.
         for spec in (wiki, daily):
             (staging / (spec.page_id + ".md")).unlink()
-        Vault(staging).write_pages([wiki, daily], "source-fixture", _NoPreviousHash())
+        _ = Vault(staging).write_pages([wiki, daily], "source-fixture", NoPreviousHash())
         stamp_knowledge(staging)
 
     service = GenerationMutationService.from_config(config)
     try:
-        service.mutate(GenerationMutation("source-fixture", GenerationOperation.RUN, NOW,
+        _ = service.mutate(GenerationMutation("source-fixture", GenerationOperation.RUN, NOW,
             GenerationAuthority(None, None), seed))
     finally:
         service.close()
     backup = Path(config.backup_root) / "before.tar.gz"
-    backup_runtime(config, backup)
+    _ = backup_runtime(config, backup)
     outside = tmp_path / "outside.tar.gz"
-    shutil.copy2(backup, outside)
-    with _running(config) as base:
-        _, page = _request(base + URL)
+    _ = shutil.copy2(backup, outside)
+    with running(config) as base:
+        _, page = request(base + URL)
         assert isinstance(page, dict)
-        status, result = _request(base + URL + "/forget", method="POST",
+        status, result = request(base + URL + "/forget", method="POST",
                                  payload={"receipt": page["receipt"]})
         assert status == 200, result
-        assert _request(base + "/api/search?q=M13SOURCE") == (200, {"results": []})
+        assert request(base + "/api/search?q=M13SOURCE") == (200, {"results": []})
     assert not backup.exists()
     extracted = tmp_path / "outside-restore"
-    restore_backup(outside, extracted)
+    _ = restore_backup(outside, extracted)
     store = RequestStore(Path(config.request_root))
     try:
         sanitized = ManagedRestoreInventory().sanitize(extracted, store.verified_tombstone_snapshot())

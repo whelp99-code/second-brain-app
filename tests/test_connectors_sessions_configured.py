@@ -19,7 +19,7 @@ from sb.connectors.sessions_claude import ADAPTER_ID as CLAUDE_ID
 from sb.connectors.sessions_codex import ADAPTER_ID as CODEX_ID
 from sb.connectors.sessions_omo import ADAPTER_ID as OMO_ID
 from sb.contracts import SourceRef
-from sb.pipeline import _select_adapters
+from sb.pipeline import select_adapters
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "config.example.toml"
 FIXTURES = Path(__file__).parent / "fixtures" / "second-brain"
@@ -71,7 +71,7 @@ def test_configured_session_source_collects_fixture_and_resumes(
     config = load_config(settings)
 
     # When: the pipeline selects that configured source and scans from the start.
-    selected = _select_adapters(discover_adapters(config), None, config)
+    selected = select_adapters(discover_adapters(config), None, config)
     assert len(selected) == 1
     adapter = selected[0]
     items = list(adapter.scan(None))

@@ -22,7 +22,7 @@ class VaultPublicationBusy(RuntimeError):
 
 class _PublicationLock:
     def __init__(self, root: Path) -> None:
-        self.root = root.absolute()
+        self.root: Path = root.absolute()
         self.fd: int | None = None
 
     def __enter__(self) -> None:

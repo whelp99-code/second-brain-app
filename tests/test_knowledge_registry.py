@@ -37,7 +37,7 @@ def test_yaml_knowledge_status_is_not_authority(tmp_path: Path) -> None:
         root,
         "wiki/yaml-only.md",
         "---\ntitle: YamlOnly\nknowledge_status: ACTIVE\napproval_status: APPROVED\n---\n"
-        "\n# YamlOnly\nYamlAuthorityToken must not leak.\n",
+        + "\n# YamlOnly\nYamlAuthorityToken must not leak.\n",
     )
     index = SearchIndex(vault_root=root, registry_path=registry_file(root))
     assert index.search("YamlAuthorityToken") == ()
@@ -52,9 +52,9 @@ def test_registry_projects_into_search_unindexed_columns(tmp_path: Path) -> None
         root,
         "wiki/approved.md",
         "---\ntitle: ApprovedPage\nsource_ref: inbox:approved.md\nupdated: '2026-08-29'\n---\n"
-        "\n# ApprovedPage\nApprovedKnowledgeToken is confirmed.\n",
+        + "\n# ApprovedPage\nApprovedKnowledgeToken is confirmed.\n",
     )
-    register_page(
+    _ = register_page(
         root,
         "wiki/approved",
         knowledge_status="ACTIVE",

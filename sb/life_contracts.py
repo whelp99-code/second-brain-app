@@ -7,8 +7,15 @@ The event parser in life_values is the only external-input constructor.
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Final
+
+from sb.life_event_wire import LifeEventDict, LifeReceiptDict
+
+type _PolicyValue = (
+    None | bool | int | float | str | Sequence[_PolicyValue] | Mapping[str, _PolicyValue]
+)
 
 EVENT_TYPES: Final = frozenset(
     {
@@ -55,11 +62,28 @@ RELATION_KINDS: Final = frozenset(
 IDENTIFIER: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@-]{0,159}\Z")
 
 
+def _identifier(value: _PolicyValue) -> bool:
+    return isinstance(value, str) and IDENTIFIER.fullmatch(value) is not None
+
+
+def _scopes(value: _PolicyValue) -> bool:
+    return (
+        isinstance(value, tuple)
+        and bool(value)
+        and all(_identifier(scope) for scope in value)
+        and len(set(value)) == len(value)
+    )
+
+
+def _types(value: _PolicyValue) -> bool:
+    return isinstance(value, tuple) and bool(value) and all(t in EVENT_TYPES for t in value)
+
+
 class LifeInputError(ValueError):
     """A bounded public error code, without leaking an input body or credential."""
 
     def __init__(self, code: str = "LIFE_INPUT_INVALID") -> None:
-        self.code = code
+        self.code: str = code
         super().__init__(code)
 
 
@@ -75,26 +99,15 @@ class SourcePolicyV1:
     policy_revision: str = "v1"
 
     def __post_init__(self) -> None:
-        if not isinstance(self.policy_revision, str) or not IDENTIFIER.fullmatch(
-            self.policy_revision
-        ):
+        if not _identifier(self.policy_revision):
             raise LifeInputError("LIFE_POLICY_INVALID")
-        if not isinstance(self.source_id, str) or not IDENTIFIER.fullmatch(self.source_id):
+        if not _identifier(self.source_id):
             raise LifeInputError("LIFE_SOURCE_INVALID")
-        if (
-            not isinstance(self.scopes, tuple)
-            or not self.scopes
-            or any(not isinstance(s, str) or not IDENTIFIER.fullmatch(s) for s in self.scopes)
-            or len(set(self.scopes)) != len(self.scopes)
-        ):
+        if not _scopes(self.scopes):
             raise LifeInputError("LIFE_SCOPE_INVALID")
         if type(self.enabled) is not bool:
             raise LifeInputError("LIFE_POLICY_INVALID")
-        if (
-            not isinstance(self.allowed_types, tuple)
-            or not self.allowed_types
-            or any(t not in EVENT_TYPES for t in self.allowed_types)
-        ):
+        if not _types(self.allowed_types):
             raise LifeInputError("LIFE_TYPE_INVALID")
         if self.sensitivity not in SENSITIVITIES:
             raise LifeInputError("LIFE_SENSITIVITY_INVALID")
@@ -160,11 +173,47 @@ class LifeEventV1:
     policy_revision: str = "v1"
     attachments: tuple[AttachmentRefV1, ...] = ()
 
-    def as_dict(self) -> dict[str, object]:
-        result = asdict(self)
-        result["scopes"] = list(self.scopes)
-        result["entities"] = [asdict(entity) for entity in self.entities]
-        return result
+    def as_dict(self) -> LifeEventDict:
+        return {
+            "schema_version": self.schema_version,
+            "event_id": self.event_id,
+            "revision": self.revision,
+            "source_id": self.source_id,
+            "source_item_id": self.source_item_id,
+            "source_version": self.source_version,
+            "event_type": self.event_type,
+            "title": self.title,
+            "body": self.body,
+            "event_status": self.event_status,
+            "evidence_level": self.evidence_level,
+            "review_state": self.review_state,
+            "occurred_start": self.occurred_start,
+            "occurred_end": self.occurred_end,
+            "observed_at": self.observed_at,
+            "recorded_at": self.recorded_at,
+            "timezone": self.timezone,
+            "time_precision": self.time_precision,
+            "valid_from": self.valid_from,
+            "valid_until": self.valid_until,
+            "entities": [
+                {"entity_id": e.entity_id, "kind": e.kind, "label": e.label} for e in self.entities
+            ],
+            "scopes": list(self.scopes),
+            "sensitivity": self.sensitivity,
+            "external_processing": self.external_processing,
+            "retention_days": self.retention_days,
+            "raw_digest": self.raw_digest,
+            "value": self.value,
+            "value_status": self.value_status,
+            "unit": self.unit,
+            "confidence": self.confidence,
+            "change_reason": self.change_reason,
+            "policy_revision": self.policy_revision,
+            "attachments": tuple(
+                {"name": a.name, "mime": a.mime, "size": a.size, "sha256": a.sha256}
+                for a in self.attachments
+            ),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,8 +225,15 @@ class LifeReceiptV1:
     replayed: bool
     state: str = "accepted"
 
-    def as_dict(self) -> dict[str, object]:
-        return asdict(self)
+    def as_dict(self) -> LifeReceiptDict:
+        return {
+            "receipt_id": self.receipt_id,
+            "event_id": self.event_id,
+            "revision": self.revision,
+            "accepted_at": self.accepted_at,
+            "replayed": self.replayed,
+            "state": self.state,
+        }
 
 
 @dataclass(frozen=True, slots=True)

@@ -45,7 +45,7 @@ def copy_compiled_markers(source: Path, destination: Path) -> None:
         if not path.is_file() or path.is_symlink() or path.suffix != ".sha":
             continue
         target = dest / path.name
-        target.write_bytes(path.read_bytes())
+        _ = target.write_bytes(path.read_bytes())
         target.chmod(0o600)
 
 
@@ -62,7 +62,7 @@ def copy_pending_inbox(source: Path, destination: Path, state_root: Path) -> Non
     )
     gate = ReingressGate(state_root / "reingress.db")
     try:
-        payloads = tuple((path, _read_pending_file(inbox, path.relative_to(inbox))) for path in pending)
+        payloads = tuple((path, read_pending_file(inbox, path.relative_to(inbox))) for path in pending)
         for path, payload in payloads:
             relative = path.relative_to(inbox).as_posix()
             gate.check(IngressIdentity(
@@ -79,7 +79,7 @@ def copy_pending_inbox(source: Path, destination: Path, state_root: Path) -> Non
         target.chmod(0o600)
 
 
-def _read_pending_file(inbox: Path, relative: Path) -> bytes:
+def read_pending_file(inbox: Path, relative: Path) -> bytes:
     descriptors: list[int] = []
     try:
         directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
@@ -189,3 +189,6 @@ def directory_fsync(path: Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+_read_pending_file = read_pending_file

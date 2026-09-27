@@ -1,7 +1,14 @@
 import importlib.util
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import pytest
+
+
+@runtime_checkable
+class TransitionModule(Protocol):
+    def assess_unit(self, state: dict[str, str]) -> list[str]: ...
+
 
 spec = importlib.util.spec_from_file_location(
     "transition_units", Path(__file__).resolve().parents[1] / "deploy/check-transition-units.py"
@@ -9,6 +16,8 @@ spec = importlib.util.spec_from_file_location(
 assert spec is not None and spec.loader is not None
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+assert isinstance(module, TransitionModule)
+assess_unit = module.assess_unit
 
 
 @pytest.mark.parametrize(
@@ -22,7 +31,7 @@ spec.loader.exec_module(module)
         ({"ActiveState": "activating"}, "UNIT_NOT_DRAINED"),
     ],
 )
-def test_rejects_live_or_unverified_unit(changes, reason):
+def test_rejects_live_or_unverified_unit(changes: dict[str, str], reason: str):
     state = {
         "LoadState": "loaded",
         "ActiveState": "inactive",
@@ -31,12 +40,12 @@ def test_rejects_live_or_unverified_unit(changes, reason):
         "ControlPID": "0",
         "Job": "",
     }
-    assert reason in module.assess_unit({**state, **changes})
+    assert reason in assess_unit({**state, **changes})
 
 
 def test_drained_unit_and_empty_response():
     assert (
-        module.assess_unit({"LoadState": "loaded", "ActiveState": "inactive", "SubState": "dead"})
+        assess_unit({"LoadState": "loaded", "ActiveState": "inactive", "SubState": "dead"})
         == []
     )
-    assert "UNIT_NOT_LOADED" in module.assess_unit({})
+    assert "UNIT_NOT_LOADED" in assess_unit({})

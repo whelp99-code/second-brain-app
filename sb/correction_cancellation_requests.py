@@ -5,9 +5,10 @@ from __future__ import annotations
 import fcntl
 import os
 from collections.abc import Callable, Mapping
-from contextlib import ExitStack
+from contextlib import AbstractContextManager, ExitStack
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -19,8 +20,25 @@ from sb.correction_cancellation import (
 from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.effect_values import JsonValue, format_instant
 from sb.effect_write_requests import EffectWriteIoError, open_request_directory
-from sb.generations import GenerationStore
+from sb.generations import Generation
 from sb.request_store import ReplayConflict, RequestStore
+
+
+class CancellationRequestRoot(Protocol):
+    @property
+    def root(self) -> Path: ...
+
+
+class CancellationGenerationSource(Protocol):
+    """The provider identity, serialized access and active generation admission needs."""
+
+    @property
+    def requests(self) -> CancellationRequestRoot | None: ...
+    @property
+    def provider_instance_id(self) -> str: ...
+    def exclusive(self) -> AbstractContextManager[None]: ...
+    def active(self) -> Generation: ...
+
 
 MAX_INVENTORY_ENTRIES = 100_000
 
@@ -43,7 +61,7 @@ def _require_no_publication(directories: tuple[int, ...], request_id: str) -> No
 
 
 def accept_correction_cancellation(
-    root: Path, value: JsonValue, *, generations: GenerationStore,
+    root: Path, value: JsonValue, *, generations: CancellationGenerationSource,
     clock: Callable[[], datetime], expected_provider: str,
     historical_delegation_keys: Mapping[str, Ed25519PublicKey],
     current_cancellation_keys: Mapping[str, Ed25519PublicKey],

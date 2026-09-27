@@ -102,7 +102,7 @@ def test_perfect_recall_does_not_hide_forbidden_old_decision() -> None:
 
 
 @pytest.mark.parametrize('damage', ['unknown', 'overlap', 'duplicate'])
-def test_forbidden_labels_require_real_disjoint_unique_documents(damage):
+def test_forbidden_labels_require_real_disjoint_unique_documents(damage: str):
     raw = fixture()
     first = object_value(array(raw['cases'])[0])
     expected = array(first['expected_page_ids'])[0]
@@ -111,4 +111,4 @@ def test_forbidden_labels_require_real_disjoint_unique_documents(damage):
     first['forbidden_page_ids'] = {'unknown': ['wiki/absent'], 'overlap': [expected],
                                    'duplicate': [distractor, distractor]}[damage]
     with pytest.raises(ValueError, match='forbidden pages'):
-        load_dataset(raw)
+        _ = load_dataset(raw)

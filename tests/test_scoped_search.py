@@ -1,36 +1,43 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
-from sb.config import Config
+from sb.config import Config, TomlValue
 from sb.generation_integrity import load_verified_manifest
 from sb.pipeline import run_compile, run_ingest
 from sb.scoped_search import search_scoped_records
+from sb.search import SearchIndex
 from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1
-from tests.test_memory_access import classified  # noqa: F401
+from tests import test_memory_access
+
+classified = test_memory_access.classified
 
 
-def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_path: Path, monkeypatch):
-    sources = []
+def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    sources: list[dict[str, str]] = []
     for name, text in [("a_hidden", "Alpha forbidden content"), ("b_unknown", "Alpha unclassified content"),
                        ("z_allowed", "Alpha permitted content")]:
         folder = tmp_path / name
         folder.mkdir()
-        (folder / "note.md").write_text(text)
+        _ = (folder / "note.md").write_text(text)
         sources.append({"id": name, "adapter": "markdown-vault", "root": str(folder)})
+    source_values: list[TomlValue] = [{key: value for key, value in source.items()} for source in sources]
     vault = tmp_path / "share" / "vault"
     config = Config(raw={"llm": {"model_id": "fake"}, "vault_root": str(vault), "share_root": str(tmp_path / "share"), "state_root": str(tmp_path / "state"),
-        "knowledge_registry": str(tmp_path / "registry.db"), "sources": sources,
+        "knowledge_registry": str(tmp_path / "registry.db"), "sources": source_values,
         "source_access": {name: {"owner": "principal:owner", "projects": [project], "policy_revision": "1"}
             for name, project in [("a_hidden", "project:b"), ("z_allowed", "project:a")]}})
     assert run_ingest(config, [source["id"] for source in sources]).exit_code == 0
     class FixtureLLM:
-        def generate(self, prompt, **kwargs):
-            if kwargs.get("json_mode"):
+        def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+            del system, timeout
+            if json_mode:
                 return '{"relation":"unrelated","confidence":1,"rationale":"fixture","cites":[]}'
             matched = re.search(r"sid=([0-9a-f]+)", prompt)
             if matched is None:
@@ -38,24 +45,26 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
             sid = matched.group(1)
             word = next(word for word in ("permitted", "forbidden", "unclassified") if word in prompt)
             return f"Alpha {word} content.[^{sid}]"
-    monkeypatch.setattr("sb.pipeline._llm", lambda *_: FixtureLLM())
+    def llm(_config: Config, _mode: str) -> FixtureLLM:
+        return FixtureLLM()
+    monkeypatch.setattr("sb.pipeline._llm", llm)
     assert run_compile(config, llm_mode="fake").exit_code == 0
     root = vault.resolve()
     manifest = load_verified_manifest(root)
-    generation = GenerationIdentityV1(*(str(manifest[name]) for name in (
-        "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
+    identity = TypeAdapter(tuple[str, str, str, str, str]).validate_python(tuple(manifest[name] for name in (
+        "provider_instance_id", "generation_id", "generation_digest", "head", "tree")), strict=True)
+    generation = GenerationIdentityV1(*identity)
     scope = SourceAccess("principal:owner", ("project:a",), "1")
-    import sb.memory_access as access_module
 
-    blob_reads = []
-    check_output = access_module.subprocess.check_output
+    blob_reads: list[str] = []
+    check_output = subprocess.check_output
 
-    def observe_blob_reads(args, **kwargs):
+    def observe_blob_reads(args: list[str], *, stderr: int | None = None) -> bytes:
         if args[3:5] == ["cat-file", "blob"]:
             blob_reads.append(args[-1])
-        return check_output(args, **kwargs)
+        return check_output(args, stderr=stderr)
 
-    monkeypatch.setattr(access_module.subprocess, "check_output", observe_blob_reads)
+    monkeypatch.setattr(subprocess, "check_output", observe_blob_reads)
     rows = search_scoped_records(root, generation, scope, "Alpha", 1)
     assert len(rows) == 1
     assert "permitted" in str(rows)
@@ -68,20 +77,20 @@ def test_hidden_and_unclassified_matches_do_not_consume_limit_or_leak_text(tmp_p
     assert search_scoped_records(root, generation, SourceAccess("principal:other", ("project:a",), "1"), "Alpha", 10) == []
     assert blob_reads == []
     with pytest.raises(ValueError):
-        search_scoped_records(root, generation, scope, "Alpha", 51)
+        _ = search_scoped_records(root, generation, scope, "Alpha", 51)
 
 
-def test_scoped_search_disables_hybrid_and_omits_scores(classified, monkeypatch):  # noqa: F811
+def test_scoped_search_disables_hybrid_and_omits_scores(classified: tuple[Path, str, GenerationIdentityV1], monkeypatch: pytest.MonkeyPatch):
     import sb.scoped_search as module
 
     root, _name, generation = classified
     constructed: list[bool | None] = []
-    original = module.SearchIndex
+    original = SearchIndex
 
     class Observed(original):
-        def __init__(self, *args, **kwargs):
-            constructed.append(kwargs.get("hybrid"))
-            super().__init__(*args, **kwargs)
+        def __init__(self, vault_root: Path, hybrid: bool | None = None, registry_path: Path | None = None, min_similarity: float = -1.0):
+            constructed.append(hybrid)
+            super().__init__(vault_root, hybrid, registry_path, min_similarity)
 
     monkeypatch.setattr(module, "SearchIndex", Observed)
     rows = search_scoped_records(
@@ -94,7 +103,7 @@ def test_scoped_search_disables_hybrid_and_omits_scores(classified, monkeypatch)
     assert denied == []
 
 
-def test_concurrent_scoped_search_keeps_deny_and_allowed(classified):  # noqa: F811
+def test_concurrent_scoped_search_keeps_deny_and_allowed(classified: tuple[Path, str, GenerationIdentityV1]):
     from concurrent.futures import ThreadPoolExecutor, wait
     from threading import Barrier, Event
 
@@ -105,20 +114,20 @@ def test_concurrent_scoped_search_keeps_deny_and_allowed(classified):  # noqa: F
     writer_done = Event()
     order: list[str] = []
 
-    def allowed() -> object:
-        started.wait()
+    def allowed():
+        _ = started.wait()
         order.append("allow")
         rows = search_scoped_records(root, generation, allowed_scope, "Cited", 10)
-        writer_done.wait(timeout=5)
+        _ = writer_done.wait(timeout=5)
         return rows
 
-    def denied() -> object:
-        started.wait()
+    def denied():
+        _ = started.wait()
         order.append("deny")
         return search_scoped_records(root, generation, denied_scope, "Cited", 10)
 
     def writer() -> str:
-        started.wait()
+        _ = started.wait()
         order.append("write")
         writer_done.set()
         return "overlap"
@@ -126,11 +135,12 @@ def test_concurrent_scoped_search_keeps_deny_and_allowed(classified):  # noqa: F
     with ThreadPoolExecutor(max_workers=5) as pool:
         futures = [pool.submit(allowed) for _ in range(2)]
         futures += [pool.submit(denied) for _ in range(2)]
-        futures.append(pool.submit(writer))
-        wait(futures)
+        writer_future = pool.submit(writer)
+        _ = wait(futures)
+        _ = wait([writer_future])
         allowed_rows = [futures[0].result(), futures[1].result()]
         denied_rows = [futures[2].result(), futures[3].result()]
-        assert futures[4].result() == "overlap"
+        assert writer_future.result() == "overlap"
     assert {"allow", "deny", "write"} <= set(order)
     assert all(rows and "Cited" in str(rows) for rows in allowed_rows)
     assert all(rows == [] for rows in denied_rows)

@@ -13,16 +13,18 @@ from contextlib import closing
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
 from uuid import UUID
 
 from sb.knowledge_registry import KnowledgeRegistry
 from sb.life_contracts import LifeInputError
+from sb.life_decode import decode_event
+from sb.life_restore_contracts import RestoreResult, RestoreSnapshot
 from sb.life_views import core_page_id
 from sb.source_access import source_access_identity
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger
-from sb.store.life import _decode, read_life_store
+from sb.store.life import read_life_store
+from sb.store.life_rows import Cell, all_rows, one, string
 from sb.vault import Vault
 
 TABLES = (
@@ -43,47 +45,51 @@ def has_life(root: Path) -> bool:
     try:
         with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
             return (
-                connection.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='life_events'"
-                ).fetchone()
+                one(
+                    connection,
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='life_events'",
+                )
                 is not None
             )
     except sqlite3.DatabaseError as exc:
         raise LifeInputError("LIFE_RESTORE_STATE_INVALID") from exc
 
 
-def capture(root: Path) -> dict[str, Any] | None:
+def capture(root: Path) -> RestoreSnapshot | None:
     """Caller owns a stable writer lock or a pinned immutable generation."""
     if not has_life(root):
         return None
     cas = ContentAddressedStore(root)
     with read_life_store(root) as store:
         connection = store.connection
-        tables = {}
+        tables: dict[str, list[list[Cell]]] = {}
         for name in TABLES:
-            if connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-            ).fetchone():
-                tables[name] = [list(row) for row in connection.execute(f'SELECT * FROM "{name}"')]
-        revisions = [_decode((row[4], row[5])) for row in tables["life_event_revisions"]]
-        sources = sorted({row[1] for row in tables["life_events"]})
-        source_rows = []
+            if one(
+                connection, "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+            ):
+                tables[name] = [
+                    list(row) for row in all_rows(connection, f'SELECT * FROM "{name}"')
+                ]
+        revisions = [decode_event((row[4], row[5])) for row in tables["life_event_revisions"]]
+        sources = sorted({string(row[1]) for row in tables["life_events"]})
+        source_rows: list[list[Cell]] = []
         if sources:
             placeholders = ",".join("?" for _ in sources)
             source_rows = [
                 list(row)
-                for row in connection.execute(
+                for row in all_rows(
+                    connection,
                     "SELECT source_id,source_uri,source_version,content_hash,first_seen_run,last_seen_run "
-                    f"FROM source_item WHERE source_id IN ({placeholders})",
+                    + f"FROM source_item WHERE source_id IN ({placeholders})",
                     sources,
                 )
             ]
-        required = {row[3] for row in source_rows}
+        required = {string(row[3]) for row in source_rows}
         for event in revisions:
             required.add(event.raw_digest)
             required.update(a.sha256 for a in event.attachments)
-        blobs = {}
-        blocked = []
+        blobs: dict[str, bytes] = {}
+        blocked: list[str] = []
         for digest in required:
             if cas.is_tombstoned(digest):
                 blocked.append(digest)
@@ -92,22 +98,22 @@ def capture(root: Path) -> dict[str, Any] | None:
             if sha256(value).hexdigest() != digest:
                 raise LifeInputError("LIFE_RESTORE_RAW_INVALID")
             blobs[digest] = value
-        source_access = []
+        source_access: list[list[Cell]] = []
         for row in source_rows:
-            sid = source_access_identity(row[0], row[1], row[3])
-            binding = connection.execute(
-                "SELECT * FROM source_access WHERE source_ref_digest=?", (sid,)
-            ).fetchone()
+            sid = source_access_identity(string(row[0]), string(row[1]), string(row[3]))
+            binding = one(
+                connection, "SELECT * FROM source_access WHERE source_ref_digest=?", (sid,)
+            )
             if binding is not None:
                 source_access.append(list(binding))
-        pages = {}
-        page_access = []
-        knowledge = []
+        pages: dict[str, bytes] = {}
+        page_access: list[list[Cell]] = []
+        knowledge: list[list[Cell]] = []
         for event_id, _source, _item, _rev, deleted, _scopes, _policy, _expires in tables[
             "life_events"
         ]:
-            UUID(event_id)
-            page_id = core_page_id(event_id)
+            _ = UUID(string(event_id))
+            page_id = core_page_id(string(event_id))
             if deleted:
                 continue
             path = page_id + ".md"
@@ -119,21 +125,24 @@ def capture(root: Path) -> dict[str, Any] | None:
                 continue
             pages[path] = result.stdout
             digest = "sha256:" + sha256(result.stdout).hexdigest()
-            access = connection.execute(
-                "SELECT * FROM page_access WHERE page_id=? AND content_digest=?", (page_id, digest)
-            ).fetchone()
-            bound = connection.execute(
+            access = one(
+                connection,
+                "SELECT * FROM page_access WHERE page_id=? AND content_digest=?",
+                (page_id, digest),
+            )
+            bound = one(
+                connection,
                 "SELECT * FROM bound_knowledge WHERE page_id=? AND content_digest=?",
                 (page_id, digest),
-            ).fetchone()
+            )
             if access is not None:
                 page_access.append(list(access))
             if bound is not None:
                 knowledge.append(list(bound))
         cursors = [
             list(row)
-            for row in connection.execute("SELECT * FROM cursor")
-            if row[0] in sources or row[0].startswith("life-health:")
+            for row in all_rows(connection, "SELECT * FROM cursor")
+            if row[0] in sources or string(row[0]).startswith("life-health:")
         ]
         return {
             "tables": tables,
@@ -150,8 +159,8 @@ def capture(root: Path) -> dict[str, Any] | None:
 
 
 def materialize(
-    current: dict[str, Any] | None, destination: Path, *, old_archive_has_life: bool = False
-) -> dict[str, object]:
+    current: RestoreSnapshot | None, destination: Path, *, old_archive_has_life: bool = False
+) -> RestoreResult:
     """Apply a captured CURRENT snapshot to an unpublished restoration candidate."""
     if current is None:
         if old_archive_has_life or has_life(destination):
@@ -161,7 +170,7 @@ def materialize(
         # Sanitized generation materializers intentionally remove old git data.
         from sb.vault import init_vault
 
-        init_vault(destination)
+        _ = init_vault(destination)
     cas = ContentAddressedStore(destination)
     for digest, value in current["blobs"].items():
         if cas.is_tombstoned(digest):
@@ -170,22 +179,24 @@ def materialize(
         if cas.put(value) != digest:
             raise LifeInputError("LIFE_RESTORE_RAW_INVALID")
     for digest in current["blocked"]:
-        cas.tombstone(digest)
+        _ = cas.tombstone(digest)
     with Ledger(destination) as ledger:
         life_store = ledger.life_store()
         connection = life_store.connection
         with ledger.transaction():
             for table in reversed(TABLES):
-                connection.execute(f'DELETE FROM "{table}"')
+                _ = connection.execute(f'DELETE FROM "{table}"')
             for table in TABLES:
                 rows = current["tables"].get(table, [])
                 if rows:
                     placeholders = ",".join("?" for _ in rows[0])
-                    connection.executemany(f'INSERT INTO "{table}" VALUES({placeholders})', rows)
+                    _ = connection.executemany(
+                        f'INSERT INTO "{table}" VALUES({placeholders})', rows
+                    )
             for row in current["source_rows"]:
-                connection.execute(
+                _ = connection.execute(
                     "INSERT INTO source_item VALUES(?,?,?,?,?,?) ON CONFLICT(source_id,source_uri,content_hash) "
-                    "DO UPDATE SET source_version=excluded.source_version,last_seen_run=excluded.last_seen_run",
+                    + "DO UPDATE SET source_version=excluded.source_version,last_seen_run=excluded.last_seen_run",
                     row,
                 )
             for table, keycount, rows in (
@@ -199,34 +210,34 @@ def materialize(
                         else ("page_id", "content_digest")
                     )
                     where = " AND ".join(key + "=?" for key in keys)
-                    existing = connection.execute(
-                        f'SELECT * FROM "{table}" WHERE ' + where, row[:keycount]
-                    ).fetchone()
+                    existing = one(
+                        connection, f'SELECT * FROM "{table}" WHERE ' + where, row[:keycount]
+                    )
                     if existing is not None and tuple(row) != tuple(existing):
                         raise LifeInputError("LIFE_RESTORE_ACCESS_CONFLICT")
                     if existing is None:
-                        connection.execute(
+                        _ = connection.execute(
                             f'INSERT INTO "{table}" VALUES(' + ",".join("?" for _ in row) + ")", row
                         )
             for row in current["knowledge"]:
-                connection.execute(
+                _ = connection.execute(
                     "INSERT INTO bound_knowledge VALUES(?,?,?,?) ON CONFLICT(page_id,content_digest) "
-                    "DO UPDATE SET knowledge_status=excluded.knowledge_status,approval_status=excluded.approval_status",
+                    + "DO UPDATE SET knowledge_status=excluded.knowledge_status,approval_status=excluded.approval_status",
                     row,
                 )
             for row in current["cursors"]:
-                connection.execute(
+                _ = connection.execute(
                     "INSERT INTO cursor VALUES(?,?,?) ON CONFLICT(source_id) "
-                    "DO UPDATE SET position=excluded.position,updated_at=excluded.updated_at",
+                    + "DO UPDATE SET position=excluded.position,updated_at=excluded.updated_at",
                     row,
                 )
-        Vault(destination).restore_life_pages(current["pages"])
+        _ = Vault(destination).restore_life_pages(current["pages"])
         registry = KnowledgeRegistry(destination / ".sb" / "knowledge-registry.sqlite")
         for page_id, _digest, knowledge_status, approval_status in current["knowledge"]:
-            registry.put(
-                page_id,
-                knowledge_status=knowledge_status,
-                approval_status=approval_status,
+            _ = registry.put(
+                string(page_id),
+                knowledge_status=string(knowledge_status),
+                approval_status=string(approval_status),
                 decided_by="current-life-restore",
                 reason="preserve latest life state",
             )
@@ -245,7 +256,7 @@ def materialize(
     }
 
 
-def preserve_current(current_root: Path, candidate_root: Path) -> dict[str, object]:
+def preserve_current(current_root: Path, candidate_root: Path) -> RestoreResult:
     return materialize(
         capture(current_root), candidate_root, old_archive_has_life=has_life(candidate_root)
     )

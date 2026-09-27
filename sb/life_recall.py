@@ -7,18 +7,21 @@ and never silently returned as a current decision.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any
 
+from sb.effect_values import JsonInput
 from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_fields import integer
+from sb.life_read_contracts import RecallHit, RecallResult
 from sb.life_values import instant, text
 from sb.search_query import LexicalQuery, normalize
+from sb.store.life import LifeStore
 from sb.store.life_journal import LifeJournal
 
 
 def temporal_versions(
-    store: Any,
+    store: LifeStore,
     events: Sequence[LifeEventV1],
     *,
     scopes: tuple[str, ...],
@@ -35,7 +38,7 @@ def temporal_versions(
     cutoff = instant(as_of)
     if cutoff > now:
         raise LifeInputError("LIFE_AS_OF_INVALID")
-    result = []
+    result: list[LifeEventV1] = []
     for current in events:
         history = store.history(current.event_id, scopes=scopes, now=now)
         eligible = [
@@ -60,7 +63,7 @@ def rank(events: Sequence[LifeEventV1], query: str, limit: int = 5) -> tuple[Lif
     plan = LexicalQuery.parse(query)
     if not plan.terms:
         raise LifeInputError("LIFE_QUERY_INVALID")
-    found = []
+    found: list[tuple[int, float, str, LifeEventV1]] = []
     for event in events:
         content = event.title + "\n" + event.body
         compact = normalize(content)
@@ -74,14 +77,14 @@ def rank(events: Sequence[LifeEventV1], query: str, limit: int = 5) -> tuple[Lif
 
 
 def recall(
-    store: Any,
+    store: LifeStore,
     events: Sequence[LifeEventV1],
-    data: dict[str, object],
+    data: Mapping[str, JsonInput],
     *,
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> dict[str, Any]:
+) -> RecallResult:
     if set(data) - {"query", "as_of", "limit", "entity_id", "trigger"}:
         raise LifeInputError("LIFE_UNKNOWN_FIELD")
     query = text(data.get("query"), maximum=4096)
@@ -89,7 +92,11 @@ def recall(
     if as_of is not None and not isinstance(as_of, str):
         raise LifeInputError("LIFE_AS_OF_INVALID")
     trigger = data.get("trigger", "explicit_question")
-    if trigger not in {"explicit_question", "selected_context", "calendar"}:
+    if not isinstance(trigger, str) or trigger not in {
+        "explicit_question",
+        "selected_context",
+        "calendar",
+    }:
         raise LifeInputError("LIFE_TRIGGER_INVALID")
     versions = temporal_versions(store, events, scopes=scopes, as_of=as_of, now=now)
     selected_id = data.get("entity_id")
@@ -101,15 +108,15 @@ def recall(
             if e.event_id == selected_id
             or any(e.source_id + ":" + entity.entity_id == selected_id for entity in e.entities)
         )
-    matched = rank(versions, query, data.get("limit", 5))
+    matched = rank(versions, query, integer(data.get("limit", 5), "LIFE_LIMIT_INVALID"))
     journal = LifeJournal(store)
     current = {e.event_id: e for e in events}
-    hits = []
+    hits: list[RecallHit] = []
     for event in matched:
         if event.source_id not in source_ids or not set(event.scopes).issubset(scopes):
             raise LifeInputError("LIFE_SOURCE_NOT_ALLOWED")
         # Verify referenced original bytes before presenting them as evidence.
-        store.evidence(event.event_id, scopes=scopes, now=now, revision=event.revision)
+        _ = store.evidence(event.event_id, scopes=scopes, now=now, revision=event.revision)
         hits.append(
             {
                 "event_id": event.event_id,

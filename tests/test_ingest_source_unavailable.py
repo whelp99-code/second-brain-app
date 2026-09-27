@@ -1,8 +1,13 @@
 import sqlite3
+from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
 
+import pytest
+from pydantic import TypeAdapter
+
 from sb.config import Config
+from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.contracts import SourceRef
 from sb.pipeline import run_ingest
 from sb.store.ledger import load_ledger_tables
@@ -13,13 +18,13 @@ class _DriverError(Exception):
 
 
 class _Down:
-    source_id = "down"
-    accepted_adapters = frozenset({"down-adapter"})
+    source_id: str = "down"
+    accepted_adapters: frozenset[str] = frozenset({"down-adapter"})
 
     def __init__(self) -> None:
-        self.scans = 0
+        self.scans: int = 0
 
-    def scan(self, cursor: str | None):
+    def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         self.scans += 1
         _ = cursor
         raise _DriverError("password=secret")
@@ -29,10 +34,10 @@ class _Down:
 
 
 class _Notes:
-    source_id = "notes"
-    accepted_adapters = frozenset({"notes-adapter"})
+    source_id: str = "notes"
+    accepted_adapters: frozenset[str] = frozenset({"notes-adapter"})
 
-    def scan(self, cursor: str | None):
+    def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         _ = cursor
         yield SourceRef("notes", "good", "v1"), b"sibling note", {"relative_path": "good.md"}
 
@@ -54,14 +59,16 @@ def _config(tmp_path: Path) -> Config:
     )
 
 
-def _install(monkeypatch, down: _Down, notes: _Notes) -> None:
+def _install(monkeypatch: pytest.MonkeyPatch, down: _Down, notes: _Notes) -> None:
+    def discover(_config: Config) -> dict[str, SourceAdapter]:
+        return {"down-adapter": down, "notes-adapter": notes}
     monkeypatch.setattr(
         "sb.connectors.discover_adapters",
-        lambda config: {"down-adapter": down, "notes-adapter": notes},
+        discover,
     )
 
 
-def test_connection_error_does_not_abort_sibling_source(tmp_path: Path, monkeypatch) -> None:
+def test_connection_error_does_not_abort_sibling_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     down, notes = _Down(), _Notes()
     _install(monkeypatch, down, notes)
     config = _config(tmp_path)
@@ -78,7 +85,7 @@ def test_connection_error_does_not_abort_sibling_source(tmp_path: Path, monkeypa
 
 
 def test_connection_error_does_not_advance_cursor_and_is_visible(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     down, notes = _Down(), _Notes()
     _install(monkeypatch, down, notes)
@@ -91,7 +98,10 @@ def test_connection_error_does_not_advance_cursor_and_is_visible(
     ]
     log = (root / ".sb/runs.log").read_text(encoding="utf-8")
     with closing(sqlite3.connect(root / ".sb/ledger.db")) as db:
-        raw = "\n".join(str(row) for row in db.execute("SELECT * FROM source_item"))
+        rows = TypeAdapter[list[tuple[str | int | float | bytes | None, ...]]](
+            list[tuple[str | int | float | bytes | None, ...]],
+        ).validate_python(db.execute("SELECT * FROM source_item").fetchall(), strict=True)
+        raw = "\n".join(str(row) for row in rows)
     second = run_ingest(config, ("down",))
     assert tables.cursors.get("down") is None
     assert unavailable[0].source_version == "_DriverError"

@@ -14,7 +14,9 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import islice
 from pathlib import Path
-from typing import Final, Protocol, TypedDict, cast, runtime_checkable
+from typing import Final, Protocol, cast, runtime_checkable
+
+from typing_extensions import TypedDict
 
 from sb.config import APP_ROOT, default_knowledge_registry_path, validate_search_min_similarity
 from sb.knowledge_registry import (
@@ -34,7 +36,8 @@ _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
 _INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
 # Version includes indexed text semantics, not only SQLite columns.
-_INDEX_SCHEMA_VERSION: Final = "4"
+INDEX_SCHEMA_VERSION: Final = "4"
+_INDEX_SCHEMA_VERSION: Final = INDEX_SCHEMA_VERSION
 _REQUIRED_DOCS_COLUMNS: Final = (
     "page_id",
     "section",
@@ -56,7 +59,7 @@ _REFERENCE_SCOPE: Final = "reference"
 _ALL_SCOPE: Final = "all"
 
 
-class SearchHitDict(TypedDict):
+class SearchHitDict(TypedDict, closed=True):
     page_id: str
     section: str
     snippet: str
@@ -535,7 +538,7 @@ def _create_schema(conn: sqlite3.Connection) -> None:
     _set_meta(conn, "schema_version", _INDEX_SCHEMA_VERSION)
 
 
-def _backup_index(db_path: Path) -> None:
+def backup_index(db_path: Path) -> None:
     if not db_path.is_file():
         return
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -664,7 +667,7 @@ def _refresh(db_path: Path, root: Path, registry: KnowledgeRegistry) -> None:
             previous = _meta(conn, "git_head")
             previous_fp = _meta(conn, "registry_fp")
         if not current_schema:
-            _backup_index(db_path)
+            backup_index(db_path)
             _rebuild_atomic(db_path, root, current, registry)
             return
         if current is None:
@@ -886,3 +889,6 @@ def _strip_frontmatter(text: str) -> str:
     if end < 0:
         return text
     return rest[end + 4 :].lstrip("\n")
+
+
+_backup_index = backup_index

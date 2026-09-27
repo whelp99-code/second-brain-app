@@ -19,6 +19,7 @@ from sb.connectors.fs_safety import (
     SourceFilesystemLimits,
 )
 from sb.contracts import SourceRef
+from sb.life_json import decode_json
 
 ADAPTER_ID: Final = "life-records"
 ADAPTERS = frozenset({ADAPTER_ID, "life-events"})
@@ -30,15 +31,15 @@ class _Config(Protocol):
 
 
 class LifeRecordsAdapter:
-    accepted_adapters = ADAPTERS
-    supports_life_events = True
+    accepted_adapters: frozenset[str] = ADAPTERS
+    supports_life_events: bool = True
 
     def __init__(self, root: Path, source_id: str, format: str, timezone: str):
-        self.root = root
-        self.source_id = source_id
-        self.life_format = format
-        self.life_timezone = timezone
-        self._next = "0"
+        self.root: Path = root
+        self.source_id: str = source_id
+        self.life_format: str = format
+        self.life_timezone: str = timezone
+        self._next: str = "0"
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         if not self.root.exists():
@@ -46,9 +47,9 @@ class LifeRecordsAdapter:
             self._next = cursor or "0"
             return
         try:
-            previous = json.loads(cursor) if cursor and cursor != "0" else {}
+            previous = decode_json(cursor) if cursor and cursor != "0" else {}
             if not isinstance(previous, dict) or any(
-                not isinstance(k, str) or not isinstance(v, str) for k, v in previous.items()
+                not isinstance(v, str) for v in previous.values()
             ):
                 raise ValueError
         except (ValueError, TypeError, RecursionError):
@@ -78,7 +79,7 @@ class LifeRecordsAdapter:
             )
             self._next = cursor or "0"
             return
-        current = {}
+        current: dict[str, str] = {}
         for skipped in scan.skipped:
             yield (
                 SourceRef(self.source_id, skipped.relative_path, "quarantined"),

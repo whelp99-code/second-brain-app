@@ -7,18 +7,27 @@ source digest, live receipt row, unexpired retention and readable CAS evidence.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Final
 from uuid import UUID
 
 import yaml
+from pydantic import TypeAdapter
 
 from sb.config import Config, load_config
 from sb.life_config import policies
 from sb.life_contracts import LifeInputError
+from sb.life_decode import decode_event
 from sb.life_values import instant
 from sb.life_views import source_uri
-from sb.store.life import _decode, read_life_store
+from sb.parsers.structured import LooseValue
+from sb.store.life import read_life_store
+from sb.store.life_rows import one, string
+
+_YAML_VALUE: Final = TypeAdapter[LooseValue](LooseValue)
+_LOAD_YAML: Final[Callable[[str], LooseValue]] = yaml.safe_load
 
 PREFIX = "wiki/life-event-"
 
@@ -50,15 +59,16 @@ def allowed(
     clock = now or datetime.now(UTC)
     try:
         with read_life_store(root) as store:
-            row = store.connection.execute(
+            row = one(
+                store.connection,
                 "SELECT r.body_json,r.body_digest,e.deleted,e.expires_at FROM life_events e "
-                "JOIN life_event_revisions r ON r.event_id=e.event_id AND r.revision=e.current_revision "
-                "WHERE e.event_id=?",
+                + "JOIN life_event_revisions r ON r.event_id=e.event_id AND r.revision=e.current_revision "
+                + "WHERE e.event_id=?",
                 (identity,),
-            ).fetchone()
-            if row is None or row[2] or instant(row[3]) <= clock:
+            )
+            if row is None or row[2] or instant(string(row[3])) <= clock:
                 return False
-            event = _decode((row[0], row[1]))
+            event = decode_event((row[0], row[1]))
             if store.cas.is_tombstoned(event.raw_digest) or not store.cas.exists(event.raw_digest):
                 return False
         cfg = config
@@ -84,14 +94,17 @@ def allowed(
             parts = content.split("\n---", 2)
             if len(parts) < 2:
                 return False
-            metadata = yaml.safe_load(parts[0][4:])
-            if not isinstance(metadata, dict) or not isinstance(metadata.get("sources"), list):
+            metadata = _YAML_VALUE.validate_python(_LOAD_YAML(parts[0][4:]), strict=True)
+            if not isinstance(metadata, dict):
+                return False
+            sources = metadata.get("sources")
+            if not isinstance(sources, list):
                 return False
             if not any(
                 isinstance(source, dict)
                 and source.get("hash") == event.raw_digest
                 and source.get("origin") == event.source_id + ":" + source_uri(event)
-                for source in metadata["sources"]
+                for source in sources
             ):
                 return False
         return True

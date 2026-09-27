@@ -4,31 +4,36 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
+from typing import override
 
 import anyio
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from mcp.client import Client
+from pytest import MonkeyPatch
 
 from sb.access_claims import access_request_digest
 from sb.config import Config, TomlValue
 from sb.delegations import create_read_fence
-from sb.effect_values import canonical_bytes, format_instant
+from sb.effect_values import JsonObject, canonical_bytes, format_instant
 from sb.effect_write_values import model_object
+from sb.generations import Generation
 from sb.mcp import build_server
+from tests.mcp_test_support import json_content
+from tests.task30_restore_factory import RestoreFixture
 from tests.test_access_claims import KEY, signed
 
 NEXT = Ed25519PrivateKey.from_private_bytes(bytes(range(32, 64)))
 
 
-def signed_next(body):
+def signed_next(body: JsonObject) -> JsonObject:
     value = {key: value for key, value in body.items() if key != "signature"}
     value["signature"] = base64.urlsafe_b64encode(NEXT.sign(
         b"orca-jarvis/memory-access-claim/v1\0" + canonical_bytes(value))).rstrip(b"=").decode()
     return value
 
 
-def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
+def check_restored_mcp(fixture: RestoreFixture, generation: Generation, page_id: str, keep: str, monkeypatch: MonkeyPatch) -> None:
     executor = fixture.executor
     now = fixture.request.now
     executor.generations.activate(generation, executor.generations.active(), now)
@@ -48,7 +53,9 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
     config = Config(raw=config_raw)
     class FrozenDate(datetime):
         @classmethod
-        def now(cls, tz=None):
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
             return now
     monkeypatch.setattr('sb.mcp.datetime', FrozenDate)
     monkeypatch.setenv('SB_MCP_CONTRACT_PROFILE', 'scoped-record-read-v5')
@@ -65,13 +72,15 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
         'read_fence_digest': fence.fence_digest, 'issued_at': format_instant(now),
         'expires_at': format_instant(now + timedelta(seconds=30)), 'nonce': 'nonce:restore-claim',
         'signing_key_id': 'key:test'})
-    async def run():
+    async def run() -> None:
         async with Client(build_server(config=config), mode='legacy', cache=None) as client:
             args = {'id': page_id, 'read_fence': model_object(fence), 'access_claim': claim}
             allowed = await client.call_tool('sb_read_page', args)
             assert not allowed.is_error, allowed
-            assert keep in str(allowed.structured_content)
-            assert allowed.structured_content['page_access']['complete'] is True
+            assert keep in str(json_content(allowed))
+            page_access = json_content(allowed)['page_access']
+            assert isinstance(page_access, dict)
+            assert page_access['complete'] is True
             for changes in ({'projects': ['project:b']}, {'policy_revision': 'policy:2'},
                             {'principal_id': 'principal:other'},
                             {'expires_at': format_instant(now)}):
@@ -83,9 +92,9 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
             assert revoked.is_error
             assert keep not in str(revoked)
     anyio.run(run)
-    config_raw.pop('revoked_jarvis_signing_key_ids')
+    _ = config_raw.pop('revoked_jarvis_signing_key_ids')
     path = root / 'restore-stdio-config.json'
-    path.write_text(json.dumps({'config': config.raw, 'now': now.isoformat()}))
+    _ = path.write_text(json.dumps({'config': config.raw, 'now': now.isoformat()}))
 
     env = {**os.environ, 'SB_MCP_CONTRACT_PROFILE': 'scoped-record-read-v5'}
     for _ in range(2):
@@ -110,12 +119,12 @@ def check_restored_mcp(fixture, generation, page_id, keep, monkeypatch):
         'read_fence_digest': fence_next.fence_digest, 'issued_at': format_instant(now),
         'expires_at': format_instant(now + timedelta(seconds=30)), 'nonce': 'nonce:restore-claim-next',
         'signing_key_id': 'key:next'})
-    async def run_next():
+    async def run_next() -> None:
         async with Client(build_server(config=config), mode='legacy', cache=None) as client:
             recovered = await client.call_tool('sb_read_page', {
                 'id': page_id, 'read_fence': model_object(fence_next), 'access_claim': claim_next})
             assert not recovered.is_error, recovered
-            assert keep in str(recovered.structured_content)
+            assert keep in str(json_content(recovered))
             stale = await client.call_tool('sb_read_page', {
                 'id': page_id, 'read_fence': model_object(fence), 'access_claim': claim})
             assert stale.is_error

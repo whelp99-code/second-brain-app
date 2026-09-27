@@ -2,21 +2,29 @@
 
 from dataclasses import replace
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
+from sb.config import Config
 from sb.life_config import settings
 from sb.life_contracts import LifeInputError
 from sb.life_http import LifeActor, read_endpoint
 from sb.life_values import parse_event
 from sb.life_views import brief, obsidian_manifest, timeline
 from sb.pipeline import run_life_batch
+from tests import test_web
+from tests.life_test_support import (
+    config_table,
+    json_rows,
+    json_text,
+)
+from tests.life_test_support import request as _request
 from tests.test_life_contracts import NOW, payload, policy
 from tests.test_life_pipeline import item, life_config
-from tests.test_web import _request, _running
 
 
-def test_source_policy_revision_invalidates_prior_reads(tmp_path):
+def test_source_policy_revision_invalidates_prior_reads(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     outcome, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
     assert outcome.exit_code == 0
@@ -35,24 +43,31 @@ def test_source_policy_revision_invalidates_prior_reads(tmp_path):
     )
     actor = LifeActor(("test-notes",), ("principal:owner",), False)
     with pytest.raises(LifeInputError, match="NOT_FOUND"):
-        read_endpoint(
-            changed, root, actor, "/api/life/v1/events/" + receipts[0]["event_id"], now=NOW
+        _ = read_endpoint(
+            changed,
+            root,
+            actor,
+            "/api/life/v1/events/" + json_text(receipts[0]["event_id"]),
+            now=NOW,
         )
     view = read_endpoint(
         changed, root, actor, "/api/life/v1/views/obsidian/manifest?day=2026-09-26", now=NOW
     )
-    assert all(receipts[0]["event_id"] not in f["path"] for f in view["files"])
+    assert all(
+        json_text(receipts[0]["event_id"]) not in json_text(f["path"])
+        for f in json_rows(view["files"])
+    )
 
 
 @pytest.mark.parametrize("event_type", ["health_sample", "location_point"])
-def test_sensor_flag_off_blocks_general_capture_route(tmp_path, event_type):
+def test_sensor_flag_off_blocks_general_capture_route(tmp_path: Path, event_type: str) -> None:
     config, _ = life_config(tmp_path)
     config = replace(
         config,
         raw={
             **config.raw,
             "life": {
-                **config.raw["life"],
+                **config_table(config.raw["life"]),
                 "sources": {
                     "test-notes": {
                         "enabled": True,
@@ -64,17 +79,16 @@ def test_sensor_flag_off_blocks_general_capture_route(tmp_path, event_type):
         },
     )
     with pytest.raises(LifeInputError, match="FEATURE_DISABLED"):
-        run_life_batch(config, "test-notes", [item(event_type=event_type)], now=NOW)
+        _ = run_life_batch(config, "test-notes", [item(event_type=event_type)], now=NOW)
 
 
-def test_new_flags_and_client_mutations_default_off(tmp_path):
-    from sb.config import Config
+def test_new_flags_and_client_mutations_default_off() -> None:
 
     assert not settings(Config()).flags
     assert not settings(Config()).client_can_write
 
 
-def test_read_only_client_cannot_mutate(tmp_path, monkeypatch):
+def test_read_only_client_cannot_mutate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config, _ = life_config(tmp_path)
     monkeypatch.setenv("SB_WEB_TOKEN", "synthetic-admin-token")
     token = "synthetic-read-only-token-123456789012345"
@@ -85,13 +99,13 @@ def test_read_only_client_cannot_mutate(tmp_path, monkeypatch):
             **config.raw,
             "web": {"token_env": "SB_WEB_TOKEN"},
             "life": {
-                **config.raw["life"],
+                **config_table(config.raw["life"]),
                 "client_token_env": "SB_TEST_LIFE_TOKEN",
                 "client_source_ids": ["test-notes"],
             },
         },
     )
-    with _running(config) as base:
+    with test_web.running(config) as base:
         code, health = _request(base + "/api/life/v1/health", token=token)
         assert code == 200 and health["credential_kind"] == "life_client"
         code, _ = _request(
@@ -103,7 +117,7 @@ def test_read_only_client_cannot_mutate(tmp_path, monkeypatch):
         assert code == 403
 
 
-def test_safe_manifest_text_and_content_hashes():
+def test_safe_manifest_text_and_content_hashes() -> None:
     event = parse_event(
         payload(
             body="<script>bad</script> ![track](https://evil.invalid/x) token=synthetic-secret"
@@ -120,7 +134,7 @@ def test_safe_manifest_text_and_content_hashes():
         assert not row["path"].startswith("MyNotes/")
 
 
-def test_sensor_event_excluded_from_default_obsidian_view():
+def test_sensor_event_excluded_from_default_obsidian_view() -> None:
     secret_policy = replace(policy(), allowed_types=("health_sample",), sensitivity="restricted")
     event = parse_event(
         payload(event_type="health_sample", title="private-health"), secret_policy, recorded_at=NOW
@@ -130,7 +144,7 @@ def test_sensor_event_excluded_from_default_obsidian_view():
     assert all(event.event_id not in row["path"] for row in view["files"])
 
 
-def test_unknown_time_stays_undated_and_cancelled_is_not_completed():
+def test_unknown_time_stays_undated_and_cancelled_is_not_completed() -> None:
     undated = parse_event(
         payload(occurred_start=None, time_precision="unknown"), policy(), recorded_at=NOW
     )
@@ -148,6 +162,6 @@ def test_unknown_time_stays_undated_and_cancelled_is_not_completed():
     assert cards["delivery_state"] == "not_attempted"
 
 
-def test_newline_in_title_cannot_inject_a_heading():
+def test_newline_in_title_cannot_inject_a_heading() -> None:
     with pytest.raises(LifeInputError, match="TITLE_INVALID"):
-        parse_event(payload(title="one\n# claimed authority"), policy(), recorded_at=NOW)
+        _ = parse_event(payload(title="one\n# claimed authority"), policy(), recorded_at=NOW)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from sb.config import Config
+from sb.config import Config, TomlValue
 from sb.life_contracts import LifeInputError, SourcePolicyV1
 from sb.life_values import zone
 
@@ -58,14 +58,14 @@ class LifeSettingsV1:
             raise LifeInputError("LIFE_FEATURE_DISABLED")
 
 
-def _mapping(config: Config) -> Mapping[str, object]:
+def _mapping(config: Config) -> Mapping[str, TomlValue]:
     raw = config.raw.get("life", {})
     if not isinstance(raw, Mapping) or set(raw) - _ALLOWED:
         raise LifeInputError("LIFE_CONFIG_INVALID")
     return raw
 
 
-def _integer(raw: Mapping, name: str, default: int, lower: int, upper: int) -> int:
+def _integer(raw: Mapping[str, TomlValue], name: str, default: int, lower: int, upper: int) -> int:
     value = raw.get(name, default)
     if type(value) is not int or not lower <= value <= upper:
         raise LifeInputError("LIFE_CONFIG_INVALID")
@@ -84,7 +84,8 @@ def settings(config: Config) -> LifeSettingsV1:
     ):
         raise LifeInputError("LIFE_CONFIG_INVALID")
     clients = raw.get("client_source_ids", [])
-    if type(raw.get("client_can_write", False)) is not bool:
+    can_write = raw.get("client_can_write", False)
+    if type(can_write) is not bool:
         raise LifeInputError("LIFE_CONFIG_INVALID")
     sensitivities = raw.get("view_sensitivities", ["public", "personal"])
     if not isinstance(clients, list) or any(not isinstance(s, str) for s in clients):
@@ -104,9 +105,9 @@ def settings(config: Config) -> LifeSettingsV1:
         quiet_end=_integer(raw, "quiet_end", 8, 0, 23),
         daily_model_calls=_integer(raw, "daily_model_calls", 20, 0, 10000),
         client_token_env=token_env,
-        client_source_ids=tuple(clients),
-        client_can_write=raw.get("client_can_write", False),
-        view_sensitivities=tuple(sensitivities),
+        client_source_ids=tuple(s for s in clients if isinstance(s, str)),
+        client_can_write=can_write,
+        view_sensitivities=tuple(s for s in sensitivities if isinstance(s, str)),
     )
 
 
@@ -115,10 +116,10 @@ def policies(config: Config, *, owner: str = "principal:owner") -> dict[str, Sou
     if not isinstance(raw, Mapping):
         raise LifeInputError("LIFE_CONFIG_INVALID")
     access = config.source_access
-    result = {}
+    result: dict[str, SourcePolicyV1] = {}
     allowed = {"enabled", "allowed_types", "sensitivity", "external_processing", "retention_days"}
     for name, value in raw.items():
-        if not isinstance(name, str) or not isinstance(value, Mapping) or set(value) - allowed:
+        if not isinstance(value, Mapping) or set(value) - allowed:
             raise LifeInputError("LIFE_CONFIG_INVALID")
         binding = access.get(name)
         if binding is None:
@@ -128,14 +129,26 @@ def policies(config: Config, *, owner: str = "principal:owner") -> dict[str, Sou
         types = value.get("allowed_types", ["note_saved", "link_saved"])
         if not isinstance(types, list) or any(not isinstance(t, str) for t in types):
             raise LifeInputError("LIFE_CONFIG_INVALID")
+        enabled = value.get("enabled", False)
+        sensitivity = value.get("sensitivity", "personal")
+        processing = value.get("external_processing", "local_only")
+        retention = value.get("retention_days", 365)
+        if type(enabled) is not bool:
+            raise LifeInputError("LIFE_POLICY_INVALID")
+        if not isinstance(sensitivity, str):
+            raise LifeInputError("LIFE_SENSITIVITY_INVALID")
+        if not isinstance(processing, str):
+            raise LifeInputError("LIFE_PROCESSING_POLICY_INVALID")
+        if type(retention) is not int:
+            raise LifeInputError("LIFE_RETENTION_INVALID")
         result[name] = SourcePolicyV1(
             source_id=name,
             scopes=(binding.owner, *binding.projects),
-            enabled=value.get("enabled", False),
-            allowed_types=tuple(types),
-            sensitivity=value.get("sensitivity", "personal"),
-            external_processing=value.get("external_processing", "local_only"),
-            retention_days=value.get("retention_days", 365),
+            enabled=enabled,
+            allowed_types=tuple(t for t in types if isinstance(t, str)),
+            sensitivity=sensitivity,
+            external_processing=processing,
+            retention_days=retention,
             policy_revision=binding.policy_revision,
         )
     return result

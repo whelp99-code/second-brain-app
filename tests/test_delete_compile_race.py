@@ -11,13 +11,14 @@ import pytest
 from sb.generation_locks import GenerationWriterBusy, generation_writer
 from sb.search import SearchIndex
 from sb.vault import Vault
-from tests.test_web import TERM, _ready
+from tests.test_web import TERM
+from tests.test_web import ready as _ready
 
 
 def test_second_writer_is_busy_while_forget_lock_held(tmp_path: Path) -> None:
     lock = tmp_path / "state" / "generation.lock"
     lock.parent.mkdir(parents=True)
-    lock.write_bytes(b"")
+    _ = lock.write_bytes(b"")
     with generation_writer(lock, blocking=True):  # noqa: SIM117
         with pytest.raises(GenerationWriterBusy, match="GENERATION_WRITER_BUSY"):
             with generation_writer(lock, blocking=False):
@@ -37,7 +38,7 @@ def test_subprocess_writers_serialize_then_forget_wins(tmp_path: Path) -> None:
     lock = tmp_path / "state" / "generation.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)
     if not lock.exists():
-        lock.write_bytes(b"")
+        _ = lock.write_bytes(b"")
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
     first = subprocess.Popen(
         [sys.executable, "-c", (

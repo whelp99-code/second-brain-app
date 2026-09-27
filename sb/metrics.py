@@ -14,8 +14,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, cast
 
+from typing_extensions import TypedDict
+
 MAX_METRICS_BYTES: Final = 10 * 1024 * 1024
 KEEP_ROWS: Final = 10_000
+
+
+class MetricSummaryDict(TypedDict, closed=True):
+    total: int
+    failures: int
+    commands: dict[str, int]
+    average_ms: float
+    p95_ms: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +36,7 @@ class MetricSummary:
     average_ms: float
     p95_ms: float
 
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> MetricSummaryDict:
         return {
             "total": self.total,
             "failures": self.failures,

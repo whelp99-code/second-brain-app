@@ -38,6 +38,7 @@ from sb.generations import Generation, GenerationStore
 from sb.inbox import parse_remember, publish_inbox
 from sb.provider_lifecycle import MaintenanceResult, ProviderLifecycle
 from sb.request_store import RequestStore
+from sb.sqlite_values import OPTIONAL_INTEGER_ROW
 from sb.store.ledger import Ledger, migrate_ledger
 from sb.vault import init_vault
 
@@ -115,12 +116,12 @@ class GenerationMutationService:
             return 0
         uri = db.resolve().as_uri() + "?mode=ro"
         with sqlite3.connect(uri, uri=True) as connection:
-            failed = connection.execute(
+            failed = OPTIONAL_INTEGER_ROW.validate_python(connection.execute(
                 "SELECT count(*) FROM derivation WHERE stage='brief' AND status='failed'",
-            ).fetchone()
-            done = connection.execute(
+            ).fetchone(), strict=True)
+            done = OPTIONAL_INTEGER_ROW.validate_python(connection.execute(
                 "SELECT count(*) FROM derivation WHERE stage='brief' AND status='done'",
-            ).fetchone()
+            ).fetchone(), strict=True)
         if failed is None or done is None or failed[0] == 0 or done[0] == 0:
             return 0
         result = self.mutate(

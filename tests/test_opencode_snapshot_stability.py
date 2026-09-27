@@ -1,34 +1,35 @@
 import json
+from pathlib import Path
 
 import pytest
 
 from sb.connectors.sessions_opencode import OpenCodeSessionsAdapter
 
 
-def write(path, text):
-    path.write_text(json.dumps({'parts': [
+def write(path: Path, text: str):
+    _ = path.write_text(json.dumps({'parts': [
         {'id': 'part', 'data': {'type': 'text', 'text': text}}]}))
 
 
 @pytest.mark.parametrize('replace', [False, True])
-def test_changed_snapshot_during_read_is_retried_without_partial_publication(tmp_path, monkeypatch,
-                                                                          replace):
+def test_changed_snapshot_during_read_is_retried_without_partial_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                                          replace: bool):
     path = tmp_path / 'snapshot.json'
     write(path, 'before')
     adapter = OpenCodeSessionsAdapter((tmp_path,), 'fixture')
-    original = adapter._read_snapshot
+    original = adapter.read_snapshot
 
-    def changed(path, rel, size):
+    def changed(path: Path, rel: str, size: int):
         rows = original(path, rel, size)
         if replace:
             replacement = path.with_suffix('.new')
             write(replacement, 'after!')
-            replacement.replace(path)
+            _ = replacement.replace(path)
         else:
             write(path, 'after!')
         return rows
 
-    monkeypatch.setattr(adapter, '_read_snapshot', changed)
+    monkeypatch.setattr(adapter, 'read_snapshot', changed)
     rows = list(adapter.scan(None))
     assert len(rows) == 1
     metadata = dict(rows[0][2])
@@ -36,7 +37,7 @@ def test_changed_snapshot_during_read_is_retried_without_partial_publication(tmp
     assert rows[0][1] == b''
     cursor = adapter.next_cursor()
     assert json.loads(cursor)['snapshot.json'] == 0
-    monkeypatch.setattr(adapter, '_read_snapshot', original)
+    monkeypatch.setattr(adapter, 'read_snapshot', original)
     recovered = list(adapter.scan(cursor))
     assert len(recovered) == 1 and recovered[0][1] == b'after!'
     assert list(adapter.scan(adapter.next_cursor())) == []

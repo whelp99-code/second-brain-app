@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -9,20 +8,26 @@ from sb.request_executor import RequestExecutor
 from sb.scoped_request_acceptance import accept_scoped_request
 from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1
+from sb.task30_barriers import BarrierEvent
+from tests.json_fixtures import parse_object
 from tests.task30_process_harness import executor_config
 
 
-def fixture(tmp_path):
-    raw = json.loads((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
-    now = datetime.fromisoformat(raw["created_at"])
+def fixture(tmp_path: Path):
+    raw = parse_object((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
+    created_at = raw["created_at"]
+    assert isinstance(created_at, str)
+    now = datetime.fromisoformat(created_at)
     config = executor_config(tmp_path)
     accepted = accept_scoped_request(config.request_root, raw, expected_provider=config.provider_instance_id,
         clock=lambda: now, validate_authority=lambda _: True)
     return raw, now, config, accepted
 
 
-def test_internal_v4_execution_proves_and_preserves_scoped_records(tmp_path):
+def test_internal_v4_execution_proves_and_preserves_scoped_records(tmp_path: Path):
     raw, now, config, accepted = fixture(tmp_path)
+    expires_at = raw["expires_at"]
+    assert isinstance(expires_at, str)
     executor = RequestExecutor(config, scoped_authority=lambda _: True)
     try:
         result = executor.apply_once(worker="fixture:worker", now=now)
@@ -30,13 +35,17 @@ def test_internal_v4_execution_proves_and_preserves_scoped_records(tmp_path):
         status = executor.store.get(accepted.request_id)
         assert status is not None
         assert status.proof_json is not None
-        proof = json.loads(status.proof_json)
+        proof = parse_object(status.proof_json)
         assert proof["schema_version"] == 4
         assert proof["request_id"] == accepted.request_id
         assert proof["request_digest"] == raw["request_digest"]
-        assert proof["scope_digest"] == raw["preparation"]["binding"]["identity_digest"]
+        preparation = raw["preparation"]
+        assert isinstance(preparation, dict)
+        binding = preparation["binding"]
+        assert isinstance(binding, dict)
+        assert proof["scope_digest"] == binding["identity_digest"]
         generation = executor.generations.active()
-        manifest = json.loads((generation.root / "generation.json").read_text())
+        manifest = parse_object((generation.root / "generation.json").read_text())
         identity = GenerationIdentityV1(*(str(manifest[k]) for k in (
             "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
         page_id = next((generation.root / "wiki").glob("*.md")).stem
@@ -53,10 +62,10 @@ def test_internal_v4_execution_proves_and_preserves_scoped_records(tmp_path):
 
 
 @pytest.mark.parametrize("tamper", [False, True])
-def test_execution_denies_revoked_authority_or_changed_envelope(tmp_path, tamper):
+def test_execution_denies_revoked_authority_or_changed_envelope(tmp_path: Path, tamper: bool):
     _, now, config, accepted = fixture(tmp_path)
     if tamper:
-        (config.request_root / accepted.inbox_path).write_bytes(b"{}\n")
+        _ = (config.request_root / accepted.inbox_path).write_bytes(b"{}\n")
     executor = RequestExecutor(config, scoped_authority=lambda _: tamper)
     try:
         result = executor.apply_once(worker="fixture:worker", now=now)
@@ -69,11 +78,13 @@ def test_execution_denies_revoked_authority_or_changed_envelope(tmp_path, tamper
         executor.close()
 
 
-def test_expired_request_cannot_start_despite_a_true_authority_callback(tmp_path):
+def test_expired_request_cannot_start_despite_a_true_authority_callback(tmp_path: Path):
     raw, _, config, accepted = fixture(tmp_path)
+    expires_at = raw["expires_at"]
+    assert isinstance(expires_at, str)
     executor = RequestExecutor(config, scoped_authority=lambda _: True)
     try:
-        result = executor.apply_once(worker="fixture:worker", now=datetime.fromisoformat(raw["expires_at"]))
+        result = executor.apply_once(worker="fixture:worker", now=datetime.fromisoformat(expires_at))
         assert result.state == "failed" and result.code == "SCOPED_WRITE_REQUEST_EXPIRED"
         assert not executor.generations.active_link.exists()
         status = executor.store.get(accepted.request_id)
@@ -83,11 +94,11 @@ def test_expired_request_cannot_start_despite_a_true_authority_callback(tmp_path
         executor.close()
 
 
-def test_revocation_after_sealing_prevents_activation(tmp_path):
+def test_revocation_after_sealing_prevents_activation(tmp_path: Path):
     _, now, config, accepted = fixture(tmp_path)
     authorized = [True]
     class Revoke:
-        def reach(self, event):
+        def reach(self, event: BarrierEvent) -> None:
             if event.barrier_id.value == "sealed_manifest":
                 authorized[0] = False
     executor = RequestExecutor(config, scoped_authority=lambda _: authorized[0], barrier_sink=Revoke())
@@ -105,12 +116,14 @@ def test_revocation_after_sealing_prevents_activation(tmp_path):
 
 @pytest.mark.parametrize("barrier", ["sealed_manifest", "pointer_parent_fsync"])
 @pytest.mark.parametrize("reason", ["expired", "revoked"])
-def test_crash_recovery_distinguishes_applied_result_from_new_write(tmp_path, monkeypatch, barrier, reason):
+def test_crash_recovery_distinguishes_applied_result_from_new_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, barrier: str, reason: str):
     import subprocess
     import sys
     from datetime import timedelta
 
     raw, now, config, accepted = fixture(tmp_path)
+    expires_at = raw["expires_at"]
+    assert isinstance(expires_at, str)
     child = '''
 import os, sys
 from datetime import datetime
@@ -128,9 +141,13 @@ executor.apply_once(worker="fixture:crash", now=datetime.fromisoformat(sys.argv[
     process = subprocess.run([sys.executable, "-c", child, str(tmp_path), now.isoformat(), barrier],
         timeout=40, check=False)
     assert process.returncode == 73
-    later = datetime.fromisoformat(raw["expires_at"]) if reason == "expired" else now + timedelta(seconds=2)
+    later = datetime.fromisoformat(expires_at) if reason == "expired" else now + timedelta(seconds=2)
     executor = RequestExecutor(config, scoped_authority=lambda _: reason != "revoked")
-    def no_new_materialization(*args, **kwargs):
+    def no_new_materialization(
+        _root: Path, *, content: str, candidate_id: str, created_at: str, release_sha: str,
+        sensitivity: str = "personal", source_access: SourceAccess | None = None,
+    ) -> None:
+        del content, candidate_id, created_at, release_sha, sensitivity, source_access
         pytest.fail("Recovery must never materialize a new memory")
     monkeypatch.setattr("sb.request_executor.materialize_remember", no_new_materialization)
     try:
@@ -147,10 +164,14 @@ executor.apply_once(worker="fixture:crash", now=datetime.fromisoformat(sys.argv[
             status = executor.store.get(accepted.request_id)
             assert status is not None
             assert status.proof_json is not None
-            proof = json.loads(status.proof_json)
+            proof = parse_object(status.proof_json)
             assert proof["generation_id"] == generation_id
             assert proof["request_id"] == raw["request_id"]
-            assert proof["scope_digest"] == raw["preparation"]["binding"]["identity_digest"]
+            preparation = raw["preparation"]
+            assert isinstance(preparation, dict)
+            binding = preparation["binding"]
+            assert isinstance(binding, dict)
+            assert proof["scope_digest"] == binding["identity_digest"]
             assert executor.generations.active().generation_id == generation_id
             assert set(executor.generations.generations.iterdir()) == generations
             assert executor.apply_once(worker="fixture:replay", now=later).state == "idle"

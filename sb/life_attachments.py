@@ -14,6 +14,7 @@ import zipfile
 from hashlib import sha256
 from pathlib import PurePosixPath
 
+from sb.effect_values import JsonInput
 from sb.life_contracts import AttachmentRefV1, LifeInputError
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -94,19 +95,19 @@ def _signature(data: bytes, mime: str) -> bool:
         return data.startswith(b"%PDF-")
     if mime.startswith("text/") or mime == "application/json":
         try:
-            data.decode("utf-8")
+            _ = data.decode("utf-8")
             return b"\0" not in data
         except UnicodeError:
             return False
     return mime == "message/rfc822" and b"\0" not in data
 
 
-def decode_attachments(value: object) -> tuple[tuple[AttachmentRefV1, bytes], ...]:
+def decode_attachments(value: JsonInput) -> tuple[tuple[AttachmentRefV1, bytes], ...]:
     if value is None:
         return ()
     if not isinstance(value, list) or len(value) > 4:
         raise LifeInputError("LIFE_ATTACHMENT_INVALID")
-    results = []
+    results: list[tuple[AttachmentRefV1, bytes]] = []
     total = 0
     for row in value:
         if not isinstance(row, dict) or set(row) - {"name", "mime", "content_base64", "sha256"}:
@@ -120,6 +121,7 @@ def decode_attachments(value: object) -> tuple[tuple[AttachmentRefV1, bytes], ..
             or any(c in name for c in "\\/:\0\r\n")
             or name.rstrip(". ") != name
             or any(ord(c) < 32 for c in name)
+            or not isinstance(mime, str)
             or mime not in MIMES
             or not isinstance(encoded, str)
             or len(encoded) > (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
@@ -153,5 +155,5 @@ def inline(name: str, mime: str, data: bytes) -> dict[str, str]:
         "content_base64": base64.b64encode(data).decode(),
         "sha256": sha256(data).hexdigest(),
     }
-    decode_attachments([encoded])
+    _ = decode_attachments([encoded])
     return encoded

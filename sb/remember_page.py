@@ -38,7 +38,7 @@ def materialize_remember(
         return
     item = SourceItem("memory-candidate", candidate_id, content_hash, content_hash, candidate_id, candidate_id)
     with Ledger(root) as ledger, ledger.transaction():
-        ledger.upsert_source_items([item])
+        _ = ledger.upsert_source_items([item])
         # Reject scope changes before writing the page; equal retries are no-ops.
         ledger.bind_source_access(item, source_access)
         write_page()

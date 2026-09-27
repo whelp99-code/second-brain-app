@@ -297,7 +297,7 @@ class CliLLM:
             raise ValueError("invalid model attempt limit")
         self._argv_template: list[str] = list(argv_template)
         self._runner: ProcessRunner = _run_subprocess if runner is None else runner
-        self._attempt_limit = attempt_limit
+        self._attempt_limit: int = attempt_limit
 
     def generate(
         self,

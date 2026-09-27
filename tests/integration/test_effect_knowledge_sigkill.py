@@ -2,14 +2,20 @@
 import hashlib
 import multiprocessing
 import signal
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from multiprocessing.synchronize import Event
 from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from sb.bound_knowledge import BoundKnowledge
+from sb.effect_access import apply_with_prior_access
+from sb.effect_knowledge import apply_with_prior_knowledge
+from sb.effect_write_models import MemoryEffectWriteRequestV2
 from sb.effect_write_requests import accept_effect_request
+from sb.erasure import ErasureEngine
 from sb.generation_runtime_models import (
     GenerationAuthority,
     GenerationMutation,
@@ -23,7 +29,7 @@ from sb.search import SearchIndex
 from sb.source_access import SourceAccess
 from sb.store.ledger import Ledger
 from sb.targets import GenerationIdentityV1
-from sb.task30_barriers import Task30BarrierId
+from sb.task30_barriers import BarrierEvent, Task30BarrierId
 from tests.task30_effect_factory import effect_request
 
 NOW = datetime(2026, 8, 31, 0, 0, 1, tzinfo=UTC)
@@ -32,63 +38,63 @@ KEEP = '강제종료 뒤 남길 기억입니다'
 SCOPE = SourceAccess('principal:owner', ('project:a',), 'policy:1')
 
 
-def _config(root):
+def _config(root: Path) -> ExecutorConfig:
     key = Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
     return ExecutorConfig(root / 'requests', root / 'state', root / 'share', root / 'exports',
         root / 'backups', 'provider:fixture', 'a' * 40, 'provider:key', key,
         {'jarvis:fixture': key.public_key()})
 
 
-def _worker(root, ready, release, phase):
-    def block(_ledger, _state):
+def _worker(root: str, ready: Event, release: Event, phase: str) -> None:
+    def block(_ledger: Ledger | None, _state: BoundKnowledge | None) -> None:
         ready.set()
         if not release.wait(30):
             raise RuntimeError('barrier timed out')
     sink = None
     if phase == 'before_bind':
-        setattr(Ledger, 'bind_knowledge', block)  # noqa: B010
+        pytest.MonkeyPatch().setattr(Ledger, 'bind_knowledge', block)
     elif phase == 'after_rebind':
         import sb.request_executor as module
-        original = module.apply_with_prior_knowledge
+        original = apply_with_prior_knowledge
 
-        def after_rebind(path, apply):
+        def after_rebind(path: Path, apply: Callable[[], None]) -> None:
             original(path, apply)
             block(None, None)
-        module.apply_with_prior_knowledge = after_rebind
+        pytest.MonkeyPatch().setattr(module, "apply_with_prior_knowledge", after_rebind)
     elif phase == 'after_access':
         import sb.request_executor as module
-        original_access = module.apply_with_prior_access
+        original_access = apply_with_prior_access
 
-        def after_access(path, apply):
+        def after_access(path: Path, apply: Callable[[], None]) -> None:
             original_access(path, apply)
             block(None, None)
-        module.apply_with_prior_access = after_access
+        pytest.MonkeyPatch().setattr(module, "apply_with_prior_access", after_access)
     else:
         class PointerBarrier:
-            def reach(self, event):
+            def reach(self, event: BarrierEvent) -> None:
                 if event.barrier_id is Task30BarrierId.POINTER_RENAME:
                     block(None, None)
         sink = PointerBarrier()
     executor = RequestExecutor(_config(Path(root)), barrier_sink=sink)
     try:
-        executor.apply_once(now=NOW + timedelta(minutes=1), lease_ms=1)
+        _ = executor.apply_once(now=NOW + timedelta(minutes=1), lease_ms=1)
     finally:
         executor.close()
 
 
 @pytest.mark.parametrize('phase', ['before_bind', 'after_rebind', 'after_access', 'pointer_rename'])
-def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase, monkeypatch):
+def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path: Path, phase: str, monkeypatch: pytest.MonkeyPatch):
     config = _config(tmp_path)
     executor = RequestExecutor(config)
     try:
-        def seed(root):
+        def seed(root: Path) -> None:
             materialize_remember(root, content=OLD + '\n' + KEEP,
                 candidate_id='memcand:pos:v1:' + 'a' * 64, created_at=NOW.isoformat(), release_sha='a' * 40, source_access=SCOPE)
             with Ledger(root) as ledger:
                 for page in (root / 'wiki').glob('*.md'):
                     ledger.bind_knowledge(BoundKnowledge(page.relative_to(root).as_posix().removesuffix('.md'),
                         'sha256:' + hashlib.sha256(page.read_bytes()).hexdigest(), 'ACTIVE', 'APPROVED'))
-        executor.mutations.mutate(GenerationMutation('seed:sigkill', GenerationOperation.RUN, NOW,
+        _ = executor.mutations.mutate(GenerationMutation('seed:sigkill', GenerationOperation.RUN, NOW,
             GenerationAuthority(None, None), seed))
         before = executor.generations.active()
         request = effect_request(before, 'forget', OLD, NOW + timedelta(minutes=1),
@@ -115,7 +121,7 @@ def test_sigkill_during_rebind_recovers_same_deletion_request(tmp_path, phase, m
             if phase == 'pointer_rename':
                 assert published_id != before.generation_id
 
-                def repeated_effect(*args, **kwargs):
+                def repeated_effect(_engine: ErasureEngine, _root: Path, _request: MemoryEffectWriteRequestV2, _now: datetime) -> None:
                     raise AssertionError('already published effect must not run twice')
                 monkeypatch.setattr(type(recovered.erasure), 'apply', repeated_effect)
             else:

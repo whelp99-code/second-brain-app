@@ -6,23 +6,22 @@ from pathlib import Path
 import anyio
 import pytest
 from mcp.client import Client
-from pydantic import TypeAdapter
 
 import sb.mcp as mcp_module
-from sb.effect_values import JsonValue
 from sb.mcp import build_server
 from sb.mcp_contract import build_contract, canonical_bytes
 from sb.mcp_remember_contract import build_remember_contract, remember_fixture_request
 from sb.vault import init_vault
+from tests.mcp_test_support import json_content
 from tests.task30_clock import FrozenTask30DateTime
-from tests.test_mcp_profile_compatibility import _configured_runtime
+from tests.test_mcp_profile_compatibility import configured_runtime
 
 
 @pytest.mark.parametrize("profile,accepted", [("task32-schema4", False), ("remember-schema5", True), ("cancellation-schema6", True)])
 def test_only_explicit_new_profile_accepts_multiline_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, accepted: bool,
 ) -> None:
-    _configured_runtime(tmp_path, monkeypatch)
+    configured_runtime(tmp_path, monkeypatch)
     # Strict profiles use the managed runtime path, unlike the legacy fixture.
     config_path = Path(os.environ["SB_CONFIG"])
     _ = init_vault(tmp_path / "share" / "vault")
@@ -41,11 +40,11 @@ def test_only_explicit_new_profile_accepts_multiline_request(
             result = await client.call_tool("sb_write_request", {"request": request})
             assert result.is_error is not accepted
             if accepted:
-                value = TypeAdapter(JsonValue).validate_python(result.structured_content)
-                assert isinstance(value, dict) and value["schema_version"] == 3
+                value = json_content(result)
+                assert value["schema_version"] == 3
                 assert value["request_id"] == request["request_id"] and value["replayed"] is False
                 replay = await client.call_tool("sb_write_request", {"request": request})
-                observed = TypeAdapter(JsonValue).validate_python(replay.structured_content)
+                observed = json_content(replay)
                 assert observed == {**value, "replayed": True}
 
     anyio.run(exercise)

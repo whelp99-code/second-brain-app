@@ -5,15 +5,17 @@ from pathlib import Path
 import pytest
 
 from sb.connectors.sessions_claude import ClaudeSessionsAdapter
+from sb.effect_values import JsonObject, JsonValue
+from tests.json_fixtures import parse_object
 
 
-def record(role: str, content: object, uid: str = "message-1") -> dict[str, object]:
+def record(role: str, content: JsonValue, uid: str = "message-1") -> JsonObject:
     return {"type": role, "uuid": uid, "sessionId": "session-1", "message": {"role": role, "content": content}}
 
 
-def scan(tmp_path: Path, records: list[dict[str, object]]):
+def scan(tmp_path: Path, records: list[JsonObject]):
     path = tmp_path / "native.jsonl"
-    path.write_text("".join(json.dumps(value) + "\n" for value in records))
+    _ = path.write_text("".join(json.dumps(value) + "\n" for value in records))
     adapter = ClaudeSessionsAdapter((tmp_path,), "claude")
     return adapter, list(adapter.scan(None))
 
@@ -25,7 +27,7 @@ def test_native_messages_and_tool_results_keep_lineage_and_failure(tmp_path: Pat
         record("user", [{"type": "tool_result", "tool_use_id": "call-1", "is_error": True,
                           "content": [{"type": "text", "text": "exit 1"}, {"type": "image", "source": {"data": "BINARY"}}]}], "message-3")])
     assert len(rows) == 4
-    bodies = [json.loads(body) for _, body, _ in rows]
+    bodies = [parse_object(body) for _, body, _ in rows]
     assert all(body["session_id"] == "session-1" for body in bodies)
     assert bodies[0]["text"] == "점검해줘"
     assert bodies[1]["text"] == "점검 중"
@@ -49,4 +51,4 @@ def test_missing_error_flag_is_unknown_not_success_and_meta_is_ignored(tmp_path:
     _, rows = scan(tmp_path, [record("user", [{"type": "tool_result", "tool_use_id": "call-1", "content": "output"}]),
                            {**record("user", "META"), "isMeta": True}])
     assert len(rows) == 1
-    assert json.loads(rows[0][1])["is_error"] is None
+    assert parse_object(rows[0][1])["is_error"] is None

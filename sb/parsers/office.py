@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.workbook.workbook import Workbook as OpenpyxlWorkbook
 
-from sb.parsers import FormatUnsupported, InvalidInput, LimitExceeded
+from sb.parsers.contracts import FormatUnsupported, InvalidInput, LimitExceeded
 
 DOCX_MEDIA_TYPE: Final = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MEDIA_TYPE: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

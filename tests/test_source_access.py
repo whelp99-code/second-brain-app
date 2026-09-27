@@ -36,15 +36,15 @@ def test_binding_is_exact_immutable_and_rolled_back_with_source(tmp_path: Path):
 
 
 @pytest.mark.parametrize("projects", [("*",), ("project:z", "project:a"), ("project:a", "project:a")])
-def test_invalid_or_ambiguous_projects_rejected(projects):
+def test_invalid_or_ambiguous_projects_rejected(projects: tuple[str, ...]):
     with pytest.raises(ValueError, match="SOURCE_ACCESS_INVALID"):
-        SourceAccess("principal:owner", projects, "policy:1")
+        _ = SourceAccess("principal:owner", projects, "policy:1")
 
 
 def test_real_ingest_uses_config_not_source_frontmatter_and_rejects_reclassification(tmp_path: Path):
     source = tmp_path / "source"
     source.mkdir()
-    (source / "notes.md").write_text("---\nproject: project:beta\nowner: principal:other\n---\nAlpha 기억\n")
+    _ = (source / "notes.md").write_text("---\nproject: project:beta\nowner: principal:other\n---\nAlpha 기억\n")
     raw: dict[str, TomlValue] = {"vault_root": str(tmp_path / "vault"), "state_root": str(tmp_path / "state"),
         "sources": [{"id": "docs", "adapter": "markdown-vault", "root": str(source)}],
         "source_access": {"docs": {"owner": "principal:owner", "projects": ["project:alpha"], "policy_revision": "policy:1"}}}
@@ -73,8 +73,8 @@ def test_legacy_migration_does_not_infer_access_for_existing_sources(tmp_path: P
         ledger.upsert_source_item(ITEM)
     path = tmp_path / ".sb" / "ledger.db"
     with sqlite3.connect(path) as db:
-        db.execute("DROP TABLE source_access")
-        db.execute("UPDATE schema_meta SET value='2' WHERE key='schema_version'")
+        _ = db.execute("DROP TABLE source_access")
+        _ = db.execute("UPDATE schema_meta SET value='2' WHERE key='schema_version'")
     assert Path(str(path) + "-wal").stat().st_size > 0
     with Ledger(tmp_path) as migrated:
         assert migrated.list_source_items() == (ITEM,)
