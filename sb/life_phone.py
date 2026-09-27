@@ -10,8 +10,10 @@ import base64
 import re
 from hashlib import sha256
 
+from sb.effect_values import JsonInput
 from sb.life_attachments import inline
 from sb.life_contracts import SENSITIVITIES, LifeInputError
+from sb.life_json import LifePayload
 from sb.life_values import canonical_bytes, instant, text
 
 TYPES = {
@@ -32,7 +34,7 @@ TYPES = {
 }
 
 
-def phone_event(document: object) -> dict[str, object]:
+def phone_event(document: JsonInput) -> LifePayload:
     if not isinstance(document, dict):
         raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
     allowed = {
@@ -66,7 +68,8 @@ def phone_event(document: object) -> dict[str, object]:
     if re.fullmatch(r"[A-Za-z0-9._:-]+", identity) is None:
         raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
     device = text(document.get("device_id"), maximum=256)
-    event_type = TYPES.get(document.get("event_type"))
+    kind = document.get("event_type")
+    event_type = TYPES.get(kind) if isinstance(kind, str) else None
     if event_type is None or document.get("capture_mode") not in {"explicit", "share", "shortcut"}:
         raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
     occurred = instant(document.get("occurred_at"))
@@ -85,7 +88,7 @@ def phone_event(document: object) -> dict[str, object]:
         ):
             raise LifeInputError("LIFE_PHONE_URL_INVALID")
         body += "\n" + url
-    attachments = []
+    attachments: list[dict[str, str]] = []
     raw_attachments = document.get("attachment", document.get("attachments"))
     if raw_attachments is not None:
         values = raw_attachments if isinstance(raw_attachments, list) else [raw_attachments]
@@ -108,6 +111,8 @@ def phone_event(document: object) -> dict[str, object]:
                 data = base64.b64decode(encoded, validate=True)
             except (ValueError, TypeError) as exc:
                 raise LifeInputError("LIFE_ATTACHMENT_INVALID") from exc
+            if not isinstance(name, str) or not isinstance(mime, str):
+                raise LifeInputError("LIFE_ATTACHMENT_INVALID")
             item = inline(name, mime, data)
             declared = attachment.get("sha256") or attachment.get("content_sha256")
             if declared is not None and declared != item["sha256"]:

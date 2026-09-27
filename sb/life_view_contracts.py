@@ -1,11 +1,13 @@
 """Dictionary contracts for deterministic Life read projections."""
 
-from typing import NotRequired, TypedDict
+from typing import NotRequired
+
+from typing_extensions import TypedDict
 
 from sb.life_event_wire import LifeEventDict
 
 
-class Timeline(TypedDict):
+class Timeline(TypedDict, closed=True):
     schema_version: int
     day: str
     timezone: str
@@ -15,7 +17,7 @@ class Timeline(TypedDict):
     complete_day_observed: bool
 
 
-class PreviousContext(TypedDict):
+class PreviousContext(TypedDict, closed=True):
     event_id: str
     revision: int
     title: str
@@ -26,12 +28,20 @@ class PreviousContext(TypedDict):
     reason: str
 
 
-class BriefCard(PreviousContext):
+class BriefCard(TypedDict, closed=True):
+    event_id: str
+    revision: int
+    title: str
+    excerpt: str
+    event_status: str
+    evidence_level: str
+    raw_digest: str
+    reason: str
     previous_context: list[PreviousContext]
     changed: bool
 
 
-class Followup(TypedDict):
+class Followup(TypedDict, closed=True):
     event_id: str
     revision: int
     title: str
@@ -39,7 +49,7 @@ class Followup(TypedDict):
     reason: str
 
 
-class BriefContent(TypedDict):
+class BriefContent(TypedDict, closed=True):
     day: str
     timezone: str
     slot: str
@@ -48,20 +58,26 @@ class BriefContent(TypedDict):
     facts_are_quoted_not_inferred: bool
 
 
-class BriefSnapshot(BriefContent):
+class BriefSnapshot(TypedDict, closed=True):
+    day: str
+    timezone: str
+    slot: str
+    cards: list[BriefCard]
+    followups: list[Followup]
+    facts_are_quoted_not_inferred: bool
     input_version: str
     mode: str
     delivery_state: str
     omitted: int
 
 
-class ViewFile(TypedDict):
+class ViewFile(TypedDict, closed=True):
     path: str
     content: str
     sha256: str
 
 
-class ObsidianManifest(TypedDict):
+class ObsidianManifest(TypedDict, closed=True):
     schema_version: int
     generation: str
     complete: bool
@@ -77,7 +93,7 @@ class ObsidianManifest(TypedDict):
     snapshot_complete: NotRequired[bool]
 
 
-class GapCandidate(TypedDict):
+class GapCandidate(TypedDict, closed=True):
     event_id: str
     revision: int
     title: str

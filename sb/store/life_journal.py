@@ -52,11 +52,11 @@ class LifeJournal(LifeJournalReader):
     def initialize(self) -> None:
         initialize_journal(self.connection, self.transaction)
 
-    def put[T](
+    def put(
         self,
         kind: str,
         object_id: JsonInput,
-        body: Mapping[str, T],
+        body: Mapping[str, JsonInput],
         *,
         events: Sequence[LifeEventV1],
         now: datetime,

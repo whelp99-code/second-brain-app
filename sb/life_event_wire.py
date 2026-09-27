@@ -1,22 +1,22 @@
 """Exact dictionary shapes emitted by the frozen Life event contracts."""
 
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 
-class EntityRefDict(TypedDict):
+class EntityRefDict(TypedDict, closed=True):
     entity_id: str
     kind: str
     label: str
 
 
-class AttachmentRefDict(TypedDict):
+class AttachmentRefDict(TypedDict, closed=True):
     name: str
     mime: str
     size: int
     sha256: str
 
 
-class LifeEventDict(TypedDict):
+class LifeEventDict(TypedDict, closed=True):
     schema_version: int
     event_id: str
     revision: int
@@ -52,7 +52,7 @@ class LifeEventDict(TypedDict):
     attachments: tuple[AttachmentRefDict, ...]
 
 
-class LifeReceiptDict(TypedDict):
+class LifeReceiptDict(TypedDict, closed=True):
     receipt_id: str
     event_id: str
     revision: int

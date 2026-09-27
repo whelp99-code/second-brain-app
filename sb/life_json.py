@@ -8,7 +8,9 @@ from typing import Final
 
 from pydantic import TypeAdapter
 
-from sb.effect_values import JsonValue
+from sb.effect_values import JsonInput, JsonValue
+
+type LifePayload = dict[str, JsonInput]
 
 _JSON: Final = TypeAdapter[JsonValue](JsonValue)
 # The standard decoder retains its duplicate-key, Unicode and number behavior;

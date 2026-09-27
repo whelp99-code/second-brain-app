@@ -1,11 +1,13 @@
 """Persistent workflow envelopes and immutable evidence references."""
 
-from typing import NotRequired, TypedDict
+from typing import NotRequired
+
+from typing_extensions import TypedDict
 
 from sb.effect_values import JsonObject
 
 
-class EvidenceRef(TypedDict):
+class EvidenceRef(TypedDict, closed=True):
     event_id: str
     revision: int
     raw_digest: str
@@ -13,7 +15,7 @@ class EvidenceRef(TypedDict):
     policy_revision: str
 
 
-class JournalRow(TypedDict):
+class JournalRow(TypedDict, closed=True):
     object_id: str
     kind: str
     revision: int
@@ -26,12 +28,12 @@ class JournalRow(TypedDict):
     execute_allowed: NotRequired[bool]
 
 
-class RecordRef(TypedDict):
+class RecordRef(TypedDict, closed=True):
     record_id: str
     record_digest: str
 
 
-class EventMutation(TypedDict):
+class EventMutation(TypedDict, closed=True):
     source_id: str
     event_id: str
     idempotency_key: str
@@ -39,7 +41,7 @@ class EventMutation(TypedDict):
     payload: JsonObject
 
 
-class Tombstone(TypedDict):
+class Tombstone(TypedDict, closed=True):
     event_id: str
     revision: int
     deleted_at: str
