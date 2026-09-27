@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import stat
 import tarfile
@@ -10,21 +11,44 @@ import zlib
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import IO, Protocol, Self, cast, final, override
+from typing import Final, final
 
-MAX_FILE_BYTES = 11 * 1024**3
-MAX_DECODED_BYTES = 12 * 1024**3
-MAX_MEMBERS = 100_000
-MAX_DEPTH = 3
-CHUNK = 65_536
+from sb.managed_inspection_stream import (
+    CHUNK,
+    MAX_FILE_BYTES,
+    ManagedInspectionError,
+    ManagedTarInfo,
+    fingerprint,
+)
+from sb.managed_inspection_stream import (
+    Budget as _Budget,
+)
+from sb.managed_inspection_stream import (
+    Reader as _Reader,
+)
+from sb.managed_inspection_stream import (
+    Source as _Source,
+)
+from sb.managed_inspection_stream import (
+    blocks as _blocks,
+)
+from sb.managed_inspection_stream import (
+    prefixed as _prefixed,
+)
 
+__all__ = [
+    "MAX_FILE_BYTES",
+    "ManagedFileInspection",
+    "ManagedInspectionError",
+    "ManagedTarInfo",
+    "fingerprint",
+    "inspect_managed_file",
+]
 
-class ManagedInspectionError(RuntimeError):
-    pass
-
-
-def fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
-    return (metadata.st_dev, metadata.st_ino, metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns)
+MAX_DECODED_BYTES: Final = 12 * 1024**3
+MAX_MEMBERS: Final = 100_000
+MAX_DEPTH: Final = 8
+MAX_RATIO: Final = 1000
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,56 +74,6 @@ class _Counter:
             self.tails[index] = joined[-(len(needle) - 1):] if len(needle) > 1 else b""
 
 
-@dataclass
-class _Budget:
-    decoded: int = 0
-    members: int = 0
-
-
-class _Source(Protocol):
-    def read(self, size: int = -1, /) -> bytes: ...
-
-
-@final
-class _Reader:
-    """Adapt bounded chunks to tarfile's stream reader; never honor an unbounded allocation."""
-    def __init__(self, chunks: Iterator[bytes]) -> None:
-        self.chunks: Iterator[bytes] = chunks
-        self.buffer: bytes = b""
-
-    def read(self, size: int = -1) -> bytes:
-        if not 0 <= size <= 1_048_576:
-            raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
-        parts: list[bytes] = []
-        while size:
-            if not self.buffer:
-                self.buffer = next(self.chunks, b"")
-                if not self.buffer:
-                    break
-            part, self.buffer = self.buffer[:size], self.buffer[size:]
-            parts.append(part)
-            size -= len(part)
-        return b"".join(parts)
-
-
-class ManagedTarInfo(tarfile.TarInfo):
-    @classmethod
-    @override
-    def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
-        value = super().frombuf(buf, encoding, errors)
-        if value.type == tarfile.GNUTYPE_SPARSE:
-            raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
-        if (value.type in (tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.GNUTYPE_LONGNAME, tarfile.GNUTYPE_LONGLINK)
-            and value.size > 65_536):
-            raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
-        return value
-
-
-def _blocks(source: _Source) -> Iterator[bytes]:
-    while block := source.read(CHUNK):
-        yield block
-
-
 def _gzip_header(header: bytes) -> None:
     # Canonical provider backups use one member and a short gzip header.
     if len(header) < 10 or header[2] != 8 or header[3] & 0xE0:
@@ -122,14 +96,18 @@ def _gzip_header(header: bytes) -> None:
 
 def _inflate(source: _Source, window: int, budget: _Budget) -> Iterator[bytes]:
     decoder = zlib.decompressobj(window)
+    compressed = 0
+    expanded = 0
     for block in _blocks(source):
+        compressed += len(block)
         if decoder.eof:
             raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
         while block:
             output = decoder.decompress(block, CHUNK)
             block = decoder.unconsumed_tail
             budget.decoded += len(output)
-            if budget.decoded > MAX_DECODED_BYTES:
+            expanded += len(output)
+            if budget.decoded > budget.max_decoded or expanded > max(CHUNK, compressed * MAX_RATIO):
                 raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
             if output:
                 yield output
@@ -139,13 +117,8 @@ def _inflate(source: _Source, window: int, budget: _Budget) -> Iterator[bytes]:
         raise ManagedInspectionError("MANAGED_ARCHIVE_INVALID")
 
 
-def _prefixed(header: bytes, source: _Source) -> Iterator[bytes]:
-    yield header
-    yield from _blocks(source)
-
-
 def _tar_scan(source: _Source, needles: Sequence[bytes], budget: _Budget, depth: int) -> int:
-    matches = 0
+    from sb.managed_tar import TarScan, scan
 
     def guarded() -> Iterator[bytes]:
         tail = b""
@@ -155,29 +128,11 @@ def _tar_scan(source: _Source, needles: Sequence[bytes], budget: _Budget, depth:
             tail = block[-16:]
             yield block
 
-    tar_source = _Reader(guarded())
-    with tarfile.open(fileobj=cast(IO[bytes], cast(object, tar_source)), mode="r|", tarinfo=ManagedTarInfo) as archive:
-        for member in archive:
-            budget.members += 1
-            if budget.members > MAX_MEMBERS or not 0 <= member.size <= MAX_FILE_BYTES:
-                raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
-            parts = PurePosixPath(member.name).parts
-            if member.name.startswith("/") or ".." in parts or not (member.isfile() or member.isdir()):
-                raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
-            if ".git" in parts and "pack" in parts:
-                raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
-            if member.isfile():
-                payload = archive.extractfile(member)
-                if payload is None:
-                    raise ManagedInspectionError("MANAGED_ARCHIVE_INVALID")
-                with payload:
-                    header = payload.read(512)
-                    nested = _Reader(_prefixed(header, payload))
-                    matches += _encoded(nested, header, member.name, needles, budget, depth + 1)
-    # Validate the gzip trailer and inspect any trailing bytes even after tar end markers.
-    for _block in _blocks(tar_source):
-        pass
-    return matches
+    def nested(payload: _Source, name: str) -> int:
+        header = payload.read(512)
+        return _encoded(_Reader(_prefixed(header, payload)), header, name, needles, budget, depth + 1)
+
+    return scan(_Reader(guarded()), TarScan(needles, budget, nested))
 
 
 def _decoded(source: _Source, needles: Sequence[bytes], budget: _Budget, depth: int) -> int:
@@ -208,14 +163,22 @@ def _encoded(source: _Source, header: bytes, name: str, needles: Sequence[bytes]
     tar = len(header) >= 512 and header[257:262] == b"ustar"
     parts = PurePosixPath(name).parts
     loose_git = ".git" in parts and "objects" in parts and "pack" not in parts and len(parts[-1]) == 38
-    if header.startswith((b"PK\x03\x04", b"PK\x05\x06", b"BZh", b"\xfd7zXZ\x00", b"PACK")):
+    zipped = header.startswith((b"PK\x03\x04", b"PK\x05\x06"))
+    if header.startswith((b"BZh", b"\xfd7zXZ\x00", b"PACK")):
         raise ManagedInspectionError("MANAGED_ARCHIVE_UNSUPPORTED")
-    if not (compressed or tar or loose_git):
-        if name.endswith((".gz", ".tgz", ".tar", ".zip", ".xz", ".bz2")):
+    if not (compressed or tar or loose_git or zipped):
+        if name.endswith((".gz", ".tgz", ".tar", ".zip", ".docx", ".xlsx", ".pptx", ".xz", ".bz2")):
             raise ManagedInspectionError("MANAGED_ARCHIVE_INVALID")
         return 0
     if depth > MAX_DEPTH:
         raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
+    if zipped:
+        from sb.managed_zip import members
+        matches = 0
+        for member_name, payload in members(source, budget):
+            matches += sum(payload.count(needle) for needle in needles if needle)
+            matches += _encoded(io.BytesIO(payload), payload[:512], member_name, needles, budget, depth + 1)
+        return matches
     if compressed:
         _gzip_header(header)
         return _decoded(_Reader(_inflate(source, 31, budget)), needles, budget, depth + 1)
@@ -244,7 +207,7 @@ def inspect_managed_file(path: Path, needles: Sequence[bytes]) -> ManagedFileIns
                 sha.update(block)
                 counter.add(block)
             _ = source.seek(0)
-            extra = _encoded(source, header, path.as_posix(), needles, _Budget(), 0)
+            extra = _encoded(source, header, path.as_posix(), needles, _Budget(MAX_DECODED_BYTES, MAX_MEMBERS), 0)
             if fingerprint(os.fstat(source.fileno())) != fingerprint(before):
                 raise ManagedInspectionError("MANAGED_SURFACE_CHANGED")
             return ManagedFileInspection("sha256:" + sha.hexdigest(), size, counter.matches + extra, fingerprint(before))
