@@ -378,7 +378,7 @@ def select_adapters(
 _URI_SCHEME: Final = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*:")
 
 
-def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
+def materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
     from sb.normalize import normalize
     from sb.parsers import ParseError, UnsupportedSuffix, parser_for
 
@@ -414,7 +414,7 @@ def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
     for item in ledger.list_source_items():
         if cas.exists(item.content_hash):
             loaded.extend(
-                _materialize(
+                materialize(
                     cas.get(item.content_hash),
                     item.content_hash,
                     item.source_uri,
@@ -789,7 +789,7 @@ def _prepare_adapter_ingest(
                 errors += 1
                 failure = failure or "REINGRESS_VERIFICATION_FAILED"
             continue
-        units = _materialize(
+        units = materialize(
             data,
             digest,
             ref.source_uri,
@@ -2046,3 +2046,5 @@ _compile_stage = compile_stage
 _run_locked = run_locked
 _try_lock = try_lock
 _unlock = unlock
+
+_materialize = materialize
