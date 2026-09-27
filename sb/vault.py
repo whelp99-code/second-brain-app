@@ -291,8 +291,7 @@ class Vault:
         """
         prefix = "wiki/life-event-"
         valid = re.compile(r"wiki/life-event-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.md\Z")
-        if any(valid.fullmatch(path) is None or not isinstance(content, bytes)
-               for path, content in pages.items()):
+        if any(valid.fullmatch(path) is None for path in pages):
             raise VaultLintError(("LIFE_RESTORE_PAGE_INVALID",))
         current = tuple((self.root / "wiki").glob("life-event-*.md"))
         touched: list[Path] = []
@@ -481,7 +480,7 @@ def _write_compiled_marker(root: Path, page_id: str, dest: Path) -> None:
     compiled = root / ".sb" / "compiled"
     compiled.mkdir(parents=True, exist_ok=True, mode=0o700)
     marker = compiled / f"{page_id.replace('/', '_')}.sha"
-    marker.write_text(hashlib.sha256(dest.read_bytes()).hexdigest(), encoding="utf-8")
+    _ = marker.write_text(hashlib.sha256(dest.read_bytes()).hexdigest(), encoding="utf-8")
     marker.chmod(0o600)
 
 
@@ -688,7 +687,7 @@ def _git(root: Path, *args: str) -> str:
     return completed.stdout
 
 
-def _commit_if_changed(root: Path, message: str, paths: Sequence[Path] | None = None) -> str | None:
+def commit_if_changed(root: Path, message: str, paths: Sequence[Path] | None = None) -> str | None:
     if paths is None:
         _ = _git(root, "add", "-A")
     elif not paths:
@@ -700,3 +699,6 @@ def _commit_if_changed(root: Path, message: str, paths: Sequence[Path] | None = 
         return None
     _ = _git(root, "commit", "-m", message)
     return _git(root, "rev-parse", "HEAD").strip()
+
+
+_commit_if_changed = commit_if_changed

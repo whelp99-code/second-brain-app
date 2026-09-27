@@ -34,7 +34,8 @@ _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
 _INDEX_PREFIXES: Final = ("wiki/", "daily/", "conflicts/")
 # Version includes indexed text semantics, not only SQLite columns.
-_INDEX_SCHEMA_VERSION: Final = "4"
+INDEX_SCHEMA_VERSION: Final = "4"
+_INDEX_SCHEMA_VERSION: Final = INDEX_SCHEMA_VERSION
 _REQUIRED_DOCS_COLUMNS: Final = (
     "page_id",
     "section",

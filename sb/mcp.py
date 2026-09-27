@@ -582,7 +582,7 @@ def build_server(
         parsed = query_plan(query)
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             if limit <= 0 or not query.strip():
                 return bind_read({"results": []}, generation, current)
@@ -630,7 +630,7 @@ def build_server(
         """Read one committed page from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             try:
                 page = read_page(current_root, id)
@@ -650,7 +650,7 @@ def build_server(
         """List committed changes from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             payload = {"changes": [row.as_dict() for row in recent_changes(
                 current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
@@ -662,7 +662,7 @@ def build_server(
         """List unresolved conflicts from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_read", "read", current)
+            _ = require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             conflicts: list[ToolResult] = []
             for row in open_conflicts(current_root):
@@ -754,7 +754,7 @@ def build_server(
         """Return metadata-only global request status and a proof only after proved."""
         with pin_generation() as (_current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_status", "status", current)
+            _ = require_read_fence(read_fence, "memory_status", "status", current)
             store = RequestStore(requests, maintenance_only=True)
             try:
                 status = store.get(request_id)
@@ -874,7 +874,7 @@ def build_server(
         """Resolve one exact citation under one shared generation pin."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            _ = require_read_fence(read_fence, "memory_resolve", "resolve", current)
             require_active_high_water(generation, current)
             if sensitivity not in {"public", "personal", "sensitive", "restricted"}:
                 raise ToolError("EFFECT_TARGET_INVALID")
@@ -915,7 +915,7 @@ def build_server(
         """Resolve only a schema-4 record identity under its exact generation pin."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            _ = require_read_fence(read_fence, "memory_resolve", "resolve", current)
             require_active_high_water(generation, current)
             if (generation.generation_id != generation_id
                     or generation.generation_manifest_digest != generation_manifest_digest):

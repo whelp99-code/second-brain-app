@@ -45,7 +45,7 @@ def copy_compiled_markers(source: Path, destination: Path) -> None:
         if not path.is_file() or path.is_symlink() or path.suffix != ".sha":
             continue
         target = dest / path.name
-        target.write_bytes(path.read_bytes())
+        _ = target.write_bytes(path.read_bytes())
         target.chmod(0o600)
 
 

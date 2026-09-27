@@ -120,7 +120,7 @@ class GenerationRestoreSanitizer:
         workspace.chmod(0o700)
 
     @staticmethod
-    def _extract(archive: Path, destination: Path) -> None:
+    def extract(archive: Path, destination: Path) -> None:
         if archive.is_dir() and not archive.is_symlink():
             sources: dict[Path, os.stat_result] = {}
             total = 0
@@ -210,6 +210,8 @@ class GenerationRestoreSanitizer:
         ):
             raise RestoreError("RESTORE_ARCHIVE_INVALID")
 
+    _extract = extract
+
     def sanitize(
         self,
         request: RestoreRequest,
@@ -286,7 +288,7 @@ class GenerationRestoreSanitizer:
                             for identity, requirement in page.sources:
                                 ledger.bind_source_classification(identity, requirement)
                             ledger.bind_page_access(page.page_id, page.content_digest, page.requirements)
-                restore_current_life(latest_life, root, old_archive_has_life=archive_has_life)
+                _ = restore_current_life(latest_life, root, old_archive_has_life=archive_has_life)
 
             result = mutations.mutate(
                 GenerationMutation(
