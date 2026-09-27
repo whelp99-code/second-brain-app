@@ -18,6 +18,7 @@ config.toml
 .pytest_cache/
 .ruff_cache/
 .omo/
+.roam/
 node_modules/
 
 # Shipping Harness runtime state (per-worktree, not product source).
