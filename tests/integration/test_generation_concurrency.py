@@ -161,7 +161,7 @@ def test_second_writer_preserves_first_successor_and_reader_blocks_switch(tmp_pa
                 assert (active.root / "inbox" / str(remembered["inbox"])).is_file()
                 assert (active.root / "inbox" / pending).read_text() == "pending before concurrent compile"
                 assert tuple(active.root.joinpath("wiki").glob("memory-*.md"))
-                service.remember("later successor", "later", NOW)
+                _ = service.remember("later successor", "later", NOW)
                 successor = service.store.active()
                 assert (successor.root / "inbox" / pending).read_text() == "pending before concurrent compile"
                 assert (successor.root / "inbox" / str(remembered["inbox"])).read_text() == "concurrent inbox survives"

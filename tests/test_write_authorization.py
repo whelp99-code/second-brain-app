@@ -138,9 +138,9 @@ def test_configured_and_unrevoked_key_is_authorized(installation: Path) -> None:
 def test_revoked_key_is_unauthorized(installation: Path) -> None:
     status = _status(
         installation,
-        f'jarvis_signing_key_id = "jarvis:test:alpha"\n'
-        f'jarvis_public_key = "{_public_key()}"\n'
-        f'revoked_jarvis_signing_key_ids = ["jarvis:test:alpha"]\n',
+        'jarvis_signing_key_id = "jarvis:test:alpha"\n'
+        + f'jarvis_public_key = "{_public_key()}"\n'
+        + 'revoked_jarvis_signing_key_ids = ["jarvis:test:alpha"]\n',
     )
     assert status["write_authorization"] == "unauthorized"
 
@@ -167,9 +167,9 @@ def test_revocation_survives_removal_from_the_config(installation: Path) -> None
     """The durable store, not the config, decides - as `sb_write_request` sees it."""
     revoked = _status(
         installation,
-        f'jarvis_signing_key_id = "jarvis:test:alpha"\n'
-        f'jarvis_public_key = "{_public_key()}"\n'
-        f'revoked_jarvis_signing_key_ids = ["jarvis:test:alpha"]\n',
+        'jarvis_signing_key_id = "jarvis:test:alpha"\n'
+        + f'jarvis_public_key = "{_public_key()}"\n'
+        + 'revoked_jarvis_signing_key_ids = ["jarvis:test:alpha"]\n',
     )
     assert revoked["write_authorization"] == "unauthorized"
     restored = _status(

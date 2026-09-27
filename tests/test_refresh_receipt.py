@@ -11,7 +11,6 @@ not.
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import stat
@@ -20,13 +19,14 @@ from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
-from typing import Final, cast
+from typing import Final
 
 import pytest
 from pytest import MonkeyPatch
 
 from sb.cli import main
 from sb.config import Config
+from sb.effect_values import JsonObject, JsonValue
 from sb.pipeline import StageReport, run_compile
 from sb.refresh_receipt import (
     RECEIPT_MAX_BYTES,
@@ -37,6 +37,7 @@ from sb.refresh_receipt import (
 )
 from sb.store.ledger import Ledger
 from sb.vault import Vault, init_vault
+from tests.json_fixtures import parse_json
 
 # Exactly what `new Date(...).toISOString()` produces; JARVIS rejects anything else.
 TO_ISO_STRING: Final = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
@@ -72,16 +73,16 @@ def _without_sources(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr("sb.connectors.discover_adapters", no_adapters)
 
 
-def _object(value: object) -> dict[str, object]:
+def _object(value: JsonValue) -> JsonObject:
     assert isinstance(value, dict)
-    return cast("dict[str, object]", value)
+    return value
 
 
-def _envelope(path: Path) -> dict[str, object]:
-    return _object(json.loads(path.read_text(encoding="utf-8")))
+def _envelope(path: Path) -> JsonObject:
+    return _object(parse_json(path.read_text(encoding="utf-8")))
 
 
-def _receipt(path: Path) -> dict[str, object]:
+def _receipt(path: Path) -> JsonObject:
     return _object(_envelope(path)["receipt"])
 
 
@@ -260,7 +261,7 @@ def test_jarvis_reader_accepts_the_published_receipt(
         capture_output=True, text=True, check=False, cwd=str(JARVIS_RELEASE),
     )
     assert done.returncode == 0, done.stderr
-    answer = _object(json.loads(done.stdout))
+    answer = _object(parse_json(done.stdout))
     outcome = _object(answer["outcome"])
     assert outcome["state"] == "received"
     assert outcome["profile"] == RECEIPT_PROFILE

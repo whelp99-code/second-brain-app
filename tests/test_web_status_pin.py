@@ -1,18 +1,23 @@
 """Status must read the generation pinned for this HTTP request."""
 
+from collections.abc import Generator
 from contextlib import contextmanager
+from pathlib import Path
 
+import pytest
+
+from sb.config import Config
 from sb.effect_values import is_json_object
 from sb.store import Run
 from sb.store.ledger import Ledger
-from tests.test_web import _ready, _request, _running
+from tests.test_web import ready, request, running
 
 
-def test_status_uses_pinned_generation_for_failure_inventory(tmp_path, monkeypatch):
-    _old_config, pinned = _ready(tmp_path / "pinned")
-    active_config, _active = _ready(tmp_path / "active")
-    (pinned / ".sb/runs.log").write_text("pinned run status\n")
-    (_active / ".sb/runs.log").write_text("different active run\n")
+def test_status_uses_pinned_generation_for_failure_inventory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _old_config, pinned = ready(tmp_path / "pinned")
+    active_config, _active = ready(tmp_path / "active")
+    _ = (pinned / ".sb/runs.log").write_text("pinned run status\n")
+    _ = (_active / ".sb/runs.log").write_text("different active run\n")
     with Ledger(pinned) as ledger:
         ledger.record_run(Run("pinned-run", "2099-01-01T00:00:00Z", None, None, "failed"))
         ledger.ensure_derivation("historical-brief", "brief", "old-run")
@@ -20,12 +25,12 @@ def test_status_uses_pinned_generation_for_failure_inventory(tmp_path, monkeypat
         ledger.mark_failed("historical-brief", "unresolved citation")
 
     @contextmanager
-    def pin(_config):
+    def pin(_config: Config) -> Generator[Path]:
         yield pinned
 
     monkeypatch.setattr("sb.web.read_root", pin)
-    with _running(active_config) as base:
-        status, payload = _request(f"{base}/api/status")
+    with running(active_config) as base:
+        status, payload = request(f"{base}/api/status")
     assert status == 200
     assert isinstance(payload, dict) and is_json_object(payload)
     status_text = payload["status"]

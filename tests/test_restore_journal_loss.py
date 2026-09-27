@@ -25,7 +25,7 @@ def test_missing_journal_is_denied(tmp_path: Path) -> None:
     )
     try:
         with pytest.raises(RestoreSourceError, match="RESTORE_SOURCE_ANCHOR_MISSING"):
-            verified_restore_source(archive, manifest, empty)
+            _ = verified_restore_source(archive, manifest, empty)
         observed = verified_restore_source(archive, manifest, store)
         digest = observed["generation_digest"]
         assert isinstance(digest, str) and digest.startswith("sha256:")
@@ -57,8 +57,8 @@ def _remember_request(content: str) -> JsonObject:
         "operation": "remember",
     }
     request["idempotency_key"] = "memidem:pos:v1:" + _digest(b"orca-jarvis/memory-write-idempotency/v1\0", identity)[7:]
-    request.pop("request_id", None)
-    request.pop("request_digest", None)
+    _ = request.pop("request_id", None)
+    _ = request.pop("request_digest", None)
     request_digest = _digest(b"orca-jarvis/memory-write-request/v1\0", request)
     request["request_id"] = "memreq:pos:v1:" + request_digest[7:]
     request["request_digest"] = request_digest
@@ -93,6 +93,6 @@ def test_restore_fixture_then_accepted_request_write(tmp_path: Path) -> None:
         "tombstone_sequence": active.manifest.tombstone_sequence,
         "cutover": False,
     }
-    Path("/var/tmp/m12-journal-restore-write.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    _ = (tmp_path / "m12-journal-restore-write.json").write_text(json.dumps(evidence, indent=2) + "\n")
     assert applied.state == "proved"
     assert pages
