@@ -73,5 +73,3 @@ class UnsupportedSuffix(Exception):
     @override
     def __str__(self) -> str:
         return f"unsupported suffix: {self.suffix}"
-
-
