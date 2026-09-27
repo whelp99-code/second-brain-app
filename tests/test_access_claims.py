@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from pydantic import TypeAdapter
 
 from sb.access_claims import (
     AccessClaimRejected,
@@ -15,7 +16,7 @@ from sb.access_claims import (
     verify_access_claim,
 )
 from sb.delegations import create_read_fence
-from sb.effect_values import JsonObject, JsonValue, canonical_bytes, is_json_object
+from sb.effect_values import JsonInput, JsonObject, JsonValue, canonical_bytes, is_json_object
 from sb.effect_write_values import model_object
 
 NOW = datetime(2026, 9, 9, tzinfo=UTC)
@@ -26,11 +27,11 @@ ROOT = "sha256:" + "a" * 64
 type ClaimCase = tuple[JsonObject, JsonObject, AccessContext]
 
 
-def signed(body: JsonObject) -> JsonObject:
+def signed(body: Mapping[str, JsonInput]) -> JsonObject:
     value = {key: value for key, value in body.items() if key != "signature"}
     value["signature"] = base64.urlsafe_b64encode(KEY.sign(
         b"orca-jarvis/memory-access-claim/v1\0" + canonical_bytes(value))).rstrip(b"=").decode()
-    return value
+    return TypeAdapter[JsonObject](JsonObject).validate_python(value)
 
 
 @pytest.fixture
@@ -39,7 +40,7 @@ def claim_case() -> ClaimCase:
         sequence=0, set_root=ROOT, issued_at="2026-09-09T00:00:00.000Z", not_before="2026-09-09T00:00:00.000Z",
         expires_at="2026-09-09T00:01:00.000Z", nonce="nonce:fence", signing_key_id="key:test", private_key=KEY)
     request = access_request_digest("sb_read_page", {"id": "wiki/test"})
-    body: JsonObject = {"schema_version": 1, "provider_instance_id": "provider:test", "principal_id": "principal:owner",
+    body: Mapping[str, JsonInput] = {"schema_version": 1, "provider_instance_id": "provider:test", "principal_id": "principal:owner",
         "agent_id": "agent:test", "session_id": "session:test", "projects": ["project:a"], "policy_revision": "policy:1",
         "purpose": "memory_read", "request_digest": request, "read_fence_digest": fence.fence_digest,
         "issued_at": "2026-09-09T00:00:00.000Z", "expires_at": "2026-09-09T00:00:30.000Z", "nonce": "nonce:claim", "signing_key_id": "key:test"}
