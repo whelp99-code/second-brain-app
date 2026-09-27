@@ -391,6 +391,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             now = datetime.now(UTC)
             result = mutations.maintain(now)
             _ = mutations.settle_superseded_briefs(now)
+            from sb.tombstone_admission import publish_terminal_tombstones
+
+            _ = publish_terminal_tombstones(mutations, now)
         finally:
             mutations.close()
         workspace = _opt_str(ns, "restore_workspace")
