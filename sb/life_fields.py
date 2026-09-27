@@ -23,7 +23,7 @@ def boolean(value: JsonInput | TomlValue, code: str = "LIFE_INPUT_INVALID") -> b
     return value
 
 
-def number(value: JsonInput, code: str = "LIFE_RECORD_CORRUPT") -> float | int:
+def number(value: JsonInput | TomlValue, code: str = "LIFE_RECORD_CORRUPT") -> float | int:
     if type(value) is not int and type(value) is not float:
         raise LifeInputError(code)
     return value
