@@ -11,9 +11,9 @@ from datetime import datetime
 from hashlib import sha256
 
 from sb.config import Config
-from sb.connectors.records_life import LifeRecordsAdapter
 from sb.life_config import policy_for, settings
 from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_export_contracts import LifeExportAdapter
 from sb.life_exports import parse_export
 from sb.life_values import parse_event
 from sb.store import SourceItem
@@ -35,7 +35,7 @@ class LifeIngestResult:
 def prepare_exports(
     config: Config,
     ledger: Ledger,
-    adapter: LifeRecordsAdapter,
+    adapter: LifeExportAdapter,
     *,
     run_id: str,
     now: datetime,
@@ -130,7 +130,7 @@ def prepare_exports(
 
 def complete_exports(
     ledger: Ledger,
-    adapter: LifeRecordsAdapter,
+    adapter: LifeExportAdapter,
     result: LifeIngestResult,
     *,
     config: Config,
