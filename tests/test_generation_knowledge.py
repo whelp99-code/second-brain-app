@@ -1,12 +1,12 @@
-from pathlib import Path
-
 """Knowledge bindings must survive sealing and participate in its identity."""
+
 import hashlib
 import json
 import sqlite3
 from contextlib import closing
 from dataclasses import replace
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 

@@ -179,14 +179,14 @@ def test_cosine_rejects_same_dimension_different_model(
 ) -> None:
     root = _ready(tmp_path)
     with pytest.raises(EmbeddingUnavailable, match="identity"):
-        query_cosine(root, EN_TERM, 3, encoder=FakeEncoder(identity))
+        _ = query_cosine(root, EN_TERM, 3, encoder=FakeEncoder(identity))
 
 
 def test_cosine_preserves_control_characters_in_text(tmp_path: Path) -> None:
     root = _ready(tmp_path)
     body = "quoted ' text\x1f field\x1e row\n한국어"
     escaped = body.replace("'", "''")
-    run_vec_sql(vectors_path(root), f"UPDATE chunks SET text = '{escaped}'")
+    _ = run_vec_sql(vectors_path(root), f"UPDATE chunks SET text = '{escaped}'")
     hits = query_cosine(root, EN_TERM, 3, encoder=FakeEncoder())
     assert hits and all(hit.snippet == body for hit in hits)
 
@@ -196,7 +196,7 @@ def test_read_only_vec_connection_rejects_writes(tmp_path: Path) -> None:
     path = vectors_path(root)
     before = path.read_bytes()
     with pytest.raises(EmbeddingUnavailable, match="readonly"):
-        run_vec_sql(path, "DELETE FROM chunks", read_only=True)
+        _ = run_vec_sql(path, "DELETE FROM chunks", read_only=True)
     assert path.read_bytes() == before
 
 
@@ -207,7 +207,9 @@ def test_invalid_query_vectors_fall_back(
 ) -> None:
     root = _ready(tmp_path)
     lexical = _lexical(root)
-    monkeypatch.setattr(FakeEncoder, "encode", lambda self, texts: vectors)
+    def invalid_encode(_self: FakeEncoder, _texts: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
+        return vectors
+    monkeypatch.setattr(FakeEncoder, "encode", invalid_encode)
     assert hybrid_search(lexical, EN_TERM, 3, vault_root=root, encoder=FakeEncoder()) == lexical
 
 
@@ -219,7 +221,10 @@ def test_malformed_results_do_not_become_perfect_matches(
 ) -> None:
     root = _ready(tmp_path)
     lexical = _lexical(root)
-    monkeypatch.setattr("sb.embeddings.run_vec_sql", lambda *args, **kwargs: raw)
+    def malformed_sql(_path: Path, _sql: str, *, read_only: bool = False, lock_fd: int | None = None) -> str:
+        del read_only, lock_fd
+        return raw
+    monkeypatch.setattr("sb.embeddings.run_vec_sql", malformed_sql)
     assert hybrid_search(lexical, EN_TERM, 3, vault_root=root, encoder=FakeEncoder()) == lexical
 
 
