@@ -43,11 +43,9 @@ def scoped_write_identity(value: JsonValue) -> ScopedWriteIdentity:
                                                      "source_digest"))):
         field = value[key]
         match field:
-            case str():
-                if pattern.fullmatch(field) is None:
-                    raise ValueError("SCOPED_WRITE_IDENTITY_INVALID")
+            case str() if pattern.fullmatch(field) is not None:
                 fields[key] = field
-            case int() | float() | list() | dict() | None:
+            case str() | int() | float() | list() | dict() | None:
                 raise ValueError("SCOPED_WRITE_IDENTITY_INVALID")
             case _:
                 assert_never(field)
@@ -57,11 +55,9 @@ def scoped_write_identity(value: JsonValue) -> ScopedWriteIdentity:
     project_ids: list[str] = []
     for item in projects:
         match item:
-            case str():
-                if not item.startswith("project:") or not _ID.fullmatch(item) or not _ID.fullmatch(item[8:]):
-                    raise ValueError("SCOPED_WRITE_IDENTITY_INVALID")
+            case str() if item.startswith("project:") and _ID.fullmatch(item) and _ID.fullmatch(item[8:]):
                 project_ids.append(item)
-            case int() | float() | list() | dict() | None:
+            case str() | int() | float() | list() | dict() | None:
                 raise ValueError("SCOPED_WRITE_IDENTITY_INVALID")
             case _:
                 assert_never(item)
