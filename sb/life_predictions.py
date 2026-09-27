@@ -7,12 +7,15 @@ financial or relationship predictions. Missing results remain unscored.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from statistics import median
-from typing import Any
 
+from sb.effect_values import JsonInput
 from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_fields import number
+from sb.life_journal_contracts import JournalRow
+from sb.life_json import LifePayload
 from sb.life_values import instant, text
 from sb.store.life_journal import LifeJournal, evidence_refs, identity
 
@@ -40,13 +43,13 @@ def duration_minutes(event: LifeEventV1) -> float | None:
 
 def issue(
     journal: LifeJournal,
-    data: dict[str, object],
+    data: Mapping[str, JsonInput],
     *,
     events: Sequence[LifeEventV1],
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> dict[str, Any]:
+) -> JournalRow:
     if set(data) - {
         "target_id",
         "target_start",
@@ -85,7 +88,7 @@ def issue(
             events=events,
             require_current=False,
         )
-    eligible = []
+    eligible: list[tuple[LifeEventV1, float]] = []
     for event in events:
         value = duration_minutes(event)
         ended = event.occurred_end or event.occurred_start
@@ -98,7 +101,7 @@ def issue(
         ):
             eligible.append((event, value))
     eligible.sort(
-        key=lambda pair: (pair[0].occurred_end or pair[0].occurred_start, pair[0].event_id)
+        key=lambda pair: (pair[0].occurred_end or pair[0].occurred_start or "", pair[0].event_id)
     )
     eligible = eligible[-500:]
     values = [pair[1] for pair in eligible]
@@ -150,7 +153,7 @@ def evaluate(
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> dict[str, Any]:
+) -> JournalRow:
     prediction = journal.get(
         "prediction",
         prediction_id,
@@ -165,9 +168,7 @@ def evaluate(
         raise LifeInputError("LIFE_PREDICTION_TARGET_MISMATCH")
     actual = matches[0]
     # Explicit stable identity, never nearest semantic match.
-    if actual is None or (
-        actual.event_id != p["target_id"] and actual.source_item_id != p["target_id"]
-    ):
+    if actual.event_id != p["target_id"] and actual.source_item_id != p["target_id"]:
         raise LifeInputError("LIFE_PREDICTION_TARGET_MISMATCH")
     if actual.event_type != p["event_type"]:
         raise LifeInputError("LIFE_PREDICTION_TARGET_MISMATCH")
@@ -182,7 +183,9 @@ def evaluate(
         state = "unscored"
     else:
         state = "scored"
-    error = value - p["estimate_minutes"] if state == "scored" else None
+    error = (
+        value - number(p["estimate_minutes"]) if state == "scored" and value is not None else None
+    )
     body = {
         "prediction_id": prediction_id,
         "actual_event_id": actual.event_id,
@@ -192,8 +195,8 @@ def evaluate(
         "evaluated_at": now.isoformat(),
         "signed_error_minutes": error,
         "absolute_error_minutes": abs(error) if error is not None else None,
-        "recent_baseline_absolute_error": abs(value - p["baseline_recent_minutes"])
-        if state == "scored"
+        "recent_baseline_absolute_error": abs(value - number(p["baseline_recent_minutes"]))
+        if state == "scored" and value is not None
         else None,
         "initial_prediction_unchanged": True,
     }
@@ -215,7 +218,7 @@ def evaluate(
     )
 
 
-def metrics(rows: Sequence[dict[str, Any]]) -> dict[str, object]:
+def metrics(rows: Sequence[JournalRow]) -> LifePayload:
     scored = [r["body"] for r in rows if r["body"].get("state") == "scored"]
     if not scored:
         return {
@@ -224,8 +227,8 @@ def metrics(rows: Sequence[dict[str, Any]]) -> dict[str, object]:
             "mae_minutes": None,
             "recent_baseline_mae_minutes": None,
         }
-    mean_error = sum(r["absolute_error_minutes"] for r in scored) / len(scored)
-    baseline = sum(r["recent_baseline_absolute_error"] for r in scored) / len(scored)
+    mean_error = sum(number(r["absolute_error_minutes"]) for r in scored) / len(scored)
+    baseline = sum(number(r["recent_baseline_absolute_error"]) for r in scored) / len(scored)
     return {
         "state": "measured",
         "count": len(scored),
