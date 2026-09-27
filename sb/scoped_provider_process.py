@@ -13,7 +13,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import final
 
-from sb.effect_values import strict_loads
+from sb.effect_values import JsonValue, strict_loads
 
 _MAX_REQUEST = 32768
 _MAX_RESPONSE = 4096
@@ -47,7 +47,7 @@ class ScopedProviderProcess:
         self._env = MappingProxyType(dict(env))
         self._timeout = timeout_seconds
 
-    def __call__(self, request: object) -> object:
+    def __call__(self, request: bytes | JsonValue) -> JsonValue:
         if not isinstance(request, bytes) or not 0 < len(request) <= _MAX_REQUEST:
             raise ScopedProviderChannelError("SCOPED_PROVIDER_CHANNEL_INPUT_INVALID")
         deadline = time.monotonic() + self._timeout

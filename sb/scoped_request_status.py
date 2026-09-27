@@ -12,15 +12,15 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import cast
 
-from sb.effect_values import JsonObject, canonical_bytes, digest, parse_instant
+from sb.effect_values import JsonObject, JsonValue, canonical_bytes, digest, parse_instant
 from sb.request_store import RequestStore
-from sb.scoped_request_acceptance import _replay  # pyright: ignore[reportPrivateUsage]
+from sb.scoped_request_acceptance import replay_scoped_request
 from sb.scoped_request_journal import prepare_scoped_journal_entry
 from sb.source_access import SourceAccess
 
 
 def read_scoped_request_status(
-    store: RequestStore, value: object, *, expected_provider: str,
+    store: RequestStore, value: JsonValue, *, expected_provider: str,
     clock: Callable[[], datetime], resolve_scope: Callable[[datetime], SourceAccess | None],
     include_acceptance: bool = False,
 ) -> JsonObject:
@@ -35,7 +35,6 @@ def read_scoped_request_status(
     started = clock()
     if not isinstance(value, dict):
         raise TypeError(denied)
-    value = cast(dict[str, object], value)
     created = value.get("created_at")
     if not isinstance(created, str):
         raise TypeError(denied)
@@ -61,7 +60,7 @@ def read_scoped_request_status(
     if status is not None:
         if status.identity != entry.identity:
             raise ValueError(denied)
-        accepted = _replay(entry, status, started)
+        accepted = replay_scoped_request(entry, status, started)
         if include_acceptance:
             result["acceptance"] = cast(JsonObject, asdict(accepted))
         updated = parse_instant(status.updated_at)

@@ -7,6 +7,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sb.effect_values import JsonObject, JsonValue
 from sb.remember_body import plain_text_body
 from sb.scoped_write_identity import ScopedWriteIdentity, scoped_write_identity
 from sb.source_access import SourceAccess
@@ -14,13 +15,13 @@ from sb.source_access import SourceAccess
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
-def _object(value: object, keys: str) -> dict[str, object]:
+def _object(value: JsonValue, keys: str) -> JsonObject:
     if not isinstance(value, dict) or set(value) != set(keys.split()):
         raise ValueError("SCOPED_WRITE_PREPARATION_INVALID")
     return value
 
 
-def _hash(domain: str, value: object) -> str:
+def _hash(domain: str, value: JsonValue) -> str:
     raw = json.dumps(
         value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False
     ).encode()
@@ -38,9 +39,10 @@ class ScopedWritePreparation:
     expires_at: datetime
     preparation_digest: str
     canonical: bytes
+    content_digest: str
 
 
-def decode_scoped_write_preparation(value: object, *, now: datetime) -> ScopedWritePreparation:
+def decode_scoped_write_preparation(value: JsonValue, *, now: datetime) -> ScopedWritePreparation:
     """Check bytes and scope binding. Callers still need current write authority,
     policy validation, atomic review consumption and the versioned request contract.
     No file, ledger, provider request or approval is created here.
@@ -110,9 +112,10 @@ def decode_scoped_write_preparation(value: object, *, now: datetime) -> ScopedWr
         ):
             raise ValueError
         content = plain_text_body(payload["content"])
+        content_digest = _hash("orca-jarvis/memory-content/v1", content)
         if payload["subject_digest"] != _hash("orca-jarvis/memory-subject/v1", subject) or payload[
             "content_digest"
-        ] != _hash("orca-jarvis/memory-content/v1", content):
+        ] != content_digest:
             raise ValueError
         if (
             payload["purpose"] != "personal_memory"
@@ -127,10 +130,9 @@ def decode_scoped_write_preparation(value: object, *, now: datetime) -> ScopedWr
         )
         if root["preparation_digest"] != expected:
             raise ValueError
-        scope = json.loads(identity.canonical)
         return ScopedWritePreparation(
             identity,
-            SourceAccess(scope["owner"], tuple(scope["projects"]), scope["policy_revision"]),
+            SourceAccess("principal:owner", identity.projects, identity.policy_revision),
             subject,
             content,
             payload["sensitivity"],
@@ -140,6 +142,7 @@ def decode_scoped_write_preparation(value: object, *, now: datetime) -> ScopedWr
             json.dumps(
                 root, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
             ).encode(),
+            content_digest,
         )
     except (ValueError, TypeError, KeyError, UnicodeError, OverflowError) as exc:
         raise ValueError("SCOPED_WRITE_PREPARATION_INVALID") from exc
