@@ -25,13 +25,15 @@
 | M5 | native session/compaction/log/WAL/백업 사본 정정·삭제 수명 | blocked_external | 실사용자 native 처분. H2 stage는 배포됨 |
 | M6 | writer/lease 배제와 단일 작성자 전환·복구. 큐0≠작성자 배제 | verified | 2026-09-15 14:32 KST writer 배제·복구 실행. SB `8ea65a7d…` JARVIS `387c7c95…`. [CLAUDE-CUTOVER-2026-09-15.md](CLAUDE-CUTOVER-2026-09-15.md) |
 | M7 | 모든 지원 읽기 표면 범위 일관. 제목/snippet/score/원문/벡터/관계 불허 0 | implemented_unverified | 2026-09-14 memory_access+web+scoped_read_policy 36 passed |
-| M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | Claude 외 타 클라이언트. `GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md` |
+| M8 | 실제 사용 클라이언트별 수집·조회·쓰기·자동 주입 | blocked_external | 2026-09-27 격리 vault만. Codex 0.157.0 읽기·쓰기 PASS, 자동 주입 미지원. OmO 5.0.1 MCP 등록·쓰기 PASS, 읽기 FAIL(빈 인자). 운영 vault 미사용·운영 검증 아님. [M8-CLIENT-ACCEPTANCE-2026-09-27.md](M8-CLIENT-ACCEPTANCE-2026-09-27.md) |
 | M9 | 자비스 실제 세션 문맥 예산·중복 주입·compaction | implemented_unverified | SB hook `verified_isolated_native (manual)`. auto 트리거 미관측(코드 경로 동일). JARVIS 이벤트 없음 |
-| M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | blocked_external | 사용자 큐레이션 정답집 |
+| M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | implemented_unverified | 2026-09-27 격리 fixture 131케이스 exit 0 (`2e9f2cd`, 운영 vault 미사용). CLI hit@1 0.2087 recall@5 0.2348, MCP hit@1 0.2000 recall@5 0.2261. natural_question·paraphrase recall@5 0. 운영 프로브 미실행. [M10-EVALUATION-2026-09-27.md](M10-EVALUATION-2026-09-27.md) |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | during-compile 재실행. pinned-read 중 publish·현재핀 p50/p95 미측정 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | 2026-09-14 cold restore 1 passed. 현재핀 전체 DR 미실행 |
 | M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | blocked_external | 실사용자 처분. H3/H4 격리는 배포됨 |
 | M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | decided_off | [CLAUDE-M14-DECISION-2026-09-15.md](CLAUDE-M14-DECISION-2026-09-15.md) |
+
+> **2026-09-27 doctor 지연:** 개발 `sb.ops.doctor` citations 5360.19ms → 1812.99ms (합계 5930.15 → 2371.89ms, 12검사 모두 pass). dev CLI 3회 2.618 / 2.499 / 2.508초 exit 0 (10검사). 배포판 1.0.7 실측 6.1초·JARVIS `doctor_timeout`은 수정 전 관측이며 배포판은 바꾸지 않음. 운영 검증 아님. [DOCTOR-LATENCY-2026-09-27.md](DOCTOR-LATENCY-2026-09-27.md). 증거 `Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c5/`.
 
 > **최신 검토 및 실행 지시:** [CODEX-FOLLOWUP-REVIEW-2026-09-10.md](/home/jm/orca/projects/second-brain-app/CODEX-FOLLOWUP-REVIEW-2026-09-10.md). 전환 미실행. GUI HTTP 테스트 23 passed, 브라우저 없음. [W8 HTTP](W8-GUI-HTTP-2026-09-10.md).
 

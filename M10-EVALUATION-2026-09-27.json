@@ -1,0 +1,242 @@
+{
+  "state": "measured",
+  "workspace": "/var/tmp/m10-eval-20260927-st01a0e292/sb-korean-search-d_yzr97l",
+  "started_at": "2026-09-27T11:11:20.596481+00:00",
+  "dataset_id": "m10-gold-curated-2026-09-15",
+  "dataset_origin": "synthetic",
+  "provenance": "Claude Opus 5 curation of M10-GOLD-DRAFT-2026-09-15.json. Document bodies are verbatim sentences copied from the operational Second Brain vault generation sbgen:v1:d55ac3acaef3795c08448749437c9509cd4bb208aad5785356156c82dd86efe8 (wiki/ and wiki/_proposed/ only, read-only). dataset_origin is 'synthetic' because the schema enum offers only 'synthetic' or 'user_curated' and no user has reviewed these cases; the content itself is real, not invented.",
+  "dataset_sha256": "e751ce6acf971fd5d46763edc9d8483c20532b39fc2784b7198b4d258b741c10",
+  "source_tree_sha256": "6433fbe6050a1f52f195f16561324182f42b22be4c41d2e6248711de00f71b6f",
+  "harness_sha256": "c751748461e90d607f1649c5e1322139571bbe73f35b763add74c617ca4e2bbb",
+  "metrics_sha256": "ee44b54bc42b808334c214f9e8787d757eb2ac3807e3bd39e9439053172f9c4f",
+  "commit": "2e9f2cd288511ec4f30f882763fbed9fa666b103",
+  "python": "3.12.13 (main, Jul 18 2026, 17:02:19) [Clang 22.1.3 ]",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "load_average_before": [
+    2.4150390625,
+    2.09130859375,
+    2.0
+  ],
+  "documents": 40,
+  "cases": 131,
+  "limit": 5,
+  "min_similarity": -1.0,
+  "limitations": [
+    "isolated cited fixture pages; no ingestion, extraction or LLM answer evaluation",
+    "single trusted owner at genesis; no scope, supersession or deletion test",
+    "SDK stdio MCP, not agent app injection; hybrid False",
+    "synthetic data cannot replace the real-user 100–300 question acceptance",
+    "small corpus, one pass; latency is diagnostic, not capacity certification"
+  ],
+  "vault_before": "a630e802d6c4f7a3848008e1505a41fa9c292564a63c26369ca47e153a283a82",
+  "completed_cases": 131,
+  "metrics": {
+    "cli": {
+      "overall": {
+        "forbidden_labeled_cases": 2,
+        "forbidden_exposure_at_5": 0.0,
+        "positive_cases": 115,
+        "negative_cases": 16,
+        "hit_at_1": 0.20869565217391303,
+        "recall_at_5": 0.23478260869565218,
+        "mrr_at_5": 0.2217391304347826,
+        "negative_empty_rate": 1.0
+      },
+      "by_kind": {
+        "exact_phrase": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 9,
+          "negative_cases": 0,
+          "hit_at_1": 0.6666666666666666,
+          "recall_at_5": 0.6666666666666666,
+          "mrr_at_5": 0.6666666666666666,
+          "negative_empty_rate": null
+        },
+        "keyword": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 23,
+          "negative_cases": 0,
+          "hit_at_1": 0.6956521739130435,
+          "recall_at_5": 0.8260869565217391,
+          "mrr_at_5": 0.7608695652173914,
+          "negative_empty_rate": null
+        },
+        "natural_question": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 66,
+          "negative_cases": 0,
+          "hit_at_1": 0.0,
+          "recall_at_5": 0.0,
+          "mrr_at_5": 0.0,
+          "negative_empty_rate": null
+        },
+        "no_answer": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 0,
+          "negative_cases": 16,
+          "hit_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_5": null,
+          "negative_empty_rate": 1.0
+        },
+        "paraphrase": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 13,
+          "negative_cases": 0,
+          "hit_at_1": 0.0,
+          "recall_at_5": 0.0,
+          "mrr_at_5": 0.0,
+          "negative_empty_rate": null
+        },
+        "reordered_terms": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "mrr_at_5": 1.0,
+          "negative_empty_rate": null
+        },
+        "stale_decision": {
+          "forbidden_labeled_cases": 2,
+          "forbidden_exposure_at_5": 0.0,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 0.0,
+          "recall_at_5": 0.0,
+          "mrr_at_5": 0.0,
+          "negative_empty_rate": null
+        }
+      }
+    },
+    "mcp": {
+      "overall": {
+        "forbidden_labeled_cases": 2,
+        "forbidden_exposure_at_5": 0.0,
+        "positive_cases": 115,
+        "negative_cases": 16,
+        "hit_at_1": 0.2,
+        "recall_at_5": 0.22608695652173913,
+        "mrr_at_5": 0.21304347826086956,
+        "negative_empty_rate": 1.0
+      },
+      "by_kind": {
+        "exact_phrase": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 9,
+          "negative_cases": 0,
+          "hit_at_1": 0.6666666666666666,
+          "recall_at_5": 0.6666666666666666,
+          "mrr_at_5": 0.6666666666666666,
+          "negative_empty_rate": null
+        },
+        "keyword": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 23,
+          "negative_cases": 0,
+          "hit_at_1": 0.6521739130434783,
+          "recall_at_5": 0.782608695652174,
+          "mrr_at_5": 0.717391304347826,
+          "negative_empty_rate": null
+        },
+        "natural_question": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 66,
+          "negative_cases": 0,
+          "hit_at_1": 0.0,
+          "recall_at_5": 0.0,
+          "mrr_at_5": 0.0,
+          "negative_empty_rate": null
+        },
+        "no_answer": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 0,
+          "negative_cases": 16,
+          "hit_at_1": null,
+          "recall_at_5": null,
+          "mrr_at_5": null,
+          "negative_empty_rate": 1.0
+        },
+        "paraphrase": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 13,
+          "negative_cases": 0,
+          "hit_at_1": 0.0,
+          "recall_at_5": 0.0,
+          "mrr_at_5": 0.0,
+          "negative_empty_rate": null
+        },
+        "reordered_terms": {
+          "forbidden_labeled_cases": 0,
+          "forbidden_exposure_at_5": null,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 1.0,
+          "recall_at_5": 1.0,
+          "mrr_at_5": 1.0,
+          "negative_empty_rate": null
+        },
+        "stale_decision": {
+          "forbidden_labeled_cases": 2,
+          "forbidden_exposure_at_5": 0.0,
+          "positive_cases": 2,
+          "negative_cases": 0,
+          "hit_at_1": 0.0,
+          "recall_at_5": 0.0,
+          "mrr_at_5": 0.0,
+          "negative_empty_rate": null
+        }
+      }
+    }
+  },
+  "latency": {
+    "cli_search": {
+      "count": 131,
+      "p50_ms": 289.15979200974107,
+      "p95_ms": 326.0792111977935,
+      "max_ms": 472.76208689436316
+    },
+    "mcp_search": {
+      "count": 131,
+      "p50_ms": 47.00449202209711,
+      "p95_ms": 70.19013864919543,
+      "max_ms": 135.79545775428414
+    },
+    "mcp_read": {
+      "count": 34,
+      "p50_ms": 44.684331864118576,
+      "p95_ms": 66.03198917582631,
+      "max_ms": 87.13772473856807
+    }
+  },
+  "generation": {
+    "provider_instance_id": "provider:second-brain:linux",
+    "generation_id": "sbgen:v1:847d0ee419669e27f2fa5989d2fc0ddeb48fee0622419112733c110c8f01cb5a",
+    "generation_manifest_digest": "sha256:847d0ee419669e27f2fa5989d2fc0ddeb48fee0622419112733c110c8f01cb5a",
+    "vault_head": "a5d80570d8aba8bf7845896a534c8ce1954f878a",
+    "vault_tree": "1855cf8fc69b3ca10d0315f2677bef365e963d2e",
+    "tombstone_sequence": 0,
+    "tombstone_set_root": "sha256:7fb694c8abb7c9a4477aa38381c49446493bc4da1c01b50690c1db5b2c20b9d3"
+  },
+  "selected_record_checks": 34,
+  "gold_answer_checks": 26,
+  "sealed_files_unchanged": true,
+  "finished_at": "2026-09-27T11:12:08.798005+00:00",
+  "artifact_sha256": {
+    "dataset.json": "e751ce6acf971fd5d46763edc9d8483c20532b39fc2784b7198b4d258b741c10",
+    "cli.jsonl": "bdd5b5e8884545fc9e5e96af4f6adcfe608055339882afd842374ff38b882768",
+    "mcp.jsonl": "25a3df113da867c59b3c3efef54fb3772305905fe00fa077f186f913b2675426",
+    "rankings.jsonl": "a94464a8731d6a8875d4063ad0d9253ab83531d1359f6943085e57b698e5566f"
+  }
+}

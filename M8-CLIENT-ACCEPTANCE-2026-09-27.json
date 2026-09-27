@@ -1,0 +1,143 @@
+{
+  "title": "M8 client acceptance 2026-09-27",
+  "date": "2026-09-27",
+  "scope": "real Codex CLI and OmO clients against an isolated Second Brain MCP vault; no production vault, no persistent client-config edit by this task, no commit",
+  "binaries": {
+    "sb_release_id": "68eee51e09981d81d210ac4154532f0cf7229417",
+    "sb_release_source_commit": "2e9f2cd288511ec4f30f882763fbed9fa666b103",
+    "sb_contract_profile": "task32-schema4",
+    "second_brain_app_head_at_report": "99b496694556022b71d7b2b86932d6cafab10e29",
+    "orca_jarvis_head_at_report": "ffbd73d086f98d1e0f9fb3dfca0477f8c6e4240c",
+    "this_task_commit": null
+  },
+  "isolated_root": "/var/tmp/sb-m8-ef5f878d",
+  "isolated_root_deleted": true,
+  "fixture": {
+    "test_vault_copy": "empty directory copy of second-brain-app/.test-vault",
+    "vault": "fresh sb init plus one cited page wiki/m8-fixture",
+    "token": "M8FIXTURE9f3a2c1b",
+    "page_id": "wiki/m8-fixture",
+    "record_id": "sbrecord:v1:226c5c2a47c932654d69dc151f49325a25b480309216da4a90b7b64e095146bf",
+    "record_text": "The isolated M8 fixture fact token is M8FIXTURE9f3a2c1b."
+  },
+  "automatic_context_injection": {
+    "codex": {
+      "supported": false,
+      "basis": "GROK-CLIENT-CONNECTION-READINESS-2026-09-14.md: Codex has no public compact event; codex mcp add only. Not re-observed as a compaction event in this run."
+    },
+    "omo": {
+      "supported": false,
+      "basis": "Same readiness note: OmO public compaction event unconfirmed, injection unsupported. This run did not observe automatic context injection."
+    }
+  },
+  "clients": [
+    {
+      "client": "codex",
+      "version": "codex-cli 0.157.0",
+      "model_invocations": 2,
+      "automatic_context_injection_supported": false,
+      "attempts": [
+        {
+          "n": 1,
+          "model": "gpt-5.4",
+          "exit_code": 1,
+          "result": "external_blocker",
+          "error": "The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account.",
+          "tool_calls": 0,
+          "read_ok": false,
+          "write_ok": false,
+          "transcript": "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/codex-exec.jsonl"
+        },
+        {
+          "n": 2,
+          "model": "gpt-6-astra",
+          "exit_code": 0,
+          "thread_id": "01a0e299-2c8e-7913-b5f1-414743ea3226",
+          "invocation": "codex exec --ignore-user-config --ephemeral --skip-git-repo-check --json --color never -m gpt-6-astra -c model_catalog_json=... -c model_reasoning_effort=low -c mcp_servers.sb_m8.command=<isolated>/run-mcp.sh --dangerously-bypass-approvals-and-sandbox -C <isolated>/work",
+          "mcp_registration": "per-invocation -c override only; --ignore-user-config so ~/.codex/config.toml mcp_servers.second-brain was not loaded; config.toml mtime unchanged",
+          "tool_calls": [
+            {"server": "sb_m8", "tool": "sb_search", "status": "completed", "query": "M8FIXTURE9f3a2c1b"},
+            {"server": "sb_m8", "tool": "sb_read_page", "status": "completed", "id": "wiki/m8-fixture"},
+            {"server": "sb_m8", "tool": "sb_remember", "status": "completed", "title": "M8 isolated remember"}
+          ],
+          "read_ok": true,
+          "write_ok": true,
+          "inbox_path": "inbox/2026-09-27T112134781156-m8-isolated-remember.md",
+          "transcript": "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/codex-exec-2.jsonl",
+          "last_message": "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/codex-last-message.txt"
+        }
+      ],
+      "read_ok": true,
+      "write_ok": true,
+      "verdict": "PASS"
+    },
+    {
+      "client": "omo",
+      "version": "omo 5.0.1 (engine: senpi 2026.9.27)",
+      "model_invocations": 2,
+      "automatic_context_injection_supported": false,
+      "per_invocation_mcp": {
+        "supported": true,
+        "mechanism": "project mcp.json under brand configDir .omo, trusted for this run with --approve; also documented OMO_CODING_AGENT_DIR. User ~/.omo/omo.jsonc and ~/.codex/config.toml were not edited. No ~/.omo/agent/mcp.json was created.",
+        "help_proof": "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/client-help.txt"
+      },
+      "attempts": [
+        {
+          "n": 1,
+          "provider": "anthropic",
+          "model_requested": "claude-opus-5-5",
+          "exit_code": 0,
+          "result": "external_blocker_then_wrong_tool_surface",
+          "error": "400 Third-party apps now draw from your extra usage, not your plan limits. Add more at claude.ai/settings/usage and keep going.",
+          "fallback": "cursor-cli-oauth/claude-opus-5",
+          "tool_calls_sb": 0,
+          "read_ok": false,
+          "write_ok": false,
+          "note": "Cursor fallback listed Cursor plugin namespaces only. sbm8 was registered by senpi (log warning at startup race) but was not in that model's tool catalog.",
+          "transcript": "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/omo-exec.json"
+        },
+        {
+          "n": 2,
+          "provider": "xai",
+          "model": "grok-4.7",
+          "exit_code": 0,
+          "flags": "--no-model-fallback --approve --mode json --no-session --omo-senpi-builtin-mcps-disabled",
+          "tool_calls": [
+            {"tool": "mcp_sbm8_sb_search", "args": {}, "is_error": true, "error": "query Field required"},
+            {"tool": "mcp_sbm8_sb_read_page", "args": {}, "is_error": true, "error": "id Field required"},
+            {"tool": "mcp_sbm8_sb_remember", "args": {"title": "M8 omo remember", "content": "M8OMOFACT3b1e6a9c isolated omo write landed"}, "is_error": false}
+          ],
+          "read_ok": false,
+          "write_ok": true,
+          "inbox_path": "inbox/2026-09-27T112659158395-m8-omo-remember.md",
+          "schema_note": "Model reported published schemas had no parameters, so query and id were dropped. Independent list_tools on the same server shows query and id required. Client exposure failure, not a server search failure.",
+          "transcript": "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/omo-exec-2.json"
+        }
+      ],
+      "read_ok": false,
+      "write_ok": true,
+      "verdict": "PARTIAL"
+    }
+  ],
+  "independent_verification": {
+    "mcp_search_read_ok": true,
+    "cli_search_ok": true,
+    "codex_write_in_inbox": true,
+    "omo_write_in_inbox": true,
+    "writes_in_requests_pending": false,
+    "compiled_search_of_new_facts": "empty; remember lands in inbox, not the compiled index",
+    "paths": [
+      "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/independent-after-codex.txt",
+      "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/independent-readback.txt",
+      "/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c6/independent-mcp-readback.json"
+    ]
+  },
+  "isolation_checks": {
+    "codex_config_toml_unchanged": true,
+    "sb_production_config_unchanged": true,
+    "production_share_and_state_dir_mtime_unchanged": true,
+    "omo_jsonc_unchanged": true,
+    "omo_agent_settings_json_side_effect": "size 7612 -> 7610 during the OmO process; not hand-edited; not reverted because the pre-image was not saved",
+    "accidental_unscoped_sb_search": "one sb search ran before SB_CONFIG was exported, returned [], production vault/.sb/search.db mtime did not move"
+  }
+}
