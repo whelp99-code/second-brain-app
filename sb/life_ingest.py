@@ -9,15 +9,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
-from typing import Any
 
 from sb.config import Config
+from sb.connectors.records_life import LifeRecordsAdapter
 from sb.life_config import policy_for, settings
 from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_exports import parse_export
 from sb.life_values import parse_event
 from sb.store import SourceItem
+from sb.store.ledger import Ledger
 from sb.store.life_journal import LifeJournal, identity
+from sb.store.life_rows import integer, one
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +33,13 @@ class LifeIngestResult:
 
 
 def prepare_exports(
-    config: Config, ledger: Any, adapter: Any, *, run_id: str, now: datetime, maximum: int
+    config: Config,
+    ledger: Ledger,
+    adapter: LifeRecordsAdapter,
+    *,
+    run_id: str,
+    now: datetime,
+    maximum: int,
 ) -> LifeIngestResult:
     policy = policy_for(config, adapter.source_id, admission=False)
     if not policy.enabled:
@@ -72,23 +80,25 @@ def prepare_exports(
                 )
                 ledger.upsert_source_item(source)
                 ledger.bind_source_access(source, config.source_access[ref.source_id])
-                staged = []
+                staged: list[LifeEventV1] = []
                 for payload in rows:
                     event = parse_event(payload, policy, recorded_at=now)
-                    current = store.connection.execute(
+                    current = one(
+                        store.connection,
                         "SELECT current_revision,deleted FROM life_events WHERE event_id=?",
                         (event.event_id,),
-                    ).fetchone()
+                    )
                     if current is not None and current[1]:
                         # A repeated source export cannot reverse user withdrawal.
                         continue
-                    revision = None if current is None else current[0]
+                    revision = None if current is None else integer(current[0])
                     if current is not None:
                         prior = store.get(event.event_id, scopes=policy.scopes, now=now)
-                        known = store.connection.execute(
+                        known = one(
+                            store.connection,
                             "SELECT 1 FROM life_event_revisions WHERE event_id=? AND source_version=?",
                             (event.event_id, event.source_version),
-                        ).fetchone()
+                        )
                         if (
                             known is None
                             and prior.evidence_level == "user_asserted"
@@ -119,7 +129,12 @@ def prepare_exports(
 
 
 def complete_exports(
-    ledger: Any, adapter: Any, result: LifeIngestResult, *, config: Config, now: datetime
+    ledger: Ledger,
+    adapter: LifeRecordsAdapter,
+    result: LifeIngestResult,
+    *,
+    config: Config,
+    now: datetime,
 ) -> None:
     """Called only after publication, under the same pipeline writer boundary."""
     if result.state == "off":
@@ -131,7 +146,7 @@ def complete_exports(
     with ledger.transaction():
         if result.next_cursor is not None:
             ledger.set_cursor(adapter.source_id, result.next_cursor, now.isoformat())
-        journal.put(
+        _ = journal.put(
             "collection",
             cid,
             {
