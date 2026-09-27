@@ -3,8 +3,7 @@ from __future__ import annotations
 import multiprocessing
 import sqlite3
 from collections.abc import Callable
-from contextlib import nullcontext
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime
 from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Event
@@ -14,70 +13,26 @@ from unittest.mock import patch
 import pytest
 from pydantic import TypeAdapter
 
-from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.correction_cancellation_requests import accept_correction_cancellation
 from sb.effect_values import JsonObject, JsonValue, is_json_object, parse_instant
 from sb.effect_write_models import MemoryEffectWriteRequestV2
 from sb.effect_write_requests import accept_effect_request, request_identity
 from sb.effect_write_values import frozen_correction_vector
-from sb.generations import Generation, GenerationManifestV1
 from sb.request_store import ReplayConflict, RequestStore
 from sb.task30_barriers import BarrierEvent, Task30BarrierId
 from sb.tombstone_snapshot import register_target_identities, verified_snapshot
+from tests.cancellation_journal_fixture import NOW, intent, journal_only_generations
 from tests.test_correction_cancellation import (
     CURRENT,
     HISTORICAL,
-    cancellation_fixture,
     resign,
     validate,
 )
-
-NOW = parse_instant("2026-08-31T00:00:01.000Z")
 
 
 def _object(value: JsonValue) -> JsonObject:
     assert is_json_object(value)
     return value
-
-
-def intent() -> JsonObject:
-    return resign({**cancellation_fixture(), "issued_at": "2026-08-31T00:00:01.000Z",
-        "not_before": "2026-08-31T00:00:01.000Z", "expires_at": "2026-08-31T00:05:00.000Z"})
-
-
-@dataclass(frozen=True)
-class JournalRoot:
-    root: Path
-
-
-@dataclass(frozen=True)
-class JournalGenerations:
-    requests: JournalRoot
-    generation: Generation
-    provider_instance_id: str = "provider:fixture"
-
-    def exclusive(self) -> nullcontext[None]:
-        return nullcontext()
-
-    def active(self) -> Generation:
-        return self.generation
-
-
-def journal_only_generations(root: Path) -> JournalGenerations:
-    """Isolate journal serialization; integration tests check the real target and locks."""
-    value = CorrectionCancellationIntentV1.model_validate(intent())
-    target = value.target
-    manifest = GenerationManifestV1(
-        schema_version=1, generation_id=target.generation_id,
-        generation_digest=target.generation_manifest_digest,
-        provider_instance_id=value.provider_instance_id, provider_release_sha="a" * 40,
-        parent_generation_id=None, head=target.vault_head, tree=target.vault_tree,
-        tombstone_sequence=0, tombstone_set_root=value.tombstone.previous_root,
-        content_manifest_digest="", ledger_manifest_digest="", lexical_manifest_digest="",
-        vector_manifest_digest="", briefing_manifest_digest="", file_count=0, byte_count=0,
-        created_at=value.issued_at,
-    )
-    return JournalGenerations(JournalRoot(root), Generation(manifest, root))
 
 
 def accept(root: Path, value: JsonValue = None, clock: Callable[[], datetime] = lambda: NOW) -> tuple[JsonObject, bool]:
