@@ -3,88 +3,63 @@
 from __future__ import annotations
 
 import hashlib
-import weakref
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
-from typing import Final, Protocol
+from typing import Final
 
+from sb.compile_cache import BodyCache
+from sb.compile_models import CompileLedger, PendingCompile
+from sb.compile_sources import (
+    ORIGIN_DIGEST_LEN,
+    SID_LEN,
+    page_id_for_origin,
+)
+from sb.compile_sources import (
+    group_by_page as _group_by_page,
+)
+from sb.compile_sources import (
+    merge_sources as _merge_sources,
+)
+from sb.compile_sources import (
+    sources_for_units as _sources,
+)
+from sb.compile_sources import (
+    title_for_origin as _title,
+)
+from sb.compile_sources import (
+    unit_block as _unit_block,
+)
+from sb.compile_state import compile_state_report
 from sb.config import Config
-from sb.contracts import PageSpec, SourceCite, Unit
+from sb.contracts import PageSpec, Unit
 from sb.llm import LLMClient, LLMUnavailable
 from sb.security import protect_units, source_llm_policy
-from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
+from sb.store import DerivationOutput, DerivStatus, deriv_key
+
+__all__ = [
+    "CAPPED_PAGE_ID",
+    "CAPPED_STATUS",
+    "COMPILE_RUN_ID",
+    "COMPILE_STAGE",
+    "ORIGIN_DIGEST_LEN",
+    "SID_LEN",
+    "CompileLedger",
+    "PendingCompile",
+    "compile_page_key",
+    "compile_pages",
+    "compile_pending",
+    "compile_state_report",
+    "page_id_for_origin",
+]
 
 COMPILE_STAGE: Final = "compile"
 COMPILE_RUN_ID: Final = "compile"
 CAPPED_PAGE_ID: Final = "CAPPED"
 CAPPED_STATUS: Final = "CAPPED"
-SID_LEN: Final = 8
-ORIGIN_DIGEST_LEN: Final = 8
-_MD_SUFFIX: Final = ".md"
 
 
-class CompileLedger(Protocol):
-    """Ledger derivation surface used by compile. Matches sb.store.ledger.Ledger."""
-
-    def get_derivation(self, key: str) -> Derivation | None: ...
-
-    def ensure_derivation(self, key: str, stage: str, run_id: str) -> None: ...
-
-    def mark_running(self, key: str, run_id: str) -> None: ...
-
-    def mark_done(self, key: str, output: DerivationOutput) -> None: ...
-
-    def mark_failed(self, key: str, error: str) -> None: ...
-
-    def requeue_failed(self, key: str, *, max_attempts: int | None = None) -> bool: ...
-
-
-@dataclass(frozen=True, slots=True)
-class PendingCompile:
-    """A generated page whose derivation is finalized only after durable vault write."""
-
-    page: PageSpec
-    key: str
-    output: DerivationOutput
-    input_sources: tuple[tuple[str, str], ...] = ()
-    untracked_context: bool = True
-
-
-class _BodyCache:
-    """Bodies belong to one live ledger instance, never a recycled object id."""
-
-    def __init__(self) -> None:
-        self._data: dict[int, tuple[weakref.ReferenceType[CompileLedger], dict[str, str]]] = {}
-
-    def get(self, ledger: CompileLedger, page_id: str) -> str:
-        entry = self._data.get(id(ledger))
-        if entry is None or entry[0]() is not ledger:
-            return ""
-        return entry[1].get(page_id, "")
-
-    def put(self, ledger: CompileLedger, page_id: str, body: str) -> None:
-        key = id(ledger)
-        entry = self._data.get(key)
-        if entry is None or entry[0]() is not ledger:
-            def discard(reference: weakref.ReferenceType[CompileLedger]) -> None:
-                current = self._data.get(key)
-                if current is not None and current[0] is reference:
-                    del self._data[key]
-
-            try:
-                reference = weakref.ref(ledger, discard)
-            except TypeError:
-                # Non-weak-referenceable implementations can supply explicit
-                # existing_bodies/pages; retaining them globally is unsafe.
-                return
-            bucket: dict[str, str] = {}
-            entry = (reference, bucket)
-            self._data[key] = entry
-        entry[1][page_id] = body
-
-
-_BODIES: Final = _BodyCache()
+_BODIES: Final = BodyCache[CompileLedger]()
 
 
 def compile_pages(
@@ -280,83 +255,6 @@ def _prepare_compile(ledger: CompileLedger, key: str, max_attempts: int) -> bool
     return row is None or row.status == DerivStatus.PENDING.value
 
 
-def _group_by_page(units: Sequence[Unit]) -> list[tuple[str, tuple[Unit, ...]]]:
-    grouped: dict[str, list[Unit]] = {}
-    for unit in units:
-        grouped.setdefault(_page_id(unit.origin), []).append(unit)
-    pages: list[tuple[str, tuple[Unit, ...]]] = []
-    for page_id in sorted(grouped):
-        members = tuple(sorted(grouped[page_id], key=lambda item: item.unit_id))
-        pages.append((page_id, members))
-    return pages
-
-
-def _page_id(origin: str) -> str:
-    return page_id_for_origin(origin)
-
-
-def page_id_for_origin(origin: str) -> str:
-    """Return the stable wiki page id used for one source origin."""
-    trimmed = origin.removesuffix(_MD_SUFFIX)
-    chars: list[str] = []
-    for char in trimmed:
-        chars.append(char.lower() if char.isalnum() else "-")
-    slug = "".join(chars)
-    while "--" in slug:
-        slug = slug.replace("--", "-")
-    digest = hashlib.sha256(origin.encode("utf-8")).hexdigest()[:ORIGIN_DIGEST_LEN]
-    return f"{slug.strip('-')}-{digest}"
-
-
-def _title(origin: str) -> str:
-    _, sep, rest = origin.partition(":")
-    path = rest if sep else origin
-    return path.rsplit("/", 1)[-1].removesuffix(_MD_SUFFIX)
-
-
-def _sources(units: Sequence[Unit]) -> list[SourceCite]:
-    order: list[str] = []
-    spans: dict[str, list[str]] = {}
-    meta: dict[str, tuple[str, str]] = {}
-    for unit in units:
-        sid = unit.content_hash[:SID_LEN]
-        if sid not in meta:
-            order.append(sid)
-            meta[sid] = (unit.origin, unit.content_hash)
-            spans[sid] = []
-        spans[sid].append(unit.span)
-    return [
-        SourceCite(sid=sid, origin=meta[sid][0], hash=meta[sid][1], spans=list(spans[sid]))
-        for sid in order
-    ]
-
-
-def _merge_sources(
-    existing: Sequence[SourceCite], current: Sequence[SourceCite]
-) -> list[SourceCite]:
-    merged: dict[tuple[str, str, str], SourceCite] = {}
-    order: list[tuple[str, str, str]] = []
-    for cite in (*existing, *current):
-        key = (cite.sid, cite.origin, cite.hash)
-        stored = merged.get(key)
-        if stored is None:
-            order.append(key)
-            merged[key] = SourceCite(cite.sid, cite.origin, cite.hash, list(cite.spans))
-            continue
-        for span in cite.spans:
-            if span not in stored.spans:
-                stored.spans.append(span)
-    return [merged[key] for key in order]
-
-
-def _unit_block(units: Sequence[Unit]) -> str:
-    lines: list[str] = []
-    for unit in units:
-        sid = unit.content_hash[:SID_LEN]
-        lines.append(f"sid={sid} origin={unit.origin} span={unit.span}")
-        lines.append(unit.text)
-    return "\n".join(lines)
-
 
 def _prompt_template() -> str:
     return (files("sb") / "prompts" / "compile.md").read_text(encoding="utf-8")
@@ -370,40 +268,3 @@ def _capped_marker() -> PageSpec:
         sources=[],
         status=CAPPED_STATUS,
     )
-
-
-def compile_state_report(
-    config: Config,
-    *,
-    dry_run: bool = False,
-    project: bool = False,
-) -> dict[str, object]:
-    """Read the knowledge registry. Never write the vault. Never create status rows."""
-    from pathlib import Path
-
-    from sb.knowledge_registry import KnowledgeRegistry
-    from sb.search import SearchIndex, resolve_registry_path
-
-    root = Path(config.vault_root)
-    explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
-    path = resolve_registry_path(root, explicit)
-    registry = KnowledgeRegistry(path)
-    states = registry.read_snapshot()
-    counts: dict[str, int] = {}
-    for state in states:
-        counts[state.knowledge_status] = counts.get(state.knowledge_status, 0) + 1
-    projected = False
-    if project and not dry_run:
-        SearchIndex(vault_root=root, registry_path=path).project()
-        projected = True
-    return {
-        "dry_run": dry_run,
-        "state_report": True,
-        "vault_written": False,
-        "status_created": False,
-        "projected": projected,
-        "projection_mode": "read-time" if (root / "generation.json").is_file() else "index",
-        "registry_path": str(path),
-        "pages": [state.as_dict() for state in states],
-        "counts": counts,
-    }
