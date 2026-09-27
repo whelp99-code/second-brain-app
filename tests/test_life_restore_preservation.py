@@ -114,6 +114,7 @@ def test_captured_current_state_applies_after_sanitized_generation_clear(tmp_pat
     (destination / "wiki").mkdir()
     _ = (destination / "wiki" / "unrelated.md").write_text("user source unaffected")
     result = materialize(state, destination, old_archive_has_life=True)
+    assert "events" in result
     assert result["events"] == 1
     assert (destination / "wiki" / "unrelated.md").read_text() == "user source unaffected"
     with Ledger(destination) as ledger:
