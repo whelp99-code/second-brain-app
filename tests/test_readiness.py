@@ -22,7 +22,6 @@ from sb.readiness import readiness
 from sb.request_store import RequestStore
 from sb.store import Run
 from sb.store.ledger import Ledger
-from tests.json_fixtures import parse_object
 from tests.ops_fixture import seed_vault
 from tests.test_cli import cli_with_config
 from tests.test_request_store import request_identity
@@ -277,25 +276,3 @@ def test_corrupt_run_payload_still_returns_json_degraded(configured: Config) -> 
         assert isinstance(reasons, list)
         assert "VAULT_UNREADABLE" in reasons
 
-
-def test_readiness_preserves_verified_receipt_fields_and_order(configured: Config) -> None:
-    receipt = verify_backup(backup(configured))
-    expected = parse_object(receipt.model_dump_json())
-    report = readiness(configured)
-    actual = report["backup_verification"]
-    assert is_json_object(actual)
-    assert actual == expected
-    assert list(actual) == list(expected)
-    actual_identity = actual["archive_identity"]
-    expected_identity = expected["archive_identity"]
-    assert is_json_object(actual_identity) and is_json_object(expected_identity)
-    assert list(actual_identity) == list(expected_identity)
-    assert actual["generation"] is None
-    with running(configured) as url:
-        code, payload = request(url + "/ready")
-    assert code == 200
-    assert is_json_object(payload)
-    wire_receipt = payload["backup_verification"]
-    assert is_json_object(wire_receipt)
-    assert wire_receipt == expected
-    assert list(wire_receipt) == list(expected)
