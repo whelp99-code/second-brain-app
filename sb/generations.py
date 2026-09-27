@@ -635,7 +635,7 @@ class GenerationStore:
                 "SELECT DISTINCT generation_id FROM reader_leases",
             ).fetchall()
             pinned = {str(row[0]) for row in rows if row[0]}
-        changed = 0
+        changed = self._discard_obsolete_sealed(now, current_id, pinned)
         rows = self.journal.execute(
             "SELECT generation_id, pointer_target FROM activations WHERE phase='activated'",
         ).fetchall()
@@ -663,6 +663,42 @@ class GenerationStore:
             changed += int(updated)
         if changed:
             self.journal.commit()
+        return changed
+
+    def _discard_obsolete_sealed(self, now: datetime, current_id: str | None,
+                                 pinned: set[str]) -> int:
+        if current_id is None:
+            return 0
+        changed = 0
+        rows = cast(list[tuple[str, str | None]], self.journal.execute(
+            "SELECT generation_id,parent_generation_id FROM activations WHERE phase='sealed'",
+        ).fetchall())
+        for generation_id, parent_id in rows:
+            # A child of current may still resume. Only a sibling whose base was
+            # already disposed is impossible to activate through the state machine.
+            if (generation_id == current_id or generation_id in pinned or parent_id is None
+                    or parent_id == current_id or (self.generations / parent_id).exists()):
+                continue
+            root = self.generations / generation_id
+            if root.exists():
+                generation = self.generation(generation_id)
+                if _proc_descriptors(generation.root):
+                    raise GenerationError("GENERATION_READER_DRAIN_REQUIRED")
+                retired = self.staging / hashlib.sha256(generation_id.encode()).hexdigest()
+                root.chmod(0o700)
+                os.replace(root, retired)
+                _directory_fsync(self.generations)
+                _directory_fsync(self.staging)
+            # Reuse validated descriptor-relative disposal. A crash after rename
+            # leaves a normal abandoned stage; the next maintenance finishes it.
+            _ = self.discard_abandoned_staging()
+            disposal = digest("generation", {"reason": "obsolete-sealed",
+                "generation_id": generation_id, "disposed": True})
+            changed += self.journal.execute(
+                "UPDATE activations SET phase='proved',disposal_digest=?,updated_at=? "
+                + "WHERE generation_id=? AND phase='sealed'",
+                (disposal, format_instant(now), generation_id),
+            ).rowcount
         return changed
 
     @contextmanager
