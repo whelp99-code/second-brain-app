@@ -7,6 +7,7 @@ import stat
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
+from sb.managed_backup_manifest import validate_backup_archive
 from sb.managed_file_inspection import ManagedInspectionError, fingerprint, inspect_managed_file
 
 
@@ -23,9 +24,21 @@ def purge_matching_managed_copies(roots: Iterable[Path], needles: Sequence[bytes
             metadata = path.stat(follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
                 continue
-            inspected = inspect_managed_file(path, needles)
-            if inspected.matches:
-                planned[path] = inspected.fingerprint
+            try:
+                inspected = inspect_managed_file(path, needles)
+                matched, identity = bool(inspected.matches), inspected.fingerprint
+            except ManagedInspectionError as exc:
+                if (not path.name.endswith(".tar.gz") or str(exc) not in {
+                    "MANAGED_ARCHIVE_UNSUPPORTED", "MANAGED_ARCHIVE_INVALID",
+                }):
+                    raise
+                # A valid backup can contain opaque/corrupt source documents. Never
+                # retain it on a false absence claim: validate its container, then
+                # conservatively dispose the entire copy and its sidecars.
+                identity = validate_backup_archive(path, for_disposal=True)
+                matched = True
+            if matched:
+                planned[path] = identity
                 for suffix in (".sha256", ".verified.json"):
                     companion = path.with_name(path.name + suffix)
                     if companion.exists() or companion.is_symlink():

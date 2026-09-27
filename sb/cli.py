@@ -356,6 +356,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if not _opt_flag(ns, "once"):
             print("maintain requires --once", file=sys.stderr)
             return 2
+        from sb.owner_effects import recover_owner_effects
+
+        recovered = recover_owner_effects(config)
         mutations = GenerationMutationService.from_config(config)
         try:
             now = datetime.now(UTC)
@@ -378,7 +381,8 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         print(
             json.dumps(
                 {"disposed_exports": len(result.disposed_export_digests),
-                 "disposed_staging": len(result.disposed_staging_keys), **restore_report},
+                 "disposed_staging": len(result.disposed_staging_keys),
+                 "recovered_owner_effects": recovered, **restore_report},
                 sort_keys=True,
                 separators=(",", ":"),
             )

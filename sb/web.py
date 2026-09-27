@@ -19,6 +19,7 @@ from sb.config import Config, load_config
 from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, discard_inbox, write_inbox
+from sb.managed_file_inspection import ManagedInspectionError
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
 from sb.ops import status_snapshot
@@ -558,6 +559,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 self._post()
             except OwnerEffectError as exc:
                 self._json(HTTPStatus.CONFLICT, {"error": str(exc)})
+            except ManagedInspectionError as exc:
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
             except (
                 ValueError,
                 TypeError,

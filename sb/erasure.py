@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import final
 
+from sb.briefing import CANONICAL_RE
 from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.correction_rendering import correction_marker, render_correction
 from sb.effect_values import canonical_bytes, format_instant
@@ -169,6 +170,12 @@ class ErasureEngine:
                     raise ErasureError("EFFECT_TARGET_AMBIGUOUS")
                 successor = successor[:start] + replacement_bytes + successor[end:]
                 boundary = start
+            if plan.source_hashes:
+                # Daily input evidence is another rendering of the erased raw source,
+                # not an unrelated statement to rebind to the correction receipt.
+                successor = b"".join(line for line in successor.splitlines(keepends=True)
+                    if not ((evidence := CANONICAL_RE.search(line.decode("utf-8")))
+                            and evidence.group(2).lower() in plan.source_hashes))
             self._write_private(page, successor)
         if plan.remove_pages:
             for page_id in {target.page_id for target in plan.targets}:
@@ -181,9 +188,15 @@ class ErasureEngine:
                 body = path.read_bytes()
             except OSError as exc:
                 raise ErasureError("SURFACE_SCAN_FAILED") from exc
+            relative = path.relative_to(root).as_posix()
+            source_linked_page = relative.startswith(("wiki/", "daily/", "conflicts/"))
             if (any(prior in body for prior in prior_records)
-                    or any(value.encode("ascii") in body for value in plan.source_hashes)):
-                relative = path.relative_to(root).as_posix()
+                    or (source_linked_page and any(
+                        value.encode("ascii") in body for value in plan.source_hashes))):
+                # Hash-only operational history is not a derived content copy.
+                # Never erase unrelated ledger rows by unlinking the database.
+                if relative == ".sb/ledger.db":
+                    raise ErasureError("MANAGED_COPY_REMAINS")
                 if relative.startswith("raw/"):
                     erased_hashes.add(path.name)
                 path.unlink()

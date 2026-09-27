@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sb.effect_values import is_json_object, strict_loads
 from sb.managed_file_inspection import (
+    MAX_FILE_BYTES,
+    ManagedFileInspection,
     ManagedInspectionError,
     ManagedTarInfo,
     fingerprint,
@@ -38,7 +40,7 @@ class _Entry(BaseModel):
 class _Manifest(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", strict=True, frozen=True)
     format: Literal["second-brain-backup-v1"]
-    origin: str = Field(min_length=1)
+    origin: str | None = Field(default=None, min_length=1)
     created_at: str
     app_version: str
     schema_version: int = Field(ge=0)
@@ -67,11 +69,13 @@ def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
     return result
 
 
-def _entries(payload: bytes) -> dict[str, _Entry]:
+def _entries(payload: bytes, *, for_disposal: bool = False) -> dict[str, _Entry]:
     if len(payload) > MAX_MANIFEST:
         raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
     # Backup JSON is not a signed wire envelope: preserve valid Unicode and whitespace.
     manifest = _Manifest.model_validate(cast(object, json.loads(payload, object_pairs_hook=_unique_pairs)))
+    if manifest.origin is None and not for_disposal:
+        raise ManagedInspectionError("BACKUP_MANIFEST_INVALID")
     if datetime.fromisoformat(manifest.created_at).utcoffset() is None:
         raise ManagedInspectionError("BACKUP_MANIFEST_INVALID")
     entries: dict[str, _Entry] = {}
@@ -94,12 +98,33 @@ def _entries(payload: bytes) -> dict[str, _Entry]:
     return entries
 
 
-def validate_backup_archive(archive: Path) -> None:
-    """Validate all members without extracting. Current restore authority is a separate gate."""
+def _disposal_identity(archive: Path) -> ManagedFileInspection:
+    descriptor = os.open(archive, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with os.fdopen(descriptor, "rb") as source:
+        before = os.fstat(source.fileno())
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1
+                or before.st_size > MAX_FILE_BYTES):
+            raise ManagedInspectionError("MANAGED_SURFACE_UNSAFE")
+        sha = hashlib.file_digest(source, "sha256").hexdigest()
+        if fingerprint(before) != fingerprint(os.fstat(source.fileno())):
+            raise ManagedInspectionError("MANAGED_SURFACE_CHANGED")
+        # Unknown content is a potential match, NEVER evidence of absence.
+        return ManagedFileInspection("sha256:" + sha, before.st_size, 1, fingerprint(before))
+
+
+def validate_backup_archive(archive: Path, *, for_disposal: bool = False) -> tuple[int, ...]:
+    """Validate the canonical container. Opaque payloads may only authorize whole-copy disposal."""
     try:
-        inspected = inspect_managed_file(archive, ())
-        checksum = _small_file(archive.with_name(archive.name + ".sha256"), 8192).decode("utf-8")
-        if checksum != f"{inspected.digest.removeprefix('sha256:')}  {archive.name}\n":
+        inspected = _disposal_identity(archive) if for_disposal else inspect_managed_file(archive, ())
+        try:
+            checksum = _small_file(archive.with_name(archive.name + ".sha256"), 8192).decode("utf-8")
+        except FileNotFoundError:
+            if not for_disposal:
+                raise
+            # Disposal removes sidecars first. Replay still requires every
+            # manifest member/hash and the gzip trailer below to validate.
+            checksum = None
+        if checksum is not None and checksum != f"{inspected.digest.removeprefix('sha256:')}  {archive.name}\n":
             raise ManagedInspectionError("BACKUP_CHECKSUM_MISMATCH")
         descriptor = os.open(archive, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
         with os.fdopen(descriptor, "rb") as source:
@@ -122,7 +147,7 @@ def validate_backup_archive(archive: Path) -> None:
                 if payload is None:
                     raise ManagedInspectionError("BACKUP_MANIFEST_INVALID")
                 with payload:
-                    entries = _entries(payload.read(MAX_MANIFEST + 1))
+                    entries = _entries(payload.read(MAX_MANIFEST + 1), for_disposal=for_disposal)
                 seen: set[str] = set()
                 for member in bundle:
                     if member is first:
@@ -154,8 +179,14 @@ def validate_backup_archive(archive: Path) -> None:
                         raise ManagedInspectionError("BACKUP_MANIFEST_MISMATCH")
                 if seen != set(entries):
                     raise ManagedInspectionError("BACKUP_MANIFEST_MISMATCH")
+                trailing = 0
+                while block := decoded.read(65_536):
+                    trailing += len(block)
+                    if trailing > MAX_MANIFEST:
+                        raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
             if fingerprint(os.fstat(source.fileno())) != inspected.fingerprint:
                 raise ManagedInspectionError("MANAGED_SURFACE_CHANGED")
+        return inspected.fingerprint
     except (OSError, EOFError, ValueError, RecursionError, tarfile.TarError) as exc:
         raise ManagedInspectionError("UNMANIFESTED_BACKUP") from exc
 
@@ -176,7 +207,7 @@ def _validate_managed_backups(root: Path) -> None:
             if not is_json_object(manifest) or manifest.get("schema_version") != 1:
                 raise ManagedInspectionError("UNMANIFESTED_BACKUP")
         elif not path.name.endswith((".sha256", ".verified.json")):
-            validate_backup_archive(path)
+            _ = validate_backup_archive(path)
             companions.update(
                 (
                     path.with_name(path.name + ".sha256"),

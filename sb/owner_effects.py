@@ -9,6 +9,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import os
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -192,14 +193,41 @@ def apply_page_effect(config: Config, page_id: str, operation: Literal["correct"
     ):
         raise OwnerEffectError("EFFECT_RECEIPT_REQUIRED")
     checked_receipt = cast(dict[str, str], supplied)
+    request_digest = "sha256:" + hashlib.sha256(canonical_bytes({
+        "page_id": page_id, "operation": operation, "receipt": checked_receipt,
+        "record_id": record_id, "content": content})).hexdigest()
+
+    def prepare(service: GenerationMutationService) -> OwnerEffect:
+        active = service.store.active()
+        high_water = service.requests.tombstone_high_water()
+        if (active.manifest.tombstone_sequence, active.manifest.tombstone_set_root) != high_water:
+            raise OwnerEffectError("OWNER_EFFECT_RECOVERY_REQUIRED")
+        return _prepare(active, page_id, operation, checked_receipt,
+            record_id, content, request_digest, high_water, datetime.now(UTC))
+
+    return _apply_effect(config, request_digest, prepare)
+
+
+def recover_owner_effects(config: Config) -> int:
+    """Replay durable intents, including admission-before-activation and lost results."""
+    folder = generation_runtime_paths(config).state / "owner-effects"
+    pending = [OwnerEffect.model_validate_json(path.read_bytes())
+               for path in sorted(folder.glob("*.json"))]
+    recovered = 0
+    for effect in sorted(pending, key=lambda value: value.tombstone.sequence):
+        if effect.result is None:
+            _ = _apply_effect(config, effect.request_digest, lambda _service, saved=effect: saved)
+            recovered += 1
+    return recovered
+
+
+def _apply_effect(config: Config, request_digest: str,
+                  prepare: Callable[[GenerationMutationService], OwnerEffect]) -> dict[str, str | int]:
     paths = generation_runtime_paths(config)
     config = replace(config, raw={**config.raw, "state_root": str(paths.state),
         "share_root": str(paths.share), "request_root": str(paths.requests),
         "export_root": str(paths.exports),
         "backup_root": config.backup_root if "backup_root" in config.raw else str(paths.state / "backups")})
-    request_digest = "sha256:" + hashlib.sha256(canonical_bytes({
-        "page_id": page_id, "operation": operation, "receipt": checked_receipt,
-        "record_id": record_id, "content": content})).hexdigest()
     with publication_lock(paths.active):
         service = GenerationMutationService.from_config(config)
         descriptor = open_request_directory(service.requests.pending)
@@ -217,9 +245,10 @@ def apply_page_effect(config: Config, page_id: str, operation: Literal["correct"
                 if path.exists():
                     effect = OwnerEffect.model_validate_json(path.read_bytes())
                 else:
-                    effect = _prepare(service.store.active(), page_id, operation, checked_receipt,
-                        record_id, content, request_digest, service.requests.tombstone_high_water(),
-                        datetime.now(UTC))
+                    if any(OwnerEffect.model_validate_json(item.read_bytes()).result is None
+                           for item in folder.glob("*.json")):
+                        raise OwnerEffectError("OWNER_EFFECT_RECOVERY_REQUIRED")
+                    effect = prepare(service)
                     _save(path, effect)
                 if effect.result is not None:
                     return effect.result
