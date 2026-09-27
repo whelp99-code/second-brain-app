@@ -1,3 +1,5 @@
+> ENGINEERING-MAP-START: 작업을 시작하면 `/home/jm/orca/engineering-vault/index.json`에서 이 디렉터리의 프로젝트 기록을 읽고 relations와 depends_on을 따라간다. 측정하지 않은 배포는 unknown이다. 이 문장은 기존 규칙을 바꾸지 않는다.
+
 # phone-history/ios/ — iPhone capture app
 
 Score 14 (35 Swift files across 8 directories, XcodeGen-generated project, generated contract

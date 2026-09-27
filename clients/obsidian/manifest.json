@@ -1,0 +1,9 @@
+{
+  "id": "sb-memory-view",
+  "name": "Second Brain MemoryView",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Scoped daily memory, evidence, corrections, questions and safe projection sync.",
+  "author": "Second Brain",
+  "isDesktopOnly": false
+}

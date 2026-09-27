@@ -25,12 +25,22 @@ class Settings:
     second_brain_vault: Path | None = None
     second_brain_base_url: str | None = None
     second_brain_token_env: str = "SB_WEB_TOKEN"
+    second_brain_sink_mode: str = "inbox"
+    second_brain_life_source_id: str = "phone"
     host: str = "127.0.0.1"
     port: int = 8787
     max_request_bytes: int = _DEFAULT_MAX_REQUEST_BYTES
     attachment_retention_days: int | None = None
 
     def __post_init__(self) -> None:
+        if self.second_brain_sink_mode not in {"inbox", "life-http"}:
+            raise ConfigurationError("unsupported Second Brain sink mode")
+        if self.second_brain_sink_mode == "life-http" and (
+            not self.second_brain_base_url or not self.second_brain_token_env.startswith("SB_LIFE_")
+        ):
+            raise ConfigurationError(
+                "life-http requires a base URL and scoped SB_LIFE token environment name"
+            )
         if len(self.api_token) < 32:
             raise ConfigurationError("PHONE_HISTORY_API_TOKEN must contain at least 32 characters")
         if len(self.master_key) != 32:
@@ -39,7 +49,9 @@ class Settings:
             raise ConfigurationError("PHONE_HISTORY_PORT is invalid")
         if self.max_request_bytes < 1024:
             raise ConfigurationError("PHONE_HISTORY_MAX_REQUEST_BYTES is too small")
-        if self.attachment_retention_days is not None and not (1 <= self.attachment_retention_days <= 3650):
+        if self.attachment_retention_days is not None and not (
+            1 <= self.attachment_retention_days <= 3650
+        ):
             raise ConfigurationError("attachment retention must be between 1 and 3650 days")
 
     @property
@@ -82,6 +94,8 @@ class Settings:
             second_brain_vault=vault,
             second_brain_base_url=raw_base or None,
             second_brain_token_env=token_env,
+            second_brain_sink_mode=os.environ.get("PHONE_HISTORY_SECOND_BRAIN_SINK_MODE", "inbox"),
+            second_brain_life_source_id=os.environ.get("PHONE_HISTORY_LIFE_SOURCE_ID", "phone"),
             host=os.environ.get("PHONE_HISTORY_HOST", "127.0.0.1"),
             port=port,
             max_request_bytes=maximum,

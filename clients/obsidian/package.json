@@ -1,0 +1,14 @@
+{
+  "name": "second-brain-memory-view",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Evidence-backed Obsidian MemoryView bridge; server features default off",
+  "scripts": {
+    "build": "node build.cjs",
+    "test": "node --test test/*.test.cjs",
+    "pretest": "node build.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,18 @@
+"use strict";
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const root = __dirname;
+const source = fs.readFileSync(path.join(root,"src/main.js"),"utf8");
+const core = fs.readFileSync(path.join(root,"src/sync-core.js"),"utf8");
+const marker = 'const Core = require("./sync-core");';
+if (source.split(marker).length !== 2) throw new Error("BUILD_CORE_MARKER_INVALID");
+const bundled = source.replace(marker, 'const Core = (() => { const module = {exports: {}};\n'+core+'\nreturn module.exports; })();');
+new vm.Script(bundled, {filename: "main.js"});
+const dest = path.join(root,"dist/sb-memory-view");
+fs.mkdirSync(dest,{recursive:true});
+fs.writeFileSync(path.join(dest,"main.js"),bundled);
+for (const name of ["manifest.json","styles.css"]) fs.copyFileSync(path.join(root,name),path.join(dest,name));
+const manifest = JSON.parse(fs.readFileSync(path.join(dest,"manifest.json"),"utf8"));
+if(manifest.isDesktopOnly !== false) throw new Error("MOBILE_MANIFEST_REQUIRED");
+console.log(JSON.stringify({status:"built",directory:dest,files:["main.js","manifest.json","styles.css"],native_validation:"NOT_RUN"}));

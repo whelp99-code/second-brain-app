@@ -243,6 +243,11 @@ class GenerationMutationService:
     def mutate[T](self, mutation: GenerationMutation[T]) -> GenerationMutationResult[T]:
         with self.store.writer() as writer:
             parent, legacy = self._current_or_legacy()
+            if mutation.operation == GenerationOperation.RESTORE:
+                from sb.life_restore_guard import contains_life_state
+                active_root = parent.root if parent is not None else legacy
+                if active_root is not None and contains_life_state(active_root):
+                    raise GenerationMutationError("LIFE_RESTORE_RECONCILIATION_REQUIRED")
             _ = self.store.discard_abandoned_staging()
             _ = self.lifecycle.maintain(mutation.now)
             target = mutation.authority.result_high_water or self.requests.tombstone_high_water()

@@ -19,10 +19,15 @@ from sb.config import Config, load_config
 from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, discard_inbox, write_inbox
+from sb.life_config import parse_settings
+from sb.life_contracts import LifeError, strict_json
+from sb.life_http import PREFIX as LIFE_PREFIX
+from sb.life_http import read_response as read_life_response
+from sb.life_policy import authenticate as authenticate_life
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
 from sb.ops import status_snapshot
-from sb.pipeline import run_all
+from sb.pipeline import run_all, run_life_operation
 from sb.redaction import redact_credentials
 from sb.runtime_access import mutate_root, read_root
 from sb.search import SearchIndex, committed_paths, committed_text
@@ -300,7 +305,22 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             except (BrokenPipeError, ConnectionResetError):
                 self.close_connection = True
 
+        def _life_principal(self):
+            from datetime import UTC, datetime
+            return authenticate_life(parse_settings(context.config.raw),
+                self.headers.get("Authorization", ""), datetime.now(UTC), owner_token=context.token)
+
         def _authorized(self) -> bool:
+            if urlsplit(self.path).path.startswith(LIFE_PREFIX + "/"):
+                try:
+                    self._life_principal()
+                    return True
+                except LifeError as exc:
+                    self._json(exc.status, {"error": exc.code})
+                    return False
+            if context.token is None and self.path.startswith("/api/") and context.config.raw.get("life"):
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "owner_auth_required"})
+                return False
             if context.token is None or not self.path.startswith("/api/"):
                 return True
             supplied = self.headers.get("Authorization", "")
@@ -318,7 +338,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 raise ValueError("invalid Content-Length") from exc
             if length < 0 or length > maximum:
                 raise ValueError("request body too large")
-            loaded = cast(object, json.loads(self.rfile.read(length) or b"{}"))
+            payload = self.rfile.read(length) or b"{}"
+            loaded = cast(object, strict_json(payload) if self.path.startswith(LIFE_PREFIX + "/") else json.loads(payload))
             if not isinstance(loaded, dict):
                 raise TypeError("JSON object required")
             return cast(dict[str, object], loaded)
@@ -332,6 +353,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 else:
                     with read_root(context.config) as pinned:
                         self._get(pinned)
+            except LifeError as exc:
+                self._json(exc.status, {"error": exc.code})
             except (ValueError, PageNotFoundError, PathEscapeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             except (BrokenPipeError, ConnectionResetError):
@@ -341,6 +364,13 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
 
         def _get(self, root: Path) -> None:
             parsed = urlsplit(self.path)
+            if parsed.path.startswith(LIFE_PREFIX + "/"):
+                from datetime import UTC, datetime
+                status, result = read_life_response(root, context.config, parse_settings(context.config.raw),
+                    self._life_principal(), parsed.path, parse_qs(parsed.query, keep_blank_values=True), datetime.now(UTC))
+                self._life_principal()  # Recheck expiry before returning private content.
+                self._json(status, result)
+                return
             if parsed.path == "/":
                 body = _INDEX_HTML.encode("utf-8")
                 self.send_response(HTTPStatus.OK)
@@ -488,6 +518,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 self._post()
+            except LifeError as exc:
+                self._json(exc.status, {"error": exc.code})
             except (
                 ValueError,
                 TypeError,
@@ -506,6 +538,36 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
             parsed = urlsplit(self.path)
             maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
             data = self._body(maximum)
+            if parsed.path.startswith(LIFE_PREFIX + "/"):
+                from datetime import UTC, datetime
+                principal = self._life_principal()
+                if parsed.path == LIFE_PREFIX + "/recall":
+                    with read_root(context.config) as pinned:
+                        status, result = read_life_response(pinned, context.config, parse_settings(context.config.raw),
+                            principal, parsed.path, {}, datetime.now(UTC), body=data)
+                    self._life_principal()
+                    self._json(status, result)
+                    return
+                operations = {"/events:batch": "capture", "/corrections": "correct", "/forget": "forget",
+                              "/run": "run", "/views/obsidian/ack": "ack",
+                              "/predictions": "prediction_issue", "/predictions/actuals": "prediction_actual",
+                              "/source-retractions": "source_retract", "/imports": "import"}
+                suffix = parsed.path.removeprefix(LIFE_PREFIX)
+                operation = operations.get(suffix)
+                if suffix.startswith(("/overland/", "/health-import/")):
+                    operation = "sensor_location" if suffix.startswith("/overland/") else "sensor_health"
+                    data = {"source_id": unquote(suffix.rsplit("/", 1)[1]), "payload": data}
+                if suffix.startswith("/questions/") and suffix.endswith("/response"):
+                    if "question_id" in data:
+                        raise LifeError("LIFE_FIELDS_INVALID")
+                    data = {**data, "question_id": unquote(suffix[len("/questions/"):-len("/response")])}
+                    operation = "answer"
+                if operation is None:
+                    raise LifeError("LIFE_ROUTE_NOT_FOUND", 404)
+                result = run_life_operation(context.config, operation, data, principal)
+                self._life_principal()
+                self._json(HTTPStatus.OK if operation in {"run", "ack", "sensor_location", "sensor_health"} else HTTPStatus.ACCEPTED, result)
+                return
             if parsed.path == "/api/uploads/retract":
                 upload_id = _string_field(data, "upload_id", required=True)
                 try:

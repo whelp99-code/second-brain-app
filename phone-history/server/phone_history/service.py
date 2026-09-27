@@ -36,6 +36,14 @@ class PhoneHistoryService:
         self.repository = Repository(settings) if repository is None else repository
         if sink is not None:
             self.sink = sink
+        elif settings.second_brain_sink_mode == "life-http":
+            from phone_history.life_sink import LifeInboxSink
+
+            self.sink = LifeInboxSink(
+                settings.second_brain_base_url or "",
+                settings.second_brain_life_source_id,
+                settings.second_brain_token_env,
+            )
         elif settings.second_brain_vault is None:
             self.sink = DisabledSink()
         else:
@@ -209,7 +217,9 @@ class PhoneHistoryService:
             **self.repository.status(),
             "version": "0.1.0-predevice",
             "device_closure": "NOT_RUN",
-            "second_brain_configured": self.settings.second_brain_vault is not None,
+            "second_brain_configured": self.settings.second_brain_vault is not None
+            or self.settings.second_brain_sink_mode == "life-http",
+            "second_brain_sink_mode": self.settings.second_brain_sink_mode,
         }
 
     def capabilities(self) -> dict[str, object]:

@@ -21,6 +21,7 @@ from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
 from sb.inbox import RememberRejected
+from sb.life_contracts import LifeError
 from sb.metrics import record_command
 from sb.metrics import summary as metrics_summary
 from sb.ops import (
@@ -33,7 +34,7 @@ from sb.ops import (
 from sb.ops import (
     doctor as run_doctor,
 )
-from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest
+from sb.pipeline import read_status, run_all, run_brief, run_compile, run_ingest, run_life_operation
 from sb.postcompact_hook import PostCompactHookError, confirm_delivery, handle_postcompact
 from sb.refresh_receipt import RefreshReceiptError, publish_refresh_receipt
 from sb.runtime_access import mutate_root, read_config
@@ -44,6 +45,7 @@ from sb.vault import Vault, VaultLintError, init_vault
 
 
 class Command(StrEnum):
+    LIFE = "life"
     INIT = "init"
     IDENTITY = "identity"
     INGEST = "ingest"
@@ -78,6 +80,13 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
     _ = sub.add_parser(Command.INIT.value)
     _ = sub.add_parser(Command.IDENTITY.value)
+    life = sub.add_parser(Command.LIFE.value)
+    _ = life.add_argument("action", choices=("status", "timeline", "questions", "manifest", "run", "import", "request"))
+    _ = life.add_argument("--input", help="Explicit local JSON request or exported .json/.ics file")
+    _ = life.add_argument("--source", help="Configured source ID for import")
+    _ = life.add_argument("--day", help="ISO local calendar date")
+    _ = life.add_argument("--expected-revisions", default="{}", help="JSON event_id-to-revision map for a revised export")
+    _ = life.add_argument("--operation", choices=("capture", "correct", "forget", "answer", "prediction_issue", "prediction_actual", "sensor_location", "sensor_health"))
     ingest = sub.add_parser(Command.INGEST.value)
     _ = ingest.add_argument("--source")
     _ = ingest.add_argument("--limit", type=int,
@@ -197,6 +206,46 @@ def _mcp() -> int:
 
 def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     config = load_config()
+
+    def life_command() -> int:
+        from sb.connectors.fs_safety import SafeSourceFilesystem
+        from sb.life_config import parse_settings
+        from sb.life_contracts import strict_json
+        from sb.life_http import read_response
+        from sb.runtime_access import read_root
+        settings = parse_settings(config.raw)
+        principal = settings.owner()
+        action = ns.action
+        if action in {"status", "timeline", "questions", "manifest"}:
+            path = {"status": "health", "timeline": "timeline", "questions": "questions", "manifest": "views/obsidian/manifest"}[action]
+            query = {} if ns.day is None else {"day": [ns.day]}
+            with read_root(config) as pinned:
+                _, result = read_response(pinned, config, settings, principal, "/api/life/v1/" + path, query, datetime.now(UTC))
+        elif action == "run":
+            result = run_life_operation(config, "run", {} if ns.day is None else {"day": ns.day}, principal)
+        else:
+            if ns.input is None:
+                raise LifeError("LIFE_INPUT_FILE_REQUIRED")
+            source = Path(ns.input).expanduser().absolute()
+            raw, _metadata = SafeSourceFilesystem((source.parent,)).read_path(source.parent, source.name)
+            if len(raw) > 1024 * 1024:
+                raise LifeError("LIFE_EXPORT_TOO_LARGE", 413)
+            if action == "import":
+                if ns.source is None:
+                    raise LifeError("LIFE_SOURCE_REQUIRED")
+                data = {"source_id": ns.source, "source_document_id": source.name,
+                        "format": source.suffix.lower().removeprefix("."), "content": raw.decode("utf-8-sig"),
+                        "expected_revisions": strict_json(ns.expected_revisions)}
+                result = run_life_operation(config, "import", data, principal)
+            else:
+                if ns.operation is None:
+                    raise LifeError("LIFE_OPERATION_REQUIRED")
+                data = strict_json(raw)
+                if not isinstance(data, dict):
+                    raise LifeError("LIFE_OBJECT_REQUIRED")
+                result = run_life_operation(config, ns.operation, data, principal)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
 
     def init() -> int:
         _ = init_vault(config.vault_root)
@@ -548,6 +597,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         return 0
 
     handlers: dict[Command, Callable[[], int]] = {
+        Command.LIFE: life_command,
         Command.INIT: init,
         Command.INGEST: ingest,
         Command.COMPILE: compile_cmd,
@@ -623,7 +673,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if result["status"] == "ok" else 1
     try:
         return _dispatch(Command(tokens[0]), ns)
-    except (OperationError, VaultLintError, GovernanceError, SearchQueryError, ConfigValueError,
+    except (LifeError, OperationError, VaultLintError, GovernanceError, SearchQueryError, ConfigValueError,
             GenerationError, GenerationIndexError, PostCompactHookError) as exc:
         print(str(exc), file=sys.stderr)
         return 1

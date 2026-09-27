@@ -16,6 +16,7 @@ from typing import Final, Self, cast
 from sb.bound_knowledge import BoundKnowledge
 from sb.config import Config
 from sb.effect_values import parse_instant
+from sb.life_store import LifeStore
 from sb.page_access import PageAccess
 from sb.source_access import (
     SourceAccess,
@@ -306,6 +307,12 @@ class Ledger:
                     raise
         finally:
             self._transaction_depth -= 1
+
+    def life_store(self) -> LifeStore:
+        """Opt in to additive life tables on this same transactional connection."""
+        store = LifeStore(self._db(), self.transaction)
+        store.initialize()
+        return store
 
     def journal_mode(self) -> str:
         return self._journal_mode

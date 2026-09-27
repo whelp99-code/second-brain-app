@@ -389,6 +389,10 @@ def _restore_backup_locked(archive: Path, destination_path: Path, *, force: bool
         reasons = audit_citations(temporary)
         if reasons:
             raise OperationError("restored vault citation audit failed: " + "; ".join(reasons[:5]))
+        from sb.life_restore_guard import contains_life_state
+
+        if contains_life_state(temporary) or contains_life_state(destination_path):
+            raise OperationError("LIFE_RESTORE_RECONCILIATION_REQUIRED")
         previous: Path | None = None
         if destination_path.exists():
             if not force and any(destination_path.iterdir()):

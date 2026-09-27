@@ -1272,3 +1272,98 @@ def audit_citations(root: Path) -> tuple[str, ...]:
                 if sid not in known:
                     reasons.append(f"{path.relative_to(root).as_posix()}: unresolved [^{sid}]")
     return tuple(reasons)
+
+
+def run_life_operation(config: Config, operation: str, data: dict[str, object],
+                       principal: object, *, now: datetime | None = None) -> dict[str, object]:
+    """Explicit life request under the existing lock and atomic generation writer.
+
+    A managed generation is required: legacy mutable roots must be migrated
+    explicitly, rather than risking a split DB/page correction commit.
+    """
+    from sb.life_config import parse_settings
+    from sb.life_contracts import LifeError, LifeEventV1, LifePrincipal, stamp
+    from sb.life_runtime import apply_operation
+    from sb.life_views import event_page, page_id
+    from sb.memory_records import parse_page_records
+    from sb.source_access import SourceAccess
+
+    if not isinstance(principal, LifePrincipal):
+        raise LifeError("LIFE_PRINCIPAL_REQUIRED", 403)
+    settings = parse_settings(config.raw)
+    if operation not in {"capture", "correct", "forget", "answer", "run", "ack", "prediction_issue", "prediction_actual", "source_retract", "sensor_location", "sensor_health", "import"}:
+        raise LifeError("LIFE_OPERATION_INVALID")
+    required_permission = ("predict" if operation.startswith("prediction_") else
+                           "forget" if operation == "source_retract" else
+                           "capture" if operation.startswith("sensor_") or operation == "import" else operation)
+    if required_permission not in principal.operations:
+        raise LifeError("LIFE_OPERATION_FORBIDDEN", 403)
+    if operation not in {"forget", "source_retract", "correct", "answer", "ack"}:
+        settings.require("life_events")
+    root = Path(config.vault_root)
+    if not root.is_symlink() and "share_root" not in config.raw:
+        raise LifeError("LIFE_MANAGED_GENERATION_REQUIRED", 409)
+    moment = datetime.now(UTC) if now is None else now
+    _ = stamp(moment)
+    lock_root = generation_runtime_paths(config).state
+    fd = _try_lock(lock_root)
+    if fd is None:
+        raise LifeError("LIFE_WRITER_BUSY", 503)
+    try:
+        service = GenerationMutationService.from_config(config)
+        try:
+            def staged(staging: Path) -> dict[str, object]:
+                run_id = uuid4().hex
+                vault = Vault(staging)
+                compiled = _Compiled(staging, ContentAddressedStore(staging))
+                with Ledger(staging) as ledger:
+                    store = ledger.life_store()
+
+                    def publish(events: Sequence[LifeEventV1]) -> None:
+                        for event in events:
+                            source = SourceItem("life-" + event.source_id,
+                                f"{event.event_id}:r{event.revision}", event.source_version,
+                                event.raw_hash, run_id, run_id)
+                            ledger.upsert_source_item(source)
+                            projects = () if event.scope == "personal" else (
+                                event.scope if event.scope.startswith("project:") else "project:" + event.scope,)
+                            access = SourceAccess("principal:owner", projects, "life-v1")
+                            ledger.bind_source_access(source, access)
+                            page = event_page(event)
+                            report = StageReport((page,), 0, 0, 1, False,
+                                compiled_by=("life-facts-v1", "deterministic-no-model"))
+                            _commit_pages(staging, vault, run_id, report,
+                                f"life: {operation} {event.event_id} revision {event.revision}",
+                                compiled, ledger=ledger, project=False, config=config)
+                            relative = page_id(event.event_id) + ".md"
+                            raw = subprocess.check_output(["git", "-C", str(staging), "show",
+                                                           "HEAD:" + relative], stderr=subprocess.PIPE)
+                            page_access = ledger.compiled_page_access(((source.source_id + ":" + source.source_uri,
+                                                                       event.raw_hash),))
+                            ledger.bind_page_access(page.page_id, "sha256:" + hashlib.sha256(raw).hexdigest(), page_access)
+                            records = parse_page_records(raw, page.page_id)
+                            if not records:
+                                raise LifeError("LIFE_PUBLISHED_EVIDENCE_MISSING", 503)
+                            store.mark_published(event.event_id, event.revision,
+                                [{"page_id": page.page_id, "record_id": record.record_id,
+                                  "record_digest": record.record_digest} for record in records])
+
+                    def remove(event_id: str) -> None:
+                        relative = page_id(event_id) + ".md"
+                        if (staging / relative).exists():
+                            vault.forget_page(page_id(event_id))
+
+                    result = apply_operation(staging, store, operation, data, settings, principal,
+                                             moment, publish, remove)
+                    ledger.record_run(Run(run_id, stamp(moment), stamp(moment), None, "ok"))
+                    return result
+
+            result = service.mutate(GenerationMutation(
+                mutation_id=f"life:{operation}:{uuid4().hex}", operation=GenerationOperation.RUN,
+                now=moment, authority=GenerationAuthority(None, None), apply=staged,
+            ))
+            return {**result.value, "provider_generation": result.generation.generation_id}
+        finally:
+            service.close()
+    finally:
+        _unlock(fd)

@@ -259,6 +259,10 @@ class GenerationRestoreSanitizer:
         request_key = hashlib.sha256(request.request_id.encode("utf-8")).hexdigest()
         with restore_workspace(self.workspace, request_key) as staging:
             self._extract(request.archive, staging)
+            from sb.life_restore_guard import contains_life_state
+
+            if contains_life_state(staging):
+                raise RestoreError("LIFE_RESTORE_RECONCILIATION_REQUIRED")
             self._verify_manifest(staging, request.archive_manifest)
             states = (read_restore_knowledge(staging, request.archive_manifest, mutations.store)
                       if (staging / "generation.json").is_file() else ())
