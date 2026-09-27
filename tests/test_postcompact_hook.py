@@ -23,12 +23,13 @@ from sb.postcompact_hook import (
 from sb.search import SearchHit, SearchIndex
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
+from tests.json_fixtures import parse_object
 from tests.knowledge import stamp_knowledge
 
 
 class _HashLedger:
     def __init__(self, root: Path) -> None:
-        self._root = root
+        self._root: Path = root
 
     def last_compiled_hash(self, page_id: str) -> str | None:
         del page_id
@@ -169,10 +170,10 @@ def test_same_page_sections_dedupe_to_one_record() -> None:
         SearchHit("wiki/omega", f"s{index}", "OmegaCompiledBody", 1.0 - index / 10)
         for index in range(8)
     )
-    from sb.postcompact_hook import _serialize, parse_postcompact_event
+    from sb.postcompact_hook import serialize, parse_postcompact_event
 
     event = parse_postcompact_event(_event())
-    records, _context = _serialize(event, hits)
+    records, _context = serialize(event, hits)
     assert len(records) == 1
     assert records[0]["page_id"] == "wiki/omega"
 
@@ -182,11 +183,11 @@ def test_final_json_stays_within_budget() -> None:
         SearchHit(f"wiki/p{index}", "body", "x" * 2048, 1.0)
         for index in range(8)
     )
-    from sb.postcompact_hook import _inject_payload, _serialize, parse_postcompact_event
+    from sb.postcompact_hook import inject_payload, serialize, parse_postcompact_event
 
     event = parse_postcompact_event(_event())
-    records, context = _serialize(event, hits)
-    payload = _inject_payload("UserPromptSubmit", context)
+    records, context = serialize(event, hits)
+    payload = inject_payload("UserPromptSubmit", context)
     assert len(json.dumps(payload, ensure_ascii=False).encode()) <= 16384
     assert len(records) <= 8
 
@@ -207,12 +208,16 @@ def test_postcompact_cli_long_summary_recovers(
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(_event(summary=("OmegaCompiledBody " * 400).strip())))
     assert main(["postcompact-hook"]) == 0
-    assert json.loads(capsys.readouterr().out) == {}
+    assert parse_object(capsys.readouterr().out) == {}
     monkeypatch.setattr("sys.stdin", BytesIO(_prompt()))
     assert main(["postcompact-hook"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
-    assert "OmegaCompiledBody" in payload["hookSpecificOutput"]["additionalContext"]
+    payload = parse_object(capsys.readouterr().out)
+    specific = payload["hookSpecificOutput"]
+    assert isinstance(specific, dict)
+    assert specific["hookEventName"] == "UserPromptSubmit"
+    context = specific["additionalContext"]
+    assert isinstance(context, str)
+    assert "OmegaCompiledBody" in context
 
 
 def test_empty_search_is_not_context_delivery(
@@ -223,10 +228,10 @@ def test_empty_search_is_not_context_delivery(
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(_event(summary="zzzz-no-such-term")))
     assert main(["postcompact-hook"]) == 0
-    assert json.loads(capsys.readouterr().out) == {}
+    assert parse_object(capsys.readouterr().out) == {}
     monkeypatch.setattr("sys.stdin", BytesIO(_prompt()))
     assert main(["postcompact-hook"]) == 0
-    payload = json.loads(capsys.readouterr().out)
+    payload = parse_object(capsys.readouterr().out)
     assert "additionalContext" not in json.dumps(payload) or payload.get("hookSpecificOutput") is None or payload == {}
 
 
@@ -396,9 +401,13 @@ def test_session_start_compact_cli(
     monkeypatch.setenv("SB_CONFIG", str(config))
     monkeypatch.setattr("sys.stdin", BytesIO(_session()))
     assert main(["postcompact-hook"]) == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
-    assert "OmegaCompiledBody" in payload["hookSpecificOutput"]["additionalContext"]
+    payload = parse_object(capsys.readouterr().out)
+    specific = payload["hookSpecificOutput"]
+    assert isinstance(specific, dict)
+    assert specific["hookEventName"] == "SessionStart"
+    context = specific["additionalContext"]
+    assert isinstance(context, str)
+    assert "OmegaCompiledBody" in context
 
 
 def test_session_start_compact_uses_last_query(tmp_path: Path) -> None:
@@ -497,7 +506,7 @@ def test_empty_prompt_does_not_clobber_last_query(tmp_path: Path) -> None:
     _ = handle_postcompact(_prompt(prompt="OmegaInturnTarget please"), index, state)
     _ = handle_postcompact(_prompt(prompt="continue"), index, state)
     _ = handle_postcompact(_prompt(prompt="go on"), index, state)
-    stored = json.loads((state / ".sb" / "session-memory" / "sess-omega.json").read_text())
+    stored = parse_object((state / ".sb" / "session-memory" / "sess-omega.json").read_text())
     assert "OmegaInturnTarget" in str(stored.get("last_query"))
     result = handle_postcompact(json.dumps({
         "hook_event_name": "SessionStart",
@@ -513,7 +522,7 @@ def test_last_query_stores_terms_not_prompt(tmp_path: Path) -> None:
     state = tmp_path / "state"
     prompt = "Can you remind me what the notes say about OmegaInturnTarget before I continue?"
     _ = handle_postcompact(_prompt(prompt=prompt), SearchIndex(root, hybrid=False), state)
-    stored = json.loads((state / ".sb" / "session-memory" / "sess-omega.json").read_text())
+    stored = parse_object((state / ".sb" / "session-memory" / "sess-omega.json").read_text())
     assert stored.get("last_query") != prompt
     assert "OmegaInturnTarget" in str(stored.get("last_query"))
 
@@ -533,8 +542,8 @@ def test_late_target_token_in_long_summary(tmp_path: Path) -> None:
 def test_target_after_forty_distinct_tokens(tmp_path: Path) -> None:
     root, _digest = _seed(tmp_path)
     filler = " ".join(f"aaaaaaaaaaaaaaaaaaaaaaaa{index:02d}" for index in range(45))
-    from sb.postcompact_hook import _candidate_tokens
-    ranked = _candidate_tokens(f"{filler} OmegaInturnTarget")
+    from sb.postcompact_hook import candidate_tokens
+    ranked = candidate_tokens(f"{filler} OmegaInturnTarget")
     assert "OmegaInturnTarget" in ranked
     result = handle_postcompact(
         _event(summary=f"{filler} OmegaInturnTarget"),
@@ -621,3 +630,7 @@ def test_short_token_does_not_outrank_identifier(tmp_path: Path) -> None:
     assert result.records
     assert "OmegaInturnTarget" in result.records[0]["snippet"]
     assert "ThetaLaterTarget" not in result.records[0]["snippet"]
+
+
+seed = _seed
+event = _event
