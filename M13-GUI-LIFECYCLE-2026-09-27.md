@@ -170,3 +170,85 @@ GUI 상태, 단계 이력, 소스·보존(metrics 포함)에 timer, OnCalendar, 
 - 미완료 영수증과 접수된 tombstone sequence 1, 활성화되지 않은 후속 세대가 남는다. 다시 정정 저장을 누르지 않았다.
 - 새 시험 기억은 없다.
 - `/ready`는 `ready`가 아니다. 문서의 `sb backup`은 이 split에서는 검증 영수증을 만들지 못한다.
+
+## 운영 불일치 복구 2026-09-27
+
+판정: **복구 통과.** 2026-09-27 23:55 KST 확인에서 SB `/ready`는 HTTP 200 `ready`,
+JARVIS `http://127.0.0.1:4173/api/v1/health`의 `second_brain.readiness`도 `ready`다.
+JARVIS 코드·설정·권한·서비스는 바꾸지 않았다. 새 시험 기억은 만들지 않았다.
+
+### 원인과 수정
+
+1. 운영 백업의 외부 형식은 `second-brain-backup-v1` / PAX tar / gzip이다. 사본 검사기가
+   `.git/objects/pack/*.idx`를 무조건 거절했고 Git pack도 해석하지 못했다. 실제 아카이브를
+   `/var/tmp`로 복사한 재현에서 이 지점이 `MANAGED_ARCHIVE_UNSUPPORTED`의 첫 원인이었다.
+   정상 ZIP 원본 외에 UTF-8 대체 문자로 손상된 ZIP 형태의 raw 원본도 있었고,
+   옛 app 1.0.0 / ledger schema 2 백업 12개에는 `origin` 필드가 없었다.
+2. Git pack은 격리된 자원 제한 Git 프로세스로 검사하고 정상 ZIP도 예산 내에서 해석한다.
+   해석할 수 없는 원본을 포함한 백업은 부재라고 판정하지 않는다. 컨테이너의 매니페스트·모든
+   파일 해시를 검증한 뒤 제품의 사본 폐기 경로로 통째로 폐기한다. 옛 백업과 중단된 사이드카
+   폐기도 재개할 수 있다. 원본 백업은 아래 관리 루트 밖 구조 사본에 보존했다.
+3. tombstone 접수는 세대 활성화보다 앞선다. 이를 되감거나 SQLite를 직접 편집하지 않고,
+   fsync된 owner 의도를 `sb maintain --once`가 재실행하도록 했다. 미완료 owner 영수증이 있으면
+   다른 정정·삭제를 먼저 접수하지 않는다. 완료 영수증의 replacement는 지운다.
+4. 같은 daily 페이지의 `origin=... hash=... text=...` 근거 줄도 지운 출처의 사본이므로 제거한다.
+   반면 운영 원장의 해시 참조는 본문 사본이 아니다. 기존 광범위 파일 삭제가 원장 전체를
+   지우는 결함을 격리 재현에서 발견해, 관련 페이지에만 출처 해시 조건을 적용했다. 원장에 실제
+   삭제 대상 본문이 남으면 실패하며, 무관한 원장 행을 지워 성공으로 만들지 않는다.
+5. 재실행이 새 sealed 세대를 만들면 옛 sealed 형제 세대가 남아 `GENERATION_CLEANUP_STALLED`가
+   됐다. 부모가 이미 폐기되어 활성화할 수 없고 읽기 lease도 없는 세대만 기존 staging 폐기
+   경로로 정리한다. rename 직후 중단과 재실행을 테스트했다.
+6. JARVIS의 최종 `protocol_incompatible`은 계약 파일 변경이 아니었다. `900f447` 릴리스와
+   복구 릴리스의 실제 tools/list·입출력 스키마는 동일했고, JARVIS의 `inspectFrozenSchemas`도
+   둘 다 통과했다. 두 릴리스 모두 sequence 1에서 `sb_generation_status({"read_fence": null})`를
+   `TOMBSTONE_FENCE_REQUIRED`로 거절했다. sequence 0에서 드러나지 않던 bootstrap 결함이다.
+   schema-4의 내용 없는 전역 상태 조회만 허용했다. 본문·검색·개별 요청 proof는 계속 fence를
+   요구하고, 명시한 잘못된 fence도 계속 거절한다. 고정 계약과 sidecar SHA-256은 그대로
+   `ae2e4b4f41ade29e8781e47e60dad6ddb17ed8cea516b82ccd16454acd5dc3e0`다.
+
+### 보존과 배포
+
+- 최초 변경 전에 `cp -a`로 state/share 전체를
+  `/var/tmp/sb-split-rescue-20260927T224450+0900/`에 복사했다. 530,665개 파일,
+  11,591,684,425바이트. `manifest.json` SHA-256:
+  `5e41819bad3746da65dd17223b675432449216dd4173f36013fa742574f8435d`.
+- 서비스 정지 뒤 같은 구조 폴더의 `quiesced/`에 활성 세대와 owner/request/control journal을
+  추가 복사하고 별도 명세를 남겼다. sequence 1 복구 뒤에도
+  `/var/tmp/sb-split-rescue-20260927T232953+0900-consistent/`를 보존했다. 명세 SHA-256:
+  `5f1e04a4fbf3a4d433eadd48830690cce660d6baaea2ad31b37bb6eebda9dfe1`.
+- 구조 사본에는 삭제 대상 원문도 남아 있다. 관리 루트 밖 0700 복구 자료이며 자동으로 지우지
+  않았다. 운영 백업을 손으로 지우지 않았고 JSON·SQLite·vault 포인터도 직접 편집하지 않았다.
+- 코드 커밋: `e74a9bf4fb77336a4800beae48b113432bc71d9c`,
+  `6da0568f6256e1f6894ab94b9f4fb630843852fe`,
+  `3b045534d03f9e91c20e69e0a1db9ad207a664e2` (master, 요청한 두 footer 포함, push 없음).
+- 각 후보는 clean tree에서 `python3 deploy/prepare-release.py --offline`으로 빌드했다.
+  §10.5의 requests.path·refresh.timer·maintenance.timer·web 정지, `app/current` 원자 교체,
+  재시작 순서를 사용했다. 최종 릴리스는 `06ea5e96db0d04f8176ed5279a63343ff0df9b9d`다.
+  상태 복구는 제품의 `sb maintain --once`로 수행했다. 롤백은 필요하지 않았다.
+
+### 최종 확인
+
+| 항목 | 측정 결과 |
+|---|---|
+| 전체 테스트 | 최종 `uv run pytest -q`: exit 0, 2225 passed, 기존 skip 3개 |
+| Ruff | `uv run ruff check sb tests`: exit 0 |
+| 회귀 순서 | 아카이브·중단 복구·오류 코드·원장 보존·sealed 정리·MCP bootstrap 실패를 먼저 기록한 뒤 수정 |
+| 세대·저널 | 활성 `sbgen:v1:35a4ddab383d83a41caa7a9ecb52cb999248b0a231d3c618e591199378c5f0d8`; 둘 다 sequence 1, root `sha256:20c5fadd19f18ea81861e7a4cabeedab3a22d2545207387866c4923eb916e193` |
+| 센티널 | CLI `no match`, 웹 검색 `results=[]`, 활성 daily 정확 일치 0 |
+| daily 보존 | 이전 43줄 중 비시험 39줄; 이후 43줄 모두 비시험. 기존 37줄은 그대로이고 2줄은 지운 출처의 sid/hash를 새 영수증 출처로 재결속. 무관한 사실 줄은 보존 |
+| 파일 보존 | wiki/daily/conflicts/raw 중 34,249개 파일 해시 불변. 해당 daily 1개만 변경, 대상 raw 1개 제거, 정정 출처 raw 1개 추가 |
+| 원장 보존 | source_item 8,633, unit 8,207, derivation 8,913, run 1,549, derivation_event 27,436 등 운영 행 누락 0. bound_knowledge는 8,703→8,704 |
+| owner 영수증 | `9e7fde4e…`: 완료 result 존재, replacement=null |
+| 옛 미활성 세대 | `bbfa04a9…` 제품 경로로 폐기, journal proved, 미완료 activation 0 |
+| 백업·검증 | `sb backup`, 이어서 `sb verify-backup`: 모두 exit 0. 최종 백업 `second-brain-20260927T233908+0900.tar.gz`, SHA-256 `006a55ddcaaa38f234e13908538c474149648eee36a68ce94b7d4399329b5fd7` |
+| SB 준비 상태 | HTTP 200, status ready, reasons=[] |
+| JARVIS 준비 상태 | HTTP 200, second_brain.readiness=ready |
+| doctor | exit 0. 필수 항목 PASS; 패키지 설치의 scheduler-assets WARN은 기존 문서상 정상 |
+| MCP 계약 | 기존과 실제 tool schemas 동일, JARVIS frozen checker matches=true, status는 sequence 1과 고정 digest 반환 |
+
+근거: `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/sb-split/`.
+`production-audit-final.json`, `ready-accepted.json`, `jarvis-health-accepted.json`,
+`mcp-comparison.json`, `mcp-comparison-final.json`, 각 red/pytest/build/cutover 로그와 구조 명세 영수증을
+남겼다. MCP의 기존 타입 경고 7개와 generation sweep의 기존 Any 경고 4개는 숨기지 않았으며,
+새 동작의 타입 오류는 관측되지 않았다. GitHub 조회는 timeout으로 등록 대기이고, 커밋 hook의
+engineering-map docs:sync도 rc=1이었다. 커밋·빌드·배포 및 위 실제 검증의 성공과는 구분한다.
