@@ -1,6 +1,8 @@
 import base64
-import json
-from datetime import UTC, datetime
+from copy import deepcopy
+from datetime import UTC, datetime, tzinfo
+from pathlib import Path
+from typing import override
 
 import anyio
 import pytest
@@ -9,19 +11,22 @@ from mcp.client import Client
 from sb.access_claims import access_request_digest
 from sb.config import Config
 from sb.delegations import create_read_fence
+from sb.effect_values import JsonObject
 from sb.effect_write_values import GENESIS_TOMBSTONE_ROOT, model_object
 from sb.mcp import build_server
+from tests.mcp_test_support import json_content
 from tests.test_access_claims import KEY, signed
 from tests.test_scoped_request_status import setup_status
 
 
 @pytest.mark.parametrize("version", [4, 5])
-def test_scoped_status_claim_binds_original_request_and_scope(tmp_path, monkeypatch, version):
+def test_scoped_status_claim_binds_original_request_and_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: int):
     raw, _now, execution, _accepted, _scope, store = setup_status(tmp_path)
     store.close()
     class Clock(datetime):
         @classmethod
-        def now(cls, tz=None):
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
             return datetime(2026, 9, 9, tzinfo=UTC)
     config = Config(raw={"vault_root": str(tmp_path / "share/vault"), "share_root": str(execution.share_root),
         "request_root": str(execution.request_root), "state_root": str(execution.state_root),
@@ -39,20 +44,29 @@ def test_scoped_status_claim_binds_original_request_and_scope(tmp_path, monkeypa
         "policy_revision": "policy:fixture", "purpose": "memory_status",
         "request_digest": access_request_digest("sb_request_status", {"request": raw}), "read_fence_digest": fence.fence_digest,
         "issued_at": "2026-09-09T00:00:00.000Z", "expires_at": "2026-09-09T00:00:30.000Z", "nonce": "nonce:claim", "signing_key_id": "key:test"}
-    async def run():
+    async def run() -> None:
         async with Client(server, mode="legacy", cache=None) as client:
             args = {"request": raw, "read_fence": model_object(fence), "access_claim": signed(body)}
             response = await client.call_tool("sb_request_status", args)
             assert not response.is_error, response
-            assert response.structured_content["request_status"]["state"] == "proved"
-            assert ("acceptance" in response.structured_content["request_status"]) == (version == 5)
-            assert response.structured_content["request_status"]["proof"]["request_digest"] == raw["request_digest"]
-            for change in [{"projects": ["project:other"]}, {"projects": []},
-                {"request_digest": access_request_digest("sb_generation_status", {})}]:
+            status = json_content(response)["request_status"]
+            assert isinstance(status, dict)
+            assert status["state"] == "proved"
+            assert ("acceptance" in status) == (version == 5)
+            proof = status["proof"]
+            assert isinstance(proof, dict)
+            assert proof["request_digest"] == raw["request_digest"]
+            changes: list[JsonObject] = [{"projects": ["project:other"]}, {"projects": []},
+                {"request_digest": access_request_digest("sb_generation_status", {})}]
+            for change in changes:
                 denied = await client.call_tool("sb_request_status", {**args, "access_claim": signed({**body, **change})})
                 assert denied.is_error
-            changed = json.loads(json.dumps(raw))
-            changed["preparation"]["payload"]["content"] = "substitution"
+            changed = deepcopy(raw)
+            preparation = changed["preparation"]
+            assert isinstance(preparation, dict)
+            payload = preparation["payload"]
+            assert isinstance(payload, dict)
+            payload["content"] = "substitution"
             assert (await client.call_tool("sb_request_status", {**args, "request": changed})).is_error
             assert (await client.call_tool("sb_request_status", {"request_id": raw["request_id"],
                 "read_fence": model_object(fence), "access_claim": signed(body)})).is_error

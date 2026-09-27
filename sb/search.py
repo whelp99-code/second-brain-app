@@ -538,7 +538,7 @@ def _create_schema(conn: sqlite3.Connection) -> None:
     _set_meta(conn, "schema_version", _INDEX_SCHEMA_VERSION)
 
 
-def _backup_index(db_path: Path) -> None:
+def backup_index(db_path: Path) -> None:
     if not db_path.is_file():
         return
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -667,7 +667,7 @@ def _refresh(db_path: Path, root: Path, registry: KnowledgeRegistry) -> None:
             previous = _meta(conn, "git_head")
             previous_fp = _meta(conn, "registry_fp")
         if not current_schema:
-            _backup_index(db_path)
+            backup_index(db_path)
             _rebuild_atomic(db_path, root, current, registry)
             return
         if current is None:
@@ -889,3 +889,6 @@ def _strip_frontmatter(text: str) -> str:
     if end < 0:
         return text
     return rest[end + 4 :].lstrip("\n")
+
+
+_backup_index = backup_index
