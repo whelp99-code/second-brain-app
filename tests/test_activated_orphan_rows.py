@@ -14,7 +14,7 @@ NOW = datetime(2026, 9, 10, tzinfo=UTC)
 ORPHAN = "sbgen:v1:" + "ab" * 32
 
 
-def _config(tmp_path: Path) -> Config:
+def config(tmp_path: Path) -> Config:
     share = tmp_path / "share"
     return Config(
         raw={
@@ -27,6 +27,9 @@ def _config(tmp_path: Path) -> Config:
             "sources": [{"id": "inbox", "adapter": "inbox-documents", "llm_policy": "deny"}],
         }
     )
+
+
+_config = config
 
 
 def test_remember_does_not_prove_non_current_activated_orphans(tmp_path: Path) -> None:

@@ -1,20 +1,21 @@
 """The read-only estimator counts distinct pages, even with identical content."""
 
 import hashlib
-import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 from sb.config import load_config
-from sb.generation_runtime import GenerationOperation
+from sb.effect_values import JsonObject
+from sb.generation_runtime_models import GenerationOperation
 from sb.pipeline import run_compile, run_ingest
 from sb.runtime_access import mutate_root
 from sb.store.ledger import Ledger
+from tests.json_fixtures import parse_object
 
 
-def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
+def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path: Path):
     root = Path(__file__).resolve().parents[1]
     vault = tmp_path / "share/vault"
     config_path = tmp_path / "config.toml"
@@ -22,20 +23,20 @@ def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
     for name in ("a", "b"):
         source = tmp_path / name
         source.mkdir()
-        (source / "same.md").write_text("동일 문서 내용")
+        _ = (source / "same.md").write_text("동일 문서 내용")
         text += f'[[sources]]\nid = "{name}"\nadapter = "markdown-vault"\nroot = "{source}"\n'
-    config_path.write_text(text)
+    _ = config_path.write_text(text)
     config = load_config(config_path)
     assert run_ingest(config, ["a", "b"]).exit_code == 0
 
-    def seed_history(root):
+    def seed_history(root: Path) -> None:
         with Ledger(root) as ledger:
             ledger.ensure_derivation("obsolete-compile-key", "compile", "old-run")
             ledger.mark_running("obsolete-compile-key", "old-run")
             ledger.mark_failed("obsolete-compile-key", "fixture historical failure")
     mutate_root(config, GenerationOperation.EFFECT, seed_history)
 
-    def estimate():
+    def estimate() -> JsonObject:
         database = vault / ".sb/ledger.db"
         before = hashlib.sha256(database.read_bytes()).hexdigest()
         result = subprocess.check_output(
@@ -50,7 +51,7 @@ def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
             timeout=30,
         )
         assert hashlib.sha256(database.read_bytes()).hexdigest() == before
-        return json.loads(result)
+        return parse_object(result)
 
     first = estimate()
     assert first["page_groups"] == first["eligible_page_calls"] == 2
@@ -61,5 +62,7 @@ def test_estimate_counts_pages_then_recognizes_completed_keys(tmp_path):
     assert run_compile(config, llm_mode="fake").exit_code == 0
     second = estimate()
     assert second["eligible_page_calls"] == 0
-    assert second["new_key_states"]["done"] == 2
+    states = second["new_key_states"]
+    assert isinstance(states, dict)
+    assert states["done"] == 2
     assert second["non_current_compile_unfinished"] == 1
