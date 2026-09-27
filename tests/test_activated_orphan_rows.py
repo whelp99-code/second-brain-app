@@ -51,11 +51,11 @@ def test_remember_does_not_prove_non_current_activated_orphans(tmp_path: Path) -
         phase = TypeAdapter[tuple[str] | None](tuple[str] | None).validate_python(mutations.store.journal.execute(
             "SELECT phase FROM activations WHERE generation_id=?",
             (ORPHAN,),
-        ).fetchone())
+        ).fetchone(), strict=True)
         current = TypeAdapter[tuple[str] | None](tuple[str] | None).validate_python(mutations.store.journal.execute(
             "SELECT phase FROM activations WHERE generation_id=?",
             (mutations.store.active().generation_id,),
-        ).fetchone())
+        ).fetchone(), strict=True)
     finally:
         mutations.close()
     assert phase is not None

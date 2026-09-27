@@ -31,7 +31,7 @@ def signed(body: Mapping[str, JsonInput]) -> JsonObject:
     value = {key: value for key, value in body.items() if key != "signature"}
     value["signature"] = base64.urlsafe_b64encode(KEY.sign(
         b"orca-jarvis/memory-access-claim/v1\0" + canonical_bytes(value))).rstrip(b"=").decode()
-    return TypeAdapter[JsonObject](JsonObject).validate_python(value)
+    return TypeAdapter[JsonObject](JsonObject).validate_python(value, strict=True)
 
 
 @pytest.fixture

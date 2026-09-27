@@ -11,6 +11,7 @@ from mcp_types import CallToolResult
 from pydantic import BaseModel, ConfigDict
 
 from sb.contracts import PageSpec, SourceCite
+from sb.effect_values import JsonObject
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 
@@ -173,3 +174,13 @@ def call(
             return await client.call_tool(name, dict(arguments))
 
     return anyio.run(go)
+
+
+class _JsonEnvelope(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="ignore")
+    structured_content: JsonObject
+
+
+def json_content(result: CallToolResult) -> JsonObject:
+    """Parse the MCP transport's untyped structured object at the test boundary."""
+    return _JsonEnvelope.model_validate_json(result.model_dump_json(), strict=True).structured_content

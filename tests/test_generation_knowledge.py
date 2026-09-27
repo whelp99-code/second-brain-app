@@ -1,3 +1,5 @@
+from pathlib import Path
+
 """Knowledge bindings must survive sealing and participate in its identity."""
 import hashlib
 import json
@@ -9,22 +11,24 @@ from datetime import UTC, datetime
 import pytest
 
 from sb.bound_knowledge import BoundKnowledge
+from sb.effect_values import JsonObject
 from sb.generation_access import access_bound_ledger_digest, verified_ledger_digest
 from sb.generation_integrity import GenerationIntegrityError, load_verified_manifest
-from sb.generations import GenerationStore
+from sb.generations import Generation, GenerationStore
 from sb.store.ledger import Ledger
+from tests.json_fixtures import parse_object
 
 BODY = '검증용 본문'
 STATE = BoundKnowledge('wiki/검증', 'sha256:' + hashlib.sha256(BODY.encode()).hexdigest(), 'ACTIVE', 'APPROVED')
 
 
-def build(root, states):
+def build(root: Path, states: tuple[BoundKnowledge, ...]) -> Generation:
     store = GenerationStore(root / 'state', root / 'share', provider_instance_id='provider:fixture', provider_release_sha='a' * 40)
     try:
-        def materialize(path):
+        def materialize(path: Path) -> None:
             page = path / 'wiki' / '검증.md'
             page.parent.mkdir(parents=True, exist_ok=True)
-            page.write_text(BODY)
+            _ = page.write_text(BODY)
             with Ledger(path) as ledger:
                 for state in states:
                     ledger.bind_knowledge(state)
@@ -35,7 +39,7 @@ def build(root, states):
         store.close()
 
 
-def test_state_changes_identity_and_order_does_not(tmp_path):
+def test_state_changes_identity_and_order_does_not(tmp_path: Path):
     other = replace(STATE, content_digest='sha256:' + 'b' * 64)
     groups = [(STATE, other), (other, STATE), (replace(STATE, approval_status='PENDING'), other), ()]
     results = [build(tmp_path / str(i), states) for i, states in enumerate(groups)]
@@ -55,39 +59,42 @@ def test_state_changes_identity_and_order_does_not(tmp_path):
     'DELETE FROM bound_knowledge',
     'DROP TABLE bound_knowledge',
 ])
-def test_tampering_rejected_after_inventory_refresh(tmp_path, sql):
+def test_tampering_rejected_after_inventory_refresh(tmp_path: Path, sql: str):
     generation = build(tmp_path, (STATE,))
     folder = generation.root / '.sb'
     folder.chmod(0o700)
     path = folder / 'ledger.db'
     path.chmod(0o600)
     with closing(sqlite3.connect(path)) as connection:
-        connection.execute(sql)
+        _ = connection.execute(sql)
         connection.commit()
     inventory_path = folder / 'derived-manifest.json'
-    inventory = json.loads(inventory_path.read_text())
-    for row in inventory['stores']:
+    inventory = parse_object(inventory_path.read_text())
+    stores = inventory['stores']
+    assert isinstance(stores, list)
+    for row in stores:
+        assert isinstance(row, dict)
         if row['name'] == 'ledger.db':
             row['digest'] = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
             row['bytes'] = path.stat().st_size
     inventory_path.chmod(0o600)
-    inventory_path.write_text(json.dumps(inventory))
+    _ = inventory_path.write_text(json.dumps(inventory))
     with pytest.raises(GenerationIntegrityError, match='GENERATION_SPLIT_BRAIN'):
-        load_verified_manifest(generation.root)
+        _ = load_verified_manifest(generation.root)
 
 
-def test_empty_and_absent_table_preserve_legacy_digest(tmp_path):
+def test_empty_and_absent_table_preserve_legacy_digest(tmp_path: Path):
     with Ledger(tmp_path):
         pass
     legacy = 'sha256:' + 'c' * 64
     assert access_bound_ledger_digest(tmp_path, legacy) == legacy
     with closing(sqlite3.connect(tmp_path / '.sb' / 'ledger.db')) as connection:
-        connection.execute('DROP TABLE bound_knowledge')
+        _ = connection.execute('DROP TABLE bound_knowledge')
         connection.commit()
     assert access_bound_ledger_digest(tmp_path, legacy) == legacy
 
 
-def test_sealed_binding_readable_in_fresh_process(tmp_path):
+def test_sealed_binding_readable_in_fresh_process(tmp_path: Path):
     import subprocess
     import sys
 
@@ -101,7 +108,7 @@ def test_sealed_binding_readable_in_fresh_process(tmp_path):
     assert result.stdout.strip() == generation.generation_id
 
 
-def test_old_body_binding_is_not_projected_onto_current_body(tmp_path):
+def test_old_body_binding_is_not_projected_onto_current_body(tmp_path: Path):
     from sb.knowledge_registry import KnowledgeState
     from sb.sealed_knowledge import sealed_knowledge_states
 
@@ -109,15 +116,15 @@ def test_old_body_binding_is_not_projected_onto_current_body(tmp_path):
     assert sealed_knowledge_states(generation.root, (KnowledgeState(STATE.page_id, 'ACTIVE', 'APPROVED'),)) == ()
 
 
-def test_knowledge_projection_rejects_ledger_change_after_initial_validation(tmp_path, monkeypatch):
+def test_knowledge_projection_rejects_ledger_change_after_initial_validation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import sb.sealed_knowledge as module
     from sb.search_errors import GenerationIndexError
 
     generation = build(tmp_path, (replace(STATE, approval_status='PENDING'),))
-    verify = module.load_verified_manifest
+    verify = load_verified_manifest
     calls = 0
 
-    def change_after_validation(root):
+    def change_after_validation(root: Path) -> JsonObject:
         nonlocal calls
         manifest = verify(root)
         calls += 1
@@ -126,10 +133,10 @@ def test_knowledge_projection_rejects_ledger_change_after_initial_validation(tmp
             ledger.parent.chmod(0o700)
             ledger.chmod(0o600)
             with closing(sqlite3.connect(ledger)) as connection:
-                connection.execute("UPDATE bound_knowledge SET approval_status='APPROVED'")
+                _ = connection.execute("UPDATE bound_knowledge SET approval_status='APPROVED'")
                 connection.commit()
         return manifest
 
     monkeypatch.setattr(module, 'load_verified_manifest', change_after_validation)
     with pytest.raises(GenerationIndexError):
-        module.sealed_knowledge_states(generation.root, ())
+        _ = module.sealed_knowledge_states(generation.root, ())

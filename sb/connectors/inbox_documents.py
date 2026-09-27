@@ -94,12 +94,12 @@ class InboxDocumentsAdapter:
                 continue
             try:
                 metadata = path.stat()
-                body = _read_regular(path, metadata)
+                body = read_regular(path, metadata)
             except OSError:
                 continue
             observed = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(body).hexdigest()}"
             if observed == token:
-                _move_done(self._root, rel, token, metadata)
+                move_done(self._root, rel, token, metadata)
 
     def _ingest(
         self, path: Path, rel: str, previous: str | None
@@ -120,7 +120,7 @@ class InboxDocumentsAdapter:
                 return token, None
             return token, _skip(self.source_id, rel, "size-limit")
         try:
-            body = _read_regular(path, stat)
+            body = read_regular(path, stat)
         except OSError:
             return self._resume_skip(rel, "unreadable", previous)
         token = f"{stat.st_mtime_ns}:{stat.st_size}:{sha256(body).hexdigest()}"
@@ -235,7 +235,7 @@ def _parse_body(suffix: str, body: bytes) -> _InboxText | str:
         return str(exc)
 
 
-def _move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> None:
+def move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> None:
     parts = Path(rel).parts
     if not parts or Path(rel).is_absolute() or any(part in {".", ".."} for part in parts):
         return
@@ -316,7 +316,7 @@ def _file_identity(info: os.stat_result) -> tuple[int, ...]:
     )
 
 
-def _read_regular(path: Path, expected: os.stat_result) -> bytes:
+def read_regular(path: Path, expected: os.stat_result) -> bytes:
     """Bound reads and reject special files or replacement during the read."""
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:

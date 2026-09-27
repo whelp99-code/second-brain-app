@@ -21,7 +21,7 @@ from sb.vault import Vault, init_vault
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 
 
-def _config(tmp_path: Path) -> tuple[Config, Path]:
+def generation_config(tmp_path: Path) -> tuple[Config, Path]:
     share = tmp_path / "share"
     root = share / "vault"
     _ = init_vault(root)
@@ -38,6 +38,9 @@ def _config(tmp_path: Path) -> tuple[Config, Path]:
         ),
         root,
     )
+
+
+_config = generation_config
 
 
 def test_compile_mutates_a_successor_instead_of_the_active_vault(tmp_path: Path) -> None:
