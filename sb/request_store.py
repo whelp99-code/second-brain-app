@@ -1039,11 +1039,15 @@ class RequestStore:
         entries: Sequence[Mapping[str, JsonValue]],
         request_id: str,
         now: datetime,
+        *,
+        targets: tuple[dict[str, JsonValue], ...] = (),
     ) -> tuple[int, str]:
         stamp = format_instant(now)
         self._begin()
         try:
             result = self._apply_tombstones_inside(entries, request_id, stamp)
+            if targets:
+                register_target_identities(self.db, result[0], targets)
             self._commit()
             return result
         except (sqlite3.Error, TypeError, ValueError):

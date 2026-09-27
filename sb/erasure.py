@@ -50,13 +50,15 @@ __all__ = (
 
 
 @dataclass(frozen=True, slots=True)
-class _ErasurePlan:
+class ErasurePlan:
     targets: Sequence[ResolvedMemoryTargetModel]
     operation: str
     request_id: str
     request_digest: str
     high_water: tuple[int, str]
     replacement: str | None
+    source_hashes: tuple[str, ...] = ()
+    remove_pages: bool = False
 
 
 @final
@@ -102,7 +104,7 @@ class ErasureEngine:
             if not isinstance(request.payload, CorrectionPayloadModelV2):
                 raise ErasureError("EFFECT_OPERATION_CONFUSION")
             replacement = request.payload.content
-        return self._apply(root, _ErasurePlan(request.targets, request.operation, request.request_id,
+        return self._apply(root, ErasurePlan(request.targets, request.operation, request.request_id,
             request.request_digest, (request.tombstone_high_water.sequence,
                 request.tombstone_high_water.set_root), replacement), now)
 
@@ -110,19 +112,28 @@ class ErasureEngine:
         self, root: Path, intent: CorrectionCancellationIntentV1, now: datetime,
     ) -> tuple[str, ...]:
         """Internal admitted-intent path; never reconstruct or apply the original correction body."""
-        return self._apply(root, _ErasurePlan((intent.target,), "suppression", intent.intent_id,
+        return self._apply(root, ErasurePlan((intent.target,), "suppression", intent.intent_id,
             intent.intent_digest, (intent.tombstone.sequence, intent.tombstone.set_root), None), now)
 
-    def _apply(self, root: Path, plan: _ErasurePlan, now: datetime) -> tuple[str, ...]:
+    def apply_owner(self, root: Path, plan: ErasurePlan, now: datetime) -> tuple[str, ...]:
+        """Apply a journal-admitted local owner receipt; never a delegated wire request."""
+        return self._apply(root, plan, now)
+
+    def _apply(self, root: Path, plan: ErasurePlan, now: datetime) -> tuple[str, ...]:
         removed: list[str] = []
         erased_hashes: set[str] = set()
-        prior_records: list[bytes] = []
+        prior_records = [(root / "raw" / value[:2] / value).read_bytes()
+                         for value in plan.source_hashes]
+        originals: dict[Path, bytes] = {}
+        edits: dict[Path, list[tuple[int, int, bytes]]] = {}
         for index, target in enumerate(plan.targets):
             if target.page_id.removesuffix(".md").startswith("wiki/life-event-"):
                 raise ErasureError("LIFE_EVENT_API_REQUIRED")
             page = self._page(root, target.page_id)
             try:
-                body = page.read_bytes()
+                if page not in originals:
+                    originals[page] = page.read_bytes()
+                body = originals[page]
             except OSError as exc:
                 raise ErasureError("EFFECT_PRIOR_STALE") from exc
             observed = "sha256:" + hashlib.sha256(body).hexdigest()
@@ -138,7 +149,8 @@ class ErasureEngine:
             if plan.replacement is not None and index == 0:
                 sid = correction_marker(body[end:])
                 replacement = render_correction(plan.replacement, sid)
-                successor = body[:start] + replacement.encode("utf-8") + body[end:]
+                replacement_bytes = replacement.encode("utf-8")
+                successor = body[:start] + replacement_bytes + body[end:]
                 if sid is not None:
                     try:
                         prospective = parse_page_records(successor, target.page_id)
@@ -147,9 +159,21 @@ class ErasureEngine:
                     except MemoryRecordError as exc:
                         raise ErasureError("CORRECTION_RECORDS_INVALID") from exc
             else:
-                successor = body[:start] + body[end:]
+                replacement_bytes = b""
+            edits.setdefault(page, []).append((start, end, replacement_bytes))
+        for page, spans in edits.items():
+            successor = originals[page]
+            boundary = len(successor)
+            for start, end, replacement_bytes in sorted(spans, reverse=True):
+                if end > boundary:
+                    raise ErasureError("EFFECT_TARGET_AMBIGUOUS")
+                successor = successor[:start] + replacement_bytes + successor[end:]
+                boundary = start
             self._write_private(page, successor)
-        targets = {self._page(root, target.page_id) for target in plan.targets}
+        if plan.remove_pages:
+            for page_id in {target.page_id for target in plan.targets}:
+                _ = Vault(root).forget_page(page_id)
+        targets = set(originals)
         for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
             if not path.is_file() or ".git" in path.relative_to(root).parts or path in targets:
                 continue
@@ -157,7 +181,8 @@ class ErasureEngine:
                 body = path.read_bytes()
             except OSError as exc:
                 raise ErasureError("SURFACE_SCAN_FAILED") from exc
-            if any(prior in body for prior in prior_records):
+            if (any(prior in body for prior in prior_records)
+                    or any(value.encode("ascii") in body for value in plan.source_hashes)):
                 relative = path.relative_to(root).as_posix()
                 if relative.startswith("raw/"):
                     erased_hashes.add(path.name)
@@ -189,7 +214,8 @@ class ErasureEngine:
                     and prior in path.read_bytes()
                 ):
                     raise ErasureError("MANAGED_COPY_REMAINS")
-        self.reingress.block_targets(plan.targets, plan.high_water, now)
+        self.reingress.block_targets(plan.targets, plan.high_water, now,
+                                     content_hashes=plan.source_hashes)
         return tuple(sorted(removed))
 
 
