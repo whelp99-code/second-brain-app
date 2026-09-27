@@ -4,20 +4,29 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
+from sb.config import Config
+from sb.effect_values import JsonObject
 from sb.life_contracts import LifeInputError
 from sb.life_sensors import health_batch, parse_overland, segments, sleep_union
 from sb.pipeline import run_life_import
 from sb.store.ledger import Ledger
+from tests import test_web
+from tests.life_test_support import (
+    config_table,
+    json_rows,
+    json_text,
+)
+from tests.life_test_support import request as _request
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import life_config
-from tests.test_web import _request, _running
 
 
-def point(at, latitude=37.5, longitude=127.0, accuracy=20):
+def point(at: datetime, latitude: float=37.5, longitude: float=127.0, accuracy: float=20) -> JsonObject:
     return {
         "type": "Feature",
         "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
@@ -29,14 +38,14 @@ def point(at, latitude=37.5, longitude=127.0, accuracy=20):
     }
 
 
-def sensor_config(tmp_path):
+def sensor_config(tmp_path: Path) -> tuple[Config, Path]:
     cfg, root = life_config(tmp_path)
     cfg = replace(
         cfg,
         raw={
             **cfg.raw,
             "life": {
-                **cfg.raw["life"],
+                **config_table(cfg.raw["life"]),
                 "location_capture": True,
                 "health_capture": True,
                 "sources": {
@@ -61,7 +70,7 @@ def sensor_config(tmp_path):
     return cfg, root
 
 
-def test_locations_accuracy_gaps_and_replay(tmp_path):
+def test_locations_accuracy_gaps_and_replay(tmp_path: Path) -> None:
     cfg, root = sensor_config(tmp_path)
     points = [
         point(NOW - timedelta(minutes=20)),
@@ -81,20 +90,20 @@ def test_locations_accuracy_gaps_and_replay(tmp_path):
         cfg, "test-notes", "overland", json.dumps(document).encode(), now=NOW
     )
     assert first.exit_code == 0, result
-    assert len(result["receipts"]) >= 4
+    assert len(json_rows(result["receipts"])) >= 4
     second, replay = run_life_import(
         cfg, "test-notes", "overland", json.dumps(document).encode(), now=NOW
     )
     assert second.exit_code == 0 and replay["import_receipt_id"] == result["import_receipt_id"]
     with Ledger(root) as ledger:
         events = ledger.life_store().events(scopes=("principal:owner",), now=NOW)
-        assert len(events) == len(result["receipts"])
+        assert len(events) == len(json_rows(result["receipts"]))
         assert all(
             e.sensitivity == "restricted" and e.external_processing == "local_only" for e in events
         )
 
 
-def test_health_absent_is_not_zero_and_sleep_dedup():
+def test_health_absent_is_not_zero_and_sleep_dedup() -> None:
     sample = {
         "id": "sample1",
         "type": "steps",
@@ -119,7 +128,7 @@ def test_health_absent_is_not_zero_and_sleep_dedup():
     )
     assert rows[0]["value"] is None
     with pytest.raises(LifeInputError, match="TYPE_DISABLED"):
-        health_batch(
+        _ = health_batch(
             {"type": "steps", "samples": [sample]}, allowed_types=["sleep"], timezone="UTC", now=NOW
         )
     sleep = [
@@ -142,7 +151,7 @@ def test_health_absent_is_not_zero_and_sleep_dedup():
     assert sleep_union(sleep + [{**sleep[0], "source": "other"}])["combined_minutes"] is None
 
 
-def test_health_actual_http_delete_cursor_and_no_resurrection(tmp_path):
+def test_health_actual_http_delete_cursor_and_no_resurrection(tmp_path: Path) -> None:
     cfg, root = sensor_config(tmp_path)
     sample = {
         "id": "fixture-step",
@@ -153,14 +162,14 @@ def test_health_actual_http_delete_cursor_and_no_resurrection(tmp_path):
         "unit": "count",
         "source": "fixture",
     }
-    with _running(cfg) as base:
+    with test_web._running(cfg) as base:
         code, result = _request(
             base + "/api/life/v1/health/test-notes",
             method="POST",
             payload={"type": "steps", "samples": [sample], "anchor": "v1"},
         )
         assert code == 202, result
-        event_id = result["receipts"][0]["event_id"]
+        event_id = json_text(json_rows(result["receipts"])[0]["event_id"])
         code, evidence = _request(base + f"/api/life/v1/attachments/{event_id}/0")
         assert code == 200 and evidence["content_type"] == "application/json"
         code, result = _request(
@@ -183,14 +192,14 @@ def test_health_actual_http_delete_cursor_and_no_resurrection(tmp_path):
         )
         assert code == 202, replayed
         code, events = _request(base + "/api/life/v1/timeline?day=2026-09-26")
-        assert code == 200 and events["events"] == []
+        assert code == 200 and json_rows(events["events"]) == []
     with Ledger(root) as ledger:
         assert ledger.life_store().events(scopes=("principal:owner",), now=NOW) == ()
 
 
-def test_overland_success_shape_after_actual_publication(tmp_path):
+def test_overland_success_shape_after_actual_publication(tmp_path: Path) -> None:
     cfg, _root = sensor_config(tmp_path)
-    with _running(cfg) as base:
+    with test_web._running(cfg) as base:
         code, result = _request(
             base + "/api/life/v1/overland/test-notes",
             method="POST",
@@ -205,7 +214,7 @@ def test_overland_success_shape_after_actual_publication(tmp_path):
         assert code != 200 and "result" not in bad
 
 
-def test_disabled_health_collection_still_allows_deletions(tmp_path):
+def test_disabled_health_collection_still_allows_deletions(tmp_path: Path) -> None:
     cfg, _root = sensor_config(tmp_path)
     sample = {
         "id": "fixture-step",
@@ -224,9 +233,9 @@ def test_disabled_health_collection_still_allows_deletions(tmp_path):
         now=NOW,
     )
     assert out.exit_code == 0
-    off = replace(cfg, raw={**cfg.raw, "life": {**cfg.raw["life"], "health_capture": False}})
+    off = replace(cfg, raw={**cfg.raw, "life": {**config_table(cfg.raw["life"]), "health_capture": False}})
     with pytest.raises(LifeInputError, match="DISABLED"):
-        run_life_import(
+        _ = run_life_import(
             off,
             "test-notes",
             "health",

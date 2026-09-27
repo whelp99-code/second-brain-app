@@ -3,16 +3,29 @@
 import math
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict, Unpack
 
 import pytest
 
+from sb.effect_values import JsonObject, JsonValue
 from sb.life_contracts import LifeInputError, SourcePolicyV1
 from sb.life_values import canonical_bytes, day_window, parse_event
 
 NOW = datetime(2026, 9, 26, 3, 0, tzinfo=UTC)
 
 
-def policy(**changes):
+class PolicyChanges(TypedDict, total=False):
+    source_id: str
+    scopes: tuple[str, ...]
+    enabled: bool
+    allowed_types: tuple[str, ...]
+    sensitivity: str
+    external_processing: str
+    retention_days: int
+    policy_revision: str
+
+
+def policy(**changes: Unpack[PolicyChanges]) -> SourcePolicyV1:
     return replace(
         SourcePolicyV1(
             source_id="test-notes",
@@ -24,7 +37,7 @@ def policy(**changes):
     )
 
 
-def payload(**changes):
+def payload(**changes: JsonValue) -> JsonObject:
     return {
         "source_item_id": "item-1",
         "source_version": "v1",

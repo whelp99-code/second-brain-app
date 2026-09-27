@@ -2,10 +2,12 @@
 
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 
 from sb.config import Config
+from sb.effect_values import JsonObject, JsonValue
 from sb.life_contracts import LifeInputError
 from sb.life_views import obsidian_manifest, timeline
 from sb.pipeline import run_life_batch
@@ -15,7 +17,7 @@ from sb.vault import init_vault
 from tests.test_life_contracts import NOW, payload
 
 
-def life_config(tmp_path):
+def life_config(tmp_path: Path) -> tuple[Config, Path]:
     root = tmp_path / "vault"
     init_vault(root)
     return Config(
@@ -44,7 +46,7 @@ def life_config(tmp_path):
     ), root
 
 
-def item(**changes):
+def item(**changes: JsonValue) -> JsonObject:
     return {"idempotency_key": "request-1", "payload": payload(**changes)}
 
 

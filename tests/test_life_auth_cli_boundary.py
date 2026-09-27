@@ -9,11 +9,13 @@ import subprocess
 import sys
 from dataclasses import replace
 from datetime import timedelta
+from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
+from sb.effect_values import JsonObject
 from sb.life_contracts import LifeInputError
 from sb.life_http import authorize
 from sb.life_phone import phone_event
@@ -21,12 +23,19 @@ from sb.pipeline import run_life_batch, run_life_maintenance
 from sb.search import SearchIndex
 from sb.store.ledger import Ledger
 from sb.vault import Vault, VaultLintError
+from tests import test_web
+from tests.life_test_support import (
+    config_table,
+    json_rows,
+    json_text,
+    load_json_object,
+)
+from tests.life_test_support import request as _request
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import item, life_config
-from tests.test_web import _request, _running
 
 
-def test_phone_contract_attachment_media_type_and_device_identity():
+def test_phone_contract_attachment_media_type_and_device_identity() -> None:
     audio = b"RIFF" + b"\0" * 4 + b"WAVEfixture"
     document = {
         "id": str(uuid4()),
@@ -41,7 +50,7 @@ def test_phone_contract_attachment_media_type_and_device_identity():
         "attachment": {
             "filename": "call.wav",
             "media_type": "audio/wav",
-            "sha256": __import__("hashlib").sha256(audio).hexdigest(),
+            "sha256": sha256(audio).hexdigest(),
             "content_base64": base64.b64encode(audio).decode(),
         },
         "knowledge_status": "UNVERIFIED",
@@ -52,15 +61,15 @@ def test_phone_contract_attachment_media_type_and_device_identity():
     assert converted["event_type"] == "call_recording_imported"
     assert (
         converted["review_state"] == "unreviewed"
-        and converted["attachments"][0]["mime"] == "audio/wav"
+        and json_rows(converted["attachments"])[0]["mime"] == "audio/wav"
     )
     with pytest.raises(LifeInputError):
-        phone_event({**document, "device_id": None})
+        _ = phone_event({**document, "device_id": None})
     with pytest.raises(LifeInputError):
-        phone_event({**document, "capture_mode": "background"})
+        _ = phone_event({**document, "capture_mode": "background"})
 
 
-def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path, monkeypatch):
+def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config, _root = life_config(tmp_path)
     token = "test-device-value-not-real-secret-0123456789"
     monkeypatch.setenv("SB_FIXTURE_DEVICE_TOKEN", token)
@@ -82,6 +91,7 @@ def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path, 
         },
     )
     actor = authorize(config, "Bearer " + token, None)
+    assert actor is not None
     assert actor.client and not actor.can_write and actor.device_id == "phone-fixture"
     assert authorize(config, "Bearer invalid-no-admin", None) is None
     expired = replace(
@@ -90,15 +100,15 @@ def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path, 
             **config.raw,
             "life_devices": {
                 "phone-fixture": {
-                    **config.raw["life_devices"]["phone-fixture"],
+                    **config_table(config_table(config.raw["life_devices"])["phone-fixture"]),
                     "expires_at": (NOW - timedelta(days=1)).isoformat(),
                 }
             },
         },
     )
     with pytest.raises(LifeInputError, match="EXPIRED_OR_REVOKED"):
-        authorize(expired, "Bearer " + token, "admin-fixture")
-    with _running(config) as base:
+        _ = authorize(expired, "Bearer " + token, "admin-fixture")
+    with test_web._running(config) as base:
         code, body = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
@@ -110,14 +120,14 @@ def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path, 
         assert code == 401
 
 
-def test_lifecycle_denies_generic_page_forget_and_expiry_before_maintenance(tmp_path):
+def test_lifecycle_denies_generic_page_forget_and_expiry_before_maintenance(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     config = replace(
         config,
         raw={
             **config.raw,
             "life": {
-                **config.raw["life"],
+                **config_table(config.raw["life"]),
                 "sources": {"test-notes": {"enabled": True, "retention_days": 1}},
             },
         },
@@ -130,9 +140,9 @@ def test_lifecycle_denies_generic_page_forget_and_expiry_before_maintenance(tmp_
         now=before,
     )
     assert out.exit_code == 0
-    page = "wiki/life-event-" + receipts[0]["event_id"]
+    page = "wiki/life-event-" + json_text(receipts[0]["event_id"])
     with pytest.raises(VaultLintError, match="LIFE_EVENT_API_REQUIRED"):
-        Vault(root).forget_page(page)
+        _ = Vault(root).forget_page(page)
     assert SearchIndex(root).search("만료된생활기억", 10) == ()
     result, state = run_life_maintenance(
         config, source_ids=("test-notes",), scopes=("principal:owner",), now=NOW
@@ -142,7 +152,7 @@ def test_lifecycle_denies_generic_page_forget_and_expiry_before_maintenance(tmp_
         assert ledger.life_store().tombstones(scopes=("principal:owner",))
 
 
-def config_text(root: Path, *, enabled=True):
+def config_text(root: Path, *, enabled: bool=True) -> str:
     return f"""vault_root = {json.dumps(str(root))}
 [life]
 life_events = true
@@ -164,17 +174,17 @@ token = "fixture-admin-token-not-real-0123456789012345"
 """
 
 
-def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(tmp_path, monkeypatch):
+def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from sb.config import load_config
 
     _config, root = life_config(tmp_path)
     cfg = tmp_path / "config.toml"
-    cfg.write_text(config_text(root))
+    _ = cfg.write_text(config_text(root))
     export = tmp_path / "events.json"
-    export.write_text(json.dumps([item(body="클리아이기억검증")["payload"]]))
+    _ = export.write_text(json.dumps([item(body="클리아이기억검증")["payload"]]))
     env = {**os.environ, "SB_CONFIG": str(cfg)}
 
-    def cli(*args):
+    def cli(*args: str) -> JsonObject:
         process = subprocess.run(
             [sys.executable, "-m", "sb.cli", "life", *args],
             capture_output=True,
@@ -184,30 +194,30 @@ def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(tmp_path
             check=False,
         )
         assert process.returncode == 0, (process.stdout, process.stderr)
-        return json.loads(process.stdout)
+        return load_json_object(process.stdout)
 
     result = cli(
         "import", "--source", "test-notes", "--format", "life-json", "--raw-file", str(export)
     )
     assert result["state"] == "published"
-    assert cli("timeline", "--day", "2026-09-26")["events"]
+    assert json_rows(cli("timeline", "--day", "2026-09-26")["events"])
     assert cli("recall", "--query", "클리아이기억검증")["state"] == "ok"
     assert "repaired" in cli("maintain")
     configured = load_config(cfg)
     monkeypatch.setenv("SB_WEB_TOKEN", "fixture-admin-token-not-real-0123456789012345")
-    with _running(configured) as base:
+    with test_web._running(configured) as base:
         token = "fixture-admin-token-not-real-0123456789012345"
         code, result = _request(base + "/api/life/v1/timeline?day=2026-09-26", token=token)
-        assert code == 200 and result["events"]
-        cfg.write_text(config_text(root, enabled=False))
+        assert code == 200 and json_rows(result["events"])
+        _ = cfg.write_text(config_text(root, enabled=False))
         code, result = _request(base + "/api/life/v1/timeline?day=2026-09-26", token=token)
-        assert code == 200 and result["events"] == []
+        assert code == 200 and json_rows(result["events"]) == []
         cfg.unlink()
         code, _result = _request(base + "/api/life/v1/health", token=token)
         assert code == 503
 
 
-def test_timeline_pages_ties_scopes_and_changed_cursor(tmp_path):
+def test_timeline_pages_ties_scopes_and_changed_cursor(tmp_path: Path) -> None:
     config, _root = life_config(tmp_path)
     records = [
         {**item(source_item_id=f"entry-{i}", body=f"기록 {i}"), "idempotency_key": f"key-{i}"}
@@ -217,17 +227,17 @@ def test_timeline_pages_ties_scopes_and_changed_cursor(tmp_path):
     assert outcome.exit_code == 0
     from urllib.parse import quote
 
-    with _running(config) as base:
+    with test_web._running(config) as base:
         code, page = _request(base + "/api/life/v1/timeline?day=2026-09-26&limit=2")
-        assert code == 200 and len(page["events"]) == 2 and page["next_cursor"]
+        assert code == 200 and len(json_rows(page["events"])) == 2 and page["next_cursor"]
         cursor = page["next_cursor"]
-        seen = {event["event_id"] for event in page["events"]}
+        seen = {json_text(event["event_id"]) for event in json_rows(page["events"])}
         while cursor:
             code, page = _request(
-                base + "/api/life/v1/timeline?day=2026-09-26&limit=2&cursor=" + quote(cursor)
+                base + "/api/life/v1/timeline?day=2026-09-26&limit=2&cursor=" + quote(json_text(cursor))
             )
             assert code == 200, page
-            ids = {event["event_id"] for event in page["events"]}
+            ids = {json_text(event["event_id"]) for event in json_rows(page["events"])}
             assert not seen.intersection(ids)
             seen.update(ids)
             cursor = page["next_cursor"]
@@ -237,7 +247,7 @@ def test_timeline_pages_ties_scopes_and_changed_cursor(tmp_path):
             base + "/api/life/v1/corrections",
             method="POST",
             payload={
-                "event_id": receipts[0]["event_id"],
+                "event_id": json_text(receipts[0]["event_id"]),
                 "expected_revision": 1,
                 "replacement": "새 개정",
                 "reason": "fixture",
@@ -248,6 +258,6 @@ def test_timeline_pages_ties_scopes_and_changed_cursor(tmp_path):
         code, stale = _request(
             base
             + "/api/life/v1/timeline?day=2026-09-26&limit=2&cursor="
-            + quote(first["next_cursor"])
+            + quote(json_text(first["next_cursor"]))
         )
         assert code == 409, stale
