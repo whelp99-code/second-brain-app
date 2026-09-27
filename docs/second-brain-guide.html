@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Second Brain 기능 안내</title>
+<style>
+  :root {
+    --paper: #f3eee4;
+    --sheet: #fffcf7;
+    --ink: #1c1814;
+    --muted: #5e574e;
+    --line: #ddd4c6;
+    --pine: #1d4a38;
+    --pine-bg: #e5f0ea;
+    --amber: #7a4e0d;
+    --amber-bg: #f8efd4;
+    --rust: #8a342c;
+    --rust-bg: #f8e6e2;
+    --slate: #2f4558;
+    --slate-bg: #e7eef3;
+    --shadow: 0 1px 0 rgba(28, 24, 20, 0.04);
+    --serif: "Noto Serif CJK KR", "Noto Serif CJK JP", "Noto Serif CJK SC", "Source Han Serif K", serif;
+    --sans: "Noto Sans CJK KR", "Noto Sans CJK JP", "Noto Sans CJK SC", "Source Han Sans K", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+  }
+  a { color: var(--pine); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--pine); outline-offset: 3px; }
+  .skip {
+    position: absolute; left: 12px; top: -40px;
+    background: var(--ink); color: white; padding: 8px 12px;
+  }
+  .skip:focus { top: 12px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 820px);
+    gap: 36px;
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+  }
+  nav {
+    position: sticky; top: 20px; align-self: start;
+    font-size: 14px; line-height: 1.4;
+  }
+  nav ol { list-style: none; margin: 12px 0 0; padding: 0; }
+  nav a {
+    display: block; padding: 6px 0; color: var(--muted); text-decoration: none;
+    border-top: 1px solid transparent;
+  }
+  nav a:hover { color: var(--ink); }
+  .brand {
+    font-family: var(--serif); font-size: 15px; letter-spacing: 0.01em;
+  }
+  .brand small { display: block; color: var(--muted); font-family: var(--sans); font-size: 12px; margin-top: 4px; }
+  header.mast {
+    margin-bottom: 28px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 650;
+    font-size: 42px;
+    line-height: 1.2;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+  }
+  .lede { font-size: 19px; max-width: 40em; margin: 0; }
+  .meta { color: var(--muted); font-size: 14px; margin-top: 14px; }
+  h2 {
+    font-family: var(--serif);
+    font-size: 28px;
+    line-height: 1.25;
+    margin: 48px 0 12px;
+  }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  p { margin: 0 0 12px; }
+  .banner {
+    display: grid;
+    grid-template-columns: 148px 1fr;
+    gap: 18px;
+    background: var(--rust-bg);
+    border: 1px solid #e4c4be;
+    padding: 16px 18px;
+    margin: 22px 0 8px;
+  }
+  .banner strong { display: block; color: var(--rust); font-size: 14px; letter-spacing: 0.04em; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; }
+  .pill {
+    display: inline-block;
+    font-size: 12px;
+    line-height: 1.3;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    font-weight: 650;
+  }
+  .ok { background: var(--pine-bg); color: var(--pine); }
+  .part { background: var(--amber-bg); color: var(--amber); }
+  .block { background: var(--rust-bg); color: var(--rust); }
+  .code { background: var(--slate-bg); color: var(--slate); }
+  .absent { background: #eceae6; color: #4e4944; }
+  figure.diagram {
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    margin: 18px 0 8px;
+    padding: 18px 16px 12px;
+    box-shadow: var(--shadow);
+  }
+  figcaption { color: var(--muted); font-size: 14px; margin-top: 10px; }
+  .layers { display: grid; gap: 10px; }
+  .layer {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .layer-name {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+  }
+  .nodes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .node {
+    background: #f7f3eb;
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    min-width: 128px;
+    flex: 1 1 128px;
+  }
+  .node b { display: block; font-size: 14px; }
+  .node span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 2px; }
+  .node.bad { background: var(--rust-bg); border-color: #e4c4be; }
+  .node.good { background: var(--pine-bg); border-color: #c9ddd2; }
+  .node.wait { background: var(--amber-bg); border-color: #ead7ae; }
+  .arrow {
+    height: 18px;
+    margin-left: 102px;
+    background:
+      linear-gradient(var(--muted), var(--muted)) center / 1px 100% no-repeat;
+    position: relative;
+  }
+  .arrow::after {
+    content: "";
+    position: absolute;
+    left: 50%; bottom: 0;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--muted);
+  }
+  svg.flow { width: 100%; height: auto; display: block; }
+  svg.flow text { font-family: var(--sans); fill: var(--ink); }
+  .callout {
+    border-left: 3px solid var(--rust);
+    padding: 2px 0 2px 14px;
+    margin: 14px 0;
+  }
+  .callout.pine { border-left-color: var(--pine); }
+  pre, code {
+    font-family: "IBM Plex Mono", "Noto Sans Mono CJK KR", ui-monospace, monospace;
+    font-size: 14px;
+  }
+  pre {
+    background: #221e1a;
+    color: #f6f1e8;
+    padding: 14px 16px;
+    overflow-x: auto;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .layout, main, figure, .table-wrap, pre, .diagram { min-width: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    background: var(--sheet);
+  }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); margin: 12px 0 20px; }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    word-break: keep-all;
+  }
+  td:nth-child(2), th:nth-child(2) { white-space: nowrap; }
+  th { font-size: 12px; letter-spacing: 0.04em; color: var(--muted); font-weight: 650; background: #f7f3eb; }
+  tr:last-child td { border-bottom: 0; }
+  ol.steps { padding-left: 1.2em; }
+  ol.steps li { margin: 0 0 10px; }
+  .fix {
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    padding: 14px 16px;
+    margin: 0 0 12px;
+  }
+  .fix h3 { margin-top: 0; }
+  footer { color: var(--muted); font-size: 14px; margin-top: 36px; }
+
+  .pipeline { list-style: none; margin: 0; padding: 0; }
+  .pipeline li {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 0 0 18px;
+  }
+  .step { position: relative; border: 1px solid var(--line); background: #f7f3eb; padding: 10px 12px; }
+  .pipeline li:not(:last-child) .step::after {
+    content: "";
+    position: absolute;
+    left: 22px;
+    top: 100%;
+    width: 1px;
+    height: 18px;
+    background: var(--muted);
+  }
+  .step b { display: block; font-size: 15px; }
+  .step span { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .step.good { background: var(--pine-bg); border-color: #c9ddd2; }
+  .step.bad { background: var(--rust-bg); border-color: #e4c4be; }
+  .step.wait { background: var(--amber-bg); border-color: #ead7ae; }
+  .note {
+    margin: 0;
+    border: 1px solid var(--line);
+    background: var(--sheet);
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .note.bad { background: var(--rust-bg); border-color: #e4c4be; color: var(--rust); }
+  .note.wait { background: var(--amber-bg); border-color: #ead7ae; color: var(--amber); }
+  .note.empty { border: 0; background: transparent; padding: 0; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); padding: 18px 14px 56px; }
+    nav { position: static; }
+    nav ol { display: flex; gap: 12px; overflow-x: auto; }
+    nav a { white-space: nowrap; }
+    h1 { font-size: 32px; }
+    .banner, .layer, .pipeline li { grid-template-columns: 1fr; }
+    .arrow { margin-left: 0; }
+    .node { flex: 1 1 100%; }
+    table, thead, tbody, tr, th, td { display: block; }
+    thead { display: none; }
+    tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
+    td { border-bottom: 0; padding: 4px 12px; }
+    td:first-child { font-weight: 650; }
+  }
+  @media print {
+    body { background: white; }
+    nav, .skip { display: none; }
+    .layout { display: block; max-width: none; }
+    pre { white-space: pre-wrap; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">본문으로</a>
+<div class="layout">
+  <nav aria-label="목차">
+    <div class="brand">Second Brain<small>기능 안내 · 2026-09-26</small></div>
+    <ol>
+      <li><a href="#now">지금 상태</a></li>
+      <li><a href="#what">한 장 정의</a></li>
+      <li><a href="#structure">구조</a></li>
+      <li><a href="#flow">하루 흐름</a></li>
+      <li><a href="#use">사용법</a></li>
+      <li><a href="#features">기능 목록</a></li>
+      <li><a href="#fix">막힌 것과 고치는 법</a></li>
+      <li><a href="#split">저장소와 운영</a></li>
+      <li><a href="#not">하지 않는 일</a></li>
+    </ol>
+  </nav>
+  <main id="content">
+    <header class="mast">
+      <h1>Second Brain이 할 수 있는 일</h1>
+      <p class="lede">원본을 남기고, 출처를 달고, 충돌은 사람이 고르고, 검색하고, 하루 브리핑에 추천을 붙이는 개인 지식 엔진이다. 일을 대신 해주는 비서는 아니다.</p>
+      <p class="meta">이 페이지는 2026-09-26 01:53 KST에 이 서버를 읽기만 하고 만든 스냅샷이다. 운영 배치를 다시 돌리거나, 유닛을 재시작하거나, MCP로 기록하지 않았다.</p>
+      <div class="legend">
+        <span class="pill ok">지금 사용 가능</span>
+        <span class="pill part">부분 사용</span>
+        <span class="pill block">막힘</span>
+        <span class="pill code">코드는 있음</span>
+        <span class="pill absent">아직 없음</span>
+      </div>
+    </header>
+
+    <section id="now">
+      <h2>지금 상태</h2>
+      <div class="banner">
+        <strong>준비 상태 실패</strong>
+        <div>
+          웹 프로세스는 살아 있다. <code>/health</code>는 200이다. <code>/ready</code>는 503이고 이유는 <code>LAST_RUN_UNSUCCESSFUL</code>, <code>DERIVATIONS_FAILED</code>다. 시간당 지식 처리는 마지막에 실패했고, 그 타이머는 지금은 다음 실행이 잡혀 있지 않다.
+        </div>
+      </div>
+      <p>이미 만들어진 위키와 브리핑은 검색된다. 키워드 검색은 응답했다. 마지막 일일 브리핑은 <code>daily/2026-09-23</code>이고, 그 안에 <strong>오늘의 추천</strong>이 있다. 9월 24일 이후 새 브리핑은 없다. 추천 기능이 없는 것이 아니라, 새 배치가 성공하지 못해 추천이 멈추어 있다.</p>
+      <p>백업 타이머는 돌고 있다. 최근 검증된 백업은 <code>second-brain-20260925T032012+0900.tar.gz</code>다.</p>
+    </section>
+
+    <section id="what">
+      <h2>한 장 정의</h2>
+      <p>엔진과 데이터는 이 Ubuntu에서 돈다. 사람은 웹 콘솔, CLI, 맥 메뉴바 앱, 그리고 JARVIS 같은 에이전트의 MCP로 붙는다. 아이폰 쪽은 별도 Phone History다. 회사 기억은 개인 보관함과 합치지 않는 다른 저장소다.</p>
+      <p>기억은 “중요하면 남긴다”가 아니다. 허용된 원본은 남기고, 중요도 필터는 알림과 추천에만 쓴다. 원본은 주인이 지우기 전까지 지우지 않는다. Unified DB는 읽기만 한다.</p>
+    </section>
+
+    <section id="structure">
+      <h2>구조</h2>
+      <figure class="diagram">
+        <div class="layers">
+          <div class="layer">
+            <p class="layer-name">쓰는 곳</p>
+            <div class="nodes">
+              <div class="node good"><b>웹 콘솔</b><span>127.0.0.1:8765 · 살아 있음</span></div>
+              <div class="node good"><b>CLI <code>sb</code></b><span>검색·상태는 됨</span></div>
+              <div class="node"><b>MCP</b><span>소켓은 있음 · 이번엔 호출 안 함</span></div>
+              <div class="node"><b>맥 앱</b><span>코드·문서 있음 · 이 서버에서 미확인</span></div>
+              <div class="node wait"><b>Phone History</b><span>게이트 통과 · 서비스는 꺼짐</span></div>
+            </div>
+          </div>
+          <div class="arrow" aria-hidden="true"></div>
+          <div class="layer">
+            <p class="layer-name">들어오는 원본</p>
+            <div class="nodes">
+              <div class="node wait"><b>inbox</b><span>기억·업로드 대기 · 설정됨</span></div>
+              <div class="node wait"><b>hermes</b><span>마크다운 폴더 · 설정됨</span></div>
+              <div class="node bad"><b>unified-db</b><span>읽기 전용 · 연결이 끊김</span></div>
+              <div class="node"><b>세션·기록 어댑터</b><span>코드만 있고 설정 안 됨</span></div>
+            </div>
+          </div>
+          <div class="arrow" aria-hidden="true"></div>
+          <div class="layer">
+            <p class="layer-name">엔진</p>
+            <div class="nodes">
+              <div class="node"><b>수집</b><span>새 원본을 장부에 적음</span></div>
+              <div class="node"><b>원본 창고</b><span>raw/ · 해시로 보존</span></div>
+              <div class="node"><b>컴파일</b><span>LLM이 인용 있는 위키를 씀</span></div>
+              <div class="node bad"><b>충돌</b><span>판정 6건이 실패로 쌓임</span></div>
+              <div class="node wait"><b>브리핑</b><span>추천 포함 · 9/23에서 멈춤</span></div>
+            </div>
+          </div>
+          <div class="arrow" aria-hidden="true"></div>
+          <div class="layer">
+            <p class="layer-name">사람이 보는 결과</p>
+            <div class="nodes">
+              <div class="node good"><b>wiki/</b><span>이미 만든 페이지는 검색됨</span></div>
+              <div class="node"><b>conflicts/</b><span>사람이 왼쪽·오른쪽·메모로 고름</span></div>
+              <div class="node wait"><b>daily/</b><span>오늘의 추천 · 최신 9/23</span></div>
+              <div class="node good"><b>검색 색인</b><span>키워드. 의미 검색은 꺼짐</span></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>구성도. 초록은 지금 응답하는 면, 노랑은 쌓이거나 오래된 결과, 빨강은 현재 실패다. 회사 기억(<code>sb-company</code>)은 이 그림 밖에 있다.</figcaption>
+      </figure>
+      <p>보관함 안은 이렇게 나뉜다. <code>wiki/</code>는 만든 지식, <code>daily/</code>는 하루 브리핑, <code>conflicts/</code>는 충돌과 사람의 결정, <code>inbox/</code>는 아직 처리 전 자료, <code>raw/</code>는 원본 창고, <code>.sb/</code>는 장부와 검색 색인이다. <code>raw/</code>와 <code>.sb/</code>는 git에 넣지 않고 백업에는 넣는다.</p>
+      <p>쓰는 사람은 하나, 보관함도 하나, 쓰는 손도 하나다. 웹은 이 컴퓨터의 loopback에만 열린다. 맥은 SSH 터널로 그 포트를 본다.</p>
+    </section>
+
+    <section id="flow">
+      <h2>하루 흐름</h2>
+      <figure class="diagram" aria-labelledby="flowTitle">
+        <ol class="pipeline" id="flowTitle">
+          <li>
+            <div class="step good"><b>1. 원본이 들어온다</b><span>기억, 업로드, 폴더, DB</span></div>
+            <p class="note bad">여기서 끊김. Unified DB에 설정한 주소가 연결을 닫는다. 이 컴퓨터의 127.0.0.1:5433은 따로 열려 있다.</p>
+          </li>
+          <li>
+            <div class="step"><b>2. inbox에 대기</b><span>접수와 위키 반영은 다른 일이다</span></div>
+            <p class="note empty"></p>
+          </li>
+          <li>
+            <div class="step"><b>3. 원본 창고에 보존</b><span>같은 내용은 한 번만 넣는다</span></div>
+            <p class="note empty"></p>
+          </li>
+          <li>
+            <div class="step"><b>4. LLM이 위키로 엮는다</b><span>문장마다 출처 각주를 달는다</span></div>
+            <p class="note empty"></p>
+          </li>
+          <li>
+            <div class="step bad"><b>5. 충돌 판정</b><span>잘못된 판정 6건이 남아 있다</span></div>
+            <p class="note wait">사람은 왼쪽 유지, 오른쪽 유지, 메모 중 하나를 고른다. 자동으로 고르지 않는다. 웹 또는 <code>sb resolve</code>.</p>
+          </li>
+          <li>
+            <div class="step wait"><b>6. 하루 브리핑</b><span>추천 3–5개. 최신 파일은 9월 23일</span></div>
+            <p class="note empty"></p>
+          </li>
+          <li>
+            <div class="step good"><b>7. 검색으로 다시 찾는다</b><span>이미 만든 페이지는 지금도 검색된다</span></div>
+            <p class="note empty"></p>
+          </li>
+        </ol>
+        <figcaption>흐름도. 새 배치가 1번에서 끝나면 4–6은 돌지 않는다. 5번의 실패 기록은 배치가 살아나도 준비 상태를 빨강으로 남긴다.</figcaption>
+      </figure>
+      <p>정상일 때의 순서는 이렇다. 시간당 타이머가 <code>sb run</code>에 해당하는 갱신을 호출한다. 수집이 새 자료를 장부에 적고, 컴파일이 위키 페이지를 쓰고, 충돌이 있으면 사람 결정을 기다리고, 브리핑이 어제 새 자료·열린 충돌·오래된 페이지·날짜가 있는 항목·이전 브리핑을 모아 추천을 쓴다. 수집과 컴파일이 둘 다 0건이면 브리핑 단계는 건너뛴다.</p>
+      <p>추천은 요약문이 아니라 출처가 달린 불릿이다. 코드는 3–5개를 요구하고, 각 불릿이 입력 표의 각주를 포함해야 한다. 알림을 보냈다고 일이 끝난 것은 아니다. 완료는 출처가 있는 사건으로 남아야 한다. 그 완료를 기록하는 생활 기억 작업은 이 저장소의 계획 1–4번만 끝났고, 5번 이하는 아직이다.</p>
+    </section>
+
+    <section id="use">
+      <h2>사용법</h2>
+      <h3>이미 있는 것을 찾기 — 지금 된다</h3>
+      <p>서버에서 아래를 실행한다. 어순이 달라도 단어가 모두 있으면 찾는다. 조사와 의역은 빼지 않으니 핵심 단어를 쓴다. 연속된 문장만 찾으면 큰따옴표를 넣는다.</p>
+      <pre>export SB_CONFIG="$HOME/.config/second-brain/config.toml"
+sb search "계약서"
+sb search '노을 "세 번 실패"'</pre>
+      <p>웹에서도 된다. 이 서버 브라우저로 <a href="http://127.0.0.1:8765/">http://127.0.0.1:8765/</a> 를 연다. 바깥에는 열려 있지 않다. 맥에서는 SSH 터널로 같은 포트를 본다.</p>
+
+      <h3>새 기억을 남기기 — 접수는 되고, 위키 반영은 지금 안 된다</h3>
+      <pre>sb remember "계약서는 수요일에 발송한다." --title "계약 일정"
+sb run</pre>
+      <p><code>remember</code>의 응답은 inbox 접수다. 검색에 나왔다는 뜻이 아니다. 반영은 <code>sb run</code> 또는 시간당 갱신이다. 그 갱신이 지금 실패하므로, 오늘 남긴 기억은 대기열에 머물 수 있다. 이번 안내를 만들면서 시험 기억은 넣지 않았다.</p>
+      <p>웹의 “기억하기”, “파일 선택”, “업로드 후 지금 처리”도 같은 길이다. 업로드는 10MiB까지이고 확장자는 pdf, hwpx, docx, xlsx, md, txt, json, yaml이다. 빈 파일은 거절된다. 같은 파일을 다시 올리면 두 번 쌓지 않는다.</p>
+
+      <h3>상태를 보기</h3>
+      <pre>sb status --json
+sb sources --json
+curl -sS http://127.0.0.1:8765/health
+curl -sS http://127.0.0.1:8765/ready</pre>
+      <p><code>/health</code>는 프로세스가 살아 있는지만 본다. <code>/ready</code>가 503이면 지식 처리가 건강하지 않은 것이다. 웹 첫 화면의 “운영 준비 상태”가 그 값이다.</p>
+
+      <h3>충돌을 사람이 고르기</h3>
+      <p>웹의 열린 충돌에서 왼쪽 유지, 오른쪽 유지, 해결 메모 중 하나를 고른다. CLI는 다음이다. 자동 해결은 없다.</p>
+      <pre>sb resolve CONFLICT_ID --decision keep-left
+sb resolve CONFLICT_ID --decision note --note "사람이 확인한 메모"</pre>
+
+      <h3>에이전트가 붙는 법</h3>
+      <p>기본 MCP는 검색, 페이지 읽기, 최근 변경, 열린 충돌, 기억 추가, 쓰기 요청이다. <code>sb_run</code>은 데스크톱용 서버에만 있고 일반 stdio 목록에는 없다. 기억 추가 뒤 검색에 보이려면 배치가 성공해야 한다. 서명된 범위 읽기·쓰기 프로필은 별도 설정과 별도 프로세스다. 기본 연결의 대체재가 아니다.</p>
+    </section>
+
+    <section id="features">
+      <h2>기능 목록</h2>
+      <p>왼쪽 상태는 이 서버의 오늘 기준이다. “코드는 있음”은 이 저장소에 구현되어 있으나 지금 운영 경로에서 쓰이지 않는다는 뜻이다.</p>
+
+      <h3>지식 처리</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>기능</th><th>상태</th><th>지금 의미</th></tr></thead>
+          <tbody>
+            <tr><td>원본 보존</td><td><span class="pill ok">지금 사용 가능</span></td><td>원본 창고와 백업이 있다. 새 배치가 실패해도 이미 넣은 원본은 남아 있다.</td></tr>
+            <tr><td>인용 있는 위키 컴파일</td><td><span class="pill block">막힘</span></td><td>구현되어 있다. 최근 배치는 쓴 페이지가 0이고 오류 1이다. LLM 래퍼는 설정되어 있으나 배치가 거기까지 성공하지 못한다.</td></tr>
+            <tr><td>충돌 감지</td><td><span class="pill part">부분 사용</span></td><td>충돌 단계 실패가 6건이다. 오류 문구는 모두 “invalid conflict verdict”다. 한 건은 56번, 한 건은 21번 재시도했다.</td></tr>
+            <tr><td>사람 충돌 해결</td><td><span class="pill code">코드는 있음</span></td><td>웹과 <code>sb resolve</code>가 있다. 이번 조사에서 운영 충돌을 고르지는 않았다.</td></tr>
+            <tr><td>일일 브리핑과 오늘의 추천</td><td><span class="pill part">부분 사용</span></td><td>추천은 구현되어 있고 9/23 브리핑에 있다. 그 뒤 날짜의 브리핑 파일이 없다. 미구현이 아니다.</td></tr>
+            <tr><td>키워드 검색</td><td><span class="pill ok">지금 사용 가능</span></td><td>설치본 <code>sb search</code>가 응답했다. 웹 검색도 같은 색인을 본다.</td></tr>
+            <tr><td>큰따옴표 정확 문구</td><td><span class="pill code">코드는 있음</span></td><td>구현되어 있다. 이번 조사에서 문구 검색은 따로 치지 않았다.</td></tr>
+            <tr><td>의미 검색</td><td><span class="pill code">코드는 있음</span></td><td>운영 설정에 hybrid가 없다. 기본은 꺼짐. 최소 유사도도 기본값이다. 켜려면 임베딩 추가 설치와 새 봉인 세대가 필요하다. 이미 봉인된 세대는 설정만으로 다시 색인되지 않는다.</td></tr>
+            <tr><td>자격증명 가리기</td><td><span class="pill ok">지금 사용 가능</span></td><td>AWS 키, GitHub 토큰, <code>sk-</code>, PEM, <code>password=</code> 같은 패턴만 가린다. 메일 주소와 전화번호는 일부러 남긴다. 세 원본 모두 sensitive는 mask다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>수집 원본</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>원본</th><th>상태</th><th>지금 의미</th></tr></thead>
+          <tbody>
+            <tr><td>inbox</td><td><span class="pill part">부분 사용</span></td><td>설정됨. 어댑터 inbox-documents. LLM 전송 허용, 마스킹. 접수는 이 대기열로 간다. 처리 배치가 실패한다.</td></tr>
+            <tr><td>hermes</td><td><span class="pill part">부분 사용</span></td><td>설정됨. 마크다운 폴더 어댑터. LLM 허용, 마스킹. 이미 컴파일된 페이지는 검색된다. 새 수집은 같은 실패 배치에 묶인다.</td></tr>
+            <tr><td>unified-db</td><td><span class="pill block">막힘</span></td><td>설정됨. 읽기 전용, LLM 전송 거부. 설정된 주소가 연결을 닫아 갱신 전체가 종료 코드 1로 끝난다. 이 컴퓨터의 127.0.0.1:5433은 따로 듣고 있다. 둘을 같은 DB로 단정하지 않았다.</td></tr>
+            <tr><td>Claude·Codex·OMO·OpenCode·GJC 세션</td><td><span class="pill code">코드는 있음</span></td><td>어댑터는 있다. 운영 원본 목록에는 없다. 예제 설정은 검토 전까지 LLM 거부를 권한다.</td></tr>
+            <tr><td>Orca·프로젝트 기록</td><td><span class="pill code">코드는 있음</span></td><td>어댑터는 있다. 운영 원본 목록에는 없다.</td></tr>
+            <tr><td>문서 파서</td><td><span class="pill ok">지금 사용 가능</span></td><td>pdf, hwpx, docx, xlsx, md, txt, json, yaml. pdf와 docx는 Docling이 있으면 그것을 먼저 쓴다. pptx, hwp, 이미지, 메일은 파서가 없다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>사람이 쓰는 화면과 명령</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>기능</th><th>상태</th><th>지금 의미</th></tr></thead>
+          <tbody>
+            <tr><td>웹 콘솔</td><td><span class="pill part">부분 사용</span></td><td>기억, 업로드, 검색, 충돌 해결, 최근 변경, 소스·보존, 메트릭, 준비 상태를 보여 준다. 화면은 열린다. “지금 처리”는 실패하는 배치를 다시 부른다.</td></tr>
+            <tr><td>CLI 검색·상태·소스</td><td><span class="pill ok">지금 사용 가능</span></td><td>설치본으로 확인했다.</td></tr>
+            <tr><td>CLI 전체 배치 <code>sb run</code></td><td><span class="pill block">막힘</span></td><td>시간당 갱신이 같은 이유로 실패한다. 안내를 만들며 다시 실행하지 않았다.</td></tr>
+            <tr><td>init, ingest, compile, brief</td><td><span class="pill part">부분 사용</span></td><td>보관함은 이미 초기화되어 있다. ingest·compile·brief는 <code>run</code>의 단계다. 지금 성공 경로가 아니다.</td></tr>
+            <tr><td>doctor, retention, metrics, gc, rollback, migrate</td><td><span class="pill code">코드는 있음</span></td><td>명령은 설치본에 있다. 이번 조사에서 실행하지 않았다. gc의 실제 삭제는 <code>--apply --confirm</code>이 있어야 한다. 원본 자동 삭제가 아니다.</td></tr>
+            <tr><td>backup, verify-backup</td><td><span class="pill ok">지금 사용 가능</span></td><td>매일 백업 타이머가 활성이다. 최근 백업은 격리 복원으로 검증되었다.</td></tr>
+            <tr><td>restore</td><td><span class="pill code">코드는 있음</span></td><td>검증된 아카이브로 복원하는 명령이 있다. 운영 보관함에 복원하지 않았다. 복원은 생산 변경이다.</td></tr>
+            <tr><td>apply-requests, apply-cancellation</td><td><span class="pill part">부분 사용</span></td><td>준비 상태의 요청 저널 검사는 통과했다. 최근 실패 요청은 0이다. 이번엔 요청을 넣지 않았다.</td></tr>
+            <tr><td>maintain</td><td><span class="pill ok">지금 사용 가능</span></td><td>유지보수 타이머는 다음 실행이 잡혀 있고, 마지막 서비스 결과는 성공이다.</td></tr>
+            <tr><td>postcompact-hook</td><td><span class="pill code">코드는 있음</span></td><td>Claude가 대화를 압축한 뒤 기억을 다시 주입하는 훅이다. 운영 연결은 확인하지 않았다.</td></tr>
+            <tr><td>identity</td><td><span class="pill code">코드는 있음</span></td><td>이 저장소의 <code>sb --help</code>에만 있다. 설치본 도움말에는 없다.</td></tr>
+            <tr><td>맥 메뉴바 앱</td><td><span class="pill code">코드는 있음</span></td><td>Finder 드롭, 선택 폴더 단방향 동기화, 검색, 즉시 실행, Notification Center 브리핑, SSH 터널, Keychain이 문서와 소스에 있다. 알림은 기본이 꺼져 있다. 이 Linux에서는 앱 실행을 확인하지 못했다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>에이전트, 폰, 회사</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>기능</th><th>상태</th><th>지금 의미</th></tr></thead>
+          <tbody>
+            <tr><td>기본 MCP 6도구</td><td><span class="pill code">코드는 있음</span></td><td>검색, 페이지, 최근 변경, 충돌, 기억, 쓰기 요청. 브로커 소켓 파일은 있다. 운영 소켓으로 도구를 부르면 운영 보관함에 쓰일 수 있어 호출하지 않았다.</td></tr>
+            <tr><td>기억 스키마 확장 도구</td><td><span class="pill code">코드는 있음</span></td><td>프로필에 따라 세대 상태, 요청 상태, 대상 해석, 취소가 추가된다. 기본 연결이 아니다.</td></tr>
+            <tr><td>범위 제한 읽기·쓰기</td><td><span class="pill code">코드는 있음</span></td><td>서명된 fence와 claim이 필요하다. 쓰기 프로필은 도구가 하나다. 수락 영수증이지 처리 완료가 아니다. 완료 확인은 다른 프로필이다.</td></tr>
+            <tr><td>Phone History</td><td><span class="pill part">부분 사용</span></td><td>서버·iOS·계약 코드가 있고 predevice 게이트는 PASS, 판정은 실기기 검증 대기이다. <code>phone-history.service</code>는 꺼져 있다. 실기기 설치는 승인되지 않았다. Second Brain으로는 inbox로만 넘긴다.</td></tr>
+            <tr><td>회사 기억 <code>sb-company</code></td><td><span class="pill code">코드는 있음</span></td><td>개인 보관함과 분리된 서명 저장소다. 후보를 받고, 수락·거절·처리 표시를 한다. 설정 디렉터리에서 회사용 설정 파일은 보이지 않았다. 운영 중이라고 보지 않는다.</td></tr>
+            <tr><td>세대와 준비 상태</td><td><span class="pill part">부분 사용</span></td><td>활성 세대가 있고 준비 상태가 그것을 읽는다. 준비 상태 자체는 503이다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="fix">
+      <h2>막힌 것과 고치는 법</h2>
+      <p>아래는 우선순위다. 이 안내를 쓰면서 운영 설정을 바꾸거나 릴리스를 갈아끼우지 않았다. 1번과 2번이 끝나기 전에는 “오늘 추천이 안 나온다”를 기능 부재로 보면 안 된다.</p>
+
+      <article class="fix">
+        <h3>1. Unified DB 연결을 고치고, 그 다음 타이머를 다시 건다</h3>
+        <p>이유: 시간당 갱신 로그가 DB 연결 종료로 끝난다. 서비스는 종료 코드 1이다. 타이머 파일은 설치되어 있으나 지금 활성 대기 상태가 아니고 다음 시각이 비어 있다. DB만 고치면 예약이 스스로 살아나지 않을 수 있다.</p>
+        <p>개선: 설정이 가리키는 DB와 이 컴퓨터의 127.0.0.1:5433이 같은 서버인지 먼저 확인한다. 같으면 루프백만 쓰게 고친다. 다르면 그 주소의 Postgres를 복구한다. 그 뒤에 타이머를 시작한다. 연결이 죽은 채로 타이머만 켜면 매시간 같은 실패가 쌓인다.</p>
+      </article>
+      <article class="fix">
+        <h3>2. 잘못된 충돌 판정을 멈추고, 재시도 상한을 운영에 올린다</h3>
+        <p>이유: 충돌 파생 6건이 “invalid conflict verdict”로 남아 준비 상태를 실패로 만든다. 재시도가 21번, 56번인 행이 있다. 이 저장소의 최신 커밋은 설정된 재시도 상한을 적용하고 상한에 닿으면 보류로 보고한다. 운영 중인 릴리스 <code>c00f378</code>에는 그 수정이 없다.</p>
+        <p>개선: 운영 릴리스를 이 저장소로 바꾸는 것은 별도 승인이다. 승인 없이는 <code>app/current</code>를 옮기지 않는다. 승인된다면, 상한 적용과 함께 LLM이 내는 충돌 판정이 허용된 값만 내도록 고쳐야 한다. 상한만 있으면 실패가 “무한 재시도”에서 “보류”로 바뀔 뿐, 그 6건이 스스로 해결되지는 않는다. 보류된 것은 사람이 웹이나 <code>sb resolve</code>로 고른다.</p>
+      </article>
+      <article class="fix">
+        <h3>3. 원본 하나가 죽어도 나머지 수집은 살린다</h3>
+        <p>이유: Unified DB 연결 실패가 갱신 전체를 종료시킨다. 최근 배치는 단계를 2개 시도하고 쓴 페이지가 0이다. inbox와 hermes까지 같이 멈춘다.</p>
+        <p>개선: 원본 연결 오류는 그 원본만 건너뛰고 장부에 이유를 남긴다. 나머지 원본은 컴파일까지 간다. 지금은 그렇게 되어 있지 않다.</p>
+      </article>
+      <article class="fix">
+        <h3>4. 배치가 성공한 뒤에야 새 추천을 기대한다</h3>
+        <p>이유: 추천은 브리핑 단계의 산출이다. 마지막 파일은 9월 23일이다.</p>
+        <p>개선: 1–3 다음에 갱신이 한 번 성공하면 <code>daily/</code>에 새 파일이 생겨야 한다. 생기지 않으면 그때 브리핑 단계를 본다. 그 전에 추천 코드를 다시 짜는 것은 잘못된 고치기다.</p>
+      </article>
+      <article class="fix">
+        <h3>5. 메일, 카카오, 통화, 아이폰 푸시는 설정 스위치가 아니다</h3>
+        <p>이유: 이 저장소에 카카오 수집기, <code>faster-whisper</code>, <code>web-push</code> 코드가 없다. 생활 기억 계획의 1–4번만 이 저장소 로컬 마스터에 반영되어 있고 5번 이하는 아니다. 그 반영도 운영 릴리스로 올라가지 않았다.</p>
+        <p>개선: 원하는 채널을 원본으로 지정하고, 원문은 로컬에 두고, 허용한 출처만 마스킹해 기존 LLM으로 보낸다. 아이폰 알림은 별도 푸시 서버를 만들지 않고 기존 JARVIS 알림에 표준 웹 푸시를 붙이는 쪽으로 계획이 잠겨 있다. 그 코드는 아직 없다. Phone History를 켜는 것과 실기기에 설치하는 것은 따로 승인해야 한다.</p>
+      </article>
+      <article class="fix">
+        <h3>6. Phone History를 운영 수집으로 보지 않는다</h3>
+        <p>이유: 게이트는 통과했다. 서비스는 꺼져 있다. 실기기 인수는 대기이다. 첨부 보관 기본값은 30일이다. 주인이 잠근 규칙은 원본을 자동으로 지우지 않는 것이다. 기본값과 규칙이 충돌한다.</p>
+        <p>개선: 서비스를 켜기 전에 첨부 보존을 “없음”으로 바꾸고, 이미 적힌 만료 시각은 지우기만 하는 이관이 필요하다. 파생 캐시와 푸시 본문만 기한을 가질 수 있다. <code>make verify</code>는 없는 스크립트를 부르므로 게이트는 <code>python3 scripts/run_predevice_gate.py</code>를 쓴다.</p>
+      </article>
+      <article class="fix">
+        <h3>7. 의미 검색은 필요할 때 새 세대로 켠다</h3>
+        <p>이유: 코드는 있다. 운영은 꺼져 있다. 키워드 검색이 되므로 “검색이 없다”는 아니다. 자연어 의역은 키워드 검색이 해주지 않는다.</p>
+        <p>개선: 임베딩 추가 기능을 설치하고 hybrid를 켠 뒤 새 세대를 봉인한다. 모델은 기존 <code>BAAI/bge-m3</code>를 유지하는 쪽이 잠긴 결정이다. 높은 유사도가 원문에 답이 있음을 보장하지는 않는다.</p>
+      </article>
+    </section>
+
+    <section id="split">
+      <h2>저장소와 운영은 다른 물건이다</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>이름</th><th>무엇인지</th><th>이번 안내에서의 위치</th></tr></thead>
+          <tbody>
+            <tr><td>이 폴더의 코드</td><td>로컬 마스터 <code>8c80091</code></td><td>기능 설명의 기준. identity 명령과 충돌 재시도 상한이 있다. origin에는 이 커밋이 없다.</td></tr>
+            <tr><td>설치본 <code>~/.local/bin/sb</code></td><td>지금 셸의 sb</td><td>도움말에 identity가 없다. 웹 서비스가 이 명령을 실행한다.</td></tr>
+            <tr><td>운영 앱</td><td><code>app/current</code> → <code>c00f378</code></td><td>실제로 배치가 쓰는 릴리스. 이 폴더보다 이전이다.</td></tr>
+            <tr><td>준비 상태가 보고하는 provider</td><td><code>78f2645</code></td><td>위 셋과 또 다르다. 하나로 합쳐 부르면 안 된다.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <p>이 페이지를 읽었다고 운영 포인터를 옮기거나, 원격에 push 하거나, 유닛을 재시작하지 않는다. 그 셋은 각각 따로 승인하는 일이다.</p>
+      </div>
+    </section>
+
+    <section id="not">
+      <h2>하지 않는 일</h2>
+      <ul>
+        <li>필요한 순간에 상황을 알아채 먼저 찌르는 실시간 비서는 없다. 맥 알림은 새 브리핑용이고, 앱이 켜져 있고 터널과 권한이 있어야 하며 기본은 꺼져 있다.</li>
+        <li>추천한 일을 Second Brain이 실행하지 않는다. 실행은 JARVIS 쪽 승인 경계 너머다.</li>
+        <li>메일함, 카카오톡, 통화 녹음을 이 프로그램이 직접 긁지 않는다. Phone History도 다른 앱의 화면·키 입력·내부 DB를 보지 않는다.</li>
+        <li>원본을 디스크가 꽉 찬다고 지우지 않는다. 자동 충돌 해결도 없다.</li>
+        <li>Unified DB에 쓰지 않는다. 회사 DB를 개인 보관함에 합치지 않는다.</li>
+        <li>보관함 git에 원격을 두지 않는다. 웹을 인터넷에 열어 두지 않는다.</li>
+      </ul>
+      <footer>
+        조사 시각 2026-09-26 01:53 KST. 읽은 것: 이 저장소의 CLI·웹·MCP·브리핑·파서·커넥터, 설치본 도움말, loopback <code>/health</code>와 <code>/ready</code>, 소스 목록, 키워드 검색의 응답 여부, 사용자 유닛 상태. 쓰지 않은 것: 운영 배치, 복원, MCP 도구 호출, 설정 파일 원문.
+      </footer>
+    </section>
+  </main>
+</div>
+</body>
+</html>
