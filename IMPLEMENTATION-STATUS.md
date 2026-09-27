@@ -30,7 +30,7 @@
 | M10 | 실제 한글 사용자 질문 100–300과 정답 근거 | implemented_unverified | 2026-09-27 격리 fixture 131케이스 exit 0 (`2e9f2cd`, 운영 vault 미사용). CLI hit@1 0.2087 recall@5 0.2348, MCP hit@1 0.2000 recall@5 0.2261. natural_question·paraphrase recall@5 0. 운영 프로브 미실행. [M10-EVALUATION-2026-09-27.md](M10-EVALUATION-2026-09-27.md) |
 | M11 | 큰 corpus 실제 MCP 및 동시 조회/정정·갱신 p50/p95 | implemented_unverified | during-compile 재실행. pinned-read 중 publish·현재핀 p50/p95 미측정 |
 | M12 | 원장/원본 journal 소실 DR와 RPO/RTO. high-water·재유입 차단 | implemented_unverified | 2026-09-14 cold restore 1 passed. 현재핀 전체 DR 미실행 |
-| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | implemented_unverified | 2026-09-27 R2 운영 GUI 정정 실패(`ManagedInspectionError`, 활성 세대 불변, 센티널 잔존). 문서 `sb backup` 후에도 `/ready`는 degraded. 검증 아님. [M13-GUI-LIFECYCLE-2026-09-27.md](M13-GUI-LIFECYCLE-2026-09-27.md) |
+| M13 | GUI 정정/삭제·원문/영수증·실패 복구·운영 timer | verified | 2026-09-28 00:21 KST 운영 릴리스 `06ea5e96` GUI 1건 `M13SENT6c2002e9` 통과. 정정·삭제 후 `/ready`는 다음 검증 백업 전까지 503, `sb backup`·`verify-backup` 후 200. 이번 브리핑은 daily에 센티널을 넣지 않음. [M13-GUI-LIFECYCLE-2026-09-27.md](M13-GUI-LIFECYCLE-2026-09-27.md) |
 | M14 | 관계 검색 기준 대비 가치·비용·삭제 일관성. 운영 전환 아님 | decided_off | [CLAUDE-M14-DECISION-2026-09-15.md](CLAUDE-M14-DECISION-2026-09-15.md) |
 
 > **2026-09-27 doctor 지연:** 개발 `sb.ops.doctor` citations 5360.19ms → 1812.99ms (합계 5930.15 → 2371.89ms, 12검사 모두 pass). dev CLI 3회 2.618 / 2.499 / 2.508초 exit 0 (10검사). 배포판 1.0.7 실측 6.1초·JARVIS `doctor_timeout`은 수정 전 관측이며 배포판은 바꾸지 않음. 운영 검증 아님. [DOCTOR-LATENCY-2026-09-27.md](DOCTOR-LATENCY-2026-09-27.md). 증거 `Orca-JARVIS/.omo/evidence/ulw/mass-20260927/c5/`.

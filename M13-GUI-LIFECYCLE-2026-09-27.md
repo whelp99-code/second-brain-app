@@ -252,3 +252,96 @@ JARVIS 코드·설정·권한·서비스는 바꾸지 않았다. 새 시험 기�
 남겼다. MCP의 기존 타입 경고 7개와 generation sweep의 기존 Any 경고 4개는 숨기지 않았으며,
 새 동작의 타입 오류는 관측되지 않았다. GitHub 조회는 timeout으로 등록 대기이고, 커밋 hook의
 engineering-map docs:sync도 rc=1이었다. 커밋·빌드·배포 및 위 실제 검증의 성공과는 구분한다.
+
+## R3 (배포 06ea5e96)
+
+판정: **통과.** 운영 웹 `http://127.0.0.1:8765`, 릴리스 `06ea5e96db0d04f8176ed5279a63343ff0df9b9d` (`source_commit` `3b045534d03f9e91c20e69e0a1db9ad207a664e2`) 위에서 시험 기억 1건의 GUI 수명이 끝났다. 삭제 후 위키·daily 검색과 CLI는 0이고, 없는 페이지는 `404: page not found`를 보였다. `sb backup`과 `sb verify-backup`는 둘 다 exit 0이고, 그 뒤 `/ready`와 JARVIS `second_brain.readiness`는 `ready`다.
+
+정정·삭제는 관리 백업을 비우므로, 다음 검증 백업 전까지 `/ready`가 degraded다. 이는 이전 split과 다르다. 미완료 영수증이나 pending 요청은 없었고, 백업 디렉터리가 비어 `BACKUP_MISSING`이었다. 확인된 degraded 구간은 아래에 적는다.
+
+### 대상
+
+- 운영 웹 서비스는 시험 전에도 활성이었다. `ActiveEnterTimestamp` 2026-09-27 23:54:47 KST, MainPID 4121999, NRestarts=0. 이 세션은 서비스·설정·릴리스를 바꾸지 않았다.
+- `[web] token`은 없다. 토큰을 넣지 않았다.
+- 브라우저: owned engine (`connectPipe`, `/opt/google/chrome/chrome`, `--headless=new`, 작업 프로필 `/var/tmp/omowright-m13-r3-*`). 사용자 프로필을 쓰지 않았고 쿠키를 지우지 않았다. 두 세션 모두 `browser.close()`로 닫혔고 프로필은 지웠다.
+- 센티널: `M13SENT6c2002e9`. 기억하기 본문은 `[M13-TEST 2026-09-27 R3] M13SENT6c2002e9 meeting is Tuesday.` 정정 본문은 `[M13-TEST 2026-09-27 R3] M13SENT6c2002e9 meeting is Friday.`
+- 새 기억은 1건이다. 첫 세션은 기억하기·지금 처리·위키 검색까지 통과한 뒤, 390 화면의 CSS `innerWidth` 단언이 하네스 검사에 걸려 닫혔다. 제품 단계가 아니므로 같은 기억을 이어 열고 정정·삭제했다. 두 번째 기억하기는 없다.
+
+### 단계
+
+| 단계 | 판정 | 사실 |
+|---|---|---|
+| GUI 기억하기 | 통과 | 00:09:07 KST. `inbox/2026-09-27T150836712587-m13-r3-lifecycle.md`. |
+| GUI 지금 처리 | 통과 | 00:09:55 KST. `run_id=75f1c47c964748c896eb8c3d2daf77e7`, `status=ok`, `pages=1`, `conflicts=0`, `errors=0`, `exit_code=0`, `already_running=false`. |
+| GUI 검색 | 통과 | 위키 1건. `wiki/inbox-2026-09-27t150836712587-m13-r3-lifecycle-f29ed05b`. 컴파일 문장은 `화요일`로 바뀌었다. daily 검색은 0건. |
+| 전체 열기·영수증 | 통과 | `page_content_digest=sha256:149aef41957c6bf093749f67bfb7519f3bbc5b1d30e3ef8ffa532ca891a9fab9`. 센티널 문장 1개. |
+| 빈 정정 | 통과 | 00:15:45 KST GUI `CORRECTION_CONTENT_INVALID`. 새 owner 영수증 파일 0. 이어 Friday 문장을 넣고 정정 저장으로 복구했다. |
+| GUI 정정 | 통과 | 00:16:42 KST. 서버 영수증 `2f38496c…f506.json`, `operation=correct`, `result.corrected`가 위 위키 페이지, `commit=5cd2fecc5a7bea245883d06e1bf88b6638c5a5d8`, `tombstone_sequence=2`, `replacement=null`. GUI JSON과 영수증 result가 같다. 클릭에서 완료까지 약 57초. 고정 시간 초과로 판정하지 않았다. |
+| 정정 후 검색 | 통과 | 위키 스니펫은 Friday 문장만. `Tuesday`·`화요일` 없음. daily는 계속 0. |
+| GUI 삭제 | 통과 | 00:17:46 KST. `forgotten`이 같은 위키 페이지. 영수증 `b31d947c…af3.json`, `operation=forget`, `commit=901bca62a788a5c49c17f689c61933b686488e7a`, `tombstone_sequence=3`, `replacement=null`. 완료까지 약 57초. |
+| 검색 0 | 통과 | GUI 위키·daily `results=[]`. CLI `sb search M13SENT6c2002e9` exit 0, `no match`. `--kind wiki`·`--kind daily` JSON도 `[]`. |
+| 삭제 페이지 | 통과 | GUI `404: page not found: wiki/inbox-2026-09-27t150836712587-m13-r3-lifecycle-f29ed05b`. |
+| 운영 타이머 | 통과 | 아래 표. refresh·maintenance·backup 유닛은 이번 시작하지 않았다. |
+| 백업·검증 | 통과 | `sb backup` exit 0 (00:18:58–00:20:20 KST). `sb verify-backup` exit 0 (00:20:26–00:21:02 KST). |
+| 준비 상태 | 통과 | 백업 후 `/ready` HTTP 200 `ready`. JARVIS `second_brain.readiness=ready`. |
+
+컴파일러가 남긴 원문은 `M13-TEST 2026-09-27 R3에서 M13SENT6c2002e9 미팅은 화요일이다.` 정정은 그 문장을 Friday 문장으로 교체했고, 검색에 옛 문장은 남지 않았다.
+
+이번 `pages=1` 처리는 `daily/2026-09-27`에 센티널·`Tuesday`·`화요일`·inbox 파일명을 넣지 않았다. 파일 정확 일치 0. 그래서 삭제 후 daily 0은 브리핑 줄을 지운 증거가 아니라, 이 항목이 아예 없었다는 관측이다. 위키 원문과 검색·삭제·404는 위 표대로 통과했다.
+
+### 준비 상태 구간
+
+정정 영수증은 00:16:42 KST에 끝났다. 그 시각 백업 디렉터리 mtime은 00:16 KST이고, 00:18:46 KST 확인에서 파일은 0개였다. 삭제 영수증은 00:17:46 KST, tombstone sequence 3, root `sha256:567f53fc1a35573e370faaeb5b8f6d09b5a5d3900526f37527f26342cc545071`. 정정과 삭제 사이의 `/ready`는 따로 찍지 않았다.
+
+00:18:46 KST `/ready`: HTTP 503, `status=degraded`, reasons `VERIFIED_BACKUP_UNAVAILABLE`, `LATEST_BACKUP_UNVERIFIED`, `backup_error=BACKUP_MISSING`, `latest_backup=null`, tombstone high-water 3. 저장: `m13-r3/ready-before-backup.json`.
+
+같은 시각 JARVIS `http://127.0.0.1:4173/api/v1/health`는 HTTP 200, `second_brain.readiness=ready`였다. SB `/ready`와 같지 않았다.
+
+`sb backup`이 만든 아카이브는 `second-brain-20260928T001859+0900.tar.gz`, SHA-256 `a4723c90d9c6f2714f2c790fe3e2f7adca58fc50167042981fc64232aee7ec6d`, 파일 42934, 바이트 149833006. 검증 영수증의 tombstone sequence는 3이고 삭제 영수증과 같은 root다.
+
+00:21:11 KST `/ready`: HTTP 200, `status=ready`, `reasons=[]`, `latest_backup=last_verified_backup=second-brain-20260928T001859+0900.tar.gz`. JARVIS는 00:21:12 KST에도 HTTP 200, `second_brain.readiness=ready`. 확인된 degraded 구간은 00:18:46–00:21:11 KST, 2분 25초다. 백업 디렉터리가 비어 있던 구간은 정정 시각 00:16 KST부터 새 아카이브 00:18:59 KST까지다.
+
+### 운영 타이머
+
+`systemctl --user list-timers` (`XDG_RUNTIME_DIR=/run/user/1000`, 기록 시각 약 00:18 KST):
+
+| 유닛 | NEXT | LAST |
+|---|---|---|
+| `jm-second-brain-maintenance.timer` | 2026-09-28 01:00:00 KST | 2026-09-28 00:00:02 KST |
+| `jm-second-brain-refresh.timer` | 2026-09-28 01:00:26 KST | 2026-09-28 00:00:17 KST |
+| `second-brain-backup.timer` | 2026-09-28 03:16:12 KST | 2026-09-27 03:17:59 KST |
+
+전체 출력: `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/systemd-timers.txt`.
+
+### 390 화면
+
+이는 수명 단계가 아니다. CSS viewport 390, `deviceScaleFactor=1` 캡처의 PNG는 390x844이다. 레이아웃 뷰포트는 435 CSS px이고 `clientWidth`는 390이라 가로로 45px 넘친다.
+
+| 캡처 | PNG | innerWidth | scrollWidth | clientWidth |
+|---|---|---|---|---|
+| `04b-search-wiki-390.png` | 390x844 | 435 | 미기록 | 미기록 |
+| `16-search-390.png` | 390x844 | 435 | 435 | 390 |
+
+1440 단계 캡처는 CSS viewport 1440x900, PNG 1440x900, `devicePixelRatio=1`이다.
+
+### 스크린샷
+
+| 단계 | 경로 |
+|---|---|
+| 콘솔 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/01-console-1440.png` |
+| 기억하기 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/02-remember-1440.png` |
+| 지금 처리 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/03-run-1440.png` |
+| 위키 검색 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/04-search-wiki-1440.png` |
+| daily 검색 0 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/05-search-daily-1440.png` |
+| 원문·영수증 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/06-original-receipt-1440.png` |
+| 빈 정정 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/07-empty-correction-1440.png` |
+| 정정 영수증 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/08-correction-receipt-1440.png` |
+| 정정 후 위키 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/09-corrected-wiki-1440.png` |
+| 정정 후 daily | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/10-corrected-daily-1440.png` |
+| 삭제 영수증 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/11-deletion-receipt-1440.png` |
+| 삭제 후 위키 0 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/12-wiki-zero-1440.png` |
+| 삭제 후 daily 0 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/13-daily-zero-1440.png` |
+| 404 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/14-deleted-page-404-1440.png` |
+| 390 검색 | `/home/jm/orca/projects/Orca-JARVIS/.omo/evidence/ulw/mass-20260927/m13-r3/16-search-390.png` |
+
+행동 기록: 같은 디렉터리의 `action-log.jsonl`. 백업 전후 준비 상태: `ready-before-backup.json`, `ready-after.json`, `jarvis-after.json`, `sb-backup.txt`, `verify-backup.txt`.
