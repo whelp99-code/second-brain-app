@@ -1508,3 +1508,7 @@ def test_retry_brief_reports_hold_without_claiming_requeued(tmp_path: Path) -> N
     assert 'requeued=' not in out
     with Ledger(root) as ledger:
         assert ledger.get_derivation('historical-brief') == before
+
+
+# Shared setup for CLI integration regressions.
+ready = _ready
