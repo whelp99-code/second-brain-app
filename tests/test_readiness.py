@@ -275,4 +275,3 @@ def test_corrupt_run_payload_still_returns_json_degraded(configured: Config) -> 
         reasons = report["reasons"]
         assert isinstance(reasons, list)
         assert "VAULT_UNREADABLE" in reasons
-
