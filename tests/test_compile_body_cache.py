@@ -23,7 +23,8 @@ class LedgerIdentity:
     def mark_failed(self, key: str, error: str) -> None:
         pass
 
-    def requeue_failed(self, key: str) -> bool:
+    def requeue_failed(self, key: str, *, max_attempts: int | None = None) -> bool:
+        del key, max_attempts
         return False
 
 

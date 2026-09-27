@@ -343,11 +343,11 @@ def test_doctor_citation_audit_reads_each_page_once(tmp_path: Path, monkeypatch:
     original_read_text = Path.read_text
     reads = 0
 
-    def count_page_reads(path: Path, *args: object, **kwargs: object) -> str:
+    def count_page_reads(path: Path, encoding: str | None = None, errors: str | None = None) -> str:
         nonlocal reads
         if path == page:
             reads += 1
-        return original_read_text(path, *args, **kwargs)
+        return original_read_text(path, encoding=encoding, errors=errors)
 
     monkeypatch.setattr(Path, "read_text", count_page_reads)
     checks = doctor(config)
