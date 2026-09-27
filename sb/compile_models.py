@@ -1,9 +1,11 @@
 """Ledger and pending-output contracts shared by compile execution."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Final, Protocol
 
-from sb.contracts import PageSpec
+from sb.contracts import PageSpec, Unit
+from sb.llm import LLMClient
 from sb.store import Derivation, DerivationOutput
 
 
@@ -32,3 +34,24 @@ class PendingCompile:
     output: DerivationOutput
     input_sources: tuple[tuple[str, str], ...] = ()
     untracked_context: bool = True
+
+COMPILE_STAGE: Final = "compile"
+COMPILE_RUN_ID: Final = "compile"
+
+
+@dataclass(frozen=True, slots=True)
+class PageJob:
+    page_id: str
+    key: str
+    units: tuple[Unit, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CompileContext:
+    ledger: CompileLedger
+    llm: LLMClient
+    template: str
+    existing_bodies: Mapping[str, str]
+    existing_pages: Mapping[str, PageSpec]
+    prompt_version: str
+    model_id: str

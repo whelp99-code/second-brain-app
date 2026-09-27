@@ -2,40 +2,23 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
 from importlib.resources import files
 from typing import Final
 
-from sb.compile_cache import BodyCache
-from sb.compile_models import CompileLedger, PendingCompile
-from sb.compile_sources import (
-    ORIGIN_DIGEST_LEN,
-    SID_LEN,
-    page_id_for_origin,
-)
-from sb.compile_sources import (
-    group_by_page as _group_by_page,
-)
-from sb.compile_sources import (
-    merge_sources as _merge_sources,
-)
-from sb.compile_sources import (
-    sources_for_units as _sources,
-)
-from sb.compile_sources import (
-    title_for_origin as _title,
-)
-from sb.compile_sources import (
-    unit_block as _unit_block,
-)
+from sb.compile_execution import compile_one as _compile_one
+from sb.compile_execution import compile_without_llm as _compile_without_llm
+from sb.compile_models import COMPILE_RUN_ID, COMPILE_STAGE, CompileLedger, PendingCompile
+from sb.compile_models import CompileContext as _CompileCtx
+from sb.compile_models import PageJob as _PageJob
+from sb.compile_sources import ORIGIN_DIGEST_LEN, SID_LEN, page_id_for_origin
+from sb.compile_sources import group_by_page as _group_by_page
 from sb.compile_state import compile_state_report
 from sb.config import Config
 from sb.contracts import PageSpec, Unit
 from sb.llm import LLMClient, LLMUnavailable
 from sb.security import protect_units, source_llm_policy
-from sb.store import DerivationOutput, DerivStatus, deriv_key
+from sb.store import DerivStatus, deriv_key
 
 __all__ = [
     "CAPPED_PAGE_ID",
@@ -46,6 +29,9 @@ __all__ = [
     "SID_LEN",
     "CompileLedger",
     "PendingCompile",
+    "_CompileCtx",
+    "_PageJob",
+    "_compile_one",
     "compile_page_key",
     "compile_pages",
     "compile_pending",
@@ -53,13 +39,10 @@ __all__ = [
     "page_id_for_origin",
 ]
 
-COMPILE_STAGE: Final = "compile"
-COMPILE_RUN_ID: Final = "compile"
 CAPPED_PAGE_ID: Final = "CAPPED"
 CAPPED_STATUS: Final = "CAPPED"
 
 
-_BODIES: Final = BodyCache[CompileLedger]()
 
 
 def compile_pages(
@@ -157,90 +140,6 @@ def compile_pending(
                 remaining = True
                 break
     return pending, remaining
-
-
-@dataclass(frozen=True, slots=True)
-class _PageJob:
-    page_id: str
-    key: str
-    units: tuple[Unit, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class _CompileCtx:
-    ledger: CompileLedger
-    llm: LLMClient
-    template: str
-    existing_bodies: Mapping[str, str]
-    existing_pages: Mapping[str, PageSpec]
-    prompt_version: str
-    model_id: str
-
-
-def _compile_without_llm(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
-    title = _title(job.units[0].origin)
-    previous = ctx.existing_pages.get(job.page_id)
-    body = "\n\n".join(unit.text for unit in job.units)
-    ctx.ledger.ensure_derivation(job.key, COMPILE_STAGE, COMPILE_RUN_ID)
-    ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
-    _BODIES.put(ctx.ledger, job.page_id, body)
-    sources = _sources(job.units)
-    page = PageSpec(
-        page_id=job.page_id,
-        title=title,
-        body_md=body,
-        sources=_merge_sources(() if previous is None else previous.sources, sources),
-        status="active",
-        prompt_version=ctx.prompt_version,
-        model_id="local-deny",
-        derivation_key=job.key,
-    )
-    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    return PendingCompile(
-        page,
-        job.key,
-        DerivationOutput(digest, f"wiki/{job.page_id}.md"),
-        tuple(sorted({(unit.origin, unit.content_hash) for unit in job.units})),
-        bool(previous is None),
-    )
-
-
-def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
-    title = _title(job.units[0].origin)
-    previous = ctx.existing_pages.get(job.page_id)
-    existing = (
-        previous.body_md
-        if previous is not None
-        else ctx.existing_bodies.get(job.page_id, _BODIES.get(ctx.ledger, job.page_id))
-    )
-    prompt = (
-        ctx.template.replace("{units_with_sids}", _unit_block(job.units))
-        .replace("{existing_page_body_or_empty}", existing)
-        .replace("{title}", title)
-    )
-    ctx.ledger.ensure_derivation(job.key, COMPILE_STAGE, COMPILE_RUN_ID)
-    ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
-    try:
-        body = ctx.llm.generate(prompt)
-    except LLMUnavailable as exc:
-        ctx.ledger.mark_failed(job.key, str(exc))
-        raise
-    _BODIES.put(ctx.ledger, job.page_id, body)
-    sources = _sources(job.units)
-    page = PageSpec(
-        page_id=job.page_id,
-        title=title,
-        body_md=body,
-        sources=_merge_sources(() if previous is None else previous.sources, sources),
-        status="active",
-        prompt_version=ctx.prompt_version,
-        model_id=ctx.model_id,
-        derivation_key=job.key,
-    )
-    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    return PendingCompile(page, job.key, DerivationOutput(digest, f"wiki/{job.page_id}.md"),
-        tuple(sorted({(unit.origin, unit.content_hash) for unit in job.units})),
-        bool(existing) and previous is None)
 
 
 def compile_page_key(page_id: str, unit_ids: Sequence[str], prompt_version: str, model_id: str) -> str:
