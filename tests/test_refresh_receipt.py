@@ -15,6 +15,7 @@ import os
 import re
 import stat
 import subprocess
+from collections.abc import Callable, Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, datetime
 from io import StringIO
@@ -25,8 +26,12 @@ import pytest
 from pytest import MonkeyPatch
 
 from sb.cli import main
+from sb.compile import CompileLedger, PendingCompile
 from sb.config import Config
+from sb.connectors.base import SourceAdapter
+from sb.contracts import PageSpec, Unit
 from sb.effect_values import JsonObject, JsonValue
+from sb.llm import LLMClient, LLMUnavailable
 from sb.pipeline import StageReport, run_compile
 from sb.refresh_receipt import (
     RECEIPT_MAX_BYTES,
@@ -66,7 +71,7 @@ def _cli(config: Path, argv: list[str], monkeypatch: MonkeyPatch) -> int:
 
 def _without_sources(monkeypatch: MonkeyPatch) -> None:
     """No ingest adapters: the refresh runs and changes nothing, as a quiet hour does."""
-    def no_adapters(config: Config) -> dict[str, object]:
+    def no_adapters(config: Config) -> dict[str, SourceAdapter]:
         del config
         return {}
 
@@ -144,8 +149,12 @@ def test_run_publishes_failed_receipt_when_the_run_fails(
 ) -> None:
     _root, state, config = _install(tmp_path)
 
-    def boom(*args: object, **kwargs: object) -> None:
-        del args, kwargs
+    def boom(units: list[Unit], ledger: CompileLedger, llm: LLMClient, config: Config, *,
+             existing_bodies: Mapping[str, str] | None = None,
+             existing_pages: Mapping[str, PageSpec] | None = None,
+             on_page: Callable[[PendingCompile], None] | None = None,
+             on_error: Callable[[LLMUnavailable], None] | None = None) -> None:
+        del units, ledger, llm, config, existing_bodies, existing_pages, on_page, on_error
         raise RuntimeError("compile exploded")
 
     monkeypatch.setattr("sb.compile.compile_pending", boom)
