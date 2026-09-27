@@ -17,7 +17,7 @@ from sb.life_journal_contracts import JournalRow
 from sb.life_json import decode_json
 from sb.life_values import text, zone
 from sb.store.life_journal import LifeJournal, identity, snapshot
-from sb.store.life_rows import all_rows
+from sb.store.life_rows import iter_rows
 
 
 class Generator(Protocol):
@@ -94,28 +94,29 @@ def reserve(
                 "execute_allowed": False,
             }
         used_calls = used_tokens = used_cost = 0
-        for (other_id,) in all_rows(
+        with iter_rows(
             journal.connection,
             "SELECT object_id FROM life_workflow_heads WHERE kind='model_reservation'",
-        ):
-            other = journal.raw("model_reservation", string(other_id))
-            if other is None or other["body"].get("day") != day:
-                continue
-            # Count all reservations for the same owner, independent of a
-            # narrower project/source subset. A subset cannot reset the budget.
-            principals = {s for s in scopes if s.startswith(("principal:", "owner:"))}
-            if not principals.intersection(other["scopes"]):
-                continue
-            b = other["body"]
-            used_calls += 1
-            used_tokens += max(
-                integer(b["reserved_tokens"], "LIFE_RECORD_CORRUPT"),
-                integer(b.get("actual_tokens", 0), "LIFE_RECORD_CORRUPT"),
-            )
-            used_cost += max(
-                integer(b["reserved_cost_micros"], "LIFE_RECORD_CORRUPT"),
-                integer(b.get("actual_cost_micros", 0), "LIFE_RECORD_CORRUPT"),
-            )
+        ) as rows:
+            for (other_id,) in rows:
+                other = journal.raw("model_reservation", string(other_id))
+                if other is None or other["body"].get("day") != day:
+                    continue
+                # Count all reservations for the same owner, independent of a
+                # narrower project/source subset. A subset cannot reset the budget.
+                principals = {s for s in scopes if s.startswith(("principal:", "owner:"))}
+                if not principals.intersection(other["scopes"]):
+                    continue
+                b = other["body"]
+                used_calls += 1
+                used_tokens += max(
+                    integer(b["reserved_tokens"], "LIFE_RECORD_CORRUPT"),
+                    integer(b.get("actual_tokens", 0), "LIFE_RECORD_CORRUPT"),
+                )
+                used_cost += max(
+                    integer(b["reserved_cost_micros"], "LIFE_RECORD_CORRUPT"),
+                    integer(b.get("actual_cost_micros", 0), "LIFE_RECORD_CORRUPT"),
+                )
         if (
             used_calls + 1 > daily_calls
             or used_tokens + estimated_tokens > daily_tokens

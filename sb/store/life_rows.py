@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Iterator, Sequence
+from contextlib import closing, contextmanager
 from typing import Final
 
 from pydantic import TypeAdapter
@@ -24,6 +25,21 @@ def one(connection: sqlite3.Connection, sql: str, params: Sequence[Cell] = ()) -
 def all_rows(connection: sqlite3.Connection, sql: str, params: Sequence[Cell] = ()) -> list[Row]:
     fetch: Callable[[], list[Row]] = connection.execute(sql, params).fetchall
     return _ROWS.validate_python(fetch(), strict=True)
+
+
+def _validated_rows(cursor: sqlite3.Cursor) -> Iterator[Row]:
+    fetch: Callable[[], Row | None] = cursor.fetchone
+    while (row := _ROW.validate_python(fetch(), strict=True)) is not None:
+        yield row
+
+
+@contextmanager
+def iter_rows(
+    connection: sqlite3.Connection, sql: str, params: Sequence[Cell] = ()
+) -> Generator[Iterator[Row]]:
+    """Validate rows on demand and release the read cursor on every context exit."""
+    with closing(connection.execute(sql, params)) as cursor:
+        yield _validated_rows(cursor)
 
 
 def string(value: Cell) -> str:

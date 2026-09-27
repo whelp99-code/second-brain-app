@@ -14,7 +14,7 @@ from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_journal_contracts import KINDS, JournalRow, RecordRef
 from sb.life_json import decode_json
 from sb.store.life import LifeStore
-from sb.store.life_rows import all_rows, one, string
+from sb.store.life_rows import all_rows, iter_rows, one, string
 
 _ENVELOPE: Final = TypeAdapter[JournalRow](JournalRow)
 
@@ -141,7 +141,7 @@ class LifeJournalReader:
             return []
         result: list[JournalRow] = []
         # Authorize before applying the caller's result limit.
-        for (object_id,) in all_rows(
+        with iter_rows(
             self.connection,
             (
                 "SELECT h.object_id FROM life_workflow_heads h JOIN life_workflow_objects o ON "
@@ -149,18 +149,19 @@ class LifeJournalReader:
                 "WHERE h.kind=? ORDER BY o.recorded_at DESC,h.object_id"
             ),
             (kind,),
-        ):
-            row = self.raw(kind, string(object_id))
-            if row is not None and self.authorized(
-                row,
-                scopes=scopes,
-                source_ids=source_ids,
-                events=events,
-                require_current=require_current,
-            ):
-                result.append(row)
-                if len(result) >= limit:
-                    break
+        ) as rows:
+            for (object_id,) in rows:
+                row = self.raw(kind, string(object_id))
+                if row is not None and self.authorized(
+                    row,
+                    scopes=scopes,
+                    source_ids=source_ids,
+                    events=events,
+                    require_current=require_current,
+                ):
+                    result.append(row)
+                    if len(result) >= limit:
+                        break
         return result
 
     def records(self, event: LifeEventV1) -> list[RecordRef]:

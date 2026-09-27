@@ -18,7 +18,7 @@ from sb.life_journal_contracts import EventMutation, JournalRow
 from sb.life_json import decode_json
 from sb.life_values import canonical_bytes, instant, text, zone
 from sb.store.life_journal import LifeJournal, identity
-from sb.store.life_rows import all_rows
+from sb.store.life_rows import iter_rows
 
 
 def quiet(now: datetime, opts: LifeSettingsV1) -> bool:
@@ -65,15 +65,16 @@ def issue(
     local_day = now.astimezone(zone(opts.timezone)).date().isoformat()
     with journal.transaction():
         existing: list[JournalRow] = []
-        for (qid,) in all_rows(
+        with iter_rows(
             journal.connection, "SELECT object_id FROM life_workflow_heads WHERE kind='question'"
-        ):
-            row = journal.raw("question", string(qid))
-            owners = {s for s in scopes if s.startswith(("owner:", "principal:"))}
-            if row is not None and (
-                owners.intersection(row["scopes"]) or set(row["scopes"]).issubset(scopes)
-            ):
-                existing.append(row)
+        ) as rows:
+            for (qid,) in rows:
+                row = journal.raw("question", string(qid))
+                owners = {s for s in scopes if s.startswith(("owner:", "principal:"))}
+                if row is not None and (
+                    owners.intersection(row["scopes"]) or set(row["scopes"]).issubset(scopes)
+                ):
+                    existing.append(row)
         used = sum(row["body"].get("issued_day") == local_day for row in existing)
         remaining = max(0, opts.question_budget - used)
         proposals: list[tuple[int, LifeEventV1, str, str]] = []

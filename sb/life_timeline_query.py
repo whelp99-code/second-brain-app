@@ -16,7 +16,7 @@ from sb.life_json import LifePayload, decode_json
 from sb.life_read_contracts import TimelineQuery
 from sb.life_values import canonical_bytes, day_window
 from sb.store.life import LifeStore
-from sb.store.life_rows import Cell, all_rows, string
+from sb.store.life_rows import Cell, all_rows, iter_rows, string
 
 
 def query(
@@ -109,7 +109,7 @@ def query(
         parameters.append(status)
     # Per-authorized-result revision checksum. The cursor contains no titles,
     # body, raw content, source counts, or private timestamps of other scopes.
-    revision_rows = all_rows(
+    with iter_rows(
         store.connection,
         "SELECT e.event_id,e.current_revision,r.body_digest "
         + from_clause
@@ -117,18 +117,18 @@ def query(
         + where
         + " ORDER BY e.event_id",
         parameters,
-    )
-    digest = sha256(canonical_bytes([day, timezone, undated, status, allowed_policy]))
-    for row in revision_rows:
-        digest.update(
-            canonical_bytes(
-                [
-                    string(row[0]),
-                    row[1] if isinstance(row[1], int) else string(row[1]),
-                    string(row[2]),
-                ]
+    ) as revision_rows:
+        digest = sha256(canonical_bytes([day, timezone, undated, status, allowed_policy]))
+        for row in revision_rows:
+            digest.update(
+                canonical_bytes(
+                    [
+                        string(row[0]),
+                        row[1] if isinstance(row[1], int) else string(row[1]),
+                        string(row[2]),
+                    ]
+                )
             )
-        )
     generation = digest.hexdigest()
     after = None
     if cursor is not None:

@@ -47,7 +47,7 @@ from sb.store import (
 )
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger, parse_page_frontmatter
-from sb.store.life_rows import all_rows, integer, one, string
+from sb.store.life_rows import integer, iter_rows, one, string
 from sb.vault import GitCommandError, Vault, VaultLintError, read_page_spec
 
 STALE_AFTER: Final = timedelta(days=30)
@@ -1553,7 +1553,7 @@ def run_life_maintenance(
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         store = ledger.life_store()
         placeholders = ",".join("?" for _ in source_ids)
-        rows = all_rows(
+        with iter_rows(
             store.connection,
             "SELECT e.event_id,e.current_revision,e.deleted,e.expires_at,r.body_json,r.body_digest "
             + "FROM life_events e JOIN life_event_revisions r ON r.event_id=e.event_id "
@@ -1562,86 +1562,86 @@ def run_life_maintenance(
             + ") "
             + "ORDER BY e.event_id",
             source_ids,
-        )
-        repaired = removed = expired = 0
-        work: list[tuple[LifeEventV1, bool, bool]] = []
-        for row in rows:
-            event = decode_event((row[4], row[5]))
-            if not set(event.scopes).issubset(scopes):
-                continue
-            policy = configured[event.source_id]
-            live = (
-                not row[2]
-                and instant(string(row[3])) > clock
-                and policy.enabled
-                and policy.scopes == event.scopes
-                and policy.sensitivity == event.sensitivity
-                and policy.policy_revision == event.policy_revision
-                and policy.external_processing == event.external_processing
-                and not store.cas.is_tombstoned(event.raw_digest)
-                and store.cas.exists(event.raw_digest)
-            )
-            page_id = core_page_id(event.event_id)
-            path = vault.root / git_rel(page_id)
-            must_expire = not row[2] and instant(string(row[3])) <= clock
-            if live:
-                from sb.life_visibility import allowed
-
-                try:
-                    raw = subprocess.check_output(
-                        ["git", "-C", str(vault.root), "show", "HEAD:" + git_rel(page_id)],
-                        stderr=subprocess.DEVNULL,
-                    )
-                except subprocess.CalledProcessError:
-                    raw = None
-                if raw is not None and allowed(
-                    vault.root, page_id, raw=raw, config=config, now=clock
-                ):
+        ) as rows:
+            repaired = removed = expired = 0
+            work: list[tuple[LifeEventV1, bool, bool]] = []
+            for row in rows:
+                event = decode_event((row[4], row[5]))
+                if not set(event.scopes).issubset(scopes):
                     continue
-            elif not path.exists() and not must_expire:
-                continue
-            work.append((event, live, must_expire))
-            if len(work) > limit:
-                break
-        more = len(work) > limit
-        for event, live, must_expire in work[:limit]:
-            if must_expire:
-                with ledger.transaction():
-                    _ = store.connection.execute(
-                        "UPDATE life_events SET deleted=1 WHERE event_id=?", (event.event_id,)
-                    )
-                    _ = store.connection.execute(
-                        "INSERT OR IGNORE INTO life_tombstones(event_id,revision,scopes_json,deleted_at) VALUES(?,?,?,?)",
-                        (
-                            event.event_id,
-                            event.revision,
-                            json.dumps(event.scopes),
-                            clock.isoformat(),
-                        ),
-                    )
-                expired += 1
-            if live:
-                repaired += _publish_life_events(config, ledger, vault, run_id, (event,))
-            else:
+                policy = configured[event.source_id]
+                live = (
+                    not row[2]
+                    and instant(string(row[3])) > clock
+                    and policy.enabled
+                    and policy.scopes == event.scopes
+                    and policy.sensitivity == event.sensitivity
+                    and policy.policy_revision == event.policy_revision
+                    and policy.external_processing == event.external_processing
+                    and not store.cas.is_tombstoned(event.raw_digest)
+                    and store.cas.exists(event.raw_digest)
+                )
                 page_id = core_page_id(event.event_id)
-                if (vault.root / git_rel(page_id)).exists():
-                    _ = vault.forget_page(page_id, life_owned=True)
-                    removed += 1
-        if removed and ".staging" not in vault.root.parts:
-            from sb.search import SearchIndex
+                path = vault.root / git_rel(page_id)
+                must_expire = not row[2] and instant(string(row[3])) <= clock
+                if live:
+                    from sb.life_visibility import allowed
 
-            explicit = (
-                Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+                    try:
+                        raw = subprocess.check_output(
+                            ["git", "-C", str(vault.root), "show", "HEAD:" + git_rel(page_id)],
+                            stderr=subprocess.DEVNULL,
+                        )
+                    except subprocess.CalledProcessError:
+                        raw = None
+                    if raw is not None and allowed(
+                        vault.root, page_id, raw=raw, config=config, now=clock
+                    ):
+                        continue
+                elif not path.exists() and not must_expire:
+                    continue
+                work.append((event, live, must_expire))
+                if len(work) > limit:
+                    break
+            more = len(work) > limit
+            for event, live, must_expire in work[:limit]:
+                if must_expire:
+                    with ledger.transaction():
+                        _ = store.connection.execute(
+                            "UPDATE life_events SET deleted=1 WHERE event_id=?", (event.event_id,)
+                        )
+                        _ = store.connection.execute(
+                            "INSERT OR IGNORE INTO life_tombstones(event_id,revision,scopes_json,deleted_at) VALUES(?,?,?,?)",
+                            (
+                                event.event_id,
+                                event.revision,
+                                json.dumps(event.scopes),
+                                clock.isoformat(),
+                            ),
+                        )
+                    expired += 1
+                if live:
+                    repaired += _publish_life_events(config, ledger, vault, run_id, (event,))
+                else:
+                    page_id = core_page_id(event.event_id)
+                    if (vault.root / git_rel(page_id)).exists():
+                        _ = vault.forget_page(page_id, life_owned=True)
+                        removed += 1
+            if removed and ".staging" not in vault.root.parts:
+                from sb.search import SearchIndex
+
+                explicit = (
+                    Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
+                )
+                SearchIndex(vault.root, registry_path=explicit).project()
+            result.update(
+                repaired=repaired,
+                withdrawn_pages=removed,
+                expired_events=expired,
+                more_pending=more,
+                shared_raw_physically_erased=False,
             )
-            SearchIndex(vault.root, registry_path=explicit).project()
-        result.update(
-            repaired=repaired,
-            withdrawn_pages=removed,
-            expired_events=expired,
-            more_pending=more,
-            shared_raw_physically_erased=False,
-        )
-        return StageReport((), 0, 0, min(len(work), limit), more, written=repaired + removed)
+            return StageReport((), 0, 0, min(len(work), limit), more, written=repaired + removed)
 
     outcome = _execute(config, stage, "compile")
     return outcome, result if not outcome.exit_code and not outcome.already_running else {}
