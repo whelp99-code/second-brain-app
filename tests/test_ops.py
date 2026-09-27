@@ -159,7 +159,10 @@ def test_status_orders_runs_by_instant_across_timezones(tmp_path: Path) -> None:
         assert [row.run_id for row in ledger.list_runs()] == ['older', 'newer']
     snapshot = status_snapshot(config)
     assert snapshot['last_run'] is not None
+    assert type(snapshot['last_run']) is dict
     assert snapshot['last_run']['run_id'] == 'newer'
+    assert type(snapshot['recent_stages']) is list
+    assert all(type(row) is dict for row in snapshot['recent_stages'])
     assert [row['run_id'] for row in snapshot['recent_stages']] == ['newer', 'older']
 
 
