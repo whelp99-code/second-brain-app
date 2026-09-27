@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
-from typing import assert_never
 
 import pytest
 from pytest import MonkeyPatch
@@ -68,8 +67,6 @@ def _damage_pack(root: Path, damage: Damage) -> None:
         case Damage.NAME_MISMATCH:
             _ = pack.rename(folder / ("pack-" + "0" * 40 + ".pack"))
             _ = index.rename(folder / ("pack-" + "0" * 40 + ".idx"))
-        case unreachable:
-            assert_never(unreachable)
 
 
 def _dispose_uninspected_backup(archive: Path, matching: Path) -> None:

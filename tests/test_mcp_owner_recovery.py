@@ -8,6 +8,7 @@ from pytest import MonkeyPatch
 from sb.contract_digest import TASK32_CONTRACT_DIGEST
 from sb.mcp import K5_TOOLS, build_server
 from sb.owner_effects import apply_page_effect, page_receipt
+from tests.mcp_test_support import json_content
 from tests.test_web_lifecycle import PAGE, ready
 
 
@@ -31,8 +32,7 @@ def test_schema4_status_bootstraps_after_owner_effect_without_unfencing_content(
             assert tuple(sorted(tool.name for tool in listed.tools)) == K5_TOOLS
             result = await client.call_tool('sb_generation_status', {'read_fence': None})
             assert not result.is_error, result
-            status = result.structured_content
-            assert status is not None
+            status = json_content(result)
             assert status['contract_schema_version'] == 4
             assert status['contract_digest'] == TASK32_CONTRACT_DIGEST
             assert status['tombstone_sequence'] == 1

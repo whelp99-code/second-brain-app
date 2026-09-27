@@ -50,7 +50,7 @@ def test_nonmatching_backup_stays_byte_identical_when_inspected_and_purged(
     archive = archived(tmp_path, OTHER if packed else document(OTHER), packed=packed)
     before = {path.name: path.read_bytes() for path in archive.parent.iterdir()}
     # When: normal validation and the real erasure decision inspect the backup.
-    validate_backup_archive(archive)
+    _ = validate_backup_archive(archive)
     removed = purge_matching_managed_copies((archive.parent,), (SENTINEL,))
     # Then: the nonmatching backup's physical identity and inventory remain intact.
     assert removed == 0

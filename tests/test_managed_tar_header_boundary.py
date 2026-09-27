@@ -56,7 +56,7 @@ def test_invalid_consumed_header_cannot_validate_backup(corrupt_backup: Path) ->
     # Given: valid outer manifest/checksum/verification do not prove nested framing valid.
     # When / Then: retained-backup validation rejects the malformed nested representation.
     with pytest.raises(ManagedInspectionError, match="MANAGED_ARCHIVE_INVALID"):
-        validate_backup_archive(corrupt_backup)
+        _ = validate_backup_archive(corrupt_backup)
 
 
 def test_invalid_consumed_header_cannot_certify_inventory(corrupt_backup: Path) -> None:
