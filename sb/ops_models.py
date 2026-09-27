@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypedDict, override
+from typing import override
+
+from typing_extensions import TypedDict
 
 
 class OperationError(Exception):
@@ -45,13 +47,13 @@ class DoctorCheck:
         return {"name": self.name, "status": self.status, "detail": self.detail}
 
 
-class DoctorCheckSnapshot(TypedDict):
+class DoctorCheckSnapshot(TypedDict, closed=True):
     name: str
     status: str
     detail: str
 
 
-class RunSnapshot(TypedDict):
+class RunSnapshot(TypedDict, closed=True):
     run_id: str
     started_at: str
     finished_at: str | None
@@ -59,7 +61,7 @@ class RunSnapshot(TypedDict):
     status: str
 
 
-class BatchSnapshot(TypedDict):
+class BatchSnapshot(TypedDict, closed=True):
     run_id: str
     status: str
     started_at: str
@@ -69,7 +71,7 @@ class BatchSnapshot(TypedDict):
     errors: int
 
 
-class StageSnapshot(TypedDict):
+class StageSnapshot(TypedDict, closed=True):
     run_id: str
     stage: str
     status: str
@@ -78,7 +80,7 @@ class StageSnapshot(TypedDict):
     detail: str
 
 
-class FailedDerivationSnapshot(TypedDict):
+class FailedDerivationSnapshot(TypedDict, closed=True):
     key: str
     stage: str
     attempts: int
@@ -86,18 +88,18 @@ class FailedDerivationSnapshot(TypedDict):
     retry_hold_reason: str | None
 
 
-class PageCounts(TypedDict):
+class PageCounts(TypedDict, closed=True):
     wiki: int
     daily: int
     conflicts: int
 
 
-class RawCounts(TypedDict):
+class RawCounts(TypedDict, closed=True):
     files: int
     bytes: int
 
 
-class StatusSnapshot(TypedDict):
+class StatusSnapshot(TypedDict, closed=True):
     vault_root: str
     initialized: bool
     schema_version: int
@@ -116,7 +118,7 @@ class StatusSnapshot(TypedDict):
     raw: RawCounts
 
 
-class MigrationSnapshot(TypedDict):
+class MigrationSnapshot(TypedDict, closed=True):
     before: int
     after: int
     current: int

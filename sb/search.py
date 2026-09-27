@@ -14,7 +14,9 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import islice
 from pathlib import Path
-from typing import Final, Protocol, TypedDict, cast, runtime_checkable
+from typing import Final, Protocol, cast, runtime_checkable
+
+from typing_extensions import TypedDict
 
 from sb.config import APP_ROOT, default_knowledge_registry_path, validate_search_min_similarity
 from sb.knowledge_registry import (
@@ -57,7 +59,7 @@ _REFERENCE_SCOPE: Final = "reference"
 _ALL_SCOPE: Final = "all"
 
 
-class SearchHitDict(TypedDict):
+class SearchHitDict(TypedDict, closed=True):
     page_id: str
     section: str
     snippet: str

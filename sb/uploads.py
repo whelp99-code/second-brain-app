@@ -17,9 +17,10 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Final, Literal, TypedDict, override
+from typing import Final, Literal, override
 
 from pydantic import JsonValue, TypeAdapter
+from typing_extensions import TypedDict
 
 from sb.connectors.inbox_documents import MAX_INBOX_BYTES
 from sb.parsers import UnsupportedSuffix, parser_for
@@ -36,7 +37,7 @@ _RECEIPT_JSON: Final[TypeAdapter[JsonValue]] = TypeAdapter(JsonValue)
 type UploadState = Literal["queued", "already-queued", "already-ingested"]
 
 
-class UploadReceiptDict(TypedDict):
+class UploadReceiptDict(TypedDict, closed=True):
     upload_id: str
     state: UploadState
     inbox_path: str
@@ -47,7 +48,7 @@ class UploadReceiptDict(TypedDict):
     device_id: str
 
 
-class RetractReceiptDict(TypedDict):
+class RetractReceiptDict(TypedDict, closed=True):
     deleted: bool
     indexed: bool
     restored: bool

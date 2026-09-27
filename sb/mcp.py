@@ -16,7 +16,7 @@ from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Final, Literal, TypedDict, cast, override
+from typing import Annotated, Final, Literal, cast, override
 
 import anyio
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
+from typing_extensions import TypedDict
 
 from sb.access_claims import (
     AccessContext,
@@ -177,7 +178,7 @@ class ConflictRow:
         }
 
 
-class RunOutcomeDict(TypedDict):
+class RunOutcomeDict(TypedDict, closed=True):
     run_id: str
     status: str
     pages: int

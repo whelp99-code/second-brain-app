@@ -12,8 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
 
+from typing_extensions import TypedDict
+
 from sb.config import Config
-from sb.security import source_policy_snapshot
+from sb.security import SourcePolicySnapshot, source_policy_snapshot
 from sb.store import LedgerCorrupt, parse_page_frontmatter
 
 _HEX: Final = frozenset("0123456789abcdef")
@@ -24,6 +26,16 @@ class GovernanceError(RuntimeError):
     """Raised when an operator governance action is unsafe or unapproved."""
 
 
+class RetentionSnapshot(TypedDict, closed=True):
+    raw_blobs: int
+    raw_bytes: int
+    protected_blobs: int
+    orphan_blobs: list[str]
+    orphan_count: int
+    invalid_blobs: list[str]
+    invalid_count: int
+
+
 @dataclass(frozen=True, slots=True)
 class RetentionReport:
     raw_blobs: int
@@ -32,7 +44,7 @@ class RetentionReport:
     orphan_blobs: tuple[str, ...]
     invalid_blobs: tuple[str, ...]
 
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> RetentionSnapshot:
         return {
             "raw_blobs": self.raw_blobs,
             "raw_bytes": self.raw_bytes,
@@ -44,7 +56,7 @@ class RetentionReport:
         }
 
 
-def source_status(config: Config) -> tuple[dict[str, object], ...]:
+def source_status(config: Config) -> tuple[SourcePolicySnapshot, ...]:
     """Return a content-free status view of configured source policies."""
     return source_policy_snapshot(config)
 
