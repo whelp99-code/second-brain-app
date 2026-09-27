@@ -83,4 +83,3 @@ def unit_block(units: Sequence[Unit]) -> str:
         lines.append(f"sid={sid} origin={unit.origin} span={unit.span}")
         lines.append(unit.text)
     return "\n".join(lines)
-

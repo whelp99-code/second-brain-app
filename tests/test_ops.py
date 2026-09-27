@@ -1,78 +1,24 @@
-"""Operational status, retry, backup/restore, diagnostics, and migration tests."""
+"""Operational status, retry, diagnostics, and migration contracts."""
 
 from __future__ import annotations
 
-import hashlib
-import io
 import json
 import sqlite3
-import tarfile
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
-from sb.config import Config
-from sb.contracts import PageSpec, SourceCite
-from sb.ops import (
-    BACKUP_FORMAT,
-    OperationError,
-    create_backup,
-    doctor,
-    migrate_status,
-    restore_backup,
-    retry_failed,
-    status_snapshot,
-)
-from sb.search import SearchIndex
+from sb.ops import OperationError, doctor, migrate_status, retry_failed, status_snapshot
 from sb.store import DerivStatus
-from sb.store.cas import ContentAddressedStore
-from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger, ledger_schema_version
-from sb.vault import init_vault
-from tests.knowledge import stamp_knowledge
+from sb.store.ledger import CURRENT_SCHEMA_VERSION, Ledger
+from tests.ops_fixture import seed_vault
+from tests.ops_fixture import seed_vault as _seed_vault
 
-_TERM = "백업복원검증키워드"
-
-
-class _NoCompiledHash:
-    def last_compiled_hash(self, page_id: str) -> str | None:
-        del page_id
-        return None
-
-
-def _seed_vault(tmp_path: Path) -> tuple[Path, Config]:
-    root = tmp_path / "vault-한글"
-    vault = init_vault(root)
-    payload = "원본 계약 데이터".encode()
-    digest = ContentAddressedStore(root).put(payload)
-    sid = digest[:8]
-    page = PageSpec(
-        page_id="계약-일정",
-        title="계약 일정",
-        body_md=f"# 계약\n{_TERM}[^{sid}]",
-        sources=[SourceCite(sid, "inbox:계약.md", digest, ["0-9"])],
-        status="active",
-    )
-    result = vault.write_pages(
-        [page],
-        "seed-ops",
-        _NoCompiledHash(),
-        compiled_by=("prompt-ops", "fake-model"),
-    )
-    assert result.commit is not None
-    stamp_knowledge(root)
-    with Ledger(root):
-        pass
-    config = Config(
-        raw={
-            "vault_root": str(root),
-            "llm": {"argv_template": ["missing-second-brain-test-llm"]},
-        }
-    )
-    return root, config
-
+__all__ = ["_seed_vault"]
 
 def test_status_snapshot_redacts_failed_derivation_secrets(tmp_path: Path) -> None:
-    root, config = _seed_vault(tmp_path)
+    root, config = seed_vault(tmp_path)
     with Ledger(root) as ledger:
         ledger.ensure_derivation("failed-key", "compile", "run-x")
         ledger.mark_running("failed-key", "run-x")
@@ -88,8 +34,9 @@ def test_status_snapshot_redacts_failed_derivation_secrets(tmp_path: Path) -> No
     assert snapshot["git_clean"] is True
 
 
+
 def test_retry_failed_resets_attempts_and_records_transition(tmp_path: Path) -> None:
-    root, _config = _seed_vault(tmp_path)
+    root, _config = seed_vault(tmp_path)
     with Ledger(root) as ledger:
         ledger.ensure_derivation("retry-key", "compile", "run-r")
         ledger.mark_running("retry-key", "run-r")
@@ -104,228 +51,16 @@ def test_retry_failed_resets_attempts_and_records_transition(tmp_path: Path) -> 
     assert row.status == DerivStatus.PENDING.value
     assert row.attempts == 0
     with sqlite3.connect(root / ".sb" / "ledger.db") as conn:
-        transitions = conn.execute(
+        transitions = TypeAdapter(list[tuple[str, str]]).validate_python(conn.execute(
             "SELECT from_status,to_status FROM derivation_event WHERE deriv_key=? ORDER BY event_id",
             ("retry-key",),
-        ).fetchall()
+        ).fetchall(), strict=True)
     assert ("failed", "pending") in transitions
 
 
-def test_backup_restore_roundtrip_preserves_unicode_git_cas_and_search(tmp_path: Path) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backups" / "second-brain.tar.gz"
-
-    backup = create_backup(root, archive)
-    restored = restore_backup(archive, tmp_path / "복원-vault")
-
-    assert backup.archive == archive.resolve()
-    assert len(backup.checksum) == 64
-    assert archive.with_name(f"{archive.name}.sha256").is_file()
-    assert restored.files == backup.files
-    assert restored.bytes == backup.bytes
-    assert (restored.destination / ".git").is_dir()
-    assert (restored.destination / "wiki" / "계약-일정.md").is_file()
-    assert (
-        ledger_schema_version(restored.destination / ".sb" / "ledger.db") == CURRENT_SCHEMA_VERSION
-    )
-    assert SearchIndex(restored.destination).search(_TERM)
-    raw_files = [path for path in (restored.destination / "raw").rglob("*") if path.is_file()]
-    assert len(raw_files) == 1
-    assert hashlib.sha256(raw_files[0].read_bytes()).hexdigest() == raw_files[0].name
-
-
-def test_corrupted_backup_sidecar_refuses_restore_without_mutation(tmp_path: Path) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    _ = create_backup(root, archive)
-    with archive.open("ab") as handle:
-        _ = handle.write(b"tamper")
-    destination = tmp_path / "destination"
-    destination.mkdir()
-    sentinel = destination / "sentinel.txt"
-    _ = sentinel.write_text("unchanged", encoding="utf-8")
-
-    with pytest.raises(OperationError, match="checksum mismatch"):
-        _ = restore_backup(archive, destination, force=True)
-
-    assert sentinel.read_text(encoding="utf-8") == "unchanged"
-
-
-def test_restore_rejects_path_traversal_manifest(tmp_path: Path) -> None:
-    archive = tmp_path / "malicious.tar.gz"
-    manifest = {
-        "format": BACKUP_FORMAT,
-        "files": [
-            {
-                "path": "../escape",
-                "sha256": hashlib.sha256(b"x").hexdigest(),
-                "size": 1,
-                "mode": 0o600,
-            }
-        ],
-    }
-    payload = json.dumps(manifest).encode()
-    with tarfile.open(archive, "w:gz") as bundle:
-        info = tarfile.TarInfo("manifest.json")
-        info.size = len(payload)
-        bundle.addfile(info, io.BytesIO(payload))
-        member = tarfile.TarInfo("vault/../escape")
-        member.size = 1
-        bundle.addfile(member, io.BytesIO(b"x"))
-
-    with pytest.raises(OperationError, match="unsafe backup path"):
-        _ = restore_backup(archive, tmp_path / "restored")
-
-    assert not (tmp_path / "escape").exists()
-
-
-def test_restore_nonempty_destination_requires_force_and_preserves_previous(tmp_path: Path) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    _ = create_backup(root, archive)
-    destination = tmp_path / "existing"
-    destination.mkdir()
-    _ = (destination / "old.txt").write_text("old", encoding="utf-8")
-
-    with pytest.raises(OperationError, match="not empty"):
-        _ = restore_backup(archive, destination)
-
-    result = restore_backup(archive, destination, force=True)
-    assert result.previous is not None
-    assert (result.previous / "old.txt").read_text(encoding="utf-8") == "old"
-    assert (destination / "wiki" / "계약-일정.md").is_file()
-
-
-def test_restore_same_timestamp_preserves_each_previous_vault(tmp_path: Path, monkeypatch) -> None:
-    from datetime import UTC, datetime
-
-    class FixedDatetime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return cls(2026, 9, 9, tzinfo=UTC)
-
-    monkeypatch.setattr("sb.ops.datetime", FixedDatetime)
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
-    destination = tmp_path / "existing"
-    destination.mkdir()
-    (destination / "original.txt").write_text("first memory")
-    first = restore_backup(archive, destination, force=True)
-    (destination / "second.txt").write_text("second memory")
-    second = restore_backup(archive, destination, force=True)
-    assert first.previous is not None and second.previous is not None
-    assert first.previous != second.previous
-    assert (first.previous / "original.txt").read_text() == "first memory"
-    assert (second.previous / "second.txt").read_text() == "second memory"
-    assert (destination / "wiki" / "계약-일정.md").is_file()
-
-
-def test_restore_publish_failure_preserves_empty_destination(tmp_path: Path, monkeypatch) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
-    destination = tmp_path / "existing"
-    destination.mkdir(mode=0o700)
-    original_stat = destination.stat()
-    import os
-    original_replace = os.replace
-
-    def fail_publish(source, target):
-        if Path(source).name.startswith(".existing.restore-"):
-            raise OSError("injected publish failure")
-        return original_replace(source, target)
-
-    monkeypatch.setattr("sb.ops.os.replace", fail_publish)
-    with pytest.raises(OSError, match="injected publish failure"):
-        restore_backup(archive, destination)
-    assert destination.is_dir()
-    assert destination.stat().st_ino == original_stat.st_ino
-    assert destination.stat().st_mode == original_stat.st_mode
-    assert not list(destination.iterdir())
-    assert not list(tmp_path.glob(".existing.restore-*"))
-
-
-def test_restore_atomically_replaces_empty_destination(tmp_path: Path) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
-    destination = tmp_path / "existing"
-    destination.mkdir()
-    result = restore_backup(archive, destination)
-    assert result.previous is None
-    assert (destination / "wiki" / "계약-일정.md").is_file()
-
-
-def test_restore_publish_failure_recovers_previous_destination(tmp_path: Path, monkeypatch) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
-    destination = tmp_path / "existing"
-    destination.mkdir()
-    (destination / "original.txt").write_text("original memory")
-    import os
-    original_replace = os.replace
-
-    def fail_publish(source, target):
-        if Path(source).name.startswith(".existing.restore-"):
-            raise OSError("injected publish failure")
-        return original_replace(source, target)
-
-    monkeypatch.setattr("sb.ops.os.replace", fail_publish)
-    with pytest.raises(OSError, match="injected publish failure"):
-        restore_backup(archive, destination, force=True)
-    assert (destination / "original.txt").read_text() == "original memory"
-    assert not list(tmp_path.glob(".existing.restore-*"))
-
-
-@pytest.mark.parametrize("new_occupant", [False, True])
-def test_restore_failed_rollback_preserves_original(tmp_path: Path, monkeypatch, new_occupant) -> None:
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
-    destination = tmp_path / "existing"
-    destination.mkdir()
-    (destination / "original.txt").write_text("original memory")
-    import os
-    original_replace = os.replace
-
-    def fail_publish_and_rollback(source, target):
-        if Path(source).name.startswith(".existing.restore-"):
-            if new_occupant:
-                destination.mkdir()
-                (destination / "new.txt").write_text("concurrent content")
-            raise OSError("publish failure")
-        if Path(source).name.startswith("existing.pre-restore-"):
-            raise OSError("rollback failure")
-        return original_replace(source, target)
-
-    monkeypatch.setattr("sb.ops.os.replace", fail_publish_and_rollback)
-    with pytest.raises(OperationError, match="RESTORE_ROLLBACK_FAILED") as error:
-        restore_backup(archive, destination, force=True)
-    previous = next(tmp_path.glob("existing.pre-restore-*"))
-    assert str(previous) in str(error.value)
-    assert (previous / "original.txt").read_text() == "original memory"
-    if new_occupant:
-        assert (destination / "new.txt").read_text() == "concurrent content"
-
-
-def test_restore_never_deletes_preexisting_staging(tmp_path: Path) -> None:
-    import os
-    root, _config = _seed_vault(tmp_path)
-    archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
-    destination = tmp_path / "restored"
-    existing = tmp_path / f".restored.restore-{os.getpid()}"
-    existing.mkdir()
-    (existing / "recovery-evidence.txt").write_text("other operation")
-    restore_backup(archive, destination)
-    assert (existing / "recovery-evidence.txt").read_text() == "other operation"
-    assert (destination / "wiki" / "계약-일정.md").is_file()
-
 
 def test_doctor_returns_machine_readable_pass_warn_fail_checks(tmp_path: Path) -> None:
-    _root, config = _seed_vault(tmp_path)
+    _root, config = seed_vault(tmp_path)
 
     checks = doctor(config)
 
@@ -337,8 +72,9 @@ def test_doctor_returns_machine_readable_pass_warn_fail_checks(tmp_path: Path) -
     assert all(set(check.as_dict()) == {"name", "status", "detail"} for check in checks)
 
 
+
 def test_doctor_citation_audit_reads_each_page_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root, config = _seed_vault(tmp_path)
+    root, config = seed_vault(tmp_path)
     page = root / "wiki" / "계약-일정.md"
     original_read_text = Path.read_text
     reads = 0
@@ -354,6 +90,7 @@ def test_doctor_citation_audit_reads_each_page_once(tmp_path: Path, monkeypatch:
 
     assert any(check.name == "citations" and check.status == "pass" for check in checks)
     assert reads == 1
+
 
 
 def test_migrate_status_backs_up_legacy_database_before_apply(tmp_path: Path) -> None:
@@ -377,9 +114,10 @@ def test_migrate_status_backs_up_legacy_database_before_apply(tmp_path: Path) ->
     assert backup.parent == root / ".sb" / "migrations"
 
 
+
 @pytest.mark.parametrize('stage', [None, 'brief'])
 def test_retry_refuses_brief_without_replay_inputs_and_preserves_other_rows(tmp_path: Path, stage: str | None) -> None:
-    root, _ = _seed_vault(tmp_path)
+    root, _ = seed_vault(tmp_path)
     with Ledger(root) as ledger:
         for key, kind in [('a-compile', 'compile'), ('b-brief', 'brief')]:
             ledger.ensure_derivation(key, kind, 'run-fixture')
@@ -387,15 +125,16 @@ def test_retry_refuses_brief_without_replay_inputs_and_preserves_other_rows(tmp_
             ledger.mark_failed(key, 'unresolved citation')
         before = ledger.list_derivations()
     with pytest.raises(OperationError, match='BRIEF_REPLAY_INPUTS_UNAVAILABLE'):
-        retry_failed(root, stage=stage)
+        _ = retry_failed(root, stage=stage)
     with Ledger(root) as ledger:
         assert ledger.list_derivations() == before
 
 
+
 @pytest.mark.parametrize('secret', ['token=plain-value', 'AKIA0123456789ABCDEF',
                                     'ghp_' + 'A' * 36, 'sk-' + 'a' * 24])
-def test_failed_details_apply_shared_credential_rules(tmp_path: Path, secret: str):
-    root, config = _seed_vault(tmp_path)
+def test_failed_details_apply_shared_credential_rules(tmp_path: Path, secret: str) -> None:
+    root, config = seed_vault(tmp_path)
     with Ledger(root) as ledger:
         ledger.ensure_derivation('credential-failure', 'compile', 'test-run')
         ledger.mark_running('credential-failure', 'test-run')
@@ -406,10 +145,11 @@ def test_failed_details_apply_shared_credential_rules(tmp_path: Path, secret: st
     assert '010-1234-5678' in result
 
 
+
 def test_status_orders_runs_by_instant_across_timezones(tmp_path: Path) -> None:
     from sb.store import Run, RunStage
 
-    root, config = _seed_vault(tmp_path)
+    root, config = seed_vault(tmp_path)
     with Ledger(root) as ledger:
         for name, timestamp in [('older', '2026-09-09T23:00:00+09:00'),
                                 ('newer', '2026-09-09T15:00:00+00:00')]:
@@ -418,11 +158,10 @@ def test_status_orders_runs_by_instant_across_timezones(tmp_path: Path) -> None:
     with Ledger(root) as ledger:
         assert [row.run_id for row in ledger.list_runs()] == ['older', 'newer']
     snapshot = status_snapshot(config)
-    assert isinstance(snapshot['last_run'], dict)
+    assert snapshot['last_run'] is not None
     assert snapshot['last_run']['run_id'] == 'newer'
-    assert isinstance(snapshot['recent_stages'], list)
-    assert all(isinstance(row, dict) for row in snapshot['recent_stages'])
     assert [row['run_id'] for row in snapshot['recent_stages']] == ['newer', 'older']
+
 
 
 def test_run_time_keys_preserve_precision_and_legacy_values() -> None:

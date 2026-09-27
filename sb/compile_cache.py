@@ -34,4 +34,3 @@ class BodyCache[Owner]:
             entry = (reference, bucket)
             self._data[key] = entry
         entry[1][page_id] = body
-
