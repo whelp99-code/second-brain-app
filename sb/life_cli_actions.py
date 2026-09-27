@@ -10,7 +10,7 @@ from sb.config import Config
 from sb.effect_values import JsonInput
 from sb.life_actor import LifeActor
 from sb.life_contracts import LifeInputError
-from sb.life_fields import boolean, integer, number, string
+from sb.life_fields import boolean, integer, string
 from sb.life_journal_contracts import JournalRow
 from sb.life_json import LifePayload, decode_json
 from sb.life_read_visibility import visible_events
@@ -39,13 +39,16 @@ def notify(
         or type(raw.get("allow_private", False)) is not bool
     ):
         raise LifeInputError("LIFE_DELIVERY_NOT_CONFIGURED")
+    timeout = raw.get("timeout", 10)
+    if not isinstance(timeout, (int, float)):
+        raise LifeInputError("LIFE_CLI_FAILED")
     channel = TransportConfig(
         endpoint=string(raw.get("endpoint", ""), "LIFE_DELIVERY_NOT_CONFIGURED"),
         token_env=None
         if raw.get("token_env") is None
         else string(raw.get("token_env"), "LIFE_DELIVERY_NOT_CONFIGURED"),
         allow_private=boolean(raw.get("allow_private", False), "LIFE_DELIVERY_NOT_CONFIGURED"),
-        timeout=number(raw.get("timeout", 10)),
+        timeout=timeout,
     )
     claim = _JOURNAL.validate_python(
         write("delivery_prepare", {"briefing_id": briefing_id}), strict=True
@@ -112,9 +115,9 @@ def model(
     request: LifePayload = {
         **data,
         "external": boolean(cfg["external"], "LIFE_MODEL_NOT_CONFIGURED"),
-        "estimated_tokens": integer(cfg.get("estimated_tokens", 4096), "LIFE_MODEL_NOT_CONFIGURED"),
+        "estimated_tokens": integer(cfg.get("estimated_tokens", 4096), "LIFE_MODEL_BUDGET_INVALID"),
         "maximum_cost_micros": integer(
-            cfg.get("maximum_cost_micros", 0), "LIFE_MODEL_NOT_CONFIGURED"
+            cfg.get("maximum_cost_micros", 0), "LIFE_MODEL_BUDGET_INVALID"
         ),
     }
     reservation = _JOURNAL.validate_python(write("model_reserve", request), strict=True)
