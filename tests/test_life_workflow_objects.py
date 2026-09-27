@@ -190,10 +190,13 @@ def test_brief_delivery_claim_unknown_not_resent_and_open_requires_ack(tmp_path:
             now=NOW,
         )
         d = prepare(j, b["object_id"], events=events, scopes=SCOPES, source_ids=SOURCES, now=NOW)
+        assert "send_allowed" in d
         assert d["send_allowed"] and d["body"]["opened_at"] is None
-        assert not prepare(
+        replay = prepare(
             j, b["object_id"], events=events, scopes=SCOPES, source_ids=SOURCES, now=NOW
-        )["send_allowed"]
+        )
+        assert "send_allowed" in replay
+        assert not replay["send_allowed"]
         unknown = finish(
             j,
             d["object_id"],
@@ -270,6 +273,7 @@ def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path:
             now=NOW,
             daily_calls=1,
         )
+        assert "execute_allowed" in reservation and "execute_allowed" in replay
         assert reservation["execute_allowed"] and not replay["execute_allowed"]
         model = Model()
         with pytest.raises(LifeInputError, match="MODEL_UNAVAILABLE"):

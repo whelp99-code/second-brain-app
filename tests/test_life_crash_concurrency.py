@@ -148,6 +148,7 @@ def test_sigkill_after_delivery_claim_does_not_resend(tmp_path: Path) -> None:
             source_ids=SOURCES,
             now=NOW,
         )
+        assert "send_allowed" in replay
         assert not replay["send_allowed"] and replay["body"]["state"] == "attempting"
 
 
