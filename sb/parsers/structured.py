@@ -11,7 +11,7 @@ from typing import Final, Protocol, override
 
 import yaml
 
-from sb.parsers import InvalidInput, LimitExceeded
+from sb.parsers.contracts import InvalidInput, LimitExceeded
 
 MAX_BYTES: Final = 67_108_864
 type CanonicalValue = (
