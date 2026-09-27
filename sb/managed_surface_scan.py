@@ -6,13 +6,13 @@ import hashlib
 import os
 import sqlite3
 import stat
-import subprocess
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from sb.effect_values import JsonValue, digest
 from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
+from sb.managed_git import git_directories, inspect_git_directory
 from sb.sqlite_values import OPTIONAL_INTEGER_ROW, OPTIONAL_TEXT_ROW, TEXT_ROWS
 
 
@@ -98,7 +98,17 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
     try:
         if not root.is_dir() or root.is_symlink():
             raise OSError("managed root missing or unsafe")
+        git_roots = git_directories(root)
+        for git_root in git_roots:
+            inspected_git = inspect_git_directory(git_root, needles)
+            object_count += inspected_git.objects
+            matches += inspected_git.matches
+            file_count += len(inspected_git.files)
+            rows.append({"surface_id": hashlib.sha256(git_root.relative_to(root).as_posix().encode()).hexdigest(),
+                         "digest": inspected_git.digest, "matches": inspected_git.matches})
         for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
+            if any(path == git_root or path.is_relative_to(git_root) for git_root in git_roots):
+                continue
             metadata = path.stat(follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
                 continue
@@ -125,25 +135,9 @@ def _scan_regular(root: Path, needles: Sequence[bytes]) -> SurfaceInventoryEntry
                 "bytes": inspected.byte_count,
                 "matches": count,
             })
-        if (root / ".git").is_dir():
-            listed = subprocess.run(
-                ["git", "cat-file", "--batch-all-objects", "--batch-check=%(objectname)"],
-                cwd=root, check=False, capture_output=True, text=True,
-            )
-            if listed.returncode != 0:
-                errors.append("GIT_OBJECT_SCAN_FAILED")
-            else:
-                for oid in listed.stdout.splitlines():
-                    item = subprocess.run(
-                        ["git", "cat-file", "-p", oid], cwd=root,
-                        check=False, capture_output=True,
-                    )
-                    if item.returncode != 0:
-                        errors.append("GIT_OBJECT_SCAN_FAILED")
-                        continue
-                    object_count += 1
-                    matches += sum(item.stdout.count(needle) for needle in needles)
         fd_count = _process_fd_count(root)
+    except ManagedInspectionError as exc:
+        errors.append(str(exc))
     except OSError:
         errors.append("SURFACE_ENUMERATION_FAILED")
     scan_digest = digest(

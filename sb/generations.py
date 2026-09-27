@@ -30,6 +30,11 @@ from sb.effect_values import (
 )
 from sb.generation_access import access_bound_ledger_digest
 from sb.generation_access_inheritance import inherit_generation_access
+from sb.generation_changes import (
+    activate_generation_changes,
+    initialize_generation_changes,
+    record_generation_changes,
+)
 from sb.generation_cleanup import discard_staging
 from sb.generation_integrity import load_verified_manifest
 from sb.generation_locks import GenerationWriteLease, generation_writer
@@ -605,6 +610,7 @@ class GenerationStore:
         _ = self.journal.execute("PRAGMA journal_mode=DELETE")
         _ = self.journal.execute("PRAGMA synchronous=FULL")
         _ = self.journal.executescript(_JOURNAL_SCHEMA)
+        initialize_generation_changes(self.journal)
         self.journal_path.chmod(0o600)
 
     def close(self) -> None:
@@ -930,6 +936,7 @@ class GenerationStore:
             os.replace(staging, final)
             _directory_fsync(self.generations)
             _seal_modes(final)
+            record_generation_changes(self.journal, Generation(manifest, final), parent)
             _ = self.journal.execute(
                 "INSERT INTO activations VALUES(?,?, 'sealed', ?,NULL,NULL,NULL,?,?)",
                 (
@@ -1020,6 +1027,7 @@ class GenerationStore:
                     ).rowcount
                     if changed != 1:
                         raise GenerationError("GENERATION_SPLIT_BRAIN")
+                    activate_generation_changes(self.journal, generation.generation_id, now)
                     self.journal.commit()
                     phase = "activated"
                     emit("activation_verify")
@@ -1048,6 +1056,7 @@ class GenerationStore:
                 ).rowcount
                 if changed != 1:
                     raise GenerationError("GENERATION_SPLIT_BRAIN")
+                activate_generation_changes(self.journal, generation.generation_id, now)
                 self.journal.commit()
                 emit("activation_verify")
                 self._complete_disposal(generation, current, now, emit)
@@ -1085,6 +1094,7 @@ class GenerationStore:
             ).rowcount
             if changed != 1:
                 raise GenerationError("GENERATION_SPLIT_BRAIN")
+            activate_generation_changes(self.journal, generation.generation_id, now)
             self.journal.commit()
             emit("activation_verify")
             self._complete_disposal(generation, current, now, emit)

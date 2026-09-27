@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 
 import anyio
 import pytest
@@ -22,9 +22,16 @@ from sb.effect_values import JsonValue
 from sb.mcp import LEGACY_TOOLS, build_server
 from sb.mcp_contract import write_fixture_request
 from sb.mcp_write_models import MemoryWriteRequestModel, MemoryWriteResultModel
-from sb.search import SearchHitDict
 from sb.vault import init_vault
 from tests.task30_clock import FrozenTask30DateTime
+
+
+# Archived c89fd43 Task29 fields, independent of the current provider type.
+class SearchHitDict(TypedDict):
+    page_id: str
+    section: str
+    snippet: str
+    score: float
 
 
 def _configured_runtime(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:

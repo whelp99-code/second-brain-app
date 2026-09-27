@@ -4,11 +4,12 @@ import re
 
 _ENDING = re.compile(r"(\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029])$")
 _MARKER = re.compile(rb"[ \t]*\[\^([0-9a-f]{8,64})\]")
+_REPLACED_MARKER = re.compile(rb"\[\^([0-9a-f]{8,64})\][ \t\r\n]*$")
 
 
-def correction_marker(suffix: bytes) -> str | None:
-    """Only inherit the actual citation immediately following the target span."""
-    match = _MARKER.match(suffix)
+def correction_marker(suffix: bytes, replaced: bytes = b"") -> str | None:
+    """Inherit a citation immediately after, or at the end of, the replaced span."""
+    match = _MARKER.match(suffix) or _REPLACED_MARKER.search(replaced)
     return match.group(1).decode("ascii") if match is not None else None
 
 
