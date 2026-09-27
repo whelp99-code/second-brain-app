@@ -19,6 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Final, Literal, TypedDict, override
 
+from pydantic import JsonValue, TypeAdapter
+
 from sb.connectors.inbox_documents import MAX_INBOX_BYTES
 from sb.parsers import UnsupportedSuffix, parser_for
 from sb.store.cas import ContentAddressedStore
@@ -29,6 +31,7 @@ MAX_RELATIVE_PATH_CHARS: Final = 1024
 _SUPPORTED_SUFFIXES: Final = (".docx", ".hwpx", ".json", ".md", ".pdf", ".txt", ".xlsx", ".yaml")
 _SAFE_COMPONENT: Final = re.compile(r"[^0-9A-Za-z가-힣._-]+")
 _HEX_64: Final = re.compile(r"[0-9a-f]{64}")
+_RECEIPT_JSON: Final[TypeAdapter[JsonValue]] = TypeAdapter(JsonValue)
 
 type UploadState = Literal["queued", "already-queued", "already-ingested"]
 
@@ -292,7 +295,9 @@ def read_retract_receipt(root: Path, receipt_id: str) -> RetractReceipt | None:
     if not path.is_file():
         return None
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
+        loaded = _RECEIPT_JSON.validate_python(
+            json.loads(path.read_text(encoding="utf-8")), strict=True,
+        )
     except (OSError, json.JSONDecodeError) as exc:
         raise UploadRejected("retract receipt is unreadable") from exc
     if not isinstance(loaded, dict):
