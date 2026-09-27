@@ -1,9 +1,11 @@
+
 import pytest
 
+from sb.effect_values import JsonObject
 from sb.scoped_write_identity import scoped_write_identity
 
 
-def material():
+def material() -> JsonObject:
     return {"schema_version": 1, "operation": "remember", "candidate_id": "memcand:pos:v1:" + "a" * 64,
             "candidate_digest": "sha256:" + "b" * 64, "classification_digest": "sha256:" + "c" * 64,
             "source_digest": "sha256:" + "d" * 64, "owner": "principal:owner",
@@ -21,6 +23,6 @@ def test_scope_changes_identity_and_key():
 @pytest.mark.parametrize("changes", [{"schema_version": True}, {"projects": ["*"]},
     {"projects": ["project:a", "project:a"]}, {"projects": ["project:b", "project:a"]},
     {"projects": ["project:"]}, {"owner": "someone"}, {"extra": 1}, {"operation": "correct"}])
-def test_rejects_invalid_identity(changes):
+def test_rejects_invalid_identity(changes: JsonObject):
     with pytest.raises(ValueError, match="SCOPED_WRITE_IDENTITY_INVALID"):
-        scoped_write_identity({**material(), **changes})
+        _ = scoped_write_identity({**material(), **changes})
