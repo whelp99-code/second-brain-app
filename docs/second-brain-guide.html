@@ -446,13 +446,13 @@ sb resolve CONFLICT_ID --decision note --note "사람이 확인한 메모"</pre>
           <thead><tr><th>기능</th><th>상태</th><th>지금 의미</th></tr></thead>
           <tbody>
             <tr><td>원본 보존</td><td><span class="pill ok">지금 사용 가능</span></td><td>원본 창고와 백업이 있다. 새 배치가 실패해도 이미 넣은 원본은 남아 있다.</td></tr>
-            <tr><td>인용 있는 위키 컴파일</td><td><span class="pill block">막힘</span></td><td>구현되어 있다. 최근 배치는 쓴 페이지가 0이고 오류 1이다. LLM 래퍼는 설정되어 있으나 배치가 거기까지 성공하지 못한다.</td></tr>
-            <tr><td>충돌 감지</td><td><span class="pill part">부분 사용</span></td><td>충돌 단계 실패가 6건이다. 오류 문구는 모두 “invalid conflict verdict”다. 한 건은 56번, 한 건은 21번 재시도했다.</td></tr>
-            <tr><td>사람 충돌 해결</td><td><span class="pill code">코드는 있음</span></td><td>웹과 <code>sb resolve</code>가 있다. 이번 조사에서 운영 충돌을 고르지는 않았다.</td></tr>
-            <tr><td>일일 브리핑과 오늘의 추천</td><td><span class="pill part">부분 사용</span></td><td>추천은 구현되어 있고 9/23 브리핑에 있다. 그 뒤 날짜의 브리핑 파일이 없다. 미구현이 아니다.</td></tr>
+            <tr><td>인용 있는 위키 컴파일</td><td><span class="pill block">운영 승인 대기</span></td><td>구현되어 있다. 최근 배치는 쓴 페이지가 0이고 오류 1이다. LLM 래퍼는 설정되어 있으나 배치가 거기까지 성공하지 못한다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>충돌 감지</td><td><span class="pill part">체크아웃 증명</span></td><td>충돌 단계 실패가 6건이다. 오류 문구는 모두 “invalid conflict verdict”다. 한 건은 56번, 한 건은 21번 재시도했다. 체크아웃 증명: 2026-09-27 HEAD 053bd7e에서 고립 시험이 통과했다. 운영 승인 대기: 설치본 current는 c00f378이라 이 증명을 아직 쓰지 않는다.</td></tr>
+            <tr><td>사람 충돌 해결</td><td><span class="pill block">운영 승인 대기</span></td><td>웹과 <code>sb resolve</code>가 있다. 이번 조사에서 운영 충돌을 고르지는 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>일일 브리핑과 오늘의 추천</td><td><span class="pill block">운영 승인 대기</span></td><td>추천은 구현되어 있고 9/23 브리핑에 있다. 그 뒤 날짜의 브리핑 파일이 없다. 미구현이 아니다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
             <tr><td>키워드 검색</td><td><span class="pill ok">지금 사용 가능</span></td><td>설치본 <code>sb search</code>가 응답했다. 웹 검색도 같은 색인을 본다.</td></tr>
-            <tr><td>큰따옴표 정확 문구</td><td><span class="pill code">코드는 있음</span></td><td>구현되어 있다. 이번 조사에서 문구 검색은 따로 치지 않았다.</td></tr>
-            <tr><td>의미 검색</td><td><span class="pill code">코드는 있음</span></td><td>운영 설정에 hybrid가 없다. 기본은 꺼짐. 최소 유사도도 기본값이다. 켜려면 임베딩 추가 설치와 새 봉인 세대가 필요하다. 이미 봉인된 세대는 설정만으로 다시 색인되지 않는다.</td></tr>
+            <tr><td>큰따옴표 정확 문구</td><td><span class="pill block">운영 승인 대기</span></td><td>구현되어 있다. 이번 조사에서 문구 검색은 따로 치지 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>의미 검색</td><td><span class="pill part">체크아웃 증명</span></td><td>운영 설정에 hybrid가 없다. 기본은 꺼짐. 최소 유사도도 기본값이다. 켜려면 임베딩 추가 설치와 새 봉인 세대가 필요하다. 이미 봉인된 세대는 설정만으로 다시 색인되지 않는다. 체크아웃 증명: 2026-09-27 HEAD 053bd7e에서 고립 시험이 통과했다. 운영 승인 대기: 설치본 current는 c00f378이라 이 증명을 아직 쓰지 않는다.</td></tr>
             <tr><td>자격증명 가리기</td><td><span class="pill ok">지금 사용 가능</span></td><td>AWS 키, GitHub 토큰, <code>sk-</code>, PEM, <code>password=</code> 같은 패턴만 가린다. 메일 주소와 전화번호는 일부러 남긴다. 세 원본 모두 sensitive는 mask다.</td></tr>
           </tbody>
         </table>
@@ -463,11 +463,11 @@ sb resolve CONFLICT_ID --decision note --note "사람이 확인한 메모"</pre>
         <table>
           <thead><tr><th>원본</th><th>상태</th><th>지금 의미</th></tr></thead>
           <tbody>
-            <tr><td>inbox</td><td><span class="pill part">부분 사용</span></td><td>설정됨. 어댑터 inbox-documents. LLM 전송 허용, 마스킹. 접수는 이 대기열로 간다. 처리 배치가 실패한다.</td></tr>
-            <tr><td>hermes</td><td><span class="pill part">부분 사용</span></td><td>설정됨. 마크다운 폴더 어댑터. LLM 허용, 마스킹. 이미 컴파일된 페이지는 검색된다. 새 수집은 같은 실패 배치에 묶인다.</td></tr>
-            <tr><td>unified-db</td><td><span class="pill block">막힘</span></td><td>설정됨. 읽기 전용, LLM 전송 거부. 설정된 주소가 연결을 닫아 갱신 전체가 종료 코드 1로 끝난다. 이 컴퓨터의 127.0.0.1:5433은 따로 듣고 있다. 둘을 같은 DB로 단정하지 않았다.</td></tr>
-            <tr><td>Claude·Codex·OMO·OpenCode·GJC 세션</td><td><span class="pill code">코드는 있음</span></td><td>어댑터는 있다. 운영 원본 목록에는 없다. 예제 설정은 검토 전까지 LLM 거부를 권한다.</td></tr>
-            <tr><td>Orca·프로젝트 기록</td><td><span class="pill code">코드는 있음</span></td><td>어댑터는 있다. 운영 원본 목록에는 없다.</td></tr>
+            <tr><td>inbox</td><td><span class="pill block">운영 승인 대기</span></td><td>설정됨. 어댑터 inbox-documents. LLM 전송 허용, 마스킹. 접수는 이 대기열로 간다. 처리 배치가 실패한다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>hermes</td><td><span class="pill block">운영 승인 대기</span></td><td>설정됨. 마크다운 폴더 어댑터. LLM 허용, 마스킹. 이미 컴파일된 페이지는 검색된다. 새 수집은 같은 실패 배치에 묶인다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>unified-db</td><td><span class="pill block">운영 승인 대기</span></td><td>설정됨. 읽기 전용, LLM 전송 거부. 설정된 주소가 연결을 닫아 갱신 전체가 종료 코드 1로 끝난다. 이 컴퓨터의 127.0.0.1:5433은 따로 듣고 있다. 둘을 같은 DB로 단정하지 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>Claude·Codex·OMO·OpenCode·GJC 세션</td><td><span class="pill block">운영 승인 대기</span></td><td>어댑터는 있다. 운영 원본 목록에는 없다. 예제 설정은 검토 전까지 LLM 거부를 권한다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>Orca·프로젝트 기록</td><td><span class="pill block">운영 승인 대기</span></td><td>어댑터는 있다. 운영 원본 목록에는 없다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
             <tr><td>문서 파서</td><td><span class="pill ok">지금 사용 가능</span></td><td>pdf, hwpx, docx, xlsx, md, txt, json, yaml. pdf와 docx는 Docling이 있으면 그것을 먼저 쓴다. pptx, hwp, 이미지, 메일은 파서가 없다.</td></tr>
           </tbody>
         </table>
@@ -478,18 +478,18 @@ sb resolve CONFLICT_ID --decision note --note "사람이 확인한 메모"</pre>
         <table>
           <thead><tr><th>기능</th><th>상태</th><th>지금 의미</th></tr></thead>
           <tbody>
-            <tr><td>웹 콘솔</td><td><span class="pill part">부분 사용</span></td><td>기억, 업로드, 검색, 충돌 해결, 최근 변경, 소스·보존, 메트릭, 준비 상태를 보여 준다. 화면은 열린다. “지금 처리”는 실패하는 배치를 다시 부른다.</td></tr>
+            <tr><td>웹 콘솔</td><td><span class="pill block">운영 승인 대기</span></td><td>기억, 업로드, 검색, 충돌 해결, 최근 변경, 소스·보존, 메트릭, 준비 상태를 보여 준다. 화면은 열린다. “지금 처리”는 실패하는 배치를 다시 부른다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
             <tr><td>CLI 검색·상태·소스</td><td><span class="pill ok">지금 사용 가능</span></td><td>설치본으로 확인했다.</td></tr>
-            <tr><td>CLI 전체 배치 <code>sb run</code></td><td><span class="pill block">막힘</span></td><td>시간당 갱신이 같은 이유로 실패한다. 안내를 만들며 다시 실행하지 않았다.</td></tr>
-            <tr><td>init, ingest, compile, brief</td><td><span class="pill part">부분 사용</span></td><td>보관함은 이미 초기화되어 있다. ingest·compile·brief는 <code>run</code>의 단계다. 지금 성공 경로가 아니다.</td></tr>
-            <tr><td>doctor, retention, metrics, gc, rollback, migrate</td><td><span class="pill code">코드는 있음</span></td><td>명령은 설치본에 있다. 이번 조사에서 실행하지 않았다. gc의 실제 삭제는 <code>--apply --confirm</code>이 있어야 한다. 원본 자동 삭제가 아니다.</td></tr>
+            <tr><td>CLI 전체 배치 <code>sb run</code></td><td><span class="pill block">운영 승인 대기</span></td><td>시간당 갱신이 같은 이유로 실패한다. 안내를 만들며 다시 실행하지 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>init, ingest, compile, brief</td><td><span class="pill block">운영 승인 대기</span></td><td>보관함은 이미 초기화되어 있다. ingest·compile·brief는 <code>run</code>의 단계다. 지금 성공 경로가 아니다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>doctor, retention, metrics, gc, rollback, migrate</td><td><span class="pill block">운영 승인 대기</span></td><td>명령은 설치본에 있다. 이번 조사에서 실행하지 않았다. gc의 실제 삭제는 <code>--apply --confirm</code>이 있어야 한다. 원본 자동 삭제가 아니다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
             <tr><td>backup, verify-backup</td><td><span class="pill ok">지금 사용 가능</span></td><td>매일 백업 타이머가 활성이다. 최근 백업은 격리 복원으로 검증되었다.</td></tr>
-            <tr><td>restore</td><td><span class="pill code">코드는 있음</span></td><td>검증된 아카이브로 복원하는 명령이 있다. 운영 보관함에 복원하지 않았다. 복원은 생산 변경이다.</td></tr>
-            <tr><td>apply-requests, apply-cancellation</td><td><span class="pill part">부분 사용</span></td><td>준비 상태의 요청 저널 검사는 통과했다. 최근 실패 요청은 0이다. 이번엔 요청을 넣지 않았다.</td></tr>
+            <tr><td>restore</td><td><span class="pill block">운영 승인 대기</span></td><td>검증된 아카이브로 복원하는 명령이 있다. 운영 보관함에 복원하지 않았다. 복원은 생산 변경이다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>apply-requests, apply-cancellation</td><td><span class="pill block">운영 승인 대기</span></td><td>준비 상태의 요청 저널 검사는 통과했다. 최근 실패 요청은 0이다. 이번엔 요청을 넣지 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
             <tr><td>maintain</td><td><span class="pill ok">지금 사용 가능</span></td><td>유지보수 타이머는 다음 실행이 잡혀 있고, 마지막 서비스 결과는 성공이다.</td></tr>
-            <tr><td>postcompact-hook</td><td><span class="pill code">코드는 있음</span></td><td>Claude가 대화를 압축한 뒤 기억을 다시 주입하는 훅이다. 운영 연결은 확인하지 않았다.</td></tr>
-            <tr><td>identity</td><td><span class="pill code">코드는 있음</span></td><td>이 저장소의 <code>sb --help</code>에만 있다. 설치본 도움말에는 없다.</td></tr>
-            <tr><td>맥 메뉴바 앱</td><td><span class="pill code">코드는 있음</span></td><td>Finder 드롭, 선택 폴더 단방향 동기화, 검색, 즉시 실행, Notification Center 브리핑, SSH 터널, Keychain이 문서와 소스에 있다. 알림은 기본이 꺼져 있다. 이 Linux에서는 앱 실행을 확인하지 못했다.</td></tr>
+            <tr><td>postcompact-hook</td><td><span class="pill block">운영 승인 대기</span></td><td>Claude가 대화를 압축한 뒤 기억을 다시 주입하는 훅이다. 운영 연결은 확인하지 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>identity</td><td><span class="pill block">운영 승인 대기</span></td><td>이 저장소의 <code>sb --help</code>에만 있다. 설치본 도움말에는 없다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>맥 메뉴바 앱</td><td><span class="pill block">운영 승인 대기</span></td><td>Finder 드롭, 선택 폴더 단방향 동기화, 검색, 즉시 실행, Notification Center 브리핑, SSH 터널, Keychain이 문서와 소스에 있다. 알림은 기본이 꺼져 있다. 이 Linux에서는 앱 실행을 확인하지 못했다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
           </tbody>
         </table>
       </div>
@@ -499,12 +499,12 @@ sb resolve CONFLICT_ID --decision note --note "사람이 확인한 메모"</pre>
         <table>
           <thead><tr><th>기능</th><th>상태</th><th>지금 의미</th></tr></thead>
           <tbody>
-            <tr><td>기본 MCP 6도구</td><td><span class="pill code">코드는 있음</span></td><td>검색, 페이지, 최근 변경, 충돌, 기억, 쓰기 요청. 브로커 소켓 파일은 있다. 운영 소켓으로 도구를 부르면 운영 보관함에 쓰일 수 있어 호출하지 않았다.</td></tr>
-            <tr><td>기억 스키마 확장 도구</td><td><span class="pill code">코드는 있음</span></td><td>프로필에 따라 세대 상태, 요청 상태, 대상 해석, 취소가 추가된다. 기본 연결이 아니다.</td></tr>
-            <tr><td>범위 제한 읽기·쓰기</td><td><span class="pill code">코드는 있음</span></td><td>서명된 fence와 claim이 필요하다. 쓰기 프로필은 도구가 하나다. 수락 영수증이지 처리 완료가 아니다. 완료 확인은 다른 프로필이다.</td></tr>
-            <tr><td>Phone History</td><td><span class="pill part">부분 사용</span></td><td>서버·iOS·계약 코드가 있고 predevice 게이트는 PASS, 판정은 실기기 검증 대기이다. <code>phone-history.service</code>는 꺼져 있다. 실기기 설치는 승인되지 않았다. Second Brain으로는 inbox로만 넘긴다.</td></tr>
-            <tr><td>회사 기억 <code>sb-company</code></td><td><span class="pill code">코드는 있음</span></td><td>개인 보관함과 분리된 서명 저장소다. 후보를 받고, 수락·거절·처리 표시를 한다. 설정 디렉터리에서 회사용 설정 파일은 보이지 않았다. 운영 중이라고 보지 않는다.</td></tr>
-            <tr><td>세대와 준비 상태</td><td><span class="pill part">부분 사용</span></td><td>활성 세대가 있고 준비 상태가 그것을 읽는다. 준비 상태 자체는 503이다.</td></tr>
+            <tr><td>기본 MCP 6도구</td><td><span class="pill block">운영 승인 대기</span></td><td>검색, 페이지, 최근 변경, 충돌, 기억, 쓰기 요청. 브로커 소켓 파일은 있다. 운영 소켓으로 도구를 부르면 운영 보관함에 쓰일 수 있어 호출하지 않았다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>기억 스키마 확장 도구</td><td><span class="pill block">운영 승인 대기</span></td><td>프로필에 따라 세대 상태, 요청 상태, 대상 해석, 취소가 추가된다. 기본 연결이 아니다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>범위 제한 읽기·쓰기</td><td><span class="pill block">운영 승인 대기</span></td><td>서명된 fence와 claim이 필요하다. 쓰기 프로필은 도구가 하나다. 수락 영수증이지 처리 완료가 아니다. 완료 확인은 다른 프로필이다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>Phone History</td><td><span class="pill part">체크아웃 증명</span></td><td>서버·iOS·계약 코드가 있고 predevice 게이트는 PASS, 판정은 실기기 검증 대기이다. <code>phone-history.service</code>는 꺼져 있다. 실기기 설치는 승인되지 않았다. Second Brain으로는 inbox로만 넘긴다. 체크아웃 증명: 2026-09-27 HEAD 053bd7e에서 고립 시험이 통과했다. 운영 승인 대기: 설치본 current는 c00f378이라 이 증명을 아직 쓰지 않는다.</td></tr>
+            <tr><td>회사 기억 <code>sb-company</code></td><td><span class="pill block">운영 승인 대기</span></td><td>개인 보관함과 분리된 서명 저장소다. 후보를 받고, 수락·거절·처리 표시를 한다. 설정 디렉터리에서 회사용 설정 파일은 보이지 않았다. 운영 중이라고 보지 않는다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
+            <tr><td>세대와 준비 상태</td><td><span class="pill block">운영 승인 대기</span></td><td>활성 세대가 있고 준비 상태가 그것을 읽는다. 준비 상태 자체는 503이다. 운영 승인 대기: 체크아웃에 코드가 있거나 고립 시험이 형제를 지키지만, 운영 배치·설치본·기기 확인은 승인 묶음 전이라 실행하지 않았다.</td></tr>
           </tbody>
         </table>
       </div>
