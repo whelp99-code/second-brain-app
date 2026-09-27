@@ -23,7 +23,7 @@ from cryptography.x509.oid import NameOID
 from sb.effect_values import JsonObject
 from sb.life_contracts import LifeInputError
 from sb.life_delivery import TransportConfig, send_notification
-from tests.life_test_support import load_json_object
+from tests.json_fixtures import parse_object
 
 
 class NotificationCall(TypedDict):
@@ -79,7 +79,7 @@ def tls_fixture(
             calls.append(
                 {
                     "path": self.path,
-                    "body": load_json_object(self.rfile.read(length)),
+                    "body": parse_object(self.rfile.read(length)),
                     "key": self.headers.get("Idempotency-Key"),
                     "auth": self.headers.get("Authorization"),
                 }

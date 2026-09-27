@@ -9,13 +9,12 @@ import pytest
 from sb.config import Config
 from sb.effect_values import JsonObject, JsonValue
 from sb.life_contracts import LifeInputError
-from sb.life_values import canonical_bytes
 from sb.life_views import obsidian_manifest, timeline
 from sb.pipeline import run_life_batch
 from sb.search import SearchIndex
 from sb.store.life import read_life_store
 from sb.vault import init_vault
-from tests.life_test_support import json_rows, json_text, load_json_object
+from tests.life_test_support import json_text
 from tests.test_life_contracts import NOW, payload
 
 
@@ -64,16 +63,9 @@ def test_capture_to_vault_search_and_obsidian(tmp_path: Path) -> None:
     with read_life_store(root) as store:
         events = store.events(scopes=("principal:owner",), now=NOW)
         assert len(events) == 1
-        assert (
-            json_rows(
-                load_json_object(canonical_bytes(timeline(events, "2026-09-26", "Asia/Seoul")))[
-                    "events"
-                ]
-            )[0]["event_id"]
-            == event_id
-        )
+        assert timeline(events, "2026-09-26", "Asia/Seoul")["events"][0]["event_id"] == event_id
         view = obsidian_manifest(events, day="2026-09-26", timezone="Asia/Seoul")
-        assert any(f["path"] == f"Auto/Events/{event_id}.md" for f in json_rows(view["files"]))
+        assert any(f["path"] == f"Auto/Events/{event_id}.md" for f in view["files"])
         assert store.evidence(event_id, scopes=("principal:owner",), now=NOW)
 
 

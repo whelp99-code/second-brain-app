@@ -10,7 +10,7 @@ from sb.config import Config
 from sb.life_config import settings
 from sb.life_contracts import LifeInputError
 from sb.life_http import LifeActor, read_endpoint
-from sb.life_values import canonical_bytes, parse_event
+from sb.life_values import parse_event
 from sb.life_views import brief, obsidian_manifest, timeline
 from sb.pipeline import run_life_batch
 from tests import test_web
@@ -18,7 +18,6 @@ from tests.life_test_support import (
     config_table,
     json_rows,
     json_text,
-    load_json_object,
 )
 from tests.life_test_support import request as _request
 from tests.test_life_contracts import NOW, payload, policy
@@ -45,12 +44,19 @@ def test_source_policy_revision_invalidates_prior_reads(tmp_path: Path) -> None:
     actor = LifeActor(("test-notes",), ("principal:owner",), False)
     with pytest.raises(LifeInputError, match="NOT_FOUND"):
         _ = read_endpoint(
-            changed, root, actor, "/api/life/v1/events/" + json_text(receipts[0]["event_id"]), now=NOW
+            changed,
+            root,
+            actor,
+            "/api/life/v1/events/" + json_text(receipts[0]["event_id"]),
+            now=NOW,
         )
     view = read_endpoint(
         changed, root, actor, "/api/life/v1/views/obsidian/manifest?day=2026-09-26", now=NOW
     )
-    assert all(json_text(receipts[0]["event_id"]) not in json_text(f["path"]) for f in json_rows(view["files"]))
+    assert all(
+        json_text(receipts[0]["event_id"]) not in json_text(f["path"])
+        for f in json_rows(view["files"])
+    )
 
 
 @pytest.mark.parametrize("event_type", ["health_sample", "location_point"])
@@ -99,7 +105,7 @@ def test_read_only_client_cannot_mutate(tmp_path: Path, monkeypatch: pytest.Monk
             },
         },
     )
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, health = _request(base + "/api/life/v1/health", token=token)
         assert code == 200 and health["credential_kind"] == "life_client"
         code, _ = _request(
@@ -120,12 +126,12 @@ def test_safe_manifest_text_and_content_hashes() -> None:
         recorded_at=NOW,
     )
     view = obsidian_manifest((event,), day="2026-09-26", timezone="Asia/Seoul")
-    for row in json_rows(view["files"]):
-        assert sha256(json_text(row["content"]).encode()).hexdigest() == json_text(row["sha256"])
-        assert "<script>" not in json_text(row["content"])
-        assert "![track]" not in json_text(row["content"])
-        assert "synthetic-secret" not in json_text(row["content"])
-        assert not json_text(row["path"]).startswith("MyNotes/")
+    for row in view["files"]:
+        assert sha256(row["content"].encode()).hexdigest() == row["sha256"]
+        assert "<script>" not in row["content"]
+        assert "![track]" not in row["content"]
+        assert "synthetic-secret" not in row["content"]
+        assert not row["path"].startswith("MyNotes/")
 
 
 def test_sensor_event_excluded_from_default_obsidian_view() -> None:
@@ -134,8 +140,8 @@ def test_sensor_event_excluded_from_default_obsidian_view() -> None:
         payload(event_type="health_sample", title="private-health"), secret_policy, recorded_at=NOW
     )
     view = obsidian_manifest((event,), day="2026-09-26", timezone="Asia/Seoul")
-    assert all("private-health" not in json_text(row["content"]) for row in json_rows(view["files"]))
-    assert all(event.event_id not in json_text(row["path"]) for row in json_rows(view["files"]))
+    assert all("private-health" not in row["content"] for row in view["files"])
+    assert all(event.event_id not in row["path"] for row in view["files"])
 
 
 def test_unknown_time_stays_undated_and_cancelled_is_not_completed() -> None:
@@ -147,12 +153,12 @@ def test_unknown_time_stays_undated_and_cancelled_is_not_completed() -> None:
         policy(),
         recorded_at=NOW,
     )
-    result = load_json_object(canonical_bytes(timeline((undated, cancelled), "2026-09-26", "Asia/Seoul")))
-    assert json_rows(result["events"])[0]["event_status"] == "cancelled"
-    assert json_text(json_rows(result["undated"])[0]["event_id"]) == undated.event_id
+    result = timeline((undated, cancelled), "2026-09-26", "Asia/Seoul")
+    assert result["events"][0]["event_status"] == "cancelled"
+    assert result["undated"][0]["event_id"] == undated.event_id
     assert not result["complete_day_observed"]
     cards = brief((undated, cancelled), "2026-09-26", "Asia/Seoul", "evening")
-    assert json_rows(cards["cards"])[0]["event_status"] == "cancelled"
+    assert cards["cards"][0]["event_status"] == "cancelled"
     assert cards["delivery_state"] == "not_attempted"
 
 

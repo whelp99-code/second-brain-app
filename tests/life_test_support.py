@@ -20,10 +20,6 @@ json_text = _TEXT.validate_python
 json_int = _INT.validate_python
 
 
-def load_json_object(raw: str | bytes) -> JsonObject:
-    return _OBJECT.validate_json(raw, strict=True)
-
-
 def config_table(value: TomlValue) -> Mapping[str, TomlValue]:
     assert isinstance(value, Mapping)
     return value
@@ -36,5 +32,6 @@ def request(
     payload: JsonInput = None,
     token: str | None = None,
 ) -> tuple[int, JsonObject]:
-    status, body = test_web._request(url, method=method, payload=payload, token=token)
-    return status, json_object(body)
+    status, body = test_web.request(url, method=method, payload=payload, token=token)
+    assert isinstance(body, dict)
+    return status, body

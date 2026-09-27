@@ -26,7 +26,8 @@ from sb.life_delivery import generate, prepare
 from sb.life_questions import issue
 from sb.store.ledger import Ledger
 from sb.store.life_journal import LifeJournal
-from tests.life_test_support import json_int, load_json_object
+from tests.json_fixtures import parse_object
+from tests.life_test_support import json_int
 from tests.test_life_contracts import NOW, payload, policy
 
 SCOPES = ("owner:test",)
@@ -204,7 +205,7 @@ def test_three_processes_share_one_question_budget(tmp_path: Path) -> None:
         results: list[JsonObject] = []
         for receiver in receivers:
             assert receiver.poll(15)
-            results.append(load_json_object(receiver.recv_bytes()))
+            results.append(parse_object(receiver.recv_bytes()))
         assert all(result["ok"] for result in results), results
         assert sum(json_int(result["count"]) for result in results) == 3
         for child in processes:

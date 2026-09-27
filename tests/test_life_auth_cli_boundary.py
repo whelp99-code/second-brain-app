@@ -24,11 +24,11 @@ from sb.search import SearchIndex
 from sb.store.ledger import Ledger
 from sb.vault import Vault, VaultLintError
 from tests import test_web
+from tests.json_fixtures import parse_object
 from tests.life_test_support import (
     config_table,
     json_rows,
     json_text,
-    load_json_object,
 )
 from tests.life_test_support import request as _request
 from tests.test_life_contracts import NOW
@@ -69,7 +69,9 @@ def test_phone_contract_attachment_media_type_and_device_identity() -> None:
         _ = phone_event({**document, "capture_mode": "background"})
 
 
-def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_registered_device_permissions_expiry_and_no_admin_escalation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config, _root = life_config(tmp_path)
     token = "test-device-value-not-real-secret-0123456789"
     monkeypatch.setenv("SB_FIXTURE_DEVICE_TOKEN", token)
@@ -108,7 +110,7 @@ def test_registered_device_permissions_expiry_and_no_admin_escalation(tmp_path: 
     )
     with pytest.raises(LifeInputError, match="EXPIRED_OR_REVOKED"):
         _ = authorize(expired, "Bearer " + token, "admin-fixture")
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, body = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
@@ -152,7 +154,7 @@ def test_lifecycle_denies_generic_page_forget_and_expiry_before_maintenance(tmp_
         assert ledger.life_store().tombstones(scopes=("principal:owner",))
 
 
-def config_text(root: Path, *, enabled: bool=True) -> str:
+def config_text(root: Path, *, enabled: bool = True) -> str:
     return f"""vault_root = {json.dumps(str(root))}
 [life]
 life_events = true
@@ -174,7 +176,9 @@ token = "fixture-admin-token-not-real-0123456789012345"
 """
 
 
-def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from sb.config import load_config
 
     _config, root = life_config(tmp_path)
@@ -194,7 +198,7 @@ def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(tmp_path
             check=False,
         )
         assert process.returncode == 0, (process.stdout, process.stderr)
-        return load_json_object(process.stdout)
+        return parse_object(process.stdout)
 
     result = cli(
         "import", "--source", "test-notes", "--format", "life-json", "--raw-file", str(export)
@@ -205,7 +209,7 @@ def test_real_cli_import_timeline_recall_maintenance_and_config_refresh(tmp_path
     assert "repaired" in cli("maintain")
     configured = load_config(cfg)
     monkeypatch.setenv("SB_WEB_TOKEN", "fixture-admin-token-not-real-0123456789012345")
-    with test_web._running(configured) as base:
+    with test_web.running(configured) as base:
         token = "fixture-admin-token-not-real-0123456789012345"
         code, result = _request(base + "/api/life/v1/timeline?day=2026-09-26", token=token)
         assert code == 200 and json_rows(result["events"])
@@ -227,14 +231,16 @@ def test_timeline_pages_ties_scopes_and_changed_cursor(tmp_path: Path) -> None:
     assert outcome.exit_code == 0
     from urllib.parse import quote
 
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, page = _request(base + "/api/life/v1/timeline?day=2026-09-26&limit=2")
         assert code == 200 and len(json_rows(page["events"])) == 2 and page["next_cursor"]
         cursor = page["next_cursor"]
         seen = {json_text(event["event_id"]) for event in json_rows(page["events"])}
         while cursor:
             code, page = _request(
-                base + "/api/life/v1/timeline?day=2026-09-26&limit=2&cursor=" + quote(json_text(cursor))
+                base
+                + "/api/life/v1/timeline?day=2026-09-26&limit=2&cursor="
+                + quote(json_text(cursor))
             )
             assert code == 200, page
             ids = {json_text(event["event_id"]) for event in json_rows(page["events"])}

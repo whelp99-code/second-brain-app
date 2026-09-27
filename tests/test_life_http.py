@@ -9,11 +9,11 @@ import pytest
 
 from sb.search import SearchIndex
 from tests import test_web
+from tests.json_fixtures import parse_object
 from tests.life_test_support import (
     config_table,
     json_rows,
     json_text,
-    load_json_object,
 )
 from tests.life_test_support import request as _request
 from tests.test_life_pipeline import item, life_config
@@ -21,7 +21,7 @@ from tests.test_life_pipeline import item, life_config
 
 def test_real_http_capture_view_correction_withdrawal(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, accepted = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
@@ -33,14 +33,21 @@ def test_real_http_capture_view_correction_withdrawal(tmp_path: Path) -> None:
         assert code == 202, accepted
         identity = json_text(json_rows(accepted["receipts"])[0]["event_id"])
         code, receipt = _request(
-            base + "/api/life/v1/receipts/" + json_text(json_rows(accepted["receipts"])[0]["receipt_id"])
+            base
+            + "/api/life/v1/receipts/"
+            + json_text(json_rows(accepted["receipts"])[0]["receipt_id"])
         )
         assert code == 200 and receipt["state"] == "accepted"
         code, evidence = _request(base + "/api/life/v1/evidence/" + identity)
-        assert code == 200 and load_json_object(json_text(evidence["content"]))["body"] == "실제 메모"
+        assert (
+            code == 200 and parse_object(json_text(evidence["content"]))["body"] == "실제 메모"
+        )
         code, manifest = _request(base + "/api/life/v1/views/obsidian/manifest?day=2026-09-26")
         assert code == 200
-        assert any(json_text(f["path"]) == f"Auto/Events/{identity}.md" for f in json_rows(manifest["files"]))
+        assert any(
+            json_text(f["path"]) == f"Auto/Events/{identity}.md"
+            for f in json_rows(manifest["files"])
+        )
         correction = {
             "event_id": identity,
             "expected_revision": 1,
@@ -77,10 +84,14 @@ def test_real_http_capture_view_correction_withdrawal(tmp_path: Path) -> None:
         assert _request(base + "/api/life/v1/evidence/" + identity)[0] == 404
         assert not SearchIndex(root).search("회의가 취소됨", 10)
         code, last_view = _request(base + "/api/life/v1/views/obsidian/manifest?day=2026-09-26")
-        assert code == 200 and all(identity not in json_text(f["path"]) for f in json_rows(last_view["files"]))
+        assert code == 200 and all(
+            identity not in json_text(f["path"]) for f in json_rows(last_view["files"])
+        )
 
 
-def test_client_token_is_not_an_admin_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_client_token_is_not_an_admin_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config, _ = life_config(tmp_path)
     monkeypatch.setenv("SB_WEB_TOKEN", "synthetic-admin-only-token")
     monkeypatch.setenv("SB_TEST_LIFE_TOKEN", "synthetic-life-only-token-1234567890123456")
@@ -98,7 +109,7 @@ def test_client_token_is_not_an_admin_token(tmp_path: Path, monkeypatch: pytest.
         },
     )
     token = "synthetic-life-only-token-1234567890123456"
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         assert _request(base + "/api/life/v1/health")[0] == 401
         assert _request(base + "/api/life/v1/health", token=token)[0] == 200
         assert _request(base + "/api/run", method="POST", payload={}, token=token)[0] == 401
@@ -128,7 +139,7 @@ def test_client_token_is_not_an_admin_token(tmp_path: Path, monkeypatch: pytest.
 
 def test_bad_input_and_revision_conflict_are_explicit(tmp_path: Path) -> None:
     config, _ = life_config(tmp_path)
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, accepted = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
@@ -157,7 +168,7 @@ def test_bad_input_and_revision_conflict_are_explicit(tmp_path: Path) -> None:
 
 def test_source_off_withdrawal_remains_available(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         _, accepted = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
@@ -175,7 +186,7 @@ def test_source_off_withdrawal_remains_available(tmp_path: Path) -> None:
             },
         },
     )
-    with test_web._running(off) as base:
+    with test_web.running(off) as base:
         assert (
             _request(
                 base + "/api/life/v1/events:batch",

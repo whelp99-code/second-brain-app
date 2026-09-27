@@ -87,7 +87,9 @@ def test_all_shipping_capture_names_are_supported() -> None:
         ),
     ],
 )
-def test_shipping_names_publish_and_replay_without_duplication(tmp_path: Path, kind: str, expected: str, file: JsonObject | None) -> None:
+def test_shipping_names_publish_and_replay_without_duplication(
+    tmp_path: Path, kind: str, expected: str, file: JsonObject | None
+) -> None:
     config, root = life_config(tmp_path)
     config = replace(
         config,

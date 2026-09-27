@@ -48,7 +48,7 @@ def test_question_answer_republishes_and_readonly_recall(tmp_path: Path) -> None
         now=NOW,
     )
     assert initial.exit_code == 0
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, generated = _request(
             base + "/api/life/v1/questions/generate", method="POST", payload={}
         )
@@ -57,7 +57,10 @@ def test_question_answer_republishes_and_readonly_recall(tmp_path: Path) -> None
         code, listed = _request(base + "/api/life/v1/questions")
         assert code == 200 and len(json_rows(listed["items"])) == 1
         path = (
-            base + "/api/life/v1/questions/" + quote(json_text(question["object_id"]), safe="") + "/response"
+            base
+            + "/api/life/v1/questions/"
+            + quote(json_text(question["object_id"]), safe="")
+            + "/response"
         )
         answer = {
             "action": "answer",
@@ -83,7 +86,9 @@ def test_question_answer_republishes_and_readonly_recall(tmp_path: Path) -> None
         assert code == 200 and no_data["state"] == "no_data"
         code, manifest = _request(base + "/api/life/v1/views/obsidian/manifest?day=2026-09-26")
         assert code == 200
-        assert any("확인된최종협의" in json_text(f["content"]) for f in json_rows(manifest["files"]))
+        assert any(
+            "확인된최종협의" in json_text(f["content"]) for f in json_rows(manifest["files"])
+        )
         assert any("Auto/Questions/" in json_text(f["path"]) for f in json_rows(manifest["files"]))
 
 
@@ -93,7 +98,7 @@ def test_persisted_brief_delivery_pagination_ack_and_health(tmp_path: Path) -> N
     config, _root = configured(tmp_path)
     outcome, _ = run_life_batch(config, "test-notes", [item()], now=NOW)
     assert outcome.exit_code == 0
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, b = _request(
             base + "/api/life/v1/briefings/generate",
             method="POST",
@@ -170,7 +175,7 @@ def test_relation_and_asof_correction(tmp_path: Path) -> None:
     )
     assert first.exit_code == 0
     event_id = json_text(receipts[0]["event_id"])
-    with test_web._running(config) as base:
+    with test_web.running(config) as base:
         code, relation = _request(
             base + "/api/life/v1/relations",
             method="POST",
@@ -204,7 +209,11 @@ def test_relation_and_asof_correction(tmp_path: Path) -> None:
             method="POST",
             payload={"query": "기존결정알파", "as_of": NOW.isoformat()},
         )
-        assert code == 200 and json_rows(past["hits"])[0]["historical"] and json_rows(past["hits"])[0]["changed_since"]
+        assert (
+            code == 200
+            and json_rows(past["hits"])[0]["historical"]
+            and json_rows(past["hits"])[0]["changed_since"]
+        )
         code, relations = _request(base + "/api/life/v1/relations")
         assert code == 200 and json_rows(relations["items"]) == []
         code, removed = _request(

@@ -26,7 +26,9 @@ from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import life_config
 
 
-def point(at: datetime, latitude: float=37.5, longitude: float=127.0, accuracy: float=20) -> JsonObject:
+def point(
+    at: datetime, latitude: float = 37.5, longitude: float = 127.0, accuracy: float = 20
+) -> JsonObject:
     return {
         "type": "Feature",
         "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
@@ -162,7 +164,7 @@ def test_health_actual_http_delete_cursor_and_no_resurrection(tmp_path: Path) ->
         "unit": "count",
         "source": "fixture",
     }
-    with test_web._running(cfg) as base:
+    with test_web.running(cfg) as base:
         code, result = _request(
             base + "/api/life/v1/health/test-notes",
             method="POST",
@@ -199,7 +201,7 @@ def test_health_actual_http_delete_cursor_and_no_resurrection(tmp_path: Path) ->
 
 def test_overland_success_shape_after_actual_publication(tmp_path: Path) -> None:
     cfg, _root = sensor_config(tmp_path)
-    with test_web._running(cfg) as base:
+    with test_web.running(cfg) as base:
         code, result = _request(
             base + "/api/life/v1/overland/test-notes",
             method="POST",
@@ -233,7 +235,9 @@ def test_disabled_health_collection_still_allows_deletions(tmp_path: Path) -> No
         now=NOW,
     )
     assert out.exit_code == 0
-    off = replace(cfg, raw={**cfg.raw, "life": {**config_table(cfg.raw["life"]), "health_capture": False}})
+    off = replace(
+        cfg, raw={**cfg.raw, "life": {**config_table(cfg.raw["life"]), "health_capture": False}}
+    )
     with pytest.raises(LifeInputError, match="DISABLED"):
         _ = run_life_import(
             off,
