@@ -8,7 +8,7 @@ import pytest
 
 
 @pytest.mark.parametrize("argument,expected", [("--help", 0), ("--unknown-option", 2)])
-def test_options_do_not_build_release(tmp_path, argument, expected):
+def test_options_do_not_build_release(tmp_path: Path, argument: str, expected: int):
     script = Path(__file__).resolve().parents[1] / "deploy/prepare-release.py"
     done = subprocess.run(
         [sys.executable, str(script), argument],
