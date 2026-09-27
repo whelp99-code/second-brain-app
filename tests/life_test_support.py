@@ -10,12 +10,14 @@ from tests import test_web
 
 _OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject, config=ConfigDict(strict=True))
 _ROWS = TypeAdapter(list[JsonObject], config=ConfigDict(strict=True))
+_INT = TypeAdapter(int, config=ConfigDict(strict=True))
 _TEXT = TypeAdapter(str, config=ConfigDict(strict=True))
 
 
 json_object = _OBJECT.validate_python
 json_rows = _ROWS.validate_python
 json_text = _TEXT.validate_python
+json_int = _INT.validate_python
 
 
 def load_json_object(raw: str | bytes) -> JsonObject:

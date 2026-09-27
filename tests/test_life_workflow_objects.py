@@ -5,18 +5,23 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
+from sb.effect_values import JsonValue
 from sb.life_config import LifeSettingsV1
-from sb.life_contracts import LifeInputError
+from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_delivery import due_slots, finish, generate, prepare
 from sb.life_model_policy import generate_after_reservation, reserve, settle
 from sb.life_predictions import evaluate, metrics
 from sb.life_predictions import issue as predict
 from sb.life_questions import finish_response, issue, prepare_response, quiet
 from sb.store.ledger import Ledger
+from sb.store.life import LifeStore
 from sb.store.life_journal import LifeJournal, identity
+from tests.life_test_support import json_object, json_text
 from tests.test_life_contracts import NOW, payload, policy
 
 SCOPES = ("owner:test",)
@@ -24,15 +29,15 @@ SOURCES = ("test-notes",)
 OPTS = LifeSettingsV1(flags=frozenset({"gap_questions", "life_briefing"}))
 
 
-def seed(store, count=1, **changes):
+def seed(store: LifeStore, count: int = 1, **changes: JsonValue) -> tuple[LifeEventV1, ...]:
     for i in range(count):
-        store.accept(
+        _ = store.accept(
             payload(source_item_id=f"event-{i}", **changes), policy(), key=f"seed-{i}", now=NOW
         )
     return store.events(scopes=SCOPES, now=NOW)
 
 
-def test_objects_are_immutable_scoped_and_invalidated_by_revision(tmp_path):
+def test_objects_are_immutable_scoped_and_invalidated_by_revision(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         events = seed(store)
@@ -44,7 +49,7 @@ def test_objects_are_immutable_scoped_and_invalidated_by_revision(tmp_path):
         assert journal.list("question", scopes=SCOPES, source_ids=(), events=events) == []
         with pytest.raises(sqlite3.IntegrityError), ledger.transaction():
             journal.connection.execute("UPDATE life_workflow_objects SET body_json='{}'")
-        store.accept(
+        _ = store.accept(
             payload(source_item_id="event-0", source_version="v2", body="정정"),
             policy(),
             key="fix",
@@ -66,7 +71,7 @@ def test_objects_are_immutable_scoped_and_invalidated_by_revision(tmp_path):
         )
 
 
-def test_question_budget_persists_across_runs_and_reopen(tmp_path):
+def test_question_budget_persists_across_runs_and_reopen(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         events = seed(store, 10, event_type="calendar_event", event_status="planned")
@@ -92,12 +97,12 @@ def test_question_budget_persists_across_runs_and_reopen(tmp_path):
 @pytest.mark.parametrize(
     "hour,expected", [(12, False), (22, True), (23, True), (0, True), (7, True), (8, False)]
 )
-def test_quiet_hours_in_user_zone(hour, expected):
-    local = NOW.astimezone(__import__("zoneinfo").ZoneInfo("Asia/Seoul")).replace(hour=hour)
+def test_quiet_hours_in_user_zone(hour: int, expected: bool) -> None:
+    local = NOW.astimezone(ZoneInfo("Asia/Seoul")).replace(hour=hour)
     assert quiet(local, OPTS) == expected
 
 
-def test_question_skip_mute_and_answer_are_new_evidence(tmp_path):
+def test_question_skip_mute_and_answer_are_new_evidence(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         events = seed(store, event_type="calendar_event", event_status="planned")
@@ -113,15 +118,20 @@ def test_question_skip_mute_and_answer_are_new_evidence(tmp_path):
         prepared, change = prepare_response(
             journal,
             row["object_id"],
-            request,
+            {**request},
             events=events,
             scopes=SCOPES,
             source_ids=SOURCES,
             now=NOW,
         )
+        assert change is not None
         assert change["expected_revision"] == 1
         receipt = store.accept(
-            change["payload"], policy(), key=change["idempotency_key"], now=NOW, expected_revision=1
+            json_object(change["payload"]),
+            policy(),
+            key=json_text(change["idempotency_key"]),
+            now=NOW,
+            expected_revision=1,
         )
         event = store.get(receipt.event_id, scopes=SCOPES, now=NOW)
         result = finish_response(journal, prepared, evidence=event, now=NOW)
@@ -130,7 +140,7 @@ def test_question_skip_mute_and_answer_are_new_evidence(tmp_path):
         replay, change = prepare_response(
             journal,
             row["object_id"],
-            request,
+            {**request},
             events=(event,),
             scopes=SCOPES,
             source_ids=SOURCES,
@@ -139,13 +149,13 @@ def test_question_skip_mute_and_answer_are_new_evidence(tmp_path):
         assert change is None and replay["revision"] == 2
 
 
-def test_stale_question_does_not_apply_to_new_event(tmp_path):
+def test_stale_question_does_not_apply_to_new_event(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         events = seed(store, event_type="calendar_event", event_status="planned")
         journal = LifeJournal(store)
         row = issue(journal, events, opts=OPTS, scopes=SCOPES, source_ids=SOURCES, now=NOW)[0]
-        store.accept(
+        _ = store.accept(
             payload(source_item_id="event-0", source_version="v2"),
             policy(),
             key="fix",
@@ -153,7 +163,7 @@ def test_stale_question_does_not_apply_to_new_event(tmp_path):
             expected_revision=1,
         )
         with pytest.raises(LifeInputError):
-            prepare_response(
+            _ = prepare_response(
                 journal,
                 row["object_id"],
                 {"action": "skip", "idempotency_key": "s", "expected_revision": 1},
@@ -164,7 +174,7 @@ def test_stale_question_does_not_apply_to_new_event(tmp_path):
             )
 
 
-def test_brief_delivery_claim_unknown_not_resent_and_open_requires_ack(tmp_path):
+def test_brief_delivery_claim_unknown_not_resent_and_open_requires_ack(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         events = seed(store)
@@ -196,7 +206,7 @@ def test_brief_delivery_claim_unknown_not_resent_and_open_requires_ack(tmp_path)
         )
         assert unknown["body"]["state"] == "unknown"
         with pytest.raises(LifeInputError):
-            finish(
+            _ = finish(
                 j,
                 d["object_id"],
                 state="opened",
@@ -208,18 +218,19 @@ def test_brief_delivery_claim_unknown_not_resent_and_open_requires_ack(tmp_path)
             )
 
 
-def test_schedule_does_not_send_old_backlog_or_quiet_hours():
+def test_schedule_does_not_send_old_backlog_or_quiet_hours() -> None:
     assert due_slots(NOW, OPTS) == []  # Noon; morning more than two hours ago.
     eight = NOW - timedelta(hours=4)
     assert due_slots(eight, OPTS) == [("2026-09-26", "morning")]
     assert due_slots(eight - timedelta(hours=1), OPTS) == []
 
 
-def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path):
+def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path: Path) -> None:
     class Model:
-        calls = 0
+        calls: int = 0
 
-        def generate(self, prompt):
+        def generate(self, prompt: str, **kwargs: JsonValue) -> str:
+            assert prompt and not kwargs
             self.calls += 1
             raise RuntimeError("fixture offline")
 
@@ -228,7 +239,7 @@ def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path)
         events = seed(store)
         j = LifeJournal(store)
         with pytest.raises(LifeInputError, match="LOCAL_ONLY"):
-            reserve(
+            _ = reserve(
                 j,
                 key="e",
                 events=events,
@@ -262,11 +273,11 @@ def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path)
         assert reservation["execute_allowed"] and not replay["execute_allowed"]
         model = Model()
         with pytest.raises(LifeInputError, match="MODEL_UNAVAILABLE"):
-            generate_after_reservation(
+            _ = generate_after_reservation(
                 reservation, model, events=events, external=False, scopes=SCOPES, source_ids=SOURCES
             )
         assert model.calls == 1
-        settle(
+        _ = settle(
             j,
             reservation["object_id"],
             state="unknown",
@@ -278,7 +289,7 @@ def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path)
             now=NOW,
         )
         with pytest.raises(LifeInputError, match="BUDGET_EXCEEDED"):
-            reserve(
+            _ = reserve(
                 j,
                 key="b",
                 events=events,
@@ -290,14 +301,14 @@ def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path)
             )
 
 
-def test_prediction_cutoff_immutable_initial_and_corrected_actual(tmp_path):
+def test_prediction_cutoff_immutable_initial_and_corrected_actual(tmp_path: Path) -> None:
     p = policy(allowed_types=("task_completed",))
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         j = LifeJournal(store)
         for n in range(20):
             at = NOW - timedelta(days=n + 1)
-            store.accept(
+            _ = store.accept(
                 payload(
                     source_item_id=f"training-{n}",
                     event_type="task_completed",
@@ -317,7 +328,7 @@ def test_prediction_cutoff_immutable_initial_and_corrected_actual(tmp_path):
             "event_type": "task_completed",
             "idempotency_key": "forecast-1",
         }
-        pred = predict(j, data, events=events, scopes=SCOPES, source_ids=SOURCES, now=NOW)
+        pred = predict(j, {**data}, events=events, scopes=SCOPES, source_ids=SOURCES, now=NOW)
         assert pred["body"]["sample_count"] == 20 and pred["body"]["state"] == "issued"
         before = json.dumps(pred, sort_keys=True)
         end = NOW + timedelta(hours=2)
@@ -346,7 +357,7 @@ def test_prediction_cutoff_immutable_initial_and_corrected_actual(tmp_path):
         assert result["body"]["state"] == "scored" and metrics([result])["count"] == 1
         assert json.dumps(j.raw("prediction", pred["object_id"]), sort_keys=True) == before
         with pytest.raises(LifeInputError, match="CUTOFF"):
-            predict(
+            _ = predict(
                 j,
                 {**data, "idempotency_key": "bad", "input_cutoff_at": end.isoformat()},
                 events=events,
@@ -356,7 +367,7 @@ def test_prediction_cutoff_immutable_initial_and_corrected_actual(tmp_path):
             )
 
 
-def test_prediction_missing_samples_not_zero(tmp_path):
+def test_prediction_missing_samples_not_zero(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         j = LifeJournal(ledger.life_store())
         result = predict(

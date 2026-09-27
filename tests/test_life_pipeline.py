@@ -9,17 +9,19 @@ import pytest
 from sb.config import Config
 from sb.effect_values import JsonObject, JsonValue
 from sb.life_contracts import LifeInputError
+from sb.life_values import canonical_bytes
 from sb.life_views import obsidian_manifest, timeline
 from sb.pipeline import run_life_batch
 from sb.search import SearchIndex
 from sb.store.life import read_life_store
 from sb.vault import init_vault
+from tests.life_test_support import json_rows, json_text, load_json_object
 from tests.test_life_contracts import NOW, payload
 
 
 def life_config(tmp_path: Path) -> tuple[Config, Path]:
     root = tmp_path / "vault"
-    init_vault(root)
+    _ = init_vault(root)
     return Config(
         raw={
             "vault_root": str(root),
@@ -50,25 +52,32 @@ def item(**changes: JsonValue) -> JsonObject:
     return {"idempotency_key": "request-1", "payload": payload(**changes)}
 
 
-def test_capture_to_vault_search_and_obsidian(tmp_path):
+def test_capture_to_vault_search_and_obsidian(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     outcome, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
     assert outcome.status == "ok", outcome
     assert len(receipts) == 1
-    event_id = receipts[0]["event_id"]
+    event_id = json_text(receipts[0]["event_id"])
     assert (root / "wiki" / ("life-event-" + event_id + ".md")).is_file()
     hits = SearchIndex(root).search("실제 메모", 10)
     assert any(event_id in hit.page_id for hit in hits)
     with read_life_store(root) as store:
         events = store.events(scopes=("principal:owner",), now=NOW)
         assert len(events) == 1
-        assert timeline(events, "2026-09-26", "Asia/Seoul")["events"][0]["event_id"] == event_id
+        assert (
+            json_rows(
+                load_json_object(canonical_bytes(timeline(events, "2026-09-26", "Asia/Seoul")))[
+                    "events"
+                ]
+            )[0]["event_id"]
+            == event_id
+        )
         view = obsidian_manifest(events, day="2026-09-26", timezone="Asia/Seoul")
-        assert any(f["path"] == f"Auto/Events/{event_id}.md" for f in view["files"])
+        assert any(f["path"] == f"Auto/Events/{event_id}.md" for f in json_rows(view["files"]))
         assert store.evidence(event_id, scopes=("principal:owner",), now=NOW)
 
 
-def test_replay_and_revision_republish_actual_search(tmp_path):
+def test_replay_and_revision_republish_actual_search(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     first, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
     assert first.exit_code == 0, first
@@ -89,28 +98,28 @@ def test_replay_and_revision_republish_actual_search(tmp_path):
     assert not SearchIndex(root).search("실제 메모", 10)
 
 
-def test_feature_off_leaves_existing_vault_unchanged(tmp_path):
+def test_feature_off_leaves_existing_vault_unchanged(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     off = replace(config, raw={**config.raw, "life": {}})
     with pytest.raises(LifeInputError, match="DISABLED"):
-        run_life_batch(off, "test-notes", [item()], now=NOW)
+        _ = run_life_batch(off, "test-notes", [item()], now=NOW)
     assert not list((root / "wiki").glob("life-event-*.md"))
 
 
-def test_client_cannot_invent_scope_in_payload(tmp_path):
+def test_client_cannot_invent_scope_in_payload(tmp_path: Path) -> None:
     config, _ = life_config(tmp_path)
     with pytest.raises(LifeInputError):
-        run_life_batch(config, "test-notes", [item(scopes=["foreign"])], now=NOW)
+        _ = run_life_batch(config, "test-notes", [item(scopes=["foreign"])], now=NOW)
 
 
-def test_large_multibyte_note_preserves_raw_and_bounds_each_record(tmp_path):
+def test_large_multibyte_note_preserves_raw_and_bounds_each_record(tmp_path: Path) -> None:
     from sb.memory_records import parse_page_records
 
     config, root = life_config(tmp_path)
     body = "긴 원본 한글 기록 " * 3000
     outcome, receipts = run_life_batch(config, "test-notes", [item(body=body)], now=NOW)
     assert outcome.exit_code == 0, outcome
-    identity = receipts[0]["event_id"]
+    identity = json_text(receipts[0]["event_id"])
     path = root / "wiki" / ("life-event-" + identity + ".md")
     records = parse_page_records(path.read_bytes(), "wiki/life-event-" + identity)
     assert records and all(len(r.record_text.encode()) <= 4096 for r in records)
@@ -118,15 +127,15 @@ def test_large_multibyte_note_preserves_raw_and_bounds_each_record(tmp_path):
         assert body in store.get(identity, scopes=("principal:owner",), now=NOW).body
 
 
-def test_unsupported_source_and_atomic_batch_validation(tmp_path):
+def test_unsupported_source_and_atomic_batch_validation(tmp_path: Path) -> None:
     config, _ = life_config(tmp_path)
     with pytest.raises(LifeInputError, match="NOT_ALLOWED"):
-        run_life_batch(config, "missing", [item()], now=NOW)
+        _ = run_life_batch(config, "missing", [item()], now=NOW)
     with pytest.raises(LifeInputError):
-        run_life_batch(config, "test-notes", [item(), {"payload": {}}], now=NOW)
+        _ = run_life_batch(config, "test-notes", [item(), {"payload": {}}], now=NOW)
 
 
-def test_managed_generation_preserves_events_and_corrected_search(tmp_path):
+def test_managed_generation_preserves_events_and_corrected_search(tmp_path: Path) -> None:
     from sb.pipeline import run_life_forget
     from sb.runtime_access import read_root
     from tests.test_generation_runtime import _config
@@ -141,7 +150,7 @@ def test_managed_generation_preserves_events_and_corrected_search(tmp_path):
     assert first.exit_code == 0, first
     assert active.is_symlink()
     original_generation = active.resolve()
-    identity = receipts[0]["event_id"]
+    identity = json_text(receipts[0]["event_id"])
     with read_root(config) as root, read_life_store(root) as store:
         assert len(store.events(scopes=("principal:owner",), now=NOW)) == 1
         assert SearchIndex(root).search("실제 메모", 10)

@@ -5,20 +5,23 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonObject
 from sb.life_attachments import decode_attachments
 from sb.life_contracts import LifeInputError
 from sb.life_exports import parse_export
 from sb.pipeline import run_ingest
 from sb.search import SearchIndex
 from sb.store.ledger import Ledger
+from tests.life_test_support import json_rows, json_text
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import life_config
 
 
-def test_google_expanded_instances_cancellation_and_missing_time():
+def test_google_expanded_instances_cancellation_and_missing_time() -> None:
     doc = {
         "items": [
             {
@@ -41,22 +44,22 @@ def test_google_expanded_instances_cancellation_and_missing_time():
     assert len(rows) == 2 and rows[0]["source_item_id"] != rows[1]["source_item_id"]
     assert rows[0]["event_status"] == "planned" and rows[1]["event_status"] == "cancelled"
     with pytest.raises(LifeInputError, match="EXPANSION_REQUIRED"):
-        parse_export(
+        _ = parse_export(
             "google-calendar",
             json.dumps({"items": [{"id": "x", "recurrence": ["RRULE:FREQ=DAILY"]}]}).encode(),
             "calendar.json",
         )
 
 
-def test_mail_export_preserves_raw_and_does_not_fetch_tracking():
+def test_mail_export_preserves_raw_and_does_not_fetch_tracking() -> None:
     raw = b"Message-ID: <fixture@invalid>\r\nSubject: Evidence\r\nFrom: example@invalid\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>original body</p><img src='https://tracking.invalid/x'><script>steal()</script>"
     event = parse_export("mail-eml", raw, "message.eml")[0]
-    assert "original body" in event["body"] and "steal()" not in event["body"]
+    assert "original body" in json_text(event["body"]) and "steal()" not in json_text(event["body"])
     assert event["occurred_start"] is None
     assert decode_attachments(event["attachments"])[0][1] == raw
 
 
-def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path):
+def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     source = tmp_path / "exports"
     source.mkdir()
@@ -71,7 +74,7 @@ def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path):
             }
         ]
     }
-    path.write_text(json.dumps(doc))
+    _ = path.write_text(json.dumps(doc))
     config = replace(
         config,
         raw={
@@ -97,7 +100,7 @@ def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path):
     second = run_ingest(config, sources=["test-notes"])
     assert second.exit_code == 0 and second.written == 0
     doc["items"][0]["status"] = "cancelled"
-    path.write_text(json.dumps(doc))
+    _ = path.write_text(json.dumps(doc))
     third = run_ingest(config, sources=["test-notes"])
     assert third.exit_code == 0 and third.errors == 0, third
     with Ledger(root) as ledger:
@@ -108,7 +111,7 @@ def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path):
         )
         assert ledger.get_cursor("test-notes") != before
         final = ledger.get_cursor("test-notes")
-    path.write_text("bad json")
+    _ = path.write_text("bad json")
     failed = run_ingest(config, sources=["test-notes"])
     assert failed.errors > 0
     with Ledger(root) as ledger:
@@ -124,12 +127,12 @@ def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path):
         {"name": "a.txt", "mime": "text/plain", "content_base64": "eA==", "sha256": "0" * 64},
     ],
 )
-def test_attachment_invalid_path_mime_encoding_hash(row):
+def test_attachment_invalid_path_mime_encoding_hash(row: JsonObject) -> None:
     with pytest.raises(LifeInputError):
-        decode_attachments([row])
+        _ = decode_attachments([row])
 
 
-def test_conversation_roles_and_audio_are_not_invented_events():
+def test_conversation_roles_and_audio_are_not_invented_events() -> None:
     raw = json.dumps(
         {
             "id": "fixture",
@@ -140,8 +143,10 @@ def test_conversation_roles_and_audio_are_not_invented_events():
         }
     ).encode()
     event = parse_export("conversation", raw, "conversation.json")[0]
-    assert "[assistant]" in event["body"] and "[user]" in event["body"]
+    assert "[assistant]" in json_text(event["body"]) and "[user]" in json_text(event["body"])
     audio = b"RIFF" + b"\0" * 4 + b"WAVE" + b"fixture"
     event = parse_export("audio", audio, "memo.wav")[0]
-    assert event["time_precision"] == "unknown" and "미실행" in event["body"]
-    assert base64.b64decode(event["attachments"][0]["content_base64"]) == audio
+    assert event["time_precision"] == "unknown" and "미실행" in json_text(event["body"])
+    assert (
+        base64.b64decode(json_text(json_rows(event["attachments"])[0]["content_base64"])) == audio
+    )

@@ -51,7 +51,7 @@ def payload(**changes: JsonValue) -> JsonObject:
     }
 
 
-def test_event_has_stable_identity_and_separate_recording_time():
+def test_event_has_stable_identity_and_separate_recording_time() -> None:
     first = parse_event(payload(), policy(), recorded_at=NOW)
     second = parse_event(
         payload(body="정정", source_version="v2"),
@@ -66,33 +66,34 @@ def test_event_has_stable_identity_and_separate_recording_time():
     assert first.raw_digest != second.raw_digest
     assert first.scopes == ("owner:test",)
     with pytest.raises(FrozenInstanceError):
-        first.title = "overwrite"
+        first.__setattr__("title", "overwrite")
 
 
-def test_different_occurrences_are_not_deduplicated_by_body():
+def test_different_occurrences_are_not_deduplicated_by_body() -> None:
     first = parse_event(payload(), policy(), recorded_at=NOW)
     second = parse_event(payload(source_item_id="item-2"), policy(), recorded_at=NOW)
     assert first.event_id != second.event_id
 
 
-def test_source_and_scope_are_operator_derived():
-    for field, value in (
+def test_source_and_scope_are_operator_derived() -> None:
+    fields: tuple[tuple[str, JsonValue], ...] = (
         ("source_id", "other"),
         ("scopes", ["other"]),
         ("sensitivity", "public"),
         ("external_processing", "allowed"),
         ("recorded_at", "2020-01-01T00:00:00Z"),
         ("revision", 9),
-    ):
+    )
+    for field, value in fields:
         with pytest.raises(LifeInputError):
-            parse_event(payload(**{field: value}), policy(), recorded_at=NOW)
+            _ = parse_event(payload(**{field: value}), policy(), recorded_at=NOW)
 
 
-def test_disabled_or_unconfigured_types_rejected():
+def test_disabled_or_unconfigured_types_rejected() -> None:
     with pytest.raises(LifeInputError):
-        parse_event(payload(), policy(enabled=False), recorded_at=NOW)
+        _ = parse_event(payload(), policy(enabled=False), recorded_at=NOW)
     with pytest.raises(LifeInputError):
-        parse_event(payload(event_type="location_point"), policy(), recorded_at=NOW)
+        _ = parse_event(payload(event_type="location_point"), policy(), recorded_at=NOW)
 
 
 @pytest.mark.parametrize(
@@ -121,12 +122,12 @@ def test_disabled_or_unconfigured_types_rejected():
         {"confidence": -0.01},
     ],
 )
-def test_invalid_values_are_not_silently_normalized(changes):
+def test_invalid_values_are_not_silently_normalized(changes: JsonObject) -> None:
     with pytest.raises(LifeInputError):
-        parse_event(payload(**changes), policy(), recorded_at=NOW)
+        _ = parse_event(payload(**changes), policy(), recorded_at=NOW)
 
 
-def test_numeric_zero_is_not_missing():
+def test_numeric_zero_is_not_missing() -> None:
     zero = parse_event(
         payload(value=0, value_status="observed", unit="count"), policy(), recorded_at=NOW
     )
@@ -137,7 +138,7 @@ def test_numeric_zero_is_not_missing():
     assert missing.value_status == "unavailable"
 
 
-def test_unknown_occurrence_does_not_become_recorded_time():
+def test_unknown_occurrence_does_not_become_recorded_time() -> None:
     event = parse_event(
         payload(occurred_start=None, time_precision="unknown"), policy(), recorded_at=NOW
     )
@@ -145,7 +146,7 @@ def test_unknown_occurrence_does_not_become_recorded_time():
     assert event.recorded_at
 
 
-def test_calendar_stays_planned_even_if_start_is_in_past():
+def test_calendar_stays_planned_even_if_start_is_in_past() -> None:
     event = parse_event(
         payload(event_type="calendar_event", event_status="planned"), policy(), recorded_at=NOW
     )
@@ -156,9 +157,9 @@ def test_calendar_stays_planned_even_if_start_is_in_past():
     assert cancelled.event_status == "cancelled"
 
 
-def test_explicit_health_policy_cannot_relax_local_only():
+def test_explicit_health_policy_cannot_relax_local_only() -> None:
     with pytest.raises(LifeInputError):
-        policy(sensitivity="restricted", external_processing="explicitly_allowed")
+        _ = policy(sensitivity="restricted", external_processing="explicitly_allowed")
 
 
 @pytest.mark.parametrize(
@@ -169,19 +170,19 @@ def test_explicit_health_policy_cannot_relax_local_only():
         ("2026-11-01", "America/New_York", 25),
     ],
 )
-def test_day_window_respects_zone_and_dst(day, zone, hours):
+def test_day_window_respects_zone_and_dst(day: str, zone: str, hours: int) -> None:
     start, end = day_window(day, zone)
     assert (end - start).total_seconds() == hours * 3600
     assert start.tzinfo == UTC and end.tzinfo == UTC
 
 
-def test_kst_midnight_window():
+def test_kst_midnight_window() -> None:
     start, end = day_window("2026-09-26", "Asia/Seoul")
     assert start.isoformat() == "2026-09-25T15:00:00+00:00"
     assert end.isoformat() == "2026-09-26T15:00:00+00:00"
 
 
-def test_canonical_input_does_not_depend_on_dictionary_order():
+def test_canonical_input_does_not_depend_on_dictionary_order() -> None:
     assert canonical_bytes({"b": 1, "a": "한글"}) == canonical_bytes({"a": "한글", "b": 1})
     with pytest.raises(LifeInputError):
-        canonical_bytes({"bad": math.nan})
+        _ = canonical_bytes({"bad": math.nan})
