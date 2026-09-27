@@ -48,7 +48,7 @@ def test_objects_are_immutable_scoped_and_invalidated_by_revision(tmp_path: Path
         assert journal.list("question", scopes=("other",), source_ids=SOURCES, events=events) == []
         assert journal.list("question", scopes=SCOPES, source_ids=(), events=events) == []
         with pytest.raises(sqlite3.IntegrityError), ledger.transaction():
-            journal.connection.execute("UPDATE life_workflow_objects SET body_json='{}'")
+            _ = journal.connection.execute("UPDATE life_workflow_objects SET body_json='{}'")
         _ = store.accept(
             payload(source_item_id="event-0", source_version="v2", body="정정"),
             policy(),

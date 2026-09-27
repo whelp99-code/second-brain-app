@@ -130,9 +130,9 @@ def test_unsupported_source_and_atomic_batch_validation(tmp_path: Path) -> None:
 def test_managed_generation_preserves_events_and_corrected_search(tmp_path: Path) -> None:
     from sb.pipeline import run_life_forget
     from sb.runtime_access import read_root
-    from tests.test_generation_runtime import _config
+    from tests.test_generation_runtime import generation_config
 
-    base, active = _config(tmp_path / "managed")
+    base, active = generation_config(tmp_path / "managed")
     source, _ = life_config(tmp_path / "config-only")
     config = replace(
         base,
