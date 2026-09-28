@@ -7,6 +7,7 @@ source digest, live receipt row, unexpired retention and readable CAS evidence.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -15,12 +16,27 @@ import yaml
 
 from sb.config import Config, load_config
 from sb.life_config import policies
-from sb.life_contracts import LifeInputError
+from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_values import instant
 from sb.life_views import source_uri
 from sb.store.life import _decode, read_life_store
 
 PREFIX = "wiki/life-event-"
+
+
+def for_projection(
+    events: Sequence[LifeEventV1],
+    *,
+    scopes: tuple[str, ...],
+    sensitivities: tuple[str, ...],
+) -> tuple[LifeEventV1, ...]:
+    """Drop events outside the caller's scopes or the view sensitivity allowlist."""
+    allowed = set(scopes)
+    return tuple(
+        event
+        for event in events
+        if set(event.scopes).issubset(allowed) and event.sensitivity in sensitivities
+    )
 
 
 def event_id(page_id: str) -> str | None:
