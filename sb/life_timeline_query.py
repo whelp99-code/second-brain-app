@@ -10,7 +10,8 @@ from typing import Any
 
 from sb.config import Config
 from sb.life_config import policies, settings
-from sb.life_contracts import LifeInputError
+from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_grouping import group_events, index_citations
 from sb.life_values import canonical_bytes, day_window
 from sb.store.life import _decode
 
@@ -79,6 +80,8 @@ def query(
             "day": day,
             "timezone": timezone,
             "events": [],
+            "groups": [],
+            "citation_index": {},
             "next_cursor": None,
             "complete": True,
             "generation": None,
@@ -171,15 +174,37 @@ def query(
         card["body"] = event.body[:2000]
         card["body_truncated"] = len(event.body) > 2000
         cards.append(card)
+    histories = _histories(store, selected, scopes=tuple(actor.scopes), now=clock)
+    groups = group_events(selected, generation=generation, history=histories)
+    cited = [event for revisions in histories.values() for event in revisions]
     return {
         "schema_version": 1,
         "day": day,
         "timezone": timezone,
         "events": cards,
+        "groups": groups,
+        "citation_index": index_citations(cited or selected),
         "next_cursor": next_cursor,
         "complete": next_cursor is None,
         "generation": generation,
         "coverage": "source_records_only",
         "complete_day_observed": False,
         "undated_query": undated,
+    }
+
+
+def _histories(
+    store: Any,
+    events: list[LifeEventV1],
+    *,
+    scopes: tuple[str, ...],
+    now: datetime,
+) -> dict[str, tuple[LifeEventV1, ...]]:
+    """Prior revisions stay citable after source_version changes. Missing API = current only."""
+    history = getattr(store, "history", None)
+    if history is None:
+        return {event.event_id: (event,) for event in events}
+    return {
+        event.event_id: tuple(history(event.event_id, scopes=scopes, now=now))
+        for event in events
     }
