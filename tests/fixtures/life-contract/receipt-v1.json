@@ -1,0 +1,8 @@
+{
+  "receipt_id": "rcpt-minimal",
+  "event_id": "3b66ab6c-105a-5b82-b597-704a1bc12aa7",
+  "revision": 1,
+  "accepted_at": "2026-09-26T03:00:00+00:00",
+  "replayed": false,
+  "state": "accepted"
+}
