@@ -152,7 +152,13 @@ def compile_pending(
     used = 0
     remaining = False
     for page_id, grouped in _group_by_page(units):
-        key = compile_page_key(page_id, [unit.unit_id for unit in grouped], prompt_version, model_id)
+        key = compile_page_key(
+            page_id,
+            [unit.unit_id for unit in grouped],
+            prompt_version,
+            model_id,
+            lineage=_lineage_token(ledger, grouped),
+        )
         row = ledger.get_derivation(key)
         if (row is not None and row.status in {DerivStatus.FAILED.value, DerivStatus.PENDING.value}
                 and row.attempts >= config.caps["max_derivation_attempts"]):
@@ -218,7 +224,7 @@ class _CompileCtx:
 def _compile_without_llm(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
     title = _title(job.units[0].origin)
     previous = ctx.existing_pages.get(job.page_id)
-    body = "\n\n".join(unit.text for unit in job.units)
+    body = _with_uncertainty("\n\n".join(unit.text for unit in job.units), _uncertainty(ctx.ledger, job.units))
     ctx.ledger.ensure_derivation(job.key, COMPILE_STAGE, COMPILE_RUN_ID)
     ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
     _BODIES.put(ctx.ledger, job.page_id, body)
@@ -265,6 +271,7 @@ def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
             raise
         ctx.ledger.mark_failed(job.key, str(exc))
         raise
+    body = _with_uncertainty(body, _uncertainty(ctx.ledger, job.units))
     _BODIES.put(ctx.ledger, job.page_id, body)
     sources = _sources(job.units)
     page = PageSpec(
@@ -283,9 +290,60 @@ def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
         bool(existing) and previous is None)
 
 
-def compile_page_key(page_id: str, unit_ids: Sequence[str], prompt_version: str, model_id: str) -> str:
-    """Identity shared by execution and read-only retry/upgrade diagnostics."""
-    return deriv_key(["compile-page-v1:" + page_id, *unit_ids], COMPILE_STAGE, prompt_version, model_id)
+# Estimator and compile share this default so a markdown page's stored key
+# matches compile_page_key(page, ids, prompt, model) with no extra argument.
+_DEFAULT_LINEAGE: Final = "builtin:.md\x1fnone\x1fv2\x1flocal-only"
+
+
+def compile_page_key(
+    page_id: str,
+    unit_ids: Sequence[str],
+    prompt_version: str,
+    model_id: str,
+    lineage: str = "",
+) -> str:
+    """Identity shared by execution and read-only retry/upgrade diagnostics.
+
+    The key always binds parser, model, normalization, and profile revisions.
+    Omitted lineage uses the builtin markdown default. A different parser
+    revision is a different key and does not overwrite the previous derivation.
+    """
+    identity = ["compile-page-v1:" + page_id, *unit_ids, "lineage:" + (lineage or _DEFAULT_LINEAGE)]
+    return deriv_key(identity, COMPILE_STAGE, prompt_version, model_id)
+
+
+def _lineage_token(ledger: CompileLedger, units: Sequence[Unit]) -> str:
+    getter = getattr(ledger, "provenance_for_unit", None)
+    if getter is None:
+        return ""
+    parts: list[str] = []
+    for unit in units:
+        row = getter(unit.unit_id)
+        if row is None:
+            continue
+        parts.append(
+            f"{row.parser_version}\x1f{row.model_version}\x1f"
+            f"{row.normalizer_version}\x1f{row.profile_revision}"
+        )
+    return "\x1e".join(sorted(parts))
+
+
+def _uncertainty(ledger: CompileLedger, units: Sequence[Unit]) -> str | None:
+    getter = getattr(ledger, "provenance_for_unit", None)
+    if getter is None:
+        return None
+    for unit in units:
+        row = getter(unit.unit_id)
+        reason = None if row is None else row.partial_reason
+        if reason:
+            return str(reason)
+    return None
+
+
+def _with_uncertainty(body: str, reason: str | None) -> str:
+    if not reason or f"uncertainty: {reason}" in body:
+        return body
+    return body.rstrip() + f"\n\nuncertainty: {reason}\n"
 
 
 def _prepare_compile(ledger: CompileLedger, key: str, max_attempts: int) -> bool:

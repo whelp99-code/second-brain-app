@@ -19,6 +19,7 @@ from sb.bound_knowledge import BoundKnowledge
 from sb.config import Config
 from sb.connectors.base import AcknowledgingSourceAdapter, SourceAdapter
 from sb.contracts import Blob, BriefingInputs, PageSpec, SourceRef, Unit
+from sb.effect_values import format_instant
 from sb.erasure import ErasureError, IngressIdentity, ReingressGate
 from sb.generation_runtime import GenerationMutationService
 from sb.generation_runtime_models import (
@@ -36,6 +37,7 @@ from sb.store import (
     Run,
     RunStage,
     SourceItem,
+    UnitProvenance,
     UnitRow,
     deriv_key,
 )
@@ -45,8 +47,9 @@ from sb.vault import GitCommandError, Vault, VaultLintError, read_page_spec
 
 STALE_AFTER: Final = timedelta(days=30)
 UPCOMING_WINDOW: Final = timedelta(days=7)
-_UPDATED: Final = re.compile(r"^updated:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
-_ISO_DATE: Final = re.compile(r"\d{4}-\d{2}-\d{2}")
+_ISO_DATE: Final = re.compile(
+    r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?|[+-]\d{2}:\d{2})?"
+)
 _SID: Final = re.compile(r"\bsid=([0-9a-f]{8})\b")
 _RETRYABLE_READ_FAILURES: Final = frozenset({
     "size-limit", "database-limit", "unstable-session-file", "unreadable-session-file",
@@ -172,6 +175,32 @@ def _as_date(stamp: str) -> date | None:
     return parsed.astimezone().date()
 
 
+def _metadata_date(value: str | None) -> date | None:
+    if value is None or len(value) != 10:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _calendar_day(token: str) -> date | None:
+    """Parse a calendar day. Invalid dates and broken offsets are absent, not errors."""
+    if len(token) == 10:
+        try:
+            return date.fromisoformat(token)
+        except ValueError:
+            return None
+    normalized = token[:-1] + "+00:00" if token.endswith("Z") else token
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.date()
+
+
 def _source_changed(ledger: Ledger, sources: tuple[tuple[str, str], ...]) -> bool:
     items = ledger.list_source_items()
     for origin, digest in sources:
@@ -224,8 +253,11 @@ def collect_briefing_inputs(
             if "_proposed" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8")
-            matched, facts = _UPDATED.search(text), parse_page_frontmatter(text)
-            if matched is None or date.fromisoformat(matched.group(1)) > cutoff or facts is None:
+            facts = parse_page_frontmatter(text)
+            updated = None if facts is None else _metadata_date(facts.updated)
+            # Body text can contain date-shaped lines. Only frontmatter `updated`
+            # is the page's metadata date.
+            if updated is None or updated > cutoff or facts is None:
                 continue
             if _source_changed(ledger, facts.sources):
                 stale.append(_stale_item(ledger, facts.page_id, facts.sources))
@@ -239,12 +271,10 @@ def collect_briefing_inputs(
             matched = _ISO_DATE.search(raw)
             if matched is None:
                 continue
-            # Source text is arbitrary: a date-shaped run of digits need not be a
-            # date. `2026-02-30` in one ingested note took the whole brief stage
-            # down with it, so a match that will not parse is simply not a date.
-            try:
-                upcoming_day = date.fromisoformat(matched.group(0))
-            except ValueError:
+            # One invalid token (Feb 30, a non-leap Feb 29, a broken offset)
+            # is not a date and must not fail the rest of the batch.
+            upcoming_day = _calendar_day(matched.group(0))
+            if upcoming_day is None:
                 continue
             if day <= upcoming_day <= end:
                 upcoming.append(
@@ -357,19 +387,32 @@ def _select_adapters(
 _URI_SCHEME: Final = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*:")
 
 
+# External callers (deploy estimate, connector tests) still expect a unit list.
+_PARSE_PROVENANCE: dict[str, dict[str, object]] = {}
+
+
 def _materialize(data: bytes, digest: str, uri: str, origin: str) -> list[Unit]:
-    from sb.normalize import normalize
-    from sb.parsers import ParseError, UnsupportedSuffix, parser_for
+    from sb.normalize import NORMALIZER_VERSION, normalize
+    from sb.parsers import ParseError, UnsupportedSuffix, parse_document
 
     path_part = uri.split("#", 1)[0]
     suffix = "" if _URI_SCHEME.match(path_part) else Path(path_part).suffix.lower()
     if suffix in {".jsonl", ".json"}:
         suffix = ".md"
     try:
-        text = parser_for(suffix or ".md")(data)
+        parsed = parse_document(data, suffix or ".md")
     except (ParseError, UnsupportedSuffix, UnicodeDecodeError):
+        _PARSE_PROVENANCE.pop(digest, None)
         return []
-    return normalize(Blob(digest, len(data)), text, origin)
+    units = normalize(Blob(digest, len(data)), parsed.body, origin)
+    _PARSE_PROVENANCE[digest] = {
+        "parser_version": parsed.parser_version,
+        "model_version": parsed.model_version,
+        "normalizer_version": NORMALIZER_VERSION,
+        "locator_json": json.dumps(parsed.locator, sort_keys=True, separators=(",", ":")),
+        "partial_reason": parsed.partial_reason,
+    }
+    return units
 
 
 def _unit_rows(units: Sequence[Unit]) -> list[UnitRow]:
@@ -401,6 +444,54 @@ def _load_units(ledger: Ledger, root: Path) -> list[Unit]:
                 )
             )
     return loaded
+
+
+def _scan_receipt_row(
+    run_id: str,
+    source_id: str,
+    stamp: str,
+    state: str,
+    checkpoint_before: str | None,
+    checkpoint_after: str | None,
+    scanned: int,
+    accepted: int,
+    unchanged: int,
+    filtered: int,
+    quarantined: int,
+    deferred: int,
+    retryable: int,
+    permanent: int,
+) -> tuple[object, ...]:
+    from sb.personal_observation import ScanReceiptV1
+    from sb.source_coverage import _receipt_params
+
+    scan_id = hashlib.sha256(f"{run_id}\0{source_id}\0{stamp}".encode()).hexdigest()
+    receipt = ScanReceiptV1(
+        scan_id=scan_id,
+        source_id=source_id,
+        account_id="local",
+        started_at=stamp,
+        finished_at=stamp,
+        state=state,
+        checkpoint_before=checkpoint_before,
+        checkpoint_after=checkpoint_after,
+        scanned=scanned,
+        accepted=accepted,
+        unchanged=unchanged,
+        filtered=filtered,
+        quarantined=quarantined,
+        deferred=deferred,
+        retryable_errors=retryable,
+        permanent_errors=permanent,
+        coverage_start=None,
+        coverage_end=None,
+        next_scan_at=None,
+        remaining_known=None if not deferred else deferred,
+        exhausted=False,
+        budget=None,
+        upstream_end_evidence=None,
+    )
+    return _receipt_params(receipt)
 
 
 def _source_content_ids(ledger: Ledger, root: Path) -> tuple[str, ...]:
@@ -459,6 +550,7 @@ def _commit_pages(
     except (subprocess.CalledProcessError, ValueError) as exc:
         raise VaultLintError(("COMPILED_KNOWLEDGE_BINDING_FAILED",)) from exc
     compiled.remember(applied)
+    _advance_observations_published(root, applied, result.commit)
     _register_compiled(root, applied, project=project, config=config)
     if result.proposals:
         raise VaultLintError((f"AUTOMATIC_PAGE_UPDATE_CONFLICT: {result.proposals} proposal(s); active pages preserved",))
@@ -489,6 +581,7 @@ def _register_compiled(
         )
     if project:
         SearchIndex(vault_root=root, registry_path=explicit).project()
+        _advance_observations_searchable(root)
 
 
 def _finish_deriv(ledger: Ledger, key: str | None, digest: str, path: str) -> None:
@@ -651,6 +744,7 @@ def _execute_under_publication_lock(config: Config, stage: StageFn, stage_name: 
 class _PreparedIngest:
     source_items: tuple[SourceItem, ...]
     units: tuple[UnitRow, ...]
+    provenance: tuple[UnitProvenance, ...]
     version_keys: tuple[tuple[str, str, str], ...]
     errors: int
     attempted: int
@@ -658,6 +752,7 @@ class _PreparedIngest:
     capped: bool
     cursor: tuple[str, str] | None
     failure: str | None
+    receipt: tuple[object, ...] | None
 
 
 def _prepare_adapter_ingest(
@@ -670,22 +765,28 @@ def _prepare_adapter_ingest(
     reingress: ReingressGate,
     unit_remaining: int,
     unit_cap: int,
+    profile_revision: str,
 ) -> _PreparedIngest:
-    items = adapter.scan(ledger.get_cursor(adapter.source_id))
+    checkpoint_before = ledger.get_cursor(adapter.source_id)
+    items = adapter.scan(checkpoint_before)
     source_items: list[SourceItem] = []
     unit_rows: list[UnitRow] = []
+    provenance: list[UnitProvenance] = []
     version_keys: list[tuple[str, str, str]] = []
     accepted: set[tuple[str, str, str]] = set()
     allocated_units: set[str] = set()
     failure: str | None = None
     errors = attempted = written = 0
+    unchanged = filtered = quarantined = deferred = retryable = permanent = 0
     capped = adapter_failed = False
+    stamp = format_instant(datetime.now(UTC))
     for ref, data, meta in items:
         # A source configuration hold is not a deduplicated/quarantined item.
         # Recheck it on every run, even if older versions recorded a skip row.
         if meta.get("skip_reason") == "ambiguous-session-roots":
             errors += 1
             attempted += 1
+            permanent += 1
             adapter_failed = True
             failure = "SOURCE_ROOTS_AMBIGUOUS"
             break
@@ -693,17 +794,21 @@ def _prepare_adapter_ingest(
         if reason in _RETRYABLE_READ_FAILURES:
             if attempted >= remaining:
                 capped = True
+                deferred += 1
                 break
             attempted += 1
             errors += 1
+            retryable += 1
             adapter_failed = True
             failure = failure or f"SOURCE_READ_INCOMPLETE: {adapter.source_id}: {reason}"
             continue
         version_key = (ref.source_id, ref.source_uri, ref.source_version)
         if version_key in seen or version_key in accepted:
+            unchanged += 1
             continue
         if attempted >= remaining:
             capped = True
+            deferred += 1
             break
         attempted += 1
         if meta.get("skip_reason"):
@@ -720,6 +825,7 @@ def _prepare_adapter_ingest(
             )
             version_keys.append(version_key)
             accepted.add(version_key)
+            filtered += 1
             continue
         digest = hashlib.sha256(data).hexdigest()
         try:
@@ -729,7 +835,10 @@ def _prepare_adapter_ingest(
             adapter_failed = True
             if str(exc) != "TOMBSTONE_REINGRESS_BLOCKED":
                 errors += 1
+                permanent += 1
                 failure = failure or "REINGRESS_VERIFICATION_FAILED"
+            else:
+                quarantined += 1
             continue
         units = _materialize(
             data,
@@ -737,10 +846,12 @@ def _prepare_adapter_ingest(
             ref.source_uri,
             f"{ref.source_id}:{ref.source_uri}",
         )
+        parsed = _PARSE_PROVENANCE.get(digest)
         new_units = [unit for unit in units
                      if unit.unit_id not in allocated_units and ledger.get_unit(unit.unit_id) is None]
         if len(new_units) > unit_cap:
             errors += 1
+            permanent += 1
             adapter_failed = True
             failure = failure or (
                 f"INGEST_UNIT_BUDGET_EXCEEDED: source requires {len(new_units)} new units; "
@@ -750,11 +861,13 @@ def _prepare_adapter_ingest(
             continue
         if len(new_units) > unit_remaining - len(allocated_units):
             capped = True
+            deferred += 1
             continue
         try:
             _ = cas.put(data)
         except OSError:
             errors += 1
+            permanent += 1
             adapter_failed = True
             continue
         source_items.append(
@@ -768,17 +881,53 @@ def _prepare_adapter_ingest(
             )
         )
         unit_rows.extend(_unit_rows(new_units))
+        if parsed is not None:
+            provenance.extend(
+                UnitProvenance(
+                    unit.unit_id,
+                    digest,
+                    str(parsed["parser_version"]),
+                    str(parsed["model_version"]),
+                    str(parsed["normalizer_version"]),
+                    profile_revision,
+                    str(parsed["locator_json"]),
+                    None if parsed["partial_reason"] is None else str(parsed["partial_reason"]),
+                )
+                for unit in new_units
+            )
         allocated_units.update(unit.unit_id for unit in new_units)
         version_keys.append(version_key)
         accepted.add(version_key)
         if units or not data:
             written += 1
+    advance = not capped and not adapter_failed and (version_keys or attempted == 0)
     cursor: tuple[str, str] | None = None
-    if not capped and not adapter_failed and (version_keys or attempted == 0):
+    checkpoint_after = adapter.next_cursor() if advance else checkpoint_before
+    if advance:
         cursor = (adapter.next_cursor(), datetime.now(UTC).isoformat())
+    accepted_count = written
+    scanned = accepted_count + unchanged + filtered + quarantined + deferred + retryable + permanent
+    state = "ok" if advance else "partial"
+    receipt = _scan_receipt_row(
+        run_id,
+        adapter.source_id,
+        stamp,
+        state,
+        checkpoint_before,
+        checkpoint_after,
+        scanned,
+        accepted_count,
+        unchanged,
+        filtered,
+        quarantined,
+        deferred,
+        retryable,
+        permanent,
+    )
     return _PreparedIngest(
         tuple(source_items),
         tuple(unit_rows),
+        tuple(provenance),
         tuple(version_keys),
         errors,
         attempted,
@@ -786,6 +935,7 @@ def _prepare_adapter_ingest(
         capped,
         cursor,
         failure,
+        receipt,
     )
 
 
@@ -868,6 +1018,8 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
             try:
                 reingress = ReingressGate(Path(config.state_root) / "reingress.db")
                 try:
+                    from sb.security import source_llm_policy
+
                     prepared = _prepare_adapter_ingest(
                         adapter,
                         ledger,
@@ -878,6 +1030,7 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                         reingress,
                         unit_cap - used_units,
                         unit_cap,
+                        source_llm_policy(config, adapter.source_id),
                     )
                 finally:
                     reingress.close()
@@ -893,9 +1046,13 @@ def _ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None)
                     for item in prepared.source_items:
                         ledger.bind_source_access(item, classification)
                 _ = ledger.upsert_units(prepared.units)
+                for row in prepared.provenance:
+                    ledger.upsert_unit_provenance(row)
                 if prepared.cursor is not None:
                     position, updated_at = prepared.cursor
                     ledger.set_cursor(adapter.source_id, position, updated_at)
+                if prepared.receipt is not None:
+                    ledger.insert_scan_receipt(prepared.receipt)
             if isinstance(adapter, AcknowledgingSourceAdapter):
                 try:
                     adapter.acknowledge(tuple(
@@ -1065,6 +1222,7 @@ def _compile_stage(config: Config, llm_mode: str) -> StageFn:
 
             explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
             SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+            _advance_observations_searchable(vault.root)
         held = any(
             row.attempts >= config.caps["max_derivation_attempts"]
             for stage_name in ("compile", "conflict")
@@ -1165,6 +1323,56 @@ def _search_proof(root: Path) -> str:
     if not path.is_file():
         return ""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _observation_ids(root: Path) -> tuple[str, ...]:
+    journal = root / ".sb" / "observations" / "receipts"
+    if not journal.is_dir():
+        return ()
+    return tuple(path.stem for path in journal.rglob("*.json") if len(path.stem) == 64)
+
+
+def _advance_observations_published(root: Path, pages: Sequence[PageSpec], commit: str | None) -> None:
+    """Published only after a commit sha exists. Searchable is a later proof."""
+    if not commit or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit):
+        return
+    hashes = {cite.hash for page in pages for cite in page.sources}
+    if not hashes:
+        return
+    from sb.observation_admission import AdmissionError, advance, read, read_body
+
+    for receipt_id in _observation_ids(root):
+        current = read(root, receipt_id)
+        body = read_body(root, receipt_id)
+        if current is None or body is None:
+            continue
+        if hashlib.sha256(body).hexdigest() not in hashes:
+            continue
+        try:
+            if current.state == "accepted_pending":
+                current = advance(root, receipt_id, "processing", proof="pipeline.processing")
+            if current.state == "processing":
+                _ = advance(root, receipt_id, "published", proof=commit)
+        except AdmissionError:
+            continue
+
+
+def _advance_observations_searchable(root: Path) -> None:
+    """Searchable only after an index file exists. Published is not searchable."""
+    proof = _search_proof(root)
+    if len(proof) != 64:
+        return
+    generation = "sbgen:v1:" + proof
+    from sb.observation_admission import AdmissionError, advance, read
+
+    for receipt_id in _observation_ids(root):
+        current = read(root, receipt_id)
+        if current is None or current.state != "published":
+            continue
+        try:
+            _ = advance(root, receipt_id, "searchable", proof=generation)
+        except AdmissionError:
+            continue
 
 
 def _advance_published(store, event_id: str, proof: str) -> None:
