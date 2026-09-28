@@ -36,6 +36,7 @@ from . import (
     Run,
     RunStage,
     SourceItem,
+    UnitProvenance,
     UnitRow,
     assert_ledger_integrity,
     deriv_key,
@@ -127,6 +128,10 @@ _SCHEMA: Final = (
     "CREATE TABLE IF NOT EXISTS source_stage_count ("
     "source_id TEXT PRIMARY KEY, captured INTEGER NOT NULL, parsed INTEGER NOT NULL, "
     "published INTEGER NOT NULL, searchable INTEGER NOT NULL, eligible INTEGER NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS unit_provenance ("
+    "unit_id TEXT PRIMARY KEY, content_hash TEXT NOT NULL, parser_version TEXT NOT NULL, "
+    "model_version TEXT NOT NULL, normalizer_version TEXT NOT NULL, profile_revision TEXT NOT NULL, "
+    "locator_json TEXT NOT NULL, partial_reason TEXT);"
     "CREATE TABLE IF NOT EXISTS derivation_event ("
     "event_id INTEGER PRIMARY KEY AUTOINCREMENT, deriv_key TEXT NOT NULL, stage TEXT NOT NULL, "
     "from_status TEXT NOT NULL, to_status TEXT NOT NULL, attempts INTEGER NOT NULL, "
@@ -458,6 +463,56 @@ class Ledger:
             "INSERT INTO scan_receipt VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             row,
         )
+
+    def upsert_unit_provenance(self, row: UnitProvenance) -> None:
+        """Bind parser provenance to a unit. Additive; does not rewrite the unit row."""
+        _ = self._exec(
+            "INSERT INTO unit_provenance VALUES (?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(unit_id) DO UPDATE SET"
+            " content_hash=excluded.content_hash, parser_version=excluded.parser_version,"
+            " model_version=excluded.model_version, normalizer_version=excluded.normalizer_version,"
+            " profile_revision=excluded.profile_revision, locator_json=excluded.locator_json,"
+            " partial_reason=excluded.partial_reason",
+            (
+                row.unit_id,
+                row.content_hash,
+                row.parser_version,
+                row.model_version,
+                row.normalizer_version,
+                row.profile_revision,
+                row.locator_json,
+                row.partial_reason,
+            ),
+        )
+
+    def provenance_for_unit(self, unit_id: str) -> UnitProvenance | None:
+        found = cast(
+            tuple[object, ...] | None,
+            self._db().execute(
+                "SELECT unit_id, content_hash, parser_version, model_version, normalizer_version,"
+                " profile_revision, locator_json, partial_reason FROM unit_provenance WHERE unit_id=?",
+                (unit_id,),
+            ).fetchone(),
+        )
+        if found is None:
+            return None
+        return UnitProvenance(
+            str(found[0]),
+            str(found[1]),
+            str(found[2]),
+            str(found[3]),
+            str(found[4]),
+            str(found[5]),
+            str(found[6]),
+            None if found[7] is None else str(found[7]),
+        )
+
+    def replace_provenance_parser(self, unit_id: str, parser_version: str) -> None:
+        """Change only the parser revision. A new derivation key must not reuse the old row."""
+        current = self.provenance_for_unit(unit_id)
+        if current is None:
+            raise ValueError("UNIT_PROVENANCE_MISSING")
+        self.upsert_unit_provenance(replace(current, parser_version=parser_version))
 
     def fetch_scan_receipt_rows(
         self, source_id: str | None = None
