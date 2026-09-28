@@ -57,7 +57,8 @@ def test_every_generator_call_site_in_sb_declares_a_consumer_kind():
     )
     assert result.returncode == 0, result.stderr
     found = {Path(path).stem for path in result.stdout.splitlines()}
-    allowed = {"life_model_policy", "pipeline", "compile", "conflict", "briefing", "llm"}
+    allowed = {"life_model_policy", "pipeline", "compile", "conflict", "briefing", "llm",
+               "security"}
     # life_cli already constructs CliLLM and cannot be edited in this lane. It is
     # not an allowed generator: the structural gate requires a prior reservation
     # and a single handoff to generate_after_reservation, which calls permit(kind=).
