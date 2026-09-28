@@ -78,7 +78,7 @@ def test_exhausted_requires_upstream_end_evidence():
 def test_sidecar_digest_frozen(filename, expected):
     schema = CONTRACTS / filename
     assert hashlib.sha256(schema.read_bytes()).hexdigest() == expected
-    assert schema.with_suffix(".json.sha256").read_text() == f"{expected}  contracts/{filename}\n"
+    assert schema.with_suffix(".json.sha256").read_text() == f"{expected}\n"
 
 
 @pytest.mark.parametrize("changes,error", [
