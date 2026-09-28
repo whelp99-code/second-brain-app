@@ -27,6 +27,13 @@ from sb.connectors.unified_db_mapping import (
     load_mapping,
     select_sql,
 )
+from sb.connectors.unified_db_reconcile import (
+    Reconciler,
+    SequenceMark,
+    has_change_sequence,
+    read_checkpoint,
+    with_checkpoint,
+)
 
 ADAPTER_ID: Final = "unified-db"
 _SET_RO: Final = "SET default_transaction_read_only = on"
@@ -102,6 +109,7 @@ class AdapterSettings:
     max_rows: int
     mapping: MappingSpec
     connect: ConnectFn
+    reconcile_rows: int = 0
 
 
 @dataclass(slots=True)
@@ -129,16 +137,34 @@ class UnifiedDbAdapter:
         mapping = self._settings.mapping
         emit = EmitCtx(ADAPTER_ID, {}, frozenset(), set(), mapping.low_value)
         state = _Scan(decode_cursor(cursor), [], emit, mapping.page_size, self._settings.max_rows)
+        checkpoint = read_checkpoint(cursor)
+        reconciler: Reconciler | None = None
+        if self._settings.reconcile_rows > 0:
+            # A failed/restarted scan must leave even its supplied cursor unchanged.
+            self._next_cursor = cursor or ""
         with self._settings.connect(self.dsn) as session:
             self.last_settings = _guard(session)
             emit.lookup = build_lookup(session.execute(catalog_sql(mapping.projects)).fetchall())
             emit.disabled = disabled_sources(
                 session.execute(catalog_sql(mapping.sources)).fetchall()
             )
+            sequence_tables: set[str] = set()
+            if self._settings.reconcile_rows > 0:
+                sequence_tables = {
+                    table.name for table in mapping.tables if has_change_sequence(session, table)
+                }
+                reconciler = Reconciler(checkpoint, emit)
+                checkpoint = reconciler.state
+                items, used = reconciler.segment(
+                    session, mapping.tables,
+                    min(self._settings.reconcile_rows, mapping.page_size, state.budget),
+                )
+                state.collected.extend(items)
+                state.budget -= used
             for table in mapping.tables:
-                _drain(session, table, state)
+                _drain(session, table, state, reconciler, table.name in sequence_tables)
             _ = session.execute(_COMMIT)
-        self._next_cursor = encode_cursor(state.marks)
+        self._next_cursor = with_checkpoint(encode_cursor(state.marks), checkpoint)
         yield from state.collected
 
     def next_cursor(self) -> str:
@@ -153,6 +179,7 @@ def create(config: _ConnectorConfig) -> UnifiedDbAdapter:
             max_rows=config.caps["max_db_rows_per_run"],
             mapping=load_mapping(),
             connect=_default_connect,
+            reconcile_rows=config.caps.get("max_db_reconcile_rows_per_run", 0),
         )
     )
 
@@ -228,21 +255,45 @@ def _guard(session: Session) -> tuple[str, str]:
     return default_ro, txn_ro
 
 
-def _drain(session: Session, table: ScanTable, state: _Scan) -> None:
+def _drain(
+    session: Session, table: ScanTable, state: _Scan,
+    reconciler: Reconciler | None = None, change_sequence: bool = False,
+) -> None:
     mark = state.marks.get(table.name)
+    checkpoint = None if reconciler is None else reconciler.table_state(table)
+    sequence: SequenceMark | None = None if checkpoint is None else checkpoint["sequence"]
+    if checkpoint is not None and not change_sequence:
+        checkpoint["sequence"] = None
     while state.budget > 0:
         limit = min(state.page_size, state.budget)
-        params: tuple[Scalar, ...] = (limit,) if mark is None else (mark[0], mark[1], limit)
-        rows = session.execute(select_sql(table, mark is not None), params).fetchall()
+        watermark: tuple[Scalar, Scalar] | None = mark
+        if change_sequence:
+            watermark = None if sequence is None else (sequence["value"], sequence["id"])
+        params: tuple[Scalar, ...] = (limit,) if watermark is None else (*watermark, limit)
+        rows = session.execute(
+            select_sql(table, watermark is not None, change_sequence=change_sequence), params,
+        ).fetchall()
         if not rows:
             break
         for row in rows:
-            item, mark = emit_row(table, row, state.emit)
+            if change_sequence:
+                value = row[-1]
+                if not isinstance(value, int) or isinstance(value, bool):
+                    raise ValueError("UNIFIED_DB_INVALID_CHANGE_SEQUENCE")
+                sequence = {"value": value, "id": cell_text(row[0])}
+                row = row[:-1]
+            if reconciler is None:
+                item, mark = emit_row(table, row, state.emit)
+            else:
+                item, observed = reconciler.observe(table, row)
+                mark = observed if mark is None else max(mark, observed)
             if item is not None:
                 state.collected.append(item)
             state.budget -= 1
         if len(rows) < limit:
             break
+    if checkpoint is not None and change_sequence:
+        checkpoint["sequence"] = sequence
     if mark is not None:
         state.marks[table.name] = mark
 
