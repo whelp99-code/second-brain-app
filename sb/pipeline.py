@@ -1151,6 +1151,35 @@ def run_ingest(
     )
 
 
+_LIFE_CRASH_HOOK = None
+
+
+def _life_boundary(point: str) -> None:
+    hook = _LIFE_CRASH_HOOK
+    if hook is not None:
+        hook(point)
+
+
+def _search_proof(root: Path) -> str:
+    path = root / ".sb" / "search.db"
+    if not path.is_file():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _advance_published(store, event_id: str, proof: str) -> None:
+    if proof:
+        store.advance_event_receipts(event_id, "published", proof=proof)
+
+
+def _advance_searchable(store, event_ids: Sequence[str], root: Path) -> None:
+    proof = _search_proof(root)
+    if not proof:
+        return
+    for event_id in event_ids:
+        store.advance_event_receipts(event_id, "searchable", proof=proof)
+
+
 def _publish_life_events(config: Config, ledger: Ledger, vault: Vault, run_id: str,
                          events: Sequence[object]) -> int:
     """Publish workflow changes through the existing writer and record identity boundary."""
@@ -1178,11 +1207,14 @@ def _publish_life_events(config: Config, ledger: Ledger, vault: Vault, run_id: s
         ledger.bind_page_access(git_rel(page.page_id).removesuffix(".md"),
                                "sha256:" + hashlib.sha256(raw).hexdigest(), access)
         journal.bind_records(event, parse_page_records(raw, page.page_id))
+        _advance_published(ledger.life_store(), event.event_id, committed or "")
         count += 1
+    _life_boundary("after_publish")
     if count and ".staging" not in vault.root.parts:
         from sb.search import SearchIndex
         explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
         SearchIndex(vault_root=vault.root, registry_path=explicit).project()
+        _advance_searchable(ledger.life_store(), tuple(event.event_id for event in events), vault.root)
     return count
 
 
@@ -1392,8 +1424,12 @@ def run_life_maintenance(config: Config, *, source_ids: tuple[str, ...],
             from sb.search import SearchIndex
             explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
             SearchIndex(vault.root, registry_path=explicit).project()
+        from sb.life_inventory import release_unreferenced
+        tombstoned, retained = release_unreferenced(store)
         result.update(repaired=repaired, withdrawn_pages=removed, expired_events=expired,
-                      more_pending=more, shared_raw_physically_erased=False)
+                      more_pending=more, shared_raw_physically_erased=False,
+                      physical_erasure_tombstoned=tombstoned,
+                      physical_erasure_retained_shared=retained)
         return StageReport((), 0, 0, min(len(work), limit), more, written=repaired + removed)
 
     outcome = _execute(config, stage, "compile")
@@ -1451,6 +1487,7 @@ def run_life_batch(
                 ledger.bind_source_access(source, config.source_access[source_id])
                 page = page_for_event(event)
                 pages[page.page_id] = page
+        _life_boundary("before_publish")
         compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
         for page in pages.values():
             access = ledger.compiled_page_access(tuple((cite.origin, cite.hash) for cite in page.sources))
@@ -1470,6 +1507,7 @@ def run_life_batch(
                               for receipt in receipts
                               if page.page_id == "wiki/life-event-" + receipt["event_id"])
             LifeJournal(store).bind_records(page_event, parse_page_records(raw, page.page_id))
+        _life_boundary("after_publish")
         if pages and ".staging" not in vault.root.parts:
             from sb.search import SearchIndex
             explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None

@@ -12,12 +12,14 @@ import signal
 
 import pytest
 
-from sb.life_config import LifeSettingsV1
+from sb.life_config import LifeSettingsV1, policy_for
 from sb.life_delivery import generate, prepare
 from sb.life_questions import issue
+from sb.pipeline import run_life_batch
 from sb.store.ledger import Ledger
-from sb.store.life_journal import LifeJournal
+from sb.store.life_journal import LifeJournal, identity
 from tests.test_life_contracts import NOW, payload, policy
+from tests.test_life_pipeline import item, life_config
 
 SCOPES = ("owner:test",)
 SOURCES = ("test-notes",)
@@ -218,3 +220,160 @@ def test_three_processes_share_one_question_budget(tmp_path):
             )
             == 3
         )
+
+
+def _publish_ack_worker(root, mode, ready, hold):
+    os.umask(0o077)
+    from pathlib import Path
+
+    from sb import pipeline
+    from sb.config import Config
+
+    def hook(point):
+        if point == mode:
+            ready.set()
+            hold.wait(20)
+
+    pipeline._LIFE_CRASH_HOOK = hook
+    root_path = Path(root)
+    built = Config(
+        raw={
+            "vault_root": str(root_path),
+            "source_access": {
+                "test-notes": {
+                    "owner": "principal:owner",
+                    "projects": [],
+                    "policy_revision": "test-v1",
+                }
+            },
+            "life": {
+                "life_events": True,
+                "life_timeline": True,
+                "obsidian_view": True,
+                "life_briefing": True,
+                "sources": {
+                    "test-notes": {
+                        "enabled": True,
+                        "allowed_types": ["note_saved", "calendar_event"],
+                    }
+                },
+            },
+        }
+    )
+    if mode == "before_ack":
+        outcome, _receipts = run_life_batch(built, "test-notes", [item()], now=NOW)
+        if outcome.exit_code:
+            raise RuntimeError(outcome.status)
+        with Ledger(root_path) as ledger:
+            store = ledger.life_store()
+            event = store.events(scopes=("principal:owner",), now=NOW)[0]
+            with ledger.transaction():
+                LifeJournal(store).put(
+                    "view_ack",
+                    identity("view_ack", ["device-1", ("test-notes",)]),
+                    {"device_id": "device-1", "generation": "gen-1", "applied": True},
+                    events=(event,),
+                    scopes=("principal:owner",),
+                    source_ids=("test-notes",),
+                    now=NOW,
+                )
+                ready.set()
+                hold.wait(20)
+        return
+    run_life_batch(built, "test-notes", [item()], now=NOW)
+
+
+@pytest.mark.parametrize("mode", ["before_publish", "after_publish", "before_ack"])
+def test_sigkill_before_after_publish_and_before_ack_matrix(tmp_path, mode):
+    config, root = life_config(tmp_path)
+    del config
+    context = multiprocessing.get_context("spawn")
+    ready, hold = context.Event(), context.Event()
+    child = context.Process(target=_publish_ack_worker, args=(str(root), mode, ready, hold))
+    child.start()
+    try:
+        assert ready.wait(20), "worker failed to reach crash boundary"
+        child.kill()
+        child.join(20)
+        assert child.exitcode == -signal.SIGKILL
+    finally:
+        if child.is_alive():
+            child.kill()
+            child.join(5)
+    page_root = root / "wiki"
+    with Ledger(root) as ledger:
+        store = ledger.life_store()
+        events = store.events(scopes=("principal:owner",), now=NOW)
+        ack = LifeJournal(store).raw("view_ack", identity("view_ack", ["device-1", ("test-notes",)]))
+        if mode == "before_publish":
+            assert len(events) == 1
+            state = store.connection.execute("SELECT state FROM life_receipts").fetchone()[0]
+            assert state == "accepted"
+            assert not any(page_root.glob("life-event-*.md"))
+            replay = store.accept(
+                item()["payload"],
+                policy_for(Config_from(root), "test-notes"),
+                key="request-1",
+                now=NOW,
+            )
+            assert replay.replayed
+        elif mode == "after_publish":
+            assert len(events) == 1
+            assert any(page_root.glob("life-event-*.md"))
+            state = store.connection.execute("SELECT state FROM life_receipts").fetchone()[0]
+            assert state == "accepted"
+            assert ack is None
+        else:
+            assert len(events) == 1
+            assert any(page_root.glob("life-event-*.md"))
+            assert ack is None
+
+
+def Config_from(root):
+    from sb.config import Config
+
+    return Config(
+        raw={
+            "vault_root": str(root),
+            "source_access": {
+                "test-notes": {"owner": "principal:owner", "projects": [], "policy_revision": "test-v1"}
+            },
+            "life": {
+                "life_events": True,
+                "life_timeline": True,
+                "obsidian_view": True,
+                "life_briefing": True,
+                "sources": {
+                    "test-notes": {
+                        "enabled": True,
+                        "allowed_types": ["note_saved", "calendar_event"],
+                    }
+                },
+            },
+        }
+    )
+
+
+def test_view_ack_lineage_survives_restart(tmp_path):
+    with Ledger(tmp_path) as ledger:
+        store = ledger.life_store()
+        accepted = store.accept(payload(), policy(), key="seed", now=NOW)
+        event = store.get(accepted.event_id, scopes=SCOPES, now=NOW)
+        aid = identity("view_ack", ["device-1", SOURCES])
+        LifeJournal(store).put(
+            "view_ack",
+            aid,
+            {"device_id": "device-1", "generation": "gen-9", "applied": True},
+            events=(event,),
+            scopes=SCOPES,
+            source_ids=SOURCES,
+            now=NOW,
+        )
+    with Ledger(tmp_path) as ledger:
+        store = ledger.life_store()
+        row = LifeJournal(store).raw("view_ack", identity("view_ack", ["device-1", SOURCES]))
+        assert row is not None
+        assert row["body"]["generation"] == "gen-9"
+        assert row["body"]["device_id"] == "device-1"
+        assert row["evidence"][0]["event_id"] == accepted.event_id
+        assert row["evidence"][0]["revision"] == 1
