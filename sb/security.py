@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Final, cast
+from typing import Final, Protocol, cast
 
 from sb.config import Config
-from sb.contracts import BriefingInputs, Unit
+from sb.contracts import BriefingInputs, PageSpec, Unit
+from sb.llm import CliLLM, LLMClient
+from sb.redaction import redact_credentials
+from sb.source_access import SourceAccess, require_current_source_access
+from sb.store import SourceItem
 
 _EMAIL: Final = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 _BEARER: Final = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}")
@@ -29,10 +33,17 @@ _PRIVATE_KEY: Final = re.compile(
     re.DOTALL,
 )
 _ORIGIN: Final = re.compile(r"(?:^|\s)origin=([^:\s]+):")
-_LOCAL_MODEL_PREFIXES: Final = ("local:", "ollama:", "llamacpp:", "lmstudio:")
 _LOCAL_COMMANDS: Final = frozenset({"ollama", "llama-server", "llamacpp", "lmstudio"})
 _VALID_LLM_POLICIES: Final = frozenset({"allow", "deny", "local-only"})
-_VALID_SENSITIVE_POLICIES: Final = frozenset({"mask", "allow", "deny"})
+_VALID_SENSITIVE_POLICIES: Final = frozenset({"mask", "allow", "deny", "credentials"})
+
+
+class SourceAccessReader(Protocol):
+    """Read-only subset of the ingest ledger used by the compile egress gate."""
+
+    def list_source_items(self) -> tuple[SourceItem, ...]: ...
+
+    def source_access_for(self, item: SourceItem) -> SourceAccess | None: ...
 
 
 class SecurityPolicyError(RuntimeError):
@@ -68,20 +79,26 @@ def mask_sensitive(text: str) -> str:
 def llm_is_external(config: Config) -> bool:
     """Return whether the configured model transports prompts outside this host."""
     raw_llm = _mapping(config.raw.get("llm"))
-    explicit = raw_llm.get("external")
-    if isinstance(explicit, bool):
-        return explicit
+    # external=true can only tighten. external=false does not attest that a
+    # configured wrapper stays on this host; a missing command has nothing to send.
+    if raw_llm.get("external") is True:
+        return True
     model = config.llm.model_id.casefold()
     # `unknown` is the default when no model_id is configured, so it means "not
     # stated", not "local". Reading it as local silently disarmed the protection:
     # the operational config names a Grok backend by argv alone, so every new
     # source defaulted to `allow` instead of `deny` and a `local-only` source
     # would have been sent outside the host without the error that forbids it.
-    if model in {"fake", "test"} or model.startswith(_LOCAL_MODEL_PREFIXES):
+    # `fake`/`test` name the in-memory seam. protect_compile_egress refuses to
+    # treat an executable CLI as that seam just because the label was copied.
+    if model in {"fake", "test"}:
         return False
-    argv = config.llm.argv_template
-    if not argv:
-        # No command means no transport: there is nothing to send a prompt to.
+    configured = raw_llm.get("argv_template")
+    has_command = isinstance(configured, list) and bool(configured)
+    if raw_llm.get("external") is False and not has_command:
+        return False
+    argv = configured if has_command else config.llm.argv_template
+    if not isinstance(argv, list) or not argv or not isinstance(argv[0], str):
         return False
     return _command_name(argv[0]).casefold() not in _LOCAL_COMMANDS
 
@@ -91,25 +108,120 @@ def _command_name(value: str) -> str:
 
 
 def source_llm_policy(config: Config, source_id: str) -> str:
-    return _policies(config, source_id)[0]
+    """Return the legacy dispatch decision, retaining the no-LLM fallback."""
+    policy = _policies(config, source_id)[0]
+    if (policy == "local-only" and llm_is_external(config)
+            and not _text(_source_row(config, source_id).get("llm_policy"))):
+        return "deny"
+    return policy
 
 
-def protect_unit(unit: Unit, config: Config) -> Unit:
+def _credential_copy(text: str) -> str:
+    # Keep the broader compound/quoted-key and Bearer coverage of the legacy
+    # gate, plus the shared provider-token patterns. Do not redact contacts.
+    protected = _PRIVATE_KEY.sub("[REDACTED_PRIVATE_KEY]", text)
+    protected = _BEARER.sub("Bearer [REDACTED_TOKEN]", protected)
+    protected = _SECRET_ASSIGN.sub(
+        lambda match: f"{match.group(1)}=[REDACTED_SECRET]", protected,
+    )
+    return redact_credentials(protected)
+
+
+def _prompt_copy(text: str, source_id: str, config: Config) -> str:
+    _, sensitive = _policies(config, source_id)
+    protected = mask_sensitive(text)
+    if sensitive == "deny" and (protected != text or _credential_copy(text) != text):
+        raise SecurityPolicyError(source_id, "sensitive content denied")
+    if not llm_is_external(config):
+        if sensitive == "allow":
+            return text
+        if source_id not in config.source_access:
+            return protected
+    # Explicit legacy mask continues masking contacts. Classified SB2 sources
+    # default to credentials only; allow never bypasses external credential removal.
+    return _credential_copy(protected if sensitive == "mask" else text)
+
+
+def protect_unit(unit: Unit, config: Config, *, ledger: SourceAccessReader | None = None) -> Unit:
     """Apply source egress and sensitive-data policy to one prompt-bound unit."""
     source_id = unit.origin.partition(":")[0] or "unknown"
-    policy, sensitive = _policies(config, source_id)
+    policy, _ = _policies(config, source_id)
+    if ledger is not None:
+        configured = config.source_access.get(source_id)
+        matches = [item for item in ledger.list_source_items()
+                   if f"{item.source_id}:{item.source_uri}" == unit.origin
+                   and item.content_hash == unit.content_hash]
+        recorded = ledger.source_access_for(matches[0]) if len(matches) == 1 else None
+        bound = require_current_source_access(recorded, configured)
+        if configured is not None and bound is None and policy != "deny":
+            policy = "local-only"
     _enforce_egress(source_id, policy, config)
-    protected = mask_sensitive(unit.text)
-    if sensitive == "deny" and protected != unit.text:
-        raise SecurityPolicyError(source_id, "sensitive content denied")
-    if sensitive == "allow":
-        return unit
-    return replace(unit, text=protected)
+    return replace(unit, text=_prompt_copy(unit.text, source_id, config))
 
 
-def protect_units(units: list[Unit], config: Config) -> list[Unit]:
+def protect_units(
+    units: list[Unit], config: Config, *, ledger: SourceAccessReader | None = None,
+) -> list[Unit]:
     """Return prompt-safe copies while preserving immutable source objects."""
-    return [protect_unit(unit, config) for unit in units]
+    return [protect_unit(unit, config, ledger=ledger) for unit in units]
+
+
+@dataclass(frozen=True)
+class _CompileEgress:
+    client: LLMClient
+    config: Config
+    units: tuple[Unit, ...]
+    ledger: SourceAccessReader
+    previous: PageSpec | None
+    untracked_context: bool
+
+    def evidence(self) -> list[Unit]:
+        """Units plus previous-page citations. Page prose is not a policy source."""
+        evidence = list(self.units)
+        if self.previous is not None:
+            evidence.extend(
+                Unit("context", cite.hash, "", "", cite.origin) for cite in self.previous.sources
+            )
+        return evidence
+
+    def enforce(self) -> list[Unit]:
+        """Refuse egress from the trusted binding, not from payload or page text."""
+        evidence = self.evidence()
+        if llm_is_external(self.config) and (
+            self.untracked_context or (self.previous is not None and not self.previous.sources)
+        ):
+            raise SecurityPolicyError("unknown", "unclassified compile context is local-only")
+        _ = protect_units(evidence, self.config, ledger=self.ledger)
+        return evidence
+
+    def generate(self, prompt: str, *, system: str | None = None,
+                 json_mode: bool = False, timeout: int = 120) -> str:
+        # Recheck at the actual call so a policy change between preparation and
+        # transport cannot reuse an earlier allow.
+        evidence = self.enforce()
+        for source_id in sorted({unit.origin.partition(":")[0] for unit in evidence}):
+            prompt = _prompt_copy(prompt, source_id, self.config)
+            if system is not None:
+                system = _prompt_copy(system, source_id, self.config)
+        return self.client.generate(prompt, system=system, json_mode=json_mode, timeout=timeout)
+
+
+def protect_compile_egress(
+    client: LLMClient, units: Sequence[Unit], config: Config, ledger: SourceAccessReader,
+    *, previous: PageSpec | None, untracked_context: bool,
+) -> LLMClient:
+    """Guard the entire rendered prompt without changing page/citation identity."""
+    if isinstance(client, CliLLM) and config.llm.model_id.casefold() in {"fake", "test"}:
+        # Legacy in-memory test clients use these names. An executable CLI does
+        # not become that test seam by copying its model label into configuration.
+        config = replace(config, raw={**config.raw, "llm": {
+            "argv_template": config.llm.argv_template, "model_id": "unknown",
+            "external": llm_is_external(config),
+        }})
+    gate = _CompileEgress(client, config, tuple(units), ledger, previous, untracked_context)
+    # Refuse before the compiler marks a derivation running.
+    _ = gate.enforce()
+    return gate
 
 
 def protect_briefing_inputs(inputs: BriefingInputs, config: Config) -> BriefingInputs:
@@ -194,9 +306,10 @@ def _enforce_egress(source_id: str, policy: str, config: Config) -> None:
 
 def _policies(config: Config, source_id: str) -> tuple[str, str]:
     row = _source_row(config, source_id)
-    default_llm = "deny" if llm_is_external(config) else "allow"
-    policy = _text(row.get("llm_policy")) or default_llm
-    sensitive = _text(row.get("sensitive")) or "mask"
+    policy = _text(row.get("llm_policy")) or "local-only"
+    # Preserve explicit legacy masking and the unclassified legacy copy format.
+    default_sensitive = "credentials" if source_id in config.source_access else "mask"
+    sensitive = _text(row.get("sensitive")) or default_sensitive
     if policy not in _VALID_LLM_POLICIES:
         raise SecurityPolicyError(source_id, f"invalid llm_policy {policy!r}")
     if sensitive not in _VALID_SENSITIVE_POLICIES:
