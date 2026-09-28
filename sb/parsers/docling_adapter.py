@@ -8,9 +8,9 @@ import os
 import resource
 import subprocess
 import sys
-from dataclasses import dataclass
-from importlib import import_module
 from pathlib import Path
+
+from sb.parsers import PARTIAL_REASONS, DocumentParseResult, LimitExceeded, WorkerFailure
 
 MAX_BYTES = 64 * 1024 * 1024
 TIMEOUT_SECONDS = 20
@@ -22,16 +22,6 @@ def _limits() -> None:
     resource.setrlimit(resource.RLIMIT_CPU, (TIMEOUT_SECONDS, TIMEOUT_SECONDS))
 
 
-@dataclass(frozen=True, slots=True)
-class DocumentParseResult:
-    body: str
-    source_hash: str
-    locator: dict[str, str | int]
-    parser_version: str
-    model_version: str
-    partial: bool
-
-
 def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
     """Return a Docling result, or ``None`` when Docling is unavailable.
 
@@ -40,8 +30,7 @@ def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
     Document text is never interpreted as instructions by this adapter.
     """
     if len(payload) > MAX_BYTES:
-        parser_errors = import_module("sb.parsers")
-        raise parser_errors.LimitExceeded("docling payload size")
+        raise LimitExceeded("docling payload size")
     worker = Path(__file__).with_name("docling_worker.py")
     try:
         completed = subprocess.run(
@@ -55,12 +44,16 @@ def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
             preexec_fn=_limits,
             env={"PATH": os.environ.get("PATH", ""), "PYTHONNOUSERSITE": "1"},
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
+    except subprocess.TimeoutExpired as exc:
+        raise WorkerFailure("timeout") from exc
+    except OSError as exc:
+        raise WorkerFailure("start") from exc
     if completed.returncode == 3:
         return None
-    if completed.returncode != 0 or len(completed.stdout) > MAX_OUTPUT_BYTES:
-        return None
+    if completed.returncode != 0:
+        raise WorkerFailure("exit")
+    if len(completed.stdout) > MAX_OUTPUT_BYTES:
+        raise WorkerFailure("output size")
     try:
         value = json.loads(completed.stdout)
         body = value["body"]
@@ -68,16 +61,24 @@ def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
         model_version = value["model_version"]
         locator = value["locator"]
         partial = value["partial"]
-        if not isinstance(body, str) or not body.strip() or not isinstance(parser_version, str):
-            return None
+        reason = value.get("partial_reason")
+        expected_kind = "page" if suffix == ".pdf" else "paragraph"
         if (
-            not isinstance(model_version, str)
+            not isinstance(body, str)
+            or not body.strip()
+            or not isinstance(parser_version, str)
+            or not parser_version.startswith("docling:")
+            or not isinstance(model_version, str)
             or not isinstance(locator, dict)
+            or locator.get("kind") != expected_kind
+            or type(locator.get("ordinal")) is not int
+            or locator["ordinal"] < 1
             or not isinstance(partial, bool)
+            or (reason not in PARTIAL_REASONS if partial else reason is not None)
         ):
-            return None
-    except (ValueError, TypeError, KeyError):
-        return None
+            raise WorkerFailure("invalid result")
+    except (ValueError, TypeError, KeyError) as exc:
+        raise WorkerFailure("invalid result") from exc
     return DocumentParseResult(
         body=body.strip(),
         source_hash="sha256:" + hashlib.sha256(payload).hexdigest(),
@@ -89,4 +90,5 @@ def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
         parser_version=parser_version,
         model_version=model_version,
         partial=partial,
+        partial_reason=reason,
     )

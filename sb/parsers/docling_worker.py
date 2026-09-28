@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import socket
 import sys
@@ -18,12 +19,14 @@ socket.socket = _NoNetworkSocket
 
 
 def main() -> int:
+    if importlib.util.find_spec("docling") is None:
+        return 3
     try:
         from docling.document_converter import (  # pyright: ignore[reportMissingImports]
             DocumentConverter,
         )
     except ImportError:
-        return 3
+        return 2
     suffix = sys.argv[1] if len(sys.argv) == 2 else ".bin"
     payload = sys.stdin.buffer.read(64 * 1024 * 1024 + 1)
     if len(payload) > 64 * 1024 * 1024:
@@ -50,10 +53,11 @@ def main() -> int:
     json.dump(
         {
             "body": body,
-            "locator": {"kind": "document", "ordinal": 1},
+            "locator": {"kind": "page" if suffix == ".pdf" else "paragraph", "ordinal": 1},
             "parser_version": parser_version,
             "model_version": "docling-default",
             "partial": False,
+            "partial_reason": None,
         },
         sys.stdout,
         ensure_ascii=False,
