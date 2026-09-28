@@ -56,7 +56,15 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
         choices=sorted(
             set(READ_COMMANDS)
             | WRITE_COMMANDS
-            | {"import", "ingest", "recall", "notify", "model-run", "maintain"}
+            | {
+                "import",
+                "ingest",
+                "recall",
+                "notify",
+                "model-run",
+                "maintain",
+                "evidence-links",
+            }
         ),
     )
     parser.add_argument("--source", action="append", default=[])
@@ -167,6 +175,17 @@ def dispatch(
             raise LifeInputError("LIFE_AUTH_CONFIG_CHANGED")
         return _check(*workflow(fresh, name, body, **common))
 
+    if command == "evidence-links":
+        event_id = data.get("event_id")
+        if not isinstance(event_id, str) or not event_id or len(event_id) > 512:
+            raise LifeInputError("LIFE_INPUT_INVALID")
+        with read_root(config) as root:
+            return read_endpoint(
+                config,
+                root,
+                principal,
+                "/api/life/v1/evidence-links/" + event_id,
+            )
     if command in READ_COMMANDS:
         query = urlencode({k: v for k, v in data.items() if v is not None})
         with read_root(config) as root:
@@ -261,9 +280,18 @@ def _notify(
                     source_ids=principal.source_ids,
                     events=events,
                 )
-        state, provider_id = send_notification(
-            channel, claim["object_id"], claim["body"]["notification"]
-        )
+                from sb.life_delivery import evidence_still_current
+
+                claimed = LifeJournal(store).raw("delivery", claim["object_id"])
+                current = claimed is not None and evidence_still_current(
+                    LifeJournal(store), claimed, now=datetime.now(UTC)
+                )
+            if not current:
+                state, provider_id = "stale", None
+            else:
+                state, provider_id = send_notification(
+                    channel, claim["object_id"], claim["body"]["notification"]
+                )
     except LifeInputError:
         state, provider_id = "rejected", None
     result = write(
