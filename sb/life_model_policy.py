@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from enum import StrEnum
 from typing import Any, Protocol
 
 from sb.life_contracts import LifeEventV1, LifeInputError
@@ -15,18 +16,31 @@ from sb.life_values import text, zone
 from sb.store.life_journal import LifeJournal, identity, snapshot
 
 
+class ModelConsumer(StrEnum):
+    GENERATE = "generate"
+    EMBED = "embed"
+    RERANK = "rerank"
+    TRANSCRIBE = "transcribe"
+
+
 class Generator(Protocol):
-    def generate(self, prompt: str, **kwargs: Any) -> str: ...
+    def generate(self, prompt: str) -> str: ...
 
 
 def permit(
     events: Sequence[LifeEventV1],
     *,
+    kind: ModelConsumer | str,
     external: bool,
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
 ) -> None:
-    if type(external) is not bool or not events:
+    if (
+        type(kind) not in (str, ModelConsumer)
+        or kind not in ModelConsumer
+        or type(external) is not bool
+        or not events
+    ):
         raise LifeInputError("LIFE_MODEL_POLICY_INVALID")
     for event in events:
         if not set(event.scopes).issubset(scopes) or event.source_id not in source_ids:
@@ -36,6 +50,40 @@ def permit(
             or event.sensitivity in {"sensitive", "restricted"}
         ):
             raise LifeInputError("LIFE_LOCAL_ONLY_REQUIRED")
+
+
+def _binding(
+    events: Sequence[LifeEventV1], kind: ModelConsumer, model_version: str
+) -> dict[str, object]:
+    return {
+        "consumer_kind": str(kind),
+        "model_version": text(model_version, maximum=256),
+        "policy_revision": [
+            list(pair) for pair in sorted({(e.source_id, e.policy_revision) for e in events})
+        ],
+    }
+
+
+def _live_snapshot(
+    journal: LifeJournal,
+    events: Sequence[LifeEventV1],
+    *,
+    scopes: tuple[str, ...],
+    now: datetime,
+) -> str:
+    """Refuse evidence that is no longer the stored revision.
+
+    A caller-held event object is not authority after correction or forget.
+    """
+    try:
+        current = tuple(
+            journal.store.get(event.event_id, scopes=scopes, now=now) for event in events
+        )
+    except LifeInputError as exc:
+        raise LifeInputError("LIFE_MODEL_RESERVATION_INVALID") from exc
+    if snapshot(current) != snapshot(events):
+        raise LifeInputError("LIFE_MODEL_RESERVATION_INVALID")
+    return snapshot(current)
 
 
 def reserve(
@@ -53,8 +101,13 @@ def reserve(
     estimated_tokens: int = 4096,
     maximum_cost_micros: int = 0,
     timezone: str = "Asia/Seoul",
+    kind: ModelConsumer = ModelConsumer.GENERATE,
+    model_version: str = "legacy-generator-v1",
 ) -> dict[str, Any]:
-    permit(events, external=external, scopes=scopes, source_ids=source_ids)
+    # Existing callers are generation-only. Other consumers must declare their
+    # kind at permit; versioned providers supply their immutable model revision.
+    permit(events, kind=kind, external=external, scopes=scopes, source_ids=source_ids)
+    binding = _binding(events, kind, model_version)
     key = text(key, maximum=256)
     if any(
         type(n) is not int or n < 0
@@ -73,10 +126,12 @@ def reserve(
     rid = identity("model_reservation", [scopes, source_ids, key])
     fp = snapshot(events)
     with journal.transaction():
+        _live_snapshot(journal, events, scopes=scopes, now=now)
         prior = journal.raw("model_reservation", rid)
         if prior is not None:
             if (
-                prior["body"].get("input_snapshot") != fp
+                any(prior["body"].get(k) != v for k, v in binding.items())
+                or prior["body"].get("input_snapshot") != fp
                 or prior["body"].get("external") != external
                 or prior["body"].get("reserved_tokens") != estimated_tokens
                 or prior["body"].get("reserved_cost_micros") != maximum_cost_micros
@@ -111,6 +166,7 @@ def reserve(
         ):
             raise LifeInputError("LIFE_MODEL_BUDGET_EXCEEDED")
         body = {
+            **binding,
             "state": "reserved",
             "day": day,
             "input_snapshot": fp,
@@ -139,15 +195,34 @@ def generate_after_reservation(
     external: bool,
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
+    model_version: str = "legacy-generator-v1",
+    journal: LifeJournal | None = None,
+    now: datetime | None = None,
 ) -> str:
-    permit(events, external=external, scopes=scopes, source_ids=source_ids)
+    permit(
+        events,
+        kind=ModelConsumer.GENERATE,
+        external=external,
+        scopes=scopes,
+        source_ids=source_ids,
+    )
+    binding = _binding(events, ModelConsumer.GENERATE, model_version)
     if (
-        not reservation.get("execute_allowed")
+        any(reservation["body"].get(k) != v for k, v in binding.items())
+        or not set(reservation["scopes"]).issubset(scopes)
+        or not set(reservation["source_ids"]).issubset(source_ids)
+        or not reservation.get("execute_allowed")
         or reservation["body"]["state"] != "reserved"
         or reservation["body"]["external"] != external
         or reservation["body"]["input_snapshot"] != snapshot(events)
     ):
         raise LifeInputError("LIFE_MODEL_RESERVATION_INVALID")
+    # life_cli re-reads visibility before calling. Direct callers must pass the
+    # journal so a forgotten or corrected object cannot be replayed from memory.
+    if journal is not None:
+        if now is None:
+            raise LifeInputError("LIFE_MODEL_RESERVATION_INVALID")
+        _live_snapshot(journal, events, scopes=scopes, now=now)
     # Quoted data is never an instruction or an execution authority.
     import json
 
@@ -168,6 +243,9 @@ def generate_after_reservation(
         '"event_ids":[근거ID]}]}만 반환하세요. 근거 없는 내용은 생략하세요.\n'
         + json.dumps(inputs, ensure_ascii=False)
     )
+    # The committed reservation is charged even on failure; this in-memory
+    # execution grant is consumed before crossing the provider boundary.
+    reservation["execute_allowed"] = False
     try:
         result = model.generate(prompt)
     except Exception as exc:
