@@ -4,10 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from sb.config import Config
-from sb.pipeline import StageReport, _Compiled, run_compile
+from sb.pipeline import Compiled, StageReport, run_compile
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger
-from sb.vault import Vault, _commit_if_changed
+from sb.vault import Vault, commit_if_changed
 from tests.vault_test_support import CAS_SID, CitedPageFixture, MemoryLedger, cited_page, ready
 
 PAGE = "daily/2026-09-10"
@@ -37,7 +37,7 @@ def test_human_page_without_frontmatter_still_goes_to_proposed(tmp_path: Path) -
     root = ready(tmp_path)
     dest = tmp_path / "daily" / "2026-09-10.md"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text("hand-edited note\n", encoding="utf-8")
+    _ = dest.write_text("hand-edited note\n", encoding="utf-8")
     result = root.write_pages([_page("compiled")], "run-1", MemoryLedger())
     assert result.proposals == 1
     assert result.pages == 0
@@ -51,7 +51,7 @@ def test_human_edit_of_compiled_page_without_marker_goes_to_proposed(tmp_path: P
     first = root.write_pages([_page("first")], "run-1", MemoryLedger())
     assert first.pages == 1
     original = dest.read_text(encoding="utf-8")
-    dest.write_text(original.replace("first", "first USER_EDIT", 1), encoding="utf-8")
+    _ = dest.write_text(original.replace("first", "first USER_EDIT", 1), encoding="utf-8")
     result = root.write_pages([_page("corrected")], "run-2", MemoryLedger())
     assert result.proposals == 1
     assert result.pages == 0
@@ -76,7 +76,7 @@ def test_managed_compile_corrects_unmodified_compiled_page(tmp_path: Path) -> No
 
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         del ledger
-        compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+        compiled = Compiled(vault.root, ContentAddressedStore(vault.root))
         written = vault.write_pages([_page("Corrected")], run_id, compiled)
         return StageReport((), written.pages, written.conflicts, 0, False)
 
@@ -100,12 +100,12 @@ def test_managed_compile_keeps_committed_human_edit(tmp_path: Path) -> None:
     first = vault.write_pages([_page("Original")], "seed", MemoryLedger())
     assert first.pages == 1
     dest = active / f"{PAGE}.md"
-    dest.write_text(dest.read_text(encoding="utf-8") + "\nUSER_EDIT_COMMITTED\n", encoding="utf-8")
-    assert _commit_if_changed(active, "human-edit", [dest]) is not None
+    _ = dest.write_text(dest.read_text(encoding="utf-8") + "\nUSER_EDIT_COMMITTED\n", encoding="utf-8")
+    assert commit_if_changed(active, "human-edit", [dest]) is not None
 
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         del ledger
-        compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+        compiled = Compiled(vault.root, ContentAddressedStore(vault.root))
         written = vault.write_pages([_page("Corrected")], run_id, compiled)
         return StageReport((), written.pages, written.conflicts, 0, False)
 
@@ -129,12 +129,12 @@ def test_managed_compile_keeps_committed_human_only_page(tmp_path: Path) -> None
     first = vault.write_pages([_page("Original")], "seed", MemoryLedger())
     assert first.pages == 1
     dest = active / f"{PAGE}.md"
-    dest.write_text("# notes\nhuman-only page\n", encoding="utf-8")
-    assert _commit_if_changed(active, "human-page", [dest]) is not None
+    _ = dest.write_text("# notes\nhuman-only page\n", encoding="utf-8")
+    assert commit_if_changed(active, "human-page", [dest]) is not None
 
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         del ledger
-        compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+        compiled = Compiled(vault.root, ContentAddressedStore(vault.root))
         written = vault.write_pages([_page("Corrected")], run_id, compiled)
         return StageReport((), written.pages, written.conflicts, 0, False)
 
@@ -158,11 +158,11 @@ def test_managed_compile_keeps_uncommitted_human_edit(tmp_path: Path) -> None:
     first = vault.write_pages([_page("Original")], "seed", MemoryLedger())
     assert first.pages == 1
     dest = active / f"{PAGE}.md"
-    dest.write_text(dest.read_text(encoding="utf-8") + "\nUSER_EDIT_KEEP_THIS\n", encoding="utf-8")
+    _ = dest.write_text(dest.read_text(encoding="utf-8") + "\nUSER_EDIT_KEEP_THIS\n", encoding="utf-8")
 
     def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
         del ledger
-        compiled = _Compiled(vault.root, ContentAddressedStore(vault.root))
+        compiled = Compiled(vault.root, ContentAddressedStore(vault.root))
         written = vault.write_pages([_page("Corrected")], run_id, compiled)
         return StageReport((), written.pages, written.conflicts, 0, False)
 
@@ -176,7 +176,7 @@ def test_marked_human_edit_still_goes_to_proposed(tmp_path: Path) -> None:
     root = ready(tmp_path)
     dest = tmp_path / "daily" / "2026-09-10.md"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text("hand-edited compiled page\n", encoding="utf-8")
+    _ = dest.write_text("hand-edited compiled page\n", encoding="utf-8")
     result = root.write_pages(
         [_page("second")],
         "run-1",

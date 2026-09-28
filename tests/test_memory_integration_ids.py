@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonInput, JsonObject
 from sb.scoped_write_request import parse_scoped_write_request
+from tests.json_fixtures import parse_json, parse_object
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / "contracts/memory-integration-ids-v1.json"
@@ -14,7 +16,7 @@ DOMAIN = b"orca-jarvis/memory-integration-ids/v1\0"
 SCOPED_DOMAIN = b"orca-jarvis/memory-scoped-write-request/v4\0"
 
 
-def _canonical(value: object) -> bytes:
+def _canonical(value: JsonInput) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
 
@@ -22,14 +24,14 @@ def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _load_contract() -> dict[str, object]:
-    loaded = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+def _load_contract() -> JsonObject:
+    loaded = parse_json(CONTRACT_PATH.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
         raise TypeError("memory-integration-ids contract must be an object")
     return loaded
 
 
-def _golden(contract: dict[str, object]) -> dict[str, object]:
+def _golden(contract: JsonObject) -> JsonObject:
     golden = contract["golden"]
     if not isinstance(golden, dict):
         raise TypeError("golden envelope must be an object")
@@ -82,21 +84,23 @@ def test_id_owners_and_encodings_are_machine_tokens() -> None:
 def test_jarvis_and_python_share_scoped_write_fixture_bytes() -> None:
     contract = _load_contract()
     assert _sha256_file(SCOPED_WRITE_PATH) == contract["scoped_write_golden_sha256"]
-    request = json.loads(SCOPED_WRITE_PATH.read_text(encoding="utf-8"))
+    request = parse_object(SCOPED_WRITE_PATH.read_text(encoding="utf-8"))
     base = {k: v for k, v in request.items() if k not in {"request_digest", "request_id"}}
     digest = "sha256:" + hashlib.sha256(SCOPED_DOMAIN + _canonical(base)).hexdigest()
     assert digest == request["request_digest"]
     assert request["request_id"] == "memreq:scoped:v4:" + digest[7:]
     assert request["request_id"] == _golden(contract)["request_id"]
+    created_at = request["created_at"]
+    assert isinstance(created_at, str)
     parsed = parse_scoped_write_request(
         request,
-        now=datetime.fromisoformat(request["created_at"]),
+        now=datetime.fromisoformat(created_at),
         expected_provider="provider:fixture",
     )
     assert parsed.request_digest == digest
 
 
-def _reseal(request: dict[str, object]) -> dict[str, object]:
+def _reseal(request: JsonObject) -> JsonObject:
     base = {k: v for k, v in request.items() if k not in {"request_digest", "request_id"}}
     digest = "sha256:" + hashlib.sha256(SCOPED_DOMAIN + _canonical(base)).hexdigest()
     request["request_digest"] = digest
@@ -109,10 +113,10 @@ def _reseal(request: dict[str, object]) -> dict[str, object]:
     ["grants", "permissions", "roles", "scopes"],
 )
 def test_client_cannot_self_assign_request_permissions(field: str) -> None:
-    request = json.loads(SCOPED_WRITE_PATH.read_text(encoding="utf-8"))
+    request = parse_object(SCOPED_WRITE_PATH.read_text(encoding="utf-8"))
     request[field] = ["write"]
     with pytest.raises(ValueError, match="SCOPED_WRITE_REQUEST_INVALID"):
-        parse_scoped_write_request(
+        _ = parse_scoped_write_request(
             _reseal(request),
             now=datetime.fromisoformat(str(request["created_at"])),
             expected_provider="provider:fixture",
@@ -120,12 +124,12 @@ def test_client_cannot_self_assign_request_permissions(field: str) -> None:
 
 
 def test_client_cannot_set_writes_authorized_true() -> None:
-    request = json.loads(SCOPED_WRITE_PATH.read_text(encoding="utf-8"))
+    request = parse_object(SCOPED_WRITE_PATH.read_text(encoding="utf-8"))
     preparation = request["preparation"]
     assert isinstance(preparation, dict)
     preparation["writes_authorized"] = True
     with pytest.raises(ValueError, match="SCOPED_WRITE_REQUEST_INVALID"):
-        parse_scoped_write_request(
+        _ = parse_scoped_write_request(
             _reseal(request),
             now=datetime.fromisoformat(str(request["created_at"])),
             expected_provider="provider:fixture",

@@ -5,6 +5,8 @@ import multiprocessing
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import TypeAdapter
+
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
 from sb.generation_runtime_models import (
@@ -12,6 +14,7 @@ from sb.generation_runtime_models import (
     GenerationMutation,
     GenerationOperation,
 )
+from sb.generations import Generation
 from sb.remember_page import materialize_remember
 from sb.scoped_search import search_scoped_records
 from sb.source_access import SourceAccess
@@ -56,7 +59,7 @@ def test_scoped_search_keeps_pinned_results_until_independent_writer_switches(tm
     parent, child = context.Pipe()
     process = context.Process(target=_successor, args=(str(tmp_path), child))
 
-    def search(generation, query="SharedProbe"):
+    def search(generation: Generation, query: str = "SharedProbe"):
         manifest = generation.manifest
         identity = GenerationIdentityV1(manifest.provider_instance_id, generation.generation_id,
             manifest.generation_digest, generation.head, generation.tree)
@@ -84,7 +87,7 @@ def test_scoped_search_keeps_pinned_results_until_independent_writer_switches(tm
             assert service.store.active().generation_id == original.generation_id
             assert original.root.exists()
         assert parent.poll(20), "writer did not finish after reader released its pin"
-        successor_id = parent.recv()
+        successor_id = TypeAdapter(str).validate_python(parent.recv(), strict=True)
         process.join(10)
         assert process.exitcode == 0
         with service.store.pin("scoped-fresh-reader", NOW) as pin:

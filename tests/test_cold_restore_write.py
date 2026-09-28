@@ -40,25 +40,25 @@ def _cfg(vault: Path) -> Config:
 
 def test_cold_restore_then_product_write(tmp_path: Path) -> None:
     live = tmp_path / "live"
-    init_vault(live)
+    _ = init_vault(live)
     cfg = _cfg(live)
     record_revoked_key_ids(Path(str(cfg.raw["state_root"])), ["key:test"])
-    (live / "inbox" / "pre.md").write_text("pre-backup-needle\n", encoding="utf-8")
+    _ = (live / "inbox" / "pre.md").write_text("pre-backup-needle\n", encoding="utf-8")
     seeded = run_all(cfg)
     assert seeded.status == "ok"
     archive = tmp_path / "backup.tar"
     backup_at = datetime.now(UTC).isoformat()
     started = time.perf_counter()
-    create_backup(live, archive)
+    _ = create_backup(live, archive)
     removed = [path for path in live.rglob("*") if path.suffix in {".sqlite", ".db"} and path.is_file()]
     for path in removed:
         path.unlink()
     restored = tmp_path / "restored"
-    restore_backup(archive, restored, force=True)
+    _ = restore_backup(archive, restored, force=True)
     cfg2 = _cfg(restored)
     pre = SearchIndex(vault_root=restored).search("pre-backup-needle", limit=5)
     rto_s = round(time.perf_counter() - started, 4)
-    (restored / "inbox" / "post.md").write_text("post-restore-needle\n", encoding="utf-8")
+    _ = (restored / "inbox" / "post.md").write_text("post-restore-needle\n", encoding="utf-8")
     written = run_all(cfg2)
     post = SearchIndex(vault_root=restored).search("post-restore-needle", limit=5)
     keys = sorted(load_revoked_key_ids(Path(str(cfg2.raw["state_root"]))))
@@ -73,7 +73,7 @@ def test_cold_restore_then_product_write(tmp_path: Path) -> None:
         "revocation_keys": keys,
         "cutover": False,
     }
-    Path("/var/tmp/m12-cold-restore-write.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    _ = Path("/var/tmp/m12-cold-restore-write.json").write_text(json.dumps(evidence, indent=2) + "\n")
     assert removed
     assert any("pre-backup" in hit.page_id or "inbox" in hit.page_id or "memory" in hit.page_id for hit in pre) or pre
     assert written.status == "ok" and written.git_commit

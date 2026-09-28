@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, override
 
+from pydantic import TypeAdapter
+
 from sb.contracts import PageSpec
 from sb.memory_records import MemoryRecordError, parse_page_records
 from sb.search import SearchHit, SearchIndex
@@ -39,6 +41,7 @@ _HOOK_STOP: Final = frozenset({
 type Json = str | int | float | bool | None | list["Json"] | dict[str, "Json"]
 type Trigger = Literal["auto", "manual", ""]
 type HookName = Literal["PostCompact", "UserPromptSubmit", "SessionStart"]
+_HOOK_JSON: Final[TypeAdapter[Json]] = TypeAdapter(Json)
 
 
 class PostCompactHookError(ValueError):
@@ -76,7 +79,7 @@ class PostCompactResult:
 def parse_postcompact_event(raw: bytes) -> PostCompactEvent:
     """Parse Claude PostCompact or UserPromptSubmit stdin."""
     try:
-        loaded: Json = json.loads(raw.decode("utf-8"))
+        loaded = _HOOK_JSON.validate_python(json.loads(raw.decode("utf-8")), strict=True)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise PostCompactHookError("HOOK_JSON_INVALID") from exc
     if not isinstance(loaded, dict):
@@ -158,7 +161,7 @@ def handle_postcompact(
                 event.name, event.session_id, " ".join(terms), event.trigger,
                 event.event_digest, event.source,
             )
-            records, context = _serialize(search_event, hits, index.vault_root)
+            records, context = serialize(search_event, hits, index.vault_root)
             prior = _read_stage(stage_root, event.session_id)
             excluded = _exclude_delivered(records, prior)
             duplicate = prior is not None and str(prior.get("event_digest")) == event.event_digest
@@ -185,7 +188,7 @@ def handle_postcompact(
             if not records:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             context = str(stage.get("context") or "")
-            payload = _inject_payload(_PROMPT, context)
+            payload = inject_payload(_PROMPT, context)
             return PostCompactResult(event.session_id, payload, records, budgets, False, True)
         case "SessionStart":
             if event.source != "compact":
@@ -206,7 +209,7 @@ def handle_postcompact(
                 event.name, event.session_id, " ".join(terms) or query, event.trigger,
                 event.event_digest, event.source,
             )
-            records, context = _serialize(search_event, hits, index.vault_root)
+            records, context = serialize(search_event, hits, index.vault_root)
             if not records:
                 return PostCompactResult(event.session_id, {}, (), budgets, False)
             prior_undelivered = () if prior is None or prior.get("delivered") is True else _records_from_stage(prior)
@@ -220,7 +223,7 @@ def handle_postcompact(
                 delivered=not remainder,
                 in_turn=records,
             )
-            payload = _inject_payload(_SESSION, context)
+            payload = inject_payload(_SESSION, context)
             return PostCompactResult(event.session_id, payload, records, budgets, False, True)
 
 
@@ -337,7 +340,7 @@ def _bound_query_text(text: str) -> str:
 
 def _standalone_term(term: str, text: str) -> bool:
     folded = term.casefold()
-    return any(part.casefold() == folded for part in _WORD_TOKEN.findall(text))
+    return any(match.group().casefold() == folded for match in _WORD_TOKEN.finditer(text))
 
 
 def _term_in(term: str, text: str) -> bool:
@@ -358,7 +361,7 @@ def _identifier_rank(token: str) -> int:
     return 2
 
 
-def _candidate_tokens(text: str) -> tuple[str, ...]:
+def candidate_tokens(text: str) -> tuple[str, ...]:
     counts: dict[str, tuple[int, str]] = {}
     for raw in text.split():
         token = raw.strip(".,;:!?\"'()[]")
@@ -387,7 +390,7 @@ def _weighted_terms(
 ) -> tuple[tuple[str, float, tuple[SearchHit, ...]], ...]:
     limit = _MAX_ITEMS * 4
     weighted: list[tuple[str, float, tuple[SearchHit, ...]]] = []
-    for term in _candidate_tokens(text):
+    for term in candidate_tokens(text):
         hits = index.search(term, limit)
         if len(term) < _SHORT_TERM:
             hits = tuple(hit for hit in hits if _standalone_term(term, hit.snippet))
@@ -481,10 +484,10 @@ def _matching_records(root: Path, hit: SearchHit, terms: tuple[str, ...]) -> tup
     return tuple(rows)
 
 
-def _serialize(
+def serialize(
     event: PostCompactEvent, hits: tuple[SearchHit, ...], root: Path | None = None,
 ) -> tuple[tuple[dict[str, str], ...], str]:
-    terms = _candidate_tokens(event.query)
+    terms = candidate_tokens(event.query)
     seen: set[str] = set()
     records: list[dict[str, str]] = []
     for hit in hits:
@@ -508,13 +511,13 @@ def _serialize(
     while True:
         context = _context_text(event.session_id, records)
         inject_name = _SESSION if event.name == "SessionStart" else _PROMPT
-        payload = _inject_payload(inject_name, context)
+        payload = inject_payload(inject_name, context)
         encoded = json.dumps(payload, ensure_ascii=False).encode()
         if len(encoded) <= _MAX_TOTAL_BYTES:
             return tuple(records), context
         if not records:
             return (), _context_text(event.session_id, [])
-        records.pop()
+        _ = records.pop()
 
 
 def _context_text(session_id: str, records: list[dict[str, str]]) -> str:
@@ -533,7 +536,7 @@ def _context_text(session_id: str, records: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _inject_payload(event_name: str, context: str) -> dict[str, Json]:
+def inject_payload(event_name: str, context: str) -> dict[str, Json]:
     return {
         "hookSpecificOutput": {
             "hookEventName": event_name,
@@ -581,7 +584,9 @@ def _read_stage(root: Path, session_id: str) -> dict[str, Json] | None:
     path = _stage_path(root, session_id)
     if not path.is_file():
         return None
-    loaded: Json = json.loads(path.read_text(encoding="utf-8"))
+    loaded = _HOOK_JSON.validate_python(
+        json.loads(path.read_text(encoding="utf-8")), strict=True,
+    )
     if not isinstance(loaded, dict):
         return None
     return loaded
@@ -618,11 +623,6 @@ def _write_stage(
     _write_stage_file(_stage_path(root, event.session_id), json.dumps(payload, ensure_ascii=False))
 
 
-def _mark_delivered(root: Path, session_id: str, stage: dict[str, Json]) -> None:
-    stage["delivered"] = True
-    _write_stage_file(_stage_path(root, session_id), json.dumps(stage, ensure_ascii=False))
-
-
 def _records_from_stage(stage: dict[str, Json]) -> tuple[dict[str, str], ...]:
     return _records_from_stage_field(stage, "records")
 
@@ -650,3 +650,9 @@ def _clip(text: str, max_bytes: int) -> str:
     if len(encoded) <= max_bytes:
         return text
     return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+# Compatibility for existing internal consumers; public names own the implementations.
+_serialize = serialize
+_inject_payload = inject_payload
+_candidate_tokens = candidate_tokens

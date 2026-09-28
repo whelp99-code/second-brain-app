@@ -6,16 +6,19 @@ All mutating functions run inside the caller's existing writer transaction.
 
 from __future__ import annotations
 
-import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Any
 
+from sb.effect_values import JsonInput, JsonObject
 from sb.life_config import LifeSettingsV1
 from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_fields import string
+from sb.life_journal_contracts import EventMutation, JournalRow
+from sb.life_json import decode_json
 from sb.life_values import canonical_bytes, instant, text, zone
 from sb.store.life_journal import LifeJournal, identity
+from sb.store.life_rows import iter_rows
 
 
 def quiet(now: datetime, opts: LifeSettingsV1) -> bool:
@@ -55,25 +58,26 @@ def issue(
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> list[dict[str, Any]]:
+) -> list[JournalRow]:
     opts.require("gap_questions")
     if quiet(now, opts) or opts.question_budget == 0:
         return []
     local_day = now.astimezone(zone(opts.timezone)).date().isoformat()
     with journal.transaction():
-        existing = []
-        for (qid,) in journal.connection.execute(
-            "SELECT object_id FROM life_workflow_heads WHERE kind='question'"
-        ):
-            row = journal.raw("question", qid)
-            owners = {s for s in scopes if s.startswith(("owner:", "principal:"))}
-            if row is not None and (
-                owners.intersection(row["scopes"]) or set(row["scopes"]).issubset(scopes)
-            ):
-                existing.append(row)
+        existing: list[JournalRow] = []
+        with iter_rows(
+            journal.connection, "SELECT object_id FROM life_workflow_heads WHERE kind='question'"
+        ) as rows:
+            for (qid,) in rows:
+                row = journal.raw("question", string(qid))
+                owners = {s for s in scopes if s.startswith(("owner:", "principal:"))}
+                if row is not None and (
+                    owners.intersection(row["scopes"]) or set(row["scopes"]).issubset(scopes)
+                ):
+                    existing.append(row)
         used = sum(row["body"].get("issued_day") == local_day for row in existing)
         remaining = max(0, opts.question_budget - used)
-        proposals = []
+        proposals: list[tuple[int, LifeEventV1, str, str]] = []
         for event in events:
             selected = candidate(event, now)
             if (
@@ -95,13 +99,13 @@ def issue(
                 continue
             proposals.append((0 if kind == "conflict" else 1, event, kind, prompt))
         proposals.sort(key=lambda p: (p[0], p[1].occurred_start or "", p[1].event_id))
-        result = []
+        result: list[JournalRow] = []
         for _, event, kind, prompt in proposals[:remaining]:
             qid = identity("question", [event.event_id, event.revision, kind])
-            prior = journal.raw("question", qid)
+            prior = journal.raw("question", string(qid))
             if prior is not None:
                 continue
-            body = {
+            body: JsonObject = {
                 "event_id": event.event_id,
                 "event_revision": event.revision,
                 "question_kind": kind,
@@ -119,17 +123,17 @@ def issue(
 def prepare_response(
     journal: LifeJournal,
     question_id: str,
-    data: dict[str, object],
+    data: Mapping[str, JsonInput],
     *,
     events: Sequence[LifeEventV1],
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> tuple[dict[str, Any], dict[str, object] | None]:
+) -> tuple[JournalRow, EventMutation | None]:
     if set(data) - {"action", "answer", "event_status", "idempotency_key", "expected_revision"}:
         raise LifeInputError("LIFE_UNKNOWN_FIELD")
     action = data.get("action")
-    if action not in {"answer", "skip", "mute"}:
+    if not isinstance(action, str) or action not in {"answer", "skip", "mute"}:
         raise LifeInputError("LIFE_RESPONSE_INVALID")
     key = text(data.get("idempotency_key"), maximum=256)
     request_digest = sha256(
@@ -147,7 +151,7 @@ def prepare_response(
     ):
         raise LifeInputError("LIFE_REVISION_CONFLICT")
     event = next(e for e in events if e.event_id == row["body"]["event_id"])
-    body = {
+    body: JsonObject = {
         **row["body"],
         "state": {"answer": "answered", "skip": "skipped", "mute": "muted"}[action],
         "response_key": key,
@@ -155,11 +159,13 @@ def prepare_response(
         "response_digest": request_digest,
         "responded_at": now.isoformat(),
     }
-    mutation = None
+    mutation: EventMutation | None = None
     if action == "answer":
         answer = text(data.get("answer"), maximum=10000)
         body["answer"] = answer
-        original = json.loads(journal.store.evidence(event.event_id, scopes=scopes, now=now))
+        original = decode_json(journal.store.evidence(event.event_id, scopes=scopes, now=now))
+        if not isinstance(original, dict):
+            raise LifeInputError("LIFE_RECORD_CORRUPT")
         original.update(
             body=answer,
             change_reason="사용자의 기록 확인 질문 응답",
@@ -168,7 +174,7 @@ def prepare_response(
             review_state="confirmed",
         )
         if "event_status" in data:
-            original["event_status"] = data["event_status"]
+            original["event_status"] = string(data["event_status"], "LIFE_EVENT_STATUS_INVALID")
         mutation = {
             "source_id": event.source_id,
             "event_id": event.event_id,
@@ -181,8 +187,8 @@ def prepare_response(
 
 
 def finish_response(
-    journal: LifeJournal, prepared: dict[str, Any], *, evidence: LifeEventV1, now: datetime
-) -> dict[str, Any]:
+    journal: LifeJournal, prepared: JournalRow, *, evidence: LifeEventV1, now: datetime
+) -> JournalRow:
     return journal.put(
         "question",
         prepared["object_id"],

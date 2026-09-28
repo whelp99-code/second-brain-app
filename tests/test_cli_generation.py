@@ -13,6 +13,7 @@ from sb import cli
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
 from sb.ops import status_snapshot
+from sb.ops_models import StatusSnapshot
 from sb.request_store import RequestStore
 from tests.test_runtime_reliability import managed
 
@@ -30,7 +31,7 @@ def test_cli_status_holds_a_reader_pin_and_uses_its_generation(
         service.close()
     monkeypatch.setattr(cli, "load_config", lambda: config)
 
-    def observed(snapshot: Config) -> dict[str, object]:
+    def observed(snapshot: Config) -> StatusSnapshot:
         assert Path(snapshot.vault_root) == generation.root
         assert not Path(snapshot.vault_root).is_symlink()
         requests = RequestStore(Path(config.request_root))
@@ -66,7 +67,7 @@ def test_cli_read_pin_is_released_when_handler_fails(tmp_path: Path, monkeypatch
         service.close()
     monkeypatch.setattr(cli, "load_config", lambda: config)
 
-    def fail(_config: Config) -> dict[str, object]:
+    def fail(_config: Config) -> StatusSnapshot:
         raise OSError("synthetic read failure")
 
     monkeypatch.setattr(cli, "status_snapshot", fail)

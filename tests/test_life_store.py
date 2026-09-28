@@ -1,45 +1,48 @@
 """SB2 P02 persistence tests against the real current Ledger and CAS."""
 
 import sqlite3
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import timedelta
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
 from sb.life_contracts import LifeInputError
 from sb.store.ledger import Ledger
+from sb.store.life import LifeStore
 from tests.test_life_contracts import NOW, payload, policy
 
 
 @pytest.fixture
-def store(tmp_path):
+def store(tmp_path: Path) -> Iterator[LifeStore]:
     with Ledger(tmp_path) as ledger:
         yield ledger.life_store()
 
 
-def test_ten_retries_create_one_event_and_one_receipt(store):
+def test_ten_retries_create_one_event_and_one_receipt(store: LifeStore) -> None:
     receipts = [store.accept(payload(), policy(), key="request-1", now=NOW) for _ in range(10)]
     assert len({r.receipt_id for r in receipts}) == 1
     assert not receipts[0].replayed and all(r.replayed for r in receipts[1:])
     assert len(store.events(scopes=("owner:test",), now=NOW)) == 1
 
 
-def test_idempotency_key_cannot_change_payload(store):
-    store.accept(payload(), policy(), key="request-1", now=NOW)
+def test_idempotency_key_cannot_change_payload(store: LifeStore) -> None:
+    _ = store.accept(payload(), policy(), key="request-1", now=NOW)
     with pytest.raises(LifeInputError, match="IDEMPOTENCY_CONFLICT"):
-        store.accept(payload(body="different"), policy(), key="request-1", now=NOW)
+        _ = store.accept(payload(body="different"), policy(), key="request-1", now=NOW)
 
 
-def test_same_source_version_cannot_silently_change_content(store):
-    store.accept(payload(), policy(), key="request-1", now=NOW)
+def test_same_source_version_cannot_silently_change_content(store: LifeStore) -> None:
+    _ = store.accept(payload(), policy(), key="request-1", now=NOW)
     with pytest.raises(LifeInputError, match="SOURCE_VERSION_CONFLICT"):
-        store.accept(
+        _ = store.accept(
             payload(body="different"), policy(), key="request-2", now=NOW, expected_revision=1
         )
 
 
-def test_correction_is_append_only_with_compare_and_swap(store):
+def test_correction_is_append_only_with_compare_and_swap(store: LifeStore) -> None:
     old = store.accept(payload(), policy(), key="r1", now=NOW)
     new = store.accept(
         payload(source_version="v2", body="changed"),
@@ -52,13 +55,17 @@ def test_correction_is_append_only_with_compare_and_swap(store):
     assert store.get(old.event_id, scopes=("owner:test",), now=NOW).body == "changed"
     assert store.history(old.event_id, scopes=("owner:test",), now=NOW)[0].body == "실제 메모"
     with pytest.raises(LifeInputError, match="REVISION_CONFLICT"):
-        store.accept(payload(source_version="v3"), policy(), key="r3", now=NOW, expected_revision=1)
+        _ = store.accept(
+            payload(source_version="v3"), policy(), key="r3", now=NOW, expected_revision=1
+        )
 
 
-def test_authority_cannot_be_relaxed_by_changing_operator_policy_mid_event(store):
-    store.accept(payload(), policy(), key="r1", now=NOW)
+def test_authority_cannot_be_relaxed_by_changing_operator_policy_mid_event(
+    store: LifeStore,
+) -> None:
+    _ = store.accept(payload(), policy(), key="r1", now=NOW)
     with pytest.raises(LifeInputError, match="POLICY_CHANGED"):
-        store.accept(
+        _ = store.accept(
             payload(source_version="v2"),
             replace(policy(), scopes=("other",)),
             key="r2",
@@ -67,7 +74,7 @@ def test_authority_cannot_be_relaxed_by_changing_operator_policy_mid_event(store
         )
 
 
-def test_scope_filter_happens_before_limit_and_hides_receipts(store):
+def test_scope_filter_happens_before_limit_and_hides_receipts(store: LifeStore) -> None:
     foreign = store.accept(
         payload(), replace(policy(), source_id="foreign", scopes=("other",)), key="r1", now=NOW
     )
@@ -76,37 +83,39 @@ def test_scope_filter_happens_before_limit_and_hides_receipts(store):
         own.event_id
     ]
     with pytest.raises(LifeInputError, match="NOT_FOUND"):
-        store.get(foreign.event_id, scopes=("owner:test",), now=NOW)
+        _ = store.get(foreign.event_id, scopes=("owner:test",), now=NOW)
     with pytest.raises(LifeInputError, match="NOT_FOUND"):
-        store.receipt(foreign.receipt_id, scopes=("owner:test",), now=NOW)
+        _ = store.receipt(foreign.receipt_id, scopes=("owner:test",), now=NOW)
 
 
-def test_original_is_retrievable_and_integrity_checked(store):
+def test_original_is_retrievable_and_integrity_checked(store: LifeStore) -> None:
     accepted = store.accept(payload(), policy(), key="r1", now=NOW)
     raw = store.evidence(accepted.event_id, scopes=("owner:test",), now=NOW)
     event = store.get(accepted.event_id, scopes=("owner:test",), now=NOW)
     assert sha256(raw).hexdigest() == event.raw_digest
 
 
-def test_delete_is_monotonic_and_blocks_replay(store):
+def test_delete_is_monotonic_and_blocks_replay(store: LifeStore) -> None:
     accepted = store.accept(payload(), policy(), key="r1", now=NOW)
     store.forget(accepted.event_id, scopes=("owner:test",), expected_revision=1, now=NOW)
     assert store.events(scopes=("owner:test",), now=NOW) == ()
     with pytest.raises(LifeInputError, match="DELETED"):
-        store.accept(payload(), policy(), key="r1", now=NOW)
+        _ = store.accept(payload(), policy(), key="r1", now=NOW)
     with pytest.raises(LifeInputError, match="NOT_FOUND"):
-        store.evidence(accepted.event_id, scopes=("owner:test",), now=NOW)
+        _ = store.evidence(accepted.event_id, scopes=("owner:test",), now=NOW)
     assert store.tombstones(scopes=("owner:test",))[0]["event_id"] == accepted.event_id
 
 
-def test_revision_rows_are_immutable_at_sql_boundary(tmp_path):
+def test_revision_rows_are_immutable_at_sql_boundary(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
-        ledger.life_store().accept(payload(), policy(), key="r1", now=NOW)
+        _ = ledger.life_store().accept(payload(), policy(), key="r1", now=NOW)
         with pytest.raises(sqlite3.IntegrityError, match="immutable"):
-            ledger._db().execute("UPDATE life_event_revisions SET body_json='{}'")
+            _ = ledger.life_store().connection.execute(
+                "UPDATE life_event_revisions SET body_json='{}'"
+            )
 
 
-def test_reopen_preserves_receipt_and_cas(tmp_path):
+def test_reopen_preserves_receipt_and_cas(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         first = ledger.life_store().accept(payload(), policy(), key="r1", now=NOW)
     with Ledger(tmp_path) as ledger:
@@ -115,31 +124,31 @@ def test_reopen_preserves_receipt_and_cas(tmp_path):
         assert ledger.life_store().evidence(second.event_id, scopes=("owner:test",), now=NOW)
 
 
-def test_outer_ledger_transaction_rolls_back_life_records(tmp_path):
+def test_outer_ledger_transaction_rolls_back_life_records(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         store = ledger.life_store()
         with pytest.raises(RuntimeError), ledger.transaction():
-            store.accept(payload(), policy(), key="r1", now=NOW)
+            _ = store.accept(payload(), policy(), key="r1", now=NOW)
             raise RuntimeError("synthetic rollback")
         assert store.events(scopes=("owner:test",), now=NOW) == ()
 
 
-def test_backup_preserves_life_rows_and_delete_intent(tmp_path):
+def test_backup_preserves_life_rows_and_delete_intent(tmp_path: Path) -> None:
     root = tmp_path / "original"
     with Ledger(root) as ledger:
         store = ledger.life_store()
         accepted = store.accept(payload(), policy(), key="r1", now=NOW)
         store.forget(accepted.event_id, scopes=("owner:test",), expected_revision=1, now=NOW)
         target = sqlite3.connect(tmp_path / "copy.db")
-        ledger._db().backup(target)
+        ledger.life_store().connection.backup(target)
         target.close()
     with sqlite3.connect(tmp_path / "copy.db") as restored:
         assert restored.execute("SELECT deleted FROM life_events").fetchone() == (1,)
         assert restored.execute("SELECT count(*) FROM life_tombstones").fetchone() == (1,)
 
 
-def test_retention_expiry_is_not_a_current_memory(store):
+def test_retention_expiry_is_not_a_current_memory(store: LifeStore) -> None:
     accepted = store.accept(payload(), replace(policy(), retention_days=1), key="r1", now=NOW)
     assert store.events(scopes=("owner:test",), now=NOW + timedelta(days=2)) == ()
     with pytest.raises(LifeInputError, match="NOT_FOUND"):
-        store.get(accepted.event_id, scopes=("owner:test",), now=NOW + timedelta(days=2))
+        _ = store.get(accepted.event_id, scopes=("owner:test",), now=NOW + timedelta(days=2))

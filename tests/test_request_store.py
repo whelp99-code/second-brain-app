@@ -110,3 +110,6 @@ def test_tombstone_replica_requires_contiguous_high_water(tmp_path: Path) -> Non
     with pytest.raises(ValueError, match="TOMBSTONE_SET_STALE"):
         _ = store.apply_tombstones((entry,), "request:1", NOW)
     store.close()
+
+
+request_identity = _identity

@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from sb.normalize import _redact  # pyright: ignore[reportPrivateUsage]
+from sb.redaction import redact_credentials
 from sb.security import mask_sensitive
 
 
@@ -65,7 +65,7 @@ _FRAGMENTS = (
 @pytest.mark.parametrize("text", _FRAGMENTS)
 def test_known_boundaries_match_previous_policy(text: str) -> None:
     assert mask_sensitive(text) == _previous_mask(text)
-    assert _redact(text) == _previous_redact(text)
+    assert redact_credentials(text) == _previous_redact(text)
 
 
 def test_seeded_unicode_and_overlaps_match_previous_policy() -> None:
@@ -73,10 +73,10 @@ def test_seeded_unicode_and_overlaps_match_previous_policy() -> None:
     for _ in range(2000):
         text = "".join(rng.choices(_FRAGMENTS, k=rng.randrange(1, 15)))
         assert mask_sensitive(text) == _previous_mask(text)
-        assert _redact(text) == _previous_redact(text)
+        assert redact_credentials(text) == _previous_redact(text)
 
 
 def test_storage_contacts_and_prompt_copy_remain_distinct() -> None:
     text = "담당 owner@example.com 010-1234-5678 password=abcdefgh"
-    assert _redact(text) == "담당 owner@example.com 010-1234-5678 [REDACTED:password]"
+    assert redact_credentials(text) == "담당 owner@example.com 010-1234-5678 [REDACTED:password]"
     assert mask_sensitive(text) == "담당 [REDACTED_EMAIL] 010-1234-5678 password=[REDACTED_SECRET]"

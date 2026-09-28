@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from sb.correction_cancellation_executor import apply_correction_cancellation
 from sb.correction_cancellation_requests import accept_correction_cancellation
@@ -22,7 +24,8 @@ from sb.request_store import ReplayConflict
 from sb.stable_requests import accept_stable_v1_request
 from tests.task30_effect_factory import effect_request
 from tests.test_correction_cancellation import CURRENT, HISTORICAL, cancellation_fixture, resign
-from tests.test_request_executor import NOW, _config
+from tests.test_request_executor import NOW
+from tests.test_request_executor import config as _config
 
 OLD = "ExampleAlpha 예시기록"
 REPLACEMENT = "replacement must never be materialized"
@@ -33,9 +36,9 @@ def _object(value: JsonValue) -> JsonObject:
     return value
 
 
-def prepare_unaccepted(root: Path):
+def prepare_unaccepted(root: Path) -> tuple[RequestExecutor, JsonObject, JsonObject]:
     config = _config(root)
-    accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
+    _ = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)
     executor = RequestExecutor(config)
     assert executor.apply_once(now=NOW).state == "proved"
     original = effect_request(executor.generations.active(), "correct", OLD, NOW + timedelta(minutes=1),
@@ -53,7 +56,7 @@ def prepare_unaccepted(root: Path):
     return executor, value, original
 
 
-def prepare(root: Path):
+def prepare(root: Path) -> tuple[RequestExecutor, str, JsonObject]:
     executor, value, original = prepare_unaccepted(root)
     config = executor.config
     stamp = NOW + timedelta(minutes=1, seconds=1)
@@ -61,10 +64,13 @@ def prepare(root: Path):
         expected_provider=config.provider_instance_id, historical_delegation_keys=config.jarvis_public_keys,
         current_cancellation_keys={"jarvis:current": CURRENT.public_key()})
     assert not replayed
-    return executor, accepted["intent_id"], original
+    intent_id = accepted["intent_id"]
+    assert isinstance(intent_id, str)
+    return executor, intent_id, original
 
 
-def execute(executor, intent_id, barrier=None, keys=None):
+def execute(executor: RequestExecutor, intent_id: str, barrier: Callable[[str], None] | None = None,
+            keys: Mapping[str, Ed25519PublicKey] | None = None) -> JsonObject:
     # Durable acceptance remains executable after the submission TTL has expired.
     return apply_correction_cancellation(executor.mutations, executor.erasure, intent_id,
         backup_root=executor.config.backup_root,
@@ -88,7 +94,7 @@ def test_real_generation_suppresses_without_applying_replacement_and_restarts(tm
         with pytest.raises(ErasureError, match="TOMBSTONE_REINGRESS_BLOCKED"):
             executor.reingress.check_content(OLD.encode())
         with pytest.raises(ReplayConflict, match="MEMORY_REQUEST_CANCELLED"):
-            accept_effect_request(executor.config.request_root, original, NOW + timedelta(minutes=2))
+            _ = accept_effect_request(executor.config.request_root, original, NOW + timedelta(minutes=2))
         assert executor.store.db.execute(
             "SELECT state FROM correction_cancellation_generations WHERE intent_id=?", (intent_id,),
         ).fetchone()[0] == "generation_active"
@@ -112,7 +118,7 @@ def test_interrupted_generation_resumes_without_original_body(tmp_path: Path, bo
 
     try:
         with pytest.raises(KeyboardInterrupt):
-            execute(executor, intent_id, interrupt)
+            _ = execute(executor, intent_id, interrupt)
     finally:
         executor.close()
     restarted = RequestExecutor(_config(tmp_path))
@@ -132,7 +138,7 @@ def test_removed_current_key_cannot_execute_previously_admitted_intent(tmp_path:
     base = executor.generations.active()
     try:
         with pytest.raises(ValueError, match="MEMORY_CANCELLATION_INTENT_INVALID"):
-            execute(executor, intent_id, keys={})
+            _ = execute(executor, intent_id, keys={})
         assert executor.generations.active().generation_id == base.generation_id
         assert executor.store.db.execute("SELECT count(*) FROM correction_cancellation_generations").fetchone()[0] == 0
     finally:
@@ -150,7 +156,7 @@ def test_key_removed_during_build_prevents_activation_and_retry_is_safe(tmp_path
 
     try:
         with pytest.raises(ValueError, match="MEMORY_CANCELLATION_INTENT_INVALID"):
-            execute(executor, intent_id, revoke, keys)
+            _ = execute(executor, intent_id, revoke, keys)
         assert executor.generations.active().generation_id == base.generation_id
         assert executor.store.db.execute("SELECT count(*) FROM correction_cancellation_generations").fetchone()[0] == 0
         assert execute(executor, intent_id)["state"] == "generation_active"
@@ -169,14 +175,14 @@ def test_changed_actual_target_is_rejected_before_successor_creation(tmp_path: P
     page = base.root / (page_id + ".md")
     page.chmod(0o600)
     original_bytes = page.read_bytes()
-    page.write_bytes(original_bytes + b"uncommitted corruption")
+    _ = page.write_bytes(original_bytes + b"uncommitted corruption")
     try:
         with pytest.raises(RuntimeError, match="EFFECT_TARGET_INVALID"):
-            execute(executor, intent_id)
+            _ = execute(executor, intent_id)
         assert not list(executor.generations.staging.iterdir())
         assert executor.store.db.execute("SELECT count(*) FROM correction_cancellation_generations").fetchone()[0] == 0
     finally:
-        page.write_bytes(original_bytes)
+        _ = page.write_bytes(original_bytes)
         page.chmod(0o400)
         executor.close()
 

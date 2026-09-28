@@ -1,28 +1,35 @@
 from __future__ import annotations
 
 import multiprocessing
+from multiprocessing.queues import Queue
+from multiprocessing.synchronize import Event
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import TypeAdapter
 
+from sb.cancellation_target import verify_cancellation_target
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
+from sb.effect_values import JsonObject
 from sb.generation_runtime_models import (
     GenerationAuthority,
     GenerationMutation,
     GenerationOperation,
 )
+from sb.generations import Generation
 from sb.request_executor import RequestExecutor
 from tests.test_cancellation_admission_binding import STAMP, admit
 from tests.test_correction_cancellation_executor import prepare_unaccepted
-from tests.test_request_executor import _config
+from tests.test_request_executor import config as _config
 
 
-def writer_process(root, entered, release, result, pause, ready, begin):
+def writer_process(root: str, entered: Event, release: Event, result: Queue[str], pause: bool, ready: Event, begin: Event) -> None:
     executor = RequestExecutor(_config(Path(root)))
     ready.set()
     assert begin.wait(20)
 
-    def barrier(phase):
+    def barrier(phase: str) -> None:
         if pause and phase == "successor_creation":
             entered.set()
             assert release.wait(20)
@@ -30,7 +37,7 @@ def writer_process(root, entered, release, result, pause, ready, begin):
     try:
         if not pause:
             entered.set()
-        executor.mutations.mutate(GenerationMutation(
+        _ = executor.mutations.mutate(GenerationMutation(
             mutation_id="concurrent-normal-writer", operation=GenerationOperation.RUN, now=STAMP,
             authority=GenerationAuthority(None, None), apply=lambda _root: None, barrier=barrier,
         ))
@@ -41,16 +48,16 @@ def writer_process(root, entered, release, result, pause, ready, begin):
         executor.close()
 
 
-def cancellation_process(root, value, entered, release, result, pause, ready, begin):
+def cancellation_process(root: str, value: JsonObject, entered: Event, release: Event, result: Queue[str], pause: bool, ready: Event, begin: Event) -> None:
     import sb.correction_cancellation_requests as requests
 
     executor = RequestExecutor(_config(Path(root)))
     ready.set()
     assert begin.wait(20)
-    real_verify = requests.verify_cancellation_target
+    real_verify = verify_cancellation_target
 
-    def verify_and_pause(*args):
-        real_verify(*args)
+    def verify_and_pause(generation: Generation, intent: CorrectionCancellationIntentV1) -> None:
+        _ = real_verify(generation, intent)
         if pause:
             entered.set()
             assert release.wait(20)
@@ -109,7 +116,7 @@ def test_actual_generation_writer_and_cancellation_admission_are_serialized(tmp_
     observer = RequestExecutor(_config(tmp_path))
     try:
         assert observer.store.tombstone_high_water()[0] == (0 if first == "writer" else 1)
-        aliases = observer.store.db.execute("SELECT count(*) FROM correction_cancellation_aliases").fetchone()[0]
+        aliases = TypeAdapter(int).validate_python(observer.store.db.execute("SELECT count(*) FROM correction_cancellation_aliases").fetchone()[0], strict=True)
         assert aliases == (0 if first == "writer" else 8)
         assert (observer.generations.active().generation_id == base) == (first == "cancellation")
     finally:

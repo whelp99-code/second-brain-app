@@ -73,7 +73,7 @@ def page_receipt(root: Path, page_id: str) -> JsonObject:
     }
 
 
-def _save(path: Path, effect: OwnerEffect) -> None:
+def save(path: Path, effect: OwnerEffect) -> None:
     temporary = path.with_suffix(".tmp")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "w") as stream:
@@ -82,6 +82,9 @@ def _save(path: Path, effect: OwnerEffect) -> None:
         os.fsync(stream.fileno())
     os.replace(temporary, path)
     directory_fsync(path.parent)
+
+
+_save = save
 
 
 def _prepare(generation: Generation, page_id: str, operation: Literal["correct", "forget"],

@@ -4,6 +4,7 @@ import inspect
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pydantic import TypeAdapter
 
 from sb.restore import GenerationRestoreSanitizer
 
@@ -40,9 +41,9 @@ def test_source_generation_digest_survives_content_disposal(tmp_path: Path) -> N
     try:
         source = fixture.request.archive_manifest
         store = fixture.executor.generations
-        row = store.journal.execute(
+        row = TypeAdapter(tuple[str]).validate_python(store.journal.execute(
             'SELECT manifest_digest FROM activations WHERE generation_id=?',
-            (source.source_generation_id,)).fetchone()
+            (source.source_generation_id,)).fetchone(), strict=True)
         assert row == (source.source_generation_manifest_digest,)
         assert store.active().generation_id != source.source_generation_id
         # Disposal removes the original generation folder; the anchor is retained

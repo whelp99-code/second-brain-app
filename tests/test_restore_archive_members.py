@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import io
 import tarfile
+from collections.abc import Callable, Iterable
+from os import PathLike
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -21,7 +24,7 @@ def test_restore_rejects_duplicate_normalized_member(tmp_path: Path, second_name
     destination = tmp_path / 'extracted'
     destination.mkdir()
     with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
-        GenerationRestoreSanitizer._extract(archive, destination)
+        GenerationRestoreSanitizer.extract(archive, destination)
     assert list(destination.iterdir()) == []
 
 
@@ -36,7 +39,7 @@ def test_restore_rejects_file_as_parent_before_writing(tmp_path: Path, names: tu
     destination = tmp_path / 'extracted'
     destination.mkdir()
     with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
-        GenerationRestoreSanitizer._extract(archive, destination)
+        GenerationRestoreSanitizer.extract(archive, destination)
     assert list(destination.iterdir()) == []
 
 
@@ -51,7 +54,7 @@ def test_restore_extracts_unambiguous_archive(tmp_path: Path) -> None:
         bundle.addfile(member, io.BytesIO(b'kept'))
     destination = tmp_path / 'extracted'
     destination.mkdir()
-    GenerationRestoreSanitizer._extract(archive, destination)
+    GenerationRestoreSanitizer.extract(archive, destination)
     assert (destination / 'wiki/page.md').read_bytes() == b'kept'
 
 
@@ -59,7 +62,7 @@ def test_restore_extracts_unambiguous_archive(tmp_path: Path) -> None:
 @pytest.mark.parametrize('limit,value', [('_MAX_RESTORE_MEMBERS', 1),
     ('_MAX_RESTORE_FILE_BYTES', 3), ('_MAX_RESTORE_TOTAL_BYTES', 7)])
 def test_restore_budget_rejection_precedes_output(
-    tmp_path: Path, monkeypatch, kind: str, limit: str, value: int,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, limit: str, value: int,
 ) -> None:
     from sb import restore
 
@@ -74,31 +77,31 @@ def test_restore_budget_rejection_precedes_output(
     else:
         archive.mkdir()
         for name in ['one.md', 'two.md']:
-            (archive / name).write_bytes(b'data')
+            _ = (archive / name).write_bytes(b'data')
     destination = tmp_path / 'extracted'
     destination.mkdir()
     with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_BUDGET_EXCEEDED'):
-        GenerationRestoreSanitizer._extract(archive, destination)
+        GenerationRestoreSanitizer.extract(archive, destination)
     assert list(destination.iterdir()) == []
 
 
 @pytest.mark.parametrize('replacement', ['symlink', 'file', 'fifo'])
-def test_directory_restore_refuses_file_replaced_after_stat(tmp_path: Path, monkeypatch, replacement: str) -> None:
+def test_directory_restore_refuses_file_replaced_after_stat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: str) -> None:
     archive = tmp_path / 'archive'
     archive.mkdir()
     source = archive / 'memory.md'
-    source.write_bytes(b'original')
+    _ = source.write_bytes(b'original')
     outside = tmp_path / 'outside.md'
-    outside.write_bytes(b'replaced')
+    _ = outside.write_bytes(b'replaced')
     destination = tmp_path / 'extracted'
     destination.mkdir()
     original_stat = Path.stat
     calls = 0
 
-    def swap_after_stat(path, *args, **kwargs):
+    def swap_after_stat(path: Path, *, follow_symlinks: bool = True):
         nonlocal calls
-        result = original_stat(path, *args, **kwargs)
-        if path == source and kwargs.get('follow_symlinks') is False:
+        result = original_stat(path, follow_symlinks=follow_symlinks)
+        if path == source and follow_symlinks is False:
             calls += 1
             if calls == 2:
                 path.unlink()
@@ -108,12 +111,12 @@ def test_directory_restore_refuses_file_replaced_after_stat(tmp_path: Path, monk
                     import os
                     os.mkfifo(path)
                 else:
-                    path.write_bytes(b'replaced')
+                    _ = path.write_bytes(b'replaced')
         return result
 
     monkeypatch.setattr(Path, 'stat', swap_after_stat)
     with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
-        GenerationRestoreSanitizer._extract(archive, destination)
+        GenerationRestoreSanitizer.extract(archive, destination)
     assert not (destination / 'memory.md').exists()
     assert outside.read_bytes() == b'replaced'
 
@@ -135,11 +138,11 @@ def test_restore_refuses_linked_tar_input(tmp_path: Path, link_type: str) -> Non
     destination = tmp_path / 'extracted'
     destination.mkdir()
     with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
-        GenerationRestoreSanitizer._extract(archive, destination)
+        GenerationRestoreSanitizer.extract(archive, destination)
     assert list(destination.iterdir()) == []
 
 
-def test_restore_refuses_tar_changed_during_extraction(tmp_path: Path, monkeypatch) -> None:
+def test_restore_refuses_tar_changed_during_extraction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     archive = tmp_path / 'input.tar'
     with tarfile.open(archive, 'w') as bundle:
         member = tarfile.TarInfo('wiki/page.md')
@@ -147,13 +150,13 @@ def test_restore_refuses_tar_changed_during_extraction(tmp_path: Path, monkeypat
         bundle.addfile(member, io.BytesIO(b'kept'))
     extractall = tarfile.TarFile.extractall
 
-    def change_after_extract(bundle, *args, **kwargs):
-        extractall(bundle, *args, **kwargs)
+    def change_after_extract(bundle: tarfile.TarFile, path: str | PathLike[str] = ".", members: Iterable[tarfile.TarInfo] | None = None, *, numeric_owner: bool = False, filter: Literal["fully_trusted", "tar", "data"] | Callable[[tarfile.TarInfo, str], tarfile.TarInfo | None] | None = None) -> None:
+        extractall(bundle, path, members, numeric_owner=numeric_owner, filter=filter)
         with archive.open('ab') as stream:
-            stream.write(b'changed')
+            _ = stream.write(b'changed')
 
     monkeypatch.setattr(tarfile.TarFile, 'extractall', change_after_extract)
     destination = tmp_path / 'extracted'
     destination.mkdir()
     with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
-        GenerationRestoreSanitizer._extract(archive, destination)
+        GenerationRestoreSanitizer.extract(archive, destination)

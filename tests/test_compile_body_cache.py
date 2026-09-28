@@ -3,33 +3,28 @@
 import gc
 import weakref
 
-import sb.compile as compiler
-from sb.store import Derivation, DerivationOutput
+import pytest
+
+import sb.compile_cache as cache_module
+from sb.compile_cache import BodyCache
 
 
 class LedgerIdentity:
-    def get_derivation(self, key: str) -> Derivation | None:
-        return None
-
-    def ensure_derivation(self, key: str, stage: str, run_id: str) -> None:
-        pass
-
-    def mark_running(self, key: str, run_id: str) -> None:
-        pass
-
-    def mark_done(self, key: str, output: DerivationOutput) -> None:
-        pass
-
-    def mark_failed(self, key: str, error: str) -> None:
-        pass
-
-    def requeue_failed(self, key: str) -> bool:
-        return False
+    """A weak-referenceable identity; the cache never invokes ledger methods."""
 
 
-def test_reused_identity_does_not_return_another_ledgers_body(monkeypatch):
-    monkeypatch.setattr(compiler, "id", lambda _value: 7, raising=False)
-    cache = compiler._BodyCache()
+class TrackedBody(str):
+    """Observe cached body lifetime without inspecting cache implementation."""
+
+
+def test_reused_identity_does_not_return_another_ledgers_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reused_id(_value: LedgerIdentity) -> int:
+        return 7
+
+    monkeypatch.setattr(cache_module, "id", reused_id, raising=False)
+    cache = BodyCache[LedgerIdentity]()
     first = LedgerIdentity()
     second = LedgerIdentity()
     cache.put(first, "page", "private first ledger")
@@ -37,16 +32,24 @@ def test_reused_identity_does_not_return_another_ledgers_body(monkeypatch):
     assert cache.get(second, "page") == ""
     cache.put(second, "page", "second ledger")
     del first
-    gc.collect()
+    _ = gc.collect()
     assert cache.get(second, "page") == "second ledger"
 
 
-def test_cache_does_not_retain_ledger_or_body_after_collection():
-    cache = compiler._BodyCache()
+def test_cache_does_not_retain_ledger_or_body_after_collection() -> None:
+    cache = BodyCache[LedgerIdentity]()
     ledger = LedgerIdentity()
+    body = TrackedBody("private body")
     reference = weakref.ref(ledger)
-    cache.put(ledger, "page", "private body")
-    del ledger
-    gc.collect()
+    body_reference = weakref.ref(body)
+    cache.put(ledger, "page", body)
+    del ledger, body
+    _ = gc.collect()
     assert reference() is None
-    assert not cache._data
+    assert body_reference() is None
+
+
+def test_non_weak_referenceable_owner_does_not_cache_body() -> None:
+    cache = BodyCache[int]()
+    cache.put(7, "page", "private body")
+    assert cache.get(7, "page") == ""

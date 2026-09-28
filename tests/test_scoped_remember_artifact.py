@@ -1,42 +1,72 @@
 import hashlib
-import json
 import sqlite3
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol, TypedDict
 
 import pytest
 
-from sb.generations import GenerationStore
+from sb.generations import Generation, GenerationStore
 from sb.memory_access import MemoryAccessError
 from sb.remember_page import materialize_remember
 from sb.scoped_remember_artifact import read_scoped_remember_artifact
-from sb.scoped_write_request import parse_scoped_write_request
+from sb.scoped_write_request import ScopedWriteRequest, parse_scoped_write_request
 from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1
+from tests.json_fixtures import parse_object
+
+
+class ArtifactBuilder(Protocol):
+    def __call__(
+        self, *, parent: Generation | None = None, access: SourceAccess | None = ...,
+        sensitivity: str = ..., content: str = ..., origin: str = ...,
+        allowed: Callable[[Path], bool] = ...,
+    ) -> Generation: ...
+
+
+class BuildOptions(TypedDict, total=False):
+    access: SourceAccess | None
+    sensitivity: str
+    content: str
+    origin: str
+
+
+type ArtifactFixture = tuple[ScopedWriteRequest, ArtifactBuilder]
 
 
 @pytest.fixture
-def artifact(tmp_path):
-    raw = json.loads((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
-    now = datetime.fromisoformat(raw["created_at"])
-    request = parse_scoped_write_request(raw, now=now, expected_provider=raw["provider_instance_id"])
+def artifact(tmp_path: Path) -> Iterator[ArtifactFixture]:
+    raw = parse_object((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
+    created_at, provider = raw["created_at"], raw["provider_instance_id"]
+    assert isinstance(created_at, str) and isinstance(provider, str)
+    now = datetime.fromisoformat(created_at)
+    request = parse_scoped_write_request(raw, now=now, expected_provider=provider)
     store = GenerationStore(tmp_path / "state", tmp_path / "share",
         provider_instance_id=request.provider_instance_id, provider_release_sha="a" * 40)
-    candidate = raw["source_request"]["candidate_id"]
+    source_request = raw["source_request"]
+    assert isinstance(source_request, dict)
+    candidate = source_request["candidate_id"]
+    assert isinstance(candidate, str)
 
-    def build(*, parent=None, access=request.preparation.source_access, sensitivity=request.preparation.sensitivity,
-              content=request.preparation.content, origin=candidate, allowed=lambda _: True):
+    def build(
+        *, parent: Generation | None = None,
+        access: SourceAccess | None = request.preparation.source_access,
+        sensitivity: str = request.preparation.sensitivity,
+        content: str = request.preparation.content, origin: str = candidate,
+        allowed: Callable[[Path], bool] = lambda _: True,
+    ) -> Generation:
         return store.build(request_id="fixture:" + str(len(list(store.staging.iterdir()))), parent=parent,
             tombstone_sequence=0, tombstone_set_root="sha256:" + "0" * 64, created_at=now, allowed=allowed,
             mutate=lambda root: materialize_remember(root, content=content, candidate_id=origin,
-                created_at=raw["created_at"], release_sha="a" * 40, source_access=access, sensitivity=sensitivity))
+                created_at=created_at, release_sha="a" * 40, source_access=access, sensitivity=sensitivity))
 
     yield request, build
     store.close()
 
 
-def read(generation, request, scope=None):
+def read(generation: Generation, request: ScopedWriteRequest, scope: SourceAccess | None = None):
     manifest = generation.manifest
     identity = GenerationIdentityV1(manifest.provider_instance_id, manifest.generation_id,
         manifest.generation_digest, manifest.head, manifest.tree)
@@ -44,7 +74,7 @@ def read(generation, request, scope=None):
         request.preparation.source_access if scope is None else scope)
 
 
-def test_exact_artifact_and_unrelated_successor_are_readable_without_writes(artifact):
+def test_exact_artifact_and_unrelated_successor_are_readable_without_writes(artifact: ArtifactFixture):
     request, build = artifact
     first = build()
     before = hashlib.sha256((first.root / ".sb/ledger.db").read_bytes()).hexdigest()
@@ -59,9 +89,9 @@ def test_exact_artifact_and_unrelated_successor_are_readable_without_writes(arti
 
 
 @pytest.mark.parametrize("change", ["scope", "sensitivity", "content", "origin", "unclassified"])
-def test_wrong_stored_artifact_is_not_completion_evidence(artifact, change):
+def test_wrong_stored_artifact_is_not_completion_evidence(artifact: ArtifactFixture, change: str):
     request, build = artifact
-    options = {
+    options: dict[str, BuildOptions] = {
         "scope": {"access": SourceAccess("principal:owner", ("project:other",), "policy:fixture")},
         "sensitivity": {"sensitivity": "restricted"},
         "content": {"content": "다른 본문"},
@@ -71,7 +101,7 @@ def test_wrong_stored_artifact_is_not_completion_evidence(artifact, change):
     generation = build(**options[change])
     broad = SourceAccess("principal:owner", ("project:other", "project:shared-memory"), "policy:fixture")
     with pytest.raises(MemoryAccessError):
-        read(generation, request, broad)
+        _ = read(generation, request, broad)
 
 
 @pytest.mark.parametrize("scope", [
@@ -79,32 +109,32 @@ def test_wrong_stored_artifact_is_not_completion_evidence(artifact, change):
     SourceAccess("principal:owner", ("project:other",), "policy:fixture"),
     SourceAccess("principal:owner", ("project:shared-memory",), "policy:next"),
 ])
-def test_current_authenticated_scope_is_required(artifact, scope):
+def test_current_authenticated_scope_is_required(artifact: ArtifactFixture, scope: SourceAccess):
     request, build = artifact
     with pytest.raises(MemoryAccessError, match="MEMORY_ACCESS_DENIED"):
-        read(build(), request, scope)
+        _ = read(build(), request, scope)
 
 
-def test_provider_mismatch_rejected(artifact):
+def test_provider_mismatch_rejected(artifact: ArtifactFixture):
     request, build = artifact
     with pytest.raises(MemoryAccessError, match="MEMORY_ARTIFACT_MISMATCH"):
-        read(build(), replace(request, provider_instance_id="provider:other"))
+        _ = read(build(), replace(request, provider_instance_id="provider:other"))
 
 
-def test_deleted_artifact_in_successor_is_not_verified(artifact):
+def test_deleted_artifact_in_successor_is_not_verified(artifact: ArtifactFixture):
     request, build = artifact
     first = build()
     successor = build(parent=first, allowed=lambda path: not str(path).startswith("wiki/"),
         origin="memcand:pos:v1:" + "d" * 64, content="다른 기억")
     with pytest.raises(MemoryAccessError):
-        read(successor, request)
+        _ = read(successor, request)
     with sqlite3.connect(f"file:{successor.root}/.sb/ledger.db?mode=ro", uri=True) as db:
         assert db.execute("SELECT count(*) FROM page_access").fetchone()[0] == 1
         assert db.execute("SELECT count(*) FROM source_access").fetchone()[0] == 1
 
 
-def test_successor_cannot_silently_reclassify_unchanged_artifact(artifact):
+def test_successor_cannot_silently_reclassify_unchanged_artifact(artifact: ArtifactFixture):
     _, build = artifact
     first = build()
     with pytest.raises(ValueError, match="SOURCE_ACCESS_RECLASSIFICATION_REQUIRED"):
-        build(parent=first, access=SourceAccess("principal:owner", ("project:other",), "policy:fixture"))
+        _ = build(parent=first, access=SourceAccess("principal:owner", ("project:other",), "policy:fixture"))

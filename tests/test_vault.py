@@ -53,7 +53,7 @@ def _cited_page(
     return PageSpec(page_id=page_id, title="Profile", body_md=text, sources=[cite], status="active")
 
 
-def _field(block: str, key: str) -> str:
+def field(block: str, key: str) -> str:
     prefix = f"{key}:"
     for line in block.splitlines():
         stripped = line.strip().removeprefix("- ")
@@ -333,7 +333,7 @@ def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fe
         definitions.reverse()
     body = f'A fact.[^{CAS_SID}]\n\n{fence}\n{definition}\n{fence}\n\n' + '\n\n'.join(definitions)
     vault = _ready(tmp_path)
-    vault.write_pages([_cited_page(body_md=body)], 'first', MemoryLedger())
+    _ = vault.write_pages([_cited_page(body_md=body)], 'first', MemoryLedger())
     text = (tmp_path / 'wiki/identity-profile.md').read_text()
     assert text.count(definition) == (1 if native_format else 2)  # code example remains
     assert f'{fence}\n{definition}\n{fence}' in text
@@ -351,7 +351,7 @@ def test_render_keeps_code_examples_and_one_source_definition(tmp_path: Path, fe
 def test_code_example_does_not_replace_real_source_definition(tmp_path: Path) -> None:
     definition = f'[^{CAS_SID}]: me-wiki:identity/profile.md'
     body = f'A fact.[^{CAS_SID}]\n\n```markdown\n{definition}\n```'
-    _ready(tmp_path).write_pages([_cited_page(body_md=body)], 'code', MemoryLedger())
+    _ = _ready(tmp_path).write_pages([_cited_page(body_md=body)], 'code', MemoryLedger())
     text = (tmp_path / 'wiki/identity-profile.md').read_text()
     assert text.count(definition) == 2
 
@@ -359,7 +359,7 @@ def test_code_example_does_not_replace_real_source_definition(tmp_path: Path) ->
 def test_different_span_annotations_are_not_silently_discarded(tmp_path: Path) -> None:
     definition = f"[^{CAS_SID}]: me-wiki:identity/profile.md"
     body = f"A fact.[^{CAS_SID}]\n\n{definition} span=0-12\n\n{definition} span=20-30"
-    _ready(tmp_path).write_pages([_cited_page(body_md=body)], "spans", MemoryLedger())
+    _ = _ready(tmp_path).write_pages([_cited_page(body_md=body)], "spans", MemoryLedger())
     text = (tmp_path / "wiki/identity-profile.md").read_text()
     assert f"{definition} span=0-12" in text
     assert f"{definition} span=20-30" in text

@@ -14,6 +14,7 @@ from sb.effect_values import JsonValue, digest, format_instant
 from sb.managed_backup_manifest import validate_managed_backups
 from sb.managed_copy_files import purge_matching_managed_copies
 from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
+from sb.managed_git import git_directories, inspect_git_directory
 
 
 class _ExportSurface(Protocol):
@@ -41,9 +42,19 @@ def copy_inventory(roots: Sequence[Path], needles: Sequence[bytes] = ()) -> str:
     for index, root in enumerate(roots):
         if not root.is_dir() or root.is_symlink():
             raise ManagedInspectionError("MANAGED_ROOT_UNSAFE")
+        git_roots = git_directories(root)
+        for git_root in git_roots:
+            inspected_git = inspect_git_directory(git_root, needles)
+            if inspected_git.matches:
+                raise ManagedInspectionError("MANAGED_COPY_REMAINS")
+            records.append({"root": index,
+                "path": hashlib.sha256(git_root.relative_to(root).as_posix().encode()).hexdigest(),
+                "digest": inspected_git.digest, "objects": inspected_git.objects})
         for count, path in enumerate(sorted(root.rglob("*")), 1):
             if count > 100_000:
                 raise ManagedInspectionError("MANAGED_ARCHIVE_BUDGET")
+            if any(path == git_root or path.is_relative_to(git_root) for git_root in git_roots):
+                continue
             metadata = path.stat(follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
                 continue

@@ -8,9 +8,10 @@ import sys
 import zipfile
 from importlib import metadata
 from pathlib import Path
-from typing import ClassVar, Literal, TypedDict
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from typing_extensions import TypedDict
 
 from sb.config import Config
 from sb.contract_digest import TASK32_CONTRACT_DIGEST
@@ -27,7 +28,7 @@ class ReleaseManifest(BaseModel):
     working_tree_modified: bool | None = None
 
 
-class IdentityReport(TypedDict):
+class IdentityReport(TypedDict, closed=True):
     status: Literal["ok", "degraded"]
     reasons: list[str]
     source_commit: str | None

@@ -10,7 +10,7 @@ from pypdf import PageObject, PdfReader
 from pypdf.errors import PyPdfError
 from pypdf.generic import DictionaryObject, PdfObject
 
-from sb.parsers import InvalidInput, LimitExceeded, OcrRequired
+from sb.parsers.contracts import InvalidInput, LimitExceeded, OcrRequired
 
 PDF_PAGE_LIMIT: Final = 5_000
 PDF_MEDIA_TYPE: Final = "application/pdf"

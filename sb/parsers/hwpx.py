@@ -13,7 +13,7 @@ from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
 from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
 
-from sb.parsers import FormatUnsupported, InvalidInput, LimitExceeded
+from sb.parsers.contracts import FormatUnsupported, InvalidInput, LimitExceeded
 
 HWPX_MEDIA_TYPE: Final = "application/haansofthwpx"
 HWPX_PACKAGE_MIMETYPE: Final = "application/hwp+zip"

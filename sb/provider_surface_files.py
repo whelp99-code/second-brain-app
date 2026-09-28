@@ -11,6 +11,7 @@ from pathlib import Path
 
 from sb.effect_values import JsonInput, digest
 from sb.managed_file_inspection import ManagedInspectionError, inspect_managed_file
+from sb.managed_git import git_directories, inspect_git_directory
 from sb.provider_observation_models import ProviderSurfaceObservationV1
 from sb.provider_surface_scanner_types import ProviderSurfaceLayout
 from sb.provider_surface_specs import (
@@ -130,7 +131,24 @@ def scan_file_surface(
     seen_tables: set[str] = set()
     matches = 0
     file_count = 0
+    git_roots: tuple[Path, ...] = ()
+    git_objects = 0
+    if spec.definition.surface_id == "managed_backups":
+        try:
+            git_roots = git_directories(layout.backup_root)
+            for git_root in git_roots:
+                inspected_git = inspect_git_directory(git_root, needles)
+                matches += inspected_git.matches
+                file_count += len(inspected_git.files)
+                git_objects += inspected_git.objects
+                records.append({"locator_digest": hashlib.sha256(
+                    git_root.relative_to(layout.backup_root).as_posix().encode()).hexdigest(),
+                    "file_digest": inspected_git.digest, "match_count": inspected_git.matches})
+        except (OSError, ManagedInspectionError) as exc:
+            errors.append(str(exc) if isinstance(exc, ManagedInspectionError) else "MANAGED_SURFACE_UNREADABLE")
     for path, locator in selected.files:
+        if any(path.is_relative_to(git_root) for git_root in git_roots):
+            continue
         try:
             metadata = path.stat(follow_symlinks=False)
             if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
@@ -174,7 +192,7 @@ def scan_file_surface(
         applicable=True,
         readable=not errors,
         manifest_digest=manifest, file_count=file_count, row_count=rows,
-        object_count=free_pages, fd_count=0, match_count=matches,
+        object_count=free_pages + git_objects, fd_count=0, match_count=matches,
         error_count=len(errors), omission_count=omissions, scan_digest=scan,
         errors=sorted(errors),
     )

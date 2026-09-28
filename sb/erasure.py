@@ -148,8 +148,10 @@ class ErasureEngine:
                 raise ErasureError("EFFECT_TARGET_INVALID")
             prior_records.append(prior)
             if plan.replacement is not None and index == 0:
-                sid = correction_marker(body[end:])
+                sid = correction_marker(body[end:], prior)
                 replacement = render_correction(plan.replacement, sid)
+                if sid is not None and correction_marker(body[end:]) is None:
+                    replacement += f"[^{sid}]"
                 replacement_bytes = replacement.encode("utf-8")
                 successor = body[:start] + replacement_bytes + body[end:]
                 if sid is not None:

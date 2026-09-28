@@ -88,7 +88,7 @@ class OpenCodeSessionsAdapter:
                     size = before[2]
                     if size > MAX_SNAPSHOT_BYTES:
                         raise _SnapshotSizeLimit
-                    extracted = self._read_snapshot(path, rel, size)
+                    extracted = self.read_snapshot(path, rel, size)
                     if file_revision(path) != before:
                         current[rel] = start
                         items.append(_skip(self.source_id, rel, "unstable-session-file"))
@@ -124,7 +124,7 @@ class OpenCodeSessionsAdapter:
     def next_cursor(self) -> str:
         return self._next_cursor
 
-    def _read_snapshot(
+    def read_snapshot(
         self, path: Path, rel: str, _size: int
     ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
         with open_session_file(path) as stream:
@@ -348,14 +348,14 @@ def _from_sqlite(database: Path) -> list[tuple[str, str]]:
         raise OSError("snapshot database cannot be read") from exc
     finally:
         connection.close()
-    extracted = _parts_from_rows(rows)
+    extracted = parts_from_rows(rows)
     _require_export_database(database)
     if file_revision(database) != before:
         raise _UnstableDatabase
     return extracted
 
 
-def _parts_from_rows(rows: Sequence[tuple[object, ...]]) -> list[tuple[str, str]]:
+def parts_from_rows(rows: Sequence[tuple[object, ...]]) -> list[tuple[str, str]]:
     items: list[tuple[str, str]] = []
     for row in rows:
         if len(row) < 2 or not isinstance(row[0], str) or not isinstance(row[1], str):

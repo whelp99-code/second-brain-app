@@ -113,13 +113,13 @@ def _read_file(directory: int, name: str) -> bytes:
 
 
 @dataclass(frozen=True, slots=True)
-class _PendingPublication:
+class PendingPublication:
     final: str
     payload: bytes
     emitter: BoundBarrierEmitter
 
 
-def _publish(directory: int, publication: _PendingPublication) -> None:
+def publish(directory: int, publication: PendingPublication) -> None:
     final = publication.final
     payload = publication.payload
     temporary = f".{final}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
@@ -178,7 +178,7 @@ def _publish(directory: int, publication: _PendingPublication) -> None:
                 raise EffectWriteIoError("WRITE_REQUEST_INBOX_UNSAFE")
 
 
-def _identity(request: MemoryEffectWriteRequestV2) -> RequestIdentity:
+def request_identity(request: MemoryEffectWriteRequestV2) -> RequestIdentity:
     delegation = request.delegation
     payload_digest = delegation.payload_digest
     return RequestIdentity(
@@ -268,7 +268,7 @@ def accept_effect_request(
         raise EffectRequestRejected("EFFECT_REQUEST_OVERSIZE", request.request_id)
     try:
         fcntl.flock(directory, fcntl.LOCK_EX)
-        identity = _identity(request)
+        identity = request_identity(request)
         previous = store.replay_status(identity)
         if previous is not None:
             loaded = strict_loads(previous.result_json, MAX_EFFECT_FILE_BYTES)
@@ -291,9 +291,9 @@ def accept_effect_request(
         if not valid_high_water:
             raise EffectRequestRejected("EFFECT_TOMBSTONE_STALE", request.request_id)
         try:
-            _publish(
+            publish(
                 directory,
-                _PendingPublication(
+                PendingPublication(
                     final,
                     payload,
                     BoundBarrierEmitter(
@@ -331,3 +331,9 @@ def accept_effect_request(
         fcntl.flock(directory, fcntl.LOCK_UN)
         os.close(directory)
         store.close()
+
+
+# Compatibility names for existing internal consumers.
+_PendingPublication = PendingPublication
+_publish = publish
+_identity = request_identity

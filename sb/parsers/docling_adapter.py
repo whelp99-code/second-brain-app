@@ -9,12 +9,28 @@ import resource
 import subprocess
 import sys
 from dataclasses import dataclass
-from importlib import import_module
 from pathlib import Path
+from typing import ClassVar, Final
 
-MAX_BYTES = 64 * 1024 * 1024
-TIMEOUT_SECONDS = 20
-MAX_OUTPUT_BYTES = 8 * 1024 * 1024
+from pydantic import BaseModel, ConfigDict, JsonValue
+
+from sb.parsers.contracts import LimitExceeded
+
+MAX_BYTES: Final = 64 * 1024 * 1024
+TIMEOUT_SECONDS: Final = 20
+MAX_OUTPUT_BYTES: Final = 8 * 1024 * 1024
+
+
+class _WorkerOutput(BaseModel):
+    """Parse the worker wire fields without coercing its scalar values."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, strict=True)
+
+    body: str
+    parser_version: str
+    model_version: str
+    locator: dict[str, JsonValue]
+    partial: bool
 
 
 def _limits() -> None:
@@ -40,8 +56,7 @@ def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
     Document text is never interpreted as instructions by this adapter.
     """
     if len(payload) > MAX_BYTES:
-        parser_errors = import_module("sb.parsers")
-        raise parser_errors.LimitExceeded("docling payload size")
+        raise LimitExceeded("docling payload size")
     worker = Path(__file__).with_name("docling_worker.py")
     try:
         completed = subprocess.run(
@@ -62,31 +77,20 @@ def parse_isolated(payload: bytes, suffix: str) -> DocumentParseResult | None:
     if completed.returncode != 0 or len(completed.stdout) > MAX_OUTPUT_BYTES:
         return None
     try:
-        value = json.loads(completed.stdout)
-        body = value["body"]
-        parser_version = value["parser_version"]
-        model_version = value["model_version"]
-        locator = value["locator"]
-        partial = value["partial"]
-        if not isinstance(body, str) or not body.strip() or not isinstance(parser_version, str):
-            return None
-        if (
-            not isinstance(model_version, str)
-            or not isinstance(locator, dict)
-            or not isinstance(partial, bool)
-        ):
+        value = _WorkerOutput.model_validate(json.loads(completed.stdout))
+        if not value.body.strip():
             return None
     except (ValueError, TypeError, KeyError):
         return None
     return DocumentParseResult(
-        body=body.strip(),
+        body=value.body.strip(),
         source_hash="sha256:" + hashlib.sha256(payload).hexdigest(),
         locator={
-            str(key): value
-            for key, value in locator.items()
-            if isinstance(value, (str, int))
+            key: item
+            for key, item in value.locator.items()
+            if isinstance(item, (str, int))
         },
-        parser_version=parser_version,
-        model_version=model_version,
-        partial=partial,
+        parser_version=value.parser_version,
+        model_version=value.model_version,
+        partial=value.partial,
     )

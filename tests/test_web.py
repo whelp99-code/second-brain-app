@@ -9,27 +9,31 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from http.client import HTTPConnection, HTTPResponse
 from pathlib import Path
-from typing import cast
+from typing import Never, cast
 
 import pytest
 from pytest import MonkeyPatch
 
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite
-from sb.effect_values import is_json_object
+from sb.effect_values import JsonInput, JsonValue, is_json_object
+from sb.generation_runtime_models import GenerationOperation
 from sb.pipeline import RunOutcome
 from sb.store import Run
 from sb.store.cas import ContentAddressedStore
 from sb.store.ledger import Ledger
+from sb.targets import GenerationIdentityV1
 from sb.vault import init_vault
 from sb.web import MAX_BODY_BYTES, SecondBrainHTTPServer, build_server
+from tests import test_memory_access
+from tests.json_fixtures import parse_json
 from tests.knowledge import stamp_knowledge
-from tests.test_memory_access import classified  # noqa: F401
 
+classified = test_memory_access.classified
 TERM = "웹콘솔계약검색"
 
 
@@ -75,9 +79,8 @@ def test_web_run_does_not_clear_held_brief_failures(
             (row.deriv_key, row.attempts, row.status)
             for row in ledger.list_derivations(status="failed", stage="brief")
         ]
-    monkeypatch.setattr(
-        "sb.web.run_all",
-        lambda *args: RunOutcome(
+    def fail_run(_config: Config, _sources: tuple[str, ...] | None) -> RunOutcome:
+        return RunOutcome(
             "console-retry",
             "failed",
             0,
@@ -86,8 +89,9 @@ def test_web_run_does_not_clear_held_brief_failures(
             1,
             None,
             failure="BRIEF_REPLAY_INPUTS_UNAVAILABLE",
-        ),
-    )
+        )
+
+    monkeypatch.setattr("sb.web.run_all", fail_run)
     with _running(config) as base:
         status, result = _request(base + "/api/run", method="POST", payload={})
         assert status == 200
@@ -98,13 +102,15 @@ def test_web_run_does_not_clear_held_brief_failures(
         status, payload = _request(f"{base}/api/status")
     assert status == 200
     assert isinstance(payload, dict)
-    failures = cast(dict[str, object], cast(dict[str, object], payload).get("failures"))
+    failures = payload.get("failures")
+    assert isinstance(failures, dict)
     assert failures.get("total") == 23
     assert failures.get("by_stage") == {"brief": 23}
     items = failures.get("items")
     assert isinstance(items, list)
     assert all(
-        cast(dict[str, object], item).get("retry_hold_reason") == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
+        isinstance(item, dict)
+        and item.get("retry_hold_reason") == "BRIEF_REPLAY_INPUTS_UNAVAILABLE"
         for item in items
     )
     with Ledger(root) as ledger:
@@ -171,7 +177,7 @@ def _ready(tmp_path: Path) -> tuple[Config, Path]:
 
 
 @contextmanager
-def _running(config: Config, host: str = "127.0.0.1") -> Generator[str, None, None]:
+def running(config: Config, host: str = "127.0.0.1") -> Generator[str, None, None]:
     server: SecondBrainHTTPServer = build_server(config, host, 0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -184,13 +190,13 @@ def _running(config: Config, host: str = "127.0.0.1") -> Generator[str, None, No
         thread.join(timeout=3)
 
 
-def _request(
+def request(
     url: str,
     *,
     method: str = "GET",
-    payload: object | None = None,
+    payload: JsonInput | None = None,
     token: str | None = None,
-) -> tuple[int, object]:
+) -> tuple[int, JsonValue]:
     headers = {"Content-Type": "application/json"}
     if token is not None:
         headers["Authorization"] = f"Bearer {token}"
@@ -200,11 +206,18 @@ def _request(
         response = cast(HTTPResponse, urllib.request.urlopen(request, timeout=3))
         with response:
             status = response.status
-            body = cast(object, json.loads(response.read().decode("utf-8")))
+            body = parse_json(response.read())
             return status, body
     except urllib.error.HTTPError as exc:
-        body = cast(object, json.loads(exc.read().decode("utf-8")))
+        body = parse_json(exc.read())
         return int(exc.code), body
+
+
+_running = running
+_request = request
+ready = _ready
+page = _page
+NoPreviousHash = _NoPreviousHash
 
 
 @pytest.mark.parametrize("query", ['"미완성', "가" * 1366])
@@ -446,7 +459,9 @@ def test_desktop_retract_network_failure_returns_deleted_false(
     token = "desktop-retract-token"
     monkeypatch.setenv("SB_WEB_TOKEN", token)
 
-    def boom(*_args: object, **_kwargs: object) -> object:
+    def boom[T](
+        _config: Config, _operation: GenerationOperation, _apply: Callable[[Path], T],
+    ) -> Never:
         raise OSError("network down")
 
     monkeypatch.setattr("sb.web.mutate_root", boom)
@@ -568,7 +583,7 @@ def test_request_body_budget_is_enforced(tmp_path: Path) -> None:
         connection.endheaders()
         response = connection.getresponse()
         status = response.status
-        payload = cast(object, json.loads(response.read().decode("utf-8")))
+        payload = parse_json(response.read())
         connection.close()
     assert status == 400
     assert payload == {"error": "request body too large"}
@@ -578,7 +593,7 @@ def test_status_summary_uses_same_ledger_run_as_details(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     with Ledger(root) as ledger:
         ledger.record_run(Run("latest-failed", "2099-01-01T00:00:00Z", None, None, "failed"))
-    (root / "log.md").write_text("old successful run\n")
+    _ = (root / "log.md").write_text("old successful run\n")
     with _running(config) as base:
         status, payload = _request(base + "/api/status")
     assert status == 200
@@ -591,7 +606,9 @@ def test_status_summary_uses_same_ledger_run_as_details(tmp_path: Path) -> None:
     assert "old successful run" not in status_text
 
 
-def test_web_search_owner_surface_does_not_replace_scoped_deny(classified) -> None:  # noqa: F811
+def test_web_search_owner_surface_does_not_replace_scoped_deny(
+    classified: tuple[Path, str, GenerationIdentityV1],
+) -> None:
     from sb.scoped_search import search_scoped_records
     from sb.source_access import SourceAccess
 

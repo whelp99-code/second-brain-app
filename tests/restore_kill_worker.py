@@ -7,10 +7,11 @@ import sys
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pytest import MonkeyPatch
 
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.restore import GenerationRestoreSanitizer
-from sb.restore_inventory import ManagedRestoreInventory
+from sb.restore_inventory import ManagedRestoreInventory, RestoreInventoryResult
 from sb.restore_models import RestoreRequest
 
 
@@ -27,17 +28,17 @@ def main() -> None:
     sanitizer = GenerationRestoreSanitizer(root / 'restore', config.provider_instance_id,
                                           config.jarvis_public_keys)
     if phase == 'extract':
-        original = GenerationRestoreSanitizer._extract
+        original = GenerationRestoreSanitizer.extract
 
         def extract(archive: Path, destination: Path):
             original(archive, destination)
             os.kill(os.getpid(), signal.SIGKILL)
 
-        GenerationRestoreSanitizer._extract = staticmethod(extract)
+        MonkeyPatch().setattr(GenerationRestoreSanitizer, "_extract", staticmethod(extract))
     elif phase == 'materialize':
         original_materialize = ManagedRestoreInventory.materialize
 
-        def materialize(destination: Path, result):
+        def materialize(destination: Path, result: RestoreInventoryResult):
             original_materialize(destination, result)
             os.kill(os.getpid(), signal.SIGKILL)
 
@@ -45,7 +46,7 @@ def main() -> None:
     with_executor = RequestExecutor(config)
     try:
         generation, proof = sanitizer.sanitize(request, with_executor.mutations)
-        (root / 'restore-result.json').write_text(proof.model_dump_json())
+        _ = (root / 'restore-result.json').write_text(proof.model_dump_json())
         assert generation.generation_id == proof.result_generation_id
     finally:
         with_executor.close()

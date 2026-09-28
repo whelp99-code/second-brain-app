@@ -47,7 +47,7 @@ class CancellationResultIssuer:
     provider_keys: Mapping[str, Ed25519PublicKey] | None = None
     authority: Callable[[], None] | None = None
 
-    def _aliases(self, intent: CorrectionCancellationIntentV1) -> str:
+    def aliases_digest(self, intent: CorrectionCancellationIntentV1) -> str:
         old = intent.original_delegation
         expected = sorted((('request_id', old.request_id), ('request_digest', old.request_digest),
             ('envelope_digest', intent.original_envelope_digest), ('idempotency_key', intent.original_idempotency_key),
@@ -129,7 +129,7 @@ class CancellationResultIssuer:
             'activation_manifest_digest':activation,'reader_drain_digest':drain,'predecessor_disposal_digest':disposal,
             'copy_checkpoint_digest':digest('surface',{'operation_id':intent.intent_id,'binding':_text(row, 0),
                 'inventory':_text(row, 1),'observed_at':_text(row, 2)}),
-            'aliases_digest':self._aliases(intent),'alias_count':8,'reingress_digest':self._reingress(intent),
+            'aliases_digest':self.aliases_digest(intent),'alias_count':8,'reingress_digest':self._reingress(intent),
             'generation_absence_digest':require_cancellation_absence(self.requests.db,intent.intent_id,generation_id,generation_digest,active.root),
             'accepted_at':_text(admitted, 0),'completed_at':format_instant(self.now)}
         if self.authority is not None:

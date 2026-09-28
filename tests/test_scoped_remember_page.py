@@ -1,34 +1,38 @@
 import hashlib
-import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
+from sb.effect_values import JsonObject
 from sb.generations import GenerationStore
 from sb.memory_access import MemoryAccessError, classified_page, require_scope
 from sb.remember_page import materialize_remember
-from sb.scoped_write_preparation import decode_scoped_write_preparation
+from sb.scoped_write_preparation import ScopedWritePreparation, decode_scoped_write_preparation
 from sb.source_access import SourceAccess
 from sb.store.ledger import Ledger
 from sb.targets import GenerationIdentityV1
+from tests.json_fixtures import parse_object
 
 NOW = datetime(2026, 8, 28, tzinfo=UTC)
 
 
 def preparation():
-    value = json.loads((Path(__file__).parent / "fixtures/scoped_write_preparation_v1.json").read_text())
+    value = parse_object((Path(__file__).parent / "fixtures/scoped_write_preparation_v1.json").read_text())
     return decode_scoped_write_preparation(value, now=NOW)
 
 
-def write(root, value, access):
+def write(root: Path, value: ScopedWritePreparation, access: SourceAccess | None) -> None:
+    candidate = parse_object(value.identity.canonical)["candidate_id"]
+    assert isinstance(candidate, str)
     materialize_remember(root, content=value.content,
-        candidate_id=json.loads(value.identity.canonical)["candidate_id"],
+        candidate_id=candidate,
         created_at=NOW.isoformat(), release_sha="a" * 40,
         sensitivity=value.sensitivity, source_access=access)
 
 
-def test_remember_scope_survives_sealing_and_denies_other_project(tmp_path):
+def test_remember_scope_survives_sealing_and_denies_other_project(tmp_path: Path):
     value = preparation()
     store = GenerationStore(tmp_path / "state", tmp_path / "share",
         provider_instance_id="provider:test", provider_release_sha="a" * 40)
@@ -38,7 +42,7 @@ def test_remember_scope_survives_sealing_and_denies_other_project(tmp_path):
             created_at=NOW, allowed=lambda _path: True,
             mutate=lambda root: write(root, value, value.source_access))
         store.activate(generation, None, NOW)
-        manifest = json.loads((generation.root / "generation.json").read_text())
+        manifest = parse_object((generation.root / "generation.json").read_text())
         identity = GenerationIdentityV1(*(str(manifest[name]) for name in (
             "provider_instance_id", "generation_id", "generation_digest", "head", "tree")))
         name = next((generation.root / "wiki").glob("*.md")).stem
@@ -55,7 +59,7 @@ def test_remember_scope_survives_sealing_and_denies_other_project(tmp_path):
         store.close()
 
 
-def test_equal_retry_preserves_scope_and_reclassification_rolls_back(tmp_path):
+def test_equal_retry_preserves_scope_and_reclassification_rolls_back(tmp_path: Path):
     value = preparation()
     write(tmp_path, value, value.source_access)
     page = next((tmp_path / "wiki").glob("*.md"))
@@ -72,7 +76,7 @@ def test_equal_retry_preserves_scope_and_reclassification_rolls_back(tmp_path):
         assert binding is not None and binding.complete and len(binding.source_refs) == 1
 
 
-def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path):
+def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path: Path):
     from sb.scoped_search import search_scoped_records
 
     content = 'SharedLineage 동일한 업무 결정'
@@ -81,7 +85,7 @@ def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path):
     store = GenerationStore(tmp_path / 'state', tmp_path / 'share',
         provider_instance_id='provider:test', provider_release_sha='a' * 40)
 
-    def materialize(root):
+    def materialize(root: Path) -> None:
         for candidate, scope in zip(candidates, scopes, strict=True):
             materialize_remember(root, content=content, candidate_id=candidate,
                 created_at=NOW.isoformat(), release_sha='a' * 40, source_access=scope)
@@ -95,9 +99,12 @@ def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path):
             manifest = pin.generation.manifest
             identity = GenerationIdentityV1(manifest.provider_instance_id, generation.generation_id,
                 manifest.generation_digest, generation.head, generation.tree)
-            results = []
+            results: list[JsonObject] = []
             for candidate, scope in zip(candidates, scopes, strict=True):
-                rows = search_scoped_records(generation.root, identity, scope, 'SharedLineage', 10)
+                rows = TypeAdapter(list[JsonObject]).validate_python(
+                    search_scoped_records(generation.root, identity, scope, 'SharedLineage', 10),
+                    strict=True,
+                )
                 assert len(rows) == 1
                 assert isinstance(rows[0], dict)
                 record = rows[0]['record']
@@ -109,9 +116,11 @@ def test_identical_content_keeps_distinct_candidate_lineage_and_scope(tmp_path):
                 assert page.requirements == (scope,)
                 assert len(page.source_refs) == 1
                 results.append(rows[0])
-            assert results[0]['record']['record_text'] == results[1]['record']['record_text']
+            first_record, second_record = results[0]['record'], results[1]['record']
+            assert isinstance(first_record, dict) and isinstance(second_record, dict)
+            assert first_record['record_text'] == second_record['record_text']
             assert results[0]['page_id'] != results[1]['page_id']
-            assert results[0]['record']['record_id'] != results[1]['record']['record_id']
+            assert first_record['record_id'] != second_record['record_id']
             combined = SourceAccess('principal:owner', ('project:a', 'project:b'), '1')
             assert len(search_scoped_records(generation.root, identity, combined, 'SharedLineage', 10)) == 2
             assert len(tuple((generation.root / 'raw').glob('*/*'))) == 1

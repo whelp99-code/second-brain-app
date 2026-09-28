@@ -83,7 +83,7 @@ class GjcSessionsAdapter:
             for path in _jsonl_paths(root):
                 rel = path.relative_to(root).as_posix()
                 extracted, consumed, checkpoint, reason = read_session_checkpoint(
-                    path, rel, previous.get(rel, 0), prior_checks.get(rel), self._read_file,
+                    path, rel, previous.get(rel, 0), prior_checks.get(rel), self.read_file,
                 )
                 current[rel] = consumed
                 if checkpoint is not None:
@@ -97,7 +97,7 @@ class GjcSessionsAdapter:
     def next_cursor(self) -> str:
         return self._next_cursor
 
-    def _read_file(
+    def read_file(
         self, path: Path, rel: str, start: int
     ) -> tuple[list[tuple[SourceRef, bytes, ItemMeta]], int]:
         consumed = start

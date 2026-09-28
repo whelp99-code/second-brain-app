@@ -8,6 +8,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final, cast
 
+from typing_extensions import TypedDict
+
 from sb.config import Config
 from sb.contracts import BriefingInputs, Unit
 
@@ -156,9 +158,19 @@ def _briefing_line(line: str, config: Config) -> str | None:
     return line if sensitive == "allow" else protected
 
 
-def source_policy_snapshot(config: Config) -> tuple[dict[str, object], ...]:
+class SourcePolicySnapshot(TypedDict, closed=True):
+    id: str
+    adapter: str
+    root: str | None
+    root_exists: bool | None
+    llm_policy: str
+    sensitive: str
+    external_model: bool
+
+
+def source_policy_snapshot(config: Config) -> tuple[SourcePolicySnapshot, ...]:
     """Return a redaction-safe operator view of configured source policies."""
-    rows: list[dict[str, object]] = []
+    rows: list[SourcePolicySnapshot] = []
     raw_sources = config.raw.get("sources")
     if not isinstance(raw_sources, list):
         return ()

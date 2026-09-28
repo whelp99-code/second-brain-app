@@ -1,83 +1,101 @@
 """Explicit source configuration must bound implicit batch collection."""
+
+from collections.abc import Iterator
+from pathlib import Path
+from typing import override
+
+import pytest
+
 from sb.config import Config
-from sb.connectors.base import SourceAdapter
+from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.inbox_documents import InboxDocumentsAdapter
-from sb.pipeline import _select_adapters
+from sb.contracts import SourceRef
+from sb.pipeline import select_adapters
 
 
-def test_implicit_selection_excludes_unconfigured_adapters(monkeypatch, tmp_path):
+def test_implicit_selection_excludes_unconfigured_adapters(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     class Adapter(SourceAdapter):
-        def __init__(self, source_id):
-            self.source_id = source_id
+        def __init__(self, source_id: str) -> None:
+            self.source_id: str = source_id
 
-        def scan(self, cursor):
+        @override
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
             return iter(())
 
-        def next_cursor(self):
+        @override
+        def next_cursor(self) -> str:
             return "0"
     chosen = {'inbox-documents': Adapter('inbox'), 'sessions-codex': Adapter('sessions-codex')}
-    monkeypatch.setattr('sb.connectors.discover_adapters', lambda config: chosen)
+    def discover(_config: Config) -> dict[str, SourceAdapter]:
+        return dict(chosen)
+    monkeypatch.setattr('sb.connectors.discover_adapters', discover)
     config = Config(raw={'vault_root': str(tmp_path), 'sources': [{'id': 'inbox', 'adapter': 'inbox-documents'}]})
-    assert [a.source_id for a in _select_adapters(chosen, None, config)] == ['inbox']
+    assert [a.source_id for a in select_adapters(chosen, None, config)] == ['inbox']
 
 
-def test_explicit_empty_source_list_does_not_enable_default_sources(tmp_path):
+def test_explicit_empty_source_list_does_not_enable_default_sources(tmp_path: Path):
     class Adapter(SourceAdapter):
-        source_id = 'sessions-codex'
+        source_id: str = 'sessions-codex'
 
-        def scan(self, cursor):
+        @override
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
             return iter(())
 
-        def next_cursor(self):
+        @override
+        def next_cursor(self) -> str:
             return "0"
     config = Config(raw={'vault_root': str(tmp_path), 'sources': []})
-    assert _select_adapters({'sessions-codex': Adapter()}, None, config) == []
+    assert select_adapters({'sessions-codex': Adapter()}, None, config) == []
 
 
-def test_legacy_defaults_and_explicit_request_remain_available(tmp_path):
+def test_legacy_defaults_and_explicit_request_remain_available(tmp_path: Path):
     class Adapter(SourceAdapter):
-        source_id = 'sessions-codex'
+        source_id: str = 'sessions-codex'
 
-        def scan(self, cursor):
+        @override
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
             return iter(())
 
-        def next_cursor(self):
+        @override
+        def next_cursor(self) -> str:
             return "0"
     chosen = {'sessions-codex': Adapter()}
     legacy = Config(raw={'vault_root': str(tmp_path)})
-    assert _select_adapters(chosen, None, legacy) == list(chosen.values())
+    assert select_adapters(chosen, None, legacy) == list(chosen.values())
     explicit_empty = Config(raw={'vault_root': str(tmp_path), 'sources': []})
-    assert _select_adapters(chosen, ['sessions-codex'], explicit_empty) == list(chosen.values())
+    assert select_adapters(chosen, ['sessions-codex'], explicit_empty) == list(chosen.values())
 
 
-def test_unknown_configured_source_is_rejected_before_scan(monkeypatch, tmp_path):
+def test_unknown_configured_source_is_rejected_before_scan(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     import pytest
-    monkeypatch.setattr('sb.connectors.discover_adapters', lambda config: {})
+    def discover(_config: Config) -> dict[str, SourceAdapter]:
+        return {}
+    monkeypatch.setattr('sb.connectors.discover_adapters', discover)
     config = Config(raw={'vault_root': str(tmp_path), 'sources': [{'id': 'typo-source', 'adapter': 'missing-adapter'}]})
     with pytest.raises(ValueError, match='SOURCE_NOT_FOUND: typo-source'):
-        _select_adapters({}, None, config)
+        _ = select_adapters({}, None, config)
 
 
-def test_default_id_does_not_accept_unknown_adapter(tmp_path):
+def test_default_id_does_not_accept_unknown_adapter(tmp_path: Path):
     import pytest
 
     from sb.connectors import discover_adapters
     config = Config(raw={'vault_root': str(tmp_path), 'sources': [{'id': 'inbox', 'adapter': 'missing-adapter'}]})
     with pytest.raises(ValueError, match='SOURCE_NOT_FOUND: inbox'):
-        _select_adapters(discover_adapters(config), None, config)
+        _ = select_adapters(discover_adapters(config), None, config)
 
 
-def test_inbox_aliases_preserve_configured_root(tmp_path):
+def test_inbox_aliases_preserve_configured_root(tmp_path: Path):
     from sb.connectors import discover_adapters
     for alias in ['inbox-documents', 'inbox', 'inbox_documents', 'documents']:
         config = Config(raw={'vault_root': str(tmp_path), 'sources': [{'id': 'custom-inbox', 'adapter': alias, 'root': str(tmp_path / 'selected')}]})
-        selected = _select_adapters(discover_adapters(config), None, config)
+        selected = select_adapters(discover_adapters(config), None, config)
         assert len(selected) == 1 and selected[0].source_id == 'custom-inbox'
         assert isinstance(selected[0], InboxDocumentsAdapter)
-        assert selected[0]._root == tmp_path / 'selected'
+        assert selected[0].root == tmp_path / 'selected'
 
 
-def test_all_declared_connector_aliases_select_the_requested_adapter(tmp_path):
+def test_all_declared_connector_aliases_select_the_requested_adapter(tmp_path: Path):
     from sb.connectors import discover_adapters
     defaults = discover_adapters(Config(raw={"vault_root": str(tmp_path)}))
     for key, adapter in defaults.items():
@@ -85,5 +103,5 @@ def test_all_declared_connector_aliases_select_the_requested_adapter(tmp_path):
             source_id = adapter.source_id
             config = Config(raw={"vault_root": str(tmp_path), "sources": [
                 {"id": source_id, "adapter": alias, "root": str(tmp_path / "selected")}]})
-            selected = _select_adapters(discover_adapters(config), None, config)
+            selected = select_adapters(discover_adapters(config), None, config)
             assert len(selected) == 1 and type(selected[0]) is type(adapter), (key, alias)

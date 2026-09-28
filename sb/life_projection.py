@@ -7,15 +7,17 @@ All user-authored text is escaped using the existing life view boundary.
 from __future__ import annotations
 
 import base64
-import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from hashlib import sha256
-from typing import Any
 from urllib.parse import quote
 
 from sb.life_contracts import LifeEventV1, LifeInputError
+from sb.life_fields import string
+from sb.life_journal_contracts import JournalRow
+from sb.life_json import decode_json
 from sb.life_values import canonical_bytes, instant, zone
+from sb.life_view_contracts import ObsidianManifest, ViewFile
 from sb.life_views import obsidian_manifest, safe_text
 
 
@@ -34,8 +36,8 @@ def project(
     timezone: str,
     sensitivities: tuple[str, ...],
     complete: bool,
-    workflows: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
-) -> dict[str, Any]:
+    workflows: Mapping[str, Sequence[JournalRow]] | None = None,
+) -> ObsidianManifest:
     base = obsidian_manifest(
         events, day=day, timezone=timezone, sensitivities=sensitivities, complete=complete
     )
@@ -65,7 +67,7 @@ def project(
         if date == day:
             continue
         lines = ["# " + date, "", "## 시간순 기록"]
-        for event in sorted(items, key=lambda e: (e.occurred_start, e.event_id)):
+        for event in sorted(items, key=lambda e: (e.occurred_start or "", e.event_id)):
             at = instant(event.occurred_start).astimezone(zone(timezone)).strftime("%H:%M")
             lines.append(
                 "- "
@@ -93,19 +95,19 @@ def project(
         "\n[[Auto/History|날짜별 기록]]\n[[Auto/Questions|확인할 기록]]\n[[Auto/Relations|관계]]\n[[Auto/Predictions|예측과 실제 결과]]\n"
     )
     workflows = workflows or {}
-    question_links = []
+    question_links: list[str] = []
     for row in workflows.get("question", ()):
         body = row["body"]
         path = _path("Questions", row["object_id"])
         qid = quote(row["object_id"], safe="")
         lines = [
-            "# " + safe_text(body.get("title", "기록 확인")),
+            "# " + safe_text(string(body.get("title", "기록 확인"))),
             "",
-            "상태: " + safe_text(body["state"]),
+            "상태: " + safe_text(string(body["state"])),
             "",
-            safe_text(body["prompt"]),
+            safe_text(string(body["prompt"])),
             "",
-            _event_link(body["event_id"], "대상 사건과 근거"),
+            _event_link(string(body["event_id"]), "대상 사건과 근거"),
         ]
         if body["state"] == "open":
             lines.append(
@@ -116,10 +118,10 @@ def project(
                 + ")"
             )
         elif "answer" in body:
-            lines += ["", "사용자 응답: " + safe_text(body["answer"])]
+            lines += ["", "사용자 응답: " + safe_text(string(body["answer"]))]
         files[path] = "\n".join(lines) + "\n"
         question_links.append(
-            "- [[" + path[:-3] + "|" + safe_text(body.get("title", "기록 확인")) + "]]"
+            "- [[" + path[:-3] + "|" + safe_text(string(body.get("title", "기록 확인"))) + "]]"
         )
     files["Auto/Questions.md"] = "# 확인할 기록\n\n" + "\n".join(question_links) + "\n"
     relation_lines = [
@@ -131,13 +133,16 @@ def project(
     for row in workflows.get("relation", ()):
         b = row["body"]
         relation_lines += [
-            "## " + safe_text(b["relation_kind"]),
-            safe_text(b["from_id"]) + " → " + safe_text(b["to_id"]),
-            "상태: " + safe_text(b["state"]) + " / " + safe_text(b["evidence_level"]),
+            "## " + safe_text(string(b["relation_kind"])),
+            safe_text(string(b["from_id"])) + " → " + safe_text(string(b["to_id"])),
+            "상태: "
+            + safe_text(string(b["state"]))
+            + " / "
+            + safe_text(string(b["evidence_level"])),
             "효력: "
-            + safe_text(b.get("valid_from") or "미지정")
+            + safe_text(string(b.get("valid_from") or "미지정"))
             + " ~ "
-            + safe_text(b.get("valid_until") or "미지정"),
+            + safe_text(string(b.get("valid_until") or "미지정")),
         ]
         relation_lines += [
             "- " + _event_link(ref["event_id"], "근거 사건") for ref in row["evidence"]
@@ -146,9 +151,12 @@ def project(
         b = row["body"]
         relation_lines += [
             "",
-            "동일인 연결: " + safe_text(b["from_id"]) + " → " + safe_text(b["to_id"]),
-            "상태: " + safe_text(b["state"]),
-            "근거: " + safe_text(b["reason"]),
+            "동일인 연결: "
+            + safe_text(string(b["from_id"]))
+            + " → "
+            + safe_text(string(b["to_id"])),
+            "상태: " + safe_text(string(b["state"])),
+            "근거: " + safe_text(string(b["reason"])),
         ]
     files["Auto/Relations.md"] = "\n".join(relation_lines) + "\n"
     prediction_lines = [
@@ -157,16 +165,16 @@ def project(
         "예측은 확정 사실이 아닙니다. 표본 부족과 결과 결측은 별도로 표시합니다.",
         "",
     ]
-    actuals = {r["body"]["prediction_id"]: r["body"] for r in workflows.get("actual", ())}
+    actuals = {string(r["body"]["prediction_id"]): r["body"] for r in workflows.get("actual", ())}
     for row in workflows.get("prediction", ()):
         b = row["body"]
         path = _path("Predictions", row["object_id"])
         lines = [
             "# 소요시간 예측",
             "",
-            "상태: " + safe_text(b["state"]),
-            "대상: " + safe_text(b["target_id"]),
-            "발행: " + safe_text(b["issued_at"]),
+            "상태: " + safe_text(string(b["state"])),
+            "대상: " + safe_text(string(b["target_id"])),
+            "발행: " + safe_text(string(b["issued_at"])),
             "표본: " + str(b["sample_count"]),
             "예상 분: "
             + ("자료 부족" if b["estimate_minutes"] is None else str(b["estimate_minutes"])),
@@ -176,7 +184,7 @@ def project(
         if actual:
             lines += [
                 "",
-                "실제 결과 상태: " + safe_text(actual["state"]),
+                "실제 결과 상태: " + safe_text(string(actual["state"])),
                 "실제 분: "
                 + ("결측" if actual["actual_minutes"] is None else str(actual["actual_minutes"])),
                 "절대 오차: "
@@ -190,9 +198,9 @@ def project(
             "- " + _event_link(ref["event_id"], "사건 근거") for ref in row["evidence"]
         ]
         files[path] = "\n".join(lines) + "\n"
-        prediction_lines.append("- [[" + path[:-3] + "|" + safe_text(b["target_id"]) + "]]")
+        prediction_lines.append("- [[" + path[:-3] + "|" + safe_text(string(b["target_id"])) + "]]")
     files["Auto/Predictions.md"] = "\n".join(prediction_lines) + "\n"
-    rows = [
+    rows: list[ViewFile] = [
         {"path": path, "content": content, "sha256": sha256(content.encode()).hexdigest()}
         for path, content in sorted(files.items())
     ]
@@ -207,15 +215,15 @@ def project(
     }
 
 
-def page(manifest: dict[str, Any], *, limit: int, cursor: str | None = None) -> dict[str, Any]:
+def page(manifest: ObsidianManifest, *, limit: int, cursor: str | None = None) -> ObsidianManifest:
     if type(limit) is not int or not 1 <= limit <= 500:
         raise LifeInputError("LIFE_LIMIT_INVALID")
     offset = 0
     if cursor is not None:
         try:
-            if not isinstance(cursor, str) or len(cursor) > 1000:
+            if len(cursor) > 1000:
                 raise ValueError
-            value = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+            value = decode_json(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
             if (
                 not isinstance(value, list)
                 or len(value) != 2

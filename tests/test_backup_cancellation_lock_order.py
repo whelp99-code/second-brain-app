@@ -3,6 +3,8 @@ from __future__ import annotations
 import fcntl
 import multiprocessing
 import os
+from multiprocessing.queues import Queue
+from multiprocessing.synchronize import Event
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,10 +13,10 @@ import pytest
 from sb.config import Config
 from sb.runtime_backup import backup_runtime, verify_runtime_backup
 from tests.test_correction_cancellation_executor import prepare_unaccepted
-from tests.test_request_executor import _config
+from tests.test_request_executor import config as _config
 
 
-def config_for(root):
+def config_for(root: Path) -> Config:
     config = _config(root)
     return Config(raw={"vault_root": str(config.share_root / "vault"),
         "request_root": str(config.request_root), "state_root": str(config.state_root),
@@ -22,13 +24,13 @@ def config_for(root):
         "provider_instance_id": config.provider_instance_id, "provider_release_sha": config.provider_release_sha})
 
 
-def backup_process(root, operation, attempted, result):
-    root = Path(root)
+def backup_process(root_path: str, operation: str, attempted: Event, result: Queue[str]) -> None:
+    root = Path(root_path)
     config = config_for(root)
     pending = (Path(config.request_root) / "pending").stat()
     real_flock = fcntl.flock
 
-    def observe_flock(descriptor, mode):
+    def observe_flock(descriptor: int, mode: int) -> None:
         current = os.fstat(descriptor)
         if (current.st_dev, current.st_ino) == (pending.st_dev, pending.st_ino) and mode == fcntl.LOCK_EX:
             attempted.set()
@@ -36,9 +38,9 @@ def backup_process(root, operation, attempted, result):
 
     with patch("fcntl.flock", observe_flock):
         if operation == "backup":
-            backup_runtime(config, root / "new.tar.gz")
+            _ = backup_runtime(config, root / "new.tar.gz")
         else:
-            verify_runtime_backup(config, root / "existing.tar.gz")
+            _ = verify_runtime_backup(config, root / "existing.tar.gz")
     result.put("completed")
 
 
@@ -48,7 +50,7 @@ def test_backup_does_not_hold_generation_mutex_while_waiting_for_admission(tmp_p
     executor.close()
     config = config_for(tmp_path)
     if operation == "verify":
-        backup_runtime(config, tmp_path / "existing.tar.gz")
+        _ = backup_runtime(config, tmp_path / "existing.tar.gz")
     ctx = multiprocessing.get_context("spawn")
     attempted, result = ctx.Event(), ctx.Queue()
     process = ctx.Process(target=backup_process, args=(str(tmp_path), operation, attempted, result))
