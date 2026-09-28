@@ -145,6 +145,68 @@ def test_bad_input_and_revision_conflict_are_explicit(tmp_path):
         assert _request(base + "/api/life/v1/not-existing")[0] == 404
 
 
+def test_receipt_get_exposes_state_lifecycle(tmp_path):
+    config, root = life_config(tmp_path)
+    with _running(config) as base:
+        code, accepted = _request(
+            base + "/api/life/v1/events:batch",
+            method="POST",
+            payload={"source_id": "test-notes", "items": [item()]},
+        )
+        assert code == 202, accepted
+        receipt_id = accepted["receipts"][0]["receipt_id"]
+        code, body = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and body["state"] == "accepted"
+        assert body["replayed"] is False
+        from sb.store.ledger import Ledger
+
+        with Ledger(root) as ledger:
+            store = ledger.life_store()
+            store.advance_receipt(receipt_id, "published", proof="commit:fixture")
+        code, published = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and published["state"] == "published"
+        with Ledger(root) as ledger:
+            store = ledger.life_store()
+            store.advance_receipt(receipt_id, "searchable", proof="index:fixture")
+        code, searchable = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and searchable["state"] == "searchable"
+        assert searchable["event_id"] == accepted["receipts"][0]["event_id"]
+
+
+def test_timeline_returns_groups_with_all_citations(tmp_path):
+    config, root = life_config(tmp_path)
+    shared = {"entity_id": "meetings:standup-2026-09-26", "kind": "event", "label": "스탠드업"}
+    with _running(config) as base:
+        code, accepted = _request(
+            base + "/api/life/v1/events:batch",
+            method="POST",
+            payload={
+                "source_id": "test-notes",
+                "items": [
+                    {"idempotency_key": "request-1", "payload": item(source_item_id="note-a", entities=[shared])["payload"]},
+                    {
+                        "idempotency_key": "request-2",
+                        "payload": item(
+                            source_item_id="cal-b",
+                            event_type="calendar_event",
+                            entities=[shared],
+                        )["payload"],
+                    },
+                ],
+            },
+        )
+        assert code == 202, accepted
+        code, timeline = _request(base + "/api/life/v1/timeline?day=2026-09-26")
+        assert code == 200, timeline
+        groups = timeline["groups"]
+        assert len(groups) == 1
+        citations = groups[0]["citations"]
+        assert {row["source_item_id"] for row in citations} == {"note-a", "cal-b"}
+        assert {row["event_id"] for row in citations} == set(groups[0]["event_ids"])
+        assert all(row["raw_digest"] and row["sid"] for row in citations)
+        del root
+
+
 def test_source_off_withdrawal_remains_available(tmp_path):
     config, root = life_config(tmp_path)
     with _running(config) as base:

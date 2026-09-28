@@ -201,6 +201,17 @@ def read_endpoint(
             "sha256": attachment.sha256,
             "content_base64": base64.b64encode(raw).decode(),
         }
+    if route.startswith("evidence-links/"):
+        from sb.store.life_journal import LifeJournal
+
+        event = _event(config, root, actor, route[len("evidence-links/") :], clock)
+        with read_life_store(root) as store:
+            records = LifeJournal(store).records(event)
+        return {
+            "event_id": event.event_id,
+            "revision": event.revision,
+            "records": records,
+        }
     if route.startswith("evidence/"):
         event = _event(config, root, actor, route[len("evidence/") :], clock)
         with read_life_store(root) as store:
