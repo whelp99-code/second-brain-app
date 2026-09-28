@@ -116,6 +116,17 @@ class Run:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceCoverage:
+    """Downstream coverage. Each field is an independent measure, not an alias."""
+
+    captured: int
+    parsed: int
+    published: int
+    searchable: int
+    eligible: int
+
+
+@dataclass(frozen=True, slots=True)
 class RunStage:
     run_id: str
     stage: str

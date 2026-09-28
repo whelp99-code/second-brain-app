@@ -52,7 +52,7 @@ def test_v4_migration_preserves_existing_data_and_backup(tmp_path):
     backup = migrate_ledger(path)
     assert backup is not None
     assert ledger_schema_version(backup) == 4
-    assert ledger_schema_version(path) == 5
+    assert ledger_schema_version(path) == 6
     with closing(sqlite3.connect(backup)) as conn:
         assert conn.execute("SELECT name FROM sqlite_master WHERE name='bound_knowledge'").fetchone() is None
         assert conn.execute('SELECT run_id FROM run').fetchall() == [('existing',)]

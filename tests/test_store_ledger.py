@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 import subprocess
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -19,7 +21,13 @@ from sb.store import (
     format_jsonl_cursor,
     format_postgres_cursor,
 )
-from sb.store.ledger import Ledger, rebuild_from_vault
+from sb.store.ledger import (
+    CURRENT_SCHEMA_VERSION,
+    Ledger,
+    ledger_schema_version,
+    migrate_ledger,
+    rebuild_from_vault,
+)
 
 _UNIT_A: str = "unit-a"
 _UNIT_B: str = "unit-b"
@@ -495,3 +503,52 @@ def test_rebuild_valid_compiled_by_uses_exact_prompt_and_model(tmp_path: Path) -
     assert row.stage == "compile"
     assert row.output_path == "wiki/exact.md"
     assert invented is None
+
+
+def test_migration_5_to_6_is_additive_and_backed_up(tmp_path: Path) -> None:
+    """Given a v5 ledger, when migration runs, then rows survive and a v5 backup exists."""
+    with Ledger(tmp_path):
+        pass
+    path = tmp_path / ".sb" / "ledger.db"
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("DROP TABLE scan_receipt")
+        conn.execute("DROP TABLE source_stage_count")
+        conn.execute("UPDATE schema_meta SET value='5' WHERE key='schema_version'")
+        conn.execute(
+            "INSERT INTO source_item VALUES ('mail','note.md','v1','abc','run','run')"
+        )
+        conn.commit()
+    before_columns = _table_columns(path, "source_item")
+    backup = migrate_ledger(path)
+    assert backup is not None
+    assert ledger_schema_version(backup) == 5
+    assert ledger_schema_version(path) == 6
+    assert CURRENT_SCHEMA_VERSION == 6
+    assert _table_columns(path, "source_item") == before_columns
+    assert "scan_id" in _table_columns(path, "scan_receipt")
+    assert "eligible" in _table_columns(path, "source_stage_count")
+    with closing(sqlite3.connect(backup)) as conn:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE name='scan_receipt'"
+        ).fetchone() is None
+        assert conn.execute("SELECT source_id FROM source_item").fetchall() == [("mail",)]
+    with closing(sqlite3.connect(path)) as conn:
+        assert conn.execute("SELECT source_id FROM source_item").fetchall() == [("mail",)]
+    assert migrate_ledger(path) is None
+
+
+def test_higher_version_refused(tmp_path: Path) -> None:
+    """Given a newer schema, when migration runs, then the file is refused unchanged."""
+    with Ledger(tmp_path):
+        pass
+    path = tmp_path / ".sb" / "ledger.db"
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("UPDATE schema_meta SET value='7' WHERE key='schema_version'")
+        conn.execute("INSERT INTO run VALUES ('kept','2026-09-28T00:00:00Z',NULL,NULL,'ok')")
+        conn.commit()
+    with pytest.raises(LedgerCorrupt, match="unsupported schema version 7"):
+        _ = migrate_ledger(path)
+    assert ledger_schema_version(path) == 7
+    assert not (path.parent / "migrations").exists()
+    with closing(sqlite3.connect(path)) as conn:
+        assert conn.execute("SELECT run_id FROM run").fetchall() == [("kept",)]

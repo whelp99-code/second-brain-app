@@ -14,6 +14,7 @@ from typing import Final, cast
 
 from sb.config import Config
 from sb.security import source_policy_snapshot
+from sb.source_coverage import coverage_by_source, empty_coverage
 from sb.store import LedgerCorrupt, parse_page_frontmatter
 
 _HEX: Final = frozenset("0123456789abcdef")
@@ -45,8 +46,17 @@ class RetentionReport:
 
 
 def source_status(config: Config) -> tuple[dict[str, object], ...]:
-    """Return a content-free status view of configured source policies."""
-    return source_policy_snapshot(config)
+    """Return a content-free status view of configured source policies.
+
+    Coverage counts are separate from policy fields and never include source bodies.
+    """
+    coverage = coverage_by_source(config.vault_root)
+    rows: list[dict[str, object]] = []
+    for item in source_policy_snapshot(config):
+        row = dict(item)
+        row["coverage"] = coverage.get(str(row["id"]), empty_coverage())
+        rows.append(row)
+    return tuple(rows)
 
 
 def retention_report(vault_root: Path | str) -> RetentionReport:
