@@ -21,7 +21,10 @@ from sb.governance import retention_report, source_status
 from sb.inbox import RememberRejected, discard_inbox, write_inbox
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
+from sb.observation_admission import AdmissionError, ObservationReceipt, admit, read
 from sb.ops import status_snapshot
+from sb.parsers.capabilities import parser_capabilities
+from sb.personal_observation import MAX_ENVELOPE_BYTES
 from sb.pipeline import run_all
 from sb.redaction import redact_credentials
 from sb.runtime_access import mutate_root, read_root
@@ -278,6 +281,20 @@ def _retract_upload(root: Path, upload_id: str, context: WebContext) -> RetractR
     return receipt.as_dict()
 
 
+def _observation_body(receipt: ObservationReceipt) -> dict[str, object]:
+    body = receipt.as_dict()
+    body["searchable"] = receipt.searchable
+    return body
+
+
+def _admission_status(exc: AdmissionError) -> HTTPStatus:
+    if exc.code == "EMITTER_UNREGISTERED":
+        return HTTPStatus.FORBIDDEN
+    if exc.code == "OBSERVATION_CONFLICT":
+        return HTTPStatus.CONFLICT
+    return HTTPStatus.BAD_REQUEST
+
+
 def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         close_connection: bool
@@ -441,6 +458,7 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 )
                 return
             if parsed.path == "/api/capabilities":
+                parsers = parser_capabilities()
                 self._json(
                     HTTPStatus.OK,
                     {
@@ -452,7 +470,9 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                             "latest_briefing": True,
                             "supported_suffixes": list(supported_suffixes()),
                             "max_upload_bytes": MAX_UPLOAD_BYTES,
-                        }
+                        },
+                        "intake_max_bytes": MAX_UPLOAD_BYTES,
+                        "parsers": parsers,
                     },
                 )
                 return
@@ -512,6 +532,21 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     {"sources": list(source_status(context.config))},
                 )
                 return
+            if parsed.path.startswith("/api/source-observations/"):
+                receipt_id = unquote(parsed.path.removeprefix("/api/source-observations/")).strip("/")
+                if "/" in receipt_id or not receipt_id:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                    return
+                try:
+                    receipt = read(root, receipt_id)
+                except AdmissionError as exc:
+                    self._json(_admission_status(exc), {"error": exc.code})
+                    return
+                if receipt is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                    return
+                self._json(HTTPStatus.OK, _observation_body(receipt))
+                return
             if parsed.path == "/api/retention":
                 self._json(HTTPStatus.OK, retention_report(root).as_dict())
                 return
@@ -527,6 +562,8 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 self._post()
+            except AdmissionError as exc:
+                self._json(_admission_status(exc), {"error": exc.code})
             except (
                 ValueError,
                 TypeError,
@@ -543,7 +580,12 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
 
         def _post(self) -> None:
             parsed = urlsplit(self.path)
-            maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
+            if parsed.path == "/api/uploads":
+                maximum = MAX_UPLOAD_REQUEST_BYTES
+            elif parsed.path == "/api/source-observations":
+                maximum = ((MAX_ENVELOPE_BYTES + 2) // 3) * 4 + 8192
+            else:
+                maximum = MAX_BODY_BYTES
             if parsed.path in {"/api/life/v1/events:batch", "/api/life/v1/exports/import"} or parsed.path.startswith(("/api/life/v1/overland/", "/api/life/v1/health/")):
                 maximum = 24 * 1024 * 1024
             data = self._body(maximum)
@@ -577,6 +619,23 @@ def _handler(context: WebContext) -> type[BaseHTTPRequestHandler]:
                     )
                     return
                 self._json(HTTPStatus.OK, receipt)
+                return
+            if parsed.path == "/api/source-observations":
+                emitter = _string_field(data, "emitter", required=True)
+                encoded = data.get("payload_base64")
+                if not isinstance(encoded, str) or not encoded:
+                    raise ValueError("payload_base64 is required")
+                try:
+                    payload = base64.b64decode(encoded, validate=True)
+                except binascii.Error as exc:
+                    raise ValueError("payload_base64 is invalid") from exc
+                receipt = mutate_root(
+                    context.config,
+                    GenerationOperation.INBOX,
+                    lambda root: admit(root, payload, emitter=emitter, config=context.config),
+                )
+                status = HTTPStatus.CREATED if receipt.state == "accepted_pending" else HTTPStatus.OK
+                self._json(status, _observation_body(receipt))
                 return
             if parsed.path == "/api/uploads":
                 filename = _string_field(data, "filename", required=True)

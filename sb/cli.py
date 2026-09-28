@@ -509,10 +509,18 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             print("no configured sources")
             return 0
         for row in rows:
+            coverage = row.get("coverage")
+            counts = ""
+            if isinstance(coverage, dict):
+                counts = (
+                    f" captured={coverage.get('captured')} parsed={coverage.get('parsed')}"
+                    f" published={coverage.get('published')} searchable={coverage.get('searchable')}"
+                    f" eligible={coverage.get('eligible')}"
+                )
             print(
                 f"{row['id']} adapter={row['adapter']} root={row['root']} "
                 + f"exists={row['root_exists']} llm_policy={row['llm_policy']} "
-                + f"sensitive={row['sensitive']}"
+                + f"sensitive={row['sensitive']}{counts}"
             )
         return 0
 
