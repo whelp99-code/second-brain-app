@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "id": "instance1",
+      "recurringEventId": "weekly",
+      "originalStartTime": {"dateTime": "2026-09-24T10:00:00+09:00"},
+      "start": {"dateTime": "2026-09-24T10:00:00+09:00"},
+      "end": {"dateTime": "2026-09-24T11:00:00+09:00"},
+      "summary": "주간 미팅"
+    },
+    {
+      "id": "instance2",
+      "recurringEventId": "weekly",
+      "originalStartTime": {"dateTime": "2026-10-01T10:00:00+09:00"},
+      "start": {"dateTime": "2026-10-01T10:00:00+09:00"},
+      "end": {"dateTime": "2026-10-01T11:00:00+09:00"},
+      "summary": "주간 미팅"
+    }
+  ]
+}

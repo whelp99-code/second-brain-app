@@ -120,10 +120,37 @@ def phone_event(document: object) -> dict[str, object]:
             event_type = "audio_saved"
         elif all(a["mime"].startswith("image/") for a in attachments):
             event_type = "photo_saved"
+    metadata = document.get("metadata") or {}
     if event_type == "call_recording_imported":
         if not attachments or not all(a["mime"].startswith("audio/") for a in attachments):
             raise LifeInputError("LIFE_PHONE_CALL_AUDIO_REQUIRED")
-        body += "\n통화 분류는 사용자가 명시한 기록입니다. 전사는 별도 상태입니다."
+        if not isinstance(metadata, dict):
+            raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
+        # capture_mode is the legacy declaration. An explicit false overrides it.
+        if "recording_declared" in metadata and metadata.get("recording_declared") is not True:
+            raise LifeInputError("LIFE_PHONE_RECORDING_UNDECLARED")
+        if document.get("capture_mode") not in {"explicit", "share", "shortcut"}:
+            raise LifeInputError("LIFE_PHONE_RECORDING_UNDECLARED")
+        duration = metadata.get("duration_seconds")
+        method = metadata.get("capture_method", document.get("capture_mode"))
+        if duration is not None and (type(duration) is not int or not 0 <= duration <= 86400):
+            raise LifeInputError("LIFE_PHONE_RECORDING_INVALID")
+        if method not in {"explicit", "share", "shortcut"}:
+            raise LifeInputError("LIFE_PHONE_RECORDING_INVALID")
+        primary = attachments[0]
+        body += "\n" + "\n".join(
+            (
+                "통화 분류는 사용자가 명시한 기록입니다. 전사는 별도 상태입니다.",
+                "attachment_state=untranscribed",
+                "recording_sha256=" + primary["sha256"],
+                "recording_locator=attachment:" + primary["name"],
+                "capture_method=" + str(method),
+                "occurred_at=" + occurred.isoformat(),
+                "duration_seconds=" + (str(duration) if duration is not None else "unknown"),
+                "audio_format=" + primary["mime"],
+                "transcript_revision=separate",
+            )
+        )
     # Keep the original signed/unsigned client event as DATA, never as an
     # authority for a scope, project or verified decision.
     raw = canonical_bytes(document)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -127,6 +128,66 @@ def test_adapter_pipeline_preserves_cursor_and_source_revision(tmp_path):
 def test_attachment_invalid_path_mime_encoding_hash(row):
     with pytest.raises(LifeInputError):
         decode_attachments([row])
+
+
+def test_note_link_and_conversation_roots_stay_separate(tmp_path):
+    notes = tmp_path / "notes"
+    chats = tmp_path / "chats"
+    notes.mkdir()
+    chats.mkdir()
+    (notes / "note-link.json").write_bytes(
+        (Path(__file__).parent / "fixtures" / "life-exports" / "note-link.json").read_bytes()
+    )
+    (chats / "conversation.json").write_bytes(
+        (Path(__file__).parent / "fixtures" / "life-exports" / "conversation.json").read_bytes()
+    )
+    config, root = life_config(tmp_path)
+    life = config.raw["life"]
+    config = replace(
+        config,
+        raw={
+            **config.raw,
+            "source_access": {
+                "life-notes": config.raw["source_access"]["test-notes"],
+                "life-chats": config.raw["source_access"]["test-notes"],
+            },
+            "sources": [
+                {
+                    "id": "life-notes",
+                    "adapter": "life-records",
+                    "root": str(notes),
+                    "format": "life-json",
+                },
+                {
+                    "id": "life-chats",
+                    "adapter": "life-records",
+                    "root": str(chats),
+                    "format": "conversation",
+                },
+            ],
+            "life": {
+                **life,
+                "sources": {
+                    "life-notes": {
+                        "enabled": True,
+                        "allowed_types": ["note_saved", "link_saved"],
+                    },
+                    "life-chats": {"enabled": True, "allowed_types": ["ai_conversation"]},
+                },
+            },
+        },
+    )
+    outcome = run_ingest(config, sources=["life-notes", "life-chats"])
+    assert outcome.exit_code == 0, outcome
+    with Ledger(root) as ledger:
+        events = ledger.life_store().events(scopes=("principal:owner",), now=NOW)
+        assert {event.event_type for event in events} == {
+            "note_saved",
+            "link_saved",
+            "ai_conversation",
+        }
+        assert {event.source_id for event in events} == {"life-notes", "life-chats"}
+        assert ledger.get_cursor("life-notes") != ledger.get_cursor("life-chats")
 
 
 def test_conversation_roles_and_audio_are_not_invented_events():
