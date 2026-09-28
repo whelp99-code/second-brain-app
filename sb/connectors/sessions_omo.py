@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Final, Protocol
+from typing import Final, Protocol, cast
 
 type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 
@@ -44,7 +45,8 @@ class OmoSessionsAdapter:
 
     accepted_adapters: Final = _ADAPTERS
 
-    def __init__(self, roots: tuple[Path, ...], source_id: str) -> None:
+    def __init__(self, roots: tuple[Path, ...], source_id: str, filter_noise: bool = False) -> None:
+        self._filter_noise: bool = filter_noise
         self.source_id: str = source_id
         self._roots: tuple[Path, ...] = roots
         self._next_cursor: str = "0"
@@ -122,17 +124,47 @@ class OmoSessionsAdapter:
                     items.append(_skip(self.source_id, rel, extracted))
                     continue
                 for item_id, text in extracted:
+                    if self._filter_noise and _noise(text):
+                        continue
                     uri = f"{rel}#{item_id}"
                     token = str(end)
-                    meta: ItemMeta = {"relative_path": rel, "cursor": token}
+                    meta = _item_meta(rel, token, text, self._filter_noise)
                     items.append((SourceRef(self.source_id, uri, token), text.encode(), meta))
         return items, consumed
+
+
+_NOISE_RE: Final = re.compile(
+    r"(?:api[_-]?key|access[_-]?token|password|secret|authorization)\s*[:=]\s*\S+"
+    + r"|bearer\s+\S+"
+    + r"|\x1b\["
+    + r"|^\s*(?:\$ |>>> |curl\s+-)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _item_meta(rel: str, token: str, text: str, tagged: bool) -> ItemMeta:
+    payload: dict[str, str] = {"relative_path": rel, "cursor": token}
+    if tagged:
+        payload["fact_kind"] = _fact_kind(text)
+    return cast(ItemMeta, cast(object, payload))
+
+
+def _noise(text: str) -> bool:
+    return _NOISE_RE.search(text) is not None
+
+
+def _fact_kind(text: str) -> str:
+    found = re.match(r"(?i)^\s*(decision|attempt|test|commit|deploy)\s*:", text)
+    return found.group(1).lower() if found else "observation"
 
 
 def create(config: _ConnectorConfig) -> SourceAdapter:
     """Build the OMO adapter from config, probing default roots when unset."""
     source_id, roots = _configured_roots(config)
-    return OmoSessionsAdapter(roots=roots, source_id=source_id)
+    enabled = any(row.get("session_profile") == "facts-v1" and
+                  (row.get("adapter") or row.get("type")) in _ADAPTERS
+                  for row in config.source_roots)
+    return OmoSessionsAdapter(roots=roots, source_id=source_id, filter_noise=enabled)
 
 
 def _configured_roots(config: _ConnectorConfig) -> tuple[str, tuple[Path, ...]]:
