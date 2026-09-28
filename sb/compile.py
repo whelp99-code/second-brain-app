@@ -5,14 +5,20 @@ from __future__ import annotations
 import hashlib
 import weakref
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import files
 from typing import Final, Protocol
 
 from sb.config import Config
 from sb.contracts import PageSpec, SourceCite, Unit
 from sb.llm import LLMClient, LLMUnavailable
-from sb.security import protect_units, source_llm_policy
+from sb.security import (
+    SecurityPolicyError,
+    SourceAccessReader,
+    protect_compile_egress,
+    protect_units,
+    source_llm_policy,
+)
 from sb.store import Derivation, DerivationOutput, DerivStatus, deriv_key
 
 COMPILE_STAGE: Final = "compile"
@@ -24,7 +30,7 @@ ORIGIN_DIGEST_LEN: Final = 8
 _MD_SUFFIX: Final = ".md"
 
 
-class CompileLedger(Protocol):
+class CompileLedger(SourceAccessReader, Protocol):
     """Ledger derivation surface used by compile. Matches sb.store.ledger.Ledger."""
 
     def get_derivation(self, key: str) -> Derivation | None: ...
@@ -166,8 +172,15 @@ def compile_pending(
                 if used >= cap:
                     remaining = True
                     break
-                protected = protect_units(list(grouped), config)
-                item = _compile_one(_PageJob(page_id, key, tuple(protected)), ctx)
+                protected = protect_units(list(grouped), config, ledger=ledger)
+                previous = ctx.existing_pages.get(page_id)
+                egress = protect_compile_egress(
+                    llm, grouped, config, ledger, previous=previous,
+                    untracked_context=previous is None and bool(
+                        ctx.existing_bodies.get(page_id, _BODIES.get(ledger, page_id))
+                    ),
+                )
+                item = _compile_one(_PageJob(page_id, key, tuple(protected)), replace(ctx, llm=egress))
                 used += 1
             pending.append(item)
             if on_page is not None:
@@ -247,7 +260,9 @@ def _compile_one(job: _PageJob, ctx: _CompileCtx) -> PendingCompile:
     ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
     try:
         body = ctx.llm.generate(prompt)
-    except LLMUnavailable as exc:
+    except (LLMUnavailable, SecurityPolicyError, ValueError) as exc:
+        if isinstance(exc, ValueError) and str(exc) != "SOURCE_ACCESS_RECLASSIFICATION_REQUIRED":
+            raise
         ctx.ledger.mark_failed(job.key, str(exc))
         raise
     _BODIES.put(ctx.ledger, job.page_id, body)
