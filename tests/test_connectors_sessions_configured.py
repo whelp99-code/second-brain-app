@@ -1,8 +1,8 @@
 """Configured [[sources]] rows collect Claude, Codex, and OMO session fixtures.
 
-discovery.py is unchanged: its SourceName allowlist is a metadata-only
-filesystem inventory, not the ingest adapter registry. Session adapters are
-selected from [[sources]] adapter values via discover_adapters().
+discovery.py remains a metadata-only filesystem inventory, not the ingest
+adapter registry. Hermes and dev-wiki names only fix that inventory's scope.
+Session adapters are selected from [[sources]] adapter values via discover_adapters().
 """
 
 from __future__ import annotations

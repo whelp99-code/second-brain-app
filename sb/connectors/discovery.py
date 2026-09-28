@@ -10,11 +10,12 @@ from pathlib import Path, PurePath, PurePosixPath
 from typing import Final, Literal, override
 
 from sb.connectors.fs_safety import SafeSourceFilesystem, SafeSourceFilesystemError
+from sb.connectors.source_manifest import discovery_path_allowed
 
 SOURCE_DISCOVERY_REQUEST_V1: Final = "second-brain-source-discovery-request-v1"
 SOURCE_DISCOVERY_ENTRY_V1: Final = "second-brain-source-discovery-entry-v1"
 SOURCE_DISCOVERY_MANIFEST_V1: Final = "second-brain-source-discovery-manifest-v1"
-SourceName = Literal["me-wiki", "unified-db", "legacy Mem0/RAG"]
+SourceName = Literal["me-wiki", "unified-db", "legacy Mem0/RAG", "hermes", "dev-wiki"]
 _REQUEST_FIELDS: Final = frozenset({"request_version", "source_name", "source_root"})
 _ALLOWED_SUFFIXES: Final = frozenset(
     {
@@ -33,6 +34,8 @@ _ALLOWED_SUFFIXES: Final = frozenset(
 )
 _SOURCE_NAMES: Final[dict[str, SourceName]] = {
     "me-wiki": "me-wiki",
+    "hermes": "hermes",
+    "dev-wiki": "dev-wiki",
     "unified-db": "unified-db",
     "legacy Mem0/RAG": "legacy Mem0/RAG",
 }
@@ -188,6 +191,8 @@ def discover_source(
         raise SourceDiscoveryError(str(exc)) from exc
     entries: list[SourceDiscoveryEntryV1] = []
     for item in scanned.files:
+        if not discovery_path_allowed(request.source_name, item.relative_path):
+            continue
         if not is_allowed_source_suffix(item.relative_path):
             raise SourceDiscoveryError(f"unsupported source file suffix: {item.relative_path}")
         relative = item.relative_path
