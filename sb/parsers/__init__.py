@@ -6,11 +6,12 @@ import hashlib
 import importlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final, Protocol, cast, override
+from typing import Final, Protocol, override
 
 
-class DocumentParseResult(Protocol):
-    """Provenance-bearing parser result implemented by the optional adapter."""
+@dataclass(frozen=True, slots=True)
+class DocumentParseResult:
+    """Provenance of the first extracted unit of a document."""
 
     body: str
     source_hash: str
@@ -18,6 +19,7 @@ class DocumentParseResult(Protocol):
     parser_version: str
     model_version: str
     partial: bool
+    partial_reason: str | None = None
 
 
 class ParseError(Exception):
@@ -59,6 +61,19 @@ class OcrRequired(ParseError):
 
 
 @dataclass(frozen=True, slots=True)
+class WorkerFailure(ParseError):
+    reason: str
+
+    @override
+    def __str__(self) -> str:
+        return f"docling worker failure: {self.reason}"
+
+
+# Machine-consumed uncertainty values, shared with the optional worker.
+PARTIAL_REASONS: Final = frozenset({"ocr_required", "formula_unavailable"})
+
+
+@dataclass(frozen=True, slots=True)
 class UnsupportedSuffix(Exception):
     suffix: str
 
@@ -86,28 +101,34 @@ def _try_docling(payload: bytes, suffix: str) -> str | None:
 
 
 def parse_document(payload: bytes, suffix: str) -> DocumentParseResult:
-    """Parse one document and retain provenance for derived memory records."""
-    adapter = importlib.import_module("sb.parsers.docling_adapter")
-
-    normalized = suffix if suffix.startswith(".") else f".{suffix}"
-    isolated = (
-        adapter.parse_isolated(payload, normalized.lower())
-        if normalized.lower() in {".pdf", ".docx"}
-        else None
-    )
-    if isolated is not None:
-        return cast(DocumentParseResult, isolated)
-    parser = parser_for(normalized)
-    body = parser(payload)
-    result_type = adapter.DocumentParseResult
-    return cast(DocumentParseResult, result_type(
+    """Parse with an exact first-unit locator; worker failure is never fallback."""
+    normalized = (suffix if suffix.startswith(".") else f".{suffix}").lower()
+    parser_for(normalized)  # Reject unknown suffixes before starting an optional worker.
+    if normalized in {".pdf", ".docx"}:
+        adapter = importlib.import_module("sb.parsers.docling_adapter")
+        isolated = adapter.parse_isolated(payload, normalized)
+        if isolated is not None:
+            return isolated
+    if normalized == ".pdf":
+        body, locator, reason = importlib.import_module("sb.parsers.pdf").PdfParser().parse_details(payload)
+    elif normalized == ".docx":
+        body, locator, reason = importlib.import_module("sb.parsers.office").DocxDocumentParser().parse_details(payload)
+    elif normalized == ".xlsx":
+        body, locator, reason = importlib.import_module("sb.parsers.office").XlsxDocumentParser().parse_details(payload)
+    elif normalized == ".hwpx":
+        body, locator, reason = importlib.import_module("sb.parsers.hwpx").HwpxDocumentParser().parse_details(payload)
+    else:
+        body = parser_for(normalized)(payload)
+        locator, reason = {"kind": "ordinal", "ordinal": 1}, None
+    return DocumentParseResult(
         body=body,
         source_hash="sha256:" + hashlib.sha256(payload).hexdigest(),
-        locator={"kind": "document", "ordinal": 1},
-        parser_version=f"builtin:{normalized.lower()}",
+        locator=locator,
+        parser_version=f"builtin:{normalized}",
         model_version="none",
-        partial=False,
-    ))
+        partial=reason is not None,
+        partial_reason=reason,
+    )
 
 
 def _bound_parse(module_name: str, class_name: str) -> Callable[[bytes], str]:
@@ -191,12 +212,15 @@ def parser_for(suffix: str) -> Callable[[bytes], str]:
 
 
 __all__ = (
+    "PARTIAL_REASONS",
+    "DocumentParseResult",
     "FormatUnsupported",
     "InvalidInput",
     "LimitExceeded",
     "OcrRequired",
     "ParseError",
     "UnsupportedSuffix",
+    "WorkerFailure",
     "parse_document",
     "parser_for",
 )
