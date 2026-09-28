@@ -7,6 +7,7 @@ The event parser in life_values is the only external-input constructor.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Final
 
@@ -164,6 +165,7 @@ class LifeEventV1:
         result = asdict(self)
         result["scopes"] = list(self.scopes)
         result["entities"] = [asdict(entity) for entity in self.entities]
+        result["attachments"] = [asdict(item) for item in self.attachments]
         return result
 
 
@@ -189,3 +191,211 @@ class LifeRelationV1:
     evidence_level: str
     valid_from: str | None = None
     valid_until: str | None = None
+
+
+_RECORD_DIGEST: Final = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_NON_INFERRED: Final = frozenset({"observed", "user_asserted"})
+
+
+def allowed_transition(previous: str, new: str, *, evidence_level: str) -> bool:
+    """Return whether one revision may replace event_status.
+
+    The same status is always allowed. Inferred evidence never yields occurred.
+    planned or unknown becomes occurred only with observed or user_asserted
+    evidence. cancelled becomes occurred, and occurred becomes cancelled, only
+    with user_asserted evidence. occurred never returns to planned or unknown.
+    planned may become cancelled or unknown. cancelled becomes planned only with
+    user_asserted evidence. unknown may become planned or cancelled.
+    """
+    if previous not in EVENT_STATES or new not in EVENT_STATES:
+        raise LifeInputError("LIFE_EVENT_STATUS_INVALID")
+    if evidence_level not in EVIDENCE_LEVELS:
+        raise LifeInputError("LIFE_EVIDENCE_LEVEL_INVALID")
+    if previous == new:
+        return True
+    if new == "occurred" and previous == "planned":
+        return evidence_level in _NON_INFERRED
+    if new == "occurred" and previous == "cancelled":
+        return evidence_level == "user_asserted"
+    if new == "occurred" and previous == "unknown":
+        return evidence_level in _NON_INFERRED
+    if previous == "occurred" and new == "cancelled":
+        return evidence_level == "user_asserted"
+    if previous == "occurred" and new == "planned":
+        return False
+    if previous == "planned" and new in {"cancelled", "unknown"}:
+        return True
+    if previous == "cancelled" and new == "planned":
+        return evidence_level == "user_asserted"
+    return previous == "unknown" and new in {"planned", "cancelled"}
+
+
+def life_record_link(
+    *,
+    record_id: str,
+    record_digest: str,
+    event_id: str,
+    revision: int,
+) -> dict[str, object]:
+    """Copy a MemoryRecord digest into a side link. Never rehash the record."""
+    if not isinstance(record_id, str) or not IDENTIFIER.fullmatch(record_id):
+        raise LifeInputError("LIFE_RECORD_ID_INVALID")
+    if not isinstance(record_digest, str) or not _RECORD_DIGEST.fullmatch(record_digest):
+        raise LifeInputError("LIFE_RECORD_DIGEST_INVALID")
+    if not isinstance(event_id, str) or not IDENTIFIER.fullmatch(event_id):
+        raise LifeInputError("LIFE_EVENT_ID_INVALID")
+    if type(revision) is not int or revision < 1:
+        raise LifeInputError("LIFE_REVISION_INVALID")
+    return {
+        "schema_version": 1,
+        "record_id": record_id,
+        "record_digest": record_digest,
+        "event_id": event_id,
+        "event_revision": revision,
+    }
+
+
+def validate_life_document(
+    instance: object,
+    schema: Mapping[str, object],
+    *,
+    definition: str | None = None,
+) -> None:
+    """Validate one document with a stdlib subset of JSON Schema."""
+    root: Mapping[str, object] = schema
+    selected: Mapping[str, object] = schema
+    if definition is not None:
+        defs = schema.get("$defs")
+        if not isinstance(defs, Mapping) or definition not in defs:
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+        chosen = defs[definition]
+        if not isinstance(chosen, Mapping):
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+        selected = chosen
+    _validate_node(instance, selected, root)
+
+
+def _validate_node(
+    instance: object,
+    schema: Mapping[str, object],
+    root: Mapping[str, object],
+) -> None:
+    if "$ref" in schema:
+        ref = schema["$ref"]
+        if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+        defs = root.get("$defs")
+        name = ref.removeprefix("#/$defs/")
+        chosen = defs.get(name) if isinstance(defs, Mapping) else None
+        if not isinstance(chosen, Mapping):
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+        _validate_node(instance, chosen, root)
+        return
+    if "oneOf" in schema:
+        options = schema["oneOf"]
+        if not isinstance(options, list):
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+        matched = 0
+        for option in options:
+            if not isinstance(option, Mapping):
+                raise LifeInputError("LIFE_SCHEMA_INVALID")
+            try:
+                _validate_node(instance, option, root)
+            except LifeInputError:
+                continue
+            matched += 1
+        if matched != 1:
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+        return
+    if "const" in schema and instance != schema["const"]:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if "enum" in schema:
+        allowed = schema["enum"]
+        if not isinstance(allowed, list) or instance not in allowed:
+            raise LifeInputError("LIFE_SCHEMA_INVALID")
+    expected = schema.get("type")
+    if expected is not None and not _type_matches(instance, expected):
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if isinstance(instance, str):
+        _check_string(instance, schema)
+    if isinstance(instance, list):
+        _check_array(instance, schema, root)
+    if isinstance(instance, int | float) and not isinstance(instance, bool):
+        _check_number(instance, schema)
+    if isinstance(instance, dict):
+        _check_object(instance, schema, root)
+
+
+def _type_matches(instance: object, expected: object) -> bool:
+    names = (expected,) if isinstance(expected, str) else expected
+    if not isinstance(names, tuple) and not isinstance(names, list):
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    checks = {
+        "object": lambda value: isinstance(value, dict),
+        "array": lambda value: isinstance(value, list),
+        "string": lambda value: isinstance(value, str),
+        "boolean": lambda value: isinstance(value, bool),
+        "integer": lambda value: type(value) is int,
+        "number": lambda value: type(value) in {int, float},
+        "null": lambda value: value is None,
+    }
+    return any(name in checks and checks[name](instance) for name in names)
+
+
+def _check_string(instance: str, schema: Mapping[str, object]) -> None:
+    minimum = schema.get("minLength")
+    maximum = schema.get("maxLength")
+    if type(minimum) is int and len(instance) < minimum:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if type(maximum) is int and len(instance) > maximum:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    pattern = schema.get("pattern")
+    if isinstance(pattern, str) and re.search(pattern, instance) is None:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+
+
+def _check_number(instance: float, schema: Mapping[str, object]) -> None:
+    minimum = schema.get("minimum")
+    maximum = schema.get("maximum")
+    if isinstance(minimum, int | float) and not isinstance(minimum, bool) and instance < minimum:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if isinstance(maximum, int | float) and not isinstance(maximum, bool) and instance > maximum:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+
+
+def _check_array(
+    instance: list[object],
+    schema: Mapping[str, object],
+    root: Mapping[str, object],
+) -> None:
+    minimum = schema.get("minItems")
+    maximum = schema.get("maxItems")
+    if type(minimum) is int and len(instance) < minimum:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if type(maximum) is int and len(instance) > maximum:
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    items = schema.get("items")
+    if isinstance(items, Mapping):
+        for item in instance:
+            _validate_node(item, items, root)
+
+
+def _check_object(
+    instance: dict[object, object],
+    schema: Mapping[str, object],
+    root: Mapping[str, object],
+) -> None:
+    required = schema.get("required", [])
+    properties = schema.get("properties", {})
+    if not isinstance(required, list) or not isinstance(properties, Mapping):
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if any(name not in instance for name in required):
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    if schema.get("additionalProperties") is False and any(
+        key not in properties for key in instance
+    ):
+        raise LifeInputError("LIFE_SCHEMA_INVALID")
+    for key, value in instance.items():
+        property_schema = properties.get(key)
+        if isinstance(property_schema, Mapping):
+            _validate_node(value, property_schema, root)

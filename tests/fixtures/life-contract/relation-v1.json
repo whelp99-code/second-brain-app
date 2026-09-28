@@ -1,0 +1,11 @@
+{
+  "from_id": "person:ada",
+  "kind": "participated_in",
+  "to_id": "3b66ab6c-105a-5b82-b597-704a1bc12aa7",
+  "evidence_event_ids": [
+    "3b66ab6c-105a-5b82-b597-704a1bc12aa7"
+  ],
+  "evidence_level": "observed",
+  "valid_from": "2026-09-26T00:00:00+00:00",
+  "valid_until": null
+}

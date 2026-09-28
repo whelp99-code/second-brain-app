@@ -1,0 +1,12 @@
+{
+  "candidate_id": "cand:old-consumer-1",
+  "candidate_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "classification_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "idempotency_key": "idem-old-consumer-1",
+  "operation": "remember",
+  "subject": "old consumer request",
+  "purpose": "compatibility",
+  "sensitivity": "personal",
+  "retention_days": 365,
+  "schema_version": 1
+}
