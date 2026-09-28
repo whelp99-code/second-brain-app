@@ -25,6 +25,15 @@ from sb.store.ledger import Ledger
 from sb.store.life import _decode, read_life_store
 from sb.vault import Vault
 
+_RESTORE_PHASE_HOOK = None
+
+
+def _restore_phase(name: str, detail: dict[str, object] | None = None) -> None:
+    hook = _RESTORE_PHASE_HOOK
+    if hook is not None and name:
+        hook(name, detail or {})
+
+
 TABLES = (
     "life_events",
     "life_event_revisions",
@@ -52,19 +61,32 @@ def has_life(root: Path) -> bool:
         raise LifeInputError("LIFE_RESTORE_STATE_INVALID") from exc
 
 
-def capture(root: Path) -> dict[str, Any] | None:
+def _table_rows(connection: sqlite3.Connection, name: str) -> list[list[object]] | None:
+    if connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone():
+        return [list(row) for row in connection.execute(f'SELECT * FROM "{name}"')]
+    return None
+
+
+def capture(root: Path, *, phase: str | None = "capture") -> dict[str, Any] | None:
     """Caller owns a stable writer lock or a pinned immutable generation."""
     if not has_life(root):
         return None
     cas = ContentAddressedStore(root)
     with read_life_store(root) as store:
         connection = store.connection
-        tables = {}
+        tables: dict[str, list[list[object]]] = {}
+        tombstones = _table_rows(connection, "life_tombstones")
+        if tombstones is not None:
+            tables["life_tombstones"] = tombstones
+        _restore_phase(phase or "", {"tombstones": len(tables.get("life_tombstones", []))})
         for name in TABLES:
-            if connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-            ).fetchone():
-                tables[name] = [list(row) for row in connection.execute(f'SELECT * FROM "{name}"')]
+            if name == "life_tombstones":
+                continue
+            rows = _table_rows(connection, name)
+            if rows is not None:
+                tables[name] = rows
         revisions = [_decode((row[4], row[5])) for row in tables["life_event_revisions"]]
         sources = sorted({row[1] for row in tables["life_events"]})
         source_rows = []
@@ -150,7 +172,11 @@ def capture(root: Path) -> dict[str, Any] | None:
 
 
 def materialize(
-    current: dict[str, Any] | None, destination: Path, *, old_archive_has_life: bool = False
+    current: dict[str, Any] | None,
+    destination: Path,
+    *,
+    old_archive_has_life: bool = False,
+    phase: str | None = "materialize",
 ) -> dict[str, object]:
     """Apply a captured CURRENT snapshot to an unpublished restoration candidate."""
     if current is None:
@@ -174,14 +200,43 @@ def materialize(
     with Ledger(destination) as ledger:
         life_store = ledger.life_store()
         connection = life_store.connection
+        tomb_rows = current["tables"].get("life_tombstones", [])
+        with ledger.transaction():
+            for row in tomb_rows:
+                connection.execute(
+                    "INSERT OR IGNORE INTO life_tombstones"
+                    "(sequence,event_id,revision,scopes_json,deleted_at) VALUES(?,?,?,?,?)",
+                    row,
+                )
+            connection.execute(
+                "UPDATE life_events SET deleted=1 WHERE event_id IN "
+                "(SELECT event_id FROM life_tombstones)"
+            )
+        _restore_phase(phase or "", {"tombstones_committed": len(tomb_rows)})
+        tomb_ids = {
+            row[0]
+            for row in connection.execute("SELECT event_id FROM life_tombstones")
+        }
         with ledger.transaction():
             for table in reversed(TABLES):
+                if table == "life_tombstones":
+                    continue
                 connection.execute(f'DELETE FROM "{table}"')
             for table in TABLES:
+                if table == "life_tombstones":
+                    continue
                 rows = current["tables"].get(table, [])
+                if table == "life_events":
+                    rows = [
+                        [*row[:4], 1, *row[5:]] if row[0] in tomb_ids else row for row in rows
+                    ]
                 if rows:
                     placeholders = ",".join("?" for _ in rows[0])
                     connection.executemany(f'INSERT INTO "{table}" VALUES({placeholders})', rows)
+            connection.execute(
+                "UPDATE life_events SET deleted=1 WHERE event_id IN "
+                "(SELECT event_id FROM life_tombstones)"
+            )
             for row in current["source_rows"]:
                 connection.execute(
                     "INSERT INTO source_item VALUES(?,?,?,?,?,?) ON CONFLICT(source_id,source_uri,content_hash) "
@@ -247,5 +302,8 @@ def materialize(
 
 def preserve_current(current_root: Path, candidate_root: Path) -> dict[str, object]:
     return materialize(
-        capture(current_root), candidate_root, old_archive_has_life=has_life(candidate_root)
+        capture(current_root, phase=None),
+        candidate_root,
+        old_archive_has_life=has_life(candidate_root),
+        phase="preserve_current",
     )

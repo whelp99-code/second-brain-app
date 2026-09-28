@@ -28,7 +28,9 @@ from sb.life_values import canonical_bytes, parse_event, text
 from sb.store.cas import ContentAddressedStore
 from sb.store.life_journal import LifeJournal
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+RECEIPT_STATES = ("accepted", "published", "searchable")
+_RECEIPT_ORDER = {name: index for index, name in enumerate(RECEIPT_STATES)}
 SCHEMA = (
     (
         "CREATE TABLE IF NOT EXISTS life_events (event_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
@@ -54,7 +56,8 @@ SCHEMA = (
     (
         "CREATE TABLE IF NOT EXISTS life_receipts (receipt_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
         "request_key TEXT NOT NULL, request_digest TEXT NOT NULL, event_id TEXT NOT NULL, revision "
-        "INTEGER NOT NULL, accepted_at TEXT NOT NULL, UNIQUE(source_id,request_key))"
+        "INTEGER NOT NULL, accepted_at TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'accepted', "
+        "proof TEXT NOT NULL DEFAULT '', UNIQUE(source_id,request_key))"
     ),
     (
         "CREATE TABLE IF NOT EXISTS life_tombstones (sequence INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -127,15 +130,30 @@ class LifeStore:
             row = self.connection.execute(
                 "SELECT value FROM schema_meta WHERE key='life_schema_version'"
             ).fetchone()
-            if row is not None and row[0] != str(SCHEMA_VERSION):
+            if row is not None and row[0] not in {"1", str(SCHEMA_VERSION)}:
                 raise LifeInputError("LIFE_SCHEMA_UNSUPPORTED")
             for statement in SCHEMA:
                 self.connection.execute(statement)
+            if row is not None and row[0] == "1":
+                self._migrate_receipts_v1()
             self.connection.execute(
-                "INSERT OR IGNORE INTO schema_meta(key,value) VALUES('life_schema_version',?)",
+                "INSERT INTO schema_meta(key,value) VALUES('life_schema_version',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (str(SCHEMA_VERSION),),
             )
             LifeJournal(self).initialize()
+
+    def _migrate_receipts_v1(self) -> None:
+        """Add receipt lifecycle columns. Existing receipt ids and rows stay put."""
+        columns = {item[1] for item in self.connection.execute("PRAGMA table_info(life_receipts)")}
+        if "state" not in columns:
+            self.connection.execute(
+                "ALTER TABLE life_receipts ADD COLUMN state TEXT NOT NULL DEFAULT 'accepted'"
+            )
+        if "proof" not in columns:
+            self.connection.execute(
+                "ALTER TABLE life_receipts ADD COLUMN proof TEXT NOT NULL DEFAULT ''"
+            )
 
     def accept(
         self,
@@ -171,14 +189,14 @@ class LifeStore:
             if current is not None and current[2] != pdigest:
                 raise LifeInputError("LIFE_POLICY_CHANGED")
             replay = self.connection.execute(
-                "SELECT receipt_id,event_id,revision,accepted_at,request_digest FROM life_receipts "
+                "SELECT receipt_id,event_id,revision,accepted_at,request_digest,state FROM life_receipts "
                 "WHERE source_id=? AND request_key=?",
                 (policy.source_id, key),
             ).fetchone()
             if replay:
                 if replay[4] != event.raw_digest:
                     raise LifeInputError("LIFE_IDEMPOTENCY_CONFLICT")
-                return LifeReceiptV1(*replay[:4], replayed=True)
+                return LifeReceiptV1(*replay[:4], replayed=True, state=replay[5])
             prior_version = self.connection.execute(
                 "SELECT revision,raw_digest FROM life_event_revisions WHERE event_id=? AND source_version=?",
                 (event.event_id, event.source_version),
@@ -193,6 +211,21 @@ class LifeStore:
                     current is None and expected_revision not in {None, 0}
                 ):
                     raise LifeInputError("LIFE_REVISION_CONFLICT")
+                if actual_revision >= 1:
+                    previous = self.connection.execute(
+                        "SELECT body_json,body_digest FROM life_event_revisions "
+                        "WHERE event_id=? AND revision=?",
+                        (event.event_id, actual_revision),
+                    ).fetchone()
+                    from sb.life_contracts import allowed_transition
+
+                    prior_event = _decode(previous)
+                    if not allowed_transition(
+                        prior_event.event_status,
+                        event.event_status,
+                        evidence_level=event.evidence_level,
+                    ):
+                        raise LifeInputError("LIFE_TRANSITION_FORBIDDEN")
                 revision = actual_revision + 1
                 event = replace(event, revision=revision)
                 from sb.life_attachments import decode_attachments
@@ -238,8 +271,10 @@ class LifeStore:
                     ),
                 )
             receipt_id = str(uuid4())
+            accepted_at = _clock(now)
             self.connection.execute(
-                "INSERT INTO life_receipts VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO life_receipts(receipt_id,source_id,request_key,request_digest,"
+                "event_id,revision,accepted_at,state,proof) VALUES(?,?,?,?,?,?,?,'accepted','')",
                 (
                     receipt_id,
                     policy.source_id,
@@ -247,10 +282,10 @@ class LifeStore:
                     event.raw_digest,
                     event.event_id,
                     revision,
-                    _clock(now),
+                    accepted_at,
                 ),
             )
-            return LifeReceiptV1(receipt_id, event.event_id, revision, _clock(now), False)
+            return LifeReceiptV1(receipt_id, event.event_id, revision, accepted_at, False)
 
     def get(self, event_id: str, *, scopes: tuple[str, ...], now: datetime) -> LifeEventV1:
         clause, params = _scope_clause(scopes)
@@ -313,13 +348,71 @@ class LifeStore:
 
     def receipt(self, receipt_id: str, *, scopes: tuple[str, ...], now: datetime) -> LifeReceiptV1:
         row = self.connection.execute(
-            "SELECT receipt_id,event_id,revision,accepted_at FROM life_receipts WHERE receipt_id=?",
+            "SELECT receipt_id,event_id,revision,accepted_at,state FROM life_receipts WHERE receipt_id=?",
             (receipt_id,),
         ).fetchone()
         if row is None:
             raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
         self.get(row[1], scopes=scopes, now=now)
-        return LifeReceiptV1(*row, replayed=False)
+        return LifeReceiptV1(*row[:4], replayed=False, state=row[4])
+
+    def receipt_proof(self, receipt_id: str) -> str:
+        row = self.connection.execute(
+            "SELECT proof FROM life_receipts WHERE receipt_id=?", (receipt_id,)
+        ).fetchone()
+        if row is None:
+            raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
+        return str(row[0])
+
+    def receipt_is_searchable(self, receipt_id: str) -> bool:
+        """Unknown and unproven states are never searchable."""
+        row = self.connection.execute(
+            "SELECT state,proof FROM life_receipts WHERE receipt_id=?", (receipt_id,)
+        ).fetchone()
+        if row is None:
+            raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
+        return row[0] == "searchable" and bool(row[1])
+
+    def advance_receipt(self, receipt_id: str, state: str, *, proof: str) -> LifeReceiptV1:
+        """Move accepted → published → searchable. Each step needs a proof ref."""
+        if state not in {"published", "searchable"}:
+            raise LifeInputError("LIFE_RECEIPT_STATE_INVALID")
+        if not isinstance(proof, str) or not proof.strip() or len(proof) > 256:
+            raise LifeInputError("LIFE_RECEIPT_PROOF_REQUIRED")
+        with self.transaction():
+            row = self.connection.execute(
+                "SELECT receipt_id,event_id,revision,accepted_at,state FROM life_receipts "
+                "WHERE receipt_id=?",
+                (receipt_id,),
+            ).fetchone()
+            if row is None:
+                raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
+            current = row[4]
+            if current not in _RECEIPT_ORDER:
+                raise LifeInputError("LIFE_RECEIPT_STATE_INVALID")
+            if _RECEIPT_ORDER[current] > _RECEIPT_ORDER[state]:
+                return LifeReceiptV1(*row[:4], replayed=True, state=current)
+            if current == state:
+                return LifeReceiptV1(*row[:4], replayed=True, state=current)
+            if state == "searchable" and current != "published":
+                raise LifeInputError("LIFE_RECEIPT_STATE_INVALID")
+            self.connection.execute(
+                "UPDATE life_receipts SET state=?,proof=? WHERE receipt_id=?",
+                (state, proof, receipt_id),
+            )
+            return LifeReceiptV1(*row[:4], replayed=False, state=state)
+
+    def advance_event_receipts(self, event_id: str, state: str, *, proof: str) -> int:
+        rows = self.connection.execute(
+            "SELECT receipt_id,state FROM life_receipts WHERE event_id=?", (event_id,)
+        ).fetchall()
+        advanced = 0
+        for receipt_id, current in rows:
+            if current in _RECEIPT_ORDER and _RECEIPT_ORDER[current] >= _RECEIPT_ORDER[state]:
+                continue
+            self.advance_receipt(receipt_id, state, proof=proof)
+            advanced += 1
+        return advanced
 
     def evidence(
         self, event_id: str, *, scopes: tuple[str, ...], now: datetime, revision: int | None = None
@@ -357,6 +450,9 @@ class LifeStore:
                 "INSERT INTO life_tombstones(event_id,revision,scopes_json,deleted_at) VALUES(?,?,?,?)",
                 (event_id, event.revision, json.dumps(event.scopes), _clock(now)),
             )
+            from sb.life_inventory import release_event_blobs
+
+            release_event_blobs(self, event_id)
 
     def tombstones(self, *, scopes: tuple[str, ...]) -> tuple[dict[str, object], ...]:
         clause, params = _scope_clause(scopes, "t")
