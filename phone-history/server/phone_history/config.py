@@ -6,10 +6,15 @@ import base64
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from phone_history.errors import ConfigurationError
 
 _DEFAULT_MAX_REQUEST_BYTES = 15 * 1024 * 1024
+_VAULT_RETIRED = (
+    "PHONE_HISTORY_SECOND_BRAIN_VAULT is retired; set PHONE_HISTORY_SECOND_BRAIN_BASE_URL "
+    "to https://… or http://127.0.0.1:… and do not fall back to a vault path"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +48,12 @@ class Settings:
             1 <= self.attachment_retention_days <= 3650
         ):
             raise ConfigurationError("attachment retention must be between 1 and 3650 days")
+        if self.second_brain_base_url is not None:
+            object.__setattr__(
+                self,
+                "second_brain_base_url",
+                accepted_second_brain_base_url(self.second_brain_base_url),
+            )
 
     @property
     def database_path(self) -> Path:
@@ -63,7 +74,9 @@ class Settings:
             raise ConfigurationError("PHONE_HISTORY_MASTER_KEY_B64 is required")
         key = _decode_key(encoded_key)
         raw_vault = os.environ.get("PHONE_HISTORY_SECOND_BRAIN_VAULT", "").strip()
-        vault = Path(raw_vault).expanduser() if raw_vault else None
+        if raw_vault:
+            raise ConfigurationError(_VAULT_RETIRED)
+        vault = None
         raw_base = os.environ.get("PHONE_HISTORY_SECOND_BRAIN_BASE_URL", "").strip()
         token_env = os.environ.get("PHONE_HISTORY_SECOND_BRAIN_TOKEN_ENV", "SB_WEB_TOKEN").strip()
         if not token_env:
@@ -100,6 +113,33 @@ class Settings:
         except OSError:
             # Permission hardening is verified separately; non-POSIX test filesystems may ignore it.
             pass
+
+
+def accepted_second_brain_base_url(value: str) -> str:
+    """Allow only https origins, or http bound to 127.0.0.1.
+
+    Public cleartext HTTP and non-loopback HTTP are rejected. A vault path is
+    never accepted as a substitute.
+    """
+    raw = value.strip()
+    parsed = urlsplit(raw)
+    host = (parsed.hostname or "").lower()
+    if (
+        parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or not host
+        or parsed.port == 0
+    ):
+        raise ConfigurationError(
+            "PHONE_HISTORY_SECOND_BRAIN_BASE_URL must be https://… or http://127.0.0.1:…"
+        )
+    if parsed.scheme == "https" or (parsed.scheme == "http" and host == "127.0.0.1"):
+        return raw.rstrip("/")
+    raise ConfigurationError(
+        "PHONE_HISTORY_SECOND_BRAIN_BASE_URL must be https://… or http://127.0.0.1:…"
+    )
 
 
 def _decode_key(value: str) -> bytes:

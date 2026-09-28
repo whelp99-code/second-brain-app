@@ -12,7 +12,13 @@ from phone_history.errors import NotFoundError, ValidationError
 from phone_history.models import EventBatch, PhoneEvent
 from phone_history.redaction import redact_fields
 from phone_history.repository import CandidateState, EventRecord, Repository
-from phone_history.sink import DisabledSink, EventSink, SecondBrainSink, SinkError
+from phone_history.sink import (
+    DisabledSink,
+    EventSink,
+    HttpSecondBrainSink,
+    SecondBrainSink,
+    SinkError,
+)
 
 _IDEMPOTENCY_RE: Final = re.compile(r"^[A-Za-z0-9._:-]{8,200}$")
 CandidateDecision = Literal["queue_for_owner_review", "dismiss"]
@@ -36,10 +42,16 @@ class PhoneHistoryService:
         self.repository = Repository(settings) if repository is None else repository
         if sink is not None:
             self.sink = sink
-        elif settings.second_brain_vault is None:
-            self.sink = DisabledSink()
-        else:
+        elif settings.second_brain_base_url:
+            self.sink = HttpSecondBrainSink(
+                settings.second_brain_base_url,
+                token_env=settings.second_brain_token_env,
+            )
+        elif settings.second_brain_vault is not None:
+            # In-process field only. from_environment() never sets it.
             self.sink = SecondBrainSink(settings.second_brain_vault)
+        else:
+            self.sink = DisabledSink()
 
     def ingest(self, batch: EventBatch, *, idempotency_key: str) -> ServiceResponse:
         key = idempotency_key.strip()
@@ -209,7 +221,9 @@ class PhoneHistoryService:
             **self.repository.status(),
             "version": "0.1.0-predevice",
             "device_closure": "NOT_RUN",
-            "second_brain_configured": self.settings.second_brain_vault is not None,
+            "second_brain_configured": bool(
+                self.settings.second_brain_base_url or self.settings.second_brain_vault
+            ),
         }
 
     def capabilities(self) -> dict[str, object]:
