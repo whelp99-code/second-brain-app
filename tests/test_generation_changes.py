@@ -85,6 +85,19 @@ def test_stale_journal_binding_cannot_mix_generation_changes(store: GenerationSt
         _ = generation_recent_changes(current.root, store.journal_path, 7)
 
 
+def test_vault_above_census_budget_records_only_real_changes(store: GenerationStore) -> None:
+    # Given: a schema-5-style first seal of an existing vault larger than the
+    # receipt census, then one real edit. Unchanged pages are the baseline.
+    pages = {f"p{index:04d}": "same" for index in range(4097)}
+    parent = publish(store, None, pages)
+    pages["p0000"] = "edited"
+    current = publish(store, parent, pages)
+    # When: recent changes are read after both seals.
+    rows = generation_recent_changes(current.root, store.journal_path, 7)
+    # Then: refresh-sized change set is the edit, not the 4097 existing pages.
+    assert [(row.page_id, row.change) for row in rows] == [("wiki/p0000", "modified")]
+
+
 def test_unactivated_generation_has_no_recent_publication(store: GenerationStore) -> None:
     # Given: a sealed candidate has not crossed the activation boundary.
     current = store.build(request_id="sealed-only", parent=None, tombstone_sequence=0,
