@@ -111,3 +111,34 @@ def test_connection_error_does_not_advance_cursor_and_is_visible(
     assert down.scans == 2
     assert first.exit_code == 1
     assert second.exit_code == 1
+
+
+def test_markdown_journal_cursor_is_not_an_observation_text_field(tmp_path: Path) -> None:
+    """A pre-existing per-file journal cursor must not fail the source as ObservationError."""
+    source = tmp_path / "journal"
+    source.mkdir()
+    for index in range(80):
+        _ = (source / f"2026-07-{index:02d}.md").write_text(f"# day {index}\n", encoding="utf-8")
+    vault = tmp_path / "share/vault"
+    config = Config(
+        raw={
+            "vault_root": str(vault),
+            "share_root": str(tmp_path / "share"),
+            "state_root": str(tmp_path / "state"),
+            "sources": [{
+                "id": "unified-db-journal",
+                "adapter": "markdown-vault",
+                "root": str(source),
+                "llm_policy": "deny",
+            }],
+            "llm": {"argv_template": ["/bin/false"]},
+        }
+    )
+    outcome = run_ingest(config, ("unified-db-journal",))
+    log = (vault / ".sb/runs.log").read_text(encoding="utf-8") if (vault / ".sb/runs.log").is_file() else ""
+    tables = load_ledger_tables(vault / ".sb/ledger.db")
+    cursor = tables.cursors["unified-db-journal"][0]
+    assert outcome.exit_code == 0
+    assert outcome.errors == 0
+    assert "ObservationError" not in log
+    assert len(cursor) > 4096

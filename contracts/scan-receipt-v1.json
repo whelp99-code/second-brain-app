@@ -13,8 +13,8 @@
     "started_at": {"$ref": "#/$defs/instant"},
     "finished_at": {"$ref": "#/$defs/instant"},
     "state": {"enum": ["ok", "partial", "failed", "unavailable", "disabled"]},
-    "checkpoint_before": {"$ref": "#/$defs/nullableText"},
-    "checkpoint_after": {"$ref": "#/$defs/nullableText"},
+    "checkpoint_before": {"$ref": "#/$defs/nullableCheckpoint"},
+    "checkpoint_after": {"$ref": "#/$defs/nullableCheckpoint"},
     "scanned": {"$ref": "#/$defs/count"},
     "accepted": {"$ref": "#/$defs/count"},
     "unchanged": {"$ref": "#/$defs/count"},
@@ -46,7 +46,9 @@
     "text": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001f]*[^\\s\\u0000-\\u001f][^\\u0000-\\u001f]*$"},
     "count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
     "instant": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"},
+    "checkpoint": {"type": "string", "minLength": 1, "maxLength": 1048576, "pattern": "^[^\\u0000-\\u001f]*[^\\s\\u0000-\\u001f][^\\u0000-\\u001f]*$"},
     "nullableText": {"oneOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+    "nullableCheckpoint": {"oneOf": [{"$ref": "#/$defs/checkpoint"}, {"type": "null"}]},
     "nullableInstant": {"oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]}
   }
 }

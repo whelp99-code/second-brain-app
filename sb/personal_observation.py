@@ -27,6 +27,10 @@ from sb.effect_values import (
 
 OBSERVATION_DOMAIN = b"second-brain/personal-source-observation/v1\0"
 MAX_INTEGER = 2**53 - 1
+MAX_TEXT = 4096
+# Opaque adapter resume tokens, not K1 identity text. A markdown-vault cursor
+# is one length-prefixed token per file, so a real journal exceeds 4096.
+MAX_CHECKPOINT = 1024 * 1024
 MAX_ENVELOPE_BYTES = 1024 * 1024
 SCAN_STATES = frozenset({"ok", "partial", "failed", "unavailable", "disabled"})
 _NAMESPACE = re.compile(r"(?:personal|company:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\Z")
@@ -40,10 +44,21 @@ class ObservationError(ValueError):
 
 
 def _text(value: object) -> str:
-    if not isinstance(value, str) or not value.strip() or len(value) > 4096:
-        raise ObservationError("TEXT_INVALID")
+    return _bounded_text(value, MAX_TEXT, "TEXT_INVALID")
+
+
+def _checkpoint(value: object) -> str | None:
+    """Validate an adapter cursor. None is an empty scan; K1 text limits do not apply."""
+    if value is None:
+        return None
+    return _bounded_text(value, MAX_CHECKPOINT, "CHECKPOINT_INVALID")
+
+
+def _bounded_text(value: object, limit: int, code: str) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > limit:
+        raise ObservationError(code)
     if any(ord(c) < 32 for c in value):
-        raise ObservationError("TEXT_INVALID")
+        raise ObservationError(code)
     canonical_bytes(value)
     return value
 
@@ -357,9 +372,10 @@ class ScanReceiptV1:
             _text(value)
         if self.state not in SCAN_STATES:
             raise ObservationError("SCAN_STATE_INVALID")
-        for value in (self.checkpoint_before, self.checkpoint_after, self.upstream_end_evidence):
-            if value is not None:
-                _text(value)
+        _checkpoint(self.checkpoint_before)
+        _checkpoint(self.checkpoint_after)
+        if self.upstream_end_evidence is not None:
+            _text(self.upstream_end_evidence)
         if _utc(self.finished_at) < _utc(self.started_at):
             raise ObservationError("SCAN_TIME_INVALID")
         for value in (self.coverage_start, self.coverage_end, self.next_scan_at):
@@ -406,8 +422,8 @@ def parse_scan_receipt(payload: Mapping[str, object]) -> ScanReceiptV1:
         started_at=_text(payload["started_at"]),
         finished_at=_text(payload["finished_at"]),
         state=_text(payload["state"]),
-        checkpoint_before=_optional_text(payload["checkpoint_before"]),
-        checkpoint_after=_optional_text(payload["checkpoint_after"]),
+        checkpoint_before=_checkpoint(payload["checkpoint_before"]),
+        checkpoint_after=_checkpoint(payload["checkpoint_after"]),
         scanned=_integer(payload["scanned"]),
         accepted=_integer(payload["accepted"]),
         unchanged=_integer(payload["unchanged"]),

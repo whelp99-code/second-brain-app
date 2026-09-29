@@ -15,7 +15,7 @@ SCHEMA = json.loads((CONTRACTS / "scan-receipt-v1.json").read_text())
 VALIDATOR = Draft202012Validator(SCHEMA, format_checker=FormatChecker())
 FROZEN_DIGESTS = {
     "personal-source-observation-v1.json": "3b580714bb2d14fb03f888b5a3a32dbe882c9f0f4ecbb7caedbebc5701ba3065",
-    "scan-receipt-v1.json": "d9c6fb93b95288e6dd8449fb9e8337033b43afd3c46762c18e39313d6695ca01",
+    "scan-receipt-v1.json": "5cce0c073c9284283791fefb376dbfd313b20813aa9e69634ce83c06d63ebadd",
 }
 
 
@@ -101,6 +101,21 @@ def test_sidecar_digest_frozen(filename, expected):
 def test_budget_time_and_checkpoint_invariants(changes, error):
     with pytest.raises(ObservationError, match=f"^{error}$"):
         parse_scan_receipt(receipt(**changes))
+
+
+def test_adapter_cursor_longer_than_observation_text_is_a_checkpoint():
+    """Production markdown-vault cursors exceed the K1 4096 text cap."""
+    cursor = "13:2026-07-02.md89:" + ("a" * 9260)
+    assert len(cursor) > 4096
+    parsed = parse_scan_receipt(receipt(checkpoint_before=cursor, checkpoint_after=cursor))
+    assert parsed.checkpoint_before == cursor
+    VALIDATOR.validate(parsed.as_dict())
+    with pytest.raises(ObservationError, match="^TEXT_INVALID$"):
+        parse_scan_receipt(receipt(scan_id="s" * 4097))
+    with pytest.raises(ObservationError, match="^CHECKPOINT_INVALID$"):
+        parse_scan_receipt(receipt(checkpoint_before="x" * (1024 * 1024 + 1)))
+    with pytest.raises(ObservationError, match="^CHECKPOINT_INVALID$"):
+        parse_scan_receipt(receipt(checkpoint_after="cursor\n2"))
 
 
 def test_unchanged_scan_is_a_new_receipt_not_exhaustion_or_publication():
