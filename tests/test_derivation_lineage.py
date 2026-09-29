@@ -7,12 +7,14 @@ from pathlib import Path
 
 from sb.briefing import generate_briefing
 from sb.compile import compile_page_key, compile_pages
+from sb.compile_sources import DEFAULT_LINEAGE
 from sb.config import Config
 from sb.connectors.base import ItemMeta
 from sb.contracts import BriefingInputs, SourceRef, Unit
 from sb.llm import FakeLLM
 from sb.parsers import parse_document
 from sb.pipeline import run_compile, run_ingest
+from sb.store import deriv_key
 from sb.store.ledger import Ledger
 from sb.vault import Vault, init_vault
 
@@ -68,6 +70,33 @@ def test_unit_provenance_persisted_from_parse_result(tmp_path: Path, monkeypatch
     assert stored[0].partial_reason == parsed.partial_reason
     assert json.loads(stored[0].locator_json) == parsed.locator
     assert stored[0].content_hash == parsed.source_hash.removeprefix("sha256:")
+
+
+def test_absent_provenance_keeps_production_compile_key(tmp_path: Path) -> None:
+    unit = _unit("unit-1")
+    with Ledger(tmp_path) as ledger:
+        assert ledger.provenance_for_unit(unit.unit_id) is None
+        pages = compile_pages([unit], ledger, FakeLLM(["cited.[^aaaaaaaa]"]), Config(raw={
+            "llm": {"prompt_version": "v1", "model_id": "fake"},
+        }))
+    page_id = pages[0].page_id
+    legacy = deriv_key(
+        ["compile-page-v1:" + page_id, unit.unit_id], "compile", "v1", "fake",
+    )
+    assert pages[0].derivation_key == legacy
+    assert compile_page_key(page_id, [unit.unit_id], "v1", "fake") == legacy
+    assert compile_page_key(page_id, [unit.unit_id], "v1", "fake", lineage="") == legacy
+    assert compile_page_key(
+        page_id, [unit.unit_id], "v1", "fake", lineage=DEFAULT_LINEAGE,
+    ) == legacy
+
+
+def test_nondefault_lineage_changes_compile_key() -> None:
+    page_id = "page"
+    unit_ids = ["unit-1"]
+    legacy = deriv_key(["compile-page-v1:" + page_id, *unit_ids], "compile", "v1", "fake")
+    changed = "builtin:.md\x1fnone\x1fv3\x1flocal-only"
+    assert compile_page_key(page_id, unit_ids, "v1", "fake", lineage=changed) != legacy
 
 
 def test_derivation_key_includes_parser_model_normalization_profile_revision(tmp_path: Path) -> None:

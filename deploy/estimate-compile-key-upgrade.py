@@ -9,11 +9,13 @@ import sqlite3
 from collections import Counter
 from contextlib import closing
 from pathlib import Path
+from types import SimpleNamespace
 
 from sb.compile import _group_by_page, compile_page_key
+from sb.compile_sources import lineage_token
 from sb.config import load_config
 from sb.pipeline import _materialize
-from sb.security import protect_units
+from sb.security import source_llm_policy
 from sb.store import deriv_key
 from sb.store.cas import ContentAddressedStore
 
@@ -32,6 +34,23 @@ def main() -> None:
         sources = db.execute("SELECT source_id,source_uri,content_hash,source_version FROM source_item").fetchall()
         states = dict(db.execute("SELECT deriv_key,status FROM derivation"))
         compile_states = dict(db.execute("SELECT deriv_key,status FROM derivation WHERE stage='compile'"))
+        has_provenance = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='unit_provenance'"
+        ).fetchone()
+        provenance = {}
+        if has_provenance is not None:
+            provenance = {
+                unit_id: SimpleNamespace(
+                    parser_version=parser,
+                    model_version=model,
+                    normalizer_version=normalizer,
+                    profile_revision=profile,
+                )
+                for unit_id, parser, model, normalizer, profile in db.execute(
+                    "SELECT unit_id, parser_version, model_version, normalizer_version,"
+                    " profile_revision FROM unit_provenance"
+                )
+            }
         by_stage = [
             {"stage": stage, "status": status, "count": count}
             for stage, status, count in db.execute(
@@ -50,18 +69,43 @@ def main() -> None:
         if hashlib.sha256(data).hexdigest() != digest:
             raise RuntimeError("CAS_DIGEST_MISMATCH")
         units.extend(_materialize(data, digest, uri, f"{source}:{uri}"))
-    groups = _group_by_page(protect_units(units, config))
+    groups = _group_by_page(units)
     counts = Counter()
+    policy_counts = Counter()
     legacy_keys = []
     current_keys = set()
+    done_invalidated = 0
+    done_unchanged = 0
+    prompt_version = config.llm.prompt_version
+    model_id = config.llm.model_id
+
+    class _Provenance:
+        def provenance_for_unit(self, unit_id: str):
+            return provenance.get(unit_id)
+
+    recorded = _Provenance()
     for page, grouped in groups:
         ids = [unit.unit_id for unit in grouped]
-        old = deriv_key(ids, "compile", config.llm.prompt_version, config.llm.model_id)
-        new = compile_page_key(page, ids, config.llm.prompt_version, config.llm.model_id)
+        policies = {
+            source_llm_policy(config, unit.origin.partition(":")[0] or "unknown")
+            for unit in grouped
+        }
+        policy_counts["deny" if "deny" in policies else "llm"] += 1
+        old = deriv_key(ids, "compile", prompt_version, model_id)
+        production = deriv_key(
+            ["compile-page-v1:" + page, *ids], "compile", prompt_version, model_id,
+        )
+        new = compile_page_key(
+            page, ids, prompt_version, model_id, lineage=lineage_token(recorded, grouped),
+        )
         current_keys.add(new)
         legacy_keys.append(old)
         state = states.get(new, "missing")
         counts[state] += 1
+        if states.get(production) == "done" and new != production:
+            done_invalidated += 1
+        elif states.get(production) == "done":
+            done_unchanged += 1
         if state in {"missing", "pending", "failed"} and states.get(old) == "done":
             counts["legacy_done_recompile"] += 1
     historical = Counter(status for key, status in compile_states.items() if key not in current_keys)
@@ -81,6 +125,10 @@ def main() -> None:
                 "page_groups": len(groups),
                 "distinct_legacy_keys": len(set(legacy_keys)),
                 "new_key_states": dict(counts),
+                "page_policy_counts": dict(policy_counts),
+                "production_key_formula": "compile-page-v1:<page_id> + unit ids",
+                "done_keys_invalidated": done_invalidated,
+                "done_keys_unchanged": done_unchanged,
                 "eligible_page_calls": eligible,
                 "non_current_compile_states": dict(historical),
                 "non_current_compile_unfinished": sum(historical[state] for state in ('pending', 'running', 'failed')),

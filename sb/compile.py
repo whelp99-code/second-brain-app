@@ -170,9 +170,22 @@ def compile_page_key(
     model_id: str,
     lineage: str = "",
 ) -> str:
-    """Bind parser, model, normalization, and profile revisions to a derivation."""
-    identity = ["compile-page-v1:" + page_id, *unit_ids, "lineage:" + (lineage or DEFAULT_LINEAGE)]
+    """Bind parser, model, normalization, and profile revisions to a derivation.
+
+    Absent provenance and the builtin default lineage omit the suffix so the key
+    stays byte-identical to production ``compile-page-v1:<page_id>`` + unit ids.
+    A non-default lineage is part of the key and forces a recompile.
+    """
+    identity = ["compile-page-v1:" + page_id, *unit_ids]
+    if not _lineage_is_builtin_default(lineage):
+        identity.append("lineage:" + lineage)
     return deriv_key(identity, COMPILE_STAGE, prompt_version, model_id)
+
+
+def _lineage_is_builtin_default(lineage: str) -> bool:
+    if not lineage:
+        return True
+    return all(part == DEFAULT_LINEAGE for part in lineage.split("\x1e"))
 
 
 def _prepare_compile(ledger: CompileLedger, key: str, max_attempts: int) -> bool:
