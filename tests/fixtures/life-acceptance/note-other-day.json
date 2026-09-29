@@ -1,0 +1,10 @@
+{
+  "source_item_id": "ac02-other-day",
+  "source_version": "v1",
+  "event_type": "note_saved",
+  "title": "다른 날짜",
+  "body": "다른날짜-AC02",
+  "occurred_start": "2026-09-27T09:00:00+09:00",
+  "timezone": "Asia/Seoul",
+  "time_precision": "minute"
+}

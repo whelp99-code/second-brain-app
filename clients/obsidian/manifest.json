@@ -3,7 +3,7 @@
   "name": "Second Brain Memory Browser",
   "version": "0.1.0",
   "minAppVersion": "1.8.0",
-  "description": "Evidence-linked life timeline with session authentication and protected personal notes.",
+  "description": "Evidence-linked life timeline, typed relation panel, session authentication, and protected personal notes.",
   "author": "Second Brain project",
   "isDesktopOnly": false
 }

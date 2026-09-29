@@ -8,8 +8,8 @@ from typing import TypedDict, Unpack
 import pytest
 
 from sb.effect_values import JsonObject, JsonValue
-from sb.life_contracts import LifeInputError, SourcePolicyV1
-from sb.life_values import canonical_bytes, day_window, parse_event
+from sb.life_contracts import LifeInputError, SourcePolicyV1, allowed_transition
+from sb.life_values import canonical_bytes, day_window, in_day_window, instant, parse_event
 
 NOW = datetime(2026, 9, 26, 3, 0, tzinfo=UTC)
 
@@ -186,3 +186,86 @@ def test_canonical_input_does_not_depend_on_dictionary_order() -> None:
     assert canonical_bytes({"b": 1, "a": "한글"}) == canonical_bytes({"a": "한글", "b": 1})
     with pytest.raises(LifeInputError):
         _ = canonical_bytes({"bad": math.nan})
+
+
+def test_transition_planned_to_occurred_requires_non_inferred_evidence():
+    assert allowed_transition("planned", "occurred", evidence_level="observed")
+    assert allowed_transition("planned", "occurred", evidence_level="user_asserted")
+    assert not allowed_transition("planned", "occurred", evidence_level="inferred")
+    event = parse_event(
+        payload(
+            event_type="calendar_event",
+            event_status="planned",
+            evidence_level="inferred",
+            observed_at="2026-09-26T10:00:00+09:00",
+        ),
+        policy(),
+        recorded_at=NOW,
+    )
+    assert event.event_status == "planned"
+    assert event.evidence_level == "inferred"
+    assert event.observed_at == "2026-09-26T01:00:00+00:00"
+
+
+def test_transition_cancelled_to_occurred_requires_user_assertion():
+    assert not allowed_transition("cancelled", "occurred", evidence_level="observed")
+    assert not allowed_transition("cancelled", "occurred", evidence_level="inferred")
+    assert allowed_transition("cancelled", "occurred", evidence_level="user_asserted")
+    assert allowed_transition("cancelled", "cancelled", evidence_level="observed")
+
+
+def test_dst_fold_and_gap_instants_are_preserved_not_shifted():
+    fold_first = "2026-11-01T01:30:00-04:00"
+    fold_second = "2026-11-01T01:30:00-05:00"
+    gap = "2026-03-08T02:30:00-04:00"
+    assert instant(fold_first).isoformat() == "2026-11-01T05:30:00+00:00"
+    assert instant(fold_second).isoformat() == "2026-11-01T06:30:00+00:00"
+    assert instant(gap).isoformat() == "2026-03-08T06:30:00+00:00"
+    assert instant(fold_first) != instant(fold_second)
+    for raw, expected in (
+        (fold_first, "2026-11-01T05:30:00+00:00"),
+        (fold_second, "2026-11-01T06:30:00+00:00"),
+        (gap, "2026-03-08T06:30:00+00:00"),
+    ):
+        event = parse_event(
+            payload(occurred_start=raw, timezone="America/New_York", time_precision="minute"),
+            policy(),
+            recorded_at=NOW,
+        )
+        assert event.occurred_start == expected
+        assert event.timezone == "America/New_York"
+
+
+def test_delayed_upload_keeps_occurred_vs_recorded_separate():
+    recorded = datetime(2026, 9, 28, 1, 0, tzinfo=UTC)
+    event = parse_event(
+        payload(
+            event_type="calendar_event",
+            event_status="planned",
+            occurred_start="2026-09-26T10:00:00+09:00",
+            observed_at="2026-09-28T09:30:00+09:00",
+            time_precision="minute",
+        ),
+        policy(),
+        recorded_at=recorded,
+    )
+    assert event.occurred_start == "2026-09-26T01:00:00+00:00"
+    assert event.recorded_at == "2026-09-28T01:00:00+00:00"
+    assert event.observed_at == "2026-09-28T00:30:00+00:00"
+    assert event.event_status == "planned"
+    assert event.occurred_start != event.recorded_at
+    assert event.observed_at != event.occurred_start
+
+
+def test_travel_timezone_day_window_is_half_open():
+    start, end = day_window("2026-06-15", "Europe/Paris")
+    assert in_day_window(start, "2026-06-15", "Europe/Paris")
+    assert not in_day_window(end, "2026-06-15", "Europe/Paris")
+    assert in_day_window(end, "2026-06-16", "Europe/Paris")
+    previous_start, previous_end = day_window("2026-06-14", "Europe/Paris")
+    assert previous_end == start
+    assert not in_day_window(start, "2026-06-14", "Europe/Paris")
+    assert (start, end) != day_window("2026-06-15", "Asia/Seoul")
+    assert start.isoformat() == "2026-06-14T22:00:00+00:00"
+    assert end.isoformat() == "2026-06-15T22:00:00+00:00"
+    assert previous_start < start < end

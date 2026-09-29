@@ -6,15 +6,17 @@ import hashlib
 from collections.abc import Callable
 from typing import Final
 
-from sb.parsers.contracts import DocumentParseResult as DocumentParseResult
 from sb.parsers.contracts import (
+    PARTIAL_REASONS,
     FormatUnsupported,
     InvalidInput,
     LimitExceeded,
     OcrRequired,
     ParseError,
     UnsupportedSuffix,
+    WorkerFailure,
 )
+from sb.parsers.contracts import DocumentParseResult as DocumentParseResult
 
 
 def _try_docling(payload: bytes, suffix: str) -> str | None:
@@ -25,27 +27,42 @@ def _try_docling(payload: bytes, suffix: str) -> str | None:
 
 
 def parse_document(payload: bytes, suffix: str) -> DocumentParseResult:
-    """Parse one document and retain provenance for derived memory records."""
-    from sb.parsers.docling_adapter import DocumentParseResult as ParsedDocument
+    """Parse with an exact first-unit locator; worker failure is never fallback."""
     from sb.parsers.docling_adapter import parse_isolated
 
-    normalized = suffix if suffix.startswith(".") else f".{suffix}"
-    isolated = (
-        parse_isolated(payload, normalized.lower())
-        if normalized.lower() in {".pdf", ".docx"}
-        else None
-    )
-    if isolated is not None:
-        return isolated
-    parser = parser_for(normalized)
-    body = parser(payload)
-    return ParsedDocument(
+    normalized = (suffix if suffix.startswith(".") else f".{suffix}").lower()
+    _ = parser_for(normalized)  # Reject unknown suffixes before starting an optional worker.
+    if normalized in {".pdf", ".docx"}:
+        isolated = parse_isolated(payload, normalized)
+        if isolated is not None:
+            return isolated
+    if normalized == ".pdf":
+        from sb.parsers.pdf import PdfParser
+
+        body, locator, reason = PdfParser().parse_details(payload)
+    elif normalized == ".docx":
+        from sb.parsers.office import DocxDocumentParser
+
+        body, locator, reason = DocxDocumentParser().parse_details(payload)
+    elif normalized == ".xlsx":
+        from sb.parsers.office import XlsxDocumentParser
+
+        body, locator, reason = XlsxDocumentParser().parse_details(payload)
+    elif normalized == ".hwpx":
+        from sb.parsers.hwpx import HwpxDocumentParser
+
+        body, locator, reason = HwpxDocumentParser().parse_details(payload)
+    else:
+        body = parser_for(normalized)(payload)
+        locator, reason = {"kind": "ordinal", "ordinal": 1}, None
+    return DocumentParseResult(
         body=body,
         source_hash="sha256:" + hashlib.sha256(payload).hexdigest(),
-        locator={"kind": "document", "ordinal": 1},
-        parser_version=f"builtin:{normalized.lower()}",
+        locator=locator,
+        parser_version=f"builtin:{normalized}",
         model_version="none",
-        partial=False,
+        partial=reason is not None,
+        partial_reason=reason,
     )
 
 
@@ -128,12 +145,15 @@ def parser_for(suffix: str) -> Callable[[bytes], str]:
 
 
 __all__ = (
+    "PARTIAL_REASONS",
+    "DocumentParseResult",
     "FormatUnsupported",
     "InvalidInput",
     "LimitExceeded",
     "OcrRequired",
     "ParseError",
     "UnsupportedSuffix",
+    "WorkerFailure",
     "parse_document",
     "parser_for",
 )

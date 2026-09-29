@@ -4,6 +4,7 @@ from typing import NotRequired
 
 from typing_extensions import TypedDict
 
+from sb.life_grouping import CitationRow, EventGroup
 from sb.life_journal_contracts import RecordRef
 from sb.life_json import LifePayload
 
@@ -47,6 +48,8 @@ class TimelineQuery(TypedDict, closed=True):
     day: str
     timezone: str
     events: list[LifePayload]
+    groups: list[EventGroup]
+    citation_index: dict[str, CitationRow]
     next_cursor: str | None
     complete: bool
     generation: str | None

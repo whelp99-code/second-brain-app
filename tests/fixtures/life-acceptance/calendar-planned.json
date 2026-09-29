@@ -1,0 +1,12 @@
+{
+  "source_item_id": "ac03-calendar",
+  "source_version": "v1",
+  "event_type": "calendar_event",
+  "title": "스탠드업",
+  "body": "예정일정-AC03",
+  "event_status": "planned",
+  "occurred_start": "2026-09-26T10:00:00+09:00",
+  "occurred_end": "2026-09-26T10:30:00+09:00",
+  "timezone": "Asia/Seoul",
+  "time_precision": "minute"
+}

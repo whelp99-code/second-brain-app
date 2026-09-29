@@ -29,8 +29,11 @@ from sb.life_json import decode_json
 from sb.managed_file_inspection import ManagedInspectionError
 from sb.mcp import PageNotFoundError, open_conflicts, read_page, recent_changes
 from sb.metrics import summary as metrics_summary
+from sb.observation_admission import AdmissionError, ObservationReceipt, admit, read
 from sb.ops import status_snapshot
 from sb.owner_effects import OwnerEffectError, apply_page_effect, page_receipt
+from sb.parsers.capabilities import parser_capabilities
+from sb.personal_observation import MAX_ENVELOPE_BYTES
 from sb.pipeline import run_all
 from sb.redaction import redact_credentials
 from sb.runtime_access import mutate_root, read_root
@@ -325,6 +328,20 @@ def _retract_upload(root: Path, upload_id: str, context: WebContext) -> RetractR
     return receipt.as_dict()
 
 
+def _observation_body(receipt: ObservationReceipt) -> dict[str, JsonInput]:
+    body = receipt.as_dict()
+    body["searchable"] = receipt.searchable
+    return body
+
+
+def _admission_status(exc: AdmissionError) -> HTTPStatus:
+    if exc.code == "EMITTER_UNREGISTERED":
+        return HTTPStatus.FORBIDDEN
+    if exc.code == "OBSERVATION_CONFLICT":
+        return HTTPStatus.CONFLICT
+    return HTTPStatus.BAD_REQUEST
+
+
 class Handler(BaseHTTPRequestHandler):
     connection: socket
     _life_actor: LifeActor | None = None
@@ -526,7 +543,9 @@ class Handler(BaseHTTPRequestHandler):
                         "latest_briefing": True,
                         "supported_suffixes": list(supported_suffixes()),
                         "max_upload_bytes": MAX_UPLOAD_BYTES,
-                    }
+                    },
+                    "intake_max_bytes": MAX_UPLOAD_BYTES,
+                    "parsers": decode_json(json.dumps(parser_capabilities())),
                 },
             )
             return
@@ -587,6 +606,21 @@ class Handler(BaseHTTPRequestHandler):
                 {"sources": list(source_status(self.context.config))},
             )
             return
+        if parsed.path.startswith("/api/source-observations/"):
+            receipt_id = unquote(parsed.path.removeprefix("/api/source-observations/")).strip("/")
+            if "/" in receipt_id or not receipt_id:
+                self.json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                return
+            try:
+                receipt = read(root, receipt_id)
+            except AdmissionError as exc:
+                self.json_response(_admission_status(exc), {"error": exc.code})
+                return
+            if receipt is None:
+                self.json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                return
+            self.json_response(HTTPStatus.OK, _observation_body(receipt))
+            return
         if parsed.path == "/api/retention":
             self.json_response(HTTPStatus.OK, retention_report(root).as_dict())
             return
@@ -602,6 +636,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             self._post()
+        except AdmissionError as exc:
+            self.json_response(_admission_status(exc), {"error": exc.code})
         except OwnerEffectError as exc:
             self.json_response(HTTPStatus.CONFLICT, {"error": str(exc)})
         except ManagedInspectionError as exc:
@@ -623,6 +659,8 @@ class Handler(BaseHTTPRequestHandler):
     def _post(self) -> None:
         parsed = urlsplit(self.path)
         maximum = MAX_UPLOAD_REQUEST_BYTES if parsed.path == "/api/uploads" else MAX_BODY_BYTES
+        if parsed.path == "/api/source-observations":
+            maximum = ((MAX_ENVELOPE_BYTES + 2) // 3) * 4 + 8192
         if parsed.path in {
             "/api/life/v1/events:batch",
             "/api/life/v1/exports/import",
@@ -659,6 +697,23 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             self.json_response(HTTPStatus.OK, receipt)
+            return
+        if parsed.path == "/api/source-observations":
+            emitter = _string_field(data, "emitter", required=True)
+            encoded = data.get("payload_base64")
+            if not isinstance(encoded, str) or not encoded:
+                raise ValueError("payload_base64 is required")
+            try:
+                payload = base64.b64decode(encoded, validate=True)
+            except binascii.Error as exc:
+                raise ValueError("payload_base64 is invalid") from exc
+            receipt = mutate_root(
+                self.context.config,
+                GenerationOperation.INBOX,
+                lambda root: admit(root, payload, emitter=emitter, config=self.context.config),
+            )
+            status = HTTPStatus.CREATED if receipt.state == "accepted_pending" else HTTPStatus.OK
+            self.json_response(status, _observation_body(receipt))
             return
         if parsed.path == "/api/uploads":
             filename = _string_field(data, "filename", required=True)

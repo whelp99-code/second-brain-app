@@ -14,7 +14,7 @@ import pytest
 from docx import Document
 
 from sb.page_metadata import scalar_frontmatter
-from sb.parsers import parse_document
+from sb.parsers import WorkerFailure, parse_document
 from sb.parsers.docling_adapter import parse_isolated
 
 
@@ -53,6 +53,7 @@ def test_worker_result_preserves_locator_scalars_and_source_identity(
         "model_version": "local-model",
         "locator": {"kind": "page", "ordinal": 2, "flag": True, "noise": [1], "ratio": 1.5},
         "partial": True,
+        "partial_reason": "ocr_required",
         "future_field": "ignored",
     }).encode()
     monkeypatch.setattr(subprocess, "run", WorkerReply(reply))
@@ -66,6 +67,7 @@ def test_worker_result_preserves_locator_scalars_and_source_identity(
     assert result.source_hash == "sha256:" + hashlib.sha256(payload).hexdigest()
     assert result.locator == {"kind": "page", "ordinal": 2, "flag": True}
     assert result.partial is True
+    assert result.partial_reason == "ocr_required"
     assert result.parser_version == "docling:test"
     assert result.model_version == "local-model"
 
@@ -82,30 +84,36 @@ def test_worker_result_preserves_locator_scalars_and_source_identity(
     b'{"body":"ok","parser_version":"x","model_version":"x","locator":{},"partial":1}',
     b'{"body":"  ","parser_version":"x","model_version":"x","locator":{},"partial":false}',
 ])
-def test_invalid_worker_reply_requests_builtin_fallback(
+def test_invalid_worker_reply_fails_closed(
     monkeypatch: pytest.MonkeyPatch, reply: bytes,
 ) -> None:
     # Given: invalid external JSON or a field that must not be coerced.
     monkeypatch.setattr(subprocess, "run", WorkerReply(reply))
 
-    # When: the worker result is parsed.
-    result = parse_isolated(b"document", ".pdf")
-
-    # Then: the caller receives the established fallback signal.
-    assert result is None
+    # When/Then: a present worker's invalid reply is an explicit failure, never builtin success.
+    with pytest.raises(WorkerFailure, match="invalid result"):
+        _ = parse_isolated(b"document", ".pdf")
 
 
-@pytest.mark.parametrize("returncode", [2, 3])
-def test_unavailable_or_failed_worker_falls_back_with_builtin_provenance(
-    monkeypatch: pytest.MonkeyPatch, returncode: int,
+def test_failed_worker_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an installed optional worker that exits with a failure.
+    monkeypatch.setattr(subprocess, "run", WorkerReply(b"", 2))
+
+    # When/Then: the document API reports the failure instead of falling back.
+    with pytest.raises(WorkerFailure, match="exit"):
+        _ = parse_document(b"document", "DOCX")
+
+
+def test_unavailable_worker_falls_back_with_builtin_provenance(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Given: a real DOCX document and an unavailable or failed optional worker.
+    # Given: a real DOCX document and an unavailable optional worker.
     document = Document()
     _ = document.add_paragraph("Builtin fallback body")
     buffer = io.BytesIO()
     document.save(buffer)
     payload = buffer.getvalue()
-    monkeypatch.setattr(subprocess, "run", WorkerReply(b"", returncode))
+    monkeypatch.setattr(subprocess, "run", WorkerReply(b"", 3))
 
     # When: the document API routes a normalized suffix through the fallback.
     result = parse_document(payload, "DOCX")
@@ -115,7 +123,7 @@ def test_unavailable_or_failed_worker_falls_back_with_builtin_provenance(
     assert result.source_hash == "sha256:" + hashlib.sha256(payload).hexdigest()
     assert result.parser_version == "builtin:.docx"
     assert result.model_version == "none"
-    assert result.locator == {"kind": "document", "ordinal": 1}
+    assert result.locator == {"kind": "paragraph", "ordinal": 1}
     assert result.partial is False
 
 

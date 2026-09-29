@@ -80,6 +80,7 @@ class ViewFile(TypedDict, closed=True):
 class ObsidianManifest(TypedDict, closed=True):
     schema_version: int
     generation: str
+    source_generation: str
     complete: bool
     files: list[ViewFile]
     managed_prefix: str

@@ -19,6 +19,7 @@ HWPX_MEDIA_TYPE: Final = "application/haansofthwpx"
 HWPX_PACKAGE_MIMETYPE: Final = "application/hwp+zip"
 OLE_MAGIC: Final = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 HWP_FILE_MAGIC: Final = b"HWP Document File"
+HWPX_MAX_BYTES: Final = 67_108_864
 MAX_ZIP_MEMBERS: Final = 10_000
 MAX_MEMBER_BYTES: Final = 67_108_864
 MAX_UNCOMPRESSED_BYTES: Final = 536_870_912
@@ -94,14 +95,19 @@ def _paragraph_text(paragraph: Element) -> str:
     return "".join(parts)
 
 
-def _section_text(root: Element) -> str:
+def _section_text(root: Element) -> tuple[str, int]:
     paragraphs: list[str] = []
+    first = 0
+    ordinal = 0
     for elem in root.iter():
         if _element_local_name(elem) == "p":
+            ordinal += 1
             text = _paragraph_text(elem)
             if text:
+                if not first:
+                    first = ordinal
                 paragraphs.append(text)
-    return "\n".join(paragraphs)
+    return "\n".join(paragraphs), first
 
 
 def _looks_like_hwpx(infos: tuple[ZipInfo, ...], archive: ZipFile) -> bool:
@@ -116,21 +122,26 @@ def _looks_like_hwpx(infos: tuple[ZipInfo, ...], archive: ZipFile) -> bool:
     return False
 
 
-def _extract_sections(archive: ZipFile, sections: tuple[tuple[int, ZipInfo], ...]) -> str:
+def _extract_sections(
+    archive: ZipFile, sections: tuple[tuple[int, ZipInfo], ...]
+) -> tuple[str, dict[str, str | int], str | None]:
     texts: list[str] = []
-    for _index, info in sections:
+    locator: dict[str, str | int] | None = None
+    for index, info in sections:
         payload = _read_member(archive, info)
         try:
             root = ElementTree.fromstring(payload)
         except (DefusedXmlException, ParseError, UnicodeDecodeError) as exc:
             raise InvalidInput("hwpx section xml") from exc
-        text = _section_text(root)
+        text, first = _section_text(root)
         if text:
+            if locator is None:
+                locator = {"kind": "paragraph", "section": index, "ordinal": first}
             texts.append(text)
-    return "\n".join(texts)
+    return "\n".join(texts), locator or {"kind": "paragraph", "section": sections[0][0], "ordinal": 1}, None
 
 
-def _extract(archive: ZipFile) -> str:
+def _extract(archive: ZipFile) -> tuple[str, dict[str, str | int], str | None]:
     infos = tuple(archive.infolist())
     _admit_members(infos)
     sections = tuple(
@@ -155,10 +166,15 @@ class HwpxDocumentParser:
     """Read-only HWPX extractor. Binary .hwp stays explicit FormatUnsupported."""
 
     def parse(self, payload: bytes) -> str:
+        return self.parse_details(payload)[0]
+
+    def parse_details(self, payload: bytes) -> tuple[str, dict[str, str | int], str | None]:
         if _is_binary_hwp(payload):
             raise FormatUnsupported("hwp")
         if not payload:
             raise InvalidInput("empty hwpx payload")
+        if len(payload) > HWPX_MAX_BYTES:
+            raise LimitExceeded("hwpx payload size")
         try:
             with ZipFile(BytesIO(payload)) as archive:
                 return _extract(archive)

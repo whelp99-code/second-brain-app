@@ -27,7 +27,7 @@ def notify(
     principal: LifeActor,
 ) -> Mapping[str, JsonInput]:
     from sb.life_auth import current_config
-    from sb.life_delivery import TransportConfig, send_notification
+    from sb.life_delivery import TransportConfig, evidence_still_current, send_notification
     from sb.store.life import read_life_store
     from sb.store.life_journal import LifeJournal
 
@@ -64,18 +64,26 @@ def notify(
             if not complete:
                 raise LifeInputError("LIFE_WORKSET_TOO_LARGE")
             with read_life_store(root) as store:
-                _ = LifeJournal(store).get(
+                journal = LifeJournal(store)
+                _ = journal.get(
                     "briefing",
                     briefing_id,
                     scopes=principal.scopes,
                     source_ids=principal.source_ids,
                     events=events,
                 )
-        state, provider_id = send_notification(
-            channel,
-            claim["object_id"],
-            _NOTIFICATION.validate_python(claim["body"]["notification"], strict=True),
-        )
+                claimed = journal.raw("delivery", claim["object_id"])
+                current = claimed is not None and evidence_still_current(
+                    journal, claimed, now=datetime.now(UTC)
+                )
+            if current:
+                state, provider_id = send_notification(
+                    channel,
+                    claim["object_id"],
+                    _NOTIFICATION.validate_python(claim["body"]["notification"], strict=True),
+                )
+            else:
+                state, provider_id = "stale", None
     except LifeInputError:
         state, provider_id = "rejected", None
     result = _JOURNAL.validate_python(

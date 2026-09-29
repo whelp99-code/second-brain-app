@@ -69,6 +69,7 @@ def test_mac_api_paths_match_server_paths() -> None:
     ):
         assert path in client
         assert path in server
+    assert "/api/source-observations" in server
 
 
 def test_folder_sync_is_one_way_manifest_based_and_bounded() -> None:

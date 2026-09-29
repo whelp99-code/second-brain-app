@@ -1,0 +1,212 @@
+{
+  "$id": "https://second-brain.local/contracts/life-event-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LifeEventV1",
+  "$ref": "#/$defs/event",
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "event_id",
+        "revision",
+        "source_id",
+        "source_item_id",
+        "source_version",
+        "event_type",
+        "title",
+        "body",
+        "event_status",
+        "evidence_level",
+        "review_state",
+        "occurred_start",
+        "occurred_end",
+        "observed_at",
+        "recorded_at",
+        "timezone",
+        "time_precision",
+        "valid_from",
+        "valid_until",
+        "entities",
+        "scopes",
+        "sensitivity",
+        "external_processing",
+        "retention_days",
+        "raw_digest",
+        "value",
+        "value_status",
+        "unit",
+        "confidence",
+        "change_reason",
+        "policy_revision",
+        "attachments"
+      ],
+      "properties": {
+        "schema_version": {"const": 1},
+        "event_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+        "revision": {"type": "integer", "minimum": 1},
+        "source_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "source_item_id": {"type": "string", "minLength": 1, "maxLength": 512},
+        "source_version": {"type": "string", "minLength": 1, "maxLength": 256},
+        "event_type": {
+          "enum": [
+            "mail_message",
+            "document_saved",
+            "ai_conversation",
+            "audio_transcript",
+            "note_saved",
+            "link_saved",
+            "calendar_event",
+            "call_recording_imported",
+            "audio_saved",
+            "photo_saved",
+            "location_point",
+            "location_visit",
+            "location_trip",
+            "health_sample",
+            "health_deleted",
+            "decision",
+            "task_started",
+            "activity_started",
+            "task_completed",
+            "question_answer"
+          ]
+        },
+        "title": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "body": {"type": "string", "maxLength": 1048576},
+        "event_status": {"enum": ["planned", "occurred", "cancelled", "unknown"]},
+        "evidence_level": {"enum": ["observed", "inferred", "user_asserted"]},
+        "review_state": {"enum": ["unreviewed", "confirmed", "rejected", "disputed"]},
+        "occurred_start": {"type": ["string", "null"]},
+        "occurred_end": {"type": ["string", "null"]},
+        "observed_at": {"type": ["string", "null"]},
+        "recorded_at": {"type": "string", "minLength": 20},
+        "timezone": {"type": "string", "minLength": 1, "maxLength": 128},
+        "time_precision": {"enum": ["exact", "minute", "day", "range", "unknown"]},
+        "valid_from": {"type": ["string", "null"]},
+        "valid_until": {"type": ["string", "null"]},
+        "entities": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/entity"}
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 160}
+        },
+        "sensitivity": {"enum": ["public", "personal", "sensitive", "restricted"]},
+        "external_processing": {"enum": ["local_only", "explicitly_allowed"]},
+        "retention_days": {"type": "integer", "minimum": 1, "maximum": 36500},
+        "raw_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "value": {"type": ["number", "null"]},
+        "value_status": {"enum": ["observed", "missing", "unavailable", "not_applicable"]},
+        "unit": {"type": ["string", "null"]},
+        "confidence": {"type": ["number", "null"]},
+        "change_reason": {"type": ["string", "null"]},
+        "policy_revision": {"type": "string", "minLength": 1, "maxLength": 160},
+        "attachments": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/attachment"}
+        }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "kind", "label"],
+      "properties": {
+        "entity_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "kind": {"enum": ["person", "company", "project", "place", "event", "decision"]},
+        "label": {"type": "string", "minLength": 1, "maxLength": 500}
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "mime", "size", "sha256"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "mime": {"type": "string", "minLength": 1},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "event_id", "revision", "accepted_at", "replayed", "state"],
+      "properties": {
+        "receipt_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "event_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "revision": {"type": "integer", "minimum": 1},
+        "accepted_at": {"type": "string", "minLength": 20},
+        "replayed": {"type": "boolean"},
+        "state": {
+          "enum": [
+            "accepted",
+            "accepted_pending",
+            "processing",
+            "published",
+            "searchable",
+            "failed",
+            "rejected"
+          ]
+        }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_id", "kind", "to_id", "evidence_event_ids", "evidence_level", "valid_from", "valid_until"],
+      "properties": {
+        "from_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "kind": {
+          "enum": ["participated_in", "works_on", "located_at", "supports", "contradicts", "supersedes"]
+        },
+        "to_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "evidence_event_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 160}
+        },
+        "evidence_level": {"enum": ["observed", "inferred", "user_asserted"]},
+        "valid_from": {"type": ["string", "null"]},
+        "valid_until": {"type": ["string", "null"]}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "scopes",
+        "enabled",
+        "allowed_types",
+        "sensitivity",
+        "external_processing",
+        "retention_days",
+        "policy_revision"
+      ],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1, "maxLength": 160},
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 160}
+        },
+        "enabled": {"type": "boolean"},
+        "allowed_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "sensitivity": {"enum": ["public", "personal", "sensitive", "restricted"]},
+        "external_processing": {"enum": ["local_only", "explicitly_allowed"]},
+        "retention_days": {"type": "integer", "minimum": 1, "maximum": 36500},
+        "policy_revision": {"type": "string", "minLength": 1, "maxLength": 160}
+      }
+    }
+  }
+}

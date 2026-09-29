@@ -89,7 +89,7 @@ def perform(
         result = finish_response(journal, prepared, evidence=event, now=now)
         return {"question": result}, changed
     if command in {"briefing_generate", "tick"}:
-        from sb.life_delivery import due_slots, generate
+        from sb.life_delivery import generate
 
         if command == "tick":
             if data:
@@ -101,27 +101,33 @@ def perform(
                 "max_age_minutes",
             }:
                 raise LifeInputError("LIFE_SCHEDULE_INVALID")
-            slots = due_slots(
-                now,
-                opts,
+            from sb.life_delivery import catch_up
+
+            rows = catch_up(
+                journal,
+                events,
+                opts=opts,
+                scopes=scopes,
+                source_ids=source_ids,
+                now=now,
                 morning=string(schedule.get("morning", "08:00"), "LIFE_SCHEDULE_INVALID"),
                 evening=string(schedule.get("evening", "21:30"), "LIFE_SCHEDULE_INVALID"),
                 max_age_minutes=integer(
                     schedule.get("max_age_minutes", 120), "LIFE_SCHEDULE_INVALID"
                 ),
             )
-        else:
-            if set(data) - {"day", "slot"}:
-                raise LifeInputError("LIFE_UNKNOWN_FIELD")
-            slots = [
-                (
-                    string(
-                        data.get("day", now.astimezone(zone(opts.timezone)).date().isoformat()),
-                        "LIFE_DAY_INVALID",
-                    ),
-                    string(data.get("slot", "morning"), "LIFE_SLOT_INVALID"),
-                )
-            ]
+            return {"briefings": rows, "notifications_sent": False}, changed
+        if set(data) - {"day", "slot"}:
+            raise LifeInputError("LIFE_UNKNOWN_FIELD")
+        slots = [
+            (
+                string(
+                    data.get("day", now.astimezone(zone(opts.timezone)).date().isoformat()),
+                    "LIFE_DAY_INVALID",
+                ),
+                string(data.get("slot", "morning"), "LIFE_SLOT_INVALID"),
+            )
+        ]
         rows = [generate(journal, opts=opts, day=day, slot=slot, **common) for day, slot in slots]
         return {"briefings": rows, "notifications_sent": False}, changed
     if command == "delivery_prepare":

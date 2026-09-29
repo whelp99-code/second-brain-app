@@ -116,13 +116,16 @@ def catalog_sql(spec: CatalogSpec) -> str:
     return f"SELECT {', '.join(quote(col) for col in spec.columns)} FROM {quote(spec.schema)}.{quote(spec.table)}"
 
 
-def select_sql(table: ScanTable, watermarked: bool) -> str:
+def select_sql(table: ScanTable, watermarked: bool, *, change_sequence: bool = False) -> str:
     cols = (table.pk, table.occurred_at, table.project_id, table.source_id, *table.text)
+    order_column = "change_sequence" if change_sequence else table.occurred_at
+    if change_sequence:
+        cols = (*cols, order_column)
     relation = f"{quote(table.schema)}.{quote(table.table)}"
-    order = f"ORDER BY {quote(table.occurred_at)} ASC, {quote(table.pk)} ASC"
+    order = f"ORDER BY {quote(order_column)} ASC, {quote(table.pk)} ASC"
     select = f"SELECT {', '.join(quote(col) for col in cols)} FROM {relation}"
     if watermarked:
-        return f"{select} WHERE ({quote(table.occurred_at)}, {quote(table.pk)}) > (%s, %s) {order} LIMIT %s"
+        return f"{select} WHERE ({quote(order_column)}, {quote(table.pk)}) > (%s, %s) {order} LIMIT %s"
     return f"{select} {order} LIMIT %s"
 
 

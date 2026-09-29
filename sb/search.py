@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import logging
 import os
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -90,6 +91,7 @@ class SearchHit:
     updated_at: str = ""
     record_id: str = ""
     record_digest: str = ""
+    uncertainty: str = ""
 
     def as_dict(self) -> SearchHitDict:
         role, verification = _labels(self.knowledge_status, self.approval_status)
@@ -107,7 +109,7 @@ class SearchHit:
             "updated_at": self.updated_at,
             "role": role,
             "verification": verification,
-        }
+        } | ({"uncertainty": self.uncertainty} if self.uncertainty else {})
 
     @property
     def role(self) -> str:
@@ -184,6 +186,22 @@ def _blob_revision(revision: str) -> str:
     ):
         raise ValueError("expected HEAD or full commit object ID")
     return revision
+
+
+_UNCERTAINTY: Final = re.compile(r"^uncertainty:\s*(\S+)\s*$", re.MULTILINE)
+
+
+def _with_uncertainty(root: Path, hit: SearchHit) -> SearchHit:
+    """Surface partial-parse uncertainty stored on the committed page."""
+    if hit.uncertainty:
+        return hit
+    text = committed_text(root, hit.page_id if hit.page_id.endswith(".md") else hit.page_id + ".md")
+    if text is None:
+        return hit
+    matched = _UNCERTAINTY.search(text)
+    if matched is None:
+        return hit
+    return replace(hit, uncertainty=matched.group(1))
 
 
 def committed_text(root: Path, rel: str, *, revision: str = "HEAD") -> str | None:
@@ -338,7 +356,7 @@ class SearchIndex:
                 )
                 for hit in rows:
                     if _life_hit_allowed(root, hit.page_id):
-                        yield hit
+                        yield _with_uncertainty(root, hit)
                 if len(rows) < 128:
                     return
                 offset += len(rows)
@@ -396,7 +414,7 @@ class SearchIndex:
                         and updated > updated_to
                     ):
                         continue
-                    yield SearchHit(
+                    yield _with_uncertainty(root, SearchHit(
                         page,
                         section,
                         snippet,
@@ -408,7 +426,7 @@ class SearchIndex:
                         state.canonical,
                         source_ref,
                         updated,
-                    )
+                    ))
 
     def semantic_hits(
         self, query: str, limit: int, *, filters: SearchFilters

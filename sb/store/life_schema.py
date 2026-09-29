@@ -77,7 +77,8 @@ EVENT_SCHEMA = (
     (
         "CREATE TABLE IF NOT EXISTS life_receipts (receipt_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, "
         "request_key TEXT NOT NULL, request_digest TEXT NOT NULL, event_id TEXT NOT NULL, revision "
-        "INTEGER NOT NULL, accepted_at TEXT NOT NULL, UNIQUE(source_id,request_key))"
+        "INTEGER NOT NULL, accepted_at TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'accepted', "
+        "proof TEXT NOT NULL DEFAULT '', UNIQUE(source_id,request_key))"
     ),
     (
         "CREATE TABLE IF NOT EXISTS life_tombstones (sequence INTEGER PRIMARY KEY AUTOINCREMENT, "

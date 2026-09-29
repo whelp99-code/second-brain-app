@@ -19,6 +19,20 @@ from sb.life_contracts import AttachmentRefV1, LifeInputError
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ENVELOPE_BYTES = 16 * 1024 * 1024
+ATTACHMENT_STATES = frozenset({"stored", "too_large", "untranscribed", "quarantined"})
+
+
+def attachment_state(
+    *, size: int, mime: str, signature_ok: bool, transcribed: bool = False
+) -> str:
+    """Classify one attachment. Audio is not stored as a finished memory."""
+    if type(size) is not int or size > MAX_ATTACHMENT_BYTES:
+        return "too_large"
+    if not signature_ok or mime not in MIMES or size <= 0:
+        return "quarantined"
+    if mime.startswith("audio/") and not transcribed:
+        return "untranscribed"
+    return "stored"
 OFFICE_PARTS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "word/document.xml",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xl/workbook.xml",

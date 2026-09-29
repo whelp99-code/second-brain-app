@@ -23,6 +23,7 @@ class PreparedImport:
     input_digest: str
     anchor: str | None
     kind: str
+    attachment_states: tuple[str, ...] = ()
 
 
 def prepare(
@@ -102,4 +103,10 @@ def prepare(
     rows = parse_export(kind, raw, filename, timezone=opts.timezone)
     if len(rows) > 1000 or len(canonical_bytes(rows)) > 24 * 1024 * 1024:
         raise LifeInputError("LIFE_IMPORT_TOO_LARGE")
-    return PreparedImport(rows, (), sha256(raw).hexdigest(), None, kind)
+    states = tuple(
+        line.split("=", 1)[1]
+        for row in rows
+        for line in str(row.get("body", "")).splitlines()
+        if line.startswith("attachment_state=")
+    )
+    return PreparedImport(rows, (), sha256(raw).hexdigest(), None, kind, states)

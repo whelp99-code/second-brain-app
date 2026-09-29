@@ -46,6 +46,7 @@ class OfficeParseLimits:
 
 
 DEFAULT_OFFICE_PARSE_LIMITS: Final = OfficeParseLimits()
+OFFICE_MAX_BYTES: Final = 67_108_864
 
 
 def _member_violation(info: zipfile.ZipInfo, limits: OfficeParseLimits, uncompressed: int) -> None:
@@ -67,6 +68,8 @@ def admit_office_package(payload: bytes, limits: OfficeParseLimits, required_mem
     """Admit one OOXML package against ZIP, encryption, macro, and link limits."""
     if not payload:
         raise InvalidInput("empty office payload")
+    if len(payload) > OFFICE_MAX_BYTES:
+        raise LimitExceeded("office payload size")
     try:
         archive = zipfile.ZipFile(io.BytesIO(payload))
     except zipfile.BadZipFile as exc:
@@ -116,20 +119,26 @@ class DocxDocumentParser:
     limits: OfficeParseLimits = DEFAULT_OFFICE_PARSE_LIMITS
 
     def parse(self, payload: bytes) -> str:
+        return self.parse_details(payload)[0]
+
+    def parse_details(self, payload: bytes) -> tuple[str, dict[str, str | int], str | None]:
         admit_office_package(payload, self.limits, "word/document.xml")
         try:
             document = Document(io.BytesIO(payload))
         except _OPEN_ERRORS as exc:
             raise InvalidInput("corrupt docx") from exc
         texts: list[str] = []
-        for block in document.iter_inner_content():
+        first = 0
+        for ordinal, block in enumerate(document.iter_inner_content(), 1):
             if isinstance(block, Paragraph):
                 text = block.text.strip()
             else:
                 text = _table_text(block)
             if text:
+                if not first:
+                    first = ordinal
                 texts.append(text)
-        return "\n".join(texts)
+        return "\n".join(texts), {"kind": "paragraph", "ordinal": first or 1}, None
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +148,9 @@ class XlsxDocumentParser:
     limits: OfficeParseLimits = DEFAULT_OFFICE_PARSE_LIMITS
 
     def parse(self, payload: bytes) -> str:
+        return self.parse_details(payload)[0]
+
+    def parse_details(self, payload: bytes) -> tuple[str, dict[str, str | int], str | None]:
         admit_office_package(payload, self.limits, "xl/workbook.xml")
         try:
             return _extract_xlsx(payload, self.limits)
@@ -176,12 +188,18 @@ def _cached_formulas(payload: bytes, keys: list[str]) -> dict[str, str]:
     return found
 
 
-def _extract_xlsx(payload: bytes, limits: OfficeParseLimits) -> str:
+def _extract_xlsx(
+    payload: bytes, limits: OfficeParseLimits
+) -> tuple[str, dict[str, str | int], str | None]:
     workbook = _open_xlsx(payload, data_only=False)
+    fallback_sheet = "Sheet"
     try:
         if len(workbook.worksheets) > limits.worksheets:
             raise LimitExceeded("xlsx worksheet count")
+        if workbook.worksheets:
+            fallback_sheet = workbook.worksheets[0].title or "Sheet"
         pending: list[tuple[str, str | None]] = []
+        first_cell: dict[str, str | int] | None = None
         formula_keys: list[str] = []
         rows = 0
         cells = 0
@@ -199,6 +217,8 @@ def _extract_xlsx(payload: bytes, limits: OfficeParseLimits) -> str:
                     if cells > limits.cells:
                         raise LimitExceeded("xlsx cell count")
                     key = f"{title}!{cell.coordinate}"
+                    if first_cell is None:
+                        first_cell = {"kind": "cell", "sheet": title, "cell": cell.coordinate}
                     if cell.data_type == "f":
                         pending.append((key, None))
                         formula_keys.append(key)
@@ -207,7 +227,12 @@ def _extract_xlsx(payload: bytes, limits: OfficeParseLimits) -> str:
     finally:
         workbook.close()
     cache = _cached_formulas(payload, formula_keys)
-    return "\n".join(_formula_text(key, cache) if text is None else text for key, text in pending)
+    missing = any(key not in cache or cache[key] == "" for key in formula_keys)
+    return (
+        "\n".join(_formula_text(key, cache) if text is None else text for key, text in pending),
+        first_cell or {"kind": "cell", "sheet": fallback_sheet, "cell": "A1"},
+        "formula_unavailable" if missing else None,
+    )
 
 
 __all__ = (

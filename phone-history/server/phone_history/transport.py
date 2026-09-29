@@ -9,6 +9,8 @@ import json
 import os
 from collections.abc import Mapping
 from typing import Final, cast
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -69,3 +71,32 @@ def open_transport_payload(value: object, api_token: str) -> dict[str, object]:
     if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
         raise ValidationError("encrypted request content must be an object")
     return cast(dict[str, object], payload)
+
+
+class TransportFailure(Exception):
+    """The Second Brain HTTP exchange did not yield a complete response."""
+
+
+def exchange_json(
+    method: str,
+    url: str,
+    body: bytes,
+    headers: Mapping[str, str],
+    timeout: float,
+) -> tuple[int, bytes]:
+    """One blocking HTTP exchange. No resident connection and no retry."""
+    outgoing = urlrequest.Request(url, data=body, headers=dict(headers), method=method)
+    try:
+        with urlrequest.urlopen(outgoing, timeout=timeout) as response:
+            status = getattr(response, "status", 200)
+            return int(status), response.read()
+    except urlerror.HTTPError as exc:
+        payload = exc.read()
+        return int(exc.code), payload
+    except TimeoutError as exc:
+        raise TransportFailure("timeout") from exc
+    except (urlerror.URLError, ConnectionError, OSError) as exc:
+        reason = exc.reason if isinstance(exc, urlerror.URLError) else exc
+        if isinstance(reason, TimeoutError):
+            raise TransportFailure("timeout") from exc
+        raise TransportFailure("response_loss") from exc

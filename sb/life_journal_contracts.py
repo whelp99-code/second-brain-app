@@ -25,6 +25,7 @@ class JournalRow(TypedDict, closed=True):
     evidence: list[EvidenceRef]
     recorded_at: str
     send_allowed: NotRequired[bool]
+    sent: NotRequired[bool]
     execute_allowed: NotRequired[bool]
 
 

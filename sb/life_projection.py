@@ -18,7 +18,7 @@ from sb.life_journal_contracts import JournalRow
 from sb.life_json import decode_json
 from sb.life_values import canonical_bytes, instant, zone
 from sb.life_view_contracts import ObsidianManifest, ViewFile
-from sb.life_views import obsidian_manifest, safe_text
+from sb.life_views import daily_markdown, obsidian_manifest, safe_text
 
 
 def _path(kind: str, identity: str) -> str:
@@ -37,9 +37,17 @@ def project(
     sensitivities: tuple[str, ...],
     complete: bool,
     workflows: Mapping[str, Sequence[JournalRow]] | None = None,
+    generation: str | None = None,
+    evidence_counts: Mapping[str, int] | None = None,
 ) -> ObsidianManifest:
     base = obsidian_manifest(
-        events, day=day, timezone=timezone, sensitivities=sensitivities, complete=complete
+        events,
+        day=day,
+        timezone=timezone,
+        sensitivities=sensitivities,
+        complete=complete,
+        generation=generation,
+        evidence_counts=evidence_counts,
     )
     files = {row["path"]: row["content"] for row in base["files"]}
     visible = {e.event_id: e for e in events if e.sensitivity in sensitivities}
@@ -63,28 +71,12 @@ def project(
                 + event.evidence_level
                 + "\n"
             )
-    for date, items in sorted(history.items()):
+    for date in sorted(history):
         if date == day:
             continue
-        lines = ["# " + date, "", "## 시간순 기록"]
-        for event in sorted(items, key=lambda e: (e.occurred_start or "", e.event_id)):
-            at = instant(event.occurred_start).astimezone(zone(timezone)).strftime("%H:%M")
-            lines.append(
-                "- "
-                + at
-                + " · "
-                + event.event_status
-                + " · "
-                + _event_link(event.event_id, event.title)
-            )
-        lines += [
-            "",
-            "## 내 메모",
-            "[[MyNotes/" + date + "]]",
-            "",
-            "과거 기록 화면입니다. 기록이 없는 시간을 활동 없음으로 해석하지 않습니다.",
-        ]
-        files[f"Auto/Daily/{date}.md"] = "\n".join(lines) + "\n"
+        files[f"Auto/Daily/{date}.md"] = daily_markdown(
+            tuple(visible.values()), day=date, timezone=timezone, complete=complete
+        )
     dates = sorted(set(history) | {day}, reverse=True)
     files["Auto/History.md"] = (
         "# 날짜별 기억\n\n"
@@ -130,23 +122,32 @@ def project(
         "타입·효력·근거가 보존된 관계입니다. 추정은 확정과 다릅니다.",
         "",
     ]
+    grouped: dict[str, list[JournalRow]] = defaultdict(list)
     for row in workflows.get("relation", ()):
-        b = row["body"]
-        relation_lines += [
-            "## " + safe_text(string(b["relation_kind"])),
-            safe_text(string(b["from_id"])) + " → " + safe_text(string(b["to_id"])),
-            "상태: "
-            + safe_text(string(b["state"]))
-            + " / "
-            + safe_text(string(b["evidence_level"])),
-            "효력: "
-            + safe_text(string(b.get("valid_from") or "미지정"))
-            + " ~ "
-            + safe_text(string(b.get("valid_until") or "미지정")),
-        ]
-        relation_lines += [
-            "- " + _event_link(ref["event_id"], "근거 사건") for ref in row["evidence"]
-        ]
+        if not row["evidence"]:
+            continue
+        kind = string(row["body"]["relation_kind"])
+        grouped[kind].append(row)
+    for kind in sorted(grouped):
+        relation_lines.append("## " + safe_text(kind))
+        for row in grouped[kind]:
+            b = row["body"]
+            relation_lines += [
+                safe_text(string(b["from_id"])) + " → " + safe_text(string(b["to_id"])),
+                "상태: "
+                + safe_text(string(b["state"]))
+                + " / "
+                + safe_text(string(b["evidence_level"])),
+                "효력: "
+                + safe_text(string(b.get("valid_from") or "미지정"))
+                + " ~ "
+                + safe_text(string(b.get("valid_until") or "미지정")),
+            ]
+            relation_lines += [
+                "- " + _event_link(ref["event_id"], "근거 사건") + " #" + str(ref["revision"])
+                for ref in row["evidence"]
+            ]
+            relation_lines.append("")
     for row in workflows.get("entity_alias", ()):
         b = row["body"]
         relation_lines += [
@@ -204,12 +205,13 @@ def project(
         {"path": path, "content": content, "sha256": sha256(content.encode()).hexdigest()}
         for path, content in sorted(files.items())
     ]
-    generation = sha256(canonical_bytes(rows)).hexdigest()
+    content_generation = sha256(canonical_bytes(rows)).hexdigest()
     return {
         **base,
         "files": rows,
-        "generation": generation,
-        "cursor": generation,
+        "generation": content_generation,
+        "cursor": content_generation,
+        "source_generation": base["source_generation"],
         "day": day,
         "timezone": timezone,
     }

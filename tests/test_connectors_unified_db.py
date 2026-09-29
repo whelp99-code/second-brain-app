@@ -369,8 +369,8 @@ def test_executed_sql_and_module_contain_no_write_or_ddl() -> None:
     for sql in db.sql:
         assert _FORBIDDEN_SQL.search(sql) is None
     source = Path(__file__).resolve().parent.parent / "sb" / "connectors"
-    for path in (source / "unified_db.py", source / "unified_db_mapping.py"):
-        assert _FORBIDDEN_SOURCE.search(path.read_text(encoding="utf-8")) is None
+    for name in ("unified_db.py", "unified_db_mapping.py", "unified_db_reconcile.py"):
+        assert _FORBIDDEN_SOURCE.search((source / name).read_text(encoding="utf-8")) is None
 
 
 def test_scan_closes_connection_when_complete() -> None:

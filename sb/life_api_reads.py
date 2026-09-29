@@ -9,6 +9,8 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 
+from typing_extensions import TypedDict
+
 from sb.config import Config
 from sb.effect_values import JsonInput
 from sb.life_actor import LifeActor
@@ -17,13 +19,27 @@ from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_fields import string
 from sb.life_journal_contracts import JournalRow
 from sb.life_json import LifePayload
-from sb.life_read_contracts import RecallResult
+from sb.life_read_contracts import RecallResult, TimelineQuery
 from sb.life_values import instant
 from sb.life_view_contracts import ObsidianManifest
+from sb.life_visibility import for_projection
 from sb.store.life import LifeStore, read_life_store
 from sb.store.life_journal import LifeJournal
 
 VIEW_KINDS = ("question", "relation", "entity_alias", "prediction", "actual")
+
+
+class RelationSurface(TypedDict, closed=True):
+    generation: str | None
+    revisions: dict[str, int]
+    kinds: tuple[str, ...]
+    items: list[JournalRow]
+
+
+class AlignedSurfaces(TypedDict, closed=True):
+    timeline: TimelineQuery
+    relations: RelationSurface
+    manifest: ObsidianManifest
 
 
 def workflow_rows(
@@ -47,6 +63,33 @@ def workflow_rows(
     }
 
 
+def _evidence_counts(store: LifeStore, events: Sequence[LifeEventV1]) -> dict[str, int]:
+    journal = LifeJournal(store)
+    return {event.event_id: 1 + len(journal.records(event)) for event in events}
+
+
+def relation_surface(
+    rows: Sequence[JournalRow],
+    *,
+    generation: str | None,
+    events: Sequence[LifeEventV1],
+) -> RelationSurface:
+    """One group per kind. Edges without evidence rows are omitted."""
+    grouped: dict[str, list[JournalRow]] = {}
+    for row in rows:
+        if not row["evidence"]:
+            continue
+        kind = string(row["body"]["relation_kind"])
+        grouped.setdefault(kind, []).append(row)
+    current = {event.event_id: event.revision for event in events}
+    return {
+        "generation": generation,
+        "revisions": current,
+        "kinds": tuple(sorted(grouped)),
+        "items": [row for kind in sorted(grouped) for row in grouped[kind]],
+    }
+
+
 def view(
     config: Config,
     store: LifeStore,
@@ -57,11 +100,12 @@ def view(
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     complete: bool,
+    generation: str | None = None,
 ) -> ObsidianManifest:
     from sb.life_projection import project
 
     opts = settings(config)
-    filtered = tuple(e for e in events if e.sensitivity in opts.view_sensitivities)
+    filtered = for_projection(events, scopes=scopes, sensitivities=opts.view_sensitivities)
     rows = workflow_rows(store, filtered, scopes=scopes, source_ids=source_ids)
     return project(
         filtered,
@@ -70,7 +114,49 @@ def view(
         sensitivities=opts.view_sensitivities,
         complete=complete,
         workflows=rows,
+        generation=generation,
+        evidence_counts=_evidence_counts(store, filtered),
     )
+
+
+def aligned_surfaces(
+    config: Config,
+    root: Path,
+    actor: LifeActor,
+    *,
+    day: str,
+    timezone: str,
+    now: datetime,
+) -> AlignedSurfaces:
+    """Timeline, relations and manifest share one store-derived generation."""
+    from sb.life_timeline_query import query as timeline_query
+
+    with read_life_store(root) as store:
+        timeline = timeline_query(
+            store, config, actor, day=day, timezone=timezone, now=now, limit=1000
+        )
+        events = store.events(
+            scopes=actor.scopes, now=now, source_ids=actor.source_ids, limit=10000
+        )
+        events = for_projection(
+            events, scopes=actor.scopes, sensitivities=settings(config).view_sensitivities
+        )
+        rows = workflow_rows(store, events, scopes=actor.scopes, source_ids=actor.source_ids)
+        manifest = view(
+            config,
+            store,
+            events,
+            day=day,
+            timezone=timezone,
+            scopes=actor.scopes,
+            source_ids=actor.source_ids,
+            complete=True,
+            generation=timeline["generation"],
+        )
+        relations = relation_surface(
+            rows["relation"], generation=timeline["generation"], events=events
+        )
+    return {"timeline": timeline, "relations": relations, "manifest": manifest}
 
 
 def health(

@@ -13,7 +13,7 @@ import pytest
 from sb.effect_values import JsonValue
 from sb.life_config import LifeSettingsV1
 from sb.life_contracts import LifeEventV1, LifeInputError
-from sb.life_delivery import due_slots, finish, generate, prepare
+from sb.life_delivery import catch_up, due_slots, finish, flag_stale_briefing, generate, prepare
 from sb.life_model_policy import generate_after_reservation, reserve, settle
 from sb.life_predictions import evaluate, metrics
 from sb.life_predictions import issue as predict
@@ -226,6 +226,104 @@ def test_schedule_does_not_send_old_backlog_or_quiet_hours() -> None:
     eight = NOW - timedelta(hours=4)
     assert due_slots(eight, OPTS) == [("2026-09-26", "morning")]
     assert due_slots(eight - timedelta(hours=1), OPTS) == []
+
+
+def test_briefing_body_has_input_version_timezone_and_evidence_refs(tmp_path: Path) -> None:
+    with Ledger(tmp_path) as ledger:
+        store = ledger.life_store()
+        events = seed(store)
+        body = generate(
+            LifeJournal(store),
+            events,
+            opts=OPTS,
+            day="2026-09-26",
+            slot="morning",
+            scopes=SCOPES,
+            source_ids=SOURCES,
+            now=NOW,
+        )["body"]
+        assert body["timezone"] == "Asia/Seoul"
+        assert body["input_version"] == body["input_snapshot"]
+        assert body["input_version"]
+        assert body["evidence"] == [
+            {
+                "event_id": events[0].event_id,
+                "revision": events[0].revision,
+                "raw_digest": events[0].raw_digest,
+                "source_id": events[0].source_id,
+                "policy_revision": events[0].policy_revision,
+            }
+        ]
+        assert body["stale"] is False
+
+
+def test_catch_up_generates_once_within_max_age_and_never_backlog(tmp_path: Path) -> None:
+    with Ledger(tmp_path) as ledger:
+        store = ledger.life_store()
+        events = seed(store)
+        journal = LifeJournal(store)
+        at = NOW - timedelta(hours=4)  # 08:00 KST, inside the morning window
+        first = catch_up(journal, events, opts=OPTS, scopes=SCOPES, source_ids=SOURCES, now=at)
+        second = catch_up(journal, events, opts=OPTS, scopes=SCOPES, source_ids=SOURCES, now=at)
+        assert len(first) == 1 and first[0]["object_id"] == second[0]["object_id"]
+        assert first[0]["revision"] == second[0]["revision"] == 1
+        assert first[0]["body"]["day"] == "2026-09-26"
+        later = NOW + timedelta(days=3)
+        assert catch_up(journal, events, opts=OPTS, scopes=SCOPES, source_ids=SOURCES, now=later) == []
+        quiet_evening = NOW.replace(hour=15)  # 00:00 next KST day, quiet, not a backlog
+        assert due_slots(quiet_evening, OPTS) == []
+
+
+def test_stale_briefing_flagged_when_inputs_changed(tmp_path: Path) -> None:
+    with Ledger(tmp_path) as ledger:
+        store = ledger.life_store()
+        events = seed(store)
+        journal = LifeJournal(store)
+        briefing = generate(
+            journal,
+            events,
+            opts=OPTS,
+            day="2026-09-26",
+            slot="morning",
+            scopes=SCOPES,
+            source_ids=SOURCES,
+            now=NOW,
+        )
+        assert briefing["body"]["stale"] is False
+        _ = store.accept(
+            payload(source_item_id="event-0", body="정정됨", source_version="v2"),
+            policy(),
+            key="corr",
+            expected_revision=1,
+            now=NOW,
+        )
+        updated = store.events(scopes=SCOPES, now=NOW)
+        flagged = flag_stale_briefing(
+            journal,
+            briefing["object_id"],
+            events=updated,
+            scopes=SCOPES,
+            source_ids=SOURCES,
+            now=NOW,
+        )
+        assert flagged["body"]["stale"] is True
+        assert flagged["revision"] == briefing["revision"] + 1
+
+
+def test_quiet_hours_and_server_day_offset() -> None:
+    from datetime import UTC, datetime
+
+    from sb.life_questions import quiet
+
+    server_noon = datetime(2026, 9, 26, 3, 0, tzinfo=UTC)  # 12:00 KST
+    assert quiet(server_noon, OPTS) is False
+    server_afternoon = datetime(2026, 9, 26, 13, 30, tzinfo=UTC)  # 22:30 KST
+    assert quiet(server_afternoon, OPTS) is True
+    assert due_slots(server_afternoon, OPTS) == []
+    # 23:30 UTC is still 25 Sep on the server clock and 26 Sep 08:30 in Seoul.
+    offset = datetime(2026, 9, 25, 23, 30, tzinfo=UTC)
+    assert offset.date().isoformat() == "2026-09-25"
+    assert due_slots(offset, OPTS) == [("2026-09-26", "morning")]
 
 
 def test_model_budget_no_external_fallback_and_replay_is_not_execution(tmp_path: Path) -> None:

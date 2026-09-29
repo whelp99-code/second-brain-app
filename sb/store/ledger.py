@@ -37,6 +37,7 @@ from . import (
     Run,
     RunStage,
     SourceItem,
+    UnitProvenance,
     UnitRow,
     assert_ledger_integrity,
     deriv_key,
@@ -47,7 +48,7 @@ from . import (
 )
 
 _HEX: Final = frozenset("0123456789abcdef")
-CURRENT_SCHEMA_VERSION: Final = 5
+CURRENT_SCHEMA_VERSION: Final = 6
 
 
 def _transient_llm_error(error: str | None) -> bool:
@@ -114,6 +115,24 @@ _SCHEMA: Final = (
     "git_commit TEXT, status TEXT NOT NULL);"
     "CREATE TABLE IF NOT EXISTS schema_meta ("
     "key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS scan_receipt ("
+    "scan_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, account_id TEXT NOT NULL, "
+    "started_at TEXT NOT NULL, finished_at TEXT NOT NULL, state TEXT NOT NULL, "
+    "checkpoint_before TEXT, checkpoint_after TEXT, "
+    "scanned INTEGER NOT NULL, accepted INTEGER NOT NULL, unchanged INTEGER NOT NULL, "
+    "filtered INTEGER NOT NULL, quarantined INTEGER NOT NULL, deferred INTEGER NOT NULL, "
+    "retryable_errors INTEGER NOT NULL, permanent_errors INTEGER NOT NULL, "
+    "coverage_start TEXT, coverage_end TEXT, next_scan_at TEXT, "
+    "remaining_known INTEGER, exhausted INTEGER NOT NULL, budget INTEGER, "
+    "upstream_end_evidence TEXT);"
+    "CREATE INDEX IF NOT EXISTS scan_receipt_source ON scan_receipt(source_id);"
+    "CREATE TABLE IF NOT EXISTS source_stage_count ("
+    "source_id TEXT PRIMARY KEY, captured INTEGER NOT NULL, parsed INTEGER NOT NULL, "
+    "published INTEGER NOT NULL, searchable INTEGER NOT NULL, eligible INTEGER NOT NULL);"
+    "CREATE TABLE IF NOT EXISTS unit_provenance ("
+    "unit_id TEXT PRIMARY KEY, content_hash TEXT NOT NULL, parser_version TEXT NOT NULL, "
+    "model_version TEXT NOT NULL, normalizer_version TEXT NOT NULL, profile_revision TEXT NOT NULL, "
+    "locator_json TEXT NOT NULL, partial_reason TEXT);"
     "CREATE TABLE IF NOT EXISTS derivation_event ("
     "event_id INTEGER PRIMARY KEY AUTOINCREMENT, deriv_key TEXT NOT NULL, stage TEXT NOT NULL, "
     "from_status TEXT NOT NULL, to_status TEXT NOT NULL, attempts INTEGER NOT NULL, "
@@ -438,6 +457,99 @@ class Ledger:
         items = list(self._tables.source_items.values())
         items.sort(key=lambda item: (item.source_id, item.source_uri, item.content_hash))
         return tuple(items)
+
+    def insert_scan_receipt(self, row: SqlParams) -> None:
+        """Insert one validated scan-receipt row. Caller owns the transaction."""
+        _ = self._exec(
+            "INSERT INTO scan_receipt VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            row,
+        )
+
+    def upsert_unit_provenance(self, row: UnitProvenance) -> None:
+        """Bind parser provenance to a unit. Additive; does not rewrite the unit row."""
+        _ = self._exec(
+            "INSERT INTO unit_provenance VALUES (?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(unit_id) DO UPDATE SET"
+            " content_hash=excluded.content_hash, parser_version=excluded.parser_version,"
+            " model_version=excluded.model_version, normalizer_version=excluded.normalizer_version,"
+            " profile_revision=excluded.profile_revision, locator_json=excluded.locator_json,"
+            " partial_reason=excluded.partial_reason",
+            (
+                row.unit_id,
+                row.content_hash,
+                row.parser_version,
+                row.model_version,
+                row.normalizer_version,
+                row.profile_revision,
+                row.locator_json,
+                row.partial_reason,
+            ),
+        )
+
+    def provenance_for_unit(self, unit_id: str) -> UnitProvenance | None:
+        found = cast(
+            tuple[object, ...] | None,
+            self._db().execute(
+                "SELECT unit_id, content_hash, parser_version, model_version, normalizer_version,"
+                " profile_revision, locator_json, partial_reason FROM unit_provenance WHERE unit_id=?",
+                (unit_id,),
+            ).fetchone(),
+        )
+        if found is None:
+            return None
+        return UnitProvenance(
+            str(found[0]),
+            str(found[1]),
+            str(found[2]),
+            str(found[3]),
+            str(found[4]),
+            str(found[5]),
+            str(found[6]),
+            None if found[7] is None else str(found[7]),
+        )
+
+    def replace_provenance_parser(self, unit_id: str, parser_version: str) -> None:
+        """Change only the parser revision. A new derivation key must not reuse the old row."""
+        current = self.provenance_for_unit(unit_id)
+        if current is None:
+            raise ValueError("UNIT_PROVENANCE_MISSING")
+        self.upsert_unit_provenance(replace(current, parser_version=parser_version))
+
+    def fetch_scan_receipt_rows(
+        self, source_id: str | None = None
+    ) -> tuple[tuple[object, ...], ...]:
+        sql = (
+            "SELECT scan_id,source_id,account_id,started_at,finished_at,state,"
+            "checkpoint_before,checkpoint_after,scanned,accepted,unchanged,filtered,"
+            "quarantined,deferred,retryable_errors,permanent_errors,coverage_start,"
+            "coverage_end,next_scan_at,remaining_known,exhausted,budget,upstream_end_evidence"
+            " FROM scan_receipt"
+        )
+        params: SqlParams = ()
+        if source_id is not None:
+            sql += " WHERE source_id=?"
+            params = (source_id,)
+        sql += " ORDER BY finished_at, scan_id"
+        return tuple(self._db().execute(sql, params).fetchall())
+
+    def set_stage_counts(
+        self,
+        source_id: str,
+        captured: int,
+        parsed: int,
+        published: int,
+        searchable: int,
+        eligible: int,
+    ) -> None:
+        """Replace independent downstream counts. These are not scan accepted totals."""
+        _ = self._exec(
+            "INSERT INTO source_stage_count VALUES (?,?,?,?,?,?)"
+            + " ON CONFLICT(source_id) DO UPDATE SET"
+            + " captured=excluded.captured, parsed=excluded.parsed,"
+            + " published=excluded.published, searchable=excluded.searchable,"
+            + " eligible=excluded.eligible",
+            (source_id, captured, parsed, published, searchable, eligible),
+        )
 
     def set_cursor(self, source_id: str, position: str, updated_at: str) -> None:
         _ = self._exec(

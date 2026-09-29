@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import socket
 import sys
@@ -34,7 +35,7 @@ class _DoclingModule(Protocol):
 
 class _NoNetworkSocket(socket.socket):
     @override
-    def connect(self, address: str | Buffer | tuple[str | bytes | int, ...]) -> None:
+    def connect(self, address: str | int | Buffer | tuple[str | bytes | int, ...]) -> None:
         raise OSError("docling network disabled")
 
 
@@ -42,6 +43,8 @@ socket.socket = _NoNetworkSocket
 
 
 def main() -> int:
+    if importlib.util.find_spec("docling") is None:
+        return 3
     try:
         module = import_module("docling.document_converter")
     except ImportError:
@@ -74,10 +77,11 @@ def main() -> int:
     json.dump(
         {
             "body": body,
-            "locator": {"kind": "document", "ordinal": 1},
+            "locator": {"kind": "page" if suffix == ".pdf" else "paragraph", "ordinal": 1},
             "parser_version": parser_version,
             "model_version": "docling-default",
             "partial": False,
+            "partial_reason": None,
         },
         sys.stdout,
         ensure_ascii=False,

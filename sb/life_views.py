@@ -3,29 +3,34 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
 from hashlib import sha256
 
 from sb.contracts import PageSpec, SourceCite
 from sb.life_brief import brief
 from sb.life_contracts import LifeEventV1
-from sb.life_obsidian import obsidian_manifest
-from sb.life_rendering import core_page_id, on_day, safe_text, source_uri
-from sb.life_values import day_window, instant
-from sb.life_view_contracts import (
-    GapCandidate,
-    Timeline,
+from sb.life_obsidian import (
+    DAILY_SECTIONS,
+    daily_markdown,
+    gap_candidates,
+    obsidian_manifest,
+    source_generation,
 )
+from sb.life_rendering import core_page_id, on_day, safe_text, source_uri
+from sb.life_values import day_window
+from sb.life_view_contracts import Timeline
 from sb.redaction import redact_credentials
 
 __all__ = [
+    "DAILY_SECTIONS",
     "brief",
     "core_page_id",
+    "daily_markdown",
     "gap_candidates",
     "obsidian_manifest",
     "on_day",
     "page_for_event",
     "safe_text",
+    "source_generation",
     "source_uri",
     "timeline",
 ]
@@ -95,33 +100,3 @@ def timeline(events: Sequence[LifeEventV1], day: str, timezone: str) -> Timeline
         "coverage": "source_records_only",
         "complete_day_observed": False,
     }
-
-
-def gap_candidates(events: Sequence[LifeEventV1], *, now: datetime) -> tuple[GapCandidate, ...]:
-    candidates: list[GapCandidate] = []
-    for event in events:
-        if event.event_type != "calendar_event" or event.event_status == "cancelled":
-            continue
-        if (
-            event.occurred_start is None
-            or instant(event.occurred_end or event.occurred_start) > now
-        ):
-            continue
-        if event.review_state in {"rejected", "disputed"}:
-            continue
-        if event.event_status == "planned":
-            question = "예정된 일정이 실제로 진행됐나요?"
-        elif event.event_status == "occurred" and not event.body.strip():
-            question = "확인된 일정의 결과로 기억할 내용이 있나요?"
-        else:
-            continue
-        candidates.append(
-            {
-                "event_id": event.event_id,
-                "revision": event.revision,
-                "title": event.title,
-                "question": question,
-                "evidence_digest": event.raw_digest,
-            }
-        )
-    return tuple(sorted(candidates, key=lambda c: c["event_id"]))

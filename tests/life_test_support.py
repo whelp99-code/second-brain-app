@@ -6,7 +6,6 @@ from pydantic import ConfigDict, TypeAdapter
 
 from sb.config import TomlValue
 from sb.effect_values import JsonInput, JsonObject
-from tests import test_web
 
 _OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject, config=ConfigDict(strict=True))
 _ROWS = TypeAdapter(list[JsonObject], config=ConfigDict(strict=True))
@@ -32,6 +31,8 @@ def request(
     payload: JsonInput = None,
     token: str | None = None,
 ) -> tuple[int, JsonObject]:
+    from tests import test_web
+
     status, body = test_web.request(url, method=method, payload=payload, token=token)
     assert isinstance(body, dict)
     return status, body

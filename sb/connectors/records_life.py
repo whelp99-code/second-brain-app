@@ -23,6 +23,8 @@ from sb.life_json import decode_json
 
 ADAPTER_ID: Final = "life-records"
 ADAPTERS = frozenset({ADAPTER_ID, "life-events"})
+# Cursor-only key. Newline-separated paths already quarantined; not a file name.
+QUARANTINE_CURSOR_KEY = "\0sb-quarantine"
 
 
 class _Config(Protocol):
@@ -99,13 +101,20 @@ class LifeRecordsAdapter:
                 continue
             digest = sha256(raw).hexdigest()
             current[relative] = digest
-            if previous.get(relative) == digest:
+            if relative in _quarantine_paths(previous) or previous.get(relative) == digest:
                 continue
             yield SourceRef(self.source_id, relative, digest), raw, {"relative_path": relative}
         self._next = json.dumps(current, sort_keys=True, separators=(",", ":"))
 
     def next_cursor(self) -> str:
         return self._next
+
+
+def _quarantine_paths(previous: dict[str, str]) -> set[str]:
+    raw = previous.get(QUARANTINE_CURSOR_KEY, "")
+    if not raw:
+        return set()
+    return {part for part in raw.split("\n") if part}
 
 
 def create(config: _Config) -> SourceAdapter:

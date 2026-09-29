@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 import pytest
 
+from sb.effect_values import JsonValue
 from sb.search import SearchIndex
 from tests import test_web
 from tests.json_fixtures import parse_object
@@ -164,6 +165,75 @@ def test_bad_input_and_revision_conflict_are_explicit(tmp_path: Path) -> None:
             _request(base + "/api/life/v1/timeline?" + urlencode({"timezone": "no-zone"}))[0] == 400
         )
         assert _request(base + "/api/life/v1/not-existing")[0] == 404
+
+
+def test_receipt_get_exposes_state_lifecycle(tmp_path: Path) -> None:
+    config, root = life_config(tmp_path)
+    with test_web.running(config) as base:
+        code, accepted = _request(
+            base + "/api/life/v1/events:batch",
+            method="POST",
+            payload={"source_id": "test-notes", "items": [item()]},
+        )
+        assert code == 202, accepted
+        receipt_id = json_text(json_rows(accepted["receipts"])[0]["receipt_id"])
+        code, body = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and body["state"] == "accepted"
+        assert body["replayed"] is False
+        from sb.store.ledger import Ledger
+
+        with Ledger(root) as ledger:
+            store = ledger.life_store()
+            _ = store.advance_receipt(receipt_id, "published", proof="commit:fixture")
+        code, published = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and published["state"] == "published"
+        with Ledger(root) as ledger:
+            store = ledger.life_store()
+            _ = store.advance_receipt(receipt_id, "searchable", proof="index:fixture")
+        code, searchable = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and searchable["state"] == "searchable"
+        assert searchable["event_id"] == json_rows(accepted["receipts"])[0]["event_id"]
+
+
+def test_timeline_returns_groups_with_all_citations(tmp_path: Path) -> None:
+    config, _ = life_config(tmp_path)
+    shared: JsonValue = {
+        "entity_id": "meetings:standup-2026-09-26",
+        "kind": "event",
+        "label": "스탠드업",
+    }
+    with test_web.running(config) as base:
+        code, accepted = _request(
+            base + "/api/life/v1/events:batch",
+            method="POST",
+            payload={
+                "source_id": "test-notes",
+                "items": [
+                    {"idempotency_key": "request-1", "payload": item(source_item_id="note-a", entities=[shared])["payload"]},
+                    {
+                        "idempotency_key": "request-2",
+                        "payload": item(
+                            source_item_id="cal-b",
+                            event_type="calendar_event",
+                            entities=[shared],
+                        )["payload"],
+                    },
+                ],
+            },
+        )
+        assert code == 202, accepted
+        code, timeline = _request(base + "/api/life/v1/timeline?day=2026-09-26")
+        assert code == 200, timeline
+        groups = json_rows(timeline["groups"])
+        assert len(groups) == 1
+        citations = json_rows(groups[0]["citations"])
+        event_ids = groups[0]["event_ids"]
+        assert isinstance(event_ids, list)
+        assert {json_text(row["source_item_id"]) for row in citations} == {"note-a", "cal-b"}
+        assert {json_text(row["event_id"]) for row in citations} == {
+            json_text(value) for value in event_ids
+        }
+        assert all(row["raw_digest"] and row["sid"] for row in citations)
 
 
 def test_source_off_withdrawal_remains_available(tmp_path: Path) -> None:

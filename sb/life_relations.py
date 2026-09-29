@@ -13,6 +13,7 @@ from typing import TypedDict
 from sb.effect_values import JsonInput
 from sb.life_contracts import RELATION_KINDS, LifeEventV1, LifeInputError
 from sb.life_fields import integer, string
+from sb.life_grouping import entity_namespace, qualified_entity_id
 from sb.life_journal_contracts import JournalRow
 from sb.life_values import instant, text
 
@@ -20,6 +21,7 @@ from sb.life_values import instant, text
 class EntityNode(TypedDict):
     kind: str
     label: str
+    namespace: str
     event_ids: list[str]
 
 
@@ -32,17 +34,49 @@ def entities(events: Sequence[LifeEventV1]) -> dict[str, EntityNode]:
         result[event.event_id] = {
             "kind": "event",
             "label": event.title,
+            "namespace": event.source_id,
             "event_ids": [event.event_id],
         }
         for entity in event.entities:
-            key = event.source_id + ":" + entity.entity_id
+            key = qualified_entity_id(event.source_id, entity.entity_id)
             row = result.setdefault(
-                key, {"kind": entity.kind, "label": entity.label, "event_ids": []}
+                key,
+                {
+                    "kind": entity.kind,
+                    "label": entity.label,
+                    "namespace": entity_namespace(event.source_id, entity.entity_id),
+                    "event_ids": [],
+                },
             )
             if row["kind"] != entity.kind:
                 raise LifeInputError("LIFE_ENTITY_CONFLICT")
-            row["event_ids"].append(event.event_id)
+            if event.event_id not in row["event_ids"]:
+                row["event_ids"].append(event.event_id)
+    for row in result.values():
+        row["event_ids"].sort()
     return result
+
+
+def resolved_entities(
+    inventory: Mapping[str, EntityNode], alias_rows: Sequence[JournalRow]
+) -> dict[str, str]:
+    """Follow explicit merges. A later split removes the redirect."""
+    redirects = {
+        string(row["body"]["from_id"]): string(row["body"]["to_id"])
+        for row in alias_rows
+        if row["body"]["state"] == "merged"
+    }
+
+    def resolve(key: str) -> str:
+        seen = {key}
+        while key in redirects:
+            key = redirects[key]
+            if key in seen:
+                raise LifeInputError("LIFE_ALIAS_CYCLE")
+            seen.add(key)
+        return key
+
+    return {key: resolve(key) for key in inventory}
 
 
 def add(

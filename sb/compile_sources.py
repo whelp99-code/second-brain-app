@@ -4,11 +4,40 @@ import hashlib
 from collections.abc import Sequence
 from typing import Final
 
+from sb.compile_models import CompileLedger
 from sb.contracts import SourceCite, Unit
 
 SID_LEN: Final = 8
 ORIGIN_DIGEST_LEN: Final = 8
 _MD_SUFFIX: Final = ".md"
+DEFAULT_LINEAGE: Final = "builtin:.md\x1fnone\x1fv2\x1flocal-only"
+
+
+def lineage_token(ledger: CompileLedger, units: Sequence[Unit]) -> str:
+    parts: list[str] = []
+    for unit in units:
+        row = ledger.provenance_for_unit(unit.unit_id)
+        if row is None:
+            continue
+        parts.append(
+            f"{row.parser_version}\x1f{row.model_version}\x1f"
+            + f"{row.normalizer_version}\x1f{row.profile_revision}"
+        )
+    return "\x1e".join(sorted(parts))
+
+
+def uncertainty(ledger: CompileLedger, units: Sequence[Unit]) -> str | None:
+    for unit in units:
+        row = ledger.provenance_for_unit(unit.unit_id)
+        if row is not None and row.partial_reason:
+            return row.partial_reason
+    return None
+
+
+def with_uncertainty(body: str, reason: str | None) -> str:
+    if not reason or f"uncertainty: {reason}" in body:
+        return body
+    return body.rstrip() + f"\n\nuncertainty: {reason}\n"
 
 
 def group_by_page(units: Sequence[Unit]) -> list[tuple[str, tuple[Unit, ...]]]:

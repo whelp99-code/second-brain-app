@@ -97,6 +97,15 @@ def send_notification(
             except ValueError:
                 message_id = None
             return "transport_accepted", str(message_id)[:256] if message_id is not None else None
+        if response.status == 401:
+            return "rejected_auth", None
+        if response.status == 410:
+            return "subscription_expired", None
+        if response.status == 429:
+            retry = response.headers.get("Retry-After")
+            if not isinstance(retry, str) or len(retry) > 64 or any(c in retry for c in "\r\n"):
+                retry = None
+            return "retry_after", retry
         return ("rejected" if 400 <= response.status < 500 else "unknown"), None
     except (OSError, http.client.HTTPException):
         return "unknown", None

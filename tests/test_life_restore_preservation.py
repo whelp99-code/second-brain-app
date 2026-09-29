@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import multiprocessing
+import os
+import signal
 from datetime import timedelta
 from hashlib import sha256
 from pathlib import Path
@@ -122,3 +126,68 @@ def test_captured_current_state_applies_after_sanitized_generation_clear(tmp_pat
         assert events[0].event_id == json_text(receipts[0]["event_id"])
     for name, raw in state["pages"].items():
         assert sha256((destination / name).read_bytes()).digest() == sha256(raw).digest()
+
+
+def _kill_restore(current: str, candidate: str, phase: str, marker: str) -> None:
+    os.umask(0o077)
+    from sb import life_restore
+
+    def hook(name, detail):
+        if name != phase:
+            return
+        Path(marker).write_text(json.dumps(detail))
+        os.kill(os.getpid(), signal.SIGKILL)
+
+    life_restore._RESTORE_PHASE_HOOK = hook
+    current_path, candidate_path = Path(current), Path(candidate)
+    if phase == "capture":
+        life_restore.capture(current_path)
+    elif phase == "materialize":
+        life_restore.materialize(
+            life_restore.capture(current_path, phase=None),
+            candidate_path,
+            old_archive_has_life=True,
+        )
+    else:
+        life_restore.preserve_current(current_path, candidate_path)
+
+
+@pytest.mark.parametrize("phase", ["capture", "materialize", "preserve_current"])
+def test_restore_applies_tombstones_before_old_revisions_in_every_kill_point(tmp_path, phase):
+    config, root = life_config(tmp_path)
+    _, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
+    event_id = receipts[0]["event_id"]
+    old = capture(root)
+    assert run_life_forget(config, "test-notes", event_id, 1, now=NOW).exit_code == 0
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    materialize(old, candidate, old_archive_has_life=True)
+    marker = tmp_path / "marker.json"
+    context = multiprocessing.get_context("spawn")
+    child = context.Process(
+        target=_kill_restore, args=(str(root), str(candidate), phase, str(marker))
+    )
+    child.start()
+    child.join(30)
+    assert child.exitcode == -signal.SIGKILL
+    assert json.loads(marker.read_text())["tombstones" if phase == "capture" else "tombstones_committed"] >= 1
+    with Ledger(root) as ledger:
+        assert ledger.life_store().connection.execute(
+            "SELECT deleted FROM life_events WHERE event_id=?", (event_id,)
+        ).fetchone() == (1,)
+        assert ledger.life_store().tombstones(scopes=SCOPES)
+    with Ledger(candidate) as ledger:
+        deleted = ledger.life_store().connection.execute(
+            "SELECT deleted FROM life_events WHERE event_id=?", (event_id,)
+        ).fetchone()
+        tomb = ledger.life_store().connection.execute(
+            "SELECT 1 FROM life_tombstones WHERE event_id=?", (event_id,)
+        ).fetchone()
+        if phase == "capture":
+            assert deleted == (0,) and tomb is None
+        else:
+            assert deleted == (1,) and tomb is not None
+            assert ledger.life_store().connection.execute(
+                "SELECT 1 FROM life_events WHERE deleted=0 AND event_id IN "
+                "(SELECT event_id FROM life_tombstones)"
+            ).fetchone() is None

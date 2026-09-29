@@ -127,6 +127,8 @@ LEGACY_TOOLS: Final = (
 )
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
+_PERSONAL_MEMORY_PROFILE: Final = "personal-memory-v1"
+_PERSONAL_MEMORY_UNSUPPORTED: Final = "PERSONAL_MEMORY_PROFILE_UNSUPPORTED"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
 _REMEMBER_PROFILE: Final = "remember-schema5"
@@ -299,6 +301,10 @@ def build_server(
         if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
             raise ContractProfileError
         return build_scoped_write_server(config, barrier_sink=barrier_sink)
+    if os.environ.get(_CONTRACT_PROFILE_ENV) == _PERSONAL_MEMORY_PROFILE:
+        if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
+            raise ContractProfileError
+        return _personal_memory_server(config)
     root = Path(os.path.abspath(config.vault_root if vault_root is None else vault_root))
     requests = Path(
         config.request_root
@@ -1186,6 +1192,210 @@ def build_server(
         resolver = sb_resolve_memory_record if contract_schema_version >= 4 else sb_resolve_memory_target
         _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server
+
+
+def _personal_memory_server(config: Config) -> MCPServer:
+    """sb_recall only. Obligation tools stay on personal-memory-v2."""
+    from sb.life_config import LifeInputError, settings
+
+    try:
+        enabled = "contextual_recall" in settings(config).flags
+    except LifeInputError:
+        enabled = False
+    if not enabled:
+        raise RuntimeError(_PERSONAL_MEMORY_UNSUPPORTED)
+    server = MCPServer("second-brain", description=_PERSONAL_MEMORY_PROFILE)
+
+    def sb_recall(
+        query: str,
+        namespace: str = "personal",
+        source_ids: list[str] | None = None,
+        time_range: dict[str, str] | None = None,
+        limit: int = 5,
+    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
+        """Read-only personal recall. Does not open a company database."""
+        return _sb_recall(config, query, namespace, source_ids, time_range, limit)
+
+    _ = server.tool(name="sb_recall")(sb_recall)
+    return server
+
+
+def _sb_recall(
+    config: Config,
+    query: str,
+    namespace: str,
+    source_ids: list[str] | None,
+    time_range: dict[str, str] | None,
+    limit: int,
+) -> dict[str, object]:
+    from sb.life_api_reads import recall_request
+    from sb.life_config import LifeInputError, policies
+    from sb.life_http import LifeActor
+    from sb.source_coverage import coverage_by_source
+
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise ToolError("RECALL_LIMIT_INVALID")
+    if not isinstance(query, str) or not query.strip() or len(query.encode()) > 4096:
+        raise ToolError("RECALL_QUERY_INVALID")
+    if not isinstance(namespace, str) or not namespace:
+        raise ToolError("RECALL_NAMESPACE_INVALID")
+    binding = {
+        "profile": _PERSONAL_MEMORY_PROFILE,
+        "provider_instance_id": config.provider_instance_id,
+    }
+    if namespace != "personal":
+        return _recall_body("unavailable", ["NAMESPACE_UNAVAILABLE"], binding, None, ())
+    try:
+        available = policies(config)
+    except LifeInputError as exc:
+        return _recall_body("unavailable", [exc.code], binding, None, ())
+    selected = tuple(available) if source_ids is None else tuple(source_ids)
+    if source_ids is not None and (
+        not selected or any(not isinstance(item, str) or item not in available for item in selected)
+    ):
+        raise ToolError("LIFE_SOURCE_NOT_ALLOWED")
+    scopes = tuple(sorted({scope for name in selected for scope in available[name].scopes}))
+    actor = LifeActor(selected, scopes, client=False)
+    root = Path(config.vault_root)
+    revisions = tuple(sorted({available[name].policy_revision for name in selected}))
+    policy_revision = revisions[0] if len(revisions) == 1 else None
+    if not (root / ".sb" / "ledger.db").is_file():
+        return _recall_body(
+            "unavailable", ["LIFE_NOT_INITIALIZED"], binding, policy_revision, selected
+        )
+    rows = coverage_by_source(root)
+    last_states: list[str] = []
+    incomplete = False
+    source_unavailable = False
+    for name in selected:
+        row = rows.get(name)
+        state = None if row is None else row.get("last_state")
+        last_states.append("missing" if not isinstance(state, str) else state)
+        if state == "unavailable":
+            source_unavailable = True
+        elif row is None or row.get("exhausted") is not True or state != "ok":
+            incomplete = True
+    if source_unavailable:
+        return _recall_body(
+            "unavailable", ["SOURCE_UNAVAILABLE"], binding, policy_revision, selected, last_states
+        )
+    if incomplete:
+        return _recall_body(
+            "coverage_incomplete",
+            ["COVERAGE_INCOMPLETE"],
+            binding,
+            policy_revision,
+            selected,
+            last_states,
+        )
+    data: dict[str, object] = {"query": query, "limit": limit, "trigger": "explicit_question"}
+    end = None if time_range is None else time_range.get("end")
+    if isinstance(end, str) and "T" in end:
+        data["as_of"] = end
+    try:
+        raw = recall_request(config, root, actor, data, now=datetime.now(UTC))
+    except LifeInputError as exc:
+        if exc.code == "LIFE_WORKSET_TOO_LARGE":
+            return _recall_body(
+                "coverage_incomplete",
+                [exc.code],
+                binding,
+                policy_revision,
+                selected,
+                last_states,
+            )
+        if exc.code in {
+            "LIFE_QUERY_INVALID",
+            "LIFE_LIMIT_INVALID",
+            "LIFE_AS_OF_INVALID",
+            "LIFE_UNKNOWN_FIELD",
+            "LIFE_TRIGGER_INVALID",
+        }:
+            raise ToolError(exc.code) from None
+        return _recall_body("unavailable", [exc.code], binding, policy_revision, selected, last_states)
+    hits = raw.get("hits")
+    if not isinstance(hits, list):
+        return _recall_body(
+            "unavailable", ["RECALL_SHAPE_INVALID"], binding, policy_revision, selected, last_states
+        )
+    mapped = [_evidence_ref(hit) if isinstance(hit, dict) else None for hit in hits]
+    if any(ref is None for ref in mapped):
+        return _recall_body(
+            "ambiguous", ["EVIDENCE_INCOMPLETE"], binding, policy_revision, selected, last_states
+        )
+    refs = tuple(ref for ref in mapped if ref is not None)
+    if not refs:
+        return _recall_body("not_found", ["NO_MATCH"], binding, policy_revision, selected, last_states)
+    if len(refs) > 1:
+        titles = tuple(
+            hit["title"] for hit in hits if isinstance(hit, dict) and isinstance(hit.get("title"), str)
+        )
+        return _recall_body(
+            "ambiguous",
+            ["MULTIPLE_MATCHES"],
+            binding,
+            policy_revision,
+            selected,
+            last_states,
+            refs,
+            titles[1:],
+        )
+    text = hits[0].get("text") if isinstance(hits[0], dict) else None
+    if not isinstance(text, str) or not text:
+        return _recall_body("ambiguous", ["ANSWER_WITHOUT_TEXT"], binding, policy_revision, selected, last_states, refs)
+    return _recall_body(
+        "answered", [], binding, policy_revision, selected, last_states, refs, answer=text
+    )
+
+
+def _evidence_ref(hit: dict[str, object]) -> dict[str, object] | None:
+    evidence = hit.get("evidence")
+    revision = hit.get("revision")
+    event_id = hit.get("event_id")
+    if not isinstance(evidence, dict) or not isinstance(event_id, str) or type(revision) is not int:
+        return None
+    digest = evidence.get("raw_digest")
+    span = hit.get("occurred_start") or hit.get("recorded_at")
+    if not isinstance(digest, str) or not isinstance(span, str) or not span:
+        return None
+    return {
+        "observation_id": event_id,
+        "full_source_hash": digest,
+        "exact_locator": f"{event_id}#{revision}",
+        "byte_or_time_span": span,
+        "namespace": "personal",
+        "revision": revision,
+    }
+
+
+def _recall_body(
+    state: str,
+    reasons: list[str],
+    binding: dict[str, str],
+    policy_revision: str | None,
+    sources: tuple[str, ...],
+    last_states: list[str] | None = None,
+    refs: tuple[dict[str, object] | None, ...] = (),
+    alternatives: tuple[str, ...] = (),
+    answer: str | None = None,
+) -> dict[str, object]:
+    clean = tuple(ref for ref in refs if ref is not None)
+    return {
+        "schema_version": 1,
+        "state": state,
+        "answer": answer,
+        "evidence_refs": list(clean),
+        "alternatives": list(alternatives),
+        "coverage": {
+            "exhausted": state in {"answered", "ambiguous", "not_found"},
+            "last_states": [] if last_states is None else last_states,
+            "sources": list(sources),
+        },
+        "generation_binding": binding,
+        "policy_revision": policy_revision,
+        "model_revision": None,
+        "uncertainty_reasons": reasons,
+    }
 
 
 def main() -> None:

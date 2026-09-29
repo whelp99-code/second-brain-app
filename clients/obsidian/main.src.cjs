@@ -1,5 +1,6 @@
 'use strict';
-const {Plugin, PluginSettingTab, Setting, Modal, Notice, TFile, requestUrl, Platform} = require('obsidian');
+const {Plugin, PluginSettingTab, Setting, Modal, Notice, TFile, ItemView, requestUrl, Platform} = require('obsidian');
+const RELATION_VIEW = 'sb-relation-panel';
 // syncCore is statically bundled by build.cjs, with no runtime dependency.
 const {applyManifest, emptyState, validatePath, collectManifest, digest, canonical} = syncCore;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -33,6 +34,40 @@ class FormModal extends Modal {
     });
   }
   onClose() { this.contentEl.empty(); }
+}
+function relationEdges(items) {
+  return (items || []).filter(row => Array.isArray(row.evidence) && row.evidence.length > 0);
+}
+function renderRelationPanel(container, items, filter, onFilter) {
+  if (typeof container.empty === 'function') container.empty();
+  const shown = relationEdges(items);
+  const kinds = [...new Set(shown.map(row => row.body.relation_kind))].sort();
+  const selected = filter && filter.kinds ? filter.kinds : {};
+  for (const kind of kinds) {
+    const section = container.createEl('section', {attr:{'data-kind':kind}});
+    section.createEl('h3', {text:kind});
+    const toggle = section.createEl('input');
+    toggle.type = 'checkbox';
+    toggle.checked = selected[kind] !== false;
+    toggle.addEventListener('change', () => onFilter(kind, toggle.checked));
+    if (selected[kind] === false) continue;
+    for (const row of shown.filter(item => item.body.relation_kind === kind)) {
+      const edge = section.createEl('article', {attr:{'data-edge':'1'}});
+      edge.createEl('p', {text:row.body.from_id+' → '+row.body.to_id});
+      edge.createEl('p', {text:'효력: '+(row.body.valid_from||'미지정')+' ~ '+(row.body.valid_until||'미지정')});
+      edge.createEl('p', {text:'근거: '+row.evidence.map(e => e.event_id+'#'+e.revision).join(', ')});
+    }
+  }
+  return container;
+}
+class RelationPanelView extends ItemView {
+  constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
+  getViewType() { return RELATION_VIEW; }
+  getDisplayText() { return '근거 관계'; }
+  async onOpen() {
+    const items = this.plugin.token ? (await this.plugin.api('relations')).items : [];
+    this.plugin.renderRelationPanel(this.containerEl, items || []);
+  }
 }
 class TextModal extends Modal {
   constructor(app, title, text) { super(app); this.heading=title; this.text=text; }
@@ -74,7 +109,10 @@ module.exports = class SecondBrainMemoryBrowser extends Plugin {
     const saved=await this.loadData() || {};
     this.options={base:typeof saved.base === 'string' ? saved.base : '', source:typeof saved.source === 'string' ? saved.source : ''};
     this.state=saved.sync && saved.sync.version===1 ? saved.sync : emptyState();
+    this.relationFilter=saved.relationFilter && typeof saved.relationFilter.kinds==='object' && saved.relationFilter.kinds
+      ? {kinds:{...saved.relationFilter.kinds}} : {kinds:{}};
     this.token=''; this.syncing=false; this.selectedDay=null;
+    this.registerView(RELATION_VIEW, leaf => new RelationPanelView(leaf, this));
     this.addSettingTab(new LifeSettings(this.app, this));
     this.status=Platform.isDesktopApp ? this.addStatusBarItem() : {setText:()=>{}};
     this.status.setText('SB: 로그인 필요');
@@ -86,7 +124,7 @@ module.exports = class SecondBrainMemoryBrowser extends Plugin {
     this.addCommand({id:'select-memory-day', name:'날짜별 하루 기록 보기', callback:()=>this.selectDay()});
     this.addCommand({id:'recall-memory', name:'과거·현재 기억에서 찾기', callback:()=>this.recall()});
     this.addCommand({id:'memory-questions', name:'필요한 확인 질문 보기', callback:()=>this.questions()});
-    this.addCommand({id:'memory-relations', name:'근거 관계 필터 보기', callback:()=>this.relations()});
+    this.addCommand({id:'memory-relations', name:'근거 관계 필터 보기', callback:()=>this.openRelationPanel()});
     this.addCommand({id:'memory-predictions', name:'예측·실제 결과 보기', callback:()=>this.predictions()});
     this.addCommand({id:'memory-health', name:'수집·전달·기기 상태 보기', callback:()=>this.health()});
     this.addCommand({id:'save-selected-personal-note', name:'현재 개인 메모를 명시적으로 기억에 저장', callback:()=>this.savePersonalNote()});
@@ -126,7 +164,23 @@ module.exports = class SecondBrainMemoryBrowser extends Plugin {
   onunload() { this.token=''; }
   async persist() {
     // Explicit allowlist: never serialize token, evidence content, or credentials.
-    await this.saveData({base:this.options.base,source:this.options.source,sync:this.state});
+    await this.saveData({base:this.options.base,source:this.options.source,sync:this.state,relationFilter:this.relationFilter});
+  }
+  renderRelationPanel(container, items) {
+    return renderRelationPanel(container, items, this.relationFilter, async (kind, checked) => {
+      this.relationFilter={kinds:{...this.relationFilter.kinds, [kind]:checked}};
+      await this.persist();
+      this.renderRelationPanel(container, items);
+    });
+  }
+  async openRelationPanel() {
+    const leaf=this.app.workspace.getLeaf ? this.app.workspace.getLeaf(false) : null;
+    if (leaf && typeof leaf.setViewState==='function') {
+      await leaf.setViewState({type:RELATION_VIEW, active:true});
+      this.app.workspace.revealLeaf?.(leaf);
+      return;
+    }
+    await this.relations();
   }
   login() {
     new FormModal(this.app,'생활기록 전용 세션 토큰',[
@@ -308,7 +362,7 @@ module.exports = class SecondBrainMemoryBrowser extends Plugin {
   async relations() {
     try {
       const result=await this.api('relations');
-      const kinds=[...new Set((result.items||[]).map(row=>row.body.relation_kind))];
+      const kinds=[...new Set(relationEdges(result.items).map(row=>row.body.relation_kind))];
       new FormModal(this.app,'근거 관계 필터',[
         {key:'kind',label:'관계 종류',value:'all',options:[['all','전체'],...kinds.map(k=>[k,k])]},
         {key:'state',label:'확인 상태',value:'all',options:[['all','전체'],['asserted','사용자 명시'],['candidate','추정 후보']]},

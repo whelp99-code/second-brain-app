@@ -3,21 +3,29 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from importlib.resources import files
 from typing import Final
 
+from sb.compile_execution import cached_body
 from sb.compile_execution import compile_one as _compile_one
 from sb.compile_execution import compile_without_llm as _compile_without_llm
 from sb.compile_models import COMPILE_RUN_ID, COMPILE_STAGE, CompileLedger, PendingCompile
 from sb.compile_models import CompileContext as _CompileCtx
 from sb.compile_models import PageJob as _PageJob
-from sb.compile_sources import ORIGIN_DIGEST_LEN, SID_LEN, page_id_for_origin
+from sb.compile_sources import (
+    DEFAULT_LINEAGE,
+    ORIGIN_DIGEST_LEN,
+    SID_LEN,
+    lineage_token,
+    page_id_for_origin,
+)
 from sb.compile_sources import group_by_page as _group_by_page
 from sb.compile_state import compile_state_report
 from sb.config import Config
 from sb.contracts import PageSpec, Unit
 from sb.llm import LLMClient, LLMUnavailable
-from sb.security import protect_units, source_llm_policy
+from sb.security import protect_compile_egress, protect_units, source_llm_policy
 from sb.store import DerivStatus, deriv_key
 
 __all__ = [
@@ -104,7 +112,13 @@ def compile_pending(
     used = 0
     remaining = False
     for page_id, grouped in _group_by_page(units):
-        key = compile_page_key(page_id, [unit.unit_id for unit in grouped], prompt_version, model_id)
+        key = compile_page_key(
+            page_id,
+            [unit.unit_id for unit in grouped],
+            prompt_version,
+            model_id,
+            lineage=lineage_token(ledger, grouped),
+        )
         row = ledger.get_derivation(key)
         if (row is not None and row.status in {DerivStatus.FAILED.value, DerivStatus.PENDING.value}
                 and row.attempts >= config.caps["max_derivation_attempts"]):
@@ -124,8 +138,15 @@ def compile_pending(
                 if used >= cap:
                     remaining = True
                     break
-                protected = protect_units(list(grouped), config)
-                item = _compile_one(_PageJob(page_id, key, tuple(protected)), ctx)
+                protected = protect_units(list(grouped), config, ledger=ledger)
+                previous = ctx.existing_pages.get(page_id)
+                egress = protect_compile_egress(
+                    llm, grouped, config, ledger, previous=previous,
+                    untracked_context=previous is None and bool(
+                        ctx.existing_bodies.get(page_id, cached_body(ledger, page_id))
+                    ),
+                )
+                item = _compile_one(_PageJob(page_id, key, tuple(protected)), replace(ctx, llm=egress))
                 used += 1
             pending.append(item)
             if on_page is not None:
@@ -142,9 +163,16 @@ def compile_pending(
     return pending, remaining
 
 
-def compile_page_key(page_id: str, unit_ids: Sequence[str], prompt_version: str, model_id: str) -> str:
-    """Identity shared by execution and read-only retry/upgrade diagnostics."""
-    return deriv_key(["compile-page-v1:" + page_id, *unit_ids], COMPILE_STAGE, prompt_version, model_id)
+def compile_page_key(
+    page_id: str,
+    unit_ids: Sequence[str],
+    prompt_version: str,
+    model_id: str,
+    lineage: str = "",
+) -> str:
+    """Bind parser, model, normalization, and profile revisions to a derivation."""
+    identity = ["compile-page-v1:" + page_id, *unit_ids, "lineage:" + (lineage or DEFAULT_LINEAGE)]
+    return deriv_key(identity, COMPILE_STAGE, prompt_version, model_id)
 
 
 def _prepare_compile(ledger: CompileLedger, key: str, max_attempts: int) -> bool:

@@ -10,8 +10,9 @@ from hashlib import sha256
 from sb.config import Config
 from sb.life_actor import LifeActor
 from sb.life_config import policies, settings
-from sb.life_contracts import LifeInputError
+from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_decode import decode_event
+from sb.life_grouping import group_events, index_citations
 from sb.life_json import LifePayload, decode_json
 from sb.life_read_contracts import TimelineQuery
 from sb.life_values import canonical_bytes, day_window
@@ -83,6 +84,8 @@ def query(
             "day": day,
             "timezone": timezone,
             "events": [],
+            "groups": [],
+            "citation_index": {},
             "next_cursor": None,
             "complete": True,
             "generation": None,
@@ -185,15 +188,34 @@ def query(
         card["body"] = event.body[:2000]
         card["body_truncated"] = len(event.body) > 2000
         cards.append(card)
+    histories = _histories(store, selected, scopes=tuple(actor.scopes), now=clock)
+    groups = group_events(selected, generation=generation, history=histories)
+    cited = [event for revisions in histories.values() for event in revisions]
     return {
         "schema_version": 1,
         "day": day,
         "timezone": timezone,
         "events": cards,
+        "groups": groups,
+        "citation_index": index_citations(cited or selected),
         "next_cursor": next_cursor,
         "complete": next_cursor is None,
         "generation": generation,
         "coverage": "source_records_only",
         "complete_day_observed": False,
         "undated_query": undated,
+    }
+
+
+def _histories(
+    store: LifeStore,
+    events: list[LifeEventV1],
+    *,
+    scopes: tuple[str, ...],
+    now: datetime,
+) -> dict[str, tuple[LifeEventV1, ...]]:
+    """Prior revisions stay citable after source_version changes."""
+    return {
+        event.event_id: store.history(event.event_id, scopes=scopes, now=now)
+        for event in events
     }

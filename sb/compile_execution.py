@@ -12,18 +12,32 @@ from sb.compile_models import (
     PageJob,
     PendingCompile,
 )
-from sb.compile_sources import merge_sources, sources_for_units, title_for_origin, unit_block
+from sb.compile_sources import (
+    merge_sources,
+    sources_for_units,
+    title_for_origin,
+    uncertainty,
+    unit_block,
+    with_uncertainty,
+)
 from sb.contracts import PageSpec
 from sb.llm import LLMUnavailable
+from sb.security import SecurityPolicyError
 from sb.store import DerivationOutput
 
 _BODIES: Final = BodyCache[CompileLedger]()
 
 
+def cached_body(ledger: CompileLedger, page_id: str) -> str:
+    return _BODIES.get(ledger, page_id)
+
+
 def compile_without_llm(job: PageJob, ctx: CompileContext) -> PendingCompile:
     title = title_for_origin(job.units[0].origin)
     previous = ctx.existing_pages.get(job.page_id)
-    body = "\n\n".join(unit.text for unit in job.units)
+    body = with_uncertainty(
+        "\n\n".join(unit.text for unit in job.units), uncertainty(ctx.ledger, job.units)
+    )
     ctx.ledger.ensure_derivation(job.key, COMPILE_STAGE, COMPILE_RUN_ID)
     ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
     _BODIES.put(ctx.ledger, job.page_id, body)
@@ -65,9 +79,12 @@ def compile_one(job: PageJob, ctx: CompileContext) -> PendingCompile:
     ctx.ledger.mark_running(job.key, COMPILE_RUN_ID)
     try:
         body = ctx.llm.generate(prompt)
-    except LLMUnavailable as exc:
+    except (LLMUnavailable, SecurityPolicyError, ValueError) as exc:
+        if isinstance(exc, ValueError) and str(exc) != "SOURCE_ACCESS_RECLASSIFICATION_REQUIRED":
+            raise
         ctx.ledger.mark_failed(job.key, str(exc))
         raise
+    body = with_uncertainty(body, uncertainty(ctx.ledger, job.units))
     _BODIES.put(ctx.ledger, job.page_id, body)
     sources = sources_for_units(job.units)
     page = PageSpec(

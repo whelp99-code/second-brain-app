@@ -90,15 +90,33 @@ class LifeReader:
     def receipt(self, receipt_id: str, *, scopes: tuple[str, ...], now: datetime) -> LifeReceiptV1:
         row = one(
             self.connection,
-            "SELECT receipt_id,event_id,revision,accepted_at FROM life_receipts WHERE receipt_id=?",
+            "SELECT receipt_id,event_id,revision,accepted_at,state FROM life_receipts WHERE receipt_id=?",
             (receipt_id,),
         )
         if row is None:
             raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
         _ = self.get(string(row[1]), scopes=scopes, now=now)
         return LifeReceiptV1(
-            string(row[0]), string(row[1]), integer(row[2]), string(row[3]), replayed=False
+            string(row[0]), string(row[1]), integer(row[2]), string(row[3]),
+            replayed=False, state=string(row[4])
         )
+
+    def receipt_proof(self, receipt_id: str) -> str:
+        row = one(
+            self.connection, "SELECT proof FROM life_receipts WHERE receipt_id=?", (receipt_id,)
+        )
+        if row is None:
+            raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
+        return string(row[0])
+
+    def receipt_is_searchable(self, receipt_id: str) -> bool:
+        """Unknown and unproven states are never searchable."""
+        row = one(
+            self.connection, "SELECT state,proof FROM life_receipts WHERE receipt_id=?", (receipt_id,)
+        )
+        if row is None:
+            raise LifeInputError("LIFE_RECEIPT_NOT_FOUND")
+        return string(row[0]) == "searchable" and bool(string(row[1]))
 
     def evidence(
         self, event_id: str, *, scopes: tuple[str, ...], now: datetime, revision: int | None = None

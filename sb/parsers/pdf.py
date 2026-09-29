@@ -47,13 +47,15 @@ def _page_has_image_xobject(page: PageObject) -> bool:
     return False
 
 
-def _extract_pages(reader: PdfReader) -> str:
+def _extract_pages(reader: PdfReader) -> tuple[str, dict[str, str | int], str | None]:
     if reader.is_encrypted:
         raise InvalidInput("encrypted pdf")
     if len(reader.pages) > PDF_PAGE_LIMIT:
         raise LimitExceeded("pdf page count")
     texts: list[str] = []
-    for page in reader.pages:
+    first_page = 0
+    missing_ocr = False
+    for number, page in enumerate(reader.pages, 1):
         try:
             raw = page.extract_text() or ""
         except PyPdfError as exc:
@@ -62,10 +64,16 @@ def _extract_pages(reader: PdfReader) -> str:
             raise InvalidInput("pdf page nul")
         text = raw.strip()
         if not text and _page_has_image_xobject(page):
-            raise OcrRequired()
+            missing_ocr = True
         if text:
+            if not first_page:
+                first_page = number
             texts.append(text)
-    return "\n".join(texts)
+    if missing_ocr and not texts:
+        raise OcrRequired()
+    return "\n".join(texts), {"kind": "page", "ordinal": first_page or 1}, (
+        "ocr_required" if missing_ocr else None
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +83,9 @@ class PdfParser:
     max_bytes: int = PDF_MAX_BYTES
 
     def parse(self, payload: bytes) -> str:
+        return self.parse_details(payload)[0]
+
+    def parse_details(self, payload: bytes) -> tuple[str, dict[str, str | int], str | None]:
         if not payload:
             raise InvalidInput("empty pdf payload")
         if len(payload) > self.max_bytes:

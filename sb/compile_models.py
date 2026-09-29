@@ -6,10 +6,11 @@ from typing import Final, Protocol
 
 from sb.contracts import PageSpec, Unit
 from sb.llm import LLMClient
-from sb.store import Derivation, DerivationOutput
+from sb.security import SourceAccessReader
+from sb.store import Derivation, DerivationOutput, UnitProvenance
 
 
-class CompileLedger(Protocol):
+class CompileLedger(SourceAccessReader, Protocol):
     """Ledger derivation surface used by compile. Matches sb.store.ledger.Ledger."""
 
     def get_derivation(self, key: str) -> Derivation | None: ...
@@ -23,6 +24,8 @@ class CompileLedger(Protocol):
     def mark_failed(self, key: str, error: str) -> None: ...
 
     def requeue_failed(self, key: str, *, max_attempts: int | None = None) -> bool: ...
+
+    def provenance_for_unit(self, unit_id: str) -> UnitProvenance | None: ...
 
 
 @dataclass(frozen=True, slots=True)

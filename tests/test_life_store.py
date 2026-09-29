@@ -147,6 +147,106 @@ def test_backup_preserves_life_rows_and_delete_intent(tmp_path: Path) -> None:
         assert restored.execute("SELECT count(*) FROM life_tombstones").fetchone() == (1,)
 
 
+def test_receipt_state_advances_accepted_published_searchable_only_with_proof(store: LifeStore) -> None:
+    accepted = store.accept(payload(), policy(), key="r1", now=NOW)
+    assert accepted.state == "accepted"
+    assert not store.receipt_is_searchable(accepted.receipt_id)
+    with pytest.raises(LifeInputError, match="PROOF_REQUIRED"):
+        _ = store.advance_receipt(accepted.receipt_id, "published", proof="")
+    with pytest.raises(LifeInputError, match="STATE_INVALID"):
+        _ = store.advance_receipt(accepted.receipt_id, "searchable", proof="index-1")
+    published = store.advance_receipt(accepted.receipt_id, "published", proof="commit-sha")
+    assert published.state == "published"
+    assert store.receipt_proof(accepted.receipt_id) == "commit-sha"
+    assert not store.receipt_is_searchable(accepted.receipt_id)
+    searchable = store.advance_receipt(accepted.receipt_id, "searchable", proof="index-gen")
+    assert searchable.state == "searchable"
+    assert store.receipt_is_searchable(accepted.receipt_id)
+    assert store.receipt(accepted.receipt_id, scopes=("owner:test",), now=NOW).state == "searchable"
+
+
+def test_unknown_receipt_state_is_not_searchable(store: LifeStore) -> None:
+    accepted = store.accept(payload(), policy(), key="r1", now=NOW)
+    _ = store.connection.execute(
+        "UPDATE life_receipts SET state=?,proof=? WHERE receipt_id=?",
+        ("processing", "not-a-search-proof", accepted.receipt_id),
+    )
+    assert store.receipt(
+        accepted.receipt_id, scopes=("owner:test",), now=NOW
+    ).state == "processing"
+    assert not store.receipt_is_searchable(accepted.receipt_id)
+
+
+def test_transition_rule_enforced_on_revision_two(store: LifeStore) -> None:
+    accepted = store.accept(
+        payload(event_status="occurred", evidence_level="observed"), policy(), key="r1", now=NOW
+    )
+    with pytest.raises(LifeInputError, match="TRANSITION_FORBIDDEN"):
+        _ = store.accept(
+            payload(source_version="v2", event_status="planned", evidence_level="observed"),
+            policy(),
+            key="r2",
+            now=NOW + timedelta(minutes=1),
+            expected_revision=1,
+        )
+    corrected = store.accept(
+        payload(
+            source_version="v3",
+            event_status="cancelled",
+            evidence_level="user_asserted",
+        ),
+        policy(),
+        key="r3",
+        now=NOW + timedelta(minutes=2),
+        expected_revision=1,
+    )
+    assert corrected.revision == 2
+    assert store.get(accepted.event_id, scopes=("owner:test",), now=NOW).event_status == "cancelled"
+
+
+def test_backup_preserves_receipt_state(tmp_path: Path) -> None:
+    root = tmp_path / "original"
+    with Ledger(root) as ledger:
+        store = ledger.life_store()
+        accepted = store.accept(payload(), policy(), key="r1", now=NOW)
+        _ = store.advance_receipt(accepted.receipt_id, "published", proof="commit-sha")
+        target = sqlite3.connect(tmp_path / "copy.db")
+        store.connection.backup(target)
+        target.close()
+    with sqlite3.connect(tmp_path / "copy.db") as restored:
+        assert restored.execute(
+            "SELECT state,proof FROM life_receipts"
+        ).fetchone() == ("published", "commit-sha")
+        assert restored.execute(
+            "SELECT value FROM schema_meta WHERE key='life_schema_version'"
+        ).fetchone() == ("2",)
+
+
+def test_schema_v1_upgrade_preserves_receipt_identity(tmp_path: Path) -> None:
+    root = tmp_path / "legacy"
+    with Ledger(root) as ledger:
+        store = ledger.life_store()
+        accepted = store.accept(payload(), policy(), key="r1", now=NOW)
+        with ledger.transaction():
+            _ = store.connection.execute("ALTER TABLE life_receipts DROP COLUMN proof")
+            _ = store.connection.execute("ALTER TABLE life_receipts DROP COLUMN state")
+            _ = store.connection.execute(
+                "UPDATE schema_meta SET value='1' WHERE key='life_schema_version'"
+            )
+
+    with Ledger(root) as ledger:
+        upgraded = ledger.life_store()
+        receipt = upgraded.receipt(accepted.receipt_id, scopes=("owner:test",), now=NOW)
+        replayed = upgraded.accept(payload(), policy(), key="r1", now=NOW)
+        assert receipt.receipt_id == replayed.receipt_id == accepted.receipt_id
+        assert receipt.state == replayed.state == "accepted"
+        assert replayed.replayed is True
+        assert upgraded.receipt_proof(accepted.receipt_id) == ""
+        assert upgraded.connection.execute(
+            "SELECT value FROM schema_meta WHERE key='life_schema_version'"
+        ).fetchone() == ("2",)
+
+
 def test_retention_expiry_is_not_a_current_memory(store: LifeStore) -> None:
     accepted = store.accept(payload(), replace(policy(), retention_days=1), key="r1", now=NOW)
     assert store.events(scopes=("owner:test",), now=NOW + timedelta(days=2)) == ()

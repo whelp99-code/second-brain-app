@@ -78,6 +78,11 @@ def text(value: JsonInput | TomlValue, *, maximum: int, empty: bool = False) -> 
 
 
 def instant(value: JsonInput | TomlValue) -> datetime:
+    """Convert an explicit-offset instant to UTC without re-localizing it.
+
+    DST folds and gaps stay at the stated offset. A named timezone must not
+    shift 01:30 twice or invent a missing 02:30.
+    """
     if not isinstance(value, str) or len(value) > 64:
         raise LifeInputError("LIFE_TIME_INVALID")
     try:
@@ -106,6 +111,7 @@ def zone(value: JsonInput | TomlValue) -> ZoneInfo:
 
 
 def day_window(day: str, timezone: str) -> tuple[datetime, datetime]:
+    """Half-open local day [start, end) in the given timezone, as UTC instants."""
     tz = zone(timezone)
     try:
         current = date.fromisoformat(day)
@@ -116,6 +122,15 @@ def day_window(day: str, timezone: str) -> tuple[datetime, datetime]:
         return start.astimezone(UTC), end.astimezone(UTC)
     except (ValueError, OverflowError, TypeError) as exc:
         raise LifeInputError("LIFE_DAY_INVALID") from exc
+
+
+def in_day_window(moment: datetime, day: str, timezone: str) -> bool:
+    """True when moment is inside the half-open travel-local day."""
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise LifeInputError("LIFE_TIMEZONE_REQUIRED")
+    start, end = day_window(day, timezone)
+    utc = moment.astimezone(UTC)
+    return start <= utc < end
 
 
 def _choice(data: Mapping[str, JsonInput], name: str, allowed: frozenset[str], default: str) -> str:

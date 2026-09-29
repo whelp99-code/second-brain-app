@@ -688,3 +688,95 @@ def test_existing_gui_entrypoints_lifetime_and_concurrent_search(tmp_path: Path)
         )
         assert after_search == 200 and TERM in json.dumps(after_hits, ensure_ascii=False)
     assert "status: resolved" in (root / "conflicts" / "web-case.md").read_text(encoding="utf-8")
+
+
+def test_capabilities_lists_intake_and_parser_limits_per_format(tmp_path: Path) -> None:
+    config, _root = _ready(tmp_path)
+    with _running(config) as base:
+        status, payload = _request(f"{base}/api/capabilities")
+    assert status == 200
+    assert isinstance(payload, dict)
+    body = cast(dict[str, object], payload)
+    desktop = cast(dict[str, object], body["desktop"])
+    assert desktop["max_upload_bytes"] == 10 * 1024 * 1024
+    assert body["intake_max_bytes"] == 10 * 1024 * 1024
+    parsers = cast(dict[str, object], body["parsers"])
+    assert set(parsers) >= {".pdf", ".docx", ".hwpx", ".xlsx", ".md", ".txt", ".json", ".yaml"}
+    for suffix, raw in parsers.items():
+        row = cast(dict[str, object], raw)
+        assert row["intake_max_bytes"] == 10 * 1024 * 1024
+        assert row["parser_max_bytes"] != row["intake_max_bytes"]
+        assert isinstance(row["parser_limits"], dict)
+        assert isinstance(row["locator_kind"], str) and row["locator_kind"]
+        assert suffix.startswith(".")
+    pdf = cast(dict[str, object], parsers[".pdf"])
+    assert pdf["locator_kind"] == "page"
+    assert "pages" in cast(dict[str, object], pdf["parser_limits"])
+    xlsx = cast(dict[str, object], parsers[".xlsx"])
+    assert xlsx["locator_kind"] == "cell"
+    assert "cells" in cast(dict[str, object], xlsx["parser_limits"])
+
+
+def test_api_sources_includes_coverage_counts(tmp_path: Path) -> None:
+    from sb.personal_observation import parse_scan_receipt
+    from sb.source_coverage import record_scan_receipt, set_stage_coverage
+    from sb.store import SourceCoverage, SourceItem
+
+    secret = "SECRET_BODY_do_not_leak"
+    root = tmp_path / "vault"
+    source = tmp_path / "notes"
+    source.mkdir()
+    (source / "note.md").write_text(secret, encoding="utf-8")
+    init_vault(root)
+    config = Config(
+        raw={
+            "vault_root": str(root),
+            "sources": [{"id": "notes", "adapter": "markdown-vault", "root": str(source)}],
+        }
+    )
+    receipt = parse_scan_receipt(
+        {
+            "scan_id": "scan-notes",
+            "source_id": "notes",
+            "account_id": "synthetic-account",
+            "started_at": "2026-09-23T00:00:00.000Z",
+            "finished_at": "2026-09-23T00:01:00.000Z",
+            "state": "ok",
+            "checkpoint_before": "c1",
+            "checkpoint_after": "c2",
+            "scanned": 2,
+            "accepted": 2,
+            "unchanged": 0,
+            "filtered": 0,
+            "quarantined": 0,
+            "deferred": 0,
+            "retryable_errors": 0,
+            "permanent_errors": 0,
+            "coverage_start": None,
+            "coverage_end": None,
+            "next_scan_at": None,
+            "remaining_known": None,
+            "exhausted": False,
+            "budget": None,
+            "upstream_end_evidence": secret,
+        }
+    )
+    with Ledger(root) as ledger:
+        ledger.upsert_source_item(SourceItem("notes", "note.md", "v1", secret, "run", "run"))
+        record_scan_receipt(ledger, receipt, cursor_updated_at="2026-09-28T00:00:00.000Z")
+        set_stage_coverage(ledger, "notes", SourceCoverage(5, 4, 3, 2, 1))
+    with _running(config) as base:
+        status, payload = _request(f"{base}/api/sources")
+    assert status == 200
+    encoded = json.dumps(payload)
+    assert secret not in encoded
+    assert "note.md" not in encoded
+    sources = cast(list[object], cast(dict[str, object], payload)["sources"])
+    coverage = cast(dict[str, object], cast(dict[str, object], sources[0])["coverage"])
+    assert coverage["captured"] == 5
+    assert coverage["parsed"] == 4
+    assert coverage["published"] == 3
+    assert coverage["searchable"] == 2
+    assert coverage["eligible"] == 1
+    assert coverage["last_state"] == "ok"
+    assert coverage["exhausted"] is False

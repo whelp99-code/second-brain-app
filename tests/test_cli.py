@@ -1512,3 +1512,74 @@ def test_retry_brief_reports_hold_without_claiming_requeued(tmp_path: Path) -> N
 
 # Shared setup for CLI integration regressions.
 ready = _ready
+
+
+def test_sources_json_includes_coverage_fields_and_never_content(tmp_path: Path) -> None:
+    from sb.personal_observation import parse_scan_receipt
+    from sb.source_coverage import record_scan_receipt, set_stage_coverage
+    from sb.store import SourceCoverage
+
+    secret = "SECRET_BODY_do_not_leak"
+    root = init_vault(tmp_path / "vault").root
+    source = tmp_path / "notes"
+    source.mkdir()
+    (source / "note.md").write_text(secret, encoding="utf-8")
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(
+        f'vault_root = "{root}"\nstate_root = "{tmp_path / "state"}"\n'
+        f'[[sources]]\nid = "notes"\nadapter = "markdown-vault"\nroot = "{source}"\n',
+        encoding="utf-8",
+    )
+    receipt = parse_scan_receipt(
+        {
+            "scan_id": "scan-notes",
+            "source_id": "notes",
+            "account_id": "synthetic-account",
+            "started_at": "2026-09-23T00:00:00.000Z",
+            "finished_at": "2026-09-23T00:01:00.000Z",
+            "state": "ok",
+            "checkpoint_before": "c1",
+            "checkpoint_after": "c2",
+            "scanned": 2,
+            "accepted": 1,
+            "unchanged": 1,
+            "filtered": 0,
+            "quarantined": 0,
+            "deferred": 0,
+            "retryable_errors": 0,
+            "permanent_errors": 0,
+            "coverage_start": None,
+            "coverage_end": None,
+            "next_scan_at": None,
+            "remaining_known": None,
+            "exhausted": False,
+            "budget": None,
+            "upstream_end_evidence": secret,
+        }
+    )
+    with Ledger(root) as ledger:
+        ledger.upsert_source_item(SourceItem("notes", "note.md", "v1", secret, "run", "run"))
+        record_scan_receipt(ledger, receipt, cursor_updated_at="2026-09-28T00:00:00.000Z")
+        set_stage_coverage(ledger, "notes", SourceCoverage(5, 4, 3, 2, 1))
+    previous = os.environ.get("SB_CONFIG")
+    os.environ["SB_CONFIG"] = str(cfg)
+    try:
+        code, out, err = _cli(["sources", "--json"])
+    finally:
+        if previous is None:
+            os.environ.pop("SB_CONFIG", None)
+        else:
+            os.environ["SB_CONFIG"] = previous
+    assert code == 0 and err == ""
+    assert secret not in out
+    assert "note.md" not in out
+    rows = json.loads(out)
+    coverage = rows[0]["coverage"]
+    assert coverage["captured"] == 5
+    assert coverage["parsed"] == 4
+    assert coverage["published"] == 3
+    assert coverage["searchable"] == 2
+    assert coverage["eligible"] == 1
+    assert "content" not in coverage
+    assert coverage["exhausted"] is False
+    assert coverage["last_state"] == "ok"

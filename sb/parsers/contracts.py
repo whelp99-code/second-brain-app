@@ -3,29 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, override
+from typing import Final, override
 
 
-class DocumentParseResult(Protocol):
-    """Provenance-bearing parser result implemented by the optional adapter."""
+@dataclass(frozen=True, slots=True)
+class DocumentParseResult:
+    """Provenance of the first extracted unit of a document."""
 
-    @property
-    def body(self) -> str: ...
+    body: str
+    source_hash: str
+    locator: dict[str, str | int]
+    parser_version: str
+    model_version: str
+    partial: bool
+    partial_reason: str | None = None
 
-    @property
-    def source_hash(self) -> str: ...
 
-    @property
-    def locator(self) -> dict[str, str | int]: ...
-
-    @property
-    def parser_version(self) -> str: ...
-
-    @property
-    def model_version(self) -> str: ...
-
-    @property
-    def partial(self) -> bool: ...
+PARTIAL_REASONS: Final = frozenset({"ocr_required", "formula_unavailable"})
 
 
 class ParseError(Exception):
@@ -64,6 +58,15 @@ class OcrRequired(ParseError):
     @override
     def __str__(self) -> str:
         return "ocr required"
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerFailure(ParseError):
+    reason: str
+
+    @override
+    def __str__(self) -> str:
+        return f"docling worker failure: {self.reason}"
 
 
 @dataclass(frozen=True, slots=True)

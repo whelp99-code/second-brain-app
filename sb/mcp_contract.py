@@ -401,6 +401,130 @@ def build_contract() -> JsonObject:
     }
 
 
+PERSONAL_MEMORY_PROFILE: Final = "personal-memory-v1"
+PERSONAL_MEMORY_UNSUPPORTED: Final = "PERSONAL_MEMORY_PROFILE_UNSUPPORTED"
+_RECALL_STATES: Final = (
+    "answered",
+    "ambiguous",
+    "not_found",
+    "coverage_incomplete",
+    "unavailable",
+)
+
+
+def recall_response_schema() -> JsonObject:
+    """K5 RecallResponseV1 subset. Obligation fields stay out of this digest."""
+    text = {"type": "string", "minLength": 1, "maxLength": 4096}
+    ref = {
+        "additionalProperties": False,
+        "properties": {
+            "observation_id": text,
+            "full_source_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "exact_locator": text,
+            "byte_or_time_span": text,
+            "namespace": {"const": "personal"},
+            "revision": {"type": "integer", "minimum": 1},
+        },
+        "required": [
+            "observation_id",
+            "full_source_hash",
+            "exact_locator",
+            "byte_or_time_span",
+            "namespace",
+            "revision",
+        ],
+        "type": "object",
+    }
+    return {
+        "$id": "urn:second-brain:recall-response:v1",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": False,
+        "description": "K5 recall response. Citation presence alone is not an answer.",
+        "properties": {
+            "alternatives": {"items": text, "maxItems": 20, "type": "array"},
+            "answer": {"type": ["string", "null"]},
+            "coverage": {
+                "additionalProperties": False,
+                "properties": {
+                    "exhausted": {"type": "boolean"},
+                    "last_states": {"items": {"type": "string"}, "type": "array"},
+                    "sources": {"items": text, "type": "array"},
+                },
+                "required": ["exhausted", "last_states", "sources"],
+                "type": "object",
+            },
+            "evidence_refs": {"items": ref, "maxItems": 20, "type": "array"},
+            "generation_binding": {
+                "additionalProperties": False,
+                "properties": {
+                    "profile": {"const": PERSONAL_MEMORY_PROFILE},
+                    "provider_instance_id": text,
+                },
+                "required": ["profile", "provider_instance_id"],
+                "type": ["object", "null"],
+            },
+            "model_revision": {"type": ["string", "null"]},
+            "policy_revision": {"type": ["string", "null"]},
+            "schema_version": {"const": 1},
+            "state": {"enum": list(_RECALL_STATES)},
+            "uncertainty_reasons": {"items": text, "maxItems": 20, "type": "array"},
+        },
+        "required": [
+            "schema_version",
+            "state",
+            "answer",
+            "evidence_refs",
+            "alternatives",
+            "coverage",
+            "generation_binding",
+            "policy_revision",
+            "model_revision",
+            "uncertainty_reasons",
+        ],
+        "title": "RecallResponseV1",
+        "type": "object",
+    }
+
+
+def personal_memory_contract() -> JsonObject:
+    """personal-memory-v1 exposes sb_recall only. v2 tools are named, not served."""
+    recall_digest = hashlib.sha256(canonical_bytes(recall_response_schema())).hexdigest()
+    return {
+        "application": {"profile": PERSONAL_MEMORY_PROFILE, "profile_role": "r1_recall_only"},
+        "canonicalization": {
+            "encoding": "utf-8",
+            "json": "sorted_keys_compact_separators_trailing_newline",
+            "sha256_sidecar": "64_lowercase_hex_newline",
+        },
+        "deferred_profile": "personal-memory-v2",
+        "deferred_tools": [
+            "sb_obligation_event",
+            "sb_obligation_status",
+            "sb_recommendations",
+        ],
+        "errors": [
+            {
+                "class": "RuntimeError",
+                "code": PERSONAL_MEMORY_UNSUPPORTED,
+                "when": "server_does_not_advertise_profile_or_contextual_recall_is_off",
+            }
+        ],
+        "recall_response_sha256": recall_digest,
+        "schema_version": 1,
+        "states": list(_RECALL_STATES),
+        "tools": ["sb_recall"],
+    }
+
+
+def require_supported_profile(advertised: tuple[str, ...], requested: str) -> None:
+    """Fail closed when a server that does not advertise the new profile is asked for it."""
+    if requested in advertised:
+        return
+    if requested == PERSONAL_MEMORY_PROFILE:
+        raise RuntimeError(PERSONAL_MEMORY_UNSUPPORTED)
+    raise RuntimeError(MISMATCH)
+
+
 def canonical_bytes(contract: JsonObject) -> bytes:
     """Encode canonical UTF-8 JSON with one trailing newline."""
     return (json.dumps(contract, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()

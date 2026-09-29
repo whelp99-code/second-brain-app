@@ -1,0 +1,15 @@
+{
+  "source_id": "notes-personal",
+  "scopes": [
+    "owner:life"
+  ],
+  "enabled": true,
+  "allowed_types": [
+    "note_saved",
+    "calendar_event"
+  ],
+  "sensitivity": "personal",
+  "external_processing": "local_only",
+  "retention_days": 365,
+  "policy_revision": "v1"
+}
