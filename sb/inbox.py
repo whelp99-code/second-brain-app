@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import stat
@@ -34,9 +36,6 @@ class RememberFollowupError(Exception):
         return f"WRITTEN_WITH_FOLLOWUP_ERROR: {self.relative.as_posix()}"
 
 
-# Same content after a follow-up error must replay the published file.
-# A fully acknowledged remember stays non-idempotent.
-_unacked_notes: dict[tuple[str, bytes], str] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,17 +55,85 @@ def parse_remember(content: str, title: str | None) -> ParsedRemember:
     return ParsedRemember(data, title)
 
 
+def _retry_index(inbox: Path) -> Path:
+    return inbox / ".retry-index.json"
+
+
+def _load_retry_index(inbox: Path) -> list[dict[str, str]] | None:
+    path = _retry_index(inbox)
+    try:
+        if not path.exists():
+            return []
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(loaded, list):
+        return None
+    entries: list[dict[str, str]] = []
+    for item in loaded:
+        if not isinstance(item, dict):
+            return None
+        digest = item.get("digest")
+        title = item.get("title")
+        relative = item.get("path")
+        if not isinstance(digest, str) or not isinstance(title, str) or not isinstance(relative, str):
+            return None
+        entries.append({"digest": digest, "title": title, "path": relative})
+    return entries
+
+
+def _store_retry_index(inbox: Path, entries: list[dict[str, str]]) -> None:
+    path = _retry_index(inbox)
+    if not entries:
+        path.unlink(missing_ok=True)
+        return
+    payload = (json.dumps(entries, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    temporary = inbox / f".retry-index.{os.getpid()}.tmp"
+    _ = temporary.write_bytes(payload)
+    os.replace(temporary, path)
+    os.chmod(path, 0o600)
+
+
+def _title_key(title: str | None) -> str:
+    return "" if title is None else title
+
+
 def publish_inbox(root: Path, note: ParsedRemember) -> Path:
     """Publish one parsed note to a collision-safe inbox path."""
     data = note.data
     vault = root.resolve()
-    replay = _unacked_notes.get((str(vault), data))
-    if replay is not None:
-        existing = vault / replay
-        if existing.is_file() and not existing.is_symlink() and existing.read_bytes() == data:
-            _ = _unacked_notes.pop((str(vault), data), None)
-            return Path(replay)
     inbox = (root / "inbox").resolve()
+    title_key = _title_key(note.title)
+    digest = hashlib.sha256(data).hexdigest()
+    if inbox.is_dir():
+        entries = _load_retry_index(inbox)
+        if entries is None:
+            raise RememberRejected("REMEMBER_RETRY_INDEX_UNREADABLE")
+        kept: list[dict[str, str]] = []
+        replay: str | None = None
+        for entry in entries:
+            if entry["digest"] != digest or entry["title"] != title_key:
+                kept.append(entry)
+                continue
+            existing = vault / entry["path"]
+            try:
+                metadata = os.lstat(existing)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise RememberRejected("REMEMBER_RETRY_INDEX_UNREADABLE") from exc
+            if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                raise RememberRejected("REMEMBER_RETRY_CONFLICT")
+            try:
+                matched = existing.read_bytes() == data
+            except OSError as exc:
+                raise RememberRejected("REMEMBER_RETRY_INDEX_UNREADABLE") from exc
+            if not matched:
+                raise RememberRejected("REMEMBER_RETRY_CONFLICT")
+            replay = entry["path"]
+        if replay is not None:
+            _store_retry_index(inbox, kept)
+            return Path(replay)
     if not inbox.is_relative_to(vault):
         raise RememberRejected("inbox escapes vault")
     inbox.mkdir(parents=True, exist_ok=True)
@@ -83,16 +150,24 @@ def publish_inbox(root: Path, note: ParsedRemember) -> Path:
     _ = tmp.write_bytes(data)
     os.replace(tmp, dest)
     relative = dest.relative_to(vault)
+    recorded = _load_retry_index(inbox)
+    if recorded is None:
+        raise RememberFollowupError(relative)
+    recorded.append({"digest": digest, "title": title_key, "path": relative.as_posix()})
+    try:
+        _store_retry_index(inbox, recorded)
+    except OSError as exc:
+        raise RememberFollowupError(relative) from exc
     directory = -1
     try:
         directory = os.open(inbox, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
         os.fsync(directory)
     except OSError as exc:
-        _unacked_notes[(str(vault), data)] = relative.as_posix()
         raise RememberFollowupError(relative) from exc
     finally:
         if directory >= 0:
             os.close(directory)
+    _store_retry_index(inbox, [entry for entry in recorded if entry["path"] != relative.as_posix()])
     return relative
 
 

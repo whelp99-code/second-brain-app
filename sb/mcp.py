@@ -10,6 +10,7 @@ import itertools
 import json
 import os
 import sqlite3
+import stat
 import sys
 from collections.abc import Callable, Generator, Mapping
 from contextlib import closing, contextmanager
@@ -97,10 +98,12 @@ from sb.vault import PathEscapeError
 from sb.vault_owner import require_vault_owner
 from sb.write_delivery import (
     NOTHING_WRITTEN,
+    WRITE_OUTCOME_UNKNOWN,
     WRITTEN_WITH_FOLLOWUP_ERROR,
+    classify_delivery,
     followup_fields,
     not_written_fields,
-    published_request_file,
+    unknown_fields,
 )
 from sb.write_request_values import WriteRequestRejected
 from sb.write_requests import accept_memory_write_request
@@ -340,6 +343,21 @@ def _followup_error(
     return json.dumps(error, sort_keys=True, separators=(",", ":"))
 
 
+def _unknown_error(raw: JsonObject, is_effect: bool, cause: str) -> str:
+    fields = unknown_fields(cause=cause)
+    raw_id = raw.get("request_id")
+    request_id = raw_id if isinstance(raw_id, str) else None
+    error = {
+        "schema_version": 2 if is_effect else 3 if raw.get("schema_version") == 3 else 1,
+        "kind": "unknown",
+        "code": WRITE_OUTCOME_UNKNOWN,
+        **fields,
+    }
+    if request_id is not None:
+        error["request_id"] = request_id
+    return json.dumps(error, sort_keys=True, separators=(",", ":"))
+
+
 def _write_failure(
     raw: JsonObject,
     is_effect: bool,
@@ -349,13 +367,14 @@ def _write_failure(
     request_root: Path,
     vault_root: Path,
 ) -> str:
-    published = published_request_file(
+    lookup = classify_delivery(
         request_root, vault_root, raw.get("request_id"), raw.get("schema_version")
     )
     reported = code if cause is None else cause
-    if published is not None:
-        path, request_id = published
-        return _followup_error(raw, is_effect, path, request_id, reported)
+    if lookup.evidence == "present" and lookup.path is not None and lookup.request_id is not None:
+        return _followup_error(raw, is_effect, lookup.path, lookup.request_id, reported)
+    if lookup.evidence == "unknown":
+        return _unknown_error(raw, is_effect, reported)
     return _not_written_error(raw, is_effect, code, cause=cause)
 
 
@@ -780,48 +799,130 @@ def build_server(
                 raise ToolError(str(exc)) from exc
             finally:
                 reingress.close()
-        def remember_failure(exc: BaseException) -> ToolError:
-            if isinstance(exc, RememberFollowupError):
-                published = root / exc.relative
-                if published.is_file() and not published.is_symlink():
-                    payload = {
-                        "cause": type(exc.__cause__).__name__ if exc.__cause__ is not None else "OSError",
-                        "code": WRITTEN_WITH_FOLLOWUP_ERROR,
-                        "delivery": "written",
-                        "inbox_path": exc.relative.as_posix(),
-                        "kind": "written_with_followup_error",
-                        "path": exc.relative.as_posix(),
-                        "retryable": True,
-                        "written": True,
-                    }
-                    return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
-                exc = exc.__cause__ if exc.__cause__ is not None else exc
+        def remember_json(payload: dict[str, object]) -> ToolError:
+            return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
+        def written_payload(path: str, cause: str, generation_id: str | None) -> ToolError:
+            body: dict[str, object] = {
+                "cause": cause,
+                "code": WRITTEN_WITH_FOLLOWUP_ERROR,
+                "delivery": "written",
+                "inbox_path": path,
+                "kind": "written_with_followup_error",
+                "path": path,
+                "retry": "The note is already in the active generation. Do not treat this as not delivered.",
+                "retryable": True,
+                "written": True,
+            }
+            if generation_id is not None:
+                body["generation_id"] = generation_id
+            return remember_json(body)
+
+        def unknown_payload(cause: str) -> ToolError:
+            return remember_json({
+                "cause": cause,
+                "code": WRITE_OUTCOME_UNKNOWN,
+                "delivery": "unknown",
+                "kind": "unknown",
+                "retry": "Retry the same request. Do not treat this as not delivered.",
+                "retryable": True,
+                "written": None,
+            })
+
+        def pointer_id(share: Path) -> tuple[bool, str | None]:
+            link = share / "vault"
+            try:
+                metadata = os.lstat(link)
+            except FileNotFoundError:
+                return True, None
+            except OSError:
+                return False, None
+            if not stat.S_ISLNK(metadata.st_mode):
+                return True, None
+            try:
+                return True, Path(os.readlink(link)).name
+            except OSError:
+                return False, None
+
+        def note_path(vault: Path, body: bytes) -> str | None | bool:
+            inbox = vault / "inbox"
+            try:
+                entries = list(inbox.iterdir())
+            except FileNotFoundError:
+                return None
+            except OSError:
+                return False
+            for entry in entries:
+                try:
+                    metadata = os.lstat(entry)
+                    if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                        continue
+                    if entry.read_bytes() != body:
+                        continue
+                except OSError:
+                    return False
+                return entry.relative_to(vault).as_posix()
+            return None
+
+        def remember_failure(
+            exc: BaseException, before: tuple[bool, str | None] | None
+        ) -> ToolError:
+            cause = type(exc.__cause__).__name__ if exc.__cause__ is not None else type(exc).__name__
             if isinstance(exc, RememberRejected):
                 return ToolError(str(exc))
-            payload = {
+            share = Path(runtime_config.share_root)
+            after = pointer_id(share)
+            switched = (
+                before is not None
+                and before[0]
+                and after[0]
+                and after[1] is not None
+                and after[1] != before[1]
+            )
+            if switched:
+                found = note_path(root, content.encode("utf-8"))
+                if found is False:
+                    return unknown_payload(cause)
+                path = found if isinstance(found, str) else f"vault-generations/{after[1]}"
+                return written_payload(path, cause, after[1])
+            if before is not None and (not before[0] or not after[0]):
+                return unknown_payload(cause)
+            if isinstance(exc, RememberFollowupError):
+                published = root / exc.relative
+                try:
+                    metadata = os.lstat(published)
+                except FileNotFoundError:
+                    return unknown_payload(cause)
+                except OSError:
+                    return unknown_payload(cause)
+                if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+                    return written_payload(exc.relative.as_posix(), cause, None)
+                return unknown_payload(cause)
+            return remember_json({
                 "cause": type(exc).__name__,
                 "code": NOTHING_WRITTEN,
                 "delivery": "not_written",
                 "kind": "not_written",
                 "retryable": False,
                 "written": False,
-            }
-            return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+            })
 
+        share = Path(runtime_config.share_root)
+        before = pointer_id(share)
         if vault_root is not None and not root.is_symlink() and root.name != "vault":
             try:
                 return {"inbox_path": write_inbox(root, content, title).as_posix()}
             except RememberRejected as exc:
                 raise ToolError(str(exc)) from exc
             except Exception as exc:
-                raise remember_failure(exc) from exc
+                raise remember_failure(exc, before) from exc
         mutations = GenerationMutationService.from_config(runtime_config)
         try:
             rel = mutations.remember(content, title, datetime.now(UTC))
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
         except Exception as exc:
-            raise remember_failure(exc) from exc
+            raise remember_failure(exc, before) from exc
         finally:
             mutations.close()
         return {"inbox_path": rel.as_posix()}

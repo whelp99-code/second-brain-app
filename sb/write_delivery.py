@@ -18,12 +18,18 @@ Do not treat transport loss after that accept as ``not_written``.
 
 from __future__ import annotations
 
+import json
+import os
+import sqlite3
 import stat
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 NOTHING_WRITTEN: Final = "NOTHING_WRITTEN"
 WRITTEN_WITH_FOLLOWUP_ERROR: Final = "WRITTEN_WITH_FOLLOWUP_ERROR"
+WRITE_OUTCOME_UNKNOWN: Final = "WRITE_OUTCOME_UNKNOWN"
+RETRY_GUIDANCE: Final = "Retry the same request. Do not treat this as not delivered."
 
 
 def not_written_fields(*, cause: str) -> dict[str, object]:
@@ -57,38 +63,149 @@ def _safe_request_id(value: object) -> str | None:
     return value
 
 
-def _regular_file(path: Path) -> bool:
+def unknown_fields(*, cause: str) -> dict[str, object]:
+    """Fields when committed state cannot be determined. Never means not written."""
+    return {
+        "written": None,
+        "delivery": "unknown",
+        "cause": cause,
+        "retryable": True,
+        "retry": RETRY_GUIDANCE,
+    }
+
+
+Evidence = Literal["absent", "present", "unknown"]
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryLookup:
+    evidence: Evidence
+    path: str | None = None
+    request_id: str | None = None
+
+
+def _stat_kind(path: Path) -> Literal["missing", "dir", "file", "other", "error"]:
     try:
-        metadata = path.lstat()
+        metadata = os.lstat(path)
+    except FileNotFoundError:
+        return "missing"
     except OSError:
-        return False
-    return stat.S_ISREG(metadata.st_mode)
+        return "error"
+    if stat.S_ISLNK(metadata.st_mode):
+        return "other"
+    if stat.S_ISDIR(metadata.st_mode):
+        return "dir"
+    if stat.S_ISREG(metadata.st_mode):
+        return "file"
+    return "other"
 
 
-def published_request_file(
+def _relative(path: Path, *roots: Path) -> str:
+    for root in roots:
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            continue
+    return path.as_posix()
+
+
+def _names(identity: str, schema_version: object) -> tuple[str, ...]:
+    if schema_version == 1:
+        return (f"{identity}.v1.json", f"{identity}.json")
+    if schema_version == 2:
+        return (f"{identity}.v2.json",)
+    if schema_version == 3:
+        return (f"{identity}.v3.json",)
+    return (
+        f"{identity}.v1.json",
+        f"{identity}.v2.json",
+        f"{identity}.v3.json",
+        f"{identity}.json",
+    )
+
+
+def _scan_dir(directory: Path, identity: str, names: tuple[str, ...]) -> Evidence | Path:
+    kind = _stat_kind(directory)
+    if kind == "missing" or kind == "other":
+        return "absent"
+    if kind == "error" or kind == "file":
+        return "unknown" if kind == "error" else "absent"
+    try:
+        entries = list(directory.iterdir())
+    except OSError:
+        return "unknown"
+    suffixes = {name for name in names}
+    for entry in entries:
+        matched = entry.name in suffixes or (
+            entry.name.startswith(f"{identity}.") and entry.name.endswith(".json")
+        )
+        if not matched:
+            continue
+        file_kind = _stat_kind(entry)
+        if file_kind == "file":
+            return entry
+        if file_kind == "error":
+            return "unknown"
+    return "absent"
+
+
+def _journal_hit(request_root: Path, identity: str) -> Evidence | str:
+    database = request_root / "journal.db"
+    kind = _stat_kind(database)
+    if kind == "missing":
+        return "absent"
+    if kind != "file":
+        return "unknown"
+    try:
+        uri = database.resolve().as_uri() + "?mode=ro"
+        with sqlite3.connect(uri, uri=True) as connection:
+            row = connection.execute(
+                "SELECT result_json FROM requests WHERE request_id=?",
+                (identity,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return "unknown"
+    if row is None:
+        return "absent"
+    raw = row[0]
+    if isinstance(raw, str):
+        try:
+            loaded = json.loads(raw)
+        except json.JSONDecodeError:
+            loaded = None
+        if isinstance(loaded, dict):
+            inbox = loaded.get("inbox_path")
+            if isinstance(inbox, str) and inbox:
+                return inbox
+    return f"journal.db#{identity}"
+
+
+def classify_delivery(
     request_root: Path, vault_root: Path, request_id: object, schema_version: object
-) -> tuple[str, str] | None:
-    """Return ``(path, request_id)`` when a durable request file is already linked."""
+) -> DeliveryLookup:
+    """Decide from pending, processing, receipts, and the journal. Lookup errors are unknown."""
     identity = _safe_request_id(request_id)
     if identity is None:
-        return None
-    if schema_version == 1:
-        names = (f"{identity}.v1.json", f"{identity}.json")
-    elif schema_version == 2:
-        names = (f"{identity}.v2.json",)
-    elif schema_version == 3:
-        names = (f"{identity}.v3.json",)
-    else:
-        names = (f"{identity}.v1.json", f"{identity}.v2.json", f"{identity}.v3.json", f"{identity}.json")
-    candidates = [request_root / "pending" / name for name in names]
-    candidates.append(vault_root / "inbox" / ".requests" / "pending" / f"{identity}.json")
-    for path in candidates:
-        if not _regular_file(path):
-            continue
-        for root in (request_root, vault_root):
-            try:
-                return path.resolve().relative_to(root.resolve()).as_posix(), identity
-            except ValueError:
-                continue
-        return path.as_posix(), identity
-    return None
+        return DeliveryLookup("absent")
+    names = _names(identity, schema_version)
+    uncertain = False
+    directories = (
+        request_root / "pending",
+        request_root / "processing",
+        request_root / "receipts",
+        vault_root / "inbox" / ".requests" / "pending",
+    )
+    for directory in directories:
+        found = _scan_dir(directory, identity, names)
+        if isinstance(found, Path):
+            return DeliveryLookup("present", _relative(found, request_root, vault_root), identity)
+        if found == "unknown":
+            uncertain = True
+    journal = _journal_hit(request_root, identity)
+    if isinstance(journal, str) and journal not in {"absent", "unknown"}:
+        return DeliveryLookup("present", journal, identity)
+    if journal == "unknown":
+        uncertain = True
+    if uncertain:
+        return DeliveryLookup("unknown", request_id=identity)
+    return DeliveryLookup("absent", request_id=identity)
