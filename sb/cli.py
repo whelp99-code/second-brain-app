@@ -23,7 +23,7 @@ from sb.effect_values import JsonObject, JsonValue
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
-from sb.inbox import RememberRejected
+from sb.inbox import RememberRejected, promote_published
 from sb.metrics import record_command
 from sb.metrics import summary as metrics_summary
 from sb.ops import (
@@ -373,6 +373,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         mutations = GenerationMutationService.from_config(config)
         try:
             rel = mutations.remember(content, _opt_str(ns, "title"), datetime.now(UTC))
+            rel = promote_published(Path(config.vault_root), rel, _opt_str(ns, "title"))
         except RememberRejected as exc:
             print(str(exc), file=sys.stderr)
             return 1

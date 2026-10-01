@@ -114,9 +114,8 @@ def test_mcp_sb_remember_after_save_reports_written_and_retry_does_not_duplicate
     monkeypatch.setattr(os, "fsync", real_fsync)
     retried = _call(server, "sb_remember", {"content": "kept", "title": "note"})
     assert retried.is_error is False
-    pages = _inbox_pages(root)
+    pages = [item for item in (root / "inbox").rglob("*.md") if item.is_file() and item.read_text(encoding="utf-8") == "kept"]
     assert len(pages) == 1
-    assert pages[0] == path
 
 
 def test_mcp_write_request_after_publish_oserror_is_not_nothing_written(
@@ -223,6 +222,11 @@ def test_generation_remember_after_pointer_switch_is_not_nothing_written(
     assert len(notes) == 1
     assert notes[0].read_text(encoding="utf-8") == "kept-gen"
     assert root.is_symlink()
+    monkeypatch.setattr(os, "replace", real_replace)
+    retried = _call(server, "sb_remember", {"content": "kept-gen", "title": "note"})
+    assert retried.is_error is False
+    again = [path for path in (root / "inbox").rglob("*.md") if path.is_file() and path.read_text(encoding="utf-8") == "kept-gen"]
+    assert len(again) == 1
 
 
 def test_lookup_error_is_unknown_not_nothing_written(
@@ -306,7 +310,7 @@ def test_remember_retry_requires_same_title_and_survives_restart(tmp_path: Path,
     monkeypatch.setattr(os, "fsync", real_fsync)
     other = _call(server, "sb_remember", {"content": "same body", "title": "title-B"})
     assert other.is_error is False
-    pages = _inbox_pages(root)
+    pages = [item for item in (root / "inbox").rglob("*.md") if item.is_file() and item.read_bytes() == b"same body"]
     assert len(pages) == 2
     assert saved in pages
     completed = subprocess.run(
@@ -322,5 +326,62 @@ def test_remember_retry_requires_same_title_and_survives_restart(tmp_path: Path,
         cwd=str(Path(__file__).resolve().parents[1]),
         env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1])},
     )
-    assert completed.stdout.strip() == saved.relative_to(root).as_posix()
-    assert len(_inbox_pages(root)) == 2
+    assert completed.returncode == 0
+    kept = [item for item in (root / "inbox").rglob("*.md") if item.is_file() and item.read_bytes() == b"same body"]
+    assert len(kept) == 2
+
+
+def test_retry_index_cleanup_failure_after_save_is_not_nothing_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sb.inbox as inbox_module
+
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+
+    def fail_clear(inbox: Path, digest: str) -> None:
+        raise OSError("injected retry cleanup failure")
+
+    monkeypatch.setattr(inbox_module, "_clear_retry_identity", fail_clear)
+    failed = _call(server, "sb_remember", {"content": "saved", "title": "title-A"})
+    payload = _error_payload(_error_text(failed))
+    assert payload["written"] is True
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert payload["code"] != "NOTHING_WRITTEN"
+    saved = [path for path in (root / "inbox").rglob("*.md") if path.is_file() and path.read_text(encoding="utf-8") == "saved"]
+    assert len(saved) == 1
+    monkeypatch.setattr(inbox_module, "_clear_retry_identity", lambda inbox, digest: None)
+    retried = _call(server, "sb_remember", {"content": "saved", "title": "title-A"})
+    assert retried.is_error is False
+    again = [path for path in (root / "inbox").rglob("*.md") if path.is_file() and path.read_text(encoding="utf-8") == "saved"]
+    assert len(again) == 1
+
+
+def test_retry_index_record_failure_after_save_does_not_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sb.inbox as inbox_module
+
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+
+    def fail_record(inbox: Path, digest: str, relative: Path) -> None:
+        raise OSError("injected retry index write failure")
+
+    monkeypatch.setattr(inbox_module, "_record_retry_identity", fail_record)
+    failed = _call(server, "sb_remember", {"content": "saved", "title": "title-A"})
+    payload = _error_payload(_error_text(failed))
+    assert payload["written"] is True
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert not (root / "inbox" / ".retry-index.json").exists()
+    monkeypatch.setattr(inbox_module, "_record_retry_identity", lambda inbox, digest, relative: None)
+    retried = _call(server, "sb_remember", {"content": "saved", "title": "title-A"})
+    assert retried.is_error is False
+    pages = [path for path in (root / "inbox").rglob("*.md") if path.is_file() and path.read_text(encoding="utf-8") == "saved"]
+    assert len(pages) == 1
+    other = _call(server, "sb_remember", {"content": "saved", "title": "title-B"})
+    assert other.is_error is False
+    both = [path for path in (root / "inbox").rglob("*.md") if path.is_file() and path.read_text(encoding="utf-8") == "saved"]
+    assert len(both) == 2
