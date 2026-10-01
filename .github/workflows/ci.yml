@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen --group dev
+
+      - name: Isolate home and config
+        run: |
+          mkdir -p "$RUNNER_TEMP/home" "$RUNNER_TEMP/xdg-config" "$RUNNER_TEMP/xdg-data"
+          echo "HOME=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
+          echo "XDG_CONFIG_HOME=$RUNNER_TEMP/xdg-config" >> "$GITHUB_ENV"
+          echo "XDG_DATA_HOME=$RUNNER_TEMP/xdg-data" >> "$GITHUB_ENV"
+
+      - name: Ruff
+        run: uv run ruff check sb tests
+
+      - name: basedpyright (files that pass on master)
+        run: |
+          mapfile -t exclude < .github/pyright-baseline.txt
+          declare -A skip
+          for path in "${exclude[@]}"; do
+            [[ -z "$path" || "$path" == \#* ]] && continue
+            skip["$path"]=1
+          done
+          files=()
+          while IFS= read -r path; do
+            [[ -n "${skip[$path]:-}" ]] && continue
+            files+=("$path")
+          done < <(find sb tests -name '*.py' -type f | sort)
+          uv run basedpyright "${files[@]}"
+
+      - name: Pytest
+        run: uv run pytest -q --ignore=tests/test_embeddings.py
