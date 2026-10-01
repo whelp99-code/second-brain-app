@@ -97,6 +97,8 @@ from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
+from sb.vault_owner import require_vault_owner
+from sb.write_delivery import NOTHING_WRITTEN, not_written_fields
 from sb.write_request_values import WriteRequestRejected
 from sb.write_requests import accept_memory_write_request
 
@@ -274,6 +276,35 @@ def open_conflicts(root: Path) -> tuple[ConflictRow, ...]:
     return tuple(rows)
 
 
+def _not_written_error(
+    raw: JsonObject, is_effect: bool, code: str, *, cause: str | None = None
+) -> str:
+    """Strict JSON tool error for a write that published no request file."""
+    raw_id = raw.get("request_id")
+    request_id = raw_id if isinstance(raw_id, str) and raw_id.startswith("memeff:req:v2:") else None
+    fields = not_written_fields(cause=code if cause is None else cause)
+    if is_effect:
+        error = MemoryEffectWriteErrorV2(
+            schema_version=2,
+            kind="error",
+            code=code,
+            retryable=False,
+            request_id=request_id,
+        ).model_dump(mode="json")
+        error.update(fields)
+        if code == NOTHING_WRITTEN:
+            error["kind"] = "not_written"
+    else:
+        error = {
+            "schema_version": 3 if raw.get("schema_version") == 3 else 1,
+            "kind": "not_written" if code == NOTHING_WRITTEN else "error",
+            "code": code,
+            "retryable": False,
+            **fields,
+        }
+    return json.dumps(error, sort_keys=True, separators=(",", ":"))
+
+
 def build_server(
     vault_root: Path | str | None = None,
     request_root: Path | str | None = None,
@@ -291,6 +322,7 @@ def build_server(
     """
     desktop = config is not None
     config = load_config() if config is None else config
+    require_vault_owner(Path(config.vault_root if vault_root is None else vault_root))
     if os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-request-status-v1":
         from sb.scoped_status_mcp import build_scoped_status_server
         if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
@@ -962,28 +994,11 @@ def build_server(
         try:
             result = accept()
         except WriteRequestRejected as exc:
-            raw_id = raw.get("request_id")
-            request_id = (
-                raw_id
-                if isinstance(raw_id, str) and raw_id.startswith("memeff:req:v2:")
-                else None
-            )
-            if is_effect:
-                error = MemoryEffectWriteErrorV2(
-                    schema_version=2,
-                    kind="error",
-                    code=exc.code,
-                    retryable=False,
-                    request_id=request_id,
-                ).model_dump(mode="json")
-            else:
-                error = {
-                    "schema_version": 3 if raw.get("schema_version") == 3 else 1,
-                    "kind": "error",
-                    "code": exc.code,
-                    "retryable": False,
-                }
-            raise ToolError(json.dumps(error, sort_keys=True, separators=(",", ":"))) from exc
+            raise ToolError(_not_written_error(raw, is_effect, exc.code)) from exc
+        except Exception as exc:
+            raise ToolError(
+                _not_written_error(raw, is_effect, NOTHING_WRITTEN, cause=type(exc).__name__)
+            ) from exc
         if isinstance(result, MemoryEffectWriteAcceptedV2):
             return cast(ToolResult, result.model_dump(mode="json"))
         return cast(ToolResult, asdict(result))

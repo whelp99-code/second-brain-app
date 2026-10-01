@@ -44,6 +44,7 @@ from sb.search import SearchIndex
 from sb.search_errors import GenerationIndexError, SearchQueryError
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import Vault, VaultLintError, init_vault
+from sb.vault_owner import VaultOwnerMismatch, require_vault_owner
 
 _ARG_VALUE: Final = TypeAdapter[JsonValue](JsonValue)
 
@@ -211,6 +212,7 @@ def _mcp() -> int:
 
 def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     config = load_config()
+    require_vault_owner(Path(config.vault_root))
     if command == Command.LIFE:
         from sb.life_cli import run as run_life
         from sb.pipeline import run_life_import, run_life_maintenance, run_life_workflow
@@ -687,7 +689,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if root.is_dir():
             try:
                 record_command(root, command.value, exit_code, (monotonic() - started) * 1000)
-            except OSError:
+            except (OSError, VaultOwnerMismatch):
                 pass
 
 
@@ -719,6 +721,7 @@ def main(argv: list[str] | None = None) -> int:
         GenerationError,
         GenerationIndexError,
         PostCompactHookError,
+        VaultOwnerMismatch,
     ) as exc:
         print(str(exc), file=sys.stderr)
         return 1
