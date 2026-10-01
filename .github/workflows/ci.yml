@@ -62,4 +62,42 @@ jobs:
         run: |
           git config --global user.name "second-brain-ci"
           git config --global user.email "ci@example.com"
-          uv run pytest -q --ignore=tests/test_embeddings.py
+          uv run pytest -q -m "not live_emb"
+
+  embeddings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies including embeddings extra
+        run: uv sync --frozen --group dev --extra embeddings
+
+      - name: Cache BAAI/bge-m3
+        uses: actions/cache@v4
+        with:
+          path: .hf-cache
+          key: hf-bge-m3-5617a9f61b028005a4858fdac845db406aefb181
+
+      - name: Warm the pinned model if the cache missed
+        env:
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+        run: |
+          uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3', revision='5617a9f61b028005a4858fdac845db406aefb181')"
+
+      - name: Live embedding smoke
+        env:
+          SB_LIVE_EMB: "1"
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+          HOME: ${{ runner.temp }}/home
+          XDG_CONFIG_HOME: ${{ runner.temp }}/xdg-config
+          XDG_DATA_HOME: ${{ runner.temp }}/xdg-data
+        run: |
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+          uv run pytest -q -m live_emb
