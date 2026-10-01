@@ -65,14 +65,14 @@ def test_mcp_sb_remember_before_save_is_nothing_written_and_retry_writes_once(
     root = tmp_path / "notes"
     _ = init_vault(root)
     server = build_server(root, config=Config(raw={"vault_root": str(root)}))
-    real_write = Path.write_bytes
+    real_write = os.write
 
-    def fail_temp(self: Path, data: bytes) -> int:
-        if self.name.endswith(".tmp"):
+    def fail_temp(fd: int, data: bytes) -> int:
+        if data == b"once":
             raise OSError("injected before rename")
-        return real_write(self, data)
+        return real_write(fd, data)
 
-    monkeypatch.setattr(Path, "write_bytes", fail_temp)
+    monkeypatch.setattr(os, "write", fail_temp)
     failed = _call(server, "sb_remember", {"content": "once", "title": "note"})
     assert failed.is_error is True
     payload = _error_payload(_error_text(failed))
@@ -80,7 +80,7 @@ def test_mcp_sb_remember_before_save_is_nothing_written_and_retry_writes_once(
     assert payload["code"] == "NOTHING_WRITTEN"
     assert payload["delivery"] == "not_written"
     assert _inbox_pages(root) == []
-    monkeypatch.setattr(Path, "write_bytes", real_write)
+    monkeypatch.setattr(os, "write", real_write)
     retried = _call(server, "sb_remember", {"content": "once", "title": "note"})
     assert retried.is_error is False
     pages = _inbox_pages(root)
@@ -385,3 +385,93 @@ def test_retry_index_record_failure_after_save_does_not_duplicate(
     assert other.is_error is False
     both = [path for path in (root / "inbox").rglob("*.md") if path.is_file() and path.read_text(encoding="utf-8") == "saved"]
     assert len(both) == 2
+
+
+def _pages(root: Path, text: str) -> list[Path]:
+    return [path for path in (root / "inbox").rglob("*.md") if path.is_file() and text in path.read_text(encoding="utf-8")]
+
+
+def test_final_rename_fsync_failure_retry_does_not_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Second directory fsync, after the public name exists, must not mint a second page."""
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_fsync = os.fsync
+    directory_fsyncs = {"count": 0}
+
+    def fail_second_directory_fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            directory_fsyncs["count"] += 1
+            if directory_fsyncs["count"] == 2:
+                raise OSError("injected post-rename fsync")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_second_directory_fsync)
+    failed = _call(server, "sb_remember", {"content": "final", "title": "note"})
+    payload = _error_payload(_error_text(failed))
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert payload["written"] is True
+    first = root / str(payload["path"])
+    assert first.is_file()
+    retry_name = next(root.joinpath("inbox").glob(".retry-*.md"), None)
+    if retry_name is not None:
+        retry_name.unlink()
+    monkeypatch.setattr(os, "fsync", real_fsync)
+    retried = _call(server, "sb_remember", {"content": "final", "title": "note"})
+    assert retried.is_error is False
+    pages = [path for path in (root / "inbox").iterdir() if path.suffix == ".md" and not path.name.startswith(".")]
+    assert len(pages) == 1
+    assert pages[0] == first or pages[0].read_text(encoding="utf-8").startswith("final")
+
+
+def test_rename_failure_restores_sealed_inbox_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = init_vault(tmp_path / "vault").root
+    inbox = root / "inbox"
+    inbox.chmod(0o500)
+    real_replace = os.replace
+
+    def fail_public_replace(src: str | os.PathLike[str], dst: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
+        if not Path(dst).name.startswith(".") and Path(dst).suffix == ".md":
+            raise OSError("injected public rename")
+        real_replace(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(os, "replace", fail_public_replace)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    failed = _call(server, "sb_remember", {"content": "sealed", "title": "note"})
+    payload = _error_payload(_error_text(failed))
+    assert payload["written"] is True
+    assert payload["code"] != "NOTHING_WRITTEN"
+    assert stat.S_IMODE(inbox.stat().st_mode) == 0o500
+    monkeypatch.setattr(os, "replace", real_replace)
+    retried = _call(server, "sb_remember", {"content": "sealed", "title": "note"})
+    assert retried.is_error is False
+    assert len(_pages(root, "sealed")) == 1
+    assert stat.S_IMODE((root / "inbox").stat().st_mode) == 0o500
+
+
+def test_mode_restore_failure_is_distinct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = init_vault(tmp_path / "vault").root
+    real_chmod = os.chmod
+    sealed = {"count": 0}
+
+    def fail_restore(path: str | os.PathLike[str], mode: int, follow_symlinks: bool = True) -> None:
+        del follow_symlinks
+        if Path(path).name == "inbox" and mode == 0o500:
+            sealed["count"] += 1
+            if sealed["count"] >= 2:
+                raise OSError("injected mode restore")
+        real_chmod(path, mode)
+
+    monkeypatch.setattr(os, "chmod", fail_restore)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    failed = _call(server, "sb_remember", {"content": "mode", "title": "note"})
+    payload = _error_payload(_error_text(failed))
+    assert payload["code"] == "INBOX_MODE_RESTORE_FAILED"
+    assert payload["code"] != "NOTHING_WRITTEN"
+    assert payload["written"] is True
