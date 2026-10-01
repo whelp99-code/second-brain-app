@@ -24,6 +24,22 @@ class RememberRejected(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class RememberFollowupError(Exception):
+    """Inbox file is already renamed into the vault; a later step failed."""
+
+    relative: Path
+
+    @override
+    def __str__(self) -> str:
+        return f"WRITTEN_WITH_FOLLOWUP_ERROR: {self.relative.as_posix()}"
+
+
+# Same content after a follow-up error must replay the published file.
+# A fully acknowledged remember stays non-idempotent.
+_unacked_notes: dict[tuple[str, bytes], str] = {}
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedRemember:
     data: bytes
     title: str | None
@@ -44,6 +60,12 @@ def publish_inbox(root: Path, note: ParsedRemember) -> Path:
     """Publish one parsed note to a collision-safe inbox path."""
     data = note.data
     vault = root.resolve()
+    replay = _unacked_notes.get((str(vault), data))
+    if replay is not None:
+        existing = vault / replay
+        if existing.is_file() and not existing.is_symlink() and existing.read_bytes() == data:
+            _ = _unacked_notes.pop((str(vault), data), None)
+            return Path(replay)
     inbox = (root / "inbox").resolve()
     if not inbox.is_relative_to(vault):
         raise RememberRejected("inbox escapes vault")
@@ -60,7 +82,18 @@ def publish_inbox(root: Path, note: ParsedRemember) -> Path:
     tmp = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
     _ = tmp.write_bytes(data)
     os.replace(tmp, dest)
-    return dest.relative_to(vault)
+    relative = dest.relative_to(vault)
+    directory = -1
+    try:
+        directory = os.open(inbox, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+        os.fsync(directory)
+    except OSError as exc:
+        _unacked_notes[(str(vault), data)] = relative.as_posix()
+        raise RememberFollowupError(relative) from exc
+    finally:
+        if directory >= 0:
+            os.close(directory)
+    return relative
 
 
 def write_inbox(root: Path, content: str, title: str | None) -> Path:

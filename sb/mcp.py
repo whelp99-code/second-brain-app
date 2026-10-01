@@ -16,7 +16,7 @@ from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Final, Literal, cast, override
+from typing import Annotated, Final, Literal, TypedDict, cast, override
 
 import anyio
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -26,7 +26,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import TypeAdapter
-from typing_extensions import TypedDict
 
 from sb.access_claims import (
     AccessContext,
@@ -59,12 +58,10 @@ from sb.effect_write_values import model_object
 from sb.erasure import ErasureError, ReingressGate
 from sb.export_status import sign_export_status
 from sb.exports import ExportPublisher
-from sb.generation_changes import ChangeRow, generation_recent_changes
 from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
-from sb.inbox import RememberRejected, write_inbox
-from sb.legacy_search_values import SearchHitDict as LegacySearchHitDict
+from sb.inbox import RememberFollowupError, RememberRejected, write_inbox
 from sb.mcp_remember_models import MemoryRememberWriteRequest
 from sb.mcp_write_models import (
     MemoryWriteRequest,
@@ -98,7 +95,13 @@ from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_mem
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
 from sb.vault_owner import require_vault_owner
-from sb.write_delivery import NOTHING_WRITTEN, not_written_fields
+from sb.write_delivery import (
+    NOTHING_WRITTEN,
+    WRITTEN_WITH_FOLLOWUP_ERROR,
+    followup_fields,
+    not_written_fields,
+    published_request_file,
+)
 from sb.write_request_values import WriteRequestRejected
 from sb.write_requests import accept_memory_write_request
 
@@ -129,8 +132,6 @@ LEGACY_TOOLS: Final = (
 )
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
-_PERSONAL_MEMORY_PROFILE: Final = "personal-memory-v1"
-_PERSONAL_MEMORY_UNSUPPORTED: Final = "PERSONAL_MEMORY_PROFILE_UNSUPPORTED"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
 _REMEMBER_PROFILE: Final = "remember-schema5"
@@ -169,6 +170,16 @@ class PageRead:
 
 
 @dataclass(frozen=True, slots=True)
+class ChangeRow:
+    page_id: str
+    change: str
+    date: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {"page_id": self.page_id, "change": self.change, "date": self.date}
+
+
+@dataclass(frozen=True, slots=True)
 class ConflictRow:
     conflict_id: str
     page_id: str
@@ -182,7 +193,7 @@ class ConflictRow:
         }
 
 
-class RunOutcomeDict(TypedDict, closed=True):
+class RunOutcomeDict(TypedDict):
     run_id: str
     status: str
     pages: int
@@ -222,10 +233,8 @@ def read_page(root: Path, page_id: str) -> PageRead:
     return PageRead(frontmatter=_frontmatter(block), body=body)
 
 
-def recent_changes(root: Path, days: int = 7, *, journal_path: Path | None = None) -> tuple[ChangeRow, ...]:
-    """Committed page deltas; MCP supplies its activation journal for sealed roots."""
-    if journal_path is not None and (root / "generation.json").exists():
-        return generation_recent_changes(root, journal_path, days)
+def recent_changes(root: Path, days: int = 7) -> tuple[ChangeRow, ...]:
+    """Committed wiki/daily/conflicts name-status rows since `days` ago."""
     raw = git_run(
         root,
         "log",
@@ -305,6 +314,51 @@ def _not_written_error(
     return json.dumps(error, sort_keys=True, separators=(",", ":"))
 
 
+def _followup_error(
+    raw: JsonObject, is_effect: bool, path: str, request_id: str, cause: str
+) -> str:
+    """Strict JSON for a write whose durable file is already in the vault."""
+    fields = followup_fields(cause=cause, path=path, request_id=request_id)
+    if is_effect:
+        error = MemoryEffectWriteErrorV2(
+            schema_version=2,
+            kind="error",
+            code=WRITTEN_WITH_FOLLOWUP_ERROR,
+            retryable=False,
+            request_id=request_id if request_id.startswith("memeff:req:v2:") else None,
+        ).model_dump(mode="json")
+        error.update(fields)
+        error["kind"] = "written_with_followup_error"
+        error["code"] = WRITTEN_WITH_FOLLOWUP_ERROR
+    else:
+        error = {
+            "schema_version": 3 if raw.get("schema_version") == 3 else 1,
+            "kind": "written_with_followup_error",
+            "code": WRITTEN_WITH_FOLLOWUP_ERROR,
+            **fields,
+        }
+    return json.dumps(error, sort_keys=True, separators=(",", ":"))
+
+
+def _write_failure(
+    raw: JsonObject,
+    is_effect: bool,
+    code: str,
+    *,
+    cause: str | None,
+    request_root: Path,
+    vault_root: Path,
+) -> str:
+    published = published_request_file(
+        request_root, vault_root, raw.get("request_id"), raw.get("schema_version")
+    )
+    reported = code if cause is None else cause
+    if published is not None:
+        path, request_id = published
+        return _followup_error(raw, is_effect, path, request_id, reported)
+    return _not_written_error(raw, is_effect, code, cause=cause)
+
+
 def build_server(
     vault_root: Path | str | None = None,
     request_root: Path | str | None = None,
@@ -333,10 +387,6 @@ def build_server(
         if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
             raise ContractProfileError
         return build_scoped_write_server(config, barrier_sink=barrier_sink)
-    if os.environ.get(_CONTRACT_PROFILE_ENV) == _PERSONAL_MEMORY_PROFILE:
-        if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
-            raise ContractProfileError
-        return _personal_memory_server(config)
     root = Path(os.path.abspath(config.vault_root if vault_root is None else vault_root))
     requests = Path(
         config.request_root
@@ -621,7 +671,7 @@ def build_server(
         parsed = query_plan(query)
         with pin_generation() as (current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_read", "read", current)
+            require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             if limit <= 0 or not query.strip():
                 return bind_read({"results": []}, generation, current)
@@ -669,7 +719,7 @@ def build_server(
         """Read one committed page from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_read", "read", current)
+            require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             try:
                 page = read_page(current_root, id)
@@ -689,10 +739,9 @@ def build_server(
         """List committed changes from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_read", "read", current)
+            require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
-            payload = {"changes": [row.as_dict() for row in recent_changes(
-                current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
+            payload = {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
             return bind_read(payload, generation, current)
 
     def sb_open_conflicts(
@@ -701,7 +750,7 @@ def build_server(
         """List unresolved conflicts from exactly one pinned generation."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_read", "read", current)
+            require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
             conflicts: list[ToolResult] = []
             for row in open_conflicts(current_root):
@@ -731,16 +780,48 @@ def build_server(
                 raise ToolError(str(exc)) from exc
             finally:
                 reingress.close()
+        def remember_failure(exc: BaseException) -> ToolError:
+            if isinstance(exc, RememberFollowupError):
+                published = root / exc.relative
+                if published.is_file() and not published.is_symlink():
+                    payload = {
+                        "cause": type(exc.__cause__).__name__ if exc.__cause__ is not None else "OSError",
+                        "code": WRITTEN_WITH_FOLLOWUP_ERROR,
+                        "delivery": "written",
+                        "inbox_path": exc.relative.as_posix(),
+                        "kind": "written_with_followup_error",
+                        "path": exc.relative.as_posix(),
+                        "retryable": True,
+                        "written": True,
+                    }
+                    return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+                exc = exc.__cause__ if exc.__cause__ is not None else exc
+            if isinstance(exc, RememberRejected):
+                return ToolError(str(exc))
+            payload = {
+                "cause": type(exc).__name__,
+                "code": NOTHING_WRITTEN,
+                "delivery": "not_written",
+                "kind": "not_written",
+                "retryable": False,
+                "written": False,
+            }
+            return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
         if vault_root is not None and not root.is_symlink() and root.name != "vault":
             try:
                 return {"inbox_path": write_inbox(root, content, title).as_posix()}
             except RememberRejected as exc:
                 raise ToolError(str(exc)) from exc
+            except Exception as exc:
+                raise remember_failure(exc) from exc
         mutations = GenerationMutationService.from_config(runtime_config)
         try:
             rel = mutations.remember(content, title, datetime.now(UTC))
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
+        except Exception as exc:
+            raise remember_failure(exc) from exc
         finally:
             mutations.close()
         return {"inbox_path": rel.as_posix()}
@@ -797,7 +878,7 @@ def build_server(
         """Return metadata-only global request status and a proof only after proved."""
         with pin_generation() as (_current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_status", "status", current)
+            require_read_fence(read_fence, "memory_status", "status", current)
             store = RequestStore(requests, maintenance_only=True)
             try:
                 status = store.get(request_id)
@@ -917,7 +998,7 @@ def build_server(
         """Resolve one exact citation under one shared generation pin."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            require_read_fence(read_fence, "memory_resolve", "resolve", current)
             require_active_high_water(generation, current)
             if sensitivity not in {"public", "personal", "sensitive", "restricted"}:
                 raise ToolError("EFFECT_TARGET_INVALID")
@@ -958,7 +1039,7 @@ def build_server(
         """Resolve only a schema-4 record identity under its exact generation pin."""
         with pin_generation() as (current_root, generation):
             current = high_water()
-            _ = require_read_fence(read_fence, "memory_resolve", "resolve", current)
+            require_read_fence(read_fence, "memory_resolve", "resolve", current)
             require_active_high_water(generation, current)
             if (generation.generation_id != generation_id
                     or generation.generation_manifest_digest != generation_manifest_digest):
@@ -988,16 +1069,30 @@ def build_server(
                 revoked_delegations=config.revoked_delegation_ids,
                 external_public_keys=external_public_keys,
                 barrier_sink=barrier_sink,
-                generation_pin=pin_generation() if is_effect else None,
             )
 
         try:
-            result = accept()
+            if is_effect:
+                with pin_generation():
+                    result = accept()
+            else:
+                result = accept()
         except WriteRequestRejected as exc:
-            raise ToolError(_not_written_error(raw, is_effect, exc.code)) from exc
+            raise ToolError(
+                _write_failure(
+                    raw, is_effect, exc.code, cause=None, request_root=requests, vault_root=root
+                )
+            ) from exc
         except Exception as exc:
             raise ToolError(
-                _not_written_error(raw, is_effect, NOTHING_WRITTEN, cause=type(exc).__name__)
+                _write_failure(
+                    raw,
+                    is_effect,
+                    NOTHING_WRITTEN,
+                    cause=type(exc).__name__,
+                    request_root=requests,
+                    vault_root=root,
+                )
             ) from exc
         if isinstance(result, MemoryEffectWriteAcceptedV2):
             return cast(ToolResult, result.model_dump(mode="json"))
@@ -1023,27 +1118,7 @@ def build_server(
         if high_water()[0] != 0:
             raise ToolError("TOMBSTONE_FENCE_REQUIRED")
 
-    @contextmanager
-    def pin_local_search() -> Generator[Path, None, None]:
-        """Local search uses the CLI's reader lock, not a JARVIS caller signature.
-
-        A non-genesis journal is readable only through its verified active
-        generation. Never bless an unsealed vault or a restored stale snapshot.
-        Check again before returning so a journal change cannot leak collected hits.
-        Signed/scoped profiles retain their separate caller-authentication fences.
-        """
-        with pin_generation() as (current_root, generation):
-            current = high_water()
-            if generation_store is None:
-                require_legacy_genesis()
-            else:
-                require_active_high_water(generation, current)
-            yield current_root
-            if high_water() != current:
-                raise ToolError("TOMBSTONE_SET_STALE")
-            require_active_high_water(generation, current)
-
-    def legacy_search(query: str, limit: int = 10) -> dict[str, list[LegacySearchHitDict]]:
+    def legacy_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
         Use this to answer questions about what the user has recorded before.
@@ -1051,12 +1126,12 @@ def build_server(
         `sb_read_page`.
         """
         _ = query_plan(query)
-        with pin_local_search() as current_root:
+        with pin_generation() as (current_root, _generation):
+            require_legacy_genesis()
             hits = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid,
                                registry_path=Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None,
                                 min_similarity=config.search_min_similarity).search(query, limit, scope="reference")
-            return {"results": [{"page_id": hit.page_id, "section": hit.section,
-                "snippet": hit.snippet, "score": hit.score} for hit in hits]}
+            return {"results": [hit.as_dict() for hit in hits]}
 
     def legacy_read_page(id: str) -> dict[str, dict[str, str] | str]:
         """Read one committed page whole, with its citation frontmatter.
@@ -1081,8 +1156,7 @@ def build_server(
         """
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            return {"changes": [row.as_dict() for row in recent_changes(
-                current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
+            return {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
 
     def legacy_open_conflicts() -> dict[str, list[dict[str, str]]]:
         """List unresolved contradictions between recorded sources.
@@ -1113,7 +1187,8 @@ def build_server(
     def desktop_search(query: str, limit: int = 10, scope: Literal["active", "candidate", "reference"] = "reference") -> dict[str, list[SearchHitDict]]:
         """Search cited knowledge, distinguishing verified and reference results."""
         _ = query_plan(query)
-        with pin_local_search() as current_root:
+        with pin_generation() as (current_root, _generation):
+            require_legacy_genesis()
             return {"results": [hit.as_dict() for hit in SearchIndex(current_root, hybrid=config.search_hybrid,
                 registry_path=Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None,
                                 min_similarity=config.search_min_similarity).search(query, limit, scope=scope)]}
@@ -1222,210 +1297,6 @@ def build_server(
         resolver = sb_resolve_memory_record if contract_schema_version >= 4 else sb_resolve_memory_target
         _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server
-
-
-def _personal_memory_server(config: Config) -> MCPServer:
-    """sb_recall only. Obligation tools stay on personal-memory-v2."""
-    from sb.life_config import LifeInputError, settings
-
-    try:
-        enabled = "contextual_recall" in settings(config).flags
-    except LifeInputError:
-        enabled = False
-    if not enabled:
-        raise RuntimeError(_PERSONAL_MEMORY_UNSUPPORTED)
-    server = MCPServer("second-brain", description=_PERSONAL_MEMORY_PROFILE)
-
-    def sb_recall(
-        query: str,
-        namespace: str = "personal",
-        source_ids: list[str] | None = None,
-        time_range: dict[str, str] | None = None,
-        limit: int = 5,
-    ) -> Annotated[dict[str, object], "# noqa: OBJECT_OK"]:
-        """Read-only personal recall. Does not open a company database."""
-        return _sb_recall(config, query, namespace, source_ids, time_range, limit)
-
-    _ = server.tool(name="sb_recall")(sb_recall)
-    return server
-
-
-def _sb_recall(
-    config: Config,
-    query: str,
-    namespace: str,
-    source_ids: list[str] | None,
-    time_range: dict[str, str] | None,
-    limit: int,
-) -> dict[str, object]:
-    from sb.life_api_reads import recall_request
-    from sb.life_config import LifeInputError, policies
-    from sb.life_http import LifeActor
-    from sb.source_coverage import coverage_by_source
-
-    if type(limit) is not int or not 1 <= limit <= 20:
-        raise ToolError("RECALL_LIMIT_INVALID")
-    if not isinstance(query, str) or not query.strip() or len(query.encode()) > 4096:
-        raise ToolError("RECALL_QUERY_INVALID")
-    if not isinstance(namespace, str) or not namespace:
-        raise ToolError("RECALL_NAMESPACE_INVALID")
-    binding = {
-        "profile": _PERSONAL_MEMORY_PROFILE,
-        "provider_instance_id": config.provider_instance_id,
-    }
-    if namespace != "personal":
-        return _recall_body("unavailable", ["NAMESPACE_UNAVAILABLE"], binding, None, ())
-    try:
-        available = policies(config)
-    except LifeInputError as exc:
-        return _recall_body("unavailable", [exc.code], binding, None, ())
-    selected = tuple(available) if source_ids is None else tuple(source_ids)
-    if source_ids is not None and (
-        not selected or any(not isinstance(item, str) or item not in available for item in selected)
-    ):
-        raise ToolError("LIFE_SOURCE_NOT_ALLOWED")
-    scopes = tuple(sorted({scope for name in selected for scope in available[name].scopes}))
-    actor = LifeActor(selected, scopes, client=False)
-    root = Path(config.vault_root)
-    revisions = tuple(sorted({available[name].policy_revision for name in selected}))
-    policy_revision = revisions[0] if len(revisions) == 1 else None
-    if not (root / ".sb" / "ledger.db").is_file():
-        return _recall_body(
-            "unavailable", ["LIFE_NOT_INITIALIZED"], binding, policy_revision, selected
-        )
-    rows = coverage_by_source(root)
-    last_states: list[str] = []
-    incomplete = False
-    source_unavailable = False
-    for name in selected:
-        row = rows.get(name)
-        state = None if row is None else row.get("last_state")
-        last_states.append("missing" if not isinstance(state, str) else state)
-        if state == "unavailable":
-            source_unavailable = True
-        elif row is None or row.get("exhausted") is not True or state != "ok":
-            incomplete = True
-    if source_unavailable:
-        return _recall_body(
-            "unavailable", ["SOURCE_UNAVAILABLE"], binding, policy_revision, selected, last_states
-        )
-    if incomplete:
-        return _recall_body(
-            "coverage_incomplete",
-            ["COVERAGE_INCOMPLETE"],
-            binding,
-            policy_revision,
-            selected,
-            last_states,
-        )
-    data: dict[str, object] = {"query": query, "limit": limit, "trigger": "explicit_question"}
-    end = None if time_range is None else time_range.get("end")
-    if isinstance(end, str) and "T" in end:
-        data["as_of"] = end
-    try:
-        raw = recall_request(config, root, actor, data, now=datetime.now(UTC))
-    except LifeInputError as exc:
-        if exc.code == "LIFE_WORKSET_TOO_LARGE":
-            return _recall_body(
-                "coverage_incomplete",
-                [exc.code],
-                binding,
-                policy_revision,
-                selected,
-                last_states,
-            )
-        if exc.code in {
-            "LIFE_QUERY_INVALID",
-            "LIFE_LIMIT_INVALID",
-            "LIFE_AS_OF_INVALID",
-            "LIFE_UNKNOWN_FIELD",
-            "LIFE_TRIGGER_INVALID",
-        }:
-            raise ToolError(exc.code) from None
-        return _recall_body("unavailable", [exc.code], binding, policy_revision, selected, last_states)
-    hits = raw.get("hits")
-    if not isinstance(hits, list):
-        return _recall_body(
-            "unavailable", ["RECALL_SHAPE_INVALID"], binding, policy_revision, selected, last_states
-        )
-    mapped = [_evidence_ref(hit) if isinstance(hit, dict) else None for hit in hits]
-    if any(ref is None for ref in mapped):
-        return _recall_body(
-            "ambiguous", ["EVIDENCE_INCOMPLETE"], binding, policy_revision, selected, last_states
-        )
-    refs = tuple(ref for ref in mapped if ref is not None)
-    if not refs:
-        return _recall_body("not_found", ["NO_MATCH"], binding, policy_revision, selected, last_states)
-    if len(refs) > 1:
-        titles = tuple(
-            hit["title"] for hit in hits if isinstance(hit, dict) and isinstance(hit.get("title"), str)
-        )
-        return _recall_body(
-            "ambiguous",
-            ["MULTIPLE_MATCHES"],
-            binding,
-            policy_revision,
-            selected,
-            last_states,
-            refs,
-            titles[1:],
-        )
-    text = hits[0].get("text") if isinstance(hits[0], dict) else None
-    if not isinstance(text, str) or not text:
-        return _recall_body("ambiguous", ["ANSWER_WITHOUT_TEXT"], binding, policy_revision, selected, last_states, refs)
-    return _recall_body(
-        "answered", [], binding, policy_revision, selected, last_states, refs, answer=text
-    )
-
-
-def _evidence_ref(hit: dict[str, object]) -> dict[str, object] | None:
-    evidence = hit.get("evidence")
-    revision = hit.get("revision")
-    event_id = hit.get("event_id")
-    if not isinstance(evidence, dict) or not isinstance(event_id, str) or type(revision) is not int:
-        return None
-    digest = evidence.get("raw_digest")
-    span = hit.get("occurred_start") or hit.get("recorded_at")
-    if not isinstance(digest, str) or not isinstance(span, str) or not span:
-        return None
-    return {
-        "observation_id": event_id,
-        "full_source_hash": digest,
-        "exact_locator": f"{event_id}#{revision}",
-        "byte_or_time_span": span,
-        "namespace": "personal",
-        "revision": revision,
-    }
-
-
-def _recall_body(
-    state: str,
-    reasons: list[str],
-    binding: dict[str, str],
-    policy_revision: str | None,
-    sources: tuple[str, ...],
-    last_states: list[str] | None = None,
-    refs: tuple[dict[str, object] | None, ...] = (),
-    alternatives: tuple[str, ...] = (),
-    answer: str | None = None,
-) -> dict[str, object]:
-    clean = tuple(ref for ref in refs if ref is not None)
-    return {
-        "schema_version": 1,
-        "state": state,
-        "answer": answer,
-        "evidence_refs": list(clean),
-        "alternatives": list(alternatives),
-        "coverage": {
-            "exhausted": state in {"answered", "ambiguous", "not_found"},
-            "last_states": [] if last_states is None else last_states,
-            "sources": list(sources),
-        },
-        "generation_binding": binding,
-        "policy_revision": policy_revision,
-        "model_revision": None,
-        "uncertainty_reasons": reasons,
-    }
 
 
 def main() -> None:

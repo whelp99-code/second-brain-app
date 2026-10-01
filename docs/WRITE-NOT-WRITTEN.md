@@ -16,3 +16,4 @@ Contract for JARVIS reconcile:
 - Map that payload to outcome code `NOTHING_WRITTEN` (including when `code` is a catalogue rejection). Catalogue codes remain in `cause`.
 - `NOTHING_WRITTEN` is a pre-delivery failure, same class as a start failure: the abandon-not-delivered path may close it without waiting for expiry.
 - Absence of this payload (transport drop, timeout after dispatch, or `kind: accepted`) is still uncertain. Do not invent not-delivered from `SECOND_BRAIN_TOOL_ERROR` alone.
+- If the durable file was already renamed into the vault and a later step failed, the payload is `written: true`, `delivery: "written"`, `code: "WRITTEN_WITH_FOLLOWUP_ERROR"`, plus `path` and the request id. That is not `NOTHING_WRITTEN`. Retry the same request; do not abandon it as undelivered.
