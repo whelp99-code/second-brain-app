@@ -28,7 +28,7 @@ If a lookup (`lstat`, directory read, or journal read) fails, or a prior deliver
 {"code":"WRITE_OUTCOME_UNKNOWN","delivery":"unknown","retry":"Retry the same request. Do not treat this as not delivered.","retryable":true,"written":null}
 ```
 
-A remember retry returns the already published inbox file only when content and title both match the failed request. That identity is the filename `inbox/.retry-<sha256>.md`, written in the same rename as the bytes. There is no side index. A different title is a new note. A matching name whose bytes differ is `REMEMBER_RETRY_CONFLICT`. After the call fully succeeds, the file is renamed to `inbox/<timestamp>-<slug>.md`.
+A remember retry returns the already published inbox file only when content and title both match. Until the public name is durable, the identity is `inbox/.retry-<sha256>.md`. After that rename, the same hash is embedded in the page (`<!-- sb-remember-id:... -->`) so a post-rename failure still finds that page. A different title is a new note. Sealed inbox modes are restored in `finally`. A failed restore is `INBOX_MODE_RESTORE_FAILED`, not `NOTHING_WRITTEN`.
 
 Contract for JARVIS reconcile:
 

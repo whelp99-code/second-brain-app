@@ -63,8 +63,10 @@ from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import (
+    InboxModeRestoreError,
     RememberFollowupError,
     RememberRejected,
+    find_marked_page,
     promote_published,
     retry_filename,
     write_inbox,
@@ -876,6 +878,30 @@ def build_server(
             cause = type(exc.__cause__).__name__ if exc.__cause__ is not None else type(exc).__name__
             if isinstance(exc, RememberRejected):
                 return ToolError(str(exc))
+            if isinstance(exc, InboxModeRestoreError):
+                saved = exc.saved
+                if saved is not None and saved.is_file():
+                    try:
+                        saved_path = saved.resolve().relative_to(root.resolve()).as_posix()
+                    except ValueError:
+                        saved_path = saved.as_posix()
+                    return remember_json({
+                        "cause": "InboxModeRestoreError",
+                        "code": "INBOX_MODE_RESTORE_FAILED",
+                        "delivery": "written",
+                        "path": saved_path,
+                        "retry": "Restore the inbox directory mode, then retry the same request.",
+                        "retryable": True,
+                        "written": True,
+                    })
+                return remember_json({
+                    "cause": "InboxModeRestoreError",
+                    "code": "INBOX_MODE_RESTORE_FAILED",
+                    "delivery": "unknown",
+                    "retry": "Restore the inbox directory mode, then retry the same request.",
+                    "retryable": True,
+                    "written": None,
+                })
             share = Path(runtime_config.share_root)
             after = pointer_id(share)
             switched = (
@@ -905,16 +931,42 @@ def build_server(
                     if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
                         return written_payload(exc.relative.as_posix(), cause, None)
                     return unknown_payload(cause)
+            if isinstance(exc, InboxModeRestoreError) and exc.saved is not None and exc.saved.is_file():
+                return remember_json({
+                    "cause": "InboxModeRestoreError",
+                    "code": "INBOX_MODE_RESTORE_FAILED",
+                    "delivery": "written",
+                    "path": exc.saved.relative_to(root).as_posix(),
+                    "retry": "Restore the inbox directory mode, then retry the same request.",
+                    "retryable": True,
+                    "written": True,
+                })
+            if isinstance(exc, InboxModeRestoreError):
+                return remember_json({
+                    "cause": "InboxModeRestoreError",
+                    "code": "INBOX_MODE_RESTORE_FAILED",
+                    "delivery": "unknown",
+                    "retry": "Restore the inbox directory mode, then retry the same request.",
+                    "retryable": True,
+                    "written": None,
+                })
             try:
-                retry = root / "inbox" / retry_filename(content.encode("utf-8"), title)
-                metadata = os.lstat(retry)
-            except (UnicodeError, FileNotFoundError):
-                retry = None
-            except OSError:
-                return unknown_payload(cause)
-            else:
-                if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
-                    return written_payload(retry.relative_to(root).as_posix(), cause, None)
+                encoded = content.encode("utf-8")
+            except UnicodeError:
+                encoded = b""
+            if encoded:
+                try:
+                    retry = root / "inbox" / retry_filename(encoded, title)
+                    metadata = os.lstat(retry)
+                except FileNotFoundError:
+                    marked = find_marked_page(root / "inbox", encoded, title)
+                    if marked is not None:
+                        return written_payload(marked.relative_to(root).as_posix(), cause, None)
+                except OSError:
+                    return unknown_payload(cause)
+                else:
+                    if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+                        return written_payload(retry.relative_to(root).as_posix(), cause, None)
             return remember_json({
                 "cause": type(exc).__name__,
                 "code": NOTHING_WRITTEN,
