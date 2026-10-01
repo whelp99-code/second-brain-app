@@ -1,18 +1,30 @@
-"""Collision-safe `inbox/` writes, shared by the CLI and the MCP server."""
+"""Collision-safe `inbox/` writes, shared by the CLI and the MCP server.
+
+The final page path is a pure function of the normalized title and the exact
+body bytes. Publication is an exclusive create of that name. A retry observes
+the same path and never mints a second page. There is no in-content marker and
+no side retry file.
+"""
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import os
 import re
 import stat
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, override
+from typing import Final, Literal, override
 
 MAX_REMEMBER_BYTES: Final = 1024 * 1024
 _SLUG_RE: Final = re.compile(r"[^0-9A-Za-z가-힣]+")
+_LINK_FALLBACK: Final = {errno.EXDEV, errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EINVAL}
+_RENAME_NOREPLACE: Final = 1
+_AT_FDCWD: Final = -100
+
+PageState = Literal["present", "absent", "unknown", "conflict"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +38,7 @@ class RememberRejected(Exception):
 
 @dataclass(frozen=True, slots=True)
 class RememberFollowupError(Exception):
-    """Inbox file is already renamed into the vault; a later step failed."""
+    """Final page is present; a later step failed. Not NOTHING_WRITTEN."""
 
     relative: Path
 
@@ -35,12 +47,71 @@ class RememberFollowupError(Exception):
         return f"WRITTEN_WITH_FOLLOWUP_ERROR: {self.relative.as_posix()}"
 
 
+class RememberOutcomeUnknown(Exception):
+    """The final path could not be classified. Not proof the page is absent."""
+
+    def __init__(self, relative: Path) -> None:
+        self.relative = relative
+        super().__init__(f"WRITE_OUTCOME_UNKNOWN: {relative.as_posix()}")
+
+
+class InboxModeRestoreError(Exception):
+    """Sealed inbox mode could not be restored. Do not treat the page as unwritten."""
+
+    def __init__(self, inbox: Path, mode: int, saved: Path | None) -> None:
+        self.inbox = inbox
+        self.mode = mode
+        self.saved = saved
+        super().__init__(f"INBOX_MODE_RESTORE_FAILED: {mode:04o} {inbox}")
 
 
 @dataclass(frozen=True, slots=True)
 class ParsedRemember:
     data: bytes
     title: str | None
+
+
+def _slug(title: str | None) -> str:
+    raw = "" if title is None else title.strip()
+    cleaned = _SLUG_RE.sub("-", raw).strip("-").lower()
+    return (cleaned or "note")[:40]
+
+
+def normalized_title(title: str | None) -> str:
+    """None and surrounding whitespace are the same title. The body is not rewritten."""
+    return "" if title is None else title.strip()
+
+
+_REQUEST_ID_RE: Final = re.compile(r"[0-9A-Za-z_-]{1,64}")
+
+
+def remember_request_id(request_id: str | None) -> str:
+    """Client id for a repeatable remember. Omitted ids are not retries."""
+    if request_id is None:
+        return ""
+    if _REQUEST_ID_RE.fullmatch(request_id) is None:
+        raise RememberRejected("REMEMBER_REQUEST_ID_INVALID")
+    return request_id
+
+
+def remember_digest(data: bytes, title: str | None, request_id: str) -> str:
+    """sha256 of request id, normalized title, and exact body bytes.
+
+    The runtime contract requires two identical remembers to be two pages
+    (``test_mcp_contract_runtime``). A client-supplied request id is therefore
+    part of the hash. The same id, title, and body are one page. A different
+    title or a different id is a different page. An omitted id is not a retry.
+    """
+    title_bytes = normalized_title(title).encode("utf-8")
+    identity = request_id.encode("ascii")
+    return hashlib.sha256(
+        b"sb-remember/v3\0" + identity + b"\0" + title_bytes + b"\0" + data
+    ).hexdigest()
+
+
+def page_filename(data: bytes, title: str | None, request_id: str) -> str:
+    """Deterministic final name. The slug is cosmetic; the digest is the identity."""
+    return f"{remember_digest(data, title, request_id)}-{_slug(title)}.md"
 
 
 def parse_remember(content: str, title: str | None) -> ParsedRemember:
@@ -54,36 +125,6 @@ def parse_remember(content: str, title: str | None) -> ParsedRemember:
     return ParsedRemember(data, title)
 
 
-def retry_digest(data: bytes, title: str | None) -> str:
-    """Identity of one unacknowledged remember. Title is part of the key."""
-    title_bytes = b"" if title is None else title.encode("utf-8")
-    return hashlib.sha256(b"sb-remember-retry/v1\0" + title_bytes + b"\0" + data).hexdigest()
-
-
-def retry_filename(data: bytes, title: str | None) -> str:
-    return f".retry-{retry_digest(data, title)}.md"
-
-
-class InboxModeRestoreError(Exception):
-    """Sealed inbox mode could not be restored. Do not treat the page as unwritten."""
-
-    def __init__(self, inbox: Path, mode: int, saved: Path | None) -> None:
-        self.inbox = inbox
-        self.mode = mode
-        self.saved = saved
-        super().__init__(f"INBOX_MODE_RESTORE_FAILED: {mode:04o} {inbox}")
-
-
-def _record_retry_identity(inbox: Path, digest: str, relative: Path) -> None:
-    """The retry filename is written with the bytes. This hook is not a second store."""
-    del inbox, digest, relative
-
-
-def _clear_retry_identity(inbox: Path, digest: str) -> None:
-    """No side index. The page marker is the post-rename identity."""
-    del inbox, digest
-
-
 def _fsync_directory(directory: Path) -> None:
     descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
     try:
@@ -92,34 +133,69 @@ def _fsync_directory(directory: Path) -> None:
         os.close(descriptor)
 
 
-def _marker(data: bytes, title: str | None) -> bytes:
-    digest = retry_digest(data, title).encode("ascii")
-    return b"\n<!-- sb-remember-id:" + digest + b" -->"
-
-
-def _with_marker(data: bytes, title: str | None) -> bytes:
-    return data + _marker(data, title)
-
-
-def find_marked_page(inbox: Path, data: bytes, title: str | None) -> Path | None:
-    """Return the finalized page whose embedded hash matches content and title."""
-    needle = _marker(data, title)
+def _read_file(path: Path) -> bytes:
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
-        entries = list(inbox.iterdir())
+        chunks: list[bytes] = []
+        while True:
+            block = os.read(descriptor, 65536)
+            if not block:
+                return b"".join(chunks)
+            chunks.append(block)
+    finally:
+        os.close(descriptor)
+
+
+def observe_page(path: Path, expected: bytes) -> PageState:
+    """Classify only by the final path. Never by which earlier step raised."""
+    try:
+        metadata = os.lstat(path)
     except FileNotFoundError:
+        return "absent"
+    except OSError:
+        return "unknown"
+    if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+        return "unknown"
+    try:
+        payload = _read_file(path)
+    except FileNotFoundError:
+        return "absent"
+    except OSError:
+        return "unknown"
+    if payload != expected:
+        return "conflict"
+    return "present"
+
+
+def observe_remember(
+    root: Path, content: str, title: str | None, request_id: str,
+) -> tuple[PageState, str | None]:
+    """Return the final-path state and, when present, the vault-relative path."""
+    try:
+        data = content.encode("utf-8")
+    except UnicodeEncodeError:
+        return "absent", None
+    try:
+        name = page_filename(data, title, request_id)
+    except RememberRejected:
+        return "absent", None
+    dest = root / "inbox" / name
+    state = observe_page(dest, data)
+    if state != "present":
+        return state, None
+    try:
+        return state, dest.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return "unknown", None
+
+
+def _saved_page(dest: Path) -> Path | None:
+    try:
+        metadata = os.lstat(dest)
+    except OSError:
         return None
-    for entry in entries:
-        if entry.name.startswith(".") or not entry.name.endswith(".md"):
-            continue
-        try:
-            metadata = os.lstat(entry)
-            if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-                continue
-            payload = entry.read_bytes()
-        except OSError:
-            continue
-        if payload == data + needle or payload.endswith(needle) and payload[: -len(needle)] == data:
-            return entry
+    if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+        return dest
     return None
 
 
@@ -132,166 +208,133 @@ def _restore_mode(inbox: Path, mode: int, changed: bool, saved: Path | None) -> 
         raise InboxModeRestoreError(inbox, mode, saved) from exc
 
 
-def _matching_retry(path: Path, data: bytes) -> str:
-    try:
-        metadata = os.lstat(path)
-    except FileNotFoundError:
-        return "missing"
-    except OSError:
-        return "error"
-    if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-        return "conflict"
-    try:
-        payload = path.read_bytes()
-    except OSError:
-        return "error"
-    if payload != data:
-        return "conflict"
-    return "match"
+def _rename_noreplace(src: Path, dst: Path) -> None:
+    """Linux renameat2(RENAME_NOREPLACE). Does not replace an existing final name."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    result = libc.renameat2(
+        _AT_FDCWD,
+        os.fsencode(src),
+        _AT_FDCWD,
+        os.fsencode(dst),
+        _RENAME_NOREPLACE,
+    )
+    if result != 0:
+        err = ctypes.get_errno()
+        raise OSError(err, os.strerror(err), str(dst))
 
 
-def publish_inbox(root: Path, note: ParsedRemember) -> Path:
-    """Publish one parsed note under a content+title retry name."""
+def _link_noreplace(src: Path, dst: Path) -> None:
+    """Publish by exclusive link. Fall back to renameat2 only if link cannot work."""
+    try:
+        os.link(src, dst)
+    except FileExistsError:
+        raise
+    except OSError as exc:
+        if exc.errno not in _LINK_FALLBACK:
+            raise
+        _rename_noreplace(src, dst)
+
+
+def _exclusive_create(dest: Path, data: bytes) -> None:
+    """Create the final name once. A retry finds that name and does not add a page."""
+    temporary = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
+    try:
+        written = 0
+        while written < len(data):
+            count = os.write(descriptor, data[written:])
+            if count <= 0:
+                raise OSError(errno.EIO, "short write")
+            written += count
+        os.fsync(descriptor)
+    except OSError:
+        os.close(descriptor)
+        temporary.unlink(missing_ok=True)
+        raise
+    os.close(descriptor)
+    try:
+        _link_noreplace(temporary, dest)
+    except FileExistsError:
+        temporary.unlink(missing_ok=True)
+        return
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
+    try:
+        _fsync_directory(dest.parent)
+        temporary.unlink()
+        _fsync_directory(dest.parent)
+    except OSError as exc:
+        raise RememberFollowupError(dest.relative_to(dest.parent.parent)) from exc
+
+
+def _ensure_page(dest: Path, data: bytes) -> None:
+    state = observe_page(dest, data)
+    if state == "present":
+        return
+    if state == "conflict":
+        raise RememberRejected("REMEMBER_RETRY_CONFLICT")
+    if state == "unknown":
+        raise OSError(errno.EIO, "final path unreadable")
+    _exclusive_create(dest, data)
+
+
+def publish_inbox(root: Path, note: ParsedRemember, request_id: str) -> Path:
+    """Publish one note at the content-addressed final path. No marker, no side file."""
     data = note.data
     vault = root.resolve()
     inbox = (root / "inbox").resolve()
     if not inbox.is_relative_to(vault):
         raise RememberRejected("inbox escapes vault")
     inbox.mkdir(parents=True, exist_ok=True)
-    name = retry_filename(data, note.title)
-    dest = inbox / name
+    dest = inbox / page_filename(data, note.title, request_id)
     if not dest.resolve().is_relative_to(inbox):
         raise RememberRejected("inbox escapes vault")
-    marked = find_marked_page(inbox, data, note.title)
-    if marked is not None:
-        return marked.relative_to(vault)
-    state = _matching_retry(dest, data)
-    if state == "error":
-        raise RememberRejected("REMEMBER_RETRY_INDEX_UNREADABLE")
-    if state == "conflict":
-        raise RememberRejected("REMEMBER_RETRY_CONFLICT")
     relative = dest.relative_to(vault)
-    if state == "missing":
-        temporary = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
-        try:
-            written = 0
-            while written < len(data):
-                count = os.write(descriptor, data[written:])
-                if count <= 0:
-                    raise OSError("short write")
-                written += count
-            os.fsync(descriptor)
-        except OSError:
-            os.close(descriptor)
-            temporary.unlink(missing_ok=True)
-            raise
-        else:
-            os.close(descriptor)
-        os.replace(temporary, dest)
-    try:
-        _record_retry_identity(inbox, retry_digest(data, note.title), relative)
-        _fsync_directory(inbox)
-    except OSError as exc:
-        raise RememberFollowupError(relative) from exc
-    return relative
-
-
-def _public_dest(inbox: Path, title: str | None) -> Path:
-    slug = _slug(title)
-    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%S%f")
-    dest = inbox / f"{stamp}-{slug}.md"
-    suffix = 1
-    while dest.exists():
-        suffix += 1
-        dest = inbox / f"{stamp}-{slug}-{suffix}.md"
-    return dest
-
-
-def _finish_public(inbox: Path, dest: Path, data: bytes, title: str | None, mode: int, changed: bool) -> None:
-    """Drop the retry name only after the public page is identifiable and durable."""
-    saved: Path | None = dest
-    try:
-        if dest.read_bytes() != data:
-            file_mode = stat.S_IMODE(dest.stat().st_mode)
-            if file_mode & 0o200 == 0:
-                dest.chmod(file_mode | 0o200)
-            strip = dest.with_name(f".{dest.name}.strip.tmp")
-            _ = strip.write_bytes(data)
-            os.replace(strip, dest)
-            if file_mode & 0o200 == 0:
-                dest.chmod(file_mode)
-            _fsync_directory(inbox)
-        retry = inbox / retry_filename(data, title)
-        if retry.exists() and retry.resolve() != dest.resolve():
-            retry.unlink()
-            _fsync_directory(inbox)
-    except OSError as exc:
-        raise RememberFollowupError(dest.relative_to(inbox.parent)) from exc
-    finally:
-        _restore_mode(inbox, mode, changed, saved)
-
-
-def promote_published(root: Path, relative: Path, title: str | None) -> Path:
-    """Publish the public name without dropping the content+title identity."""
-    vault = root.resolve()
-    source = vault / relative
-    inbox = (vault / "inbox").resolve()
-    if source.is_file() and not source.name.startswith(".retry-"):
-        data = source.read_bytes()
-        marker = _marker(data.split(b"\n<!-- sb-remember-id:")[0], title) if b"sb-remember-id:" in data else b""
-        payload = data[: -len(marker)] if marker and data.endswith(marker) else data
-        if b"sb-remember-id:" in data:
-            mode = stat.S_IMODE(inbox.stat().st_mode)
-            changed = False
-            try:
-                if mode & 0o200 == 0:
-                    inbox.chmod(mode | 0o200)
-                    changed = True
-                _finish_public(inbox, source, payload, title, mode, changed)
-                changed = False
-            finally:
-                _restore_mode(inbox, mode, changed, source)
-        return relative
-    if not source.is_file():
-        raise RememberFollowupError(relative)
-    data = source.read_bytes()
-    marked = find_marked_page(inbox, data, title)
-    mode = stat.S_IMODE(inbox.stat().st_mode)
+    mode = stat.S_IMODE(os.lstat(inbox).st_mode)
     changed = False
-    saved: Path | None = source
+    attempt: BaseException | None = None
     try:
         if mode & 0o200 == 0:
             inbox.chmod(mode | 0o200)
             changed = True
-        if marked is None:
-            _clear_retry_identity(inbox, retry_digest(data, title))
-            dest = _public_dest(inbox, title)
-            temporary = dest.with_name(f".{dest.name}.{os.getpid()}.tmp")
-            _ = temporary.write_bytes(_with_marker(data, title))
-            os.replace(temporary, dest)
-            saved = dest
-            _fsync_directory(inbox)
-        else:
-            dest = marked
-            saved = dest
-        _finish_public(inbox, dest, data, title, mode, changed)
-        changed = False
-    except InboxModeRestoreError:
-        raise
-    except RememberFollowupError:
-        raise
-    except OSError as exc:
-        raise RememberFollowupError((saved or source).relative_to(vault)) from exc
+        try:
+            _ensure_page(dest, data)
+        except RememberRejected:
+            raise
+        except RememberFollowupError as exc:
+            attempt = exc
+        except OSError as exc:
+            attempt = exc
     finally:
-        _restore_mode(inbox, mode, changed, saved)
-    return dest.relative_to(vault)
+        _restore_mode(inbox, mode, changed, _saved_page(dest))
+    state = observe_page(dest, data)
+    if state == "present":
+        if attempt is not None:
+            raise RememberFollowupError(relative) from attempt
+        return relative
+    if state == "unknown":
+        raise RememberOutcomeUnknown(relative) from attempt
+    if state == "conflict":
+        raise RememberRejected("REMEMBER_RETRY_CONFLICT")
+    if attempt is not None:
+        raise attempt
+    raise OSError(errno.ENOENT, "remember page absent after publish")
 
 
-def write_inbox(root: Path, content: str, title: str | None) -> Path:
-    """Write UTF-8 text <=1MB to a new `inbox/<ISO>-<slug>.md`. Never overwrites."""
+def promote_published(root: Path, relative: Path, title: str | None) -> Path:
+    """The published path is already the final name. Do not rename or rewrite it."""
+    del root, title
+    return relative
+
+
+def write_inbox(
+    root: Path, content: str, title: str | None, request_id: str | None = None,
+) -> Path:
+    """Write UTF-8 text <=1MB to the content-addressed inbox page. Never overwrites."""
     note = parse_remember(content, title)
-    relative = publish_inbox(root, note)
+    identity = remember_request_id(request_id)
+    relative = publish_inbox(root, note, identity)
     return promote_published(root, relative, title)
 
 
@@ -332,9 +375,3 @@ def discard_inbox(root: Path, relative: str) -> str:
         if vault_fd >= 0:
             os.close(vault_fd)
     return rel.as_posix()
-
-
-def _slug(title: str | None) -> str:
-    raw = "" if title is None else title.strip()
-    cleaned = _SLUG_RE.sub("-", raw).strip("-").lower()
-    return (cleaned or "note")[:40]

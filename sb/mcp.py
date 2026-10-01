@@ -10,7 +10,6 @@ import itertools
 import json
 import os
 import sqlite3
-import stat
 import sys
 from collections.abc import Callable, Generator, Mapping
 from contextlib import closing, contextmanager
@@ -18,6 +17,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Final, Literal, TypedDict, cast, override
+from uuid import uuid4
 
 import anyio
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -64,11 +64,10 @@ from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
 from sb.inbox import (
     InboxModeRestoreError,
-    RememberFollowupError,
     RememberRejected,
-    find_marked_page,
+    observe_remember,
     promote_published,
-    retry_filename,
+    remember_request_id,
     write_inbox,
 )
 from sb.mcp_remember_models import MemoryRememberWriteRequest
@@ -794,7 +793,9 @@ def build_server(
                 conflicts.append(value)
             return bind_read({"conflicts": conflicts}, generation, current)
 
-    def sb_remember(content: str, title: str | None = None) -> dict[str, str]:
+    def sb_remember(
+        content: str, title: str | None = None, request_id: str | None = None,
+    ) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
         maintain(datetime.now(UTC))
         if not task30_enabled and high_water()[0] != 0:
@@ -837,59 +838,24 @@ def build_server(
                 "written": None,
             })
 
-        def pointer_id(share: Path) -> tuple[bool, str | None]:
-            link = share / "vault"
-            try:
-                metadata = os.lstat(link)
-            except FileNotFoundError:
-                return True, None
-            except OSError:
-                return False, None
-            if not stat.S_ISLNK(metadata.st_mode):
-                return True, None
-            try:
-                return True, Path(os.readlink(link)).name
-            except OSError:
-                return False, None
-
-        def note_path(vault: Path, body: bytes) -> str | None | bool:
-            inbox = vault / "inbox"
-            try:
-                entries = list(inbox.iterdir())
-            except FileNotFoundError:
-                return None
-            except OSError:
-                return False
-            for entry in entries:
-                try:
-                    metadata = os.lstat(entry)
-                    if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-                        continue
-                    if entry.read_bytes() != body:
-                        continue
-                except OSError:
-                    return False
-                return entry.relative_to(vault).as_posix()
-            return None
-
-        def remember_failure(
-            exc: BaseException, before: tuple[bool, str | None] | None
-        ) -> ToolError:
+        def remember_failure(exc: BaseException) -> ToolError:
             cause = type(exc.__cause__).__name__ if exc.__cause__ is not None else type(exc).__name__
             if isinstance(exc, RememberRejected):
                 return ToolError(str(exc))
+            state, path = observe_remember(root, content, title, identity)
             if isinstance(exc, InboxModeRestoreError):
-                saved = exc.saved
-                if saved is not None and saved.is_file():
+                saved = path
+                if saved is None and exc.saved is not None:
                     try:
-                        saved_path = saved.resolve().relative_to(root.resolve()).as_posix()
-                    except ValueError:
-                        saved_path = saved.as_posix()
+                        saved = exc.saved.resolve().relative_to(root.resolve()).as_posix()
+                    except (OSError, ValueError):
+                        saved = None
+                if state == "present" and saved is not None:
                     return remember_json({
                         "cause": "InboxModeRestoreError",
                         "code": "INBOX_MODE_RESTORE_FAILED",
                         "delivery": "written",
-                        "path": saved_path,
+                        "path": saved,
                         "retry": "Restore the inbox directory mode, then retry the same request.",
                         "retryable": True,
                         "written": True,
@@ -902,71 +868,10 @@ def build_server(
                     "retryable": True,
                     "written": None,
                 })
-            share = Path(runtime_config.share_root)
-            after = pointer_id(share)
-            switched = (
-                before is not None
-                and before[0]
-                and after[0]
-                and after[1] is not None
-                and after[1] != before[1]
-            )
-            if switched:
-                found = note_path(root, content.encode("utf-8"))
-                if found is False:
-                    return unknown_payload(cause)
-                path = found if isinstance(found, str) else f"vault-generations/{after[1]}"
-                return written_payload(path, cause, after[1])
-            if before is not None and (not before[0] or not after[0]):
+            if state == "unknown" or state == "conflict":
                 return unknown_payload(cause)
-            if isinstance(exc, RememberFollowupError):
-                published = root / exc.relative
-                try:
-                    metadata = os.lstat(published)
-                except FileNotFoundError:
-                    pass
-                except OSError:
-                    return unknown_payload(cause)
-                else:
-                    if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
-                        return written_payload(exc.relative.as_posix(), cause, None)
-                    return unknown_payload(cause)
-            if isinstance(exc, InboxModeRestoreError) and exc.saved is not None and exc.saved.is_file():
-                return remember_json({
-                    "cause": "InboxModeRestoreError",
-                    "code": "INBOX_MODE_RESTORE_FAILED",
-                    "delivery": "written",
-                    "path": exc.saved.relative_to(root).as_posix(),
-                    "retry": "Restore the inbox directory mode, then retry the same request.",
-                    "retryable": True,
-                    "written": True,
-                })
-            if isinstance(exc, InboxModeRestoreError):
-                return remember_json({
-                    "cause": "InboxModeRestoreError",
-                    "code": "INBOX_MODE_RESTORE_FAILED",
-                    "delivery": "unknown",
-                    "retry": "Restore the inbox directory mode, then retry the same request.",
-                    "retryable": True,
-                    "written": None,
-                })
-            try:
-                encoded = content.encode("utf-8")
-            except UnicodeError:
-                encoded = b""
-            if encoded:
-                try:
-                    retry = root / "inbox" / retry_filename(encoded, title)
-                    metadata = os.lstat(retry)
-                except FileNotFoundError:
-                    marked = find_marked_page(root / "inbox", encoded, title)
-                    if marked is not None:
-                        return written_payload(marked.relative_to(root).as_posix(), cause, None)
-                except OSError:
-                    return unknown_payload(cause)
-                else:
-                    if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
-                        return written_payload(retry.relative_to(root).as_posix(), cause, None)
+            if state == "present" and path is not None:
+                return written_payload(path, cause, None)
             return remember_json({
                 "cause": type(exc).__name__,
                 "code": NOTHING_WRITTEN,
@@ -976,23 +881,27 @@ def build_server(
                 "written": False,
             })
 
-        share = Path(runtime_config.share_root)
-        before = pointer_id(share)
+        try:
+            identity = remember_request_id(request_id)
+        except RememberRejected as exc:
+            raise ToolError(str(exc)) from exc
+        if request_id is None:
+            identity = uuid4().hex
         if vault_root is not None and not root.is_symlink() and root.name != "vault":
             try:
-                return {"inbox_path": write_inbox(root, content, title).as_posix()}
+                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
             except RememberRejected as exc:
                 raise ToolError(str(exc)) from exc
             except Exception as exc:
-                raise remember_failure(exc, before) from exc
+                raise remember_failure(exc) from exc
         mutations = GenerationMutationService.from_config(runtime_config)
         try:
-            rel = mutations.remember(content, title, datetime.now(UTC))
+            rel = mutations.remember(content, title, datetime.now(UTC), identity)
             rel = promote_published(root, rel, title)
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
         except Exception as exc:
-            raise remember_failure(exc, before) from exc
+            raise remember_failure(exc) from exc
         finally:
             mutations.close()
         return {"inbox_path": rel.as_posix()}
@@ -1339,15 +1248,17 @@ def build_server(
             require_legacy_genesis()
             return {"conflicts": [row.as_dict() for row in open_conflicts(current_root)]}
 
-    def legacy_remember(content: str, title: str | None = None) -> dict[str, str]:
+    def legacy_remember(
+        content: str, title: str | None = None, request_id: str | None = None,
+    ) -> dict[str, str]:
         """Record `content` as a note for the second brain to absorb.
 
         This is the only write. Use it whenever the user says to remember,
         note, or record something, including personal details. The note lands
         in the vault inbox and is picked up by the next ingest run; it does not
-        appear in search immediately.
+        appear in search immediately. Pass the same request_id to retry.
         """
-        return sb_remember(content, title)
+        return sb_remember(content, title, request_id)
 
     def legacy_write_request(request: MemoryWriteRequestModel) -> MemoryWriteResultModel:
         """Accept one closed JARVIS memory request into the pending inbox queue."""

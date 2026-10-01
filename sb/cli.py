@@ -130,6 +130,7 @@ def _parser() -> argparse.ArgumentParser:
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
+    _ = remember.add_argument("--request-id")
     cancellation = sub.add_parser(Command.APPLY_CANCELLATION.value)
     _ = cancellation.add_argument("--intent-id", required=True)
     apply_requests = sub.add_parser(Command.APPLY_REQUESTS.value)
@@ -372,7 +373,9 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             return 2
         mutations = GenerationMutationService.from_config(config)
         try:
-            rel = mutations.remember(content, _opt_str(ns, "title"), datetime.now(UTC))
+            rel = mutations.remember(
+                content, _opt_str(ns, "title"), datetime.now(UTC), _opt_str(ns, "request_id"),
+            )
             rel = promote_published(Path(config.vault_root), rel, _opt_str(ns, "title"))
         except RememberRejected as exc:
             print(str(exc), file=sys.stderr)
