@@ -46,7 +46,7 @@ def test_subprocess_writers_serialize_then_forget_wins(tmp_path: Path) -> None:
             f"with generation_writer(Path({str(lock)!r}), blocking=True):\n"
             "    pass\n"
         )],
-        cwd="/home/jm/orca/projects/second-brain-app",
+        cwd=str(Path(__file__).resolve().parents[1]),
         env=env,
     )
     second = subprocess.Popen(
@@ -56,7 +56,7 @@ def test_subprocess_writers_serialize_then_forget_wins(tmp_path: Path) -> None:
             f"with generation_writer(Path({str(lock)!r}), blocking=True):\n"
             "    pass\n"
         )],
-        cwd="/home/jm/orca/projects/second-brain-app",
+        cwd=str(Path(__file__).resolve().parents[1]),
         env=env,
     )
     assert first.wait(timeout=30) == 0
