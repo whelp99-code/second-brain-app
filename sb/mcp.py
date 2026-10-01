@@ -62,7 +62,13 @@ from sb.exports import ExportPublisher
 from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
-from sb.inbox import RememberFollowupError, RememberRejected, write_inbox
+from sb.inbox import (
+    RememberFollowupError,
+    RememberRejected,
+    promote_published,
+    retry_filename,
+    write_inbox,
+)
 from sb.mcp_remember_models import MemoryRememberWriteRequest
 from sb.mcp_write_models import (
     MemoryWriteRequest,
@@ -892,12 +898,23 @@ def build_server(
                 try:
                     metadata = os.lstat(published)
                 except FileNotFoundError:
-                    return unknown_payload(cause)
+                    pass
                 except OSError:
                     return unknown_payload(cause)
-                if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
-                    return written_payload(exc.relative.as_posix(), cause, None)
+                else:
+                    if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+                        return written_payload(exc.relative.as_posix(), cause, None)
+                    return unknown_payload(cause)
+            try:
+                retry = root / "inbox" / retry_filename(content.encode("utf-8"), title)
+                metadata = os.lstat(retry)
+            except (UnicodeError, FileNotFoundError):
+                retry = None
+            except OSError:
                 return unknown_payload(cause)
+            else:
+                if stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode):
+                    return written_payload(retry.relative_to(root).as_posix(), cause, None)
             return remember_json({
                 "cause": type(exc).__name__,
                 "code": NOTHING_WRITTEN,
@@ -919,6 +936,7 @@ def build_server(
         mutations = GenerationMutationService.from_config(runtime_config)
         try:
             rel = mutations.remember(content, title, datetime.now(UTC))
+            rel = promote_published(root, rel, title)
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
         except Exception as exc:
