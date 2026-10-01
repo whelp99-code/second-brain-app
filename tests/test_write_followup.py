@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import stat
+import subprocess
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -26,9 +29,10 @@ from tests.task30_clock import FrozenTask30DateTime
 
 
 def _error_payload(text: str) -> dict[str, object]:
-    start = text.find("{")
-    assert start >= 0
-    payload = cast(object, json.loads(text[start:]))
+    _prefix, separator, body = text.partition(": ")
+    assert separator == ": "
+    payload = cast(object, json.loads(body))
+    assert body == json.dumps(payload, sort_keys=True, separators=(",", ":"))
     assert isinstance(payload, dict)
     return cast(dict[str, object], payload)
 
@@ -190,3 +194,133 @@ def test_mcp_and_web_refuse_foreign_uid(tmp_path: Path, monkeypatch: pytest.Monk
     with pytest.raises(VaultOwnerMismatch, match="VAULT_OWNER_MISMATCH"):
         _ = build_web(config)
     assert not (vault / ".sb").exists()
+
+
+def test_generation_remember_after_pointer_switch_is_not_nothing_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = init_vault(tmp_path / "vault").root
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_replace = os.replace
+    switched = {"done": False}
+
+    def fail_after_pointer(src: str | os.PathLike[str], dst: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
+        real_replace(src, dst, *args, **kwargs)
+        if Path(dst).name == "vault" and Path(src).name.startswith(".vault-") and not switched["done"]:
+            switched["done"] = True
+            raise RuntimeError("after pointer switch")
+
+    monkeypatch.setattr(os, "replace", fail_after_pointer)
+    failed = _call(server, "sb_remember", {"content": "kept-gen", "title": "note"})
+    assert switched["done"] is True
+    assert failed.is_error is True
+    payload = _error_payload(_error_text(failed))
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert payload["written"] is True
+    assert payload["code"] != "NOTHING_WRITTEN"
+    assert (root / "inbox").is_dir()
+    notes = [path for path in (root / "inbox").iterdir() if path.suffix == ".md"]
+    assert len(notes) == 1
+    assert notes[0].read_text(encoding="utf-8") == "kept-gen"
+    assert root.is_symlink()
+
+
+def test_lookup_error_is_unknown_not_nothing_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = init_vault(tmp_path / "vault").root
+    monkeypatch.setattr(mcp_module, "datetime", FrozenTask30DateTime)
+    server = build_server(root, task30=False)
+    real_lstat = os.lstat
+    real_fsync = os.fsync
+
+    def deny_pending(path: str | os.PathLike[str], *args: object, **kwargs: object) -> os.stat_result:
+        if "pending" in Path(path).parts:
+            raise PermissionError("injected lookup")
+        return real_lstat(path, *args, **kwargs)
+
+    def fail_directory_fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            monkeypatch.setattr(os, "lstat", deny_pending)
+            raise OSError("injected directory fsync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_directory_fsync)
+    failed = _call(server, "sb_write_request", {"request": write_fixture_request()})
+    assert failed.is_error is True
+    payload = _error_payload(_error_text(failed))
+    assert payload["code"] == "WRITE_OUTCOME_UNKNOWN"
+    assert payload["delivery"] == "unknown"
+    assert payload["written"] is None
+    assert payload["code"] != "NOTHING_WRITTEN"
+    assert isinstance(payload["retry"], str)
+
+
+def test_processing_and_journal_count_as_written(tmp_path: Path) -> None:
+    from sb.write_delivery import classify_delivery
+
+    request_root = tmp_path / "requests"
+    processing = request_root / "processing"
+    processing.mkdir(parents=True)
+    identity = "memreq:pos:v2:" + "ab" * 32
+    v2 = processing / f"{identity}.1.v2.json"
+    _ = v2.write_text("{}", encoding="utf-8")
+    found = classify_delivery(request_root, tmp_path / "vault", identity, 2)
+    assert found.evidence == "present"
+    assert found.path is not None and found.path.endswith(".v2.json")
+    v2.unlink()
+    v3 = processing / f"{identity}.2.v3.json"
+    _ = v3.write_text("{}", encoding="utf-8")
+    assert classify_delivery(request_root, tmp_path / "vault", identity, 3).evidence == "present"
+    v3.unlink()
+    database = request_root / "journal.db"
+    with sqlite3.connect(database) as connection:
+        _ = connection.execute(
+            "CREATE TABLE requests(request_id TEXT PRIMARY KEY, result_json TEXT NOT NULL)"
+        )
+        _ = connection.execute(
+            "INSERT INTO requests VALUES (?, ?)",
+            (identity, json.dumps({"inbox_path": "pending/kept.json"})),
+        )
+    journal = classify_delivery(request_root, tmp_path / "vault", identity, 1)
+    assert journal.evidence == "present"
+    assert journal.path == "pending/kept.json"
+
+
+def test_remember_retry_requires_same_title_and_survives_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_fsync = os.fsync
+
+    def fail_directory_fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError("injected directory fsync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_directory_fsync)
+    failed = _call(server, "sb_remember", {"content": "same body", "title": "title-A"})
+    payload = _error_payload(_error_text(failed))
+    assert payload["written"] is True
+    saved = root / str(payload["path"])
+    monkeypatch.setattr(os, "fsync", real_fsync)
+    other = _call(server, "sb_remember", {"content": "same body", "title": "title-B"})
+    assert other.is_error is False
+    pages = _inbox_pages(root)
+    assert len(pages) == 2
+    assert saved in pages
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from pathlib import Path; from sb.inbox import write_inbox; print(write_inbox(Path(sys.argv[1]), 'same body', 'title-A').as_posix())",
+            str(root),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=str(Path(__file__).resolve().parents[1]),
+        env={**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1])},
+    )
+    assert completed.stdout.strip() == saved.relative_to(root).as_posix()
+    assert len(_inbox_pages(root)) == 2

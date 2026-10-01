@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from sb.cli import main
+from sb.effect_values import JsonObject
 from sb.mcp import _not_written_error
 from sb.metrics import record_command
 from sb.vault_owner import VaultOwnerMismatch, require_vault_owner
@@ -53,7 +54,7 @@ def test_cli_refuses_foreign_uid_without_creating_files(
 
 
 def test_write_tool_error_marks_nothing_written() -> None:
-    raw = {"schema_version": 1, "request_id": "not-an-effect"}
+    raw: JsonObject = {"schema_version": 1, "request_id": "not-an-effect"}
     payload = json.loads(_not_written_error(raw, False, "WRITE_REQUEST_INVALID"))
     assert payload["written"] is False
     assert payload["delivery"] == "not_written"
