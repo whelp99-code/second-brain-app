@@ -59,4 +59,7 @@ jobs:
           PY
 
       - name: Pytest
-        run: uv run pytest -q --ignore=tests/test_embeddings.py
+        run: |
+          git config --global user.name "second-brain-ci"
+          git config --global user.email "ci@example.com"
+          uv run pytest -q --ignore=tests/test_embeddings.py
