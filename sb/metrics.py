@@ -16,6 +16,8 @@ from typing import Final, cast
 
 from typing_extensions import TypedDict
 
+from sb.vault_owner import require_vault_owner
+
 MAX_METRICS_BYTES: Final = 10 * 1024 * 1024
 KEEP_ROWS: Final = 10_000
 
@@ -49,6 +51,7 @@ class MetricSummary:
 def record_command(root: Path | str, command: str, exit_code: int, duration_ms: float) -> None:
     """Append one content-free command metric under an exclusive file lock."""
     vault = Path(root)
+    require_vault_owner(vault)
     folder = vault / ".sb"
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / "metrics.jsonl"

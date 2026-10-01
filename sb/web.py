@@ -1116,6 +1116,9 @@ def build_server(
 ) -> SecondBrainHTTPServer:
     """Build a local console server; non-loopback binding requires a token."""
     chosen = load_config() if config is None else config
+    from sb.vault_owner import require_vault_owner
+
+    require_vault_owner(Path(chosen.vault_root))
     token = os.environ.get("SB_WEB_TOKEN") or None
     if not _is_loopback(host) and token is None:
         raise ValueError("non-loopback web binding requires SB_WEB_TOKEN")
