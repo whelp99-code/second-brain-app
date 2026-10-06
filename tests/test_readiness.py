@@ -7,7 +7,7 @@ import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
-from typing import override
+from typing import cast, override
 
 import pytest
 
@@ -20,8 +20,8 @@ from sb.effect_values import is_json_object
 from sb.ops import OperationError, create_backup, restore_backup
 from sb.readiness import readiness
 from sb.request_store import RequestStore
-from sb.store import Run
-from sb.store.ledger import Ledger
+from sb.store import DerivStatus, Run, deriv_key
+from sb.store.ledger import DerivationOutput, Ledger
 from tests.ops_fixture import seed_vault
 from tests.test_cli import cli_with_config
 from tests.test_request_store import request_identity
@@ -36,6 +36,36 @@ class Clock(datetime):
     def now(cls, tz: tzinfo | None = None) -> datetime:
         del tz
         return NOW
+
+
+def _mark_failed_at(ledger: Ledger, key: str, stamp: str, error: str) -> None:
+    instant = datetime.fromisoformat(stamp)
+
+    class StampClock(datetime):
+        @classmethod
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
+            return instant
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.store.ledger.datetime", StampClock)
+        ledger.mark_failed(key, error)
+
+
+def _mark_done_at(ledger: Ledger, key: str, output: DerivationOutput, stamp: str) -> None:
+    instant = datetime.fromisoformat(stamp)
+
+    class StampClock(datetime):
+        @classmethod
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
+            return instant
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.store.ledger.datetime", StampClock)
+        ledger.mark_done(key, output)
 
 
 @pytest.fixture
@@ -194,6 +224,49 @@ def test_historical_request_failure_remains_counted_but_does_not_block(configure
     result = readiness(configured)
     assert result["status"] == "ready"
     assert result["requests"] == {"failed": 1} and result["recent_failed_requests"] == 0
+
+
+def test_historical_llm_timeout_reconciliation_updates_live_readiness(configured: Config) -> None:
+    _ = verify_backup(backup(configured))
+    failed_key = deriv_key(("note-a",), "brief", "p", "m")
+    done_key = deriv_key(("note-b",), "brief", "p", "m")
+    with Ledger(configured.vault_root) as ledger:
+        ledger.ensure_derivation(failed_key, "brief", "run-old")
+        ledger.mark_running(failed_key, "run-old")
+        _mark_failed_at(
+            ledger,
+            failed_key,
+            "2026-10-03T00:00:00.000Z",
+            "LLM unavailable after 2 attempts: timeout after 120s",
+        )
+        ledger.ensure_derivation(done_key, "brief", "run-new")
+        ledger.mark_running(done_key, "run-new")
+        _mark_done_at(
+            ledger,
+            done_key,
+            DerivationOutput(output_hash="out", output_path="daily/2026-10-05.md"),
+            "2026-10-05T00:00:00.000Z",
+        )
+
+    with running(configured) as url:
+        before_code, before_body = request(url + "/ready")
+        before = cast(dict[str, object], before_body)
+        assert before_code == 503
+        assert "DERIVATIONS_FAILED" in cast(list[str], before["reasons"])
+
+        with Ledger(configured.vault_root) as ledger:
+            closed = ledger.supersede_historical_brief_failures()
+            failed = ledger.get_derivation(failed_key)
+        assert closed == 1
+        assert failed is not None
+        assert failed.status == DerivStatus.SUPERSEDED.value
+        assert failed.error == "LLM unavailable after 2 attempts: timeout after 120s"
+
+        after_code, after_body = request(url + "/ready")
+        after = cast(dict[str, object], after_body)
+        assert after_code == 200
+        assert after["status"] == "ready"
+        assert after["failed_derivations"] == 0
 
 
 def test_corrupt_journal_and_unreadable_backup_are_degraded(configured: Config) -> None:
