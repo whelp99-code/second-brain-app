@@ -1506,12 +1506,7 @@ superseded → pending</code></pre>
     <ul>
       <li>현재 세대의 <code>ledger.db</code>에서 <code>stage='brief'</code>인 <code>failed</code> 개수와 <code>done</code> 개수를 읽는다.</li>
       <li><strong>둘 다 1건 이상일 때만</strong> EFFECT mutation으로 <code>supersede_historical_brief_failures()</code>를 실행한다.</li>
-      <li>그 안에서 실패 brief 행은 다음 두 조건을 모두 만족할 때만 <code>superseded</code>로 바뀐다(<code>sb/store/ledger.py</code>):
-        <ul>
-          <li>오류 문자열이 <strong>일시적 LLM 오류가 아닐 것</strong> (<code>error.casefold().startswith("llm unavailable")</code>이면 제외)</li>
-          <li>그 행의 <code>finished_at</code>보다 <strong>나중에 끝난 <code>done</code> brief 행이 존재</strong>할 것 (<code>_has_later_done_brief</code>)</li>
-        </ul>
-      </li>
+      <li>그 안에서 실패 brief 행은 그 행의 <code>finished_at</code>보다 <strong>나중에 끝난 <code>done</code> brief 행이 존재</strong>할 때만 <code>superseded</code>로 바뀐다(<code>sb/store/ledger.py</code>, <code>_has_later_done_brief</code>). <code>LLM unavailable</code> 타임아웃 실패도 같은 조건으로 닫히며, 원래 오류 문자열은 행과 전이 이벤트에 그대로 남는다. 나중 성공이 없거나 실패 시각을 읽을 수 없으면 <code>failed</code>로 남는다.</li>
       <li>행은 삭제되지 않는다. 상태만 바뀌고 전이 이벤트가 기록된다.</li>
     </ul>
     <p>출력은 한 줄 JSON이다:</p>
@@ -2098,7 +2093,7 @@ systemctl --user start jm-second-brain-refresh.service</code></pre>
           <tr><td><code>sb maintain --once</code>가 <code>GENERATION_READER_DRAIN_REQUIRED</code> + exit 1</td><td>선행 세대 디렉터리를 연 fd가 남아 있다(동시 실행한 <code>sb status</code>/<code>sb search</code>, 구 릴리스의 <code>sb mcp</code> 프로세스 등)</td><td>읽기 CLI를 모두 끝내고 단독으로 재실행. 구 릴리스 MCP 프로세스가 있으면 SIGTERM</td></tr>
           <tr><td>유지보수가 <code>GENERATION_READER_DRAIN_UNVERIFIABLE</code></td><td><code>/proc</code>을 읽을 수 없는 환경</td><td><code>ProtectProc</code>/컨테이너 설정을 확인한다. 이 검사는 우회할 수 없다</td></tr>
           <tr><td><code>/ready</code>가 <code>GENERATION_CLEANUP_STALLED</code></td><td>현재 세대가 아닌 <code>activated</code> 행이 남았고 디렉터리·핀이 없다(고아)</td><td><code>sb maintain --once</code> 1회. 2026-09-15 운영에서 <code>activated 3 → proved</code>로 해소</td></tr>
-          <tr><td><code>/ready</code>가 <code>DERIVATIONS_FAILED</code></td><td><code>derivation</code>에 <code>failed</code> 행 존재</td><td><code>sb status --json</code>의 <code>failed_by_stage</code> 확인. compile/conflict는 원인 해소 후 <code>sb retry --stage &lt;stage&gt;</code>. brief는 <code>maintain</code>이 조건(이후 성공 brief 존재 + 일시적 LLM 오류 아님)을 만족할 때 <code>superseded</code>로 종결</td></tr>
+          <tr><td><code>/ready</code>가 <code>DERIVATIONS_FAILED</code></td><td><code>derivation</code>에 <code>failed</code> 행 존재</td><td><code>sb status --json</code>의 <code>failed_by_stage</code> 확인. compile/conflict는 원인 해소 후 <code>sb retry --stage &lt;stage&gt;</code>. brief는 <code>maintain</code>이 이후 성공 brief가 있을 때 <code>superseded</code>로 종결</td></tr>
           <tr><td><code>sb retry</code>가 <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE</code></td><td>선택 집합에 <code>brief</code> 행이 섞였다</td><td><code>--stage compile</code> 등으로 단계를 좁힌다. 과거 브리핑은 의도적으로 재생하지 않는다</td></tr>
           <tr><td><code>/ready</code>가 <code>LAST_RUN_UNSUCCESSFUL</code></td><td>최신 run status가 <code>ok</code>/<code>capped</code>가 아님</td><td><code>sb status --json</code>의 <code>recent_stages</code>에서 실패 단계와 사유 확인</td></tr>
           <tr><td>compile이 전부 <code>LLM unavailable after 2 attempts</code></td><td>백엔드 CLI가 없거나(<code>command not found</code>), 설정을 잘못 상속했거나, 계정 한도</td><td><code>sb doctor</code>의 <code>llm-cli</code> 확인. 백엔드를 stdin으로 직접 실행해 재현. 계정 한도면 회복 후 <code>sb retry --stage compile</code> + 실행 1회</td></tr>
@@ -2197,7 +2192,7 @@ TMPDIR=/var/tmp .venv/bin/python scripts/korean-search-acceptance.py \
 
     <h3 id="t13-2">13.2 파이프라인</h3>
     <ul>
-      <li><strong>과거 브리핑 재시도 불가</strong> — <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE</code>. 실패 행과 attempts는 감사 기록으로 보존된다. <code>maintain</code>의 supersede는 “이후 성공 brief 존재 + 일시적 LLM 오류 아님”일 때만 상태를 닫는다.</li>
+      <li><strong>과거 브리핑 재시도 불가</strong> — <code>BRIEF_REPLAY_INPUTS_UNAVAILABLE</code>. 실패 행과 attempts는 감사 기록으로 보존된다. <code>maintain</code>의 supersede는 “이후 성공 brief 존재”일 때만 상태를 닫는다.</li>
       <li><strong><code>sb rollback</code> 미구현</strong> — 항상 <code>ROLLBACK_REQUIRES_GENERATION_AUTHORITY</code>. 실질 롤백은 릴리스 <code>current</code> 되돌리기 또는 백업 격리 복원이다.</li>
       <li><strong>brief는 변화가 있을 때만 실행</strong> — 조용한 날에는 일일 브리핑이 생기지 않는다(§6.3).</li>
       <li><strong>LLM 의존</strong> — compile/conflict/brief 모두 외부 CLI 백엔드가 필요하다. 백엔드 계정 한도·프록시 설정 같은 외부 조건이 그대로 실패로 나타난다.</li>
