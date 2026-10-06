@@ -76,21 +76,38 @@ def test_prior_done_does_not_supersede_later_failure(tmp_path: Path) -> None:
     assert failed.status == DerivStatus.FAILED.value
 
 
-def test_llm_unavailable_failure_is_not_superseded(tmp_path: Path) -> None:
+def test_historical_llm_timeout_superseded_after_later_brief(tmp_path: Path) -> None:
     failed_key = deriv_key(("note-a",), "brief", _PROMPT, _MODEL)
     done_key = deriv_key(("note-b",), "brief", _PROMPT, _MODEL)
     with Ledger(tmp_path) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "LLM unavailable after 1 attempts: Codex")
+        ledger.mark_failed(failed_key, "LLM unavailable after 2 attempts: timeout after 120s")
+        _stamp_finished(ledger, failed_key, "2026-10-03T00:00:00.000Z")
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
         ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
+        _stamp_finished(ledger, done_key, "2026-10-05T00:00:00.000Z")
+        closed = ledger.supersede_historical_brief_failures()
+        failed = ledger.get_derivation(failed_key)
+    assert closed == 1
+    assert failed is not None
+    assert failed.status == DerivStatus.SUPERSEDED.value
+    assert failed.error == "LLM unavailable after 2 attempts: timeout after 120s"
+
+
+def test_llm_timeout_stays_failed_without_later_success(tmp_path: Path) -> None:
+    failed_key = deriv_key(("note-a",), "brief", _PROMPT, _MODEL)
+    with Ledger(tmp_path) as ledger:
+        ledger.ensure_derivation(failed_key, "brief", "run-old")
+        ledger.mark_running(failed_key, "run-old")
+        ledger.mark_failed(failed_key, "LLM unavailable after 2 attempts: timeout after 120s")
         closed = ledger.supersede_historical_brief_failures()
         failed = ledger.get_derivation(failed_key)
     assert closed == 0
     assert failed is not None
     assert failed.status == DerivStatus.FAILED.value
+    assert failed.error == "LLM unavailable after 2 attempts: timeout after 120s"
 
 
 def test_superseded_brief_reopens_to_pending(tmp_path: Path) -> None:
@@ -128,11 +145,12 @@ def test_status_snapshot_omits_superseded_from_failed_list(tmp_path: Path) -> No
     with Ledger(tmp_path) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "unresolved citations")
+        ledger.mark_failed(failed_key, "LLM unavailable after 2 attempts: timeout after 120s")
         _stamp_finished(ledger, failed_key, "2026-09-05T00:00:00.000Z")
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
         ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
+        _stamp_finished(ledger, done_key, "2026-10-05T00:00:00.000Z")
         _ = ledger.supersede_historical_brief_failures()
     snapshot = status_snapshot(Config(raw={"vault_root": str(tmp_path)}))
     failed_items = cast(list[object], snapshot["failed_derivations"])

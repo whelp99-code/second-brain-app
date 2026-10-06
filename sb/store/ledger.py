@@ -49,10 +49,6 @@ _HEX: Final = frozenset("0123456789abcdef")
 CURRENT_SCHEMA_VERSION: Final = 5
 
 
-def _transient_llm_error(error: str | None) -> bool:
-    return bool(error) and error.casefold().startswith("llm unavailable")
-
-
 def _stamp(value: str | None) -> datetime | None:
     if value is None or value == "":
         return None
@@ -564,7 +560,7 @@ class Ledger:
             return 0
         closed = 0
         for row in self.list_derivations(status=DerivStatus.FAILED.value, stage="brief"):
-            if _transient_llm_error(row.error) or not _has_later_done_brief(row, done):
+            if not _has_later_done_brief(row, done):
                 continue
             require_transition(row.deriv_key, DerivStatus.FAILED, DerivStatus.SUPERSEDED)
             _ = self._exec(
