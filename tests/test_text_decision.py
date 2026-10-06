@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
 from sb.text_decision import (
     TextDecisionError,
@@ -140,6 +141,69 @@ def test_same_correction_is_replay_and_cancel_does_not_execute() -> None:
     assert propose_confirmed(inferred) is None
 
 
+def test_malformed_history_json_is_text_decision_error(tmp_path: Path) -> None:
+    path = tmp_path / "meet-bad.jsonl"
+    _ = path.write_text("{not-json\n", encoding="utf-8")
+    with pytest.raises(TextDecisionError, match="QUOTE_HISTORY_MALFORMED") as malformed:
+        _ = load_quote_history(tmp_path, "meet-bad")
+    assert not isinstance(malformed.value, json.JSONDecodeError)
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    ("identity", "revision", "state", "quote", "owner", "due", "scope", "basis", "prior_quote"),
+)
+def test_missing_history_field_is_text_decision_error(
+    tmp_path: Path,
+    missing_field: str,
+) -> None:
+    row: dict[str, str | int | None] = {
+        "identity": "meet-bad",
+        "revision": 1,
+        "state": "recorded",
+        "quote": "exact source quote",
+        "owner": "unknown",
+        "due": "unknown",
+        "scope": "unknown",
+        "basis": "quoted",
+        "prior_quote": None,
+    }
+    del row[missing_field]
+    _ = (tmp_path / "meet-bad.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
+    with pytest.raises(TextDecisionError, match="QUOTE_HISTORY_MALFORMED") as error:
+        _ = load_quote_history(tmp_path, "meet-bad")
+    assert not isinstance(error.value.__cause__, KeyError)
+
+
+def test_whitespace_metadata_stays_unknown(tmp_path: Path) -> None:
+    recorded = link_text_decision(
+        SOURCE,
+        identity="meet-space",
+        quote="담당 없는 메모는 보류.",
+        owner="김",
+        due="2026-10-09",
+        scope="personal",
+        basis="quoted",
+        action="record",
+    )
+    save_quote_history(tmp_path, recorded)
+    path = tmp_path / "meet-space.jsonl"
+    row = TypeAdapter(dict[str, str | int | None]).validate_json(
+        path.read_text(encoding="utf-8"),
+        strict=True,
+    )
+    row["owner"] = "   "
+    row["due"] = "\n"
+    row["scope"] = " \t "
+    _ = path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    loaded = load_quote_history(tmp_path, "meet-space")
+    assert loaded.quote == recorded.quote
+    assert loaded.scope == "unknown"
+    assert loaded.owner == "unknown"
+    assert loaded.due == "unknown"
+    assert loaded.basis == "quoted"
+
+
 def test_quote_history_reloads_same_fields_after_writer_dropped(tmp_path: Path) -> None:
     recorded = link_text_decision(
         SOURCE,
@@ -188,7 +252,7 @@ def test_quote_history_reloads_same_fields_after_writer_dropped(tmp_path: Path) 
         capture_output=True,
         text=True,
     )
-    reloaded = json.loads(replay.stdout)
+    reloaded = TypeAdapter(dict[str, str | int]).validate_json(replay.stdout, strict=True)
     assert reloaded == {
         "identity": loaded.identity,
         "revision": loaded.revision,

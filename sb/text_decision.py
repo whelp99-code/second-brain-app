@@ -3,12 +3,29 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, TypedDict
+
+from pydantic import TypeAdapter, ValidationError
 
 UNKNOWN: Final = "unknown"
 SCOPES: Final = frozenset({"personal", "company", UNKNOWN})
 BASES: Final = frozenset({"quoted", "inferred"})
 Action = Literal["record", "correct", "cancel"]
+
+
+class _QuoteHistoryRow(TypedDict):
+    identity: str
+    revision: int
+    state: str
+    quote: str
+    owner: str
+    due: str
+    scope: str
+    basis: str
+    prior_quote: str | None
+
+
+_QUOTE_HISTORY_ROW: Final[TypeAdapter[_QuoteHistoryRow]] = TypeAdapter(_QuoteHistoryRow)
 
 
 class TextDecisionError(ValueError):
@@ -121,10 +138,10 @@ def _journal_path(directory: str | Path, identity: str) -> Path:
 def save_quote_history(directory: str | Path, decision: TextDecision) -> None:
     """Append one quote-history revision to a caller-owned journal directory."""
     path = _journal_path(directory, decision.identity)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _ = path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(asdict(decision), ensure_ascii=False, sort_keys=True)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+        _ = handle.write(line + "\n")
 
 
 def load_quote_history(directory: str | Path, identity: str) -> TextDecision:
@@ -132,30 +149,39 @@ def load_quote_history(directory: str | Path, identity: str) -> TextDecision:
     path = _journal_path(directory, identity)
     if not path.is_file():
         raise TextDecisionError("QUOTE_HISTORY_MISSING")
-    last: dict[str, object] | None = None
+    last: _QuoteHistoryRow | None = None
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
-            loaded = json.loads(line)
-            if not isinstance(loaded, dict):
-                raise TextDecisionError("QUOTE_HISTORY_MISSING")
+            try:
+                loaded = _QUOTE_HISTORY_ROW.validate_json(line, strict=True)
+            except ValidationError as exc:
+                raise TextDecisionError("QUOTE_HISTORY_MALFORMED") from exc
             last = loaded
-    if last is None or last.get("identity") != identity:
+    if last is None:
         raise TextDecisionError("QUOTE_HISTORY_MISSING")
-    revision = last.get("revision")
-    if isinstance(revision, bool) or not isinstance(revision, int):
+    if last["identity"] != identity:
         raise TextDecisionError("QUOTE_HISTORY_MISSING")
-    prior = last.get("prior_quote")
-    if prior is not None and not isinstance(prior, str):
-        raise TextDecisionError("QUOTE_HISTORY_MISSING")
+    if last["revision"] < 1:
+        raise TextDecisionError("QUOTE_HISTORY_MALFORMED")
+    state = last["state"]
+    if state not in {"recorded", "corrected", "cancelled"}:
+        raise TextDecisionError("QUOTE_HISTORY_MALFORMED")
+    prior = last["prior_quote"]
+    scope = _stated(last["scope"])
+    if scope not in SCOPES:
+        raise TextDecisionError("QUOTE_HISTORY_MALFORMED")
+    basis = last["basis"]
+    if basis not in BASES:
+        raise TextDecisionError("QUOTE_HISTORY_MALFORMED")
     return TextDecision(
         identity=identity,
-        revision=revision,
-        state=str(last["state"]),
-        quote=str(last["quote"]),
-        owner=str(last["owner"]),
-        due=str(last["due"]),
-        scope=str(last["scope"]),
-        basis=str(last["basis"]),
+        revision=last["revision"],
+        state=state,
+        quote=last["quote"],
+        owner=_stated(last["owner"]),
+        due=_stated(last["due"]),
+        scope=scope,
+        basis=basis,
         prior_quote=prior,
     )
 
