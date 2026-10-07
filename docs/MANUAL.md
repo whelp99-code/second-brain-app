@@ -698,10 +698,10 @@ current(세대 A)            staging/<64hex>             새 세대 B           
 
 - 현재 세대의 `ledger.db`에서 `stage='brief'`인 `failed` 개수와 `done` 개수를 읽는다.
 - **둘 다 1건 이상일 때만** EFFECT mutation으로 `supersede_historical_brief_failures()`를 실행한다.
-- 그 안에서 실패 brief 행은 다음 두 조건을 모두 만족할 때만 `superseded`로 바뀐다
-  (`sb/store/ledger.py`):
-  - 오류 문자열이 **일시적 LLM 오류가 아닐 것** (`error.casefold().startswith("llm unavailable")`이면 제외)
-  - 그 행의 `finished_at`보다 **나중에 끝난 `done` brief 행이 존재**할 것 (`_has_later_done_brief`)
+- 그 안에서 실패 brief 행은 그 행의 `finished_at`보다 **나중에 끝난 `done` brief 행이 존재**할 때만
+  `superseded`로 바뀐다 (`sb/store/ledger.py`, `_has_later_done_brief`). `LLM unavailable` 타임아웃 실패도
+  같은 조건으로 닫히며, 원래 오류 문자열은 행과 전이 이벤트에 그대로 남는다. 나중 성공이 없거나
+  실패 시각을 읽을 수 없으면 `failed`로 남는다.
 - 행은 삭제되지 않는다. 상태만 바뀌고 전이 이벤트가 기록된다.
 
 출력은 한 줄 JSON이다:
@@ -1571,7 +1571,7 @@ systemctl --user start jm-second-brain-refresh.service
 | `sb maintain --once`가 `GENERATION_READER_DRAIN_REQUIRED` + exit 1 | 선행 세대 디렉터리를 연 fd가 남아 있다(동시 실행한 `sb status`/`sb search`, 구 릴리스의 `sb mcp` 프로세스 등) | 읽기 CLI를 모두 끝내고 단독으로 재실행. 구 릴리스 MCP 프로세스가 있으면 SIGTERM |
 | 유지보수가 `GENERATION_READER_DRAIN_UNVERIFIABLE` | `/proc`을 읽을 수 없는 환경 | `ProtectProc`/컨테이너 설정을 확인한다. 이 검사는 우회할 수 없다 |
 | `/ready`가 `GENERATION_CLEANUP_STALLED` | 현재 세대가 아닌 `activated` 행이 남았고 디렉터리·핀이 없다(고아) | `sb maintain --once` 1회. 2026-09-15 운영에서 `activated 3 → proved`로 해소 |
-| `/ready`가 `DERIVATIONS_FAILED` | `derivation`에 `failed` 행 존재 | `sb status --json`의 `failed_by_stage` 확인. compile/conflict는 원인 해소 후 `sb retry --stage <stage>`. brief는 `maintain`이 조건(이후 성공 brief 존재 + 일시적 LLM 오류 아님)을 만족할 때 `superseded`로 종결 |
+| `/ready`가 `DERIVATIONS_FAILED` | `derivation`에 `failed` 행 존재 | `sb status --json`의 `failed_by_stage` 확인. compile/conflict는 원인 해소 후 `sb retry --stage <stage>`. brief는 `maintain`이 이후 성공 brief가 있을 때 `superseded`로 종결 |
 | `sb retry`가 `BRIEF_REPLAY_INPUTS_UNAVAILABLE` | 선택 집합에 `brief` 행이 섞였다 | `--stage compile` 등으로 단계를 좁힌다. 과거 브리핑은 의도적으로 재생하지 않는다 |
 | `/ready`가 `LAST_RUN_UNSUCCESSFUL` | 최신 run status가 `ok`/`capped`가 아님 | `sb status --json`의 `recent_stages`에서 실패 단계와 사유 확인 |
 | compile이 전부 `LLM unavailable after 2 attempts` | 백엔드 CLI가 없거나(`command not found`), 설정을 잘못 상속했거나, 계정 한도 | `sb doctor`의 `llm-cli` 확인. 백엔드를 stdin으로 직접 실행해 재현. 계정 한도면 회복 후 `sb retry --stage compile` + 실행 1회 |
@@ -1681,7 +1681,7 @@ TMPDIR=/var/tmp .venv/bin/python scripts/korean-search-acceptance.py \
 ### 13.2 파이프라인
 
 - **과거 브리핑 재시도 불가** — `BRIEF_REPLAY_INPUTS_UNAVAILABLE`. 실패 행과 attempts는 감사 기록으로
-  보존된다. `maintain`의 supersede는 "이후 성공 brief 존재 + 일시적 LLM 오류 아님"일 때만 상태를 닫는다.
+  보존된다. `maintain`의 supersede는 "이후 성공 brief 존재"일 때만 상태를 닫는다.
 - **`sb rollback` 미구현** — 항상 `ROLLBACK_REQUIRES_GENERATION_AUTHORITY`. 실질 롤백은 릴리스 `current`
   되돌리기 또는 백업 격리 복원이다.
 - **brief는 변화가 있을 때만 실행** — 조용한 날에는 일일 브리핑이 생기지 않는다(§6.3).

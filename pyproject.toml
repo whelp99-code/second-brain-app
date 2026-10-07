@@ -50,3 +50,6 @@ target-version = "py312"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live_emb: downloads BAAI/bge-m3; run only in the embeddings CI job",
+]

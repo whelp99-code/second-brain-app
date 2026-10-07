@@ -347,6 +347,7 @@ def test_hybrid_search_fuses_cosine_when_vectors_ready(tmp_path: Path) -> None:
     assert fused[0].score != lexical[0].score
 
 
+@pytest.mark.live_emb
 @pytest.mark.skipif(os.environ.get("SB_LIVE_EMB") != "1", reason="optional live smoke")
 def test_live_warmup_and_korean_english_query(tmp_path: Path) -> None:
     from sb.embeddings import warmup

@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen --group dev
+
+      - name: Isolate home and config
+        run: |
+          mkdir -p "$RUNNER_TEMP/home" "$RUNNER_TEMP/xdg-config" "$RUNNER_TEMP/xdg-data"
+          echo "HOME=$RUNNER_TEMP/home" >> "$GITHUB_ENV"
+          echo "XDG_CONFIG_HOME=$RUNNER_TEMP/xdg-config" >> "$GITHUB_ENV"
+          echo "XDG_DATA_HOME=$RUNNER_TEMP/xdg-data" >> "$GITHUB_ENV"
+
+      - name: Ruff
+        run: uv run ruff check sb tests
+
+      - name: basedpyright (files that pass on master)
+        run: |
+          mapfile -t exclude < .github/pyright-baseline.txt
+          declare -A skip
+          for path in "${exclude[@]}"; do
+            [[ -z "$path" || "$path" == \#* ]] && continue
+            skip["$path"]=1
+          done
+          files=()
+          while IFS= read -r path; do
+            [[ -n "${skip[$path]:-}" ]] && continue
+            files+=("$path")
+          done < <(find sb tests -name '*.py' -type f | sort)
+          set +e
+          uv run basedpyright --outputjson "${files[@]}" > "$RUNNER_TEMP/basedpyright.json"
+          set -e
+          uv run python - << 'PY'
+          import json, os, sys
+          from pathlib import Path
+          data = json.loads(Path(os.environ["RUNNER_TEMP"], "basedpyright.json").read_text())
+          errors = [d for d in data.get("generalDiagnostics", []) if d.get("severity") == "error"]
+          print(f"{len(errors)} errors, {data.get('summary', {}).get('warningCount', '?')} warnings")
+          for d in errors[:50]:
+              loc = d.get("range", {}).get("start", {})
+              print(f"{d.get('file')}:{loc.get('line', 0)+1}: {d.get('message','').splitlines()[0]}")
+          sys.exit(1 if errors else 0)
+          PY
+
+      - name: Pytest
+        run: |
+          git config --global user.name "second-brain-ci"
+          git config --global user.email "ci@example.com"
+          uv run pytest -q -m "not live_emb"
+
+  embeddings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies including embeddings extra
+        run: uv sync --frozen --group dev --extra embeddings
+
+      - name: Cache BAAI/bge-m3
+        uses: actions/cache@v4
+        with:
+          path: .hf-cache
+          key: hf-bge-m3-5617a9f61b028005a4858fdac845db406aefb181
+
+      - name: Warm the pinned model if the cache missed
+        env:
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+        run: |
+          uv run python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3', revision='5617a9f61b028005a4858fdac845db406aefb181')"
+
+      - name: Live embedding smoke
+        env:
+          SB_LIVE_EMB: "1"
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+          HOME: ${{ runner.temp }}/home
+          XDG_CONFIG_HOME: ${{ runner.temp }}/xdg-config
+          XDG_DATA_HOME: ${{ runner.temp }}/xdg-data
+        run: |
+          mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+          uv run pytest -q -m live_emb
