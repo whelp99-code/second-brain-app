@@ -36,3 +36,27 @@ tests/test_life_sensor_ingress.py
 tests/test_life_workflow_http.py
 tests/test_life_workflow_objects.py
 tests/test_ops.py
+
+# Pre-existing errors on the production lineage (c33517f, schema 6), which never ran this CI.
+# Same 21 error files before and after merging master; this merge adds none.
+sb/connectors/records_life.py
+sb/generation_changes.py
+sb/mcp.py
+sb/mcp_contract.py
+sb/search.py
+tests/test_derivation_lineage.py
+tests/test_life_acceptance_r1.py
+tests/test_life_cas_refcount.py
+tests/test_life_contract_fixtures.py
+tests/test_life_delivery_race.py
+tests/test_life_evidence_links.py
+tests/test_life_ingest_quarantine.py
+tests/test_life_kakao_export.py
+tests/test_life_model_egress_harness.py
+tests/test_life_projection_daily.py
+tests/test_life_relations.py
+tests/test_mcp_personal_memory_profile.py
+tests/test_observation_admission.py
+tests/test_observation_receipt_pipeline.py
+tests/test_source_manifest.py
+tests/test_web_source_observations.py
