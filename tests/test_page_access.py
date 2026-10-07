@@ -7,6 +7,7 @@ from contextlib import closing
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
 from sb.config import Config
 from sb.page_access import PageAccess
@@ -20,7 +21,7 @@ def test_all_inputs_and_parent_requirements_are_retained(tmp_path: Path):
     a = SourceItem("docs", "a", "1", "a" * 64, "1", "1")
     b = SourceItem("docs", "b", "1", "b" * 64, "1", "1")
     with Ledger(tmp_path) as ledger:
-        ledger.upsert_source_items([a, b])
+        _ = ledger.upsert_source_items([a, b])
         ledger.bind_source_access(a, SourceAccess("principal:owner", ("project:a",), "1"))
         parent = ledger.compiled_page_access((("docs:a", a.content_hash),))
         assert parent.complete
@@ -44,13 +45,13 @@ def test_all_inputs_and_parent_requirements_are_retained(tmp_path: Path):
 
 def test_page_access_strict_roundtrip():
     with pytest.raises(ValueError, match="PAGE_ACCESS_CORRUPT"):
-        PageAccess.decode('{"schema_version":1,"source_refs":[],"complete":true}')
+        _ = PageAccess.decode('{"schema_version":1,"source_refs":[],"complete":true}')
 
 
 def test_ingest_compile_binds_committed_page_bytes(tmp_path: Path):
     source = tmp_path / "source"
     source.mkdir()
-    (source / "a.md").write_text("Alpha fixture memory.")
+    _ = (source / "a.md").write_text("Alpha fixture memory.")
     vault = tmp_path / "share" / "vault"
     config = Config(
         raw={
@@ -83,10 +84,10 @@ def test_ingest_compile_binds_committed_page_bytes(tmp_path: Path):
         assert files
         for name in files:
             raw = subprocess.check_output(["git", "-C", str(vault), "show", f"HEAD:{name}"])
-            row = db.execute(
+            row = TypeAdapter[tuple[str] | None](tuple[str] | None).validate_python(db.execute(
                 "SELECT requirements_json FROM page_access WHERE page_id=? AND content_digest=?",
                 (name.removesuffix(".md"), "sha256:" + hashlib.sha256(raw).hexdigest()),
-            ).fetchone()
+            ).fetchone(), strict=True)
             binding = PageAccess.decode(row[0]) if row else None
             assert binding is not None and binding.complete
             assert len(binding.source_refs) == 1

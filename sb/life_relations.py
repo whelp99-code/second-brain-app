@@ -6,43 +6,88 @@ people. All returned edges carry their original event evidence and revision.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any
+from typing import TypedDict
 
+from sb.effect_values import JsonInput
 from sb.life_contracts import RELATION_KINDS, LifeEventV1, LifeInputError
+from sb.life_fields import integer, string
+from sb.life_grouping import entity_namespace, qualified_entity_id
+from sb.life_journal_contracts import JournalRow
 from sb.life_values import instant, text
+
+
+class EntityNode(TypedDict):
+    kind: str
+    label: str
+    namespace: str
+    event_ids: list[str]
+
+
 from sb.store.life_journal import LifeJournal, identity
 
 
-def entities(events: Sequence[LifeEventV1]) -> dict[str, dict[str, Any]]:
-    result: dict[str, dict[str, Any]] = {}
+def entities(events: Sequence[LifeEventV1]) -> dict[str, EntityNode]:
+    result: dict[str, EntityNode] = {}
     for event in events:
         result[event.event_id] = {
             "kind": "event",
             "label": event.title,
+            "namespace": event.source_id,
             "event_ids": [event.event_id],
         }
         for entity in event.entities:
-            key = event.source_id + ":" + entity.entity_id
+            key = qualified_entity_id(event.source_id, entity.entity_id)
             row = result.setdefault(
-                key, {"kind": entity.kind, "label": entity.label, "event_ids": []}
+                key,
+                {
+                    "kind": entity.kind,
+                    "label": entity.label,
+                    "namespace": entity_namespace(event.source_id, entity.entity_id),
+                    "event_ids": [],
+                },
             )
             if row["kind"] != entity.kind:
                 raise LifeInputError("LIFE_ENTITY_CONFLICT")
-            row["event_ids"].append(event.event_id)
+            if event.event_id not in row["event_ids"]:
+                row["event_ids"].append(event.event_id)
+    for row in result.values():
+        row["event_ids"].sort()
     return result
+
+
+def resolved_entities(
+    inventory: Mapping[str, EntityNode], alias_rows: Sequence[JournalRow]
+) -> dict[str, str]:
+    """Follow explicit merges. A later split removes the redirect."""
+    redirects = {
+        string(row["body"]["from_id"]): string(row["body"]["to_id"])
+        for row in alias_rows
+        if row["body"]["state"] == "merged"
+    }
+
+    def resolve(key: str) -> str:
+        seen = {key}
+        while key in redirects:
+            key = redirects[key]
+            if key in seen:
+                raise LifeInputError("LIFE_ALIAS_CYCLE")
+            seen.add(key)
+        return key
+
+    return {key: resolve(key) for key in inventory}
 
 
 def add(
     journal: LifeJournal,
-    data: dict[str, object],
+    data: Mapping[str, JsonInput],
     *,
     events: Sequence[LifeEventV1],
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> dict[str, Any]:
+) -> JournalRow:
     if set(data) - {
         "from_id",
         "to_id",
@@ -81,9 +126,9 @@ def add(
     start = data.get("valid_from")
     end = data.get("valid_until")
     if start is not None:
-        instant(start)
+        _ = instant(start)
     if end is not None:
-        instant(end)
+        _ = instant(end)
     if start is not None and end is not None and instant(start) >= instant(end):
         raise LifeInputError("LIFE_TIME_INVALID")
     key = text(data.get("idempotency_key"), maximum=256)
@@ -105,13 +150,13 @@ def add(
 
 def alias(
     journal: LifeJournal,
-    data: dict[str, object],
+    data: Mapping[str, JsonInput],
     *,
     events: Sequence[LifeEventV1],
     scopes: tuple[str, ...],
     source_ids: tuple[str, ...],
     now: datetime,
-) -> dict[str, Any]:
+) -> JournalRow:
     if set(data) - {"from_id", "to_id", "action", "reason", "expected_revision"}:
         raise LifeInputError("LIFE_UNKNOWN_FIELD")
     left, right = text(data.get("from_id"), maximum=320), text(data.get("to_id"), maximum=320)
@@ -130,7 +175,9 @@ def alias(
         "entity_alias", scopes=scopes, source_ids=source_ids, events=events, limit=10000
     )
     redirects = {
-        r["body"]["from_id"]: r["body"]["to_id"] for r in rows if r["body"]["state"] == "merged"
+        string(r["body"]["from_id"]): string(r["body"]["to_id"])
+        for r in rows
+        if r["body"]["state"] == "merged"
     }
     target = right
     seen = {left}
@@ -160,5 +207,5 @@ def alias(
         },
         events=selected,
         now=now,
-        expected_revision=data.get("expected_revision", 0),
+        expected_revision=integer(data.get("expected_revision", 0), "LIFE_REVISION_INVALID"),
     )

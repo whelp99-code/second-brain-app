@@ -34,6 +34,8 @@ def _config(tmp_path: Path) -> ExecutorConfig:
     )
 
 
+config = _config
+
 def test_apply_once_consumes_v1_remember_into_one_sealed_generation(tmp_path: Path) -> None:
     config = _config(tmp_path)
     accepted = accept_stable_v1_request(config.request_root, write_fixture_request(), NOW)

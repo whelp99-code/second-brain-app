@@ -1,0 +1,19 @@
+[
+  {"name":"namespace","set":{"namespace":"company:12345678-1234-1234-1234-123456789abc"},"error":"SOURCE_MANIFEST_MISMATCH"},
+  {"name":"account","set":{"account_id":"someone-else"},"error":"SOURCE_MANIFEST_MISMATCH"},
+  {"name":"missing-account","remove":"account_id","error":"FIELDS_INVALID"},
+  {"name":"revision","set":{"revision":0},"error":"INTEGER_INVALID"},
+  {"name":"boolean-revision","set":{"revision":true},"error":"INTEGER_INVALID"},
+  {"name":"unsafe-revision","set":{"revision":9007199254740992},"error":"INTEGER_INVALID"},
+  {"name":"hash","set":{"content_sha256":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},"error":"CONTENT_HASH_MISMATCH"},
+  {"name":"malformed-hash","set":{"content_sha256":"not-a-hash"},"error":"CONTENT_HASH_INVALID"},
+  {"name":"time","set":{"occurred_at":"2026-02-30T00:00:00.000Z"},"error":"TIME_MISMATCH"},
+  {"name":"ingested-time","set":{"ingested_at":"2026-02-30T00:00:00.000Z"},"error":"TIME_INVALID"},
+  {"name":"offset","set":{"original_timestamp":"2026-09-23T09:00:00+08:00"},"error":"TIME_MISMATCH"},
+  {"name":"timezone","set":{"source_timezone":"UTC"},"error":"TIMEZONE_MISMATCH"},
+  {"name":"policy","set":{"source_policy_revision":"allow-all"},"error":"SOURCE_MANIFEST_MISMATCH"},
+  {"name":"owner","set":{"owner":"principal:attacker"},"error":"FIELDS_INVALID"},
+  {"name":"span","set":{"evidence_spans":[{"kind":"byte","start":9,"end":1}]},"error":"EVIDENCE_SPAN_INVALID"},
+  {"name":"span-bounds","set":{"evidence_spans":[{"kind":"byte","start":0,"end":1000}]},"error":"EVIDENCE_SPAN_OUT_OF_BOUNDS"},
+  {"name":"span-extra","set":{"evidence_spans":[{"kind":"byte","start":0,"end":1,"execute":"no"}]},"error":"FIELDS_INVALID"}
+]

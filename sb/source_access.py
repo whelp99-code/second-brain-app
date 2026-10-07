@@ -39,6 +39,20 @@ class SourceAccess:
             "policy_revision": self.policy_revision}, sort_keys=True, separators=(",", ":"))
 
 
+def require_current_source_access(
+    recorded: SourceAccess | None, configured: SourceAccess | None,
+) -> SourceAccess | None:
+    """Use only an exact, immutable ingest binding at an egress boundary.
+
+    Missing history is unclassified, not permission to stamp today's policy on
+    yesterday's bytes. Changing or removing an existing classification requires
+    the explicit migration already required by the ingest writer.
+    """
+    if recorded is not None and recorded != configured:
+        raise ValueError("SOURCE_ACCESS_RECLASSIFICATION_REQUIRED")
+    return recorded
+
+
 def source_access_identity(source_id: str, source_uri: str, content_hash: str) -> str:
     if not source_id or not source_uri or _HASH.fullmatch(content_hash) is None:
         raise ValueError("SOURCE_ACCESS_IDENTITY_INVALID")

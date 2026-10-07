@@ -31,10 +31,10 @@ def test_export_scan_keeps_originals_and_reads_mail_kakao_and_calls(tmp_path: Pa
     kakao = exports / "chat.kakao.txt"
     call = exports / "today.call.vtt"
     audio = exports / "voice.m4a"
-    eml.write_bytes(_eml("계약", "수요일에 발송한다. password=secret"))
-    kakao.write_text("카카오 내보내기\n회의는 내일", encoding="utf-8")
-    call.write_text("WEBVTT\n\n00:00.000 --> 00:01.000\n통화 내용", encoding="utf-8")
-    audio.write_bytes(b"not-a-real-audio")
+    _ = eml.write_bytes(_eml("계약", "수요일에 발송한다. password=secret"))
+    _ = kakao.write_text("카카오 내보내기\n회의는 내일", encoding="utf-8")
+    _ = call.write_text("WEBVTT\n\n00:00.000 --> 00:01.000\n통화 내용", encoding="utf-8")
+    _ = audio.write_bytes(b"not-a-real-audio")
     before = {path.name: path.read_bytes() for path in exports.iterdir()}
     adapter = create(_config(tmp_path))
     items = list(adapter.scan(None))
@@ -62,6 +62,6 @@ def test_web_push_builds_a_request_and_refuses_to_listen() -> None:
     payload = notification_request("https://push.example/send", "브리핑", "새 추천")
     assert payload["endpoint"].startswith("https://")
     with pytest.raises(ValueError):
-        notification_request("http://push.example/send", "브리핑", "새 추천")
+        _ = notification_request("http://push.example/send", "브리핑", "새 추천")
     with pytest.raises(PushServerRefused, match="NO_PUSH_SERVER"):
         listen()

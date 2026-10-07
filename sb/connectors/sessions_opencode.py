@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sqlite3
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
@@ -58,7 +59,8 @@ class OpenCodeSessionsAdapter:
 
     accepted_adapters: Final = _ADAPTERS
 
-    def __init__(self, roots: tuple[Path, ...], source_id: str) -> None:
+    def __init__(self, roots: tuple[Path, ...], source_id: str, filter_noise: bool = False) -> None:
+        self._filter_noise: bool = filter_noise
         self.source_id: str = source_id
         self._roots: tuple[Path, ...] = roots
         self._next_cursor: str = "0"
@@ -88,7 +90,7 @@ class OpenCodeSessionsAdapter:
                     size = before[2]
                     if size > MAX_SNAPSHOT_BYTES:
                         raise _SnapshotSizeLimit
-                    extracted = self._read_snapshot(path, rel, size)
+                    extracted = self.read_snapshot(path, rel, size)
                     if file_revision(path) != before:
                         current[rel] = start
                         items.append(_skip(self.source_id, rel, "unstable-session-file"))
@@ -124,7 +126,7 @@ class OpenCodeSessionsAdapter:
     def next_cursor(self) -> str:
         return self._next_cursor
 
-    def _read_snapshot(
+    def read_snapshot(
         self, path: Path, rel: str, _size: int
     ) -> list[tuple[SourceRef, bytes, ItemMeta]]:
         with open_session_file(path) as stream:
@@ -149,17 +151,47 @@ class OpenCodeSessionsAdapter:
                 extracted = _from_sqlite(selected)
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         for item_id, text in extracted:
+            if self._filter_noise and _noise(text):
+                continue
             token = _content_revision([(item_id, text)])
             uri = f"{rel}#{item_id}"
-            meta: ItemMeta = {"relative_path": rel, "cursor": token}
+            meta = _item_meta(rel, token, text, self._filter_noise)
             items.append((SourceRef(self.source_id, uri, token), text.encode(), meta))
         return items
+
+
+_NOISE_RE: Final = re.compile(
+    r"(?:api[_-]?key|access[_-]?token|password|secret|authorization)\s*[:=]\s*\S+"
+    + r"|bearer\s+\S+"
+    + r"|\x1b\["
+    + r"|^\s*(?:\$ |>>> |curl\s+-)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _item_meta(rel: str, token: str, text: str, tagged: bool) -> ItemMeta:
+    payload: dict[str, str] = {"relative_path": rel, "cursor": token}
+    if tagged:
+        payload["fact_kind"] = _fact_kind(text)
+    return cast(ItemMeta, cast(object, payload))
+
+
+def _noise(text: str) -> bool:
+    return _NOISE_RE.search(text) is not None
+
+
+def _fact_kind(text: str) -> str:
+    found = re.match(r"(?i)^\s*(decision|attempt|test|commit|deploy)\s*:", text)
+    return found.group(1).lower() if found else "observation"
 
 
 def create(config: _ConnectorConfig) -> SourceAdapter:
     """Build the OpenCode adapter from config, probing default roots when unset."""
     source_id, roots = _configured_roots(config)
-    return OpenCodeSessionsAdapter(roots=roots, source_id=source_id)
+    enabled = any(row.get("session_profile") == "facts-v1" and
+                  (row.get("adapter") or row.get("type")) in _ADAPTERS
+                  for row in config.source_roots)
+    return OpenCodeSessionsAdapter(roots=roots, source_id=source_id, filter_noise=enabled)
 
 
 def _configured_roots(config: _ConnectorConfig) -> tuple[str, tuple[Path, ...]]:
@@ -348,14 +380,14 @@ def _from_sqlite(database: Path) -> list[tuple[str, str]]:
         raise OSError("snapshot database cannot be read") from exc
     finally:
         connection.close()
-    extracted = _parts_from_rows(rows)
+    extracted = parts_from_rows(rows)
     _require_export_database(database)
     if file_revision(database) != before:
         raise _UnstableDatabase
     return extracted
 
 
-def _parts_from_rows(rows: Sequence[tuple[object, ...]]) -> list[tuple[str, str]]:
+def parts_from_rows(rows: Sequence[tuple[object, ...]]) -> list[tuple[str, str]]:
     items: list[tuple[str, str]] = []
     for row in rows:
         if len(row) < 2 or not isinstance(row[0], str) or not isinstance(row[1], str):

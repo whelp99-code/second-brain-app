@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.test_web import _ready, _request, _running
+from tests.test_web import ready as _ready
+from tests.test_web import request as _request
+from tests.test_web import running as _running
 
 
 def test_inbox_discard_refuses_outside_vault_parent_symlink(tmp_path: Path) -> None:
@@ -10,10 +12,10 @@ def test_inbox_discard_refuses_outside_vault_parent_symlink(tmp_path: Path) -> N
     outside = tmp_path / "outside-vault"
     outside.mkdir()
     victim = outside / "canary.md"
-    victim.write_text("isolated external canary", encoding="utf-8")
+    _ = victim.write_text("isolated external canary", encoding="utf-8")
     inbox = vault / "inbox"
     inbox.mkdir(exist_ok=True)
-    (inbox / "pending.md").write_text("pending note", encoding="utf-8")
+    _ = (inbox / "pending.md").write_text("pending note", encoding="utf-8")
     with _running(config) as base:
         ok_status, ok_body = _request(
             base + "/api/inbox-discard", method="POST", payload={"inbox_path": "inbox/pending.md"})
@@ -26,7 +28,7 @@ def test_inbox_discard_refuses_outside_vault_parent_symlink(tmp_path: Path) -> N
         link_status, _ = _request(
             base + "/api/inbox-discard", method="POST", payload={"inbox_path": "inbox/outside-link.md"})
         assert link_status == 400 and victim.exists()
-        inbox.rename(vault / "saved-inbox")
+        _ = inbox.rename(vault / "saved-inbox")
         inbox.symlink_to(outside, target_is_directory=True)
         parent_status, _ = _request(
             base + "/api/inbox-discard", method="POST", payload={"inbox_path": "inbox/canary.md"})

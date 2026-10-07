@@ -4,7 +4,7 @@ A small Obsidian client for the existing Python Second Brain server. It manages 
 
 ## Implemented client paths
 
-The plugin provides session login, verified paged synchronization, memory home, date navigation, capture, explicit personal-note capture, current/as-of recall, evidence inspection, correction, question response/skip/mute, typed-relation filters, prediction/actual views, and source/delivery/device status. The command IDs are registered in `main.src.cjs` and tested by `test/paging-ui.test.cjs`.
+The plugin provides session login, verified paged synchronization, memory home, date navigation, capture, explicit personal-note capture, current/as-of recall, evidence inspection, correction, question response/skip/mute, a typed relation panel (`sb-relation-panel`: one section per kind, edges only with evidence rows, filter stored in plugin data), prediction/actual views, and source/delivery/device status. The panel view is registered on mobile and desktop. Command IDs are registered in `main.src.cjs` and covered by `test/paging-ui.test.cjs` and `test/relations-panel.test.cjs`. Login tokens stay in session memory and are not written to plugin data.
 
 `Auto/` is server-managed; `MyNotes/` remains user-owned. Unknown existing files are not adopted. Changes to a previously managed file become conflicts, never silent overwrites. The synchronization journal records intended hashes before compare-and-write and only advances the cursor for a complete, conflict-free snapshot. Pages from different generations cannot be combined. Full generation and file hashes are verified before writes.
 

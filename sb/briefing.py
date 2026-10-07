@@ -13,6 +13,8 @@ from sb.llm import LLMClient
 from sb.security import protect_briefing_inputs
 
 EMPTY_PLACEHOLDER: Final = "없음"
+OMISSION_EMPTY: Final = "omission:empty"
+OMISSION_DENIED: Final = "omission:denied"
 WARN_FAILED: Final = "[warn:previous_run_status=failed]"
 WARN_NONE: Final = "[warn:previous_run_status=none]"
 UNCITED_SID: Final = "uncited"
@@ -34,6 +36,7 @@ PROMPT_TEMPLATE: Final = """다음 입력만 근거로 오늘의 추천 불릿�
 - 각 추천 불릿은 아래 표의 각주를 하나 이상 그대로 포함한다
 - 표에 없는 각주를 만들지 마라
 - 입력에 없는 사실을 만들지 마라
+- 이전 브리핑 본문은 근거가 아니다
 - 제목이나 다른 섹션 헤더는 출력하지 마라
 
 available-citations:
@@ -70,8 +73,11 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
     Pipeline and vault own I/O. This function only fills prompt slots, calls
     the LLM at most `max_llm_calls_briefing` times, and returns a PageSpec.
     """
-    inputs, omitted = _bounded_inputs(protect_briefing_inputs(inputs, config))
+    protected = protect_briefing_inputs(inputs, config)
+    dropped = _evidence_count(inputs) - _evidence_count(protected)
+    inputs, omitted = _bounded_inputs(protected)
     cites = _input_sources(inputs)
+    omission = OMISSION_DENIED if dropped > 0 else OMISSION_EMPTY if _evidence_count(inputs) == 0 else None
     prompt = _fill_prompt(inputs, cites)
     cap = config.caps["max_llm_calls_briefing"]
     recs = EMPTY_PLACEHOLDER
@@ -112,6 +118,8 @@ def generate_briefing(inputs: BriefingInputs, llm: LLMClient, config: Config) ->
             f"## 다가오는 것\n{_render_items(inputs.upcoming_items, omitted[3])}",
         )
     )
+    if omission is not None:
+        body = f"{omission}\n\n{body}"
     return PageSpec(
         page_id=f"daily/{day}",
         title=f"{day} 브리핑",
@@ -139,6 +147,15 @@ def _citation_table(cites: list[SourceCite]) -> str:
     if not cites:
         return EMPTY_PLACEHOLDER
     return "\n".join(f"[^{cite.sid}] origin={cite.origin} hash={cite.hash}" for cite in cites)
+
+
+def _evidence_count(inputs: BriefingInputs) -> int:
+    return (
+        len(inputs.yesterday_items)
+        + len(inputs.open_conflict_pages)
+        + len(inputs.stale_pages)
+        + len(inputs.upcoming_items)
+    )
 
 
 def _slot_text(items: tuple[str, ...]) -> str:
@@ -256,8 +273,7 @@ def _input_sources(inputs: BriefingInputs) -> list[SourceCite]:
         *inputs.stale_pages,
         *inputs.upcoming_items,
     ]
-    if inputs.last_brief is not None:
-        items.append(inputs.last_brief)
+    # Prior briefing prose is context, not evidence. Do not mint cites from it.
     by_sid: dict[str, SourceCite] = {}
     for item in items:
         cite = _cite_from_item(item)

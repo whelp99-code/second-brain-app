@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import json
+import multiprocessing
+import os
+import signal
 from datetime import timedelta
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonObject, JsonValue
 from sb.life_lock import publication_lock
 from sb.life_restore import capture, materialize
 from sb.ops import OperationError, create_backup, restore_backup
 from sb.pipeline import run_life_batch, run_life_forget
 from sb.search import SearchIndex
 from sb.store.ledger import Ledger
+from tests.life_test_support import json_int, json_text
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import item as base_item
 from tests.test_life_pipeline import life_config
@@ -20,11 +27,11 @@ from tests.test_life_pipeline import life_config
 SCOPES = ("principal:owner",)
 
 
-def item(*, key="request-1", **changes):
+def item(*, key: str = "request-1", **changes: JsonValue) -> JsonObject:
     return {**base_item(**changes), "idempotency_key": key}
 
 
-def test_restore_old_backup_preserves_correction_deletion_and_new_receipts(tmp_path):
+def test_restore_old_backup_preserves_correction_deletion_and_new_receipts(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     _, receipts = run_life_batch(
         config,
@@ -36,7 +43,7 @@ def test_restore_old_backup_preserves_correction_deletion_and_new_receipts(tmp_p
         now=NOW,
     )
     archive = tmp_path / "old.tar.gz"
-    create_backup(root, archive)
+    _ = create_backup(root, archive)
     correction = item(
         key="correct-a", source_item_id="a", source_version="v2", body="확정새내용오메가"
     )
@@ -49,13 +56,13 @@ def test_restore_old_backup_preserves_correction_deletion_and_new_receipts(tmp_p
     )
     assert out.exit_code == 0
     out = run_life_forget(
-        config, "test-notes", receipts[1]["event_id"], 1, now=NOW + timedelta(minutes=2)
+        config, "test-notes", json_text(receipts[1]["event_id"]), 1, now=NOW + timedelta(minutes=2)
     )
     assert out.exit_code == 0
     with Ledger(root) as ledger:
         prior = ledger.life_store().events(scopes=SCOPES, now=NOW + timedelta(minutes=2))
         before = {e.event_id: e.as_dict() for e in prior}
-        receipt_count = (
+        receipt_count = json_int(
             ledger.life_store()
             .connection.execute("SELECT COUNT(*) FROM life_receipts")
             .fetchone()[0]
@@ -81,37 +88,106 @@ def test_restore_old_backup_preserves_correction_deletion_and_new_receipts(tmp_p
     assert SearchIndex(root).search("백업이후추가기억", 10)
 
 
-def test_cold_restore_without_current_control_state_is_blocked(tmp_path):
+def test_cold_restore_without_current_control_state_is_blocked(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
-    run_life_batch(config, "test-notes", [item()], now=NOW)
+    _ = run_life_batch(config, "test-notes", [item()], now=NOW)
     archive = tmp_path / "backup.tar.gz"
-    create_backup(root, archive)
+    _ = create_backup(root, archive)
     destination = tmp_path / "cold"
     with pytest.raises(OperationError, match="LIFE_LATEST_STATE_REQUIRED"):
-        restore_backup(archive, destination)
+        _ = restore_backup(archive, destination)
     assert not destination.exists()
 
 
-def test_restoration_lock_prevents_new_writer_even_if_vault_temporarily_missing(tmp_path):
+def test_restoration_lock_prevents_new_writer_even_if_vault_temporarily_missing(
+    tmp_path: Path,
+) -> None:
     config, root = life_config(tmp_path)
     with publication_lock(root):
         result, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
         assert result.already_running and receipts == ()
 
 
-def test_captured_current_state_applies_after_sanitized_generation_clear(tmp_path):
+def test_captured_current_state_applies_after_sanitized_generation_clear(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
     _, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
     state = capture(root)
+    assert state is not None
     destination = tmp_path / "candidate"
     destination.mkdir()
     (destination / "wiki").mkdir()
-    (destination / "wiki" / "unrelated.md").write_text("user source unaffected")
+    _ = (destination / "wiki" / "unrelated.md").write_text("user source unaffected")
     result = materialize(state, destination, old_archive_has_life=True)
+    assert "events" in result
     assert result["events"] == 1
     assert (destination / "wiki" / "unrelated.md").read_text() == "user source unaffected"
     with Ledger(destination) as ledger:
         events = ledger.life_store().events(scopes=SCOPES, now=NOW)
-        assert events[0].event_id == receipts[0]["event_id"]
+        assert events[0].event_id == json_text(receipts[0]["event_id"])
     for name, raw in state["pages"].items():
         assert sha256((destination / name).read_bytes()).digest() == sha256(raw).digest()
+
+
+def _kill_restore(current: str, candidate: str, phase: str, marker: str) -> None:
+    os.umask(0o077)
+    from sb import life_restore
+
+    def hook(name, detail):
+        if name != phase:
+            return
+        Path(marker).write_text(json.dumps(detail))
+        os.kill(os.getpid(), signal.SIGKILL)
+
+    life_restore._RESTORE_PHASE_HOOK = hook
+    current_path, candidate_path = Path(current), Path(candidate)
+    if phase == "capture":
+        life_restore.capture(current_path)
+    elif phase == "materialize":
+        life_restore.materialize(
+            life_restore.capture(current_path, phase=None),
+            candidate_path,
+            old_archive_has_life=True,
+        )
+    else:
+        life_restore.preserve_current(current_path, candidate_path)
+
+
+@pytest.mark.parametrize("phase", ["capture", "materialize", "preserve_current"])
+def test_restore_applies_tombstones_before_old_revisions_in_every_kill_point(tmp_path, phase):
+    config, root = life_config(tmp_path)
+    _, receipts = run_life_batch(config, "test-notes", [item()], now=NOW)
+    event_id = receipts[0]["event_id"]
+    old = capture(root)
+    assert run_life_forget(config, "test-notes", event_id, 1, now=NOW).exit_code == 0
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    materialize(old, candidate, old_archive_has_life=True)
+    marker = tmp_path / "marker.json"
+    context = multiprocessing.get_context("spawn")
+    child = context.Process(
+        target=_kill_restore, args=(str(root), str(candidate), phase, str(marker))
+    )
+    child.start()
+    child.join(30)
+    assert child.exitcode == -signal.SIGKILL
+    assert json.loads(marker.read_text())["tombstones" if phase == "capture" else "tombstones_committed"] >= 1
+    with Ledger(root) as ledger:
+        assert ledger.life_store().connection.execute(
+            "SELECT deleted FROM life_events WHERE event_id=?", (event_id,)
+        ).fetchone() == (1,)
+        assert ledger.life_store().tombstones(scopes=SCOPES)
+    with Ledger(candidate) as ledger:
+        deleted = ledger.life_store().connection.execute(
+            "SELECT deleted FROM life_events WHERE event_id=?", (event_id,)
+        ).fetchone()
+        tomb = ledger.life_store().connection.execute(
+            "SELECT 1 FROM life_tombstones WHERE event_id=?", (event_id,)
+        ).fetchone()
+        if phase == "capture":
+            assert deleted == (0,) and tomb is None
+        else:
+            assert deleted == (1,) and tomb is not None
+            assert ledger.life_store().connection.execute(
+                "SELECT 1 FROM life_events WHERE deleted=0 AND event_id IN "
+                "(SELECT event_id FROM life_tombstones)"
+            ).fetchone() is None

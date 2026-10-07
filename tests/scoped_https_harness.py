@@ -18,8 +18,8 @@ def certificate(root: Path) -> tuple[Path, Path]:
         .add_extension(x509.SubjectAlternativeName([x509.DNSName("localhost"), x509.IPAddress(ip_address("127.0.0.1"))]), critical=False)
         .sign(key, hashes.SHA256()))
     cert_path, key_path = root / "tls-cert.pem", root / "tls-key.pem"
-    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+    _ = cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    _ = key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption()))
     key_path.chmod(0o600)
     return cert_path, key_path

@@ -1,4 +1,5 @@
 import sqlite3
+from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
 
@@ -12,30 +13,33 @@ from sb.store.ledger import load_ledger_tables
 
 
 class Adapter:
-    source_id = 'fixture'
-    accepted_adapters = frozenset({'fixture-adapter'})
+    source_id: str = 'fixture'
+    accepted_adapters: frozenset[str] = frozenset({'fixture-adapter'})
 
-    def __init__(self, reason):
-        self.reason = reason
-        self.legacy = False
+    def __init__(self, reason: str) -> None:
+        self.reason: str | None = reason
+        self.legacy: bool = False
 
-    def scan(self, cursor):
+    def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
+        del cursor
         if self.reason:
             meta: ItemMeta = {'relative_path': 'bad', 'skip_reason': (
                 'invalid-format' if self.legacy else self.reason)}
             yield SourceRef('fixture', 'bad', self.reason), b'', meta
         yield SourceRef('fixture', 'good', 'v1'), b'valid sibling', {'relative_path': 'good'}
 
-    def next_cursor(self):
+    def next_cursor(self) -> str:
         return 'completed'
 
 
 @pytest.mark.parametrize('reason', ['size-limit', 'database-limit',
                                     'unstable-session-file', 'unreadable-session-file'])
 @pytest.mark.parametrize('legacy', [False, True])
-def test_read_failure_is_visible_every_run_and_recovers(tmp_path, monkeypatch, reason, legacy):
+def test_read_failure_is_visible_every_run_and_recovers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reason: str, legacy: bool):
     adapter = Adapter(reason)
-    monkeypatch.setattr('sb.connectors.discover_adapters', lambda config: {'fixture-adapter': adapter})
+    def discover(_config: Config) -> dict[str, Adapter]:
+        return {'fixture-adapter': adapter}
+    monkeypatch.setattr('sb.connectors.discover_adapters', discover)
     config = Config(raw={'vault_root': str(tmp_path / 'share/vault'),
         'share_root': str(tmp_path / 'share'), 'state_root': str(tmp_path / 'state'),
         'sources': [{'id': 'fixture', 'adapter': 'fixture-adapter'}]})

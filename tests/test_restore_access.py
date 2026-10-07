@@ -1,6 +1,7 @@
 import hashlib
 import shutil
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -22,13 +23,13 @@ EMPTY = TombstoneSnapshot(0, 'unused', 'unused', (), ())
 
 
 @pytest.mark.parametrize('mode', ['complete', 'incomplete', 'missing', 'changed', 'blocked', 'tampered'])
-def test_verified_access_projection_is_conservative(tmp_path, mode):
+def test_verified_access_projection_is_conservative(tmp_path: Path, mode: str):
     store = GenerationStore(tmp_path / 'state', tmp_path / 'share',
                             provider_instance_id='provider:fixture', provider_release_sha='a' * 40)
     try:
-        def materialize(root):
+        def materialize(root: Path):
             (root / 'wiki').mkdir(exist_ok=True)
-            (root / 'wiki/page.md').write_bytes(BODY)
+            _ = (root / 'wiki/page.md').write_bytes(BODY)
             with Ledger(root) as ledger:
                 if mode != 'missing':
                     ledger.bind_source_classification(REF, ACCESS)
@@ -37,14 +38,14 @@ def test_verified_access_projection_is_conservative(tmp_path, mode):
         generation = store.build(request_id='fixture:access', parent=None, tombstone_sequence=0,
             tombstone_set_root='sha256:' + '0' * 64, created_at=now, allowed=lambda _: True, mutate=materialize)
         archive = tmp_path / 'archive'
-        shutil.copytree(generation.root, archive)
+        _ = shutil.copytree(generation.root, archive)
         manifest = build_restore_archive_manifest(archive, RestoreArchiveSource(
             provider_instance_id=store.provider_instance_id, source_generation_id=generation.generation_id,
             source_generation_manifest_digest=generation.manifest.generation_digest,
             source_tombstone_sequence=0, source_tombstone_set_root='sha256:' + '0' * 64, created_at=now))
         if mode == 'changed':
             (archive / 'wiki/page.md').chmod(0o600)
-            (archive / 'wiki/page.md').write_bytes(b'changed content')
+            _ = (archive / 'wiki/page.md').write_bytes(b'changed content')
         inventory = ManagedRestoreInventory().sanitize(archive, EMPTY)
         snapshot = EMPTY
         if mode == 'blocked':
@@ -53,9 +54,9 @@ def test_verified_access_projection_is_conservative(tmp_path, mode):
             snapshot = TombstoneSnapshot(1, 'unused', 'unused', (), (target,))
         if mode == 'tampered':
             (archive / '.sb/ledger.db').chmod(0o600)
-            (archive / '.sb/ledger.db').write_bytes(b'changed ledger')
+            _ = (archive / '.sb/ledger.db').write_bytes(b'changed ledger')
             with pytest.raises(RestoreSourceError):
-                read_restore_access(archive, manifest, store, inventory, snapshot)
+                _ = read_restore_access(archive, manifest, store, inventory, snapshot)
             return
         result = read_restore_access(archive, manifest, store, inventory, snapshot)
         if mode in {'missing', 'changed', 'blocked'}:

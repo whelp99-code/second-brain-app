@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypedDict
@@ -9,9 +10,15 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 
 from sb.cancellation_result import CancellationResultError
 from sb.cancellation_status import CancellationStatusError, read_cancellation_status
-from sb.delegations import DelegationRejected, create_read_fence
-from sb.effect_values import JsonValue, canonical_bytes, format_instant
+from sb.delegations import (
+    DelegationRejected,
+    MemoryReadFenceV1,
+    create_read_fence,
+    verify_read_fence,
+)
+from sb.effect_values import JsonObject, JsonValue, canonical_bytes, format_instant
 from sb.effect_write_values import model_object
+from sb.request_executor import RequestExecutor
 from tests.test_cancellation_result import intent_for, issue
 from tests.test_correction_cancellation import CURRENT
 from tests.test_correction_cancellation_executor import execute, prepare
@@ -31,7 +38,7 @@ class _StatusArgs(TypedDict):
     provider_keys: dict[str, Ed25519PublicKey]
 
 
-def arguments(executor, identity) -> _StatusArgs:
+def arguments(executor: RequestExecutor, identity: str) -> _StatusArgs:
     intent = intent_for(executor, identity)
     seq, root = executor.store.tombstone_high_water()
     fence = create_read_fence(provider_instance_id=executor.config.provider_instance_id,
@@ -51,7 +58,7 @@ def test_read_only_pending_active_and_completed_lookup(tmp_path: Path):
         args = arguments(executor, identity)
         pending = read_cancellation_status(**args)
         assert pending["state"] == "suppression_pending" and "result" not in pending
-        execute(executor, identity)
+        _ = execute(executor, identity)
         assert read_cancellation_status(**args) == pending
         expected = issue(executor, identity)
         before = list(executor.store.db.iterdump())
@@ -93,7 +100,7 @@ def test_invalid_authority_or_identity_cannot_lookup_even_not_found(tmp_path: Pa
                 signing_key_id="reader", private_key=CURRENT))
         before = list(executor.store.db.iterdump())
         with pytest.raises((DelegationRejected, CancellationStatusError)):
-            read_cancellation_status(**args)
+            _ = read_cancellation_status(**args)
         assert list(executor.store.db.iterdump()) == before
     finally:
         executor.close()
@@ -108,10 +115,10 @@ def test_rotated_public_keys_and_revocation_without_private_key(tmp_path: Path):
         args["provider_keys"]["new-provider-key"] = Ed25519PrivateKey.from_private_bytes(b"x" * 32).public_key()
         assert read_cancellation_status(**args)["result"] == expected
         with pytest.raises(CancellationResultError):
-            read_cancellation_status(**args, revoked_provider_key_ids=frozenset({old_id}))
+            _ = read_cancellation_status(**args, revoked_provider_key_ids=frozenset({old_id}))
         del args["provider_keys"][old_id]
         with pytest.raises(CancellationResultError):
-            read_cancellation_status(**args)
+            _ = read_cancellation_status(**args)
     finally:
         executor.close()
 
@@ -122,46 +129,46 @@ def test_rotated_public_keys_and_revocation_without_private_key(tmp_path: Path):
     ("correction_cancellation_results", "result_digest", "sha256:" + "0" * 64, "cancellation_result_no_update"),
     ("correction_cancellation_results", "result_json", "{}", "cancellation_result_no_update"),
 ])
-def test_corrupt_saved_rows_are_not_returned(tmp_path: Path, table, field, value, trigger):
+def test_corrupt_saved_rows_are_not_returned(tmp_path: Path, table: str, field: str, value: str, trigger: str):
     executor, identity, _ = prepare(tmp_path)
     try:
-        issue(executor, identity)
+        _ = issue(executor, identity)
         args = arguments(executor, identity)
-        executor.store.db.execute(f"DROP TRIGGER {trigger}")
-        executor.store.db.execute(f"UPDATE {table} SET {field}=?", (value,))
+        _ = executor.store.db.execute(f"DROP TRIGGER {trigger}")
+        _ = executor.store.db.execute(f"UPDATE {table} SET {field}=?", (value,))
         executor.store.db.commit()
         with pytest.raises((CancellationStatusError, CancellationResultError)):
-            read_cancellation_status(**args)
+            _ = read_cancellation_status(**args)
     finally:
         executor.close()
 
 
 def test_missing_journal_is_not_created_or_reported_not_found(tmp_path: Path):
     with pytest.raises(CancellationStatusError, match="CANCELLATION_STATUS_UNAVAILABLE"):
-        read_cancellation_status(tmp_path / "missing.db", "id", "digest",
+        _ = read_cancellation_status(tmp_path / "missing.db", "id", "digest",
             provider_instance_id="provider", now=OBSERVED, read_fence=None,
             reader_keys={}, provider_keys={})
     assert list(tmp_path.iterdir()) == []
 
 
-def test_completion_during_read_keeps_one_snapshot(tmp_path: Path, monkeypatch):
+def test_completion_during_read_keeps_one_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Event
 
     import sb.cancellation_status as status_module
     from sb.request_executor import RequestExecutor
-    from tests.test_request_executor import _config
+    from tests.test_request_executor import config as _config
 
     executor, identity, _ = prepare(tmp_path)
     try:
         args = arguments(executor, identity)
-        original = status_module.verify_read_fence
+        original = verify_read_fence
         ready, start, writing = Event(), Event(), Event()
 
-        def complete_concurrently():
+        def complete_concurrently() -> JsonObject:
             writer = RequestExecutor(_config(tmp_path))
             try:
-                def observe(sql):
+                def observe(sql: str) -> None:
                     if "INSERT INTO correction_cancellation_generations" in sql:
                         writing.set()
                 writer.store.db.set_trace_callback(observe)
@@ -171,8 +178,8 @@ def test_completion_during_read_keeps_one_snapshot(tmp_path: Path, monkeypatch):
             finally:
                 writer.close()
 
-        def complete_after_authorization(*positional, **keywords):
-            fence = original(*positional, **keywords)
+        def complete_after_authorization(value: JsonValue, public_keys: Mapping[str, Ed25519PublicKey | bytes], provider_instance_id: str, now: datetime, sequence: int, set_root: str) -> MemoryReadFenceV1:
+            fence = original(value, public_keys, provider_instance_id, now, sequence, set_root)
             start.set()
             assert writing.wait(10)
             return fence
@@ -198,7 +205,7 @@ def test_genesis_still_requires_fence(tmp_path: Path):
     store = RequestStore(tmp_path)
     store.close()
     with pytest.raises(DelegationRejected, match="TOMBSTONE_FENCE_REQUIRED"):
-        read_cancellation_status(tmp_path / "journal.db",
+        _ = read_cancellation_status(tmp_path / "journal.db",
             "memcancel:intent:v1:" + "0" * 64, "sha256:" + "0" * 64,
             provider_instance_id="provider", now=OBSERVED, read_fence=None,
             reader_keys={}, provider_keys={})
@@ -207,13 +214,13 @@ def test_genesis_still_requires_fence(tmp_path: Path):
 def test_missing_intent_tombstone_is_corruption_not_completion(tmp_path: Path):
     executor, identity, _ = prepare(tmp_path)
     try:
-        issue(executor, identity)
+        _ = issue(executor, identity)
         for trigger in ("tombstone_target_no_delete", "tombstone_replica_no_delete"):
-            executor.store.db.execute(f"DROP TRIGGER {trigger}")
-        executor.store.db.execute("DELETE FROM tombstone_target_identities")
-        executor.store.db.execute("DELETE FROM tombstone_replica")
+            _ = executor.store.db.execute(f"DROP TRIGGER {trigger}")
+        _ = executor.store.db.execute("DELETE FROM tombstone_target_identities")
+        _ = executor.store.db.execute("DELETE FROM tombstone_replica")
         args = arguments(executor, identity)
         with pytest.raises(CancellationStatusError, match="CANCELLATION_RESULT_CORRUPT"):
-            read_cancellation_status(**args)
+            _ = read_cancellation_status(**args)
     finally:
         executor.close()

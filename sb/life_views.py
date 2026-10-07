@@ -1,39 +1,39 @@
-"""L4 pure event/timeline/Obsidian projections. Only sb.vault writes core pages."""
+"""Pure deterministic Life projections; no I/O."""
 
 from __future__ import annotations
 
-import html
-from collections import defaultdict
 from collections.abc import Sequence
-from datetime import datetime
 from hashlib import sha256
-from urllib.parse import quote
 
 from sb.contracts import PageSpec, SourceCite
-from sb.life_contracts import LifeEventV1, LifeInputError
-from sb.life_values import canonical_bytes, day_window, instant, zone
+from sb.life_brief import brief
+from sb.life_contracts import LifeEventV1
+from sb.life_obsidian import (
+    DAILY_SECTIONS,
+    daily_markdown,
+    gap_candidates,
+    obsidian_manifest,
+    source_generation,
+)
+from sb.life_rendering import core_page_id, on_day, safe_text, source_uri
+from sb.life_values import day_window
+from sb.life_view_contracts import Timeline
 from sb.redaction import redact_credentials
 
-
-def safe_text(value: str) -> str:
-    """Render input as literal Markdown text, not commands, HTML, images or links."""
-    return (
-        html.escape(redact_credentials(value), quote=True)
-        .replace("[", "&#91;")
-        .replace("]", "&#93;")
-        .replace("|", "&#124;")
-        .replace("`", "&#96;")
-        .replace("!", "&#33;")
-    )
-
-
-def source_uri(event: LifeEventV1) -> str:
-    return "life/" + quote(event.source_item_id, safe="")
-
-
-def core_page_id(event_id: str) -> str:
-    # Keep the existing Vault.forget_page no-follow, single-folder boundary.
-    return f"wiki/life-event-{event_id}"
+__all__ = [
+    "DAILY_SECTIONS",
+    "brief",
+    "core_page_id",
+    "daily_markdown",
+    "gap_candidates",
+    "obsidian_manifest",
+    "on_day",
+    "page_for_event",
+    "safe_text",
+    "source_generation",
+    "source_uri",
+    "timeline",
+]
 
 
 def page_for_event(event: LifeEventV1) -> PageSpec:
@@ -84,19 +84,8 @@ def page_for_event(event: LifeEventV1) -> PageSpec:
     )
 
 
-def on_day(event: LifeEventV1, day: str, timezone: str) -> bool:
-    start, end = day_window(day, timezone)
-    if event.occurred_start is None:
-        return False
-    occurred = instant(event.occurred_start)
-    stopped = instant(event.occurred_end) if event.occurred_end else occurred
-    if stopped == occurred:
-        return start <= occurred < end
-    return occurred < end and stopped > start
-
-
-def timeline(events: Sequence[LifeEventV1], day: str, timezone: str) -> dict[str, object]:
-    day_window(day, timezone)
+def timeline(events: Sequence[LifeEventV1], day: str, timezone: str) -> Timeline:
+    _ = day_window(day, timezone)
     selected = sorted(
         (event for event in events if on_day(event, day, timezone)),
         key=lambda event: (event.occurred_start or "", event.event_id),
@@ -111,299 +100,3 @@ def timeline(events: Sequence[LifeEventV1], day: str, timezone: str) -> dict[str
         "coverage": "source_records_only",
         "complete_day_observed": False,
     }
-
-
-def brief(events: Sequence[LifeEventV1], day: str, timezone: str, slot: str) -> dict[str, object]:
-    if slot not in {"morning", "evening"}:
-        raise LifeInputError("LIFE_SLOT_INVALID")
-    selected = [e for e in events if on_day(e, day, timezone)]
-    selected.sort(key=lambda e: (e.occurred_start or "", e.event_id))
-    day_start, day_end = day_window(day, timezone)
-
-    def entity_keys(event):
-        return {
-            (event.source_id, entity.kind, entity.entity_id)
-            for entity in event.entities
-            if entity.kind in {"person", "company", "project"}
-        }
-
-    def previous_context(event):
-        keys = entity_keys(event)
-        if not keys:
-            return []
-        previous = [
-            past
-            for past in events
-            if past.event_id != event.event_id
-            and past.occurred_start is not None
-            and instant(past.occurred_start) < day_start
-            and keys.intersection(entity_keys(past))
-            and (past.valid_from is None or instant(past.valid_from) < day_end)
-            and (past.valid_until is None or day_start < instant(past.valid_until))
-        ]
-        previous.sort(
-            key=lambda past: (
-                past.event_type == "decision",
-                past.occurred_start,
-                past.recorded_at,
-                past.event_id,
-            ),
-            reverse=True,
-        )
-        return [
-            {
-                "event_id": past.event_id,
-                "revision": past.revision,
-                "title": past.title,
-                "excerpt": past.body[:800],
-                "event_status": past.event_status,
-                "evidence_level": past.evidence_level,
-                "raw_digest": past.raw_digest,
-                "reason": "같은 명시적 인물·회사·프로젝트의 이전 기록",
-            }
-            for past in previous[:3]
-        ]
-
-    if slot == "morning":
-        selected.sort(key=lambda e: (e.event_status != "planned", e.occurred_start or ""))
-    cards = [
-        {
-            "event_id": e.event_id,
-            "revision": e.revision,
-            "title": e.title,
-            "event_status": e.event_status,
-            "evidence_level": e.evidence_level,
-            "reason": "오늘의 예정 기록" if e.event_status == "planned" else "오늘의 사건 기록",
-            "raw_digest": e.raw_digest,
-            "excerpt": e.body[:800],
-            "previous_context": previous_context(e),
-            "changed": e.revision > 1,
-        }
-        for e in selected[:5]
-    ]
-    followups = [
-        event
-        for event in events
-        if event.event_type == "task_started"
-        and event.event_status != "cancelled"
-        and event.occurred_start is not None
-        and instant(event.occurred_start) < day_start
-    ]
-    followups.sort(key=lambda event: (event.occurred_start, event.event_id), reverse=True)
-    pending = [
-        {
-            "event_id": event.event_id,
-            "revision": event.revision,
-            "title": event.title,
-            "raw_digest": event.raw_digest,
-            "reason": "시작 기록은 있으나 이 사건의 완료 상태가 미확인",
-        }
-        for event in followups[:3]
-    ]
-    snapshot = {
-        "day": day,
-        "timezone": timezone,
-        "slot": slot,
-        "cards": cards,
-        "followups": pending,
-        "facts_are_quoted_not_inferred": True,
-    }
-    return {
-        **snapshot,
-        "input_version": sha256(canonical_bytes(snapshot)).hexdigest(),
-        "mode": "facts_only",
-        "delivery_state": "not_attempted",
-        "omitted": max(0, len(selected) - 5),
-    }
-
-
-def _entity_path(event: LifeEventV1, kind: str, entity_id: str) -> str:
-    folders = {
-        "person": "People",
-        "company": "Companies",
-        "project": "Projects",
-        "place": "Places",
-        "event": "Events",
-        "decision": "Decisions",
-    }
-    stable = sha256((event.source_id + "\0" + kind + "\0" + entity_id).encode()).hexdigest()[:24]
-    return "Auto/" + folders[kind] + "/entity-" + stable + ".md"
-
-
-def _wikilink(path: str, label: str) -> str:
-    return "[[" + path.removesuffix(".md") + "|" + safe_text(label).replace("\n", " ") + "]]"
-
-
-def obsidian_manifest(
-    events: Sequence[LifeEventV1],
-    *,
-    day: str,
-    timezone: str,
-    sensitivities: tuple[str, ...] = ("public", "personal"),
-    complete: bool = True,
-) -> dict[str, object]:
-    """A bounded, complete authorized snapshot. No private source paths or credentials.
-
-    Callers enforce scope/source policies BEFORE passing records to this function.
-    Revoked/deleted/expired records must be excluded, including their graph nodes.
-    Only previously-owned generated paths may be pruned by the client.
-    """
-    day_window(day, timezone)
-    visible = tuple(
-        sorted((e for e in events if e.sensitivity in sensitivities), key=lambda e: e.event_id)
-    )
-    files: dict[str, str] = {}
-    entity_events: dict[str, list[tuple[str, LifeEventV1]]] = defaultdict(list)
-    local_zone = zone(timezone)
-    day_lines = []
-    for event in visible:
-        path = f"Auto/Events/{event.event_id}.md"
-        evidence_path = f"Auto/Evidence/{event.event_id}.md"
-        lines = [
-            "---",
-            "sb_view_schema: 1",
-            f'sb_object_id: "{event.event_id}"',
-            f"sb_revision: {event.revision}",
-            "sb_managed: true",
-            "sb_event_state: " + event.event_status,
-            "sb_evidence_state: " + event.evidence_level,
-            "---",
-            "# " + safe_text(event.title),
-            "",
-            "발생: " + (event.occurred_start or "알 수 없음"),
-            "접수: " + event.recorded_at,
-            "",
-            "상태: " + event.event_status + " / " + event.evidence_level,
-            "",
-            safe_text(event.body),
-            "",
-            _wikilink(evidence_path, "원문 근거"),
-            "",
-            f"[정정 요청](obsidian://sb-life-correct?event={event.event_id}&revision={event.revision})",
-        ]
-        for entity in event.entities:
-            ep = _entity_path(event, entity.kind, entity.entity_id)
-            lines.append(_wikilink(ep, entity.label))
-            entity_events[ep].append((entity.label, event))
-        files[path] = "\n".join(lines) + "\n"
-        files[evidence_path] = (
-            "# 원문 근거\n\n"
-            + _wikilink(path, event.title)
-            + "\n\n"
-            + "출처 버전: "
-            + safe_text(event.source_version)
-            + "\n\n"
-            + f"[인증하여 원문 열기](obsidian://sb-life-evidence?event={event.event_id})\n"
-        )
-        if on_day(event, day, timezone):
-            stamp = instant(event.occurred_start).astimezone(local_zone).strftime("%H:%M")
-            day_lines.append(
-                (
-                    event.occurred_start,
-                    event.event_id,
-                    f"- {stamp} · {event.event_status} · " + _wikilink(path, event.title),
-                )
-            )
-    for path, linked in sorted(entity_events.items()):
-        files[path] = (
-            "# "
-            + safe_text(linked[0][0])
-            + "\n\n"
-            + "자동 병합이 아닌 출처의 명시적 연결입니다.\n\n"
-            + "\n".join(
-                "- " + _wikilink(f"Auto/Events/{e.event_id}.md", e.title) for _, e in linked
-            )
-            + "\n"
-        )
-    morning = brief(visible, day, timezone, "morning")
-    evening = brief(visible, day, timezone, "evening")
-    daily = [
-        "# " + day,
-        "",
-        "## 오늘의 요점",
-        "실제 수집 기록만 표시합니다.",
-        "",
-        "## 시간순 기록",
-        *[row[2] for row in sorted(day_lines)],
-        "",
-        "## 아침 참고",
-        *["- " + safe_text(c["title"]) for c in morning["cards"]],
-        *[
-            "  - 이전 맥락: "
-            + _wikilink(f"Auto/Events/{past['event_id']}.md", past["title"])
-            + " · "
-            + safe_text(past["excerpt"][:400])
-            for card in morning["cards"]
-            for past in card["previous_context"]
-        ],
-        "",
-        "## 완료 여부를 확인할 기록",
-        *[
-            "- "
-            + _wikilink(f"Auto/Events/{row['event_id']}.md", row["title"])
-            + " · "
-            + safe_text(row["reason"])
-            for row in morning["followups"]
-        ],
-        "",
-        "## 저녁 정리",
-        *["- " + safe_text(c["title"]) + " · " + c["event_status"] for c in evening["cards"]],
-        "",
-        "## 내 메모",
-        f"[[MyNotes/{day}]]",
-        "",
-        "## 수집 상태",
-        "기록이 없는 시간을 실제 활동 없음으로 해석하지 않습니다.",
-        "[[Auto/System/Sync-Status]]",
-    ]
-    files[f"Auto/Daily/{day}.md"] = "\n".join(daily) + "\n"
-    files["Auto/Home.md"] = "# 나의 기억\n\n" + _wikilink(f"Auto/Daily/{day}.md", "오늘") + "\n"
-    files["Auto/System/Sync-Status.md"] = (
-        "# 동기화 상태\n\n허용된 기록의 복제 뷰입니다. MyNotes는 자동 갱신하지 않습니다.\n"
-        + ("전체 스냅샷\n" if complete else "부분 스냅샷 — 누락된 파일을 삭제하지 않습니다.\n")
-    )
-    rows = [
-        {"path": path, "content": content, "sha256": sha256(content.encode()).hexdigest()}
-        for path, content in sorted(files.items())
-    ]
-    generation = sha256(canonical_bytes(rows)).hexdigest()
-    return {
-        "schema_version": 1,
-        "generation": generation,
-        "complete": complete,
-        "files": rows,
-        "managed_prefix": "Auto/",
-        "cursor": generation,
-    }
-
-
-def gap_candidates(
-    events: Sequence[LifeEventV1], *, now: datetime
-) -> tuple[dict[str, object], ...]:
-    candidates = []
-    for event in events:
-        if event.event_type != "calendar_event" or event.event_status == "cancelled":
-            continue
-        if (
-            event.occurred_start is None
-            or instant(event.occurred_end or event.occurred_start) > now
-        ):
-            continue
-        if event.review_state in {"rejected", "disputed"}:
-            continue
-        if event.event_status == "planned":
-            question = "예정된 일정이 실제로 진행됐나요?"
-        elif event.event_status == "occurred" and not event.body.strip():
-            question = "확인된 일정의 결과로 기억할 내용이 있나요?"
-        else:
-            continue
-        candidates.append(
-            {
-                "event_id": event.event_id,
-                "revision": event.revision,
-                "title": event.title,
-                "question": question,
-                "evidence_digest": event.raw_digest,
-            }
-        )
-    return tuple(sorted(candidates, key=lambda c: c["event_id"]))

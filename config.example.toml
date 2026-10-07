@@ -65,6 +65,8 @@ dsn = "postgresql://localhost:5433/unified"
 # id = "claude"
 # adapter = "claude-sessions"
 # root = "~/.claude/projects"
+# scope = "ai-session"
+# session_profile = "facts-v1"
 # llm_policy = "deny"
 # sensitive = "mask"
 #
@@ -72,6 +74,8 @@ dsn = "postgresql://localhost:5433/unified"
 # id = "codex"
 # adapter = "codex-sessions"
 # root = "~/.codex/sessions"
+# scope = "ai-session"
+# session_profile = "facts-v1"
 # llm_policy = "deny"
 # sensitive = "mask"
 #
@@ -79,5 +83,66 @@ dsn = "postgresql://localhost:5433/unified"
 # id = "omo"
 # adapter = "omo-sessions"
 # root = "~/.omo/agent/sessions"
+# scope = "ai-session"
+# session_profile = "facts-v1"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# GJC accepts only an approved public export, never its live session store.
+# [[sources]]
+# id = "gjc"
+# adapter = "gjc-sessions"
+# root = "~/.gjc/exports"
+# scope = "ai-session"
+# session_profile = "facts-v1"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# [[sources]]
+# id = "opencode"
+# adapter = "opencode-sessions"
+# root = "~/.local/share/opencode"
+# scope = "ai-session"
+# session_profile = "facts-v1"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# Hermes memory only: plugins, skills, and config are not diary entries.
+# Owner classification stays in [source_access], never in the export body.
+# [[sources]]
+# id = "hermes"
+# adapter = "markdown-vault"
+# root = "~/.hermes"
+# scope = "hermes-memory"
+# include = "memory/**/*.md,memory.md"
+# exclude = "config/**,plugins/**,skills/**"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# Development memory is a separate source/scope, never personal life data.
+# [[sources]]
+# id = "dev-wiki"
+# adapter = "markdown-vault"
+# root = "~/dev-wiki"
+# scope = "development-memory"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# Project and Orca records are approved exported JSONL, not live databases.
+# [[sources]]
+# id = "project"
+# adapter = "project-records"
+# root = "~/exports/project"
+# scope = "project-record"
+# record_identity = "v1"
+# llm_policy = "deny"
+# sensitive = "mask"
+#
+# [[sources]]
+# id = "orca"
+# adapter = "orca-records"
+# root = "~/exports/orca"
+# scope = "project-record"
+# record_identity = "v1"
 # llm_policy = "deny"
 # sensitive = "mask"

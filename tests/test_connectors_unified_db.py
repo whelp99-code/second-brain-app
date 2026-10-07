@@ -33,7 +33,7 @@ from sb.connectors.unified_db_mapping import (
     is_low_value,
 )
 from sb.contracts import SourceRef
-from sb.pipeline import _materialize
+from sb.pipeline import materialize
 
 _FORBIDDEN_SQL: re.Pattern[str] = re.compile(
     r"\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)\b", re.IGNORECASE
@@ -369,8 +369,8 @@ def test_executed_sql_and_module_contain_no_write_or_ddl() -> None:
     for sql in db.sql:
         assert _FORBIDDEN_SQL.search(sql) is None
     source = Path(__file__).resolve().parent.parent / "sb" / "connectors"
-    for path in (source / "unified_db.py", source / "unified_db_mapping.py"):
-        assert _FORBIDDEN_SOURCE.search(path.read_text(encoding="utf-8")) is None
+    for name in ("unified_db.py", "unified_db_mapping.py", "unified_db_reconcile.py"):
+        assert _FORBIDDEN_SOURCE.search((source / name).read_text(encoding="utf-8")) is None
 
 
 def test_scan_closes_connection_when_complete() -> None:
@@ -485,7 +485,7 @@ def test_dotted_row_uri_still_materializes_units() -> None:
     602 rows reached the operational vault as stored bytes that no search could
     ever reach (2026-09-20).
     """
-    units = _materialize(
+    units = materialize(
         b"# 1.0.2\n\n\xeb\xb0\x9c\xed\x96\x89 \xeb\xb8\x8c\xeb\x9e\x9c\xec\xb9\x98\xec\x97\x90 \xed\x95\xa9\xec\xb3\xa4\xeb\x8b\xa4.\n",
         "d" * 64,
         "unified-db:global:memory.events:evt_006b62f70530e8af",
@@ -500,4 +500,4 @@ def test_unsupported_file_suffix_is_still_skipped() -> None:
     Treating every unknown tail as "no suffix" would parse binaries as text; only
     an extension-shaped tail counts, so `.png` keeps its skip.
     """
-    assert _materialize(b"\x89PNG\r\n\x1a\n", "e" * 64, "inbox/scan.png", "inbox:scan.png") == []
+    assert materialize(b"\x89PNG\r\n\x1a\n", "e" * 64, "inbox/scan.png", "inbox:scan.png") == []

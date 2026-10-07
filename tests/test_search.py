@@ -8,6 +8,7 @@ import sys
 import types
 from pathlib import Path
 
+from pydantic import TypeAdapter
 from pytest import LogCaptureFixture, MonkeyPatch
 
 from sb.contracts import PageSpec, SourceCite
@@ -289,7 +290,7 @@ def test_search_empty_query_returns_no_hits(tmp_path: Path) -> None:
 
 def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path: Path) -> None:
     """Given current schema_version and old 3-col FTS, when searching, then docs rebuilds and hits return."""
-    from sb.search import _INDEX_SCHEMA_VERSION
+    from sb.search import INDEX_SCHEMA_VERSION
 
     root = _seed(tmp_path)
     index = SearchIndex(vault_root=root)
@@ -298,27 +299,27 @@ def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path
 
     db = root / ".sb" / "search.db"
     with sqlite3.connect(str(db)) as conn:
-        conn.execute("DROP TABLE IF EXISTS docs")
-        conn.execute(
+        _ = conn.execute("DROP TABLE IF EXISTS docs")
+        _ = conn.execute(
             "CREATE VIRTUAL TABLE docs USING fts5(page_id, section, text, tokenize='trigram')"
         )
-        conn.execute(
+        _ = conn.execute(
             "INSERT INTO search_meta(key,value) VALUES('schema_version',?) "
             + "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            (_INDEX_SCHEMA_VERSION,)
+            (INDEX_SCHEMA_VERSION,)
         )
         conn.commit()
-        cols_before = [row[1] for row in conn.execute("PRAGMA table_info(docs)")]
+        cols_before = [row[1] for row in TypeAdapter(list[tuple[int, str, str, int, str | None, int]]).validate_python(conn.execute("PRAGMA table_info(docs)").fetchall(), strict=True)]
     assert cols_before == ["page_id", "section", "text"]
 
     hits = index.search(EN_TERM)
 
     assert [hit.page_id for hit in hits] == [hit.page_id for hit in expected]
     with sqlite3.connect(str(db)) as conn:
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(docs)")]
-        version = conn.execute(
+        cols = [row[1] for row in TypeAdapter(list[tuple[int, str, str, int, str | None, int]]).validate_python(conn.execute("PRAGMA table_info(docs)").fetchall(), strict=True)]
+        version = TypeAdapter[tuple[str] | None](tuple[str] | None).validate_python(conn.execute(
             "SELECT value FROM search_meta WHERE key='schema_version'"
-        ).fetchone()
+        ).fetchone(), strict=True)
     assert cols == [
         "page_id",
         "section",
@@ -334,7 +335,7 @@ def test_search_rebuilds_when_schema_version_matches_stale_docs_columns(tmp_path
         "normalize_id",
         "normalize_section",
     ]
-    assert version is not None and str(version[0]) == _INDEX_SCHEMA_VERSION
+    assert version is not None and str(version[0]) == INDEX_SCHEMA_VERSION
 
 
 def test_search_matches_yaml_title_and_empty_bodied_h1(tmp_path: Path) -> None:
@@ -402,14 +403,14 @@ def test_search_yaml_title_equal_h1_does_not_duplicate_hits(tmp_path: Path) -> N
     db = root / ".sb" / "search.db"
     with sqlite3.connect(str(db)) as conn:
         match = '"Hello World"'
-        count = conn.execute(
+        count = TypeAdapter[tuple[int] | None](tuple[int] | None).validate_python(conn.execute(
             "SELECT count(*) FROM docs WHERE page_id=? AND docs MATCH ?",
             ("wiki/same-title", match),
-        ).fetchone()
-        rows = conn.execute(
+        ).fetchone(), strict=True)
+        rows = TypeAdapter[list[tuple[str, str]]](list[tuple[str, str]]).validate_python(conn.execute(
             "SELECT section, text FROM docs WHERE page_id=?",
             ("wiki/same-title",),
-        ).fetchall()
+        ).fetchall(), strict=True)
     assert count is not None and int(count[0]) == 1
     title_rows = [row for row in rows if str(row[0]) == "title"]
     assert title_rows == []
@@ -429,10 +430,10 @@ def test_search_empty_h1_does_not_insert_blank_text_row(tmp_path: Path) -> None:
 
     db = root / ".sb" / "search.db"
     with sqlite3.connect(str(db)) as conn:
-        rows = conn.execute(
+        rows = TypeAdapter[list[tuple[str, str]]](list[tuple[str, str]]).validate_python(conn.execute(
             "SELECT section, text FROM docs WHERE page_id=?",
             ("wiki/empty-h1",),
-        ).fetchall()
+        ).fetchall(), strict=True)
     assert rows
     assert all(str(text).strip() != "" for _section, text in rows)
 
@@ -468,7 +469,7 @@ def test_default_search_excludes_unknown_and_candidate(tmp_path: Path) -> None:
         "wiki/candidate.md",
         "---\ntitle: CandidatePage\n---\n\n# CandidatePage\nExcludeCandidateToken lives here.\n",
     )
-    register_page(root, "wiki/candidate", knowledge_status="CANDIDATE", approval_status="PENDING")
+    _ = register_page(root, "wiki/candidate", knowledge_status="CANDIDATE", approval_status="PENDING")
     index = SearchIndex(vault_root=root)
     assert index.search("ExcludeUnknownToken") == ()
     assert index.search("ExcludeCandidateToken") == ()
@@ -482,10 +483,10 @@ def test_default_search_returns_active_approved_page(tmp_path: Path) -> None:
         root,
         "wiki/approved.md",
         "---\ntitle: ApprovedPage\n"
-        "source_ref: inbox:approved.md\nupdated: '2026-08-29'\n---\n"
-        "\n# ApprovedPage\nApprovedKnowledgeToken is confirmed.\n",
+        + "source_ref: inbox:approved.md\nupdated: '2026-08-29'\n---\n"
+        + "\n# ApprovedPage\nApprovedKnowledgeToken is confirmed.\n",
     )
-    register_page(
+    _ = register_page(
         root,
         "wiki/approved",
         knowledge_status="ACTIVE",
@@ -515,18 +516,18 @@ def test_scope_candidate_returns_candidate_page_id(tmp_path: Path) -> None:
         root,
         "wiki/dec-candidate.md",
         "---\ntitle: DecCandidate\n---\n"
-        "\n# DecCandidate\nCandidateOnlyToken and 운영 Registry는.\n",
+        + "\n# DecCandidate\nCandidateOnlyToken and 운영 Registry는.\n",
     )
     commit_page(
         root,
         "wiki/approved.md",
         "---\ntitle: ApprovedPage\n---\n"
-        "\n# ApprovedPage\nApprovedKnowledgeToken stays out of candidate scope.\n",
+        + "\n# ApprovedPage\nApprovedKnowledgeToken stays out of candidate scope.\n",
     )
-    register_page(
+    _ = register_page(
         root, "wiki/dec-candidate", knowledge_status="CANDIDATE", approval_status="PENDING"
     )
-    register_page(root, "wiki/approved", knowledge_status="ACTIVE", approval_status="APPROVED")
+    _ = register_page(root, "wiki/approved", knowledge_status="ACTIVE", approval_status="APPROVED")
     index = SearchIndex(vault_root=root)
     hits = index.search("CandidateOnlyToken", scope="candidate")
     assert [hit.page_id for hit in hits] == ["wiki/dec-candidate"]
@@ -549,10 +550,10 @@ def test_missing_knowledge_fields_index_as_unknown(tmp_path: Path) -> None:
     assert index.search("MissingFieldsToken", scope="candidate") == ()
     db = root / ".sb" / "search.db"
     with sqlite3.connect(str(db)) as conn:
-        rows = conn.execute(
+        rows = TypeAdapter[list[tuple[str, str]]](list[tuple[str, str]]).validate_python(conn.execute(
             "SELECT knowledge_status, approval_status FROM docs WHERE page_id=?",
             ("wiki/bare",),
-        ).fetchall()
+        ).fetchall(), strict=True)
     assert rows
     assert all(str(knowledge) == "UNKNOWN" for knowledge, _approval in rows)
     assert all(str(approval) == "UNKNOWN" for _knowledge, approval in rows)

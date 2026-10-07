@@ -3,149 +3,103 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Final, Protocol, cast, override
+from typing import Final
 
-
-class DocumentParseResult(Protocol):
-    """Provenance-bearing parser result implemented by the optional adapter."""
-
-    body: str
-    source_hash: str
-    locator: dict[str, str | int]
-    parser_version: str
-    model_version: str
-    partial: bool
-
-
-class ParseError(Exception):
-    """Base class for document parse failures."""
-
-
-@dataclass(frozen=True, slots=True)
-class InvalidInput(ParseError):
-    reason: str
-
-    @override
-    def __str__(self) -> str:
-        return self.reason
-
-
-@dataclass(frozen=True, slots=True)
-class FormatUnsupported(ParseError):
-    format_name: str
-
-    @override
-    def __str__(self) -> str:
-        return f"unsupported format: {self.format_name}"
-
-
-@dataclass(frozen=True, slots=True)
-class LimitExceeded(ParseError):
-    limit_name: str
-
-    @override
-    def __str__(self) -> str:
-        return f"limit exceeded: {self.limit_name}"
-
-
-@dataclass(frozen=True, slots=True)
-class OcrRequired(ParseError):
-    @override
-    def __str__(self) -> str:
-        return "ocr required"
-
-
-@dataclass(frozen=True, slots=True)
-class UnsupportedSuffix(Exception):
-    suffix: str
-
-    @override
-    def __str__(self) -> str:
-        return f"unsupported suffix: {self.suffix}"
-
-
-class _BytesParser(Protocol):
-    def parse(self, payload: bytes) -> str: ...
-
-
-class _BytesParserType(Protocol):
-    def __call__(self) -> _BytesParser: ...
-
-
-class _StructuredParse(Protocol):
-    def __call__(self, kind: str, payload: bytes) -> str: ...
+from sb.parsers.contracts import (
+    PARTIAL_REASONS,
+    FormatUnsupported,
+    InvalidInput,
+    LimitExceeded,
+    OcrRequired,
+    ParseError,
+    UnsupportedSuffix,
+    WorkerFailure,
+)
+from sb.parsers.contracts import DocumentParseResult as DocumentParseResult
 
 
 def _try_docling(payload: bytes, suffix: str) -> str | None:
-    adapter = importlib.import_module("sb.parsers.docling_adapter")
-    result = adapter.parse_isolated(payload, suffix)
+    from sb.parsers.docling_adapter import parse_isolated
+
+    result = parse_isolated(payload, suffix)
     return None if result is None else result.body
 
 
 def parse_document(payload: bytes, suffix: str) -> DocumentParseResult:
-    """Parse one document and retain provenance for derived memory records."""
-    adapter = importlib.import_module("sb.parsers.docling_adapter")
+    """Parse with an exact first-unit locator; worker failure is never fallback."""
+    from sb.parsers.docling_adapter import parse_isolated
 
-    normalized = suffix if suffix.startswith(".") else f".{suffix}"
-    isolated = (
-        adapter.parse_isolated(payload, normalized.lower())
-        if normalized.lower() in {".pdf", ".docx"}
-        else None
-    )
-    if isolated is not None:
-        return cast(DocumentParseResult, isolated)
-    parser = parser_for(normalized)
-    body = parser(payload)
-    result_type = adapter.DocumentParseResult
-    return cast(DocumentParseResult, result_type(
+    normalized = (suffix if suffix.startswith(".") else f".{suffix}").lower()
+    _ = parser_for(normalized)  # Reject unknown suffixes before starting an optional worker.
+    if normalized in {".pdf", ".docx"}:
+        isolated = parse_isolated(payload, normalized)
+        if isolated is not None:
+            return isolated
+    if normalized == ".pdf":
+        from sb.parsers.pdf import PdfParser
+
+        body, locator, reason = PdfParser().parse_details(payload)
+    elif normalized == ".docx":
+        from sb.parsers.office import DocxDocumentParser
+
+        body, locator, reason = DocxDocumentParser().parse_details(payload)
+    elif normalized == ".xlsx":
+        from sb.parsers.office import XlsxDocumentParser
+
+        body, locator, reason = XlsxDocumentParser().parse_details(payload)
+    elif normalized == ".hwpx":
+        from sb.parsers.hwpx import HwpxDocumentParser
+
+        body, locator, reason = HwpxDocumentParser().parse_details(payload)
+    else:
+        body = parser_for(normalized)(payload)
+        locator, reason = {"kind": "ordinal", "ordinal": 1}, None
+    return DocumentParseResult(
         body=body,
         source_hash="sha256:" + hashlib.sha256(payload).hexdigest(),
-        locator={"kind": "document", "ordinal": 1},
-        parser_version=f"builtin:{normalized.lower()}",
+        locator=locator,
+        parser_version=f"builtin:{normalized}",
         model_version="none",
-        partial=False,
-    ))
-
-
-def _bound_parse(module_name: str, class_name: str) -> Callable[[bytes], str]:
-    module = importlib.import_module(module_name)
-    parser_cls: _BytesParserType | None = getattr(module, class_name, None)
-    if parser_cls is None:
-        raise TypeError(class_name)
-    return parser_cls().parse
+        partial=reason is not None,
+        partial_reason=reason,
+    )
 
 
 def _parse_pdf(payload: bytes) -> str:
     extracted = _try_docling(payload, ".pdf")
     if extracted is not None:
         return extracted
-    return _bound_parse("sb.parsers.pdf", "PdfParser")(payload)
+    from sb.parsers.pdf import PdfParser
+
+    return PdfParser().parse(payload)
 
 
 def _parse_docx(payload: bytes) -> str:
     extracted = _try_docling(payload, ".docx")
     if extracted is not None:
         return extracted
-    return _bound_parse("sb.parsers.office", "DocxDocumentParser")(payload)
+    from sb.parsers.office import DocxDocumentParser
+
+    return DocxDocumentParser().parse(payload)
 
 
 def _parse_hwpx(payload: bytes) -> str:
-    return _bound_parse("sb.parsers.hwpx", "HwpxDocumentParser")(payload)
+    from sb.parsers.hwpx import HwpxDocumentParser
+
+    return HwpxDocumentParser().parse(payload)
 
 
 def _parse_xlsx(payload: bytes) -> str:
-    return _bound_parse("sb.parsers.office", "XlsxDocumentParser")(payload)
+    from sb.parsers.office import XlsxDocumentParser
+
+    return XlsxDocumentParser().parse(payload)
 
 
 def _parse_structured(kind: str, payload: bytes) -> str:
-    module = importlib.import_module("sb.parsers.structured")
-    parse: _StructuredParse | None = getattr(module, "parse_structured", None)
-    if parse is None:
-        raise TypeError(kind)
-    return parse(kind, payload)
+    from sb.parsers.structured import parse_structured
+
+    return parse_structured(kind, payload)
 
 
 def _parse_md(payload: bytes) -> str:
@@ -191,12 +145,15 @@ def parser_for(suffix: str) -> Callable[[bytes], str]:
 
 
 __all__ = (
+    "PARTIAL_REASONS",
+    "DocumentParseResult",
     "FormatUnsupported",
     "InvalidInput",
     "LimitExceeded",
     "OcrRequired",
     "ParseError",
     "UnsupportedSuffix",
+    "WorkerFailure",
     "parse_document",
     "parser_for",
 )

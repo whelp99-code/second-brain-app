@@ -69,10 +69,12 @@ function pluginRuntime(desktop=false) {
     addSettingTab(){}
     addCommand(value){this.commands.push(value);}
     registerObsidianProtocolHandler(name,handler){this.protocols[name]=handler;}
+    registerView(type,factory){this.views=this.views||{}; this.views[type]=factory;}
     registerDomEvent(){}
     registerEvent(){}
   }
-  const obsidian={Plugin,Modal,PluginSettingTab:class{},Setting:class{},Notice:class{},
+  class ItemView { constructor(leaf){ this.leaf=leaf; this.containerEl={empty(){},createEl(){return this;}}; } }
+  const obsidian={Plugin,Modal,ItemView,PluginSettingTab:class{},Setting:class{},Notice:class{},
                   TFile:class{},TFolder:class{},Platform:{isDesktopApp:desktop},requestUrl:async()=>({status:200,json:{}})};
   const code='const syncCore = injectedCore;\n'+fs.readFileSync(path.join(__dirname,'..','main.src.cjs'),'utf8');
   const context={module:{exports:{}},require:name=>{assert.equal(name,'obsidian');return obsidian;},

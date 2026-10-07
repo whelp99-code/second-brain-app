@@ -12,6 +12,7 @@ from sb.life_attachments import OFFICE_PARTS, decode_attachments, inline
 from sb.life_contracts import LifeInputError
 from sb.life_exports import parse_export
 from sb.life_phone import phone_event
+from tests.life_test_support import json_text
 from tests.test_life_phone_shipping import attachment, sample
 
 
@@ -33,12 +34,12 @@ def office(part: str, extra: str | None = None) -> bytes:
         ("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
     ],
 )
-def test_office_document_and_phone_source_preserve_identical_bytes(suffix, mime):
+def test_office_document_and_phone_source_preserve_identical_bytes(suffix: str, mime: str) -> None:
     raw = office(OFFICE_PARTS[mime])
     filename = "fixture." + suffix
     row = parse_export("document", raw, filename)[0]
     assert row["event_type"] == "document_saved"
-    assert "해석 대기" in row["body"]
+    assert "해석 대기" in json_text(row["body"])
     assert decode_attachments(row["attachments"])[0][1] == raw
     mirrored = phone_event(sample("file_shared", attachment(mime, raw, filename)))
     assert mirrored["event_type"] == "document_saved"
@@ -46,7 +47,7 @@ def test_office_document_and_phone_source_preserve_identical_bytes(suffix, mime)
 
 
 @pytest.mark.parametrize("mode", ["traversal", "wrong-kind", "zip-bomb-metadata"])
-def test_office_archive_metadata_negative_controls(mode):
+def test_office_archive_metadata_negative_controls(mode: str) -> None:
     mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     raw = office(
         "xl/workbook.xml" if mode == "wrong-kind" else "word/document.xml",
@@ -58,4 +59,4 @@ def test_office_archive_metadata_negative_controls(mode):
         struct.pack_into("<I", value, central + 24, 128 * 1024 * 1024)
         raw = bytes(value)
     with pytest.raises(LifeInputError, match="LIFE_ATTACHMENT_MIME_MISMATCH"):
-        inline("fixture.docx", mime, raw)
+        _ = inline("fixture.docx", mime, raw)

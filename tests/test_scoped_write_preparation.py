@@ -7,13 +7,15 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonValue
 from sb.scoped_write_preparation import decode_scoped_write_preparation
+from tests.json_fixtures import parse_object
 
 NOW = datetime(2026, 8, 28, tzinfo=UTC)
 
 
 def material():
-    return json.loads(
+    return parse_object(
         (Path(__file__).parent / "fixtures/scoped_write_preparation_v1.json").read_text()
     )
 
@@ -25,7 +27,13 @@ def test_actual_jarvis_preparation_preserves_scope_and_exact_bytes():
     assert decoded.source_access.projects == ("project:shared-memory",)
     assert decoded.preparation_digest == value["preparation_digest"]
     assert json.loads(decoded.canonical) == value
-    value["binding"]["identity"]["projects"].append("project:other")
+    binding = value["binding"]
+    assert isinstance(binding, dict)
+    identity = binding["identity"]
+    assert isinstance(identity, dict)
+    projects = identity["projects"]
+    assert isinstance(projects, list)
+    projects.append("project:other")
     assert decoded.source_access.projects == ("project:shared-memory",)
     assert json.loads(decoded.identity.canonical)["projects"] == ["project:shared-memory"]
 
@@ -47,19 +55,25 @@ def test_actual_jarvis_preparation_preserves_scope_and_exact_bytes():
         (("preparation_digest",), "sha256:" + "0" * 64),
     ],
 )
-def test_rejects_changed_scope_body_and_noncanonical_material(path, replacement):
+def test_rejects_changed_scope_body_and_noncanonical_material(path: tuple[str, ...], replacement: JsonValue):
     value = copy.deepcopy(material())
     target = value
     for name in path[:-1]:
-        target = target[name]
+        nested = target[name]
+        assert isinstance(nested, dict)
+        target = nested
     target[path[-1]] = replacement
     with pytest.raises(ValueError, match="SCOPED_WRITE_PREPARATION_INVALID"):
-        decode_scoped_write_preparation(value, now=NOW)
+        _ = decode_scoped_write_preparation(value, now=NOW)
 
 
 def test_expiry_and_ambiguous_clock_rejected():
     value = material()
-    expiry = datetime.fromisoformat(value["binding"]["expires_at"])
+    binding = value["binding"]
+    assert isinstance(binding, dict)
+    expiry_raw = binding["expires_at"]
+    assert isinstance(expiry_raw, str)
+    expiry = datetime.fromisoformat(expiry_raw)
     for now in (expiry, NOW.replace(tzinfo=None)):
         with pytest.raises(ValueError, match="SCOPED_WRITE_PREPARATION_INVALID"):
-            decode_scoped_write_preparation(value, now=now)
+            _ = decode_scoped_write_preparation(value, now=now)

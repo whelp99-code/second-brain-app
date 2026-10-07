@@ -1,6 +1,7 @@
 import sqlite3
 from contextlib import closing
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -19,12 +20,12 @@ STATE = BoundKnowledge('wiki/검증', 'sha256:' + 'a' * 64, 'ACTIVE', 'APPROVED'
     ('knowledge_status', []), ('approval_status', None),
     ('page_id', None), ('content_digest', None),
 ])
-def test_invalid_binding_rejected(field, value):
+def test_invalid_binding_rejected(field: str, value: str | list[str] | None) -> None:
     with pytest.raises(ValueError, match='BOUND_KNOWLEDGE_'):
-        replace(STATE, **{field: value})
+        _ = replace(STATE, **{field: value})
 
 
-def test_binding_survives_reopen_and_never_transfers_to_other_content(tmp_path):
+def test_binding_survives_reopen_and_never_transfers_to_other_content(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         ledger.bind_knowledge(STATE)
         ledger.bind_knowledge(STATE)
@@ -39,20 +40,20 @@ def test_binding_survives_reopen_and_never_transfers_to_other_content(tmp_path):
         assert ledger.knowledge_for(STATE.page_id, 'sha256:' + 'b' * 64) is None
 
 
-def test_v4_migration_preserves_existing_data_and_backup(tmp_path):
+def test_v4_migration_preserves_existing_data_and_backup(tmp_path: Path) -> None:
     # Reconstruct the previous schema by removing only the new additive table.
     with Ledger(tmp_path):
         pass
     path = tmp_path / '.sb' / 'ledger.db'
     with closing(sqlite3.connect(path)) as conn:
-        conn.execute('DROP TABLE bound_knowledge')
-        conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
-        conn.execute("INSERT INTO run VALUES ('existing', '2026-09-10T00:00:00Z', NULL, NULL, 'ok')")
+        _ = conn.execute('DROP TABLE bound_knowledge')
+        _ = conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+        _ = conn.execute("INSERT INTO run VALUES ('existing', '2026-09-10T00:00:00Z', NULL, NULL, 'ok')")
         conn.commit()
     backup = migrate_ledger(path)
     assert backup is not None
     assert ledger_schema_version(backup) == 4
-    assert ledger_schema_version(path) == 5
+    assert ledger_schema_version(path) == 6
     with closing(sqlite3.connect(backup)) as conn:
         assert conn.execute("SELECT name FROM sqlite_master WHERE name='bound_knowledge'").fetchone() is None
         assert conn.execute('SELECT run_id FROM run').fetchall() == [('existing',)]

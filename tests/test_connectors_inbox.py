@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -122,9 +123,9 @@ def test_acknowledge_preserves_previous_file_with_same_name(tmp_path: Path) -> N
     inbox = tmp_path / "inbox"
     done = inbox / ".done"
     done.mkdir(parents=True)
-    (done / "keep.md").write_text("previous original\n")
+    _ = (done / "keep.md").write_text("previous original\n")
     source = inbox / "keep.md"
-    source.write_text("new original\n")
+    _ = source.write_text("new original\n")
     adapter = create(_cfg(inbox))
     items = list(adapter.scan(None))
     assert isinstance(adapter, AcknowledgingSourceAdapter)
@@ -136,27 +137,27 @@ def test_acknowledge_preserves_previous_file_with_same_name(tmp_path: Path) -> N
 
 
 @pytest.mark.parametrize("collision", [False, True])
-def test_acknowledge_resumes_published_file_after_unlink_failure(tmp_path, monkeypatch, collision):
-    import sb.connectors.inbox_documents as module
+def test_acknowledge_resumes_published_file_after_unlink_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, collision: bool):
 
     inbox = tmp_path / "inbox"
     done = inbox / ".done"
     done.mkdir(parents=True)
     if collision:
-        (done / "keep.md").write_text("previous\n")
+        _ = (done / "keep.md").write_text("previous\n")
     source = inbox / "keep.md"
-    source.write_text("current\n")
+    _ = source.write_text("current\n")
     adapter = create(_cfg(inbox))
     items = list(adapter.scan(None))
     cursor = adapter.next_cursor()
     assert isinstance(adapter, AcknowledgingSourceAdapter)
     refs = tuple(ref for ref, _, _ in items)
 
-    def fail_unlink(*args, **kwargs):
+    def fail_unlink(_path: str | bytes | os.PathLike[str] | os.PathLike[bytes], *, dir_fd: int | None = None) -> None:
+        del dir_fd
         raise OSError("simulated failure after publication")
 
     with monkeypatch.context() as patch:
-        patch.setattr(module.os, "unlink", fail_unlink)
+        patch.setattr(os, "unlink", fail_unlink)
         with pytest.raises(OSError, match="after publication"):
             adapter.acknowledge(refs)
     assert source.read_text() == "current\n"
@@ -173,30 +174,30 @@ def test_acknowledge_resumes_published_file_after_unlink_failure(tmp_path, monke
 
 
 @pytest.mark.parametrize("replace_inode", [False, True])
-def test_acknowledge_rejects_change_after_verified_read(tmp_path, monkeypatch, replace_inode):
+def test_acknowledge_rejects_change_after_verified_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replace_inode: bool):
     import sb.connectors.inbox_documents as module
 
     inbox = tmp_path / "inbox"
     inbox.mkdir()
     source = inbox / "note.md"
-    source.write_text("committed original\n")
+    _ = source.write_text("committed original\n")
     adapter = create(_cfg(inbox))
     items = list(adapter.scan(None))
     cursor = adapter.next_cursor()
-    move = module._move_done
+    move = module.move_done
 
-    def changed(*args, **kwargs):
+    def changed(root: Path, rel: str, version: str, verified: os.stat_result) -> None:
         if replace_inode:
             replacement = inbox / "replacement.md"
-            replacement.write_text("uncommitted replacement\n")
-            replacement.replace(source)
+            _ = replacement.write_text("uncommitted replacement\n")
+            _ = replacement.replace(source)
         else:
-            source.write_text("uncommitted replacement\n")
-        return move(*args, **kwargs)
+            _ = source.write_text("uncommitted replacement\n")
+        return move(root, rel, version, verified)
 
     assert isinstance(adapter, AcknowledgingSourceAdapter)
     with monkeypatch.context() as patch:
-        patch.setattr(module, "_move_done", changed)
+        patch.setattr(module, "move_done", changed)
         with pytest.raises(OSError, match="changed"):
             adapter.acknowledge(tuple(ref for ref, _, _ in items))
     assert source.read_text() == "uncommitted replacement\n"
@@ -344,7 +345,7 @@ def test_acknowledgment_does_not_move_changed_input(tmp_path: Path) -> None:
     assert not (tmp_path / ".done").exists()
 
 
-def test_fifo_is_skipped_without_opening_a_writer(tmp_path):
+def test_fifo_is_skipped_without_opening_a_writer(tmp_path: Path):
     import os
     import subprocess
     import sys
@@ -363,29 +364,29 @@ assert list(adapter.scan(adapter.next_cursor())) == []
     assert result.returncode == 0, result.stderr
 
 
-def test_file_replacement_before_open_is_not_ingested(tmp_path, monkeypatch):
+def test_file_replacement_before_open_is_not_ingested(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import os
 
     import sb.connectors.inbox_documents as module
 
     path = tmp_path / 'note.txt'
-    path.write_text('original')
-    original = module._read_regular
+    _ = path.write_text('original')
+    original = module.read_regular
 
-    def replace_before_read(target, metadata):
+    def replace_before_read(target: Path, metadata: os.stat_result) -> bytes:
         replacement = tmp_path / 'replacement'
-        replacement.write_text('replaced')
+        _ = replacement.write_text('replaced')
         os.replace(replacement, target)
         return original(target, metadata)
 
-    monkeypatch.setattr(module, '_read_regular', replace_before_read)
+    monkeypatch.setattr(module, 'read_regular', replace_before_read)
     adapter = create(_cfg(tmp_path))
     assert _skipped(list(adapter.scan(None))) == ['unreadable']
-    monkeypatch.setattr(module, '_read_regular', original)
+    monkeypatch.setattr(module, 'read_regular', original)
     assert _delivered(list(adapter.scan(adapter.next_cursor()))) == [('note.txt', b'replaced')]
 
 
-def test_acknowledge_does_not_follow_done_directory_symlink(tmp_path):
+def test_acknowledge_does_not_follow_done_directory_symlink(tmp_path: Path):
     import pytest
 
     from sb.connectors.base import AcknowledgingSourceAdapter
@@ -394,7 +395,7 @@ def test_acknowledge_does_not_follow_done_directory_symlink(tmp_path):
     outside = tmp_path / 'outside'
     inbox.mkdir()
     outside.mkdir()
-    (inbox / 'note.txt').write_text('keep inside inbox')
+    _ = (inbox / 'note.txt').write_text('keep inside inbox')
     adapter = create(_cfg(inbox))
     assert isinstance(adapter, AcknowledgingSourceAdapter)
     items = list(adapter.scan(None))

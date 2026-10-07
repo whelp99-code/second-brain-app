@@ -1,40 +1,45 @@
 """Conflict retries retain committed comparison pages after compilation is cached."""
+
 import subprocess
 from pathlib import Path
 
+import pytest
 from pytest import MonkeyPatch
 
 from sb.config import Config
-from sb.pipeline import _CitedFake, run_compile, run_ingest
+from sb.pipeline import CitedFake, run_compile, run_ingest
 from sb.store.ledger import Ledger
 from sb.vault import init_vault
 
 
-def test_conflict_retry_without_recompilation(tmp_path: Path, monkeypatch):
+def test_conflict_retry_without_recompilation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = tmp_path / 'vault'
-    init_vault(root)
+    _ = init_vault(root)
     source = tmp_path / 'source'
     source.mkdir()
-    (source / 'note.md').write_text('검증기억 충돌 비교용 사실입니다.')
+    _ = (source / 'note.md').write_text('검증기억 충돌 비교용 사실입니다.')
     config = Config(raw={'vault_root': str(root),
                          'sources': [{'id': 'notes', 'adapter': 'markdown-vault',
                                       'root': str(source)}],
                          'llm': {'model_id': 'test', 'prompt_version': 'v1'}})
 
     class Model:
-        recovered = False
-        calls = 0
+        recovered: bool = False
+        calls: int = 0
 
-        def generate(self, prompt, **kwargs):
+        def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+            del system, timeout
             self.calls += 1
-            if kwargs.get('json_mode') and self.recovered:
+            if json_mode and self.recovered:
                 return '{"relation":"unrelated","confidence":1,"rationale":"test","cites":[]}'
-            return '검증기억 ' + _CitedFake().generate(prompt)
+            return '검증기억 ' + CitedFake().generate(prompt)
 
     model = Model()
-    monkeypatch.setattr('sb.pipeline._llm', lambda *args: model)
+    def installed(_config: Config, _mode: str) -> Model:
+        return model
+    monkeypatch.setattr('sb.pipeline._llm', installed)
     assert run_ingest(config, ("notes",)).exit_code == 0
-    run_compile(config)
+    _ = run_compile(config)
     with Ledger(root) as ledger:
         failed = list(ledger.list_derivations(status='failed', stage='conflict'))
         assert failed
@@ -76,11 +81,12 @@ def test_pipeline_holds_failed_conflict_without_success_log(tmp_path: Path, monk
         def __init__(self) -> None:
             self.calls: int = 0
 
-        def generate(self, prompt: str, **kwargs: object) -> str:
+        def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+            del system, timeout
             self.calls += 1
-            if kwargs.get('json_mode'):
+            if json_mode:
                 return '{"relation":"invented","confidence":0.8,"rationale":"x"}'
-            return '검증기억 ' + _CitedFake().generate(prompt)
+            return '검증기억 ' + CitedFake().generate(prompt)
 
     model = InvalidModel()
     def installed_model(config: Config, llm_mode: str) -> InvalidModel:

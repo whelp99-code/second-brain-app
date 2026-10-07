@@ -1,9 +1,9 @@
 """H6: historical failed brief rows close as superseded when a later brief succeeded."""
 from __future__ import annotations
 
-from dataclasses import replace
+from datetime import datetime, tzinfo
 from pathlib import Path
-from typing import cast
+from typing import override
 
 import pytest
 
@@ -16,11 +16,36 @@ _PROMPT = "p"
 _MODEL = "m"
 
 
-def _stamp_finished(ledger: Ledger, key: str, stamp: str) -> None:
-    _ = ledger._exec("UPDATE derivation SET finished_at=? WHERE deriv_key=?", (stamp, key))
-    row = ledger.get_derivation(key)
-    assert row is not None
-    ledger._tables.derivations[key] = replace(row, finished_at=stamp)
+def _mark_done_at(ledger: Ledger, key: str, output: DerivationOutput, stamp: str) -> None:
+    instant = datetime.fromisoformat(stamp)
+
+    class Clock(datetime):
+        @classmethod
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
+            return instant
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.store.ledger.datetime", Clock)
+        ledger.mark_done(key, output)
+
+
+def _mark_failed_at(
+    ledger: Ledger, key: str, stamp: str, error: str = "unresolved citations"
+) -> None:
+    instant = datetime.fromisoformat(stamp)
+
+    class Clock(datetime):
+        @classmethod
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
+            return instant
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.store.ledger.datetime", Clock)
+        ledger.mark_failed(key, error)
 
 
 def test_failed_brief_stays_failed_without_later_success(tmp_path: Path) -> None:
@@ -43,8 +68,7 @@ def test_failed_brief_superseded_when_later_brief_is_done(tmp_path: Path) -> Non
     with Ledger(tmp_path) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "unresolved citations")
-        _stamp_finished(ledger, failed_key, "2026-09-05T00:00:00.000Z")
+        _mark_failed_at(ledger, failed_key, "2026-09-05T00:00:00.000Z")
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
         ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
@@ -82,12 +106,20 @@ def test_historical_llm_timeout_superseded_after_later_brief(tmp_path: Path) -> 
     with Ledger(tmp_path) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "LLM unavailable after 2 attempts: timeout after 120s")
-        _stamp_finished(ledger, failed_key, "2026-10-03T00:00:00.000Z")
+        _mark_failed_at(
+            ledger,
+            failed_key,
+            "2026-10-03T00:00:00.000Z",
+            "LLM unavailable after 2 attempts: timeout after 120s",
+        )
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
-        ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
-        _stamp_finished(ledger, done_key, "2026-10-05T00:00:00.000Z")
+        _mark_done_at(
+            ledger,
+            done_key,
+            DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"),
+            "2026-10-05T00:00:00.000Z",
+        )
         closed = ledger.supersede_historical_brief_failures()
         failed = ledger.get_derivation(failed_key)
     assert closed == 1
@@ -116,8 +148,7 @@ def test_superseded_brief_reopens_to_pending(tmp_path: Path) -> None:
     with Ledger(tmp_path) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "unresolved citations")
-        _stamp_finished(ledger, failed_key, "2026-09-05T00:00:00.000Z")
+        _mark_failed_at(ledger, failed_key, "2026-09-05T00:00:00.000Z")
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
         ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
@@ -136,7 +167,7 @@ def test_retry_failed_still_refuses_remaining_brief_failures(tmp_path: Path) -> 
         ledger.mark_running(failed_key, "run-old")
         ledger.mark_failed(failed_key, "unresolved citations")
     with pytest.raises(OperationError, match="BRIEF_REPLAY_INPUTS_UNAVAILABLE"):
-        retry_failed(tmp_path)
+        _ = retry_failed(tmp_path)
 
 
 def test_status_snapshot_omits_superseded_from_failed_list(tmp_path: Path) -> None:
@@ -145,16 +176,14 @@ def test_status_snapshot_omits_superseded_from_failed_list(tmp_path: Path) -> No
     with Ledger(tmp_path) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "LLM unavailable after 2 attempts: timeout after 120s")
-        _stamp_finished(ledger, failed_key, "2026-09-05T00:00:00.000Z")
+        _mark_failed_at(ledger, failed_key, "2026-09-05T00:00:00.000Z")
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
         ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-09-15.md"))
-        _stamp_finished(ledger, done_key, "2026-10-05T00:00:00.000Z")
         _ = ledger.supersede_historical_brief_failures()
     snapshot = status_snapshot(Config(raw={"vault_root": str(tmp_path)}))
-    failed_items = cast(list[object], snapshot["failed_derivations"])
-    counts = cast(dict[str, int], snapshot["derivation_counts"])
+    failed_items = snapshot["failed_derivations"]
+    counts = snapshot["derivation_counts"]
     assert failed_items == []
     assert counts[DerivStatus.SUPERSEDED.value] == 1
     assert counts[DerivStatus.FAILED.value] == 0

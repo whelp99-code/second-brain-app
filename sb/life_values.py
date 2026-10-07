@@ -10,6 +10,8 @@ from hashlib import sha256
 from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sb.config import TomlValue
+from sb.effect_values import JsonInput
 from sb.life_contracts import (
     ENTITY_KINDS,
     EVENT_STATES,
@@ -53,7 +55,7 @@ INPUT_FIELDS = frozenset(
 MAX_INPUT_BYTES = 1024 * 1024
 
 
-def canonical_bytes(value: object) -> bytes:
+def canonical_bytes(value: JsonInput) -> bytes:
     try:
         return json.dumps(
             value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
@@ -62,7 +64,7 @@ def canonical_bytes(value: object) -> bytes:
         raise LifeInputError("LIFE_JSON_INVALID") from exc
 
 
-def text(value: object, *, maximum: int, empty: bool = False) -> str:
+def text(value: JsonInput | TomlValue, *, maximum: int, empty: bool = False) -> str:
     if not isinstance(value, str) or (not empty and not value.strip()):
         raise LifeInputError("LIFE_TEXT_INVALID")
     try:
@@ -75,7 +77,12 @@ def text(value: object, *, maximum: int, empty: bool = False) -> str:
     return value
 
 
-def instant(value: object) -> datetime:
+def instant(value: JsonInput | TomlValue) -> datetime:
+    """Convert an explicit-offset instant to UTC without re-localizing it.
+
+    DST folds and gaps stay at the stated offset. A named timezone must not
+    shift 01:30 twice or invent a missing 02:30.
+    """
     if not isinstance(value, str) or len(value) > 64:
         raise LifeInputError("LIFE_TIME_INVALID")
     try:
@@ -90,11 +97,11 @@ def instant(value: object) -> datetime:
         raise LifeInputError("LIFE_TIME_INVALID") from exc
 
 
-def _optional_time(value: object) -> str | None:
+def _optional_time(value: JsonInput) -> str | None:
     return None if value is None else instant(value).isoformat()
 
 
-def zone(value: object) -> ZoneInfo:
+def zone(value: JsonInput | TomlValue) -> ZoneInfo:
     if not isinstance(value, str) or len(value) > 128:
         raise LifeInputError("LIFE_TIMEZONE_INVALID")
     try:
@@ -104,11 +111,12 @@ def zone(value: object) -> ZoneInfo:
 
 
 def day_window(day: str, timezone: str) -> tuple[datetime, datetime]:
+    """Half-open local day [start, end) in the given timezone, as UTC instants."""
     tz = zone(timezone)
     try:
         current = date.fromisoformat(day)
         if current.isoformat() != day:
-            raise ValueError("noncanonical date")
+            raise LifeInputError("LIFE_DAY_INVALID")
         start = datetime.combine(current, time.min, tz)
         end = datetime.combine(current + timedelta(days=1), time.min, tz)
         return start.astimezone(UTC), end.astimezone(UTC)
@@ -116,17 +124,26 @@ def day_window(day: str, timezone: str) -> tuple[datetime, datetime]:
         raise LifeInputError("LIFE_DAY_INVALID") from exc
 
 
-def _choice(data: Mapping[str, object], name: str, allowed: frozenset[str], default: str) -> str:
+def in_day_window(moment: datetime, day: str, timezone: str) -> bool:
+    """True when moment is inside the half-open travel-local day."""
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise LifeInputError("LIFE_TIMEZONE_REQUIRED")
+    start, end = day_window(day, timezone)
+    utc = moment.astimezone(UTC)
+    return start <= utc < end
+
+
+def _choice(data: Mapping[str, JsonInput], name: str, allowed: frozenset[str], default: str) -> str:
     value = data.get(name, default)
     if not isinstance(value, str) or value not in allowed:
         raise LifeInputError("LIFE_" + name.upper() + "_INVALID")
     return value
 
 
-def _number(value: object) -> int | float | None:
+def _number(value: JsonInput) -> int | float | None:
     if value is None:
         return None
-    if type(value) not in {int, float}:
+    if type(value) is not int and type(value) is not float:
         raise LifeInputError("LIFE_NUMBER_INVALID")
     try:
         if not math.isfinite(value):
@@ -136,7 +153,7 @@ def _number(value: object) -> int | float | None:
     return value
 
 
-def _entities(value: object) -> tuple[EntityRefV1, ...]:
+def _entities(value: JsonInput) -> tuple[EntityRefV1, ...]:
     if not isinstance(value, list) or len(value) > 64:
         raise LifeInputError("LIFE_ENTITIES_INVALID")
     result: list[EntityRefV1] = []
@@ -158,10 +175,10 @@ def _entities(value: object) -> tuple[EntityRefV1, ...]:
 
 
 def parse_event(
-    payload: Mapping[str, object],
+    payload: JsonInput,
     policy: SourcePolicyV1,
     *,
-    recorded_at: datetime,
+    recorded_at: datetime | JsonInput,
     revision: int = 1,
 ) -> LifeEventV1:
     """Bind an untrusted input to an operator-owned source policy and server clock."""

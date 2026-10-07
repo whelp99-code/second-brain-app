@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:second-brain:scan-receipt:v1",
+  "title": "ScanReceiptV1",
+  "description": "K2 records every scan, including unchanged scans. Counts are disjoint outcomes: scanned = accepted + unchanged + filtered + quarantined + deferred + retryable_errors + permanent_errors. Runtime validation enforces the sum, scanned <= budget when bounded, ordered time/coverage ranges, and unchanged checkpoints for disabled/unavailable scans. budget and upstream_end_evidence make the plan's budget/end-evidence invariants explicit on the wire. Checkpoints are opaque adapter cursors. An upstream_end_evidence reference must name durable adapter evidence of continuation exhaustion or a complete snapshot, never an HTTP status, count plateau or inferred emptiness. A producer supplies this proof; schema validation cannot establish upstream truth. ok is not exhausted. captured/parsed/published/searchable/recommendation_eligible are separate downstream coverage measures, not aliases for accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scan_id", "source_id", "account_id", "started_at", "finished_at", "state", "checkpoint_before", "checkpoint_after", "scanned", "accepted", "unchanged", "filtered", "quarantined", "deferred", "retryable_errors", "permanent_errors", "coverage_start", "coverage_end", "next_scan_at", "remaining_known", "exhausted", "budget", "upstream_end_evidence"],
+  "properties": {
+    "scan_id": {"$ref": "#/$defs/text"},
+    "source_id": {"$ref": "#/$defs/text"},
+    "account_id": {"$ref": "#/$defs/text"},
+    "started_at": {"$ref": "#/$defs/instant"},
+    "finished_at": {"$ref": "#/$defs/instant"},
+    "state": {"enum": ["ok", "partial", "failed", "unavailable", "disabled"]},
+    "checkpoint_before": {"$ref": "#/$defs/nullableCheckpoint"},
+    "checkpoint_after": {"$ref": "#/$defs/nullableCheckpoint"},
+    "scanned": {"$ref": "#/$defs/count"},
+    "accepted": {"$ref": "#/$defs/count"},
+    "unchanged": {"$ref": "#/$defs/count"},
+    "filtered": {"$ref": "#/$defs/count"},
+    "quarantined": {"$ref": "#/$defs/count"},
+    "deferred": {"$ref": "#/$defs/count"},
+    "retryable_errors": {"$ref": "#/$defs/count"},
+    "permanent_errors": {"$ref": "#/$defs/count"},
+    "coverage_start": {"$ref": "#/$defs/nullableInstant"},
+    "coverage_end": {"$ref": "#/$defs/nullableInstant"},
+    "next_scan_at": {"$ref": "#/$defs/nullableInstant"},
+    "remaining_known": {"oneOf": [{"$ref": "#/$defs/count"}, {"type": "null"}]},
+    "exhausted": {"type": "boolean"},
+    "budget": {"oneOf": [{"$ref": "#/$defs/count"}, {"type": "null"}]},
+    "upstream_end_evidence": {"$ref": "#/$defs/nullableText"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"exhausted": {"const": true}}},
+      "then": {"properties": {"state": {"const": "ok"}, "upstream_end_evidence": {"$ref": "#/$defs/text"}, "remaining_known": {"const": 0}, "deferred": {"const": 0}, "retryable_errors": {"const": 0}}}
+    },
+    {
+      "if": {"properties": {"state": {"enum": ["disabled", "unavailable"]}}},
+      "then": {"properties": {"scanned": {"const": 0}, "accepted": {"const": 0}, "unchanged": {"const": 0}, "filtered": {"const": 0}, "quarantined": {"const": 0}, "deferred": {"const": 0}, "retryable_errors": {"const": 0}, "permanent_errors": {"const": 0}, "exhausted": {"const": false}}}
+    },
+    {"if": {"properties": {"coverage_start": {"type": "null"}}}, "then": {"properties": {"coverage_end": {"type": "null"}}}, "else": {"properties": {"coverage_end": {"$ref": "#/$defs/instant"}}}}
+  ],
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001f]*[^\\s\\u0000-\\u001f][^\\u0000-\\u001f]*$"},
+    "count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "instant": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"},
+    "checkpoint": {"type": "string", "minLength": 1, "maxLength": 1048576, "pattern": "^[^\\u0000-\\u001f]*[^\\s\\u0000-\\u001f][^\\u0000-\\u001f]*$"},
+    "nullableText": {"oneOf": [{"$ref": "#/$defs/text"}, {"type": "null"}]},
+    "nullableCheckpoint": {"oneOf": [{"$ref": "#/$defs/checkpoint"}, {"type": "null"}]},
+    "nullableInstant": {"oneOf": [{"$ref": "#/$defs/instant"}, {"type": "null"}]}
+  }
+}

@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -11,14 +12,14 @@ from tests.test_session_file_replacement import FACTORIES, record
 
 
 @pytest.mark.parametrize("kind", list(FACTORIES))
-def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
+def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path: Path, kind: str):
     roots = [tmp_path / "agent-a", tmp_path / "agent-b"]
     for root in roots:
         root.mkdir()
-        (root / "session.jsonl").write_bytes(record(kind, "same-id"))
+        _ = (root / "session.jsonl").write_bytes(record(kind, "same-id"))
     vault = tmp_path / "vault"
     config = tmp_path / "config.toml"
-    config.write_text(
+    _ = config.write_text(
         f'vault_root = "{vault}"\nshare_root = "{tmp_path}"\nstate_root = "{tmp_path / "state"}"\n'
         + "".join(
             f'[[sources]]\nid = "agent-{i}"\nadapter = "{kind}-sessions"\nroot = "{root}"\n'
@@ -77,7 +78,7 @@ def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
     if kind == "gjc":
         addition = addition.split(b"\n", 1)[1]
     with (roots[0] / "session.jsonl").open("ab") as stream:
-        stream.write(addition)
+        _ = stream.write(addition)
     ingest()
     items, after = snapshot()
     assert len(items) == 3
@@ -86,19 +87,19 @@ def test_explicit_sources_keep_independent_ledger_and_resume(tmp_path, kind):
 
 
 @pytest.mark.parametrize("kind", [*FACTORIES, "opencode"])
-def test_ambiguous_roots_fail_cli_on_every_restart(tmp_path, kind):
+def test_ambiguous_roots_fail_cli_on_every_restart(tmp_path: Path, kind: str):
     roots = [tmp_path / "a", tmp_path / "b"]
     for root in roots:
         root.mkdir()
         if kind == "opencode":
-            (root / "snapshot.json").write_text(
+            _ = (root / "snapshot.json").write_text(
                 '{"parts":[{"id":"same-id","data":{"type":"text","text":"same body"}}]}'
             )
         else:
-            (root / "session.jsonl").write_bytes(record(kind, "same-id"))
+            _ = (root / "session.jsonl").write_bytes(record(kind, "same-id"))
     vault = tmp_path / "vault"
     config = tmp_path / "config.toml"
-    config.write_text(
+    _ = config.write_text(
         f'vault_root = "{vault}"\nshare_root = "{tmp_path}"\nstate_root = "{tmp_path / "state"}"\n'
         + "".join(f'[[sources]]\nadapter = "{kind}-sessions"\nroot = "{root}"\n' for root in roots)
     )

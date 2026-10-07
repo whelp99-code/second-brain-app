@@ -7,10 +7,9 @@ import os
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from sb.config import Config, load_config
-from sb.life_contracts import IDENTIFIER, LifeInputError
+from sb.life_contracts import IDENTIFIER, LifeInputError, SourcePolicyV1
 from sb.life_values import instant
 
 
@@ -40,23 +39,27 @@ def admin_token(fresh: Config, original: Config, server_token: str | None) -> st
 
 
 def device(
-    config: Config, supplied: str, available: Mapping[str, Any], *, now: datetime | None = None
+    config: Config,
+    supplied: str,
+    available: Mapping[str, SourcePolicyV1],
+    *,
+    now: datetime | None = None,
 ) -> tuple[str, tuple[str, ...], bool] | None:
     raw = config.raw.get("life_devices", {})
     if not isinstance(raw, Mapping) or len(raw) > 100:
         raise LifeInputError("LIFE_DEVICE_CONFIG_INVALID")
     clock = now or datetime.now(UTC)
-    matches = []
+    matches: list[tuple[str, tuple[str, ...], bool]] = []
     for identity, entry in raw.items():
         if (
-            not isinstance(identity, str)
-            or IDENTIFIER.fullmatch(identity) is None
+            IDENTIFIER.fullmatch(identity) is None
             or not isinstance(entry, Mapping)
             or set(entry) - {"token_env", "source_ids", "can_write", "expires_at", "revoked"}
         ):
             raise LifeInputError("LIFE_DEVICE_CONFIG_INVALID")
         name = entry.get("token_env")
         sources = entry.get("source_ids")
+        can_write = entry.get("can_write", False)
         if (
             not isinstance(name, str)
             or not name.isidentifier()
@@ -64,7 +67,7 @@ def device(
             or not isinstance(sources, list)
             or not sources
             or any(not isinstance(s, str) or s not in available for s in sources)
-            or type(entry.get("can_write", False)) is not bool
+            or type(can_write) is not bool
             or type(entry.get("revoked", False)) is not bool
         ):
             raise LifeInputError("LIFE_DEVICE_CONFIG_INVALID")
@@ -75,7 +78,9 @@ def device(
         ):
             if entry.get("revoked") or clock >= expires:
                 raise LifeInputError("LIFE_DEVICE_EXPIRED_OR_REVOKED")
-            matches.append((identity, tuple(sorted(set(sources))), entry.get("can_write", False)))
+            matches.append(
+                (identity, tuple(sorted({s for s in sources if isinstance(s, str)})), can_write)
+            )
     if len(matches) > 1:
         raise LifeInputError("LIFE_DEVICE_CONFIG_INVALID")
     return matches[0] if matches else None

@@ -51,7 +51,7 @@ def stamp_knowledge(
     """Register committed index pages. Does not parse body or write YAML."""
     for rel in committed_paths(root, _INDEX_PREFIXES):
         page_id = rel.removesuffix(".md")
-        register_page(
+        _ = register_page(
             root,
             page_id,
             knowledge_status=knowledge_status,

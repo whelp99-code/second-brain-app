@@ -1,0 +1,38 @@
+"""Strict JSON boundaries shared by the synthetic Life contract tests."""
+
+from collections.abc import Mapping
+
+from pydantic import ConfigDict, TypeAdapter
+
+from sb.config import TomlValue
+from sb.effect_values import JsonInput, JsonObject
+
+_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject, config=ConfigDict(strict=True))
+_ROWS = TypeAdapter(list[JsonObject], config=ConfigDict(strict=True))
+_INT = TypeAdapter(int, config=ConfigDict(strict=True))
+_TEXT = TypeAdapter(str, config=ConfigDict(strict=True))
+
+
+json_object = _OBJECT.validate_python
+json_rows = _ROWS.validate_python
+json_text = _TEXT.validate_python
+json_int = _INT.validate_python
+
+
+def config_table(value: TomlValue) -> Mapping[str, TomlValue]:
+    assert isinstance(value, Mapping)
+    return value
+
+
+def request(
+    url: str,
+    *,
+    method: str = "GET",
+    payload: JsonInput = None,
+    token: str | None = None,
+) -> tuple[int, JsonObject]:
+    from tests import test_web
+
+    status, body = test_web.request(url, method=method, payload=payload, token=token)
+    assert isinstance(body, dict)
+    return status, body

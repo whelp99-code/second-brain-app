@@ -116,6 +116,31 @@ class Run:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceCoverage:
+    """Downstream coverage. Each field is an independent measure, not an alias."""
+
+    captured: int
+    parsed: int
+    published: int
+    searchable: int
+    eligible: int
+
+
+@dataclass(frozen=True, slots=True)
+class UnitProvenance:
+    """Parser result bound to one normalized unit. Not evidence by itself."""
+
+    unit_id: str
+    content_hash: str
+    parser_version: str
+    model_version: str
+    normalizer_version: str
+    profile_revision: str
+    locator_json: str
+    partial_reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class RunStage:
     run_id: str
     stage: str
@@ -135,6 +160,7 @@ class PageFacts:
     model_id: str | None
     sources: tuple[tuple[str, str], ...]
     derivation_key: str | None = None
+    updated: str | None = None
 
 
 def deriv_key(unit_ids: Sequence[str], stage: str, prompt_version: str, model_id: str) -> str:
@@ -188,6 +214,7 @@ def parse_page_frontmatter(text: str) -> PageFacts | None:
     page_id: str | None = None
     compiled: str | None = None
     stored_derivation_key: str | None = None
+    stored_updated: str | None = None
     sources: list[tuple[str, str]] = []
     current: dict[str, str] = {}
     in_sources = False
@@ -209,6 +236,8 @@ def parse_page_frontmatter(text: str) -> PageFacts | None:
                 compiled = parsed
             elif field == "derivation_key":
                 stored_derivation_key = parsed
+            elif field == "updated":
+                stored_updated = parsed
             elif field == "sources":
                 in_sources = True
             continue
@@ -232,7 +261,7 @@ def parse_page_frontmatter(text: str) -> PageFacts | None:
     stamp = parse_compiled_by(compiled) if compiled is not None else None
     prompt = stamp[0] if stamp is not None else None
     model = stamp[1] if stamp is not None else None
-    return PageFacts(page_id, prompt, model, tuple(sources), stored_derivation_key)
+    return PageFacts(page_id, prompt, model, tuple(sources), stored_derivation_key, stored_updated)
 
 
 def _flush_source(current: dict[str, str], sources: list[tuple[str, str]]) -> None:

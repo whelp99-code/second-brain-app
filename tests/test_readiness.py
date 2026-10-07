@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 import sqlite3
 from contextlib import closing
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
-from typing import cast
+from typing import cast, override
 
 import pytest
 
@@ -16,25 +16,56 @@ import sb.ops as ops_module
 import sb.readiness as readiness_module
 from sb.backup_verification import read_verification, verification_path, verify_backup
 from sb.config import Config
-from sb.ops import OperationError, create_backup
+from sb.effect_values import is_json_object
+from sb.ops import OperationError, create_backup, restore_backup
 from sb.readiness import readiness
 from sb.request_store import RequestStore
 from sb.store import DerivStatus, Run, deriv_key
 from sb.store.ledger import DerivationOutput, Ledger
-from tests.test_cli import _cli_with_config
-from tests.test_ops import _seed_vault
-from tests.test_request_store import _identity
-from tests.test_supersede_brief_failures import _stamp_finished
-from tests.test_web import _request, _running
+from tests.ops_fixture import seed_vault
+from tests.test_cli import cli_with_config
+from tests.test_request_store import request_identity
+from tests.test_web import request, running
 
 NOW = datetime(2030, 1, 2, 12, tzinfo=UTC)
 
 
 class Clock(datetime):
     @classmethod
-    def now(cls, tz: object = None) -> datetime:
+    @override
+    def now(cls, tz: tzinfo | None = None) -> datetime:
         del tz
         return NOW
+
+
+def _mark_failed_at(ledger: Ledger, key: str, stamp: str, error: str) -> None:
+    instant = datetime.fromisoformat(stamp)
+
+    class StampClock(datetime):
+        @classmethod
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
+            return instant
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.store.ledger.datetime", StampClock)
+        ledger.mark_failed(key, error)
+
+
+def _mark_done_at(ledger: Ledger, key: str, output: DerivationOutput, stamp: str) -> None:
+    instant = datetime.fromisoformat(stamp)
+
+    class StampClock(datetime):
+        @classmethod
+        @override
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            del tz
+            return instant
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.store.ledger.datetime", StampClock)
+        ledger.mark_done(key, output)
 
 
 @pytest.fixture
@@ -42,7 +73,7 @@ def configured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Config:
     monkeypatch.setattr(ops_module, "datetime", Clock)
     monkeypatch.setattr(verification_module, "datetime", Clock)
     monkeypatch.setattr(readiness_module, "datetime", Clock)
-    root, config = _seed_vault(tmp_path)
+    root, config = seed_vault(tmp_path)
     with Ledger(root) as ledger:
         ledger.record_run(Run("ready-run", (NOW - timedelta(minutes=2)).isoformat(),
             (NOW - timedelta(minutes=1)).isoformat(), None, "ok"))
@@ -59,14 +90,16 @@ def backup(config: Config) -> Path:
 def test_file_mtime_does_not_prove_backup_and_verified_file_changes_invalidate(configured: Config) -> None:
     archive = backup(configured)
     assert readiness(configured)["status"] == "degraded"
-    assert "VERIFIED_BACKUP_UNAVAILABLE" in cast(list[str], readiness(configured)["reasons"])
+    reasons = readiness(configured)["reasons"]
+    assert isinstance(reasons, list)
+    assert "VERIFIED_BACKUP_UNAVAILABLE" in reasons
     receipt = verify_backup(archive)
     assert receipt.files > 0
     assert readiness(configured)["status"] == "ready"
     assert not list(archive.parent.glob(".verify-backup-*"))
     before = archive.stat()
     raw = archive.read_bytes()
-    archive.write_bytes(raw[:-1] + bytes([raw[-1] ^ 1]))
+    _ = archive.write_bytes(raw[:-1] + bytes([raw[-1] ^ 1]))
     os.utime(archive, ns=(before.st_atime_ns, before.st_mtime_ns))
     assert readiness(configured)["status"] == "degraded"
     with pytest.raises(OperationError):
@@ -85,7 +118,10 @@ def test_old_failed_and_future_runs_are_degraded(configured: Config, age: timede
         ledger.record_run(Run("ready-run", (NOW - age - timedelta(minutes=1)).isoformat(),
             (NOW - age).isoformat(), None, status))
     result = readiness(configured)
-    assert result["status"] == "degraded" and code in cast(list[str], result["reasons"])
+    assert result["status"] == "degraded"
+    reasons = result["reasons"]
+    assert isinstance(reasons, list)
+    assert code in reasons
 
 
 def test_receipt_ages_and_future_timestamps_are_not_fresh(configured: Config) -> None:
@@ -107,21 +143,26 @@ def test_new_bad_backup_is_not_hidden_by_previous_valid_backup(configured: Confi
     result = readiness(configured)
     assert result["status"] == "degraded"
     assert result["last_verified_backup"] == archive.name
-    assert "LATEST_BACKUP_UNVERIFIED" in cast(list[str], result["reasons"])
+    reasons = result["reasons"]
+    assert isinstance(reasons, list)
+    assert "LATEST_BACKUP_UNVERIFIED" in reasons
 
 
 def test_verified_backup_of_another_vault_does_not_make_this_vault_ready(configured: Config, tmp_path: Path) -> None:
-    other, _ = _seed_vault(tmp_path / "other")
+    other, _ = seed_vault(tmp_path / "other")
     archive = Path(configured.backup_root) / "wrong-vault.tar.gz"
     _ = create_backup(other, archive)
     _ = verify_backup(archive)
     report = readiness(configured)
     assert report["status"] == "degraded"
-    assert "VERIFIED_BACKUP_UNAVAILABLE" in cast(list[str], report["reasons"])
+    reasons = report["reasons"]
+    assert isinstance(reasons, list)
+    assert "VERIFIED_BACKUP_UNAVAILABLE" in reasons
     assert report["backup_error"] == "BACKUP_ORIGIN_MISMATCH"
 
 
 def test_managed_backup_keeps_provider_origin(configured: Config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    del configured
     from sb.generation_runtime import GenerationMutationService
     from sb.runtime_backup import backup_runtime, verify_runtime_backup
     from tests.test_runtime_reliability import managed
@@ -132,7 +173,7 @@ def test_managed_backup_keeps_provider_origin(configured: Config, tmp_path: Path
         _ = service.remember("기억 백업 검증", "backup", NOW)
         archive = tmp_path / "managed.tar.gz"
         _ = backup_runtime(config, archive)
-        original_restore = verification_module.restore_backup
+        original_restore = restore_backup
         observed_lock: list[bool] = []
 
         def check_lock(archive_path: Path, destination: Path) -> ops_module.RestoreResult:
@@ -165,18 +206,20 @@ def test_managed_backup_keeps_provider_origin(configured: Config, tmp_path: Path
 def test_stalled_or_failed_request_degrades_readiness(configured: Config, state: str) -> None:
     _ = verify_backup(backup(configured))
     with closing(RequestStore(Path(configured.request_root))) as store:
-        _ = store.accept(_identity(), {"state": "pending"}, NOW - timedelta(minutes=16))
+        _ = store.accept(request_identity(), {"state": "pending"}, NOW - timedelta(minutes=16))
         _ = store.db.execute("UPDATE requests SET state=?", (state,))
     result = readiness(configured)
     assert result["status"] == "degraded"
     expected = "REQUESTS_STALLED" if state in {"pending", "processing"} else "RECENT_REQUEST_FAILURES"
-    assert expected in cast(list[str], result["reasons"])
+    reasons = result["reasons"]
+    assert isinstance(reasons, list)
+    assert expected in reasons
 
 
 def test_historical_request_failure_remains_counted_but_does_not_block(configured: Config) -> None:
     _ = verify_backup(backup(configured))
     with closing(RequestStore(Path(configured.request_root))) as store:
-        _ = store.accept(_identity(), {"state": "pending"}, NOW - timedelta(days=3))
+        _ = store.accept(request_identity(), {"state": "pending"}, NOW - timedelta(days=3))
         _ = store.db.execute("UPDATE requests SET state='failed'")
     result = readiness(configured)
     assert result["status"] == "ready"
@@ -190,15 +233,23 @@ def test_historical_llm_timeout_reconciliation_updates_live_readiness(configured
     with Ledger(configured.vault_root) as ledger:
         ledger.ensure_derivation(failed_key, "brief", "run-old")
         ledger.mark_running(failed_key, "run-old")
-        ledger.mark_failed(failed_key, "LLM unavailable after 2 attempts: timeout after 120s")
-        _stamp_finished(ledger, failed_key, "2026-10-03T00:00:00.000Z")
+        _mark_failed_at(
+            ledger,
+            failed_key,
+            "2026-10-03T00:00:00.000Z",
+            "LLM unavailable after 2 attempts: timeout after 120s",
+        )
         ledger.ensure_derivation(done_key, "brief", "run-new")
         ledger.mark_running(done_key, "run-new")
-        ledger.mark_done(done_key, DerivationOutput(output_hash="out", output_path="daily/2026-10-05.md"))
-        _stamp_finished(ledger, done_key, "2026-10-05T00:00:00.000Z")
+        _mark_done_at(
+            ledger,
+            done_key,
+            DerivationOutput(output_hash="out", output_path="daily/2026-10-05.md"),
+            "2026-10-05T00:00:00.000Z",
+        )
 
-    with _running(configured) as url:
-        before_code, before_body = _request(url + "/ready")
+    with running(configured) as url:
+        before_code, before_body = request(url + "/ready")
         before = cast(dict[str, object], before_body)
         assert before_code == 503
         assert "DERIVATIONS_FAILED" in cast(list[str], before["reasons"])
@@ -211,7 +262,7 @@ def test_historical_llm_timeout_reconciliation_updates_live_readiness(configured
         assert failed.status == DerivStatus.SUPERSEDED.value
         assert failed.error == "LLM unavailable after 2 attempts: timeout after 120s"
 
-        after_code, after_body = _request(url + "/ready")
+        after_code, after_body = request(url + "/ready")
         after = cast(dict[str, object], after_body)
         assert after_code == 200
         assert after["status"] == "ready"
@@ -225,7 +276,9 @@ def test_corrupt_journal_and_unreadable_backup_are_degraded(configured: Config) 
     request_root.mkdir()
     _ = (request_root / "journal.db").write_bytes(b"not a SQLite database")
     result = readiness(configured)
-    assert "REQUEST_JOURNAL_UNREADABLE" in cast(list[str], result["reasons"])
+    reasons = result["reasons"]
+    assert isinstance(reasons, list)
+    assert "REQUEST_JOURNAL_UNREADABLE" in reasons
     assert (request_root / "journal.db").read_bytes() == b"not a SQLite database"
     verification_path(archive).unlink()
     verification_path(archive).symlink_to(archive)
@@ -236,30 +289,34 @@ def test_missing_managed_control_journals_are_not_created(configured: Config) ->
     config = Config(raw={**configured.raw, "share_root": str(Path(configured.vault_root).parent)})
     result = readiness(config)
     assert result["status"] == "degraded"
-    assert "REQUEST_JOURNAL_UNREADABLE" in cast(list[str], result["reasons"])
-    assert "GENERATION_JOURNAL_UNREADABLE" in cast(list[str], result["reasons"])
+    reasons = result["reasons"]
+    assert isinstance(reasons, list)
+    assert "REQUEST_JOURNAL_UNREADABLE" in reasons
+    assert "GENERATION_JOURNAL_UNREADABLE" in reasons
     assert not Path(config.request_root).exists() and not Path(config.state_root).exists()
 
 
 def test_cli_backup_verifies_and_verify_existing_archive(configured: Config, tmp_path: Path) -> None:
     archive = Path(configured.backup_root) / "cli.tar.gz"
-    code, output, error = _cli_with_config(tmp_path, Path(configured.vault_root), ["backup", str(archive)])
+    code, output, error = cli_with_config(tmp_path, Path(configured.vault_root), ["backup", str(archive)])
     assert code == 0, error
     assert '"verification"' in output
     verification_path(archive).unlink()
-    code, output, error = _cli_with_config(tmp_path, Path(configured.vault_root), ["verify-backup", str(archive)])
+    code, output, error = cli_with_config(tmp_path, Path(configured.vault_root), ["verify-backup", str(archive)])
     assert code == 0 and "isolated-vault-restore-v1" in output, error
     assert readiness(configured)["status"] == "ready"
 
 
 def test_http_health_is_live_while_readiness_tracks_verified_backup(configured: Config) -> None:
     archive = backup(configured)
-    with _running(configured) as url:
-        assert _request(url + "/health")[0] == 200
-        assert _request(url + "/ready")[0] == 503
+    with running(configured) as url:
+        assert request(url + "/health")[0] == 200
+        assert request(url + "/ready")[0] == 503
         _ = verify_backup(archive)
-        code, result = _request(url + "/ready")
-        assert code == 200 and cast(dict[str, object], result)["status"] == "ready"
+        code, result = request(url + "/ready")
+        assert code == 200
+        assert is_json_object(result)
+        assert result["status"] == "ready"
 
 
 def test_generation_cleanup_and_invalid_policy(configured: Config) -> None:
@@ -284,7 +341,10 @@ def test_corrupt_run_payload_still_returns_json_degraded(configured: Config) -> 
     with closing(sqlite3.connect(Path(configured.vault_root) / ".sb" / "ledger.db")) as connection:
         _ = connection.execute("UPDATE run SET git_commit=?", (b"invalid blob",))
         connection.commit()
-    with _running(configured) as url:
-        code, report = _request(url + "/ready")
+    with running(configured) as url:
+        code, report = request(url + "/ready")
         assert code == 503
-        assert "VAULT_UNREADABLE" in cast(dict[str, list[str]], report)["reasons"]
+        assert is_json_object(report)
+        reasons = report["reasons"]
+        assert isinstance(reasons, list)
+        assert "VAULT_UNREADABLE" in reasons

@@ -292,7 +292,7 @@ def test_changed_page_body_invalidates_judgment(ledger: Ledger, config: Config, 
     llm = RecordingLLM(_verdict('unrelated', 1.0, 'test', []))
     assert check([unit], [page], ledger, llm, config)
     first = llm.calls
-    check([unit], [page], ledger, llm, config)
+    _ = check([unit], [page], ledger, llm, config)
     assert llm.calls == first
     changed = replace(page, body_md=page.body_md + '\n정정된 추가 사실입니다.')
     assert check([unit], [changed], ledger, llm, config)
@@ -326,7 +326,7 @@ def test_capped_comparison_resumes_and_completed_cache_ignores_zero_budget(ledge
     '{"relation":"supersedes","confidence":0.99,"rationale":"x","cites":[""]}',
     '{"nested":{"relation":"contradicts","confidence":0.9,"rationale":"x"}}',
 ])
-def test_invalid_verdict_never_creates_conflict(ledger, config, unit, raw):
+def test_invalid_verdict_never_creates_conflict(ledger: Ledger, config: Config, unit: Unit, raw: str):
     found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, RecordingLLM(raw), config)
     assert found
     assert all(item.page is None and item.failure for item in found)
@@ -417,7 +417,8 @@ def test_provider_failure_uses_only_safe_code(
     from sb.llm import LLMUnavailable
 
     class FailingModel:
-        def generate(self, prompt: str, **kwargs: object) -> str:
+        def generate(self, prompt: str, *, system: str | None = None, json_mode: bool = False, timeout: int = 120) -> str:
+            del prompt, system, json_mode, timeout
             raise LLMUnavailable(1, reason)
 
     found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, FailingModel(), config)
@@ -427,7 +428,7 @@ def test_provider_failure_uses_only_safe_code(
     assert reason not in row.error
 
 
-def test_json_whitespace_exponent_and_escaped_rationale(ledger, config, unit):
+def test_json_whitespace_exponent_and_escaped_rationale(ledger: Ledger, config: Config, unit: Unit):
     raw = '{"relation" : "contradicts", "confidence" : 1e-1, "rationale" : "line\\nnext"}'
     found = check([unit, _unit("c1", TEXT_DYNAMIC)], EMPTY_PAGES, ledger, RecordingLLM(raw), config)
     assert found
@@ -436,7 +437,7 @@ def test_json_whitespace_exponent_and_escaped_rationale(ledger, config, unit):
 
 
 @pytest.mark.parametrize("profile", ["conflict-inputs-v2", "conflict-inputs-v3"])
-def test_prior_parser_cached_verdict_is_rejudged(ledger, config, unit, monkeypatch, profile):
+def test_prior_parser_cached_verdict_is_rejudged(ledger: Ledger, config: Config, unit: Unit, monkeypatch: pytest.MonkeyPatch, profile: str):
     units = [unit, _unit("c1", TEXT_DYNAMIC)]
     with monkeypatch.context() as old:
         old.setattr("sb.conflict._INPUT_PROFILE", profile)

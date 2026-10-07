@@ -14,7 +14,8 @@ from sb.generation_runtime_models import (
 )
 from sb.vault import Vault
 from tests.knowledge import stamp_knowledge
-from tests.test_web import TERM, _NoPreviousHash, _page, _ready, _request, _running
+from tests.test_web import TERM, NoPreviousHash, page, request, running
+from tests.test_web import ready as web_ready
 
 NOW = datetime(2026, 9, 27, tzinfo=UTC)
 PAGE = "wiki/계약-일정"
@@ -22,10 +23,10 @@ URL = "/api/pages/" + quote(PAGE, safe="")
 
 
 def ready(tmp_path: Path) -> tuple[Config, Path]:
-    original, root = _ready(tmp_path)
-    Vault(root).write_pages(
-        [_page(root, "daily/2026-09-27", "active", TERM)],
-        "daily-copy", _NoPreviousHash(),
+    original, root = web_ready(tmp_path)
+    _ = Vault(root).write_pages(
+        [page(root, "daily/2026-09-27", "active", TERM)],
+        "daily-copy", NoPreviousHash(),
     )
     stamp_knowledge(root)
     config = Config(raw={**original.raw, "share_root": str(tmp_path),
@@ -33,7 +34,7 @@ def ready(tmp_path: Path) -> tuple[Config, Path]:
         "export_root": str(tmp_path / "exports"), "backup_root": str(tmp_path / "backups")})
     service = GenerationMutationService.from_config(config)
     try:
-        service.mutate(GenerationMutation("web-seed", GenerationOperation.RUN, NOW,
+        _ = service.mutate(GenerationMutation("web-seed", GenerationOperation.RUN, NOW,
             GenerationAuthority(None, None), lambda _root: None))
     finally:
         service.close()
@@ -42,8 +43,8 @@ def ready(tmp_path: Path) -> tuple[Config, Path]:
 
 def test_web_correction_is_bound_to_read_receipt(tmp_path: Path) -> None:
     config, _root = ready(tmp_path)
-    with _running(config) as base:
-        status, page = _request(base + URL)
+    with running(config) as base:
+        status, page = request(base + URL)
         assert status == 200 and isinstance(page, dict)
         receipt = page.get("receipt")
         assert isinstance(receipt, dict)
@@ -53,12 +54,12 @@ def test_web_correction_is_bound_to_read_receipt(tmp_path: Path) -> None:
         assert isinstance(record, dict)
         payload = {"receipt": receipt, "record_id": record["record_id"],
                    "content": "M13CORRECTED Friday appointment."}
-        status, result = _request(base + URL + "/correct", method="POST", payload=payload)
+        status, result = request(base + URL + "/correct", method="POST", payload=payload)
         assert status == 200 and isinstance(result, dict)
         assert result["corrected"] == PAGE and result["tombstone_sequence"] == 1
-        status, hits = _request(base + "/api/search?q=M13CORRECTED&kind=wiki")
+        status, hits = request(base + "/api/search?q=M13CORRECTED&kind=wiki")
         assert status == 200 and isinstance(hits, dict) and hits["results"]
-        status, stale = _request(base + URL + "/correct", method="POST",
+        status, stale = request(base + URL + "/correct", method="POST",
                                  payload={**payload, "content": "stale overwrite"})
         assert status == 409 and isinstance(stale, dict)
         assert stale["error"] == "EFFECT_PRIOR_STALE"
@@ -76,15 +77,15 @@ def test_web_delete_erases_daily_and_leaves_restore_tombstone(tmp_path: Path) ->
 
     config, _root = ready(tmp_path)
     archive = tmp_path / "older.tar.gz"
-    backup_runtime(config, archive)
-    with _running(config) as base:
-        _, page = _request(base + URL)
+    _ = backup_runtime(config, archive)
+    with running(config) as base:
+        _, page = request(base + URL)
         assert isinstance(page, dict)
-        status, result = _request(base + URL + "/forget", method="POST",
+        status, result = request(base + URL + "/forget", method="POST",
                                  payload={"receipt": page.get("receipt")})
         assert status == 200 and isinstance(result, dict)
         for kind in ("wiki", "daily"):
-            status, hits = _request(base + "/api/search?q=" + quote(TERM) + "&kind=" + kind)
+            status, hits = request(base + "/api/search?q=" + quote(TERM) + "&kind=" + kind)
             assert status == 200 and hits == {"results": []}
         assert result["tombstone_sequence"] == 1
     store = RequestStore(Path(config.request_root))
@@ -100,21 +101,21 @@ def test_web_delete_erases_daily_and_leaves_restore_tombstone(tmp_path: Path) ->
     finally:
         gate.close()
     restored = tmp_path / "restored"
-    restore_backup(archive, restored)
+    _ = restore_backup(archive, restored)
     inventory = ManagedRestoreInventory().sanitize(restored, snapshot)
     assert inventory.blocked_matches == 0
     assert not any(TERM.encode() in item.payload for item in inventory.files)
     after = tmp_path / "after.tar.gz"
-    backup_runtime(config, after)
+    _ = backup_runtime(config, after)
     restored_after = tmp_path / "restored-after"
-    restore_backup(after, restored_after)
+    _ = restore_backup(after, restored_after)
     assert SearchIndex(restored_after).search(TERM) == ()
 
 
 def test_web_missing_page_is_404_json_not_disconnect(tmp_path: Path) -> None:
     config, _root = ready(tmp_path)
-    with _running(config) as base:
-        status, error = _request(base + "/api/pages/wiki%2Fdeleted")
+    with running(config) as base:
+        status, error = request(base + "/api/pages/wiki%2Fdeleted")
         assert status == 404
         assert error == {"error": "page not found: wiki/deleted"}
-        assert _request(base + "/health") == (200, {"status": "ok"})
+        assert request(base + "/health") == (200, {"status": "ok"})

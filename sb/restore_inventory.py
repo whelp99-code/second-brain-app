@@ -92,7 +92,7 @@ def _page_id(relative: Path) -> str | None:
 
 
 @dataclass(slots=True)
-class _ScanBudget:
+class ScanBudget:
     # Measured 4MiB / 256-byte targets complete below two seconds on the
     # reference host. These are aggregate per-inventory work limits, not RAM.
     windows: int = 8_000_000
@@ -116,6 +116,9 @@ class _ScanBudget:
                 if hashlib.sha256(payload[start:start + size]).hexdigest() in hashes:
                     found.append((start, start + size))
         return found
+
+
+_ScanBudget = ScanBudget
 
 
 @dataclass(slots=True)

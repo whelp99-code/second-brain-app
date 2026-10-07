@@ -1,19 +1,27 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Never
 
+import pytest
+
+from sb.config import Config
 from sb.effect_values import is_json_object
 from sb.pipeline import RunOutcome
-from tests.test_web import _ready, _request, _running
+from sb.store.ledger import Ledger
+from sb.vault import Vault
+from tests.test_web import ready, request, running
 
 
-def test_web_run_exposes_redacted_failure(tmp_path: Path, monkeypatch):
-    config, _ = _ready(tmp_path)
-    monkeypatch.setattr('sb.web.run_all', lambda *args: RunOutcome(
-        'test-run', 'failed', 0, 0, 1, 1, None,
-        failure='RuntimeError: token=private-value LLM egress denied',
-    ))
-    with _running(config) as url:
-        status, result = _request(url + '/api/run', method='POST', payload={})
+def test_web_run_exposes_redacted_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    config, _ = ready(tmp_path)
+    def failed_run(_config: Config, _sources: Sequence[str] | None = None) -> RunOutcome:
+        return RunOutcome(
+            'test-run', 'failed', 0, 0, 1, 1, None,
+            failure='RuntimeError: token=private-value LLM egress denied',
+        )
+    monkeypatch.setattr('sb.web.run_all', failed_run)
+    with running(config) as url:
+        status, result = request(url + '/api/run', method='POST', payload={})
     assert status == 200
     assert isinstance(result, dict) and is_json_object(result)
     assert result['status'] == 'failed'
@@ -24,16 +32,17 @@ def test_web_run_exposes_redacted_failure(tmp_path: Path, monkeypatch):
 
 
 def test_status_includes_stage_exception_history(tmp_path: Path):
-    from sb.pipeline import _run_locked
+    from sb.pipeline import run_locked
 
-    config, root = _ready(tmp_path)
+    config, root = ready(tmp_path)
 
-    def reject(ledger, vault, run_id: str) -> Never:
+    def reject(ledger: Ledger, vault: Vault, run_id: str) -> Never:
+        del ledger, vault, run_id
         raise RuntimeError('token=private-value policy denied')
 
-    failed = _run_locked(root, reject, 'compile')
-    with _running(config) as url:
-        status, result = _request(url + '/api/status')
+    failed = run_locked(root, reject, 'compile')
+    with running(config) as url:
+        status, result = request(url + '/api/status')
     assert status == 200
     assert isinstance(result, dict) and is_json_object(result)
     recent_stages = result['recent_stages']
@@ -48,17 +57,17 @@ def test_status_includes_stage_exception_history(tmp_path: Path):
     assert 'private-value' not in error
 
 
-def test_web_search_uses_explicit_registry_over_environment(tmp_path: Path, monkeypatch):
+def test_web_search_uses_explicit_registry_over_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from urllib.parse import quote
 
     from sb.config import Config
     from tests.test_web import TERM
 
-    config, root = _ready(tmp_path)
+    config, root = ready(tmp_path)
     monkeypatch.setenv('SB_KNOWLEDGE_REGISTRY', str(tmp_path / 'unrelated.sqlite'))
     config = Config(raw={**config.raw, 'knowledge_registry': str(root / '.sb/knowledge-registry.sqlite')})
-    with _running(config) as url:
-        status, result = _request(url + '/api/search?q=' + quote(TERM))
+    with running(config) as url:
+        status, result = request(url + '/api/search?q=' + quote(TERM))
     assert status == 200
     assert isinstance(result, dict) and is_json_object(result)
     assert result['results']

@@ -49,7 +49,7 @@ def _write_marker(marker: Path, digest_hex: str) -> None:
             last_error = exc
             continue
         try:
-            os.write(marker_fd, (digest_hex + "\n").encode("ascii"))
+            _ = os.write(marker_fd, (digest_hex + "\n").encode("ascii"))
             os.fsync(marker_fd)
         finally:
             os.close(marker_fd)
@@ -141,7 +141,7 @@ def record_revoked_key_ids(state_root: Path, key_ids: Iterable[str]) -> None:
         _reject_unsafe(journal)
         journal_fd = os.open(journal, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         try:
-            os.write(journal_fd, (digest + "\n").encode("ascii") + payload)
+            _ = os.write(journal_fd, (digest + "\n").encode("ascii") + payload)
             os.fsync(journal_fd)
         finally:
             os.close(journal_fd)

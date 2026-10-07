@@ -10,8 +10,8 @@ from sb.connectors.sessions_opencode import OpenCodeSessionsAdapter
 def database(path: Path):
     connection = sqlite3.connect(path)
     try:
-        connection.execute('CREATE TABLE part(id TEXT, data TEXT, time_created INTEGER)')
-        connection.execute('INSERT INTO part VALUES (?,?,?)',
+        _ = connection.execute('CREATE TABLE part(id TEXT, data TEXT, time_created INTEGER)')
+        _ = connection.execute('INSERT INTO part VALUES (?,?,?)',
                            ('item', json.dumps({'type': 'text', 'text': 'outside marker'}), 1))
         connection.commit()
     finally:
@@ -19,7 +19,7 @@ def database(path: Path):
 
 
 @pytest.mark.parametrize('kind', ['absolute', 'parent', 'directory_link'])
-def test_snapshot_rejects_database_outside_its_directory(tmp_path, kind):
+def test_snapshot_rejects_database_outside_its_directory(tmp_path: Path, kind: str):
     outside = tmp_path / 'outside'
     outside.mkdir()
     database(outside / 'export.sqlite')
@@ -32,17 +32,17 @@ def test_snapshot_rejects_database_outside_its_directory(tmp_path, kind):
     else:
         (root / 'linked').symlink_to(outside, target_is_directory=True)
         reference = 'linked/export.sqlite'
-    (root / 'snapshot.json').write_text(json.dumps({'database': reference}))
+    _ = (root / 'snapshot.json').write_text(json.dumps({'database': reference}))
     rows = list(OpenCodeSessionsAdapter((root,), 'fixture').scan(None))
     assert len(rows) == 1 and rows[0][2].get('skip_reason') == 'unsafe-database-path'
     assert rows[0][1] == b''
 
 
-def test_snapshot_reads_relative_database_with_uri_characters(tmp_path):
+def test_snapshot_reads_relative_database_with_uri_characters(tmp_path: Path):
     db = tmp_path / 'export?#.sqlite'
     database(db)
     before = db.read_bytes()
-    (tmp_path / 'snapshot.json').write_text(json.dumps({'database': db.name}))
+    _ = (tmp_path / 'snapshot.json').write_text(json.dumps({'database': db.name}))
     rows = list(OpenCodeSessionsAdapter((tmp_path,), 'fixture').scan(None))
     assert len(rows) == 1 and rows[0][1] == b'outside marker'
     assert db.read_bytes() == before

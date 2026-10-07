@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import anyio
+import pytest
 from mcp.client import Client
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult
@@ -373,7 +374,7 @@ def test_mcp_sb_search_schema_includes_scope(tmp_path: Path) -> None:
     assert "reference" in blob
 
 
-def test_mcp_search_uses_explicit_registry(tmp_path: Path, monkeypatch):
+def test_mcp_search_uses_explicit_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     root = _seed(tmp_path)
     unrelated = tmp_path / 'unrelated-registry.sqlite'
     monkeypatch.setenv('SB_KNOWLEDGE_REGISTRY', str(unrelated))

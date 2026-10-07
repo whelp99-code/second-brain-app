@@ -1,8 +1,13 @@
 import sqlite3
+from collections.abc import Iterator
 from contextlib import closing
 from pathlib import Path
 
+import pytest
+from pydantic import TypeAdapter
+
 from sb.config import Config
+from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.contracts import SourceRef
 from sb.pipeline import run_ingest
 from sb.store.ledger import load_ledger_tables
@@ -13,13 +18,13 @@ class _DriverError(Exception):
 
 
 class _Down:
-    source_id = "down"
-    accepted_adapters = frozenset({"down-adapter"})
+    source_id: str = "down"
+    accepted_adapters: frozenset[str] = frozenset({"down-adapter"})
 
     def __init__(self) -> None:
-        self.scans = 0
+        self.scans: int = 0
 
-    def scan(self, cursor: str | None):
+    def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         self.scans += 1
         _ = cursor
         raise _DriverError("password=secret")
@@ -29,10 +34,10 @@ class _Down:
 
 
 class _Notes:
-    source_id = "notes"
-    accepted_adapters = frozenset({"notes-adapter"})
+    source_id: str = "notes"
+    accepted_adapters: frozenset[str] = frozenset({"notes-adapter"})
 
-    def scan(self, cursor: str | None):
+    def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         _ = cursor
         yield SourceRef("notes", "good", "v1"), b"sibling note", {"relative_path": "good.md"}
 
@@ -54,14 +59,16 @@ def _config(tmp_path: Path) -> Config:
     )
 
 
-def _install(monkeypatch, down: _Down, notes: _Notes) -> None:
+def _install(monkeypatch: pytest.MonkeyPatch, down: _Down, notes: _Notes) -> None:
+    def discover(_config: Config) -> dict[str, SourceAdapter]:
+        return {"down-adapter": down, "notes-adapter": notes}
     monkeypatch.setattr(
         "sb.connectors.discover_adapters",
-        lambda config: {"down-adapter": down, "notes-adapter": notes},
+        discover,
     )
 
 
-def test_connection_error_does_not_abort_sibling_source(tmp_path: Path, monkeypatch) -> None:
+def test_connection_error_does_not_abort_sibling_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     down, notes = _Down(), _Notes()
     _install(monkeypatch, down, notes)
     config = _config(tmp_path)
@@ -78,7 +85,7 @@ def test_connection_error_does_not_abort_sibling_source(tmp_path: Path, monkeypa
 
 
 def test_connection_error_does_not_advance_cursor_and_is_visible(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     down, notes = _Down(), _Notes()
     _install(monkeypatch, down, notes)
@@ -91,7 +98,10 @@ def test_connection_error_does_not_advance_cursor_and_is_visible(
     ]
     log = (root / ".sb/runs.log").read_text(encoding="utf-8")
     with closing(sqlite3.connect(root / ".sb/ledger.db")) as db:
-        raw = "\n".join(str(row) for row in db.execute("SELECT * FROM source_item"))
+        rows = TypeAdapter[list[tuple[str | int | float | bytes | None, ...]]](
+            list[tuple[str | int | float | bytes | None, ...]],
+        ).validate_python(db.execute("SELECT * FROM source_item").fetchall(), strict=True)
+        raw = "\n".join(str(row) for row in rows)
     second = run_ingest(config, ("down",))
     assert tables.cursors.get("down") is None
     assert unavailable[0].source_version == "_DriverError"
@@ -101,3 +111,34 @@ def test_connection_error_does_not_advance_cursor_and_is_visible(
     assert down.scans == 2
     assert first.exit_code == 1
     assert second.exit_code == 1
+
+
+def test_markdown_journal_cursor_is_not_an_observation_text_field(tmp_path: Path) -> None:
+    """A pre-existing per-file journal cursor must not fail the source as ObservationError."""
+    source = tmp_path / "journal"
+    source.mkdir()
+    for index in range(80):
+        _ = (source / f"2026-07-{index:02d}.md").write_text(f"# day {index}\n", encoding="utf-8")
+    vault = tmp_path / "share/vault"
+    config = Config(
+        raw={
+            "vault_root": str(vault),
+            "share_root": str(tmp_path / "share"),
+            "state_root": str(tmp_path / "state"),
+            "sources": [{
+                "id": "unified-db-journal",
+                "adapter": "markdown-vault",
+                "root": str(source),
+                "llm_policy": "deny",
+            }],
+            "llm": {"argv_template": ["/bin/false"]},
+        }
+    )
+    outcome = run_ingest(config, ("unified-db-journal",))
+    log = (vault / ".sb/runs.log").read_text(encoding="utf-8") if (vault / ".sb/runs.log").is_file() else ""
+    tables = load_ledger_tables(vault / ".sb/ledger.db")
+    cursor = tables.cursors["unified-db-journal"][0]
+    assert outcome.exit_code == 0
+    assert outcome.errors == 0
+    assert "ObservationError" not in log
+    assert len(cursor) > 4096

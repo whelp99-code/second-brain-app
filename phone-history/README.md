@@ -24,7 +24,7 @@
 - HTTPS Bearer 동기화
 - 이벤트별 서버 영수증을 받은 항목만 안전 삭제
 - 서버 타임라인, 삭제, 검토 후보
-- Second Brain inbox-only handoff
+- Second Brain inbox-only handoff over `POST /api/uploads` (vault-path config is a migration error)
 - dedup, conflict, tombstone, PII/secret redaction, prompt-injection flag
 
 ## 의도적으로 하지 않는 것
@@ -73,6 +73,8 @@ cd phone-history
 ```
 
 운영 서버는 공인 HTTP에 직접 노출하지 않는다. loopback에 bind하고 Caddy/Nginx 등 TLS reverse proxy 뒤에 배치한다. API token과 암호화 key는 저장소에 커밋하지 않는다.
+
+Second Brain으로 넘길 때는 `PHONE_HISTORY_SECOND_BRAIN_BASE_URL`만 설정한다. 허용 값은 `https://…` 또는 `http://127.0.0.1:…`이다. 토큰 값은 저장하지 않고 `PHONE_HISTORY_SECOND_BRAIN_TOKEN_ENV`(기본 `SB_WEB_TOKEN`)가 가리키는 환경변수에서 요청 시점에 읽는다. `PHONE_HISTORY_SECOND_BRAIN_VAULT`만 있으면 프로세스는 `ConfigurationError`로 끝나며 볼트 경로로 되돌리지 않는다. 업로드는 `POST /api/uploads`(선언한 SHA-256 포함), 철회는 `POST /api/uploads/retract`이고 `deleted: true` 영수증이 없으면 로컬 사건은 pending으로 남는다.
 
 ## Xcode 프로젝트 생성과 시뮬레이터 Gate
 

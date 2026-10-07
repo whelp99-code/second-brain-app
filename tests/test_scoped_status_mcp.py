@@ -2,33 +2,42 @@ import base64
 import hashlib
 import json
 import sys
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
+from typing import override
 
 import anyio
 import pytest
 from mcp import StdioServerParameters
 from mcp.client import Client
+from pydantic import TypeAdapter
 
 from sb.access_claims import access_request_digest
 from sb.config import Config
 from sb.delegations import create_read_fence
-from sb.effect_values import is_json_object
+from sb.effect_values import JsonObject, JsonValue, is_json_object
 from sb.effect_write_values import GENESIS_TOMBSTONE_ROOT, model_object
 from sb.mcp import build_server
 from sb.request_executor import RequestExecutor
 from sb.request_store import RequestStore
+from sb.scoped_request_status import read_scoped_request_status
+from sb.source_access import SourceAccess
+from tests.json_fixtures import parse_object
+from tests.mcp_test_support import json_content
 from tests.test_access_claims import KEY, signed
 from tests.test_scoped_request_status import setup_status
 
 
 class Clock(datetime):
     @classmethod
-    def now(cls, tz=None):
+    @override
+    def now(cls, tz: tzinfo | None = None) -> datetime:
+        del tz
         return datetime(2026, 9, 9, tzinfo=UTC)
 
 
-def material(tmp_path, monkeypatch, state="pending"):
+def material(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str = "pending") -> tuple[Config, JsonObject]:
     raw, now, execution, _, _, store = setup_status(tmp_path, execute=state == "proved")
     store.close()
     if state == "failed":
@@ -57,33 +66,39 @@ def material(tmp_path, monkeypatch, state="pending"):
 
 
 @pytest.mark.parametrize("state", ["pending", "failed", "proved"])
-def test_journal_profile_reads_without_generation_and_does_not_claim_current_artifact(tmp_path, monkeypatch, state):
+def test_journal_profile_reads_without_generation_and_does_not_claim_current_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str):
     config, args = material(tmp_path, monkeypatch, state)
-    async def run():
+    async def run() -> None:
         async with Client(build_server(config=config), mode="legacy", cache=None) as client:
             assert [t.name for t in (await client.list_tools()).tools] == ["sb_request_status"]
             result = await client.call_tool("sb_request_status", args)
             assert not result.is_error, result
-            value = result.structured_content
+            value = json_content(result)
             assert value["profile"] == "scoped-request-status-v1"
-            assert value["request_status"]["state"] == state
-            assert value["request_status"]["acceptance"]["replayed"] is True
+            status = value["request_status"]
+            assert isinstance(status, dict)
+            acceptance = status["acceptance"]
+            assert isinstance(acceptance, dict)
+            assert status["state"] == state
+            assert acceptance["replayed"] is True
             assert "generation_id" not in value and "records" not in value
             assert (await client.call_tool("sb_read_page", {})).is_error
             assert (await client.call_tool("sb_write_request", {})).is_error
         if state != "proved":
             monkeypatch.setenv("SB_MCP_CONTRACT_PROFILE", "scoped-record-read-v5")
             with pytest.raises(ValueError, match="MEMORY_SCOPED_CONFIG_INVALID"):
-                build_server(config=config)
+                _ = build_server(config=config)
     anyio.run(run)
 
 
 @pytest.mark.parametrize("change", ["project", "session", "request", "revoked_during", "expiry_during", "fence_during"])
-def test_journal_status_rejects_wrong_or_changed_authority(tmp_path, monkeypatch, change):
+def test_journal_status_rejects_wrong_or_changed_authority(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str):
     import sb.scoped_status_mcp as module
     config, args = material(tmp_path, monkeypatch)
     if change in ("project", "session"):
-        args["access_claim"] = signed({**args["access_claim"], **({"projects": ["project:other"]} if change == "project" else {"session_id": "session:other"})})
+        claim = args["access_claim"]
+        assert isinstance(claim, dict)
+        args["access_claim"] = signed({**claim, **({"projects": ["project:other"]} if change == "project" else {"session_id": "session:other"})})
     if change == "request":
         request = args["request"]
         assert is_json_object(request)
@@ -92,23 +107,30 @@ def test_journal_status_rejects_wrong_or_changed_authority(tmp_path, monkeypatch
         payload = preparation["payload"]
         assert is_json_object(payload)
         payload["content"] = "substitution"
-    original = module.read_scoped_request_status
-    def mutate(*pos, **kw):
-        result = original(*pos, **kw)
+    original = read_scoped_request_status
+    def mutate(store: RequestStore, value: JsonValue, *, expected_provider: str,
+               clock: Callable[[], datetime], resolve_scope: Callable[[datetime], SourceAccess | None],
+               include_acceptance: bool = False) -> JsonObject:
+        result = original(store, value, expected_provider=expected_provider, clock=clock,
+                          resolve_scope=resolve_scope, include_acceptance=include_acceptance)
         if change == "revoked_during":
             assert isinstance(config.raw, dict)
             config.raw["revoked_jarvis_signing_key_ids"] = ["key:test"]
         if change == "expiry_during":
             class Expired(Clock):
                 @classmethod
-                def now(cls, tz=None):
+                @override
+                def now(cls, tz: tzinfo | None = None) -> datetime:
+                    del tz
                     return datetime(2026, 9, 9, 0, 2, tzinfo=UTC)
             monkeypatch.setattr(module, "datetime", Expired)
         if change == "fence_during":
-            monkeypatch.setattr(module.RequestStore, "tombstone_high_water", lambda _: (1, GENESIS_TOMBSTONE_ROOT))
+            def changed_fence(_store: RequestStore) -> tuple[int, str]:
+                return 1, GENESIS_TOMBSTONE_ROOT
+            monkeypatch.setattr(RequestStore, "tombstone_high_water", changed_fence)
         return result
     monkeypatch.setattr(module, "read_scoped_request_status", mutate)
-    async def run():
+    async def run() -> None:
         async with Client(build_server(config=config), mode="legacy", cache=None) as client:
             result = await client.call_tool("sb_request_status", args)
             assert result.is_error
@@ -116,63 +138,72 @@ def test_journal_status_rejects_wrong_or_changed_authority(tmp_path, monkeypatch
     anyio.run(run)
 
 
-def test_real_stdio_restart_recovers_pending_with_frozen_contract(tmp_path, monkeypatch):
+def test_real_stdio_restart_recovers_pending_with_frozen_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     config, args = material(tmp_path, monkeypatch)
     path = tmp_path / "config.json"
-    path.write_text(json.dumps(config.raw))
+    _ = path.write_text(json.dumps(config.raw))
     program = "from pathlib import Path; import json; from tests.test_scoped_status_mcp import Clock; import sb.scoped_status_mcp as s; from sb.config import Config; from sb.mcp import build_server; s.datetime=Clock; build_server(config=Config(raw=json.loads(Path(__import__('sys').argv[1]).read_text()))).run()"
     contract_path = Path("contracts/second-brain-scoped-status-v1.json")
     data = contract_path.read_bytes()
     assert hashlib.sha256(data).hexdigest() + "\n" == Path(str(contract_path) + ".sha256").read_text()
-    contract = json.loads(data)
-    def strip(value):
+    contract = parse_object(data)
+    def strip(value: JsonValue) -> JsonValue:
         if isinstance(value, dict):
             return {k: strip(v) for k, v in value.items() if k != "title"}
         if isinstance(value, list):
             return [strip(v) for v in value]
         return value
-    async def run():
-        values = []
+    contract_tools = contract["tools"]
+    assert isinstance(contract_tools, dict)
+    status_tool = contract_tools["sb_request_status"]
+    assert isinstance(status_tool, dict)
+    response_required = contract["response_required"]
+    assert isinstance(response_required, list)
+    async def run() -> None:
+        values: list[JsonObject] = []
         for _ in range(2):
             params = StdioServerParameters(command=sys.executable, args=["-c", program, str(path)],
                 env={"SB_MCP_CONTRACT_PROFILE": "scoped-request-status-v1"})
             async with Client(params, mode="legacy", cache=None) as client:
                 tools = (await client.list_tools()).tools
                 assert len(tools) == 1
-                assert strip(tools[0].input_schema) == contract["tools"]["sb_request_status"]["arguments"]
+                assert strip(TypeAdapter[JsonValue](JsonValue).validate_python(tools[0].input_schema, strict=True)) == status_tool["arguments"]
                 response = await client.call_tool("sb_request_status", args)
                 assert not response.is_error, response
-                assert set(response.structured_content) == set(contract["response_required"])
-                values.append(response.structured_content)
+                assert set(json_content(response)) == set(response_required)
+                values.append(json_content(response))
         assert values[0] == values[1]
-        assert values[0]["request_status"]["state"] == "pending"
+        status = values[0]["request_status"]
+        assert isinstance(status, dict)
+        assert status["state"] == "pending"
     anyio.run(run)
 
 
-def test_absent_journal_is_unavailable_without_creating_storage(tmp_path, monkeypatch):
+def test_absent_journal_is_unavailable_without_creating_storage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     config, args = material(tmp_path, monkeypatch)
     missing = tmp_path / "missing"
     assert isinstance(config.raw, dict)
     config.raw["request_root"] = str(missing)
-    async def run():
+    async def run() -> None:
         async with Client(build_server(config=config), mode="legacy", cache=None) as client:
             assert (await client.call_tool("sb_request_status", args)).is_error
     anyio.run(run)
     assert not missing.exists()
 
 
-def test_not_found_in_existing_journal_has_no_acceptance_or_mutation(tmp_path, monkeypatch):
+def test_not_found_in_existing_journal_has_no_acceptance_or_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     config, args = material(tmp_path, monkeypatch)
     assert isinstance(config.raw, dict)
     config.raw["request_root"] = str(tmp_path / "empty-journal")
     store = RequestStore(Path(config.request_root), maintenance_only=True)
     try:
         before = tuple(store.db.iterdump())
-        async def run():
+        async def run() -> None:
             async with Client(build_server(config=config), mode="legacy", cache=None) as client:
                 response = await client.call_tool("sb_request_status", args)
                 assert not response.is_error, response
-                status = response.structured_content["request_status"]
+                status = json_content(response)["request_status"]
+                assert isinstance(status, dict)
                 assert status["state"] == "not_found"
                 assert not {"acceptance", "proof", "receipt"} & set(status)
         anyio.run(run)

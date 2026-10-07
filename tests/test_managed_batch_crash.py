@@ -1,32 +1,41 @@
 """Unpublished batch work must not replace the active managed generation."""
 import multiprocessing
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
+from multiprocessing.synchronize import Event
 from pathlib import Path
 
-from sb.config import Config
+from sb.config import Config, TomlValue
 from sb.generation_runtime import GenerationMutationService
 from sb.ops import status_snapshot
-from sb.pipeline import run_all
+from sb.pipeline import StageFn, StageReport, run_all
+from sb.store.ledger import Ledger
+from sb.vault import Vault
 from tests.test_runtime_reliability import managed
 
 
-def _blocked_managed_batch(raw, ready, release):
+def _blocked_managed_batch(raw: Mapping[str, TomlValue], ready: Event, release: Event):
     from sb import pipeline
 
-    def stage(*args):
+    def stage(ledger: Ledger, vault: Vault, run_id: str) -> StageReport:
+        del ledger, vault, run_id
         ready.set()
-        release.wait(30)
+        _ = release.wait(30)
         return pipeline.StageReport((), 0, 0, 0, False)
 
-    pipeline._ingest = lambda *args: stage
-    pipeline.run_all(Config(raw=raw))
+    def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) -> StageFn:
+        del config, source_ids, limit
+        return stage
+
+    pipeline.ingest = ingest
+    _ = pipeline.run_all(Config(raw=raw))
 
 
 def test_unpublished_killed_batch_preserves_active_input_and_recovers(tmp_path: Path):
     config = Config(raw={**managed(tmp_path).raw, 'sources': []})
     service = GenerationMutationService.from_config(config)
     try:
-        service.remember('합성 기억 원본 보존', 'crash-baseline', datetime.now(UTC))
+        _ = service.remember('합성 기억 원본 보존', 'crash-baseline', datetime.now(UTC))
     finally:
         service.close()
     active = Path(config.vault_root)
@@ -61,28 +70,30 @@ def test_unpublished_killed_batch_preserves_active_input_and_recovers(tmp_path: 
         child.join(10)
 
 
-def _blocked_published_batch(raw, phase, ready, release):
-    from sb.generations import GenerationStore
+def _blocked_published_batch(raw: Mapping[str, TomlValue], phase: str, ready: Event, release: Event):
+    from sb.generations import Generation, GenerationStore
     original = GenerationStore.activate
 
-    def barrier(observed):
+    def pause_at_phase(observed: str) -> None:
         if observed == phase:
             ready.set()
-            release.wait(30)
+            _ = release.wait(30)
 
-    def activate(self, *args, **kwargs):
-        kwargs['barrier'] = barrier
-        return original(self, *args, **kwargs)
+    def activate(self: GenerationStore, generation: Generation, expected_parent: Generation | None,
+                 now: datetime, *, barrier: Callable[[str], None] | None = None,
+                 lock_held: bool = False) -> None:
+        del barrier
+        original(self, generation, expected_parent, now, barrier=pause_at_phase, lock_held=lock_held)
 
     GenerationStore.activate = activate
-    run_all(Config(raw=raw))
+    _ = run_all(Config(raw=raw))
 
 
 def _published_crash_case(tmp_path: Path, phase: str):
     config = Config(raw={**managed(tmp_path).raw, 'sources': []})
     service = GenerationMutationService.from_config(config)
     try:
-        service.remember('공개 후 원본 보존 검증', 'published-crash', datetime.now(UTC))
+        _ = service.remember('공개 후 원본 보존 검증', 'published-crash', datetime.now(UTC))
     finally:
         service.close()
     active = Path(config.vault_root)
@@ -104,8 +115,8 @@ def _published_crash_case(tmp_path: Path, phase: str):
         assert child.exitcode is not None and child.exitcode != 0
         service = GenerationMutationService.from_config(config)
         try:
-            service.maintain(datetime.now(UTC))
-            service.maintain(datetime.now(UTC))
+            _ = service.maintain(datetime.now(UTC))
+            _ = service.maintain(datetime.now(UTC))
         finally:
             service.close()
         assert active.resolve() == published
@@ -122,4 +133,4 @@ def _published_crash_case(tmp_path: Path, phase: str):
 
 def test_pointer_switch_crash_recovers_without_repeating_batch(tmp_path: Path):
     for phase in ('pointer_rename', 'activation_verify'):
-        _published_crash_case(tmp_path / phase, phase)
+        _ = _published_crash_case(tmp_path / phase, phase)

@@ -2,16 +2,27 @@
 
 import json
 from dataclasses import replace
+from pathlib import Path
 from urllib.parse import urlencode
 
+import pytest
+
+from sb.effect_values import JsonValue
 from sb.search import SearchIndex
+from tests import test_web
+from tests.json_fixtures import parse_object
+from tests.life_test_support import (
+    config_table,
+    json_rows,
+    json_text,
+)
+from tests.life_test_support import request as _request
 from tests.test_life_pipeline import item, life_config
-from tests.test_web import _request, _running
 
 
-def test_real_http_capture_view_correction_withdrawal(tmp_path):
+def test_real_http_capture_view_correction_withdrawal(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
-    with _running(config) as base:
+    with test_web.running(config) as base:
         code, accepted = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
@@ -21,16 +32,23 @@ def test_real_http_capture_view_correction_withdrawal(tmp_path):
             },
         )
         assert code == 202, accepted
-        identity = accepted["receipts"][0]["event_id"]
+        identity = json_text(json_rows(accepted["receipts"])[0]["event_id"])
         code, receipt = _request(
-            base + "/api/life/v1/receipts/" + accepted["receipts"][0]["receipt_id"]
+            base
+            + "/api/life/v1/receipts/"
+            + json_text(json_rows(accepted["receipts"])[0]["receipt_id"])
         )
         assert code == 200 and receipt["state"] == "accepted"
         code, evidence = _request(base + "/api/life/v1/evidence/" + identity)
-        assert code == 200 and json.loads(evidence["content"])["body"] == "실제 메모"
+        assert (
+            code == 200 and parse_object(json_text(evidence["content"]))["body"] == "실제 메모"
+        )
         code, manifest = _request(base + "/api/life/v1/views/obsidian/manifest?day=2026-09-26")
         assert code == 200
-        assert any(f["path"] == f"Auto/Events/{identity}.md" for f in manifest["files"])
+        assert any(
+            json_text(f["path"]) == f"Auto/Events/{identity}.md"
+            for f in json_rows(manifest["files"])
+        )
         correction = {
             "event_id": identity,
             "expected_revision": 1,
@@ -46,11 +64,11 @@ def test_real_http_capture_view_correction_withdrawal(tmp_path):
         code, replay = _request(
             base + "/api/life/v1/corrections", method="POST", payload=correction
         )
-        assert code == 202 and replay["receipts"][0]["replayed"], replay
+        assert code == 202 and json_rows(replay["receipts"])[0]["replayed"], replay
         assert SearchIndex(root).search("회의가 취소됨", 10)
         assert not SearchIndex(root).search("실제 메모", 10)
         code, timeline = _request(base + "/api/life/v1/timeline?day=2026-09-26")
-        assert code == 200 and timeline["events"][0]["event_status"] == "cancelled"
+        assert code == 200 and json_rows(timeline["events"])[0]["event_status"] == "cancelled"
         code, new_view = _request(base + "/api/life/v1/views/obsidian/manifest?day=2026-09-26")
         assert code == 200 and "실제 메모" not in json.dumps(new_view, ensure_ascii=False)
         code, removed = _request(
@@ -67,10 +85,14 @@ def test_real_http_capture_view_correction_withdrawal(tmp_path):
         assert _request(base + "/api/life/v1/evidence/" + identity)[0] == 404
         assert not SearchIndex(root).search("회의가 취소됨", 10)
         code, last_view = _request(base + "/api/life/v1/views/obsidian/manifest?day=2026-09-26")
-        assert code == 200 and all(identity not in f["path"] for f in last_view["files"])
+        assert code == 200 and all(
+            identity not in json_text(f["path"]) for f in json_rows(last_view["files"])
+        )
 
 
-def test_client_token_is_not_an_admin_token(tmp_path, monkeypatch):
+def test_client_token_is_not_an_admin_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config, _ = life_config(tmp_path)
     monkeypatch.setenv("SB_WEB_TOKEN", "synthetic-admin-only-token")
     monkeypatch.setenv("SB_TEST_LIFE_TOKEN", "synthetic-life-only-token-1234567890123456")
@@ -80,7 +102,7 @@ def test_client_token_is_not_an_admin_token(tmp_path, monkeypatch):
             **config.raw,
             "web": {"token_env": "SB_WEB_TOKEN"},
             "life": {
-                **config.raw["life"],
+                **config_table(config.raw["life"]),
                 "client_token_env": "SB_TEST_LIFE_TOKEN",
                 "client_source_ids": ["test-notes"],
                 "client_can_write": True,
@@ -88,7 +110,7 @@ def test_client_token_is_not_an_admin_token(tmp_path, monkeypatch):
         },
     )
     token = "synthetic-life-only-token-1234567890123456"
-    with _running(config) as base:
+    with test_web.running(config) as base:
         assert _request(base + "/api/life/v1/health")[0] == 401
         assert _request(base + "/api/life/v1/health", token=token)[0] == 200
         assert _request(base + "/api/run", method="POST", payload={}, token=token)[0] == 401
@@ -106,7 +128,7 @@ def test_client_token_is_not_an_admin_token(tmp_path, monkeypatch):
             payload={"source_id": "test-notes", "items": [item()]},
         )
         assert code == 202, body
-        identity = body["receipts"][0]["event_id"]
+        identity = json_text(json_rows(body["receipts"])[0]["event_id"])
         code, _ = _request(
             base + "/api/life/v1/withdrawals",
             method="POST",
@@ -116,16 +138,16 @@ def test_client_token_is_not_an_admin_token(tmp_path, monkeypatch):
         assert code == 403
 
 
-def test_bad_input_and_revision_conflict_are_explicit(tmp_path):
+def test_bad_input_and_revision_conflict_are_explicit(tmp_path: Path) -> None:
     config, _ = life_config(tmp_path)
-    with _running(config) as base:
+    with test_web.running(config) as base:
         code, accepted = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
             payload={"source_id": "test-notes", "items": [item()]},
         )
         assert code == 202
-        identity = accepted["receipts"][0]["event_id"]
+        identity = json_text(json_rows(accepted["receipts"])[0]["event_id"])
         code, error = _request(
             base + "/api/life/v1/corrections",
             method="POST",
@@ -145,27 +167,96 @@ def test_bad_input_and_revision_conflict_are_explicit(tmp_path):
         assert _request(base + "/api/life/v1/not-existing")[0] == 404
 
 
-def test_source_off_withdrawal_remains_available(tmp_path):
+def test_receipt_get_exposes_state_lifecycle(tmp_path: Path) -> None:
     config, root = life_config(tmp_path)
-    with _running(config) as base:
+    with test_web.running(config) as base:
+        code, accepted = _request(
+            base + "/api/life/v1/events:batch",
+            method="POST",
+            payload={"source_id": "test-notes", "items": [item()]},
+        )
+        assert code == 202, accepted
+        receipt_id = json_text(json_rows(accepted["receipts"])[0]["receipt_id"])
+        code, body = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and body["state"] == "accepted"
+        assert body["replayed"] is False
+        from sb.store.ledger import Ledger
+
+        with Ledger(root) as ledger:
+            store = ledger.life_store()
+            _ = store.advance_receipt(receipt_id, "published", proof="commit:fixture")
+        code, published = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and published["state"] == "published"
+        with Ledger(root) as ledger:
+            store = ledger.life_store()
+            _ = store.advance_receipt(receipt_id, "searchable", proof="index:fixture")
+        code, searchable = _request(base + "/api/life/v1/receipts/" + receipt_id)
+        assert code == 200 and searchable["state"] == "searchable"
+        assert searchable["event_id"] == json_rows(accepted["receipts"])[0]["event_id"]
+
+
+def test_timeline_returns_groups_with_all_citations(tmp_path: Path) -> None:
+    config, _ = life_config(tmp_path)
+    shared: JsonValue = {
+        "entity_id": "meetings:standup-2026-09-26",
+        "kind": "event",
+        "label": "스탠드업",
+    }
+    with test_web.running(config) as base:
+        code, accepted = _request(
+            base + "/api/life/v1/events:batch",
+            method="POST",
+            payload={
+                "source_id": "test-notes",
+                "items": [
+                    {"idempotency_key": "request-1", "payload": item(source_item_id="note-a", entities=[shared])["payload"]},
+                    {
+                        "idempotency_key": "request-2",
+                        "payload": item(
+                            source_item_id="cal-b",
+                            event_type="calendar_event",
+                            entities=[shared],
+                        )["payload"],
+                    },
+                ],
+            },
+        )
+        assert code == 202, accepted
+        code, timeline = _request(base + "/api/life/v1/timeline?day=2026-09-26")
+        assert code == 200, timeline
+        groups = json_rows(timeline["groups"])
+        assert len(groups) == 1
+        citations = json_rows(groups[0]["citations"])
+        event_ids = groups[0]["event_ids"]
+        assert isinstance(event_ids, list)
+        assert {json_text(row["source_item_id"]) for row in citations} == {"note-a", "cal-b"}
+        assert {json_text(row["event_id"]) for row in citations} == {
+            json_text(value) for value in event_ids
+        }
+        assert all(row["raw_digest"] and row["sid"] for row in citations)
+
+
+def test_source_off_withdrawal_remains_available(tmp_path: Path) -> None:
+    config, root = life_config(tmp_path)
+    with test_web.running(config) as base:
         _, accepted = _request(
             base + "/api/life/v1/events:batch",
             method="POST",
             payload={"source_id": "test-notes", "items": [item()]},
         )
-    identity = accepted["receipts"][0]["event_id"]
+    identity = json_text(json_rows(accepted["receipts"])[0]["event_id"])
     off = replace(
         config,
         raw={
             **config.raw,
             "life": {
-                **config.raw["life"],
+                **config_table(config.raw["life"]),
                 "life_events": False,
                 "sources": {"test-notes": {"enabled": False}},
             },
         },
     )
-    with _running(off) as base:
+    with test_web.running(off) as base:
         assert (
             _request(
                 base + "/api/life/v1/events:batch",

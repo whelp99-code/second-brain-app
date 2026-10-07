@@ -27,8 +27,8 @@ def test_tombstone_spans_preserve_unrelated_memory(
     payload = original.encode()
     page = tmp_path / 'wiki' / 'memory.md'
     page.parent.mkdir()
-    page.write_bytes(payload)
-    targets = []
+    _ = page.write_bytes(payload)
+    targets: list[BlockedTargetIdentity] = []
     for sequence, phrase in enumerate(phrases, 1):
         content = phrase.encode()
         start = payload.index(content)
@@ -42,28 +42,28 @@ def test_tombstone_spans_preserve_unrelated_memory(
         ))
     snapshot = TombstoneSnapshot(2, 'unused', 'unused', (), tuple(targets))
     with pytest.raises(RestoreInventoryError, match="RESTORE_SANITATION_FAILED"):
-        ManagedRestoreInventory().sanitize(tmp_path, snapshot, require_clean=True)
+        _ = ManagedRestoreInventory().sanitize(tmp_path, snapshot, require_clean=True)
     result = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
     assert len(result.files) == 1
     assert result.files[0].payload == expected.encode()
 
 
-def test_content_scan_refuses_exhausted_budget(tmp_path: Path, monkeypatch) -> None:
+def test_content_scan_refuses_exhausted_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from functools import partial
 
     import sb.restore_inventory as inventory
 
     page = tmp_path / "wiki" / "page.md"
     page.parent.mkdir()
-    page.write_bytes(b"unrelated text")
+    _ = page.write_bytes(b"unrelated text")
     target = BlockedTargetIdentity(1, "unused", "unused", hashlib.sha256(b"secret").hexdigest(),
         "unused", "unused", "unused", "unused", 0, 6)
     snapshot = TombstoneSnapshot(1, "unused", "unused", (), (target,))
-    original = inventory._ScanBudget
+    original = inventory.ScanBudget
     for windows, hashed_bytes in [(0, 1000), (1000, 0)]:
         monkeypatch.setattr(inventory, "_ScanBudget", partial(original, windows, hashed_bytes))
         with pytest.raises(RestoreInventoryError, match="RESTORE_SCAN_BUDGET_EXCEEDED"):
-            ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+            _ = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
     assert page.read_bytes() == b"unrelated text"
 
 
@@ -74,36 +74,36 @@ def test_default_budget_restores_megabyte_page_without_deleted_line(tmp_path: Pa
     payload = prefix + secret + b"\n" + suffix
     page = tmp_path / "wiki" / "large.md"
     page.parent.mkdir()
-    page.write_bytes(payload)
+    _ = page.write_bytes(payload)
     target = BlockedTargetIdentity(1, "unused", "unused", hashlib.sha256(secret).hexdigest(),
         "unused", "unused", "unused", "unused", 0, len(secret))
     snapshot = TombstoneSnapshot(1, "unused", "unused", (), (target,))
     result = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
     assert result.files[0].payload == prefix + suffix
-    page.write_bytes(result.files[0].payload)
+    _ = page.write_bytes(result.files[0].payload)
     assert ManagedRestoreInventory().sanitize(tmp_path, snapshot, require_clean=True).blocked_matches == 0
 
 
 def test_default_budget_still_rejects_oversized_scan(tmp_path: Path) -> None:
     page = tmp_path / 'wiki' / 'oversized.md'
     page.parent.mkdir()
-    page.write_bytes(b'x' * (8 * 1024 * 1024))
+    _ = page.write_bytes(b'x' * (8 * 1024 * 1024))
     target = BlockedTargetIdentity(1, 'unused', 'unused', hashlib.sha256(b'secret').hexdigest(),
         'unused', 'unused', 'unused', 'unused', 0, 6)
     snapshot = TombstoneSnapshot(1, 'unused', 'unused', (), (target,))
     with pytest.raises(RestoreInventoryError, match='RESTORE_SCAN_BUDGET_EXCEEDED'):
-        ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+        _ = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
 
 
 def test_removing_line_cannot_create_new_blocked_sequence(tmp_path: Path) -> None:
     page = tmp_path / 'wiki' / 'memory.md'
     page.parent.mkdir()
     payload = b'header\nalpha\nremove me\nbeta\ntail\n'
-    page.write_bytes(payload)
+    _ = page.write_bytes(payload)
     targets = tuple(BlockedTargetIdentity(index, 'unused', 'unused', hashlib.sha256(content).hexdigest(),
         'unused', 'unused', 'unused', 'unused', 0, len(content))
         for index, content in enumerate([b'remove me', b'alpha\nbeta'], 1))
     snapshot = TombstoneSnapshot(2, 'unused', 'unused', (), targets)
     with pytest.raises(RestoreInventoryError, match='RESTORE_SANITATION_FAILED'):
-        ManagedRestoreInventory().sanitize(tmp_path, snapshot)
+        _ = ManagedRestoreInventory().sanitize(tmp_path, snapshot)
     assert page.read_bytes() == payload

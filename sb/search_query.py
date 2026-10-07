@@ -7,14 +7,6 @@ from sb.search_errors import SearchQueryError
 
 MAX_QUERY_BYTES = 4096
 MAX_QUERY_GROUPS = 32
-_HANGUL_START = 0xAC00
-_HANGUL_END = 0xD7A3
-
-
-def _has_hangul(text: str) -> bool:
-    return any(_HANGUL_START <= ord(char) <= _HANGUL_END for char in text)
-
-
 def _compact(text: str) -> str:
     return "".join(char for char in text if not char.isspace())
 

@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import multiprocessing
 import subprocess
+from multiprocessing.process import BaseProcess
+from multiprocessing.queues import Queue
+from multiprocessing.synchronize import Event
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import TypeAdapter
 
-from sb.effect_write_requests import accept_effect_request
+from sb.cancellation_target import verify_cancellation_target
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
+from sb.effect_values import JsonValue
+from sb.effect_write_requests import PendingPublication, accept_effect_request
+from sb.generations import Generation
 from sb.request_executor import RequestExecutor
 from tests.test_cancellation_admission_binding import STAMP, admit
 from tests.test_correction_cancellation_executor import (
@@ -16,22 +24,30 @@ from tests.test_correction_cancellation_executor import (
     execute,
     prepare_unaccepted,
 )
-from tests.test_request_executor import _config
+from tests.test_request_executor import config as _config
 
 
-def admission_actor(root, value, kind, pause, ready, begin, entered, release, results):
+def admission_actor(root: str, value: JsonValue, kind: str, pause: bool, ready: Event, begin: Event, entered: Event, release: Event, results: Queue[tuple[str, str]]) -> None:
     import sb.correction_cancellation_requests as cancellation
     import sb.effect_write_requests as publication
 
     executor = RequestExecutor(_config(Path(root)))
-    original = publication._publish if kind == "request" else cancellation.verify_cancellation_target
+    original_publish = publication.publish
+    original_verify = verify_cancellation_target
 
-    def at_locked_boundary(*args, **kwargs):
+    def at_locked_boundary() -> None:
         # Both hooks run with the real pending-directory admission mutex held.
         if pause:
             entered.set()
             assert release.wait(20)
-        return original(*args, **kwargs)
+
+    def publish(directory: int, pending: PendingPublication) -> None:
+        at_locked_boundary()
+        original_publish(directory, pending)
+
+    def verify(generation: Generation, intent: CorrectionCancellationIntentV1) -> bytes:
+        at_locked_boundary()
+        return original_verify(generation, intent)
 
     ready.set()
     try:
@@ -39,16 +55,18 @@ def admission_actor(root, value, kind, pause, ready, begin, entered, release, re
         if not pause:
             entered.set()
         if kind == "request":
-            with patch.object(publication, "_publish", at_locked_boundary):
+            with patch.object(publication, "publish", publish):
                 accepted = accept_effect_request(executor.config.request_root, value, STAMP,
                     public_keys=executor.config.jarvis_public_keys,
                     provider_instance_id=executor.config.provider_instance_id)
             result = ("request_accepted", accepted.request_id)
         else:
-            with patch.object(cancellation, "verify_cancellation_target", at_locked_boundary):
+            with patch.object(cancellation, "verify_cancellation_target", verify):
                 accepted, replayed = admit(executor, value)
             assert not replayed
-            result = ("cancellation_accepted", accepted["intent_id"])
+            intent_id = accepted["intent_id"]
+            assert isinstance(intent_id, str)
+            result = ("cancellation_accepted", intent_id)
         results.put(result)
     except (RuntimeError, ValueError) as exc:
         results.put((type(exc).__name__, str(exc)))
@@ -62,9 +80,10 @@ def test_same_request_publication_and_cancellation_have_one_winner(tmp_path: Pat
     executor.close()
     ctx = multiprocessing.get_context("spawn")
     release = ctx.Event()
-    actors = {}
+    actors: dict[str, tuple[BaseProcess, Event, Event, Event, Queue[tuple[str, str]]]] = {}
     for kind, value in (("request", request), ("cancellation", intent)):
-        ready, begin, entered, results = ctx.Event(), ctx.Event(), ctx.Event(), ctx.Queue()
+        ready, begin, entered = ctx.Event(), ctx.Event(), ctx.Event()
+        results: Queue[tuple[str, str]] = ctx.Queue()
         process = ctx.Process(target=admission_actor, args=(str(tmp_path), value, kind, kind == first,
             ready, begin, entered, release, results))
         actors[kind] = (process, ready, begin, entered, results)
@@ -94,7 +113,9 @@ def test_same_request_publication_and_cancellation_have_one_winner(tmp_path: Pat
     restarted = RequestExecutor(_config(tmp_path))
     try:
         assert restarted.store.tombstone_high_water()[0] == 1
-        count = restarted.store.db.execute("SELECT count(*) FROM correction_cancellations").fetchone()[0]
+        count = TypeAdapter(int).validate_python(
+            restarted.store.db.execute("SELECT count(*) FROM correction_cancellations").fetchone()[0], strict=True,
+        )
         assert count == int(first == "cancellation")
         if first == "request":
             replay = accept_effect_request(restarted.config.request_root, request, STAMP,
@@ -106,7 +127,9 @@ def test_same_request_publication_and_cancellation_have_one_winner(tmp_path: Pat
             assert isinstance(request['request_id'], str)
             accepted, replayed = admit(restarted, intent)
             assert replayed
-            assert execute(restarted, accepted["intent_id"])["state"] == "generation_active"
+            intent_id = accepted["intent_id"]
+            assert isinstance(intent_id, str)
+            assert execute(restarted, intent_id)["state"] == "generation_active"
             assert restarted.store.get(request["request_id"]) is None
         assert restarted.apply_once(now=STAMP).state == "idle"
         active = restarted.generations.active()
@@ -118,20 +141,20 @@ def test_same_request_publication_and_cancellation_have_one_winner(tmp_path: Pat
         restarted.close()
 
 
-def publish_then_exit(root, request):
+def publish_then_exit(root: str, request: JsonValue) -> None:
     import os
 
     import sb.effect_write_requests as publication
 
-    original = publication._publish
+    original = publication.publish
 
-    def stop_after_publication(*args, **kwargs):
-        original(*args, **kwargs)
+    def stop_after_publication(directory: int, pending: PendingPublication) -> None:
+        original(directory, pending)
         os._exit(77)
 
     config = _config(Path(root))
-    with patch.object(publication, "_publish", stop_after_publication):
-        publication.accept_effect_request(config.request_root, request, STAMP,
+    with patch.object(publication, "publish", stop_after_publication):
+        _ = publication.accept_effect_request(config.request_root, request, STAMP,
             public_keys=config.jarvis_public_keys, provider_instance_id=config.provider_instance_id)
 
 
@@ -154,7 +177,7 @@ def test_exit_after_request_file_publication_blocks_cancellation_and_recovers(tm
         assert restarted.store.tombstone_high_water()[0] == 0
         assert list(restarted.config.request_root.joinpath("pending").glob("*.v2.json"))
         with pytest.raises(ReplayConflict, match="MEMORY_CANCELLATION_ALREADY_RECEIVED"):
-            admit(restarted, intent)
+            _ = admit(restarted, intent)
         assert restarted.store.db.execute("SELECT count(*) FROM correction_cancellations").fetchone()[0] == 0
         accepted = accept_effect_request(restarted.config.request_root, request, STAMP,
             public_keys=restarted.config.jarvis_public_keys,

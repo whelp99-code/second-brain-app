@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+from os import PathLike
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -67,10 +70,10 @@ def test_restore_shifted_deleted_record_cannot_survive_signed_restore(
         for path in tuple(archive.rglob('*.md')):
             if OLD.encode() in path.read_bytes():
                 if change == "shift":
-                    path.write_bytes(b'New introduction\n' + path.read_bytes())
+                    _ = path.write_bytes(b'New introduction\n' + path.read_bytes())
                 else:
                     copied = archive / 'wiki' / 'relocated.md'
-                    copied.write_bytes(b'New introduction\n' + path.read_bytes())
+                    _ = copied.write_bytes(b'New introduction\n' + path.read_bytes())
                     copied.chmod(0o600)
                     if change == "move":
                         path.unlink()
@@ -114,11 +117,11 @@ def test_managed_restore_preserves_existing_request_staging(
         previous = fixture.sanitizer.workspace / f'restore-{request_key}'
         previous.mkdir()
         evidence = previous / 'recovery-evidence.txt'
-        evidence.write_text('other interrupted restore')
+        _ = evidence.write_text('other interrupted restore')
         if invalid_manifest:
-            (fixture.request.archive / 'wiki' / 'unexpected.md').write_text('extra bytes')
+            _ = (fixture.request.archive / 'wiki' / 'unexpected.md').write_text('extra bytes')
             with pytest.raises(RestoreError, match="RESTORE_ARCHIVE_INVALID"):
-                fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
+                _ = fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
         else:
             _, proof = fixture.sanitizer.sanitize(fixture.request, fixture.executor.mutations)
             assert proof.scan_errors == 0
@@ -128,7 +131,7 @@ def test_managed_restore_preserves_existing_request_staging(
         fixture.executor.close()
 
 
-def test_changed_tar_fails_without_generation_or_staging(tmp_path: Path, monkeypatch) -> None:
+def test_changed_tar_fails_without_generation_or_staging(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import tarfile
 
     fixture = restore_fixture(tmp_path)
@@ -142,14 +145,14 @@ def test_changed_tar_fails_without_generation_or_staging(tmp_path: Path, monkeyp
         before = set(fixture.executor.generations.generations.iterdir())
         extractall = tarfile.TarFile.extractall
 
-        def mutate_after_extract(bundle, *args, **kwargs):
-            extractall(bundle, *args, **kwargs)
+        def mutate_after_extract(bundle: tarfile.TarFile, path: str | PathLike[str] = ".", members: Iterable[tarfile.TarInfo] | None = None, *, numeric_owner: bool = False, filter: Literal["fully_trusted", "tar", "data"] | Callable[[tarfile.TarInfo, str], tarfile.TarInfo | None] | None = None) -> None:
+            extractall(bundle, path, members, numeric_owner=numeric_owner, filter=filter)
             with archive.open('ab') as output:
-                output.write(b'changed-after-read')
+                _ = output.write(b'changed-after-read')
 
         monkeypatch.setattr(tarfile.TarFile, 'extractall', mutate_after_extract)
         with pytest.raises(RestoreError, match='RESTORE_ARCHIVE_UNSAFE'):
-            fixture.sanitizer.sanitize(request, fixture.executor.mutations)
+            _ = fixture.sanitizer.sanitize(request, fixture.executor.mutations)
         assert set(fixture.executor.generations.generations.iterdir()) == before
         assert list(fixture.sanitizer.workspace.iterdir()) == []
         assert fixture.executor.generations.active().generation_id == fixture.active_generation_id

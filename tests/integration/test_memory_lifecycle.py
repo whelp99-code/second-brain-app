@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Unpack
 
 import anyio
 import pytest
@@ -21,11 +21,13 @@ from sb.effect_write_requests import accept_effect_request
 from sb.effect_write_values import model_object
 from sb.mcp import build_server
 from sb.mcp_contract import write_fixture_request
+from sb.page_access import PageAccess
 from sb.pipeline import audit_citations
 from sb.provider_observation_models import ProviderLifecycleObservationsV1
 from sb.request_executor import ExecutorConfig, RequestExecutor
 from sb.search import git_run
 from sb.stable_requests import accept_stable_v1_request
+from tests.remember_fixture import RememberArguments
 from tests.task30_effect_factory import effect_request
 from tests.test_generation_vectors import CountingEncoder
 
@@ -59,7 +61,7 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
 
     scope = SourceAccess('principal:owner', ('project:a',), 'policy:1')
     if bound:
-        def materialize_bound(root, **kwargs):
+        def materialize_bound(root: Path, **kwargs: Unpack[RememberArguments]) -> None:
             kwargs['source_access'] = scope
             materialize_remember(root, **kwargs)
             # Seed the same explicit state as compilation before the real seal.
@@ -110,7 +112,7 @@ def test_real_provider_lifecycle_remember_correct_export_forget(
         public_keys=config.jarvis_public_keys, provider_instance_id="provider:fixture",
     )
     if binding_failure:
-        def fail_binding(*_args):
+        def fail_binding(_ledger: Ledger, *_args: BoundKnowledge | str | PageAccess) -> None:
             raise RuntimeError('INJECTED_CORRECTION_STATE_FAILURE')
         with monkeypatch.context() as failing:
             method = 'bind_knowledge' if binding_failure == 'knowledge' else 'bind_page_access'

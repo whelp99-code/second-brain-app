@@ -7,12 +7,17 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import cast
+from typing import Final, cast
+
+from pydantic import TypeAdapter, ValidationError
 
 from sb.backup_verification import instant
 from sb.config import DEFAULT_CAPS, Config
+from sb.effect_values import JsonInput
 from sb.store.ledger import CURRENT_SCHEMA_VERSION
 from sb.tombstone_snapshot import GENESIS_ROOT
+
+_RUN_METADATA: Final = TypeAdapter[dict[str, str | None]](dict[str, str | None])
 
 
 @dataclass(frozen=True)
@@ -49,7 +54,7 @@ def readonly(path: Path) -> sqlite3.Connection:
 def ledger_checks(
     root: Path, now: datetime, policy: ReadinessPolicy,
     max_attempts: int = DEFAULT_CAPS["max_derivation_attempts"],
-) -> tuple[dict[str, bool], dict[str, object]]:
+) -> tuple[dict[str, bool], dict[str, JsonInput]]:
     with closing(readonly(root / ".sb" / "ledger.db")) as connection:
         _ = connection.execute("BEGIN")
         version = cast(tuple[str] | None, connection.execute(
@@ -62,9 +67,10 @@ def ledger_checks(
         held = _count(connection,
             "SELECT count(*) FROM derivation WHERE stage IN ('compile','conflict','brief') "
             + "AND status IN ('failed','pending') AND attempts>=?", (max_attempts,))
-    last = None if row is None else cast(dict[str, object], dict(row))
-    if last is not None and any(value is not None and not isinstance(value, str) for value in last.values()):
-        raise ValueError("invalid run metadata")
+    try:
+        last = None if row is None else _RUN_METADATA.validate_python(dict(row), strict=True)
+    except ValidationError as exc:
+        raise ValueError("invalid run metadata") from exc
     age: float | None = None
     time_valid = False
     if last is not None and isinstance(last.get("finished_at"), str):
@@ -82,7 +88,7 @@ def ledger_checks(
     return checks, {"last_run": last, "last_run_age_seconds": age, "failed_derivations": failed, "held_derivations": held}
 
 
-def request_checks(db: Path, now: datetime, policy: ReadinessPolicy) -> tuple[dict[str, bool], dict[str, object]]:
+def request_checks(db: Path, now: datetime, policy: ReadinessPolicy) -> tuple[dict[str, bool], dict[str, JsonInput]]:
     with closing(readonly(db)) as connection:
         _ = connection.execute("BEGIN")
         counts = cast(list[tuple[str, int]], connection.execute(

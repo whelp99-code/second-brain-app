@@ -9,7 +9,7 @@ def test_ack_failure_is_reported_and_retry_uses_committed_input(tmp_path: Path):
     inbox = tmp_path / 'intake'
     inbox.mkdir()
     note = inbox / 'note.md'
-    note.write_text('Committed source remains retryable')
+    _ = note.write_text('Committed source remains retryable')
     outside = tmp_path / 'outside'
     outside.mkdir()
     (inbox / '.done').symlink_to(outside, target_is_directory=True)

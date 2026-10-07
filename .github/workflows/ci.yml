@@ -10,11 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install ripgrep
+        run: sudo apt-get update -q && sudo apt-get install -y -q ripgrep
 
       - name: Install uv and Python 3.12
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
           enable-cache: true
 
       - name: Sync dependencies
@@ -73,7 +78,7 @@ jobs:
       - name: Install uv and Python 3.12
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
           enable-cache: true
 
       - name: Sync dependencies including embeddings extra

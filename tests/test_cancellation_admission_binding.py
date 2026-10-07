@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from collections.abc import Callable, Mapping
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from sb.cancellation_target import verify_cancellation_target
+from sb.correction_cancellation_models import CorrectionCancellationIntentV1
 from sb.correction_cancellation_requests import accept_correction_cancellation
-from sb.effect_values import is_json_object
+from sb.effect_values import JsonObject, JsonValue, is_json_object
 from sb.generation_runtime_models import (
     GenerationAuthority,
     GenerationMutation,
     GenerationOperation,
 )
+from sb.generations import Generation
+from sb.request_executor import RequestExecutor
 from tests.test_correction_cancellation import CURRENT
 from tests.test_correction_cancellation_executor import execute, prepare_unaccepted
 from tests.test_request_executor import NOW
@@ -19,14 +25,15 @@ from tests.test_request_executor import NOW
 STAMP = NOW + timedelta(minutes=1, seconds=1)
 
 
-def admit(executor, value, clock=lambda: STAMP, keys=None, root=None):
+def admit(executor: RequestExecutor, value: JsonValue, clock: Callable[[], datetime] = lambda: STAMP,
+          keys: Mapping[str, Ed25519PublicKey] | None = None, root: Path | None = None) -> tuple[JsonObject, bool]:
     return accept_correction_cancellation(root or executor.config.request_root, value,
         generations=executor.generations, expected_provider=executor.config.provider_instance_id, clock=clock,
         historical_delegation_keys=executor.config.jarvis_public_keys,
         current_cancellation_keys={"jarvis:current": CURRENT.public_key()} if keys is None else keys)
 
 
-def assert_unreceived(executor):
+def assert_unreceived(executor: RequestExecutor) -> None:
     assert executor.store.tombstone_high_water()[0] == 0
     for table in ("correction_cancellations", "correction_cancellation_aliases", "tombstone_replica"):
         assert executor.store.db.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0
@@ -35,12 +42,12 @@ def assert_unreceived(executor):
 def test_changed_generation_rejected_without_advancing_journal(tmp_path: Path):
     executor, value, _original = prepare_unaccepted(tmp_path)
     try:
-        executor.mutations.mutate(GenerationMutation(
+        _ = executor.mutations.mutate(GenerationMutation(
             mutation_id="ordinary-work-before-cancellation", operation=GenerationOperation.RUN,
             now=STAMP, authority=GenerationAuthority(None, None), apply=lambda _root: None,
         ))
         with pytest.raises(RuntimeError, match="EFFECT_PRIOR_STALE"):
-            admit(executor, value)
+            _ = admit(executor, value)
         assert_unreceived(executor)
     finally:
         executor.close()
@@ -61,21 +68,21 @@ def test_changed_or_unsafe_actual_page_is_not_admitted(tmp_path: Path, change: s
     page.parent.chmod(0o700)
     page.chmod(0o600)
     if change == "body":
-        page.write_bytes(contents + b"changed")
+        _ = page.write_bytes(contents + b"changed")
     else:
         page.unlink()
         if change == "fifo":
             os.mkfifo(page, 0o600)
         else:
             outside = tmp_path / "outside-page"
-            outside.write_bytes(contents)
+            _ = outside.write_bytes(contents)
             if change == "symlink":
                 page.symlink_to(outside)
             else:
                 os.link(outside, page)
     try:
         with pytest.raises(RuntimeError, match="EFFECT_TARGET_INVALID"):
-            admit(executor, value)
+            _ = admit(executor, value)
         assert_unreceived(executor)
     finally:
         executor.close()
@@ -86,31 +93,31 @@ def test_target_scan_expiry_and_provider_binding_fail_without_mutation(tmp_path:
     try:
         times = iter((STAMP, STAMP, STAMP + timedelta(minutes=5)))
         with pytest.raises(ValueError, match="MEMORY_CANCELLATION_INTENT_INVALID"):
-            admit(executor, value, clock=lambda: next(times))
+            _ = admit(executor, value, clock=lambda: next(times))
         assert_unreceived(executor)
         with pytest.raises(ValueError, match="CANCELLATION_PROVIDER_BINDING_INVALID"):
-            admit(executor, value, root=tmp_path / "unrelated-journal")
+            _ = admit(executor, value, root=tmp_path / "unrelated-journal")
         assert not (tmp_path / "unrelated-journal").exists()
         assert_unreceived(executor)
     finally:
         executor.close()
 
 
-def test_key_removed_during_target_scan_is_rejected(tmp_path: Path, monkeypatch):
+def test_key_removed_during_target_scan_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import sb.correction_cancellation_requests as requests
 
     executor, value, _original = prepare_unaccepted(tmp_path)
     keys = {"jarvis:current": CURRENT.public_key()}
-    verify = requests.verify_cancellation_target
+    verify = verify_cancellation_target
 
-    def verify_and_revoke(*args):
-        verify(*args)
+    def verify_and_revoke(generation: Generation, intent: CorrectionCancellationIntentV1) -> None:
+        _ = verify(generation, intent)
         keys.clear()
 
     monkeypatch.setattr(requests, "verify_cancellation_target", verify_and_revoke)
     try:
         with pytest.raises(ValueError, match="MEMORY_CANCELLATION_INTENT_INVALID"):
-            admit(executor, value, keys=keys)
+            _ = admit(executor, value, keys=keys)
         assert_unreceived(executor)
     finally:
         executor.close()
@@ -121,7 +128,9 @@ def test_admission_replay_survives_target_removal(tmp_path: Path):
     try:
         accepted, replayed = admit(executor, value)
         assert not replayed
-        assert execute(executor, accepted["intent_id"])["state"] == "generation_active"
+        intent_id = accepted["intent_id"]
+        assert isinstance(intent_id, str)
+        assert execute(executor, intent_id)["state"] == "generation_active"
         assert admit(executor, value) == (accepted, True)
     finally:
         executor.close()

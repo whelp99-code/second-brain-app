@@ -1,18 +1,20 @@
-import json
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from sb.effect_values import JsonObject, format_instant
+from sb.effect_values import JsonObject, JsonValue, format_instant
 from sb.scoped_provider_decision import validate_scoped_provider_decision
 from sb.scoped_write_request import parse_scoped_write_request
+from tests.json_fixtures import parse_object
 
 
 def material():
-    raw = json.loads((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
-    at = datetime.fromisoformat(raw["created_at"])
+    raw = parse_object((Path(__file__).parent / "fixtures/scoped_write_request_v4.json").read_text())
+    created_at = raw["created_at"]
+    assert isinstance(created_at, str)
+    at = datetime.fromisoformat(created_at)
     request = parse_scoped_write_request(raw, now=at, expected_provider="provider:fixture")
     value: JsonObject = {"kind": "current_scoped_dispatch", "outbox_id": "memout:scoped:v4:" + "a" * 64,
         "dispatch_fence": 1, "provider_instance_id": request.provider_instance_id,
@@ -32,7 +34,7 @@ def test_live_decision_is_bound_and_frozen():
 
 @pytest.mark.parametrize("mode", ["provider", "request", "scope", "outbox", "bool", "float", "overflow",
     "extra", "stale", "future", "expired", "overlong", "rewind", "naive"])
-def test_invalid_or_delayed_decision_cannot_authorize(mode):
+def test_invalid_or_delayed_decision_cannot_authorize(mode: str):
     request, at, value = material()
     started, now = at, at
     if mode == "provider":
@@ -60,7 +62,7 @@ def test_invalid_or_delayed_decision_cannot_authorize(mode):
     if mode == "naive":
         started = at.replace(tzinfo=None)
     with pytest.raises(ValueError, match="SCOPED_PROVIDER_DECISION_INVALID"):
-        validate_scoped_provider_decision(value, request, started=started, now=now)
+        _ = validate_scoped_provider_decision(value, request, started=started, now=now)
 
 
 def test_live_millisecond_decision_accepts_submillisecond_python_clock():
@@ -71,13 +73,13 @@ def test_live_millisecond_decision_accepts_submillisecond_python_clock():
 
 
 @pytest.mark.parametrize("mode", ["valid", "expired", "rewind", "stale", "denied", "transport"])
-def test_authority_reinvokes_channel_and_checks_each_response(mode):
+def test_authority_reinvokes_channel_and_checks_each_response(mode: str):
     from sb.scoped_provider_decision import create_scoped_provider_authority
 
     request, at, value = material()
-    calls = []
+    calls: list[bytes] = []
     current = [at]
-    def verify(payload):
+    def verify(payload: bytes) -> JsonValue:
         assert isinstance(payload, bytes) and payload == request.canonical
         calls.append(payload)
         if len(calls) == 1:
@@ -100,7 +102,7 @@ def test_authority_reinvokes_channel_and_checks_each_response(mode):
     current[0] += timedelta(milliseconds=1)
     if mode == "transport":
         with pytest.raises(OSError, match="channel unavailable"):
-            authorize(request)
+            _ = authorize(request)
     else:
         assert authorize(request) is (mode == "valid")
     assert len(calls) == 2
@@ -112,11 +114,11 @@ def test_submillisecond_expiry_and_rewind_are_not_rounded_away():
     for started, finished in [(at, at + timedelta(microseconds=1001)),
                              (at + timedelta(microseconds=500), at + timedelta(microseconds=499))]:
         with pytest.raises(ValueError, match="SCOPED_PROVIDER_DECISION_INVALID"):
-            validate_scoped_provider_decision(value, request, started=started, now=finished)
+            _ = validate_scoped_provider_decision(value, request, started=started, now=finished)
 
 
 @pytest.mark.parametrize("mode", ["valid", "admission_expiry", "execution_expiry"])
-def test_composed_channel_gates_real_admission_and_execution(tmp_path, mode):
+def test_composed_channel_gates_real_admission_and_execution(tmp_path: Path, mode: str):
     from sb.request_executor import RequestExecutor
     from sb.request_store import RequestStore
     from sb.scoped_provider_decision import create_scoped_provider_authority
@@ -125,8 +127,8 @@ def test_composed_channel_gates_real_admission_and_execution(tmp_path, mode):
 
     request, at, value = material()
     current = [at]
-    calls = []
-    def verify(payload):
+    calls: list[bytes] = []
+    def verify(payload: bytes) -> JsonValue:
         assert payload == request.canonical
         calls.append(payload)
         decision = dict(value)
@@ -142,7 +144,7 @@ def test_composed_channel_gates_real_admission_and_execution(tmp_path, mode):
     config = executor_config(tmp_path)
     if mode == "admission_expiry":
         with pytest.raises(ValueError, match="SCOPED_WRITE_AUTHORITY_INVALID"):
-            accept_scoped_request(config.request_root, json.loads(request.canonical),
+            _ = accept_scoped_request(config.request_root, parse_object(request.canonical),
                 expected_provider=config.provider_instance_id, clock=lambda: current[0],
                 validate_authority=authorize)
         store = RequestStore(config.request_root, scoped_v4=True)
@@ -151,7 +153,7 @@ def test_composed_channel_gates_real_admission_and_execution(tmp_path, mode):
         finally:
             store.close()
         return
-    accepted = accept_scoped_request(config.request_root, json.loads(request.canonical),
+    accepted = accept_scoped_request(config.request_root, parse_object(request.canonical),
         expected_provider=config.provider_instance_id, clock=lambda: current[0],
         validate_authority=authorize)
     executor = RequestExecutor(config, scoped_authority=authorize)

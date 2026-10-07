@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from hashlib import sha256
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Final, Protocol, override
 
 from sb.connectors.base import ItemMeta, SourceAdapter
@@ -45,8 +46,14 @@ class MarkdownVaultAdapter:
 
     accepted_adapters: Final = _MARKDOWN_ADAPTERS
 
-    def __init__(self, root: Path, source_id: str = DEFAULT_SOURCE_ID) -> None:
+    def __init__(
+        self, root: Path, source_id: str = DEFAULT_SOURCE_ID,
+        include: tuple[str, ...] = (),
+        exclude: tuple[str, ...] = (),
+    ) -> None:
         self._root: Path = root
+        self._include: tuple[str, ...] = include
+        self._exclude: tuple[str, ...] = exclude
         self.source_id: str = source_id
         self._next_cursor: str = ""
         self._fs: SafeSourceFilesystem = SafeSourceFilesystem((root,))
@@ -68,6 +75,10 @@ class MarkdownVaultAdapter:
         for entry in result.files:
             if Path(entry.relative_path).suffix.casefold() != ".md":
                 continue
+            if self._include and not _matches(entry.relative_path, self._include):
+                continue
+            if self._exclude and _matches(entry.relative_path, self._exclude):
+                continue
             body, metadata = self._fs.read_path(self._root, entry.relative_path)
             token = f"{metadata.st_mtime_ns}:{metadata.st_size}:{sha256(body).hexdigest()}"
             current[entry.relative_path] = token
@@ -84,11 +95,11 @@ class MarkdownVaultAdapter:
 
 def create(config: _ConnectorConfig) -> SourceAdapter:
     """Build the markdown-vault adapter from config, defaulting to me-wiki."""
-    source_id, root = _configured_root(config)
-    return MarkdownVaultAdapter(root=root, source_id=source_id)
+    source_id, root, include, exclude = _configured_root(config)
+    return MarkdownVaultAdapter(root=root, source_id=source_id, include=include, exclude=exclude)
 
 
-def _configured_root(config: _ConnectorConfig) -> tuple[str, Path]:
+def _configured_root(config: _ConnectorConfig) -> tuple[str, Path, tuple[str, ...], tuple[str, ...]]:
     for raw in config.source_roots:
         source_id = raw.get("id") or DEFAULT_SOURCE_ID
         adapter = raw.get("adapter") or raw.get("type") or ""
@@ -96,8 +107,35 @@ def _configured_root(config: _ConnectorConfig) -> tuple[str, Path]:
         if root_value is None or root_value == "":
             continue
         if adapter in _MARKDOWN_ADAPTERS or source_id == DEFAULT_SOURCE_ID:
-            return source_id, Path(root_value)
-    return DEFAULT_SOURCE_ID, DEFAULT_ROOT
+            include = _pattern_list(raw.get("include", ""))
+            exclude = _pattern_list(raw.get("exclude", ""))
+            if any(not _valid_pattern(pattern, require_markdown=True) for pattern in include):
+                raise MarkdownVaultError("invalid markdown include pattern")
+            if any(not _valid_pattern(pattern, require_markdown=False) for pattern in exclude):
+                raise MarkdownVaultError("invalid markdown exclude pattern")
+            return source_id, Path(root_value), include, exclude
+    return DEFAULT_SOURCE_ID, DEFAULT_ROOT, (), ()
+
+
+def _pattern_list(raw: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _valid_pattern(pattern: str, *, require_markdown: bool) -> bool:
+    if pattern.startswith("/") or ".." in PurePosixPath(pattern).parts:
+        return False
+    return not require_markdown or pattern.endswith(".md")
+
+
+def _matches(path: str, patterns: tuple[str, ...]) -> bool:
+    return any(_pattern_match(path, pattern) for pattern in patterns)
+
+
+def _pattern_match(path: str, pattern: str) -> bool:
+    if fnmatch.fnmatchcase(path, pattern):
+        return True
+    collapsed = pattern.replace("/**/", "/")
+    return collapsed != pattern and fnmatch.fnmatchcase(path, collapsed)
 
 
 def encode_source_cursor(current: dict[str, str]) -> str:

@@ -73,6 +73,7 @@ from sb.task30_barriers import (
     NoopBarrierSink,
     Task30BarrierSink,
 )
+from sb.tombstone_admission import publish_terminal_tombstones
 from sb.write_request_values import digest as write_digest
 from sb.write_request_values import parse_remember_envelope
 
@@ -734,6 +735,7 @@ class RequestExecutor:
     ) -> ApplyResult:
         observed = datetime.now(UTC) if now is None else now.astimezone(UTC)
         _ = self.mutations.maintain(observed)
+        _ = publish_terminal_tombstones(self.mutations, observed)
         _ = self._finalize_proved()
         lease = self.store.claim(worker, observed, lease_ms)
         if lease is None:
@@ -808,5 +810,10 @@ class RequestExecutor:
                     path.unlink(missing_ok=True)
                     self._fsync(path.parent)
                 self._write_receipt(final_status, code)
-                return ApplyResult(lease.request_id, "failed", phase, code, lease.fence)
-            return ApplyResult(lease.request_id, "reconciling", phase, code, lease.fence)
+                closed = ApplyResult(lease.request_id, "failed", phase, code, lease.fence)
+            else:
+                return ApplyResult(lease.request_id, "reconciling", phase, code, lease.fence)
+        # Publication runs outside the failure handler so a crash while sealing the
+        # admitted tombstone is not recorded as a second effect failure.
+        _ = publish_terminal_tombstones(self.mutations, observed)
+        return closed

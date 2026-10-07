@@ -10,8 +10,10 @@ import base64
 import re
 from hashlib import sha256
 
+from sb.effect_values import JsonInput
 from sb.life_attachments import inline
 from sb.life_contracts import SENSITIVITIES, LifeInputError
+from sb.life_json import LifePayload
 from sb.life_values import canonical_bytes, instant, text
 
 TYPES = {
@@ -32,7 +34,7 @@ TYPES = {
 }
 
 
-def phone_event(document: object) -> dict[str, object]:
+def phone_event(document: JsonInput) -> LifePayload:
     if not isinstance(document, dict):
         raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
     allowed = {
@@ -66,7 +68,8 @@ def phone_event(document: object) -> dict[str, object]:
     if re.fullmatch(r"[A-Za-z0-9._:-]+", identity) is None:
         raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
     device = text(document.get("device_id"), maximum=256)
-    event_type = TYPES.get(document.get("event_type"))
+    kind = document.get("event_type")
+    event_type = TYPES.get(kind) if isinstance(kind, str) else None
     if event_type is None or document.get("capture_mode") not in {"explicit", "share", "shortcut"}:
         raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
     occurred = instant(document.get("occurred_at"))
@@ -85,7 +88,7 @@ def phone_event(document: object) -> dict[str, object]:
         ):
             raise LifeInputError("LIFE_PHONE_URL_INVALID")
         body += "\n" + url
-    attachments = []
+    attachments: list[dict[str, str]] = []
     raw_attachments = document.get("attachment", document.get("attachments"))
     if raw_attachments is not None:
         values = raw_attachments if isinstance(raw_attachments, list) else [raw_attachments]
@@ -108,6 +111,8 @@ def phone_event(document: object) -> dict[str, object]:
                 data = base64.b64decode(encoded, validate=True)
             except (ValueError, TypeError) as exc:
                 raise LifeInputError("LIFE_ATTACHMENT_INVALID") from exc
+            if not isinstance(name, str) or not isinstance(mime, str):
+                raise LifeInputError("LIFE_ATTACHMENT_INVALID")
             item = inline(name, mime, data)
             declared = attachment.get("sha256") or attachment.get("content_sha256")
             if declared is not None and declared != item["sha256"]:
@@ -120,10 +125,37 @@ def phone_event(document: object) -> dict[str, object]:
             event_type = "audio_saved"
         elif all(a["mime"].startswith("image/") for a in attachments):
             event_type = "photo_saved"
+    metadata = document.get("metadata") or {}
     if event_type == "call_recording_imported":
         if not attachments or not all(a["mime"].startswith("audio/") for a in attachments):
             raise LifeInputError("LIFE_PHONE_CALL_AUDIO_REQUIRED")
-        body += "\n통화 분류는 사용자가 명시한 기록입니다. 전사는 별도 상태입니다."
+        if not isinstance(metadata, dict):
+            raise LifeInputError("LIFE_PHONE_EVENT_INVALID")
+        # capture_mode is the legacy declaration. An explicit false overrides it.
+        if "recording_declared" in metadata and metadata.get("recording_declared") is not True:
+            raise LifeInputError("LIFE_PHONE_RECORDING_UNDECLARED")
+        if document.get("capture_mode") not in {"explicit", "share", "shortcut"}:
+            raise LifeInputError("LIFE_PHONE_RECORDING_UNDECLARED")
+        duration = metadata.get("duration_seconds")
+        method = metadata.get("capture_method", document.get("capture_mode"))
+        if duration is not None and (type(duration) is not int or not 0 <= duration <= 86400):
+            raise LifeInputError("LIFE_PHONE_RECORDING_INVALID")
+        if method not in {"explicit", "share", "shortcut"}:
+            raise LifeInputError("LIFE_PHONE_RECORDING_INVALID")
+        primary = attachments[0]
+        body += "\n" + "\n".join(
+            (
+                "통화 분류는 사용자가 명시한 기록입니다. 전사는 별도 상태입니다.",
+                "attachment_state=untranscribed",
+                "recording_sha256=" + primary["sha256"],
+                "recording_locator=attachment:" + primary["name"],
+                "capture_method=" + str(method),
+                "occurred_at=" + occurred.isoformat(),
+                "duration_seconds=" + (str(duration) if duration is not None else "unknown"),
+                "audio_format=" + primary["mime"],
+                "transcript_revision=separate",
+            )
+        )
     # Keep the original signed/unsigned client event as DATA, never as an
     # authority for a scope, project or verified decision.
     raw = canonical_bytes(document)

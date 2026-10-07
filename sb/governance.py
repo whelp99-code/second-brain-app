@@ -12,8 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
 
+from typing_extensions import TypedDict
+
 from sb.config import Config
 from sb.security import source_policy_snapshot
+from sb.source_coverage import CoverageSnapshot, coverage_by_source, empty_coverage
 from sb.store import LedgerCorrupt, parse_page_frontmatter
 
 _HEX: Final = frozenset("0123456789abcdef")
@@ -24,6 +27,27 @@ class GovernanceError(RuntimeError):
     """Raised when an operator governance action is unsafe or unapproved."""
 
 
+class SourceStatus(TypedDict, closed=True):
+    id: str
+    adapter: str
+    root: str | None
+    root_exists: bool | None
+    llm_policy: str
+    sensitive: str
+    external_model: bool
+    coverage: CoverageSnapshot
+
+
+class RetentionSnapshot(TypedDict, closed=True):
+    raw_blobs: int
+    raw_bytes: int
+    protected_blobs: int
+    orphan_blobs: list[str]
+    orphan_count: int
+    invalid_blobs: list[str]
+    invalid_count: int
+
+
 @dataclass(frozen=True, slots=True)
 class RetentionReport:
     raw_blobs: int
@@ -32,7 +56,7 @@ class RetentionReport:
     orphan_blobs: tuple[str, ...]
     invalid_blobs: tuple[str, ...]
 
-    def as_dict(self) -> dict[str, object]:
+    def as_dict(self) -> RetentionSnapshot:
         return {
             "raw_blobs": self.raw_blobs,
             "raw_bytes": self.raw_bytes,
@@ -44,9 +68,16 @@ class RetentionReport:
         }
 
 
-def source_status(config: Config) -> tuple[dict[str, object], ...]:
-    """Return a content-free status view of configured source policies."""
-    return source_policy_snapshot(config)
+def source_status(config: Config) -> tuple[SourceStatus, ...]:
+    """Return a content-free status view of configured source policies.
+
+    Coverage counts are separate from policy fields and never include source bodies.
+    """
+    coverage = coverage_by_source(config.vault_root)
+    rows: list[SourceStatus] = []
+    for item in source_policy_snapshot(config):
+        rows.append({**item, "coverage": coverage.get(item["id"], empty_coverage())})
+    return tuple(rows)
 
 
 def retention_report(vault_root: Path | str) -> RetentionReport:

@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import TypeAdapter
+
 from sb.config import Config
 from sb.generation_runtime import GenerationMutationService
 from sb.ops import doctor
@@ -12,7 +14,7 @@ NOW = datetime(2026, 9, 10, tzinfo=UTC)
 ORPHAN = "sbgen:v1:" + "ab" * 32
 
 
-def _config(tmp_path: Path) -> Config:
+def config(tmp_path: Path) -> Config:
     share = tmp_path / "share"
     return Config(
         raw={
@@ -27,12 +29,15 @@ def _config(tmp_path: Path) -> Config:
     )
 
 
+_config = config
+
+
 def test_remember_does_not_prove_non_current_activated_orphans(tmp_path: Path) -> None:
     mutations = GenerationMutationService.from_config(_config(tmp_path))
     try:
-        mutations.remember("first", "one", NOW)
-        mutations.remember("second", "two", NOW)
-        mutations.store.journal.execute(
+        _ = mutations.remember("first", "one", NOW)
+        _ = mutations.remember("second", "two", NOW)
+        _ = mutations.store.journal.execute(
             """
             INSERT INTO activations(
               generation_id, parent_generation_id, phase, manifest_digest,
@@ -42,15 +47,15 @@ def test_remember_does_not_prove_non_current_activated_orphans(tmp_path: Path) -
             (ORPHAN, "c" * 64, NOW.isoformat(), NOW.isoformat()),
         )
         mutations.store.journal.commit()
-        mutations.remember("third", "three", NOW)
-        phase = mutations.store.journal.execute(
+        _ = mutations.remember("third", "three", NOW)
+        phase = TypeAdapter[tuple[str] | None](tuple[str] | None).validate_python(mutations.store.journal.execute(
             "SELECT phase FROM activations WHERE generation_id=?",
             (ORPHAN,),
-        ).fetchone()
-        current = mutations.store.journal.execute(
+        ).fetchone(), strict=True)
+        current = TypeAdapter[tuple[str] | None](tuple[str] | None).validate_python(mutations.store.journal.execute(
             "SELECT phase FROM activations WHERE generation_id=?",
             (mutations.store.active().generation_id,),
-        ).fetchone()
+        ).fetchone(), strict=True)
     finally:
         mutations.close()
     assert phase is not None
@@ -63,9 +68,9 @@ def test_doctor_warns_on_non_current_activated_orphans(tmp_path: Path) -> None:
     config = _config(tmp_path)
     mutations = GenerationMutationService.from_config(config)
     try:
-        mutations.remember("first", "one", NOW)
-        mutations.remember("second", "two", NOW)
-        mutations.store.journal.execute(
+        _ = mutations.remember("first", "one", NOW)
+        _ = mutations.remember("second", "two", NOW)
+        _ = mutations.store.journal.execute(
             """
             INSERT INTO activations(
               generation_id, parent_generation_id, phase, manifest_digest,
@@ -85,8 +90,8 @@ def test_doctor_passes_without_activated_orphans(tmp_path: Path) -> None:
     config = _config(tmp_path)
     mutations = GenerationMutationService.from_config(config)
     try:
-        mutations.remember("first", "one", NOW)
-        mutations.remember("second", "two", NOW)
+        _ = mutations.remember("first", "one", NOW)
+        _ = mutations.remember("second", "two", NOW)
     finally:
         mutations.close()
     checks = {check.name: check for check in doctor(config)}
