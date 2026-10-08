@@ -41,7 +41,6 @@ class ExportPublisher:
         if (
             not stat.S_ISDIR(metadata.st_mode)
             or metadata.st_uid != os.getuid()
-            or metadata.st_nlink < 2
         ):
             raise ExportError("EXPORT_ROOT_UNSAFE")
         root.chmod(0o700)
