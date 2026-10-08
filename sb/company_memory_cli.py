@@ -12,12 +12,13 @@ from pathlib import Path
 from typing import Literal, cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from sb.company_memory import CompanyMemoryError, CompanyMemoryStore
 from sb.company_memory_authority import (
     CompanyAuthorityContext,
     CompanyAuthorityRejected,
+    CompanyKeyScope,
     CompanyMemoryAuthorityV1,
     canonical_workspace_id,
     verify_company_authority,
@@ -52,6 +53,7 @@ class CompanyCliConfigV1(ClosedModel):
     deletion_set_root: str
     trusted_keys: dict[str, str]
     source_profile: CompanySourceProfile | None = None
+    key_scopes: dict[str, CompanyKeyScope] = Field(default_factory=dict)
 
 
 def _object(value: JsonValue, code: str) -> JsonObject:
@@ -62,9 +64,12 @@ def _object(value: JsonValue, code: str) -> JsonObject:
 
 def _load_config(path: Path) -> CompanyCliConfigV1:
     try:
-        return CompanyCliConfigV1.model_validate(
+        config = CompanyCliConfigV1.model_validate(
             _object(strict_loads(path.read_bytes(), _MAX_CONFIG), "COMPANY_CONFIG_INVALID")
         )
+        if not config.key_scopes.keys() <= config.trusted_keys.keys():
+            raise CompanyMemoryError("COMPANY_CONFIG_INVALID")
+        return config
     except (OSError, ValueError, ValidationError, CanonicalValueError) as exc:
         raise CompanyMemoryError("COMPANY_CONFIG_INVALID") from exc
 
@@ -156,7 +161,8 @@ def run(config_path: Path, raw_request: bytes, *, now: datetime | None = None) -
     authority, authority_value, arguments = _request(raw_request, config.source_profile is not None)
     instant = now or datetime.now(UTC)
     verified, current = verify_company_authority(
-        authority_value, arguments, _trusted_keys(config.trusted_keys), context, instant
+        authority_value, arguments, _trusted_keys(config.trusted_keys), context, instant,
+        key_scopes=config.key_scopes,
     )
     if verified != authority:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED")

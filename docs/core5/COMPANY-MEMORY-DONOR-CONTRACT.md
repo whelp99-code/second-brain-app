@@ -24,6 +24,32 @@ The closed config has schema version 1 and these mandatory fields:
 
 Removing a key revokes it. The config is trusted operator state; request values are never copied into expected context.
 
+Optional `key_scopes` restricts individual signing-key IDs in `trusted_keys`.
+A Mail receive-only entry is:
+
+```json
+{
+  "key_scopes": {
+    "mail-ms-key": {
+      "operations": ["receive"],
+      "source_systems": ["mail"]
+    }
+  }
+}
+```
+
+Both lists must be nonempty, and every scoped ID must exist in `trusted_keys`.
+Keys absent from `key_scopes` retain the existing operation behavior. Restrictions
+are operator configuration, not fields the signer can override in its request.
+After signature/context verification, unauthorized operations fail with
+`COMPANY_KEY_OPERATION_DENIED`; receive from another source system fails with
+`COMPANY_KEY_SOURCE_DENIED`, before source resolution or database access.
+Source-profile bindings still pin the exact permitted original reference.
+Accept, reject and mark-processed remain separate authorized operations; the
+Mail key cannot invoke them or replay their old receipts. Unsupported `confirm`
+or `update` operations remain invalid under the closed authority schema
+(`COMPANY_AUTHORITY_REQUIRED`). No confirmation endpoint or key is provisioned.
+
 An operator may opt into keys-only receive requests with `source_profile`:
 
 - `schema_version`: `1`;
