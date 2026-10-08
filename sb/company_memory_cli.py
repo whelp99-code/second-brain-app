@@ -22,6 +22,7 @@ from sb.company_memory_authority import (
     canonical_workspace_id,
     verify_company_authority,
 )
+from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
 from sb.effect_values import (
     CanonicalValueError,
     JsonObject,
@@ -50,6 +51,7 @@ class CompanyCliConfigV1(ClosedModel):
     deletion_sequence: int
     deletion_set_root: str
     trusted_keys: dict[str, str]
+    source_profile: CompanySourceProfile | None = None
 
 
 def _object(value: JsonValue, code: str) -> JsonObject:
@@ -60,7 +62,9 @@ def _object(value: JsonValue, code: str) -> JsonObject:
 
 def _load_config(path: Path) -> CompanyCliConfigV1:
     try:
-        return CompanyCliConfigV1.model_validate(_object(strict_loads(path.read_bytes(), _MAX_CONFIG), "COMPANY_CONFIG_INVALID"))
+        return CompanyCliConfigV1.model_validate(
+            _object(strict_loads(path.read_bytes(), _MAX_CONFIG), "COMPANY_CONFIG_INVALID")
+        )
     except (OSError, ValueError, ValidationError, CanonicalValueError) as exc:
         raise CompanyMemoryError("COMPANY_CONFIG_INVALID") from exc
 
@@ -99,14 +103,14 @@ def _trusted_keys(values: dict[str, str]) -> dict[str, Ed25519PublicKey]:
     return result
 
 
-def _validate_arguments(operation: str, arguments: JsonObject) -> None:
+def _validate_arguments(operation: str, arguments: JsonObject, keys_only: bool) -> None:
     expected = {"candidate_id"}
     if operation == "receive":
         expected |= {
             "source_system",
             "source_locator",
             "source_event_id",
-            "content",
+            "content_digest" if keys_only else "content",
             "parser_version",
             "locator",
         }
@@ -116,7 +120,10 @@ def _validate_arguments(operation: str, arguments: JsonObject) -> None:
         raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
 
 
-def _request(raw: bytes) -> tuple[CompanyMemoryAuthorityV1, JsonObject, JsonObject]:
+def _request(
+    raw: bytes,
+    keys_only: bool,
+) -> tuple[CompanyMemoryAuthorityV1, JsonObject, JsonObject]:
     envelope = _object(strict_loads(raw, _MAX_REQUEST), "COMPANY_REQUEST_INVALID")
     if set(envelope) != {"authority", "arguments"}:
         raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
@@ -126,7 +133,7 @@ def _request(raw: bytes) -> tuple[CompanyMemoryAuthorityV1, JsonObject, JsonObje
         authority = CompanyMemoryAuthorityV1.model_validate(authority_value)
     except ValidationError as exc:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED") from exc
-    _validate_arguments(authority.operation, arguments)
+    _validate_arguments(authority.operation, arguments, keys_only)
     return authority, authority_value, arguments
 
 
@@ -146,13 +153,22 @@ def run(config_path: Path, raw_request: bytes, *, now: datetime | None = None) -
         config.deletion_sequence,
         config.deletion_set_root,
     )
-    authority, authority_value, arguments = _request(raw_request)
+    authority, authority_value, arguments = _request(raw_request, config.source_profile is not None)
     instant = now or datetime.now(UTC)
     verified, current = verify_company_authority(
         authority_value, arguments, _trusted_keys(config.trusted_keys), context, instant
     )
     if verified != authority:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED")
+    if authority.operation == "receive" and config.source_profile is not None:
+        arguments = {
+            **arguments,
+            "content": resolve_company_source(
+                config.source_profile,
+                arguments,
+                config.personal_data_roots,
+            ),
+        }
     store = CompanyMemoryStore(database)
     try:
         receipt = store.execute(

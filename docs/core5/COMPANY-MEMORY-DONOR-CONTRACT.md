@@ -24,6 +24,26 @@ The closed config has schema version 1 and these mandatory fields:
 
 Removing a key revokes it. The config is trusted operator state; request values are never copied into expected context.
 
+An operator may opt into keys-only receive requests with `source_profile`:
+
+- `schema_version`: `1`;
+- `source_roots`: nonempty absolute company source directories;
+- `bindings`: exact `source_locator` to `path`, `source_system`,
+  `source_event_id`, `parser_version`, and `content_digest`.
+
+Each binding pins a retained UTF-8 original and its SHA-256 digest. Receive
+arguments use `content_digest` instead of `content`; other receive fields
+stay unchanged. Signature verification covers the keys-only arguments before
+source resolution, and the receipt preserves their request digest. Inline
+receive requests are refused when this profile is configured.
+
+Unregistered references, mismatched metadata/digests, personal paths, paths
+outside company roots, symlink files, missing sources, non-UTF-8 bytes and
+sources over 1 MiB fail before opening the company database. Source roots and
+bindings are trusted operator configuration, not donor-supplied fields.
+Successful receive creates only a candidate; it does not confirm it.
+This profile neither provisions authority nor enables a Mail outbox tick.
+
 ## Request
 
 The envelope has exactly `authority` and `arguments`. Encoding is canonical UTF-8 JSON as implemented by `sb.effect_values.canonical_bytes`.
