@@ -142,7 +142,6 @@ def _private_directory(path: Path) -> None:
     if (
         not stat.S_ISDIR(metadata.st_mode)
         or metadata.st_uid != os.getuid()
-        or metadata.st_nlink < 2
     ):
         raise GenerationError("GENERATION_ROOT_UNSAFE")
     path.chmod(0o700)

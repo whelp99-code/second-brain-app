@@ -1,17 +1,83 @@
 from __future__ import annotations
 
 import os
+import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 import pytest
 
-from sb.generations import Generation, GenerationError, GenerationStore
+from sb.generations import (
+    Generation,
+    GenerationError,
+    GenerationStore,
+    _private_directory,
+    _regular_files,
+)
 from sb.request_store import RequestStore
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 ROOT = "sha256:" + "0" * 64
+
+
+def test_private_directory_accepts_single_link_and_enforces_private_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "state"
+    root.mkdir(mode=0o777)
+    root.chmod(0o777)
+    original_stat = Path.stat
+    inspected = []
+
+    def single_link(path: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+        metadata = original_stat(path, follow_symlinks=follow_symlinks)
+        if path == root and not follow_symlinks:
+            inspected.append(path)
+            fields = list(metadata)
+            fields[3] = 1
+            return os.stat_result(fields)
+        return metadata
+
+    monkeypatch.setattr(Path, "stat", single_link)
+    _private_directory(root)
+    assert inspected == [root]
+    assert stat.S_IMODE(original_stat(root).st_mode) == 0o700
+
+
+@pytest.mark.parametrize("kind", ["symlink", "file", "foreign_uid", "chmod_failure"])
+def test_private_directory_preserves_security_rejections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str,
+) -> None:
+    root = tmp_path / "state"
+    if kind == "symlink":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        root.symlink_to(outside, target_is_directory=True)
+    elif kind == "file":
+        root.write_text("not a directory")
+    else:
+        root.mkdir()
+    if kind == "foreign_uid":
+        owner = root.stat().st_uid
+        monkeypatch.setattr(os, "getuid", lambda: owner + 1)
+    if kind == "chmod_failure":
+        def denied(path: Path, mode: int, *, follow_symlinks: bool = True) -> None:
+            raise PermissionError("private mode cannot be enforced")
+        monkeypatch.setattr(Path, "chmod", denied)
+    error = FileExistsError if kind == "file" else PermissionError if kind == "chmod_failure" else GenerationError
+    with pytest.raises(error):
+        _private_directory(root)
+
+
+def test_generation_surface_rejects_regular_file_hardlinks(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    (root / "wiki").mkdir(parents=True)
+    page = root / "wiki/page.md"
+    page.write_text("approved fixture")
+    os.link(page, tmp_path / "outside.md")
+    with pytest.raises(GenerationError, match="GENERATION_SURFACE_UNSAFE"):
+        _regular_files(root, include_derived=False)
 
 
 def build_generation(

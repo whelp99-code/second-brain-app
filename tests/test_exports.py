@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import stat
 import subprocess
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
@@ -17,6 +19,87 @@ from sb.request_store import RequestStore
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 RECORD = "approved export record"
 ROOT = "sha256:" + "0" * 64
+
+
+def test_export_root_accepts_single_link_and_enforces_private_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    root = tmp_path / "exports"
+    root.mkdir()
+    root.chmod(0o777)
+    original_stat = Path.stat
+    inspected = []
+
+    def single_link(path: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+        metadata = original_stat(path, follow_symlinks=follow_symlinks)
+        if path == root and not follow_symlinks:
+            inspected.append(path)
+            fields = list(metadata)
+            fields[3] = 1
+            return os.stat_result(fields)
+        return metadata
+
+    monkeypatch.setattr(Path, "stat", single_link)
+    try:
+        ExportPublisher(root, "a" * 40, requests.exports)
+        assert inspected == [root]
+        assert stat.S_IMODE(original_stat(root).st_mode) == 0o700
+    finally:
+        requests.close()
+
+
+@pytest.mark.parametrize("kind", ["symlink", "file", "foreign_uid", "chmod_failure"])
+def test_export_root_preserves_security_rejections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    root = tmp_path / "exports"
+    if kind == "symlink":
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        root.symlink_to(outside, target_is_directory=True)
+    elif kind == "file":
+        root.write_text("not a directory")
+    else:
+        root.mkdir()
+    if kind == "foreign_uid":
+        owner = root.stat().st_uid
+        monkeypatch.setattr(os, "getuid", lambda: owner + 1)
+    if kind == "chmod_failure":
+        def denied(path: Path, mode: int, *, follow_symlinks: bool = True) -> None:
+            raise PermissionError("private mode cannot be enforced")
+        monkeypatch.setattr(Path, "chmod", denied)
+    error = FileExistsError if kind == "file" else PermissionError if kind == "chmod_failure" else ExportError
+    try:
+        with pytest.raises(error):
+            ExportPublisher(root, "a" * 40, requests.exports)
+    finally:
+        requests.close()
+
+
+@pytest.mark.parametrize("tamper", ["hardlink", "symlink", "mode"])
+def test_export_regular_file_security_checks_remain_enforced(tmp_path: Path, tamper: str) -> None:
+    store, generation = _generation(tmp_path)
+    request = _request(generation)
+    requests = RequestStore(tmp_path / "requests")
+    publisher = ExportPublisher(tmp_path / "exports", "a" * 40, requests.exports)
+    try:
+        publisher.publish(ExportPublication(request, generation, NOW, lambda: (0, ROOT), 1))
+        data = publisher.root / request.request_id / "memory.json"
+        if tamper == "hardlink":
+            os.link(data, tmp_path / "outside.json")
+        elif tamper == "symlink":
+            outside = tmp_path / "outside.json"
+            data.rename(outside)
+            data.symlink_to(outside)
+        else:
+            data.chmod(0o644)
+        with pytest.raises(ExportError, match="EXPORT_ROOT_UNSAFE"):
+            publisher.validate(NOW)
+    finally:
+        store.close()
+        requests.close()
 
 
 def _generation(tmp_path: Path) -> tuple[GenerationStore, Generation]:
