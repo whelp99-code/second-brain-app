@@ -70,6 +70,52 @@ bindings are trusted operator configuration, not donor-supplied fields.
 Successful receive creates only a candidate; it does not confirm it.
 This profile neither provisions authority nor enables a Mail outbox tick.
 
+## Producer source registration
+
+Mail registers its retained original before invoking the keys-only receive:
+
+```bash
+sb-company register-source --config /absolute/path/company-memory-config.json < registration.json
+```
+
+`registration.json` is canonical JSON with exactly `authority`, `arguments`,
+and `content`. Authority and arguments are the usual signed **keys-only receive**
+envelope; `content` is the original UTF-8 text. Its exact bytes must match the
+signed `arguments.content_digest`. No filename or source-root path is accepted
+from Mail. Graph messages use their Graph ID as source locator/event ID and
+`mail:company-memory:2` as parser version.
+
+Registration requires an existing trusted key explicitly scoped to
+`operations=["receive"]`, `source_systems=["mail"]`, plus the matching current
+authority context. Unscoped or broader keys fail with
+`COMPANY_SOURCE_REGISTRATION_DENIED`. Other-source and other-operation errors
+retain their existing codes. No key is provisioned or replaced.
+
+The caller needs read access to the existing authority/signer and write access
+to the private config directory and company database parent directory. The
+command serializes registrations on the config directory, reloads and verifies
+the trusted config under that lock, retains originals under
+`<company_database parent>/sources/<SHA256 hex>.txt` (directory `0700`, file
+`0600`), and atomically publishes the updated canonical config (`0600`). These
+paths must be transferred with the existing company config and keys during
+host migration; no host IP or hostname is part of the config.
+
+Success returns `{"registration":{"state":"registered","source_locator":"...",
+"content_digest":"sha256:..."}}`, not a candidate receipt. Registration creates
+no company database or candidate and has no confirmation path. Mail then sends
+the unchanged `authority`/`arguments` envelope through normal `sb-company`
+receive, which can create only a candidate with this key.
+
+Exact replay preserves the original file. Rebinding an existing locator fails
+with `COMPANY_SOURCE_BINDING_CONFLICT`; body/digest or retained-original mismatch
+fails with `COMPANY_SOURCE_BINDING_MISMATCH`. Symlinks, nonprivate source
+directories/files and foreign owners are refused. Originals are flushed and
+published before their bindings. An interrupted config publication can leave
+an unreferenced original, never a binding to a partial file; replay completes
+registration without replacing it. Originals are never deleted.
+The existing 64 KiB config and 1 MiB request limits apply. A registration that
+would exceed the config limit is refused before storing its original.
+
 ## Request
 
 The envelope has exactly `authority` and `arguments`. Encoding is canonical UTF-8 JSON as implemented by `sb.effect_values.canonical_bytes`.
