@@ -836,8 +836,15 @@ def _prepare_adapter_ingest(
     errors = attempted = written = 0
     unchanged = filtered = quarantined = deferred = retryable = permanent = 0
     capped = adapter_failed = False
+    source_unavailable = False
     stamp = format_instant(datetime.now(UTC))
     for ref, data, meta in items:
+        if meta.get("skip_reason") == "source-unavailable":
+            errors += 1
+            attempted += 1
+            adapter_failed = source_unavailable = True
+            failure = failure or f"SOURCE_UNAVAILABLE: {adapter.source_id}"
+            break
         # A source configuration hold is not a deduplicated/quarantined item.
         # Recheck it on every run, even if older versions recorded a skip row.
         if meta.get("skip_reason") == "ambiguous-session-roots":
@@ -957,7 +964,9 @@ def _prepare_adapter_ingest(
         allocated_units.update(unit.unit_id for unit in new_units)
         version_keys.append(version_key)
         accepted.add(version_key)
-        if units or not data:
+        if parsed is None:
+            quarantined += 1
+        elif units or not data:
             written += 1
     advance = not capped and not adapter_failed and (version_keys or attempted == 0)
     cursor: tuple[str, str] | None = None
@@ -966,7 +975,9 @@ def _prepare_adapter_ingest(
         cursor = (adapter.next_cursor(), datetime.now(UTC).isoformat())
     accepted_count = written
     scanned = accepted_count + unchanged + filtered + quarantined + deferred + retryable + permanent
-    state = "ok" if advance else "partial"
+    state = "unavailable" if source_unavailable else (
+        "ok" if advance else "partial"
+    )
     receipt = _scan_receipt_row(
         run_id,
         adapter.source_id,
@@ -1016,6 +1027,12 @@ def _note_source_unavailable(
                 ),
             )
         )
+        checkpoint = ledger.get_cursor(source_id)
+        receipt = _scan_receipt_row(
+            run_id, source_id, format_instant(datetime.now(UTC)), "unavailable",
+            checkpoint, checkpoint, 0, 0, 0, 0, 0, 0, 0, 0,
+        )
+        ledger.insert_scan_receipt(receipt)
     _append_run_log(root, f"SOURCE_UNAVAILABLE: {source_id}: {code}")
 
 

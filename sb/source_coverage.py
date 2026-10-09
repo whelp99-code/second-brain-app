@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Mapping, Sequence
 from contextlib import closing
+from hashlib import sha256
 from pathlib import Path
 from typing import Final
 
@@ -44,6 +45,20 @@ _RECEIPT_COLUMNS: tuple[str, ...] = (
 )
 
 
+class ScanSummary(TypedDict, closed=True):
+    scan_id: str
+    state: str
+    accepted: int
+    unchanged: int
+    filtered: int
+    quarantined: int
+    deferred: int
+    retryable_errors: int
+    permanent_errors: int
+    checkpoint_before_sha256: str | None
+    checkpoint_after_sha256: str | None
+
+
 class CoverageSnapshot(TypedDict, closed=True):
     captured: int
     parsed: int
@@ -55,6 +70,8 @@ class CoverageSnapshot(TypedDict, closed=True):
     scanned: int
     last_state: str | None
     exhausted: bool
+    last_scan: ScanSummary | None
+    stage_counts_measured: bool
 
 
 def record_scan_receipt(ledger: Ledger, receipt: ScanReceiptV1, *, cursor_updated_at: str) -> None:
@@ -94,6 +111,8 @@ def list_scan_receipts(ledger: Ledger, source_id: str | None = None) -> tuple[Sc
 def assemble_coverage(
     receipts: Sequence[ScanReceiptV1],
     coverage: SourceCoverage,
+    *,
+    stage_counts_measured: bool = True,
 ) -> CoverageSnapshot:
     """Expose stage measures separately from scan accepted/exhausted."""
     last = receipts[-1] if receipts else None
@@ -109,6 +128,22 @@ def assemble_coverage(
         "scanned": sum(item.scanned for item in receipts),
         "last_state": None if last is None else last.state,
         "exhausted": False if last is None else last.exhausted,
+        "stage_counts_measured": stage_counts_measured,
+        "last_scan": None if last is None else {
+            "scan_id": last.scan_id,
+            "state": last.state,
+            "accepted": last.accepted,
+            "unchanged": last.unchanged,
+            "filtered": last.filtered,
+            "quarantined": last.quarantined,
+            "deferred": last.deferred,
+            "retryable_errors": last.retryable_errors,
+            "permanent_errors": last.permanent_errors,
+            "checkpoint_before_sha256": None if last.checkpoint_before is None else
+                sha256(last.checkpoint_before.encode()).hexdigest(),
+            "checkpoint_after_sha256": None if last.checkpoint_after is None else
+                sha256(last.checkpoint_after.encode()).hexdigest(),
+        },
     }
 
 
@@ -134,13 +169,14 @@ def coverage_by_source(vault_root: Path | str) -> dict[str, CoverageSnapshot]:
         source_id: assemble_coverage(
             receipts.get(source_id, ()),
             stages.get(source_id, SourceCoverage(0, 0, 0, 0, 0)),
+            stage_counts_measured=source_id in stages,
         )
         for source_id in source_ids
     }
 
 
 def empty_coverage() -> CoverageSnapshot:
-    return assemble_coverage((), SourceCoverage(0, 0, 0, 0, 0))
+    return assemble_coverage((), SourceCoverage(0, 0, 0, 0, 0), stage_counts_measured=False)
 
 
 def receipt_params(receipt: ScanReceiptV1) -> tuple[str | int | None, ...]:

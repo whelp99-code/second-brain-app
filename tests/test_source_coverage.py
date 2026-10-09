@@ -9,6 +9,7 @@ import pytest
 from sb.personal_observation import ScanReceiptV1, parse_scan_receipt
 from sb.source_coverage import (
     assemble_coverage,
+    coverage_by_source,
     list_scan_receipts,
     record_scan_receipt,
     set_stage_coverage,
@@ -60,6 +61,17 @@ def test_scan_receipt_recorded_in_same_transaction_as_cursor(tmp_path: Path) -> 
         record_scan_receipt(ledger, receipt, cursor_updated_at=_AT)
         assert ledger.get_cursor("mail") == "cursor-2"
         assert list_scan_receipts(ledger, "mail") == (receipt,)
+
+
+def test_scan_without_stage_measurement_is_not_measured_zero(tmp_path: Path) -> None:
+    receipt = _receipt(scanned=2, accepted=2)
+    with Ledger(tmp_path) as ledger:
+        record_scan_receipt(ledger, receipt, cursor_updated_at=_AT)
+
+    view = coverage_by_source(tmp_path)["mail"]
+
+    assert view["accepted"] == 2
+    assert view["stage_counts_measured"] is False
 
 
 def test_unchanged_scan_creates_ok_receipt_with_zero_accepted(tmp_path: Path) -> None:
