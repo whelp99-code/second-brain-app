@@ -1,0 +1,12 @@
+[Unit]
+Description=Second Brain signed Mail candidate reader socket
+
+[Socket]
+ListenStream=/var/lib/jarvis-svc/spool/second-brain/company-reader.sock
+Accept=yes
+SocketMode=0660
+RemoveOnStop=true
+MaxConnections=16
+
+[Install]
+WantedBy=sockets.target

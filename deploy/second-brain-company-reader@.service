@@ -1,0 +1,13 @@
+[Unit]
+Description=Second Brain signed Mail candidate reader connection %i
+CollectMode=inactive-or-failed
+
+[Service]
+Type=simple
+StandardInput=socket
+StandardOutput=socket
+StandardError=socket
+ExecStart=%h/.local/state/second-brain/app/current/bin/sb-company candidates --config %h/.config/second-brain/company-memory/jarvis-reader/config.json
+RuntimeMaxSec=15
+TimeoutStopSec=5
+UMask=0077

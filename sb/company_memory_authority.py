@@ -19,7 +19,9 @@ from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
 
-type CompanyOperation = Literal["receive", "read", "accept", "reject", "mark_processed"]
+type CompanyOperation = Literal[
+    "receive", "read", "accept", "reject", "mark_processed", "list_candidates",
+]
 type CompanyPurpose = Literal[
     "company_memory_receive",
     "company_memory_read",
@@ -38,6 +40,7 @@ _PURPOSE: dict[CompanyOperation, CompanyPurpose] = {
     "accept": "company_memory_accept",
     "reject": "company_memory_reject",
     "mark_processed": "company_memory_process",
+    "list_candidates": "company_memory_read",
 }
 
 
