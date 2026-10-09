@@ -6,6 +6,7 @@ import argparse
 import base64
 import os
 import sys
+from contextlib import nullcontext
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from sb.company_memory_authority import (
     canonical_workspace_id,
     verify_company_authority,
 )
+from sb.company_memory_registration import register_original, registration_lock
 from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
 from sb.effect_values import (
     CanonicalValueError,
@@ -32,6 +34,7 @@ from sb.effect_values import (
     strict_loads,
 )
 from sb.effect_write_models import ClosedModel
+from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
 
 _MAX_CONFIG = 65_536
@@ -142,7 +145,25 @@ def _request(
     return authority, authority_value, arguments
 
 
-def run(config_path: Path, raw_request: bytes, *, now: datetime | None = None) -> JsonObject:
+def run(
+    config_path: Path,
+    raw_request: bytes,
+    *,
+    now: datetime | None = None,
+    register_source: bool = False,
+) -> JsonObject:
+    """Serialize registrations before reading trusted config; legacy calls stay read-only."""
+    with registration_lock(config_path) if register_source else nullcontext():
+        return _run(config_path, raw_request, now=now, register_source=register_source)
+
+
+def _run(
+    config_path: Path,
+    raw_request: bytes,
+    *,
+    now: datetime | None,
+    register_source: bool,
+) -> JsonObject:
     config = _load_config(config_path)
     database = _database_path(config)
     _ = canonical_workspace_id(config.workspace_id)
@@ -158,7 +179,21 @@ def run(config_path: Path, raw_request: bytes, *, now: datetime | None = None) -
         config.deletion_sequence,
         config.deletion_set_root,
     )
-    authority, authority_value, arguments = _request(raw_request, config.source_profile is not None)
+    content = ""
+    if register_source:
+        envelope = _object(strict_loads(raw_request, _MAX_REQUEST), "COMPANY_REQUEST_INVALID")
+        if set(envelope) != {"authority", "arguments", "content"}:
+            raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
+        payload = envelope["content"]
+        if not isinstance(payload, str):
+            raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
+        content = payload
+        raw_request = canonical_bytes({
+            "authority": envelope["authority"], "arguments": envelope["arguments"],
+        })
+    authority, authority_value, arguments = _request(
+        raw_request, register_source or config.source_profile is not None,
+    )
     instant = now or datetime.now(UTC)
     verified, current = verify_company_authority(
         authority_value, arguments, _trusted_keys(config.trusted_keys), context, instant,
@@ -166,6 +201,19 @@ def run(config_path: Path, raw_request: bytes, *, now: datetime | None = None) -
     )
     if verified != authority:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED")
+    if register_source:
+        key_scope = config.key_scopes.get(authority.signing_key_id)
+        if (
+            authority.operation != "receive"
+            or key_scope is None
+            or key_scope.operations != ["receive"]
+            or key_scope.source_systems != ["mail"]
+        ):
+            raise CompanyAuthorityRejected("COMPANY_SOURCE_REGISTRATION_DENIED")
+        return register_original(
+            config_path, model_object(config), database, config.source_profile,
+            arguments, content, _MAX_CONFIG, config.personal_data_roots,
+        )
     if authority.operation == "receive" and config.source_profile is not None:
         arguments = {
             **arguments,
@@ -193,12 +241,15 @@ def run(config_path: Path, raw_request: bytes, *, now: datetime | None = None) -
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sb-company")
+    _ = parser.add_argument("action", nargs="?", choices=["register-source"])
     _ = parser.add_argument("--config", type=Path, required=True)
     args = parser.parse_args(argv)
     config_path = cast(Path, args.config)
     previous_umask = os.umask(0o077)
     try:
-        result = run(config_path, sys.stdin.buffer.read())
+        result = run(
+            config_path, sys.stdin.buffer.read(), register_source=args.action is not None,
+        )
         _ = sys.stdout.buffer.write(canonical_bytes(result) + b"\n")
         return 0
     except (CompanyMemoryError, CompanyAuthorityRejected, CanonicalValueError, ValueError) as exc:
