@@ -11,7 +11,7 @@ from typing import Literal
 from uuid import UUID
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from sb.delegations import verify_signed_object
 from sb.effect_values import JsonObject, JsonValue, canonical_bytes, parse_instant
@@ -43,6 +43,13 @@ _PURPOSE: dict[CompanyOperation, CompanyPurpose] = {
 
 class CompanyAuthorityRejected(ValueError):
     pass
+
+
+class CompanyKeyScope(ClosedModel):
+    """Trusted per-key restrictions, never supplied by the signed request."""
+
+    operations: list[CompanyOperation] = Field(min_length=1)
+    source_systems: list[str] = Field(min_length=1)
 
 
 class CompanyMemoryAuthorityV1(ClosedModel):
@@ -104,6 +111,8 @@ def verify_company_authority(
     keys: Mapping[str, Ed25519PublicKey | bytes],
     context: CompanyAuthorityContext,
     now: datetime,
+    *,
+    key_scopes: Mapping[str, CompanyKeyScope] | None = None,
 ) -> tuple[CompanyMemoryAuthorityV1, SourceAccess]:
     """Verify one operation against trusted current context and key set."""
     try:
@@ -158,6 +167,12 @@ def verify_company_authority(
         verify_signed_object(
             model_object(claim), key, _AUTHORITY_DOMAIN, "COMPANY_AUTHORITY_REQUIRED"
         )
-        return claim, scope
     except (ValueError, TypeError, ValidationError) as exc:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED") from exc
+    key_scope = key_scopes.get(claim.signing_key_id) if key_scopes is not None else None
+    if key_scope is not None:
+        if claim.operation not in key_scope.operations:
+            raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
+        if claim.operation == "receive" and arguments.get("source_system") not in key_scope.source_systems:
+            raise CompanyAuthorityRejected("COMPANY_KEY_SOURCE_DENIED")
+    return claim, scope
