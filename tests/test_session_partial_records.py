@@ -20,7 +20,9 @@ def test_incomplete_last_record_is_recovered_once_after_restart(tmp_path: Path, 
     _ = path.write_bytes(prefix + encoded[:split])
     factory = ClaudeSessionsAdapter if kind == "claude" else CodexSessionsAdapter
     first = factory((tmp_path,), "fixture")
-    assert list(first.scan(None)) == []
+    pending = list(first.scan(None))
+    assert [meta.get("skip_reason") for _, _, meta in pending] == ["incomplete-session-file"]
+    assert not any(body for _, body, _ in pending)
     cursor = first.next_cursor()
     assert json.loads(cursor)["session.jsonl"] == len(prefix)
     with path.open("ab") as output:
