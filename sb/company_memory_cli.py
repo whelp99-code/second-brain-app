@@ -24,6 +24,7 @@ from sb.company_memory_authority import (
     canonical_workspace_id,
     verify_company_authority,
 )
+from sb.company_memory_reader import list_mail_candidates
 from sb.company_memory_registration import register_original, registration_lock
 from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
 from sb.effect_values import (
@@ -112,6 +113,16 @@ def _trusted_keys(values: dict[str, str]) -> dict[str, Ed25519PublicKey]:
 
 
 def _validate_arguments(operation: str, arguments: JsonObject, keys_only: bool) -> None:
+    if operation == "list_candidates":
+        if (
+            set(arguments) != {"limit", "offset"}
+            or type(arguments["limit"]) is not int
+            or type(arguments["offset"]) is not int
+            or not 1 <= arguments["limit"] <= 1000
+            or not 0 <= arguments["offset"] <= 2**63 - 1
+        ):
+            raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
+        return
     expected = {"candidate_id"}
     if operation == "receive":
         expected |= {
@@ -151,10 +162,14 @@ def run(
     *,
     now: datetime | None = None,
     register_source: bool = False,
+    candidates_only: bool = False,
 ) -> JsonObject:
     """Serialize registrations before reading trusted config; legacy calls stay read-only."""
     with registration_lock(config_path) if register_source else nullcontext():
-        return _run(config_path, raw_request, now=now, register_source=register_source)
+        return _run(
+            config_path, raw_request, now=now, register_source=register_source,
+            candidates_only=candidates_only,
+        )
 
 
 def _run(
@@ -163,6 +178,7 @@ def _run(
     *,
     now: datetime | None,
     register_source: bool,
+    candidates_only: bool,
 ) -> JsonObject:
     config = _load_config(config_path)
     database = _database_path(config)
@@ -201,6 +217,18 @@ def _run(
     )
     if verified != authority:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED")
+    if candidates_only and authority.operation != "list_candidates":
+        raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
+    if authority.operation == "list_candidates":
+        key_scope = config.key_scopes.get(authority.signing_key_id)
+        if (
+            register_source
+            or key_scope is None
+            or key_scope.operations != ["list_candidates"]
+            or key_scope.source_systems != ["mail"]
+        ):
+            raise CompanyAuthorityRejected("COMPANY_CANDIDATE_READER_DENIED")
+        return list_mail_candidates(database, context, arguments)
     if register_source:
         key_scope = config.key_scopes.get(authority.signing_key_id)
         if (
@@ -241,14 +269,16 @@ def _run(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sb-company")
-    _ = parser.add_argument("action", nargs="?", choices=["register-source"])
+    _ = parser.add_argument("action", nargs="?", choices=["register-source", "candidates"])
     _ = parser.add_argument("--config", type=Path, required=True)
     args = parser.parse_args(argv)
     config_path = cast(Path, args.config)
     previous_umask = os.umask(0o077)
     try:
         result = run(
-            config_path, sys.stdin.buffer.read(), register_source=args.action is not None,
+            config_path, sys.stdin.buffer.read(_MAX_REQUEST + 1),
+            register_source=args.action == "register-source",
+            candidates_only=args.action == "candidates",
         )
         _ = sys.stdout.buffer.write(canonical_bytes(result) + b"\n")
         return 0
