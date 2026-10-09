@@ -14,9 +14,13 @@ from typing import Self
 
 import pytest
 
+from sb.connectors.base import SourceAdapter
 from sb.connectors.unified_db import AdapterSettings, UnifiedDbAdapter, UnsafeSessionError
 from sb.connectors.unified_db_mapping import Item, Scalar, load_mapping
 from sb.connectors.unified_db_reconcile import TableState, read_checkpoint
+from sb.pipeline import run_compile
+from sb.search import SearchIndex
+from sb.source_coverage import list_scan_receipts
 from sb.store.ledger import Ledger
 from tests.test_connectors_unified_db import _FORBIDDEN_SQL, T0, T1, _Result
 
@@ -508,3 +512,74 @@ def test_newer_checkpoint_version_is_rejected_without_source_reads(db: SqlSource
     with pytest.raises(ValueError, match="UNIFIED_DB_RECONCILE_CURSOR_VERSION"):
         list(adapter.scan('{"_reconcile":{"version":2}}'))
     assert db.sql == []
+
+
+def test_readonly_lifecycle_receipts_reach_committed_search(
+    tmp_path: Path, db: SqlSource, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sb.config import Config
+    from sb.pipeline import run_ingest
+    from sb.store.cas import ContentAddressedStore
+    from sb.vault import init_vault
+
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    config = Config(raw={
+        "vault_root": str(root), "knowledge_registry": str(tmp_path / "registry.db"),
+        "state_root": str(tmp_path / "state"),
+        "sources": [{"id": "unified-db", "adapter": "unified-db", "llm_policy": "deny"}],
+        "source_access": {"unified-db": {
+            "owner": "principal:owner", "projects": ["project:db-fixture"], "policy_revision": "1",
+        }},
+        "llm": {"model_id": "local", "argv_template": ["/bin/false"]},
+    })
+    def discover_fixture(_config: Config) -> dict[str, SourceAdapter]:
+        return {"unified-db": _adapter(db)}
+
+    monkeypatch.setattr("sb.connectors.discover_adapters", discover_fixture)
+    db.add("a", summary="SBSTEP2DB oldword")
+    assert run_ingest(config, ("unified-db",)).exit_code == 0
+    assert run_ingest(config, ("unified-db",)).exit_code == 0
+    assert run_compile(config, llm_mode="subprocess").exit_code == 0
+    with Ledger(root) as ledger:
+        old = {row.content_hash for row in ledger.list_source_items()}
+    cas = ContentAddressedStore(root)
+    originals = {digest: cas.get(digest) for digest in old}
+    # Only the scratch fixture owner changes rows; adapter SQL remains guarded readonly.
+    _ = db.conn.execute("UPDATE memory.events SET summary=? WHERE event_id=?", (
+        "SBSTEP2DB newword", "a",
+    ))
+    assert run_ingest(config, ("unified-db",)).exit_code == 0
+    assert run_compile(config, llm_mode="subprocess").exit_code == 0
+    assert SearchIndex(root).search("newword", scope="all")
+    _ = db.conn.execute("DELETE FROM memory.events WHERE event_id=?", ("a",))
+    # Three bounded state-machine passes finish snapshot and known-key verification.
+    for _pass in range(3):
+        assert run_ingest(config, ("unified-db",)).exit_code == 0
+    with Ledger(root) as ledger:
+        rows = ledger.list_source_items()
+        assert sum(":source_deleted:" in row.source_version for row in rows) == 1
+        receipts = list_scan_receipts(ledger, "unified-db")
+        assert sum(receipt.accepted for receipt in receipts) == 2
+        checkpoint = ledger.get_cursor("unified-db")
+    for digest, raw in originals.items():
+        assert cas.get(digest) == raw
+    assert SearchIndex(root).search("newword", scope="all")
+    # A damaged source schema must not advance its cursor or create searchable success.
+    _ = db.conn.execute("DROP TABLE memory.events")
+    failed = run_ingest(config, ("unified-db",))
+    assert failed.exit_code == 1
+    with Ledger(root) as ledger:
+        receipt = list_scan_receipts(ledger, "unified-db")[-1]
+        assert receipt.state == "unavailable" and receipt.scanned == 0
+        assert ledger.get_cursor("unified-db") == checkpoint
+        assert tuple(
+            item for item in ledger.list_source_items() if item.source_uri.startswith("unified-db:")
+        ) == rows
+        assert any(
+            item.source_uri == "connection-unavailable" for item in ledger.list_source_items()
+        )
+    assert SearchIndex(root).search("newword", scope="all")
+    assert db.closed
+    assert all(query.startswith(("SELECT ", "SET ", "BEGIN READ ONLY", "COMMIT"))
+               for query, _params in db.sql)
