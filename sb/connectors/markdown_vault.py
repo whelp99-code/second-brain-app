@@ -50,16 +50,26 @@ class MarkdownVaultAdapter:
         self, root: Path, source_id: str = DEFAULT_SOURCE_ID,
         include: tuple[str, ...] = (),
         exclude: tuple[str, ...] = (),
+        observe_deletions: bool = False,
     ) -> None:
         self._root: Path = root
         self._include: tuple[str, ...] = include
         self._exclude: tuple[str, ...] = exclude
+        self._observe_deletions: bool = observe_deletions
         self.source_id: str = source_id
         self._next_cursor: str = ""
         self._fs: SafeSourceFilesystem = SafeSourceFilesystem((root,))
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         previous = decode_source_cursor(cursor)
+        if not self._root.exists():
+            self._next_cursor = cursor or ""
+            yield (
+                SourceRef(self.source_id, "", "source-unavailable"),
+                b"",
+                {"skip_reason": "source-unavailable"},
+            )
+            return
         result = self._fs.scan(self._root, reject_denied=False, reject_unsafe=False)
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         current: dict[str, str] = {}
@@ -86,6 +96,28 @@ class MarkdownVaultAdapter:
                 continue
             meta = {"relative_path": entry.relative_path, "cursor": token}
             items.append((SourceRef(self.source_id, entry.relative_path, token), body, meta))
+        present = {entry.relative_path for entry in result.files}
+        for path, old_token in previous.items():
+            if path in current or path in present:
+                continue
+            if old_token.startswith("skipped:"):
+                continue
+            blocked = any(
+                path == skipped.relative_path or path.startswith(skipped.relative_path + "/")
+                for skipped in result.skipped
+            )
+            if blocked or not self._observe_deletions or old_token.startswith("source-deleted:"):
+                current[path] = old_token
+                continue
+            token = "source-deleted:" + sha256(old_token.encode()).hexdigest()
+            current[path] = token
+            items.append(
+                (
+                    SourceRef(self.source_id, path, token),
+                    b"",
+                    {"relative_path": path, "skip_reason": "source-deleted"},
+                )
+            )
         self._next_cursor = encode_source_cursor(current)
         yield from items
 
@@ -96,7 +128,14 @@ class MarkdownVaultAdapter:
 def create(config: _ConnectorConfig) -> SourceAdapter:
     """Build the markdown-vault adapter from config, defaulting to me-wiki."""
     source_id, root, include, exclude = _configured_root(config)
-    return MarkdownVaultAdapter(root=root, source_id=source_id, include=include, exclude=exclude)
+    row = next((row for row in config.source_roots if row.get("id") == source_id), None)
+    deletion_mode = "off" if row is None else row.get("deletion_observations", "off")
+    if deletion_mode not in {"off", "v1"}:
+        raise MarkdownVaultError("invalid markdown deletion observation mode")
+    return MarkdownVaultAdapter(
+        root=root, source_id=source_id, include=include, exclude=exclude,
+        observe_deletions=deletion_mode == "v1",
+    )
 
 
 def _configured_root(config: _ConnectorConfig) -> tuple[str, Path, tuple[str, ...], tuple[str, ...]]:

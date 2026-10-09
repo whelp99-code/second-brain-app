@@ -51,7 +51,10 @@ def _checkpoint(value: object) -> str | None:
     """Validate an adapter cursor. None is an empty scan; K1 text limits do not apply."""
     if value is None:
         return None
-    return _bounded_text(value, MAX_CHECKPOINT, "CHECKPOINT_INVALID")
+    if not isinstance(value, str) or len(value) > MAX_CHECKPOINT:
+        raise ObservationError("CHECKPOINT_INVALID")
+    _ = canonical_bytes(value)
+    return value
 
 
 def _bounded_text(value: object, limit: int, code: str) -> str:

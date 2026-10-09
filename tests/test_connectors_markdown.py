@@ -251,3 +251,69 @@ def test_parse_cursor_rejects_malformed_payload() -> None:
     # When / Then: parse fails closed with the typed cursor error.
     with pytest.raises(MarkdownVaultError):
         _ = decode_source_cursor("not-a-cursor")
+
+
+def test_missing_root_preserves_resume_and_reports_unavailable(tmp_path: Path) -> None:
+    root = tmp_path / "source"
+    _ = _write_md(root, "note.md", "retained\n")
+    adapter = MarkdownVaultAdapter(root=root, source_id="notes")
+    _ = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    _ = root.rename(tmp_path / "offline")
+
+    items = list(MarkdownVaultAdapter(root=root, source_id="notes").scan(cursor))
+
+    assert len(items) == 1
+    assert items[0][2].get("skip_reason") == "source-unavailable"
+    resumed = MarkdownVaultAdapter(root=root, source_id="notes")
+    _ = list(resumed.scan(cursor))
+    assert resumed.next_cursor() == cursor
+
+
+def test_disappearance_is_one_observation_not_remote_erasure(tmp_path: Path) -> None:
+    root = tmp_path / "source"
+    path = _write_md(root, "note.md", "retained elsewhere\n")
+    adapter = MarkdownVaultAdapter(root=root, source_id="notes", observe_deletions=True)
+    _ = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    _ = path.rename(tmp_path / "retained.md")
+
+    items = list(adapter.scan(cursor))
+
+    assert len(items) == 1
+    assert items[0][0].source_uri == "note.md"
+    assert items[0][2].get("skip_reason") == "source-deleted"
+    assert items[0][1] == b""
+    assert (tmp_path / "retained.md").read_text() == "retained elsewhere\n"
+    assert list(adapter.scan(adapter.next_cursor())) == []
+
+
+def test_deletion_observations_default_off_preserves_prior_checkpoint(tmp_path: Path) -> None:
+    root = tmp_path / "source"
+    page = _write_md(root, "note.md", "retained\n")
+    adapter = MarkdownVaultAdapter(root=root, source_id="notes")
+    _ = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    _ = page.rename(tmp_path / "retained.md")
+
+    assert list(adapter.scan(cursor)) == []
+
+    assert adapter.next_cursor() == cursor
+
+
+def test_blocked_ancestor_does_not_become_disappearance(tmp_path: Path) -> None:
+    root = tmp_path / "source"
+    _ = _write_md(root, "nested/note.md", "retained\n")
+    adapter = MarkdownVaultAdapter(root=root, source_id="notes", observe_deletions=True)
+    _ = list(adapter.scan(None))
+    cursor = adapter.next_cursor()
+    _ = (root / "nested").rename(tmp_path / "retained")
+    (root / "nested").symlink_to(tmp_path / "retained", target_is_directory=True)
+
+    items = list(adapter.scan(cursor))
+
+    assert any(meta.get("skip_reason") == "symlink" for _ref, _body, meta in items)
+    assert not any(meta.get("skip_reason") == "source-deleted" for _ref, _body, meta in items)
+    assert decode_source_cursor(adapter.next_cursor())["nested/note.md"] == (
+        decode_source_cursor(cursor)["nested/note.md"]
+    )
