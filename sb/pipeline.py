@@ -65,6 +65,7 @@ _RETRYABLE_READ_FAILURES: Final = frozenset(
         "database-limit",
         "unstable-session-file",
         "unreadable-session-file",
+        "incomplete-session-file",
     }
 )
 
@@ -831,6 +832,7 @@ def _prepare_adapter_ingest(
     provenance: list[UnitProvenance] = []
     version_keys: list[tuple[str, str, str]] = []
     accepted: set[tuple[str, str, str]] = set()
+    legacy_content: set[tuple[str, str]] | None = None
     allocated_units: set[str] = set()
     failure: str | None = None
     errors = attempted = written = 0
@@ -870,6 +872,18 @@ def _prepare_adapter_ingest(
         if version_key in seen or version_key in accepted:
             unchanged += 1
             continue
+        if ref.source_version.startswith("content-sha256:"):
+            content_digest = hashlib.sha256(data).hexdigest()
+            if ref.source_version == "content-sha256:" + content_digest:
+                if legacy_content is None:
+                    legacy_content = {
+                        (row.source_uri, row.content_hash)
+                        for row in ledger.list_source_items()
+                        if row.source_id == adapter.source_id and row.source_version.isdecimal()
+                    }
+                if (ref.source_uri, content_digest) in legacy_content:
+                    unchanged += 1
+                    continue
         if attempted >= remaining:
             capped = True
             deferred += 1
@@ -889,7 +903,10 @@ def _prepare_adapter_ingest(
             )
             version_keys.append(version_key)
             accepted.add(version_key)
-            filtered += 1
+            if meta.get("skip_reason") in {"malformed-json", "malformed-document"}:
+                quarantined += 1
+            else:
+                filtered += 1
             continue
         digest = hashlib.sha256(data).hexdigest()
         try:

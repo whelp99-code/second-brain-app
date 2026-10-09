@@ -27,8 +27,8 @@ root = Path(sys.argv[3])
 path = root / 'session.jsonl'
 path.write_bytes(b'{}\\n')
 revision = checkpoint.file_revision
-def replace_after_check(selected):
-    value = revision(selected)
+def replace_after_check(selected, *, root=None):
+    value = revision(selected, root=root)
     selected.unlink()
     os.mkfifo(selected)
     return value

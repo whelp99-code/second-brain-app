@@ -18,7 +18,9 @@ def test_export_tail_recovers_after_new_adapter(tmp_path: Path, kind: str) -> No
     path = tmp_path / "session.jsonl"; _ = path.write_bytes(prefix + body[:split])
     factory = GjcSessionsAdapter if kind == "gjc" else OmoSessionsAdapter
     adapter = factory((tmp_path,), "fixture")
-    assert list(adapter.scan(None)) == []
+    pending = list(adapter.scan(None))
+    assert [meta.get("skip_reason") for _, _, meta in pending] == ["incomplete-session-file"]
+    assert not any(body for _, body, _ in pending)
     cursor = adapter.next_cursor()
     assert json.loads(cursor)[path.name] == len(prefix)
     with path.open('ab') as output: _ = output.write(body[split:])
@@ -49,7 +51,9 @@ def test_gjc_partial_header_is_not_consumed(tmp_path: Path) -> None:
     header = b'{"type":"export_meta","export_version":"gjc-public-session-v1"}\n'
     _ = path.write_bytes(header[:15])
     adapter = GjcSessionsAdapter((tmp_path,), "fixture")
-    assert list(adapter.scan(None)) == []
+    pending = list(adapter.scan(None))
+    assert [meta.get("skip_reason") for _, _, meta in pending] == ["incomplete-session-file"]
+    assert not any(body for _, body, _ in pending)
     cursor = adapter.next_cursor()
     assert json.loads(cursor)[path.name] == 0
     with path.open('ab') as output:
