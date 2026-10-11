@@ -45,7 +45,7 @@ final class SettingsStore: ObservableObject {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, token: String? = nil) {
         self.defaults = defaults
         if let data = defaults.data(forKey: "settings"),
            let decoded = try? decoder.decode(AppSettings.self, from: data) {
@@ -59,7 +59,7 @@ final class SettingsStore: ObservableObject {
         } else {
             watchedFolders = []
         }
-        token = (try? KeychainStore.load(account: "api-token")) ?? ""
+        self.token = token ?? (try? KeychainStore.load(account: "api-token")) ?? ""
         if let existing = defaults.string(forKey: "device-id") {
             deviceID = existing
         } else {

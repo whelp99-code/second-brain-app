@@ -242,10 +242,12 @@ public struct CapabilitiesEnvelope: Codable, Equatable, Sendable {
 public struct FileSignature: Codable, Equatable, Sendable {
     public let bytes: Int
     public let modifiedMilliseconds: Int64
+    public let contentSHA256: String?
 
-    public init(bytes: Int, modifiedMilliseconds: Int64) {
+    public init(bytes: Int, modifiedMilliseconds: Int64, contentSHA256: String? = nil) {
         self.bytes = bytes
         self.modifiedMilliseconds = modifiedMilliseconds
+        self.contentSHA256 = contentSHA256
     }
 }
 
