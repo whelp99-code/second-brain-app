@@ -21,6 +21,7 @@ from sb.source_access import SourceAccess
 
 type CompanyOperation = Literal[
     "receive", "read", "accept", "reject", "mark_processed", "list_candidates",
+    "enroll_handoff", "handoff",
 ]
 type CompanyPurpose = Literal[
     "company_memory_receive",
@@ -28,6 +29,7 @@ type CompanyPurpose = Literal[
     "company_memory_accept",
     "company_memory_reject",
     "company_memory_process",
+    "company_memory_handoff",
 ]
 
 _AUTHORITY_DOMAIN = b"second-brain/company-memory-authority/v1\0"
@@ -41,6 +43,8 @@ _PURPOSE: dict[CompanyOperation, CompanyPurpose] = {
     "reject": "company_memory_reject",
     "mark_processed": "company_memory_process",
     "list_candidates": "company_memory_read",
+    "enroll_handoff": "company_memory_handoff",
+    "handoff": "company_memory_handoff",
 }
 
 
@@ -173,6 +177,8 @@ def verify_company_authority(
     except (ValueError, TypeError, ValidationError) as exc:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED") from exc
     key_scope = key_scopes.get(claim.signing_key_id) if key_scopes is not None else None
+    if claim.operation in {"handoff", "enroll_handoff"} and key_scope is None:
+        raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
     if key_scope is not None:
         if claim.operation not in key_scope.operations:
             raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
