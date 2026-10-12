@@ -86,12 +86,94 @@ Never pin an autonomous worker key as an owner approval key.
    - `SB_COMPANY_PROCESSOR_CONFIG`: fallback for `process`.
 
    Explicit `--config` wins. Other existing CLI actions still require their
-   explicit config. No environment variable grants authority; every request
-   remains signed and scoped. These names identify config files, not secrets.
+   explicit config. These variables and `--config` select the **trust root**:
+   database, owner/processor identities and pinned verification keys. Signatures
+   do not protect against an attacker choosing a config containing their own
+   keys. A `0600`, current-owner, nonsymlink file is not necessarily the intended
+   operator-approved config. Caller-controlled selection is forbidden.
 6. Submit a signed enrollment request once, before running the producer.
    Enrollment is idempotent only for exactly the same context. Removing a
    config or changing context does not remove the DB protection. No unenroll
    or blind downgrade command is provided.
+
+### Mandatory broker launch restrictions
+
+This PR provides the CLI, not an enforcing broker implementation. The operator
+must enforce all of the following before exposing it to JARVIS or any external
+caller:
+
+- Pin the absolute executable, allowed action and absolute `--config` path in
+  an operator-owned service/wrapper. A processor endpoint always runs `process`
+  with its approved config; it does not forward arbitrary CLI arguments, action
+  names, `--config`, config file descriptors or paths supplied by the caller.
+  Enrollment is a separate operator-only action.
+- Start children with an explicit allowlisted environment. Never inherit or
+  merge caller-supplied environment values, including
+  `SB_COMPANY_HANDOFF_CONFIG`, `SB_COMPANY_PROCESSOR_CONFIG`, interpreter/module
+  search paths or loader variables. If config environment variables are used
+  instead of fixed `--config`, their values must be fixed by the operator-owned
+  launcher, never by the request. Do not expose a generic shell/command runner.
+- Accept only the bounded signed JSON envelope on stdin. Transport metadata,
+  query parameters, request headers and job payloads must not become argv,
+  environment entries, filesystem paths or service overrides.
+- Prevent callers from replacing the executable, approved config, their parent
+  directories or service/environment files, or from accessing `company.db`
+  directly. File modes alone do not establish this separation when the caller
+  can write those locations or runs with the data owner's privileges.
+- Verify at the broker boundary that attempted argv/env/config overrides are
+  rejected or ignored without changing the selected executable, action, DB or
+  trust keys. The CLI smoke validates config selection; it does **not** prove
+  that an unimplemented broker filters an external caller's environment.
+
+**Do not activate the endpoint if the broker cannot guarantee these conditions.**
+Document it as unconfigured/blocked, rather than relying on CLI signature checks
+or file mode checks to compensate for a caller-selected trust root. Implementing
+and verifying this broker restriction remains required JARVIS/operations work.
+
+### Immutable enrollment lock and recovery
+
+The persisted context fixes provider ID, workspace ID, candidate-owner
+principal, projects (including list order), policy revision, deletion sequence
+and deletion root, and processor principal. For the same enrolled workspace,
+changing any of these values makes `handoff` and `process` fail with
+`COMPANY_HANDOFF_ENROLLMENT_REQUIRED` even with otherwise valid fresh signed
+authority. Repeating `enroll-handoff` does not repair
+the mismatch: its `INSERT ... ON CONFLICT DO NOTHING` preserves the original
+row and the subsequent equality check fails.
+
+This is a persistent lock, **not a timeout**. Restarting, waiting for proposal
+expiry, rotating signing keys or retrying enrollment cannot clear it. Even a
+legitimate policy/deletion-fence advance will lock the current implementation
+until the context is reconciled through a supported recovery or a separately
+implemented migration. Switching workspace IDs selects a different enrollment
+entry; it does not migrate or unlock the original workspace's candidates.
+Public-key trust maps and agent/session IDs are not enrollment fields; their
+other signature/config checks still apply.
+
+Operator recovery procedure:
+
+1. Pause the affected company's handoff/processor callers, preserve a consistent
+   DB/config backup, and compare the selected trusted config with
+   `company_handoff_enrollment.context_json` read-only. Keep outbox, decisions and
+   operation receipts together as audit evidence. Confirm that the broker is
+   selecting the intended config, not a caller override.
+2. If the mismatch is only accidental config drift, restore the erroneously
+   changed fixed fields from the known-good configuration **only after verifying
+   that the original context is still authoritative**. Preserve current key
+   removals and rotations; do not restore revoked keys from an old backup.
+   Retry with fresh signed requests and verify exact enrollment equality.
+3. If the new owner, scope, policy or deletion fence is legitimate, or the old
+   context cannot be established safely, leave processing locked. **Do not lower
+   a valid deletion high-water mark or policy fence to make the comparison pass.**
+   This PR has no supported in-place rebind/migration command. Obtain a separately
+   reviewed migration that reconciles candidate access/deletion state, enrollment,
+   outbox generations and consumed decisions; prove it on an isolated backup
+   before separately authorized activation.
+4. Do not delete/edit the enrollment row, clear decision/outbox history, copy
+   candidates into an unenrolled workspace, restore a stale DB or use an older
+   binary as a shortcut. Those actions can remove approval protection or replay
+   fences. Resume only after the authoritative context and protected lifecycle
+   checks succeed; otherwise keep the explicit blocked state.
 
 ## CLI and handoff contract
 
@@ -157,9 +239,16 @@ approvals or silently reuse its old digest.
 ## Owner decision and completion
 
 - `accept` requires `decision=approve`; `reject` requires `decision=reject`.
-  Signature, current pinned key, exact request/digest, owner principal and
-  session are checked. First use must be inside the receipt window (at most
-  30 minutes), bounded by the command's lifetime.
+  Signature, current pinned key, exact request/digest and owner principal are
+  checked. The receipt's `authenticated_session_id` is required to be a
+  nonempty string and is covered by the verified signature. SB does **not**
+  compare that field to an expected owner session, look up its existence or
+  validity in JARVIS, or independently authenticate the session. It trusts the
+  pinned owner signer to attest the representative's authenticated ceremony.
+  This differs from the processor's company-authority `session_id`, which is
+  compared exactly to the trusted config by `verify_company_authority`.
+  First use must be inside the receipt window (at most 30 minutes), bounded
+  by the command's lifetime.
 - First use stores the exact owner receipt in `company_handoff_decisions` with
   unique receipt/request IDs. A conflicting decision or receipt reuse for
   another candidate fails. Rejection is terminal.
@@ -194,9 +283,11 @@ approvals or silently reuse its old digest.
    Call mark_processed only after actual downstream completion, keep returned
    SB receipt metadata as evidence, and retry exact requests rather than
    inventing new decisions.
-5. Register broker/config/signer paths and a bounded caller cadence. The SB
-   producer is pull-based; no running importer, timer, inbox population or
-   production account has been provisioned by this PR.
+5. Register broker/config/signer paths and a bounded caller cadence, enforcing
+   the mandatory fixed-config/argv and allowlisted-environment restrictions
+   above. Do not activate a broker that forwards caller-controlled selection.
+   The SB producer is pull-based; no running importer, timer, inbox population
+   or production account has been provisioned by this PR.
 
 This dependency is the intentional stopping boundary requested by the user.
 The SB producer and processor are implemented/tested; **the live 19 candidates
