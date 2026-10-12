@@ -6,12 +6,14 @@ import hashlib
 import json
 import re
 import sqlite3
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
 from sb.company_memory_authority import CompanyOperation, canonical_workspace_id
+from sb.company_memory_handoff import HANDOFF_SCHEMA
 from sb.effect_values import JsonObject, JsonValue, canonical_bytes, format_instant, strict_loads
 from sb.source_access import SourceAccess
 
@@ -27,6 +29,13 @@ type ReceiptRow = tuple[str, str, str, str, str, str]
 
 class CompanyMemoryError(ValueError):
     pass
+
+
+class _TransitionPermit:
+    """Connection-local code capability, never accepted from a wire request."""
+
+
+_APPROVED_TRANSITION = _TransitionPermit()
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,10 +161,19 @@ class CompanyMemoryStore:
                 ON company_memory_candidates(workspace_id, source_system, source_event_id);
             """
         )
+        _ = self.db.executescript(HANDOFF_SCHEMA)
         self.db.commit()
 
     def close(self) -> None:
         self.db.close()
+
+    def _guard_transition(
+        self, workspace_id: str, permit: _TransitionPermit | None,
+    ) -> None:
+        if permit is not _APPROVED_TRANSITION and self.db.execute(
+            "SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?", (workspace_id,),
+        ).fetchone():
+            raise CompanyMemoryError("COMPANY_OWNER_APPROVAL_REQUIRED")
 
     def receive(
         self,
@@ -232,19 +250,28 @@ class CompanyMemoryStore:
         *,
         now: datetime | None = None,
         _commit: bool = True,
+        _permit: _TransitionPermit | None = None,
     ) -> MemoryCandidate:
+        self._guard_transition(workspace_id, _permit)
         candidate = self.get(workspace_id, candidate_id, current, deletion)
         if candidate.state == "accepted":
             return candidate
         if candidate.state != "candidate":
             raise CompanyMemoryError("MEMORY_CANDIDATE_TRANSITION_DENIED")
         timestamp = format_instant(now or datetime.now(UTC))
-        _ = self.db.execute(
+        changed = self.db.execute(
             """UPDATE company_memory_candidates
                SET state='accepted',accepted_at=?
-               WHERE workspace_id=? AND candidate_id=? AND state='candidate'""",
-            (timestamp, workspace_id, candidate_id),
+               WHERE workspace_id=? AND candidate_id=? AND state='candidate'
+               AND (? OR NOT EXISTS (
+                   SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?
+               ))""",
+            (timestamp, workspace_id, candidate_id,
+             _permit is _APPROVED_TRANSITION, workspace_id),
         )
+        if changed.rowcount != 1:
+            self.db.rollback()
+            raise CompanyMemoryError("COMPANY_CANDIDATE_TRANSITION_DENIED")
         if _commit:
             self.db.commit()
         return self.get(workspace_id, candidate_id, current, deletion)
@@ -258,19 +285,28 @@ class CompanyMemoryStore:
         *,
         now: datetime | None = None,
         _commit: bool = True,
+        _permit: _TransitionPermit | None = None,
     ) -> MemoryCandidate:
+        self._guard_transition(workspace_id, _permit)
         candidate = self.get(workspace_id, candidate_id, current, deletion)
         if candidate.state == "rejected":
             return candidate
         if candidate.state != "candidate":
             raise CompanyMemoryError("MEMORY_CANDIDATE_TRANSITION_DENIED")
         timestamp = format_instant(now or datetime.now(UTC))
-        _ = self.db.execute(
+        changed = self.db.execute(
             """UPDATE company_memory_candidates
                SET state='rejected',rejected_at=?
-               WHERE workspace_id=? AND candidate_id=? AND state='candidate'""",
-            (timestamp, workspace_id, candidate_id),
+               WHERE workspace_id=? AND candidate_id=? AND state='candidate'
+               AND (? OR NOT EXISTS (
+                   SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?
+               ))""",
+            (timestamp, workspace_id, candidate_id,
+             _permit is _APPROVED_TRANSITION, workspace_id),
         )
+        if changed.rowcount != 1:
+            self.db.rollback()
+            raise CompanyMemoryError("COMPANY_CANDIDATE_TRANSITION_DENIED")
         if _commit:
             self.db.commit()
         return self.get(workspace_id, candidate_id, current, deletion)
@@ -284,19 +320,28 @@ class CompanyMemoryStore:
         *,
         now: datetime | None = None,
         _commit: bool = True,
+        _permit: _TransitionPermit | None = None,
     ) -> MemoryCandidate:
+        self._guard_transition(workspace_id, _permit)
         candidate = self.get(workspace_id, candidate_id, current, deletion)
         if candidate.state == "processed_complete":
             return candidate
         if candidate.state != "accepted":
             raise CompanyMemoryError("MEMORY_CANDIDATE_NOT_ACCEPTED")
         timestamp = format_instant(now or datetime.now(UTC))
-        _ = self.db.execute(
+        changed = self.db.execute(
             """UPDATE company_memory_candidates
                SET state='processed_complete',processed_at=?
-               WHERE workspace_id=? AND candidate_id=? AND state='accepted'""",
-            (timestamp, workspace_id, candidate_id),
+               WHERE workspace_id=? AND candidate_id=? AND state='accepted'
+               AND (? OR NOT EXISTS (
+                   SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?
+               ))""",
+            (timestamp, workspace_id, candidate_id,
+             _permit is _APPROVED_TRANSITION, workspace_id),
         )
+        if changed.rowcount != 1:
+            self.db.rollback()
+            raise CompanyMemoryError("COMPANY_CANDIDATE_TRANSITION_DENIED")
         if _commit:
             self.db.commit()
         return self.get(workspace_id, candidate_id, current, deletion)
@@ -353,6 +398,7 @@ class CompanyMemoryStore:
         current: SourceAccess,
         deletion: tuple[int, str],
         now: datetime,
+        authorization: Callable[[sqlite3.Connection, MemoryCandidate], None] | None = None,
     ) -> CompanyMemoryReceipt:
         """Apply one verified operation and persist its receipt atomically."""
         if _DIGEST.fullmatch(request_digest) is None:
@@ -362,6 +408,14 @@ class CompanyMemoryStore:
             raise CompanyMemoryError("MEMORY_CANDIDATE_INVALID")
         _ = self.db.execute("BEGIN IMMEDIATE")
         try:
+            permit = None
+            if operation in {"accept", "reject", "mark_processed"}:
+                if authorization is not None:
+                    authorization(
+                        self.db, self.get(workspace_id, candidate_id, current, deletion),
+                    )
+                    permit = _APPROVED_TRANSITION
+                self._guard_transition(workspace_id, permit)
             existing = cast(
                 ReceiptRow | None,
                 self.db.execute(
@@ -419,16 +473,21 @@ class CompanyMemoryStore:
                 candidate = self.get(workspace_id, candidate_id, current, deletion)
             elif operation == "accept":
                 candidate = self.accept(
-                    workspace_id, candidate_id, current, deletion, now=now, _commit=False
+                    workspace_id, candidate_id, current, deletion, now=now, _commit=False,
+                    _permit=permit,
                 )
             elif operation == "reject":
                 candidate = self.reject(
-                    workspace_id, candidate_id, current, deletion, now=now, _commit=False
+                    workspace_id, candidate_id, current, deletion, now=now, _commit=False,
+                    _permit=permit,
+                )
+            elif operation == "mark_processed":
+                candidate = self.mark_processed(
+                    workspace_id, candidate_id, current, deletion, now=now, _commit=False,
+                    _permit=permit,
                 )
             else:
-                candidate = self.mark_processed(
-                    workspace_id, candidate_id, current, deletion, now=now, _commit=False
-                )
+                raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
             result = _candidate_result(candidate)
             created_at = format_instant(now)
             receipt_body: JsonObject = {
