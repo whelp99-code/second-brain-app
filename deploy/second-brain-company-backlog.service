@@ -9,6 +9,7 @@ StateDirectoryMode=0700
 TimeoutStartSec=60
 Nice=10
 NoNewPrivileges=true
+PrivateUsers=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only

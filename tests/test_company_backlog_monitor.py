@@ -345,3 +345,15 @@ def test_units_pin_periodic_readonly_command_and_private_result() -> None:
     assert timer["Timer"]["Persistent"] == "true"
     assert timer["Timer"]["Unit"] == "second-brain-company-backlog.service"
     assert timer["Install"]["WantedBy"] == "timers.target"
+
+
+def test_user_filesystem_sandbox_requires_private_user_namespace() -> None:
+    # Given the actual user service template, rather than system-manager defaults.
+    service = configparser.ConfigParser(interpolation=None)
+    _ = service.read(DEPLOY / "second-brain-company-backlog.service")
+    # When filesystem isolation is requested in a user unit.
+    settings = service["Service"]
+    # Then it includes the prerequisite needed to enforce mounts on systemd 255.
+    assert settings["ProtectSystem"] == "strict"
+    assert settings["ProtectHome"] == "read-only"
+    assert settings.getboolean("PrivateUsers", fallback=False)

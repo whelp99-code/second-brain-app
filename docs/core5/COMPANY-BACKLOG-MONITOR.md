@@ -126,6 +126,11 @@ there is no caller-controlled SQL, remote fetch or credential config. Confirm
 the DB location against trusted local registration before installation.
 The service's `StateDirectory` creates its private result directory and grants
 the write exception while the rest of home/system is read-only.
+`PrivateUsers=true` supplies the user namespace prerequisite for enforcing
+`ProtectSystem=strict` and `ProtectHome=read-only` in a user service, including
+systemd 255. The host must support unprivileged user namespaces. Unit syntax
+validation alone does not demonstrate that these mount restrictions took effect;
+verify them with a disposable user unit, not by starting the production monitor.
 
 ## Operator activation after Cursor review (not executed by this PR)
 
@@ -172,14 +177,17 @@ it ages out. These commands do not drain or acknowledge company candidates.
 Focused tests use fixed observation times and real fixture databases, covering
 empty/recent/exact-threshold/stale/unknown/error states, source immutability,
 one-line JSON and stdout equality, file permissions, atomic replacement and
-rename/read failures. Unit tests inspect machine-consumed service/timer fields,
-not prose.
+rename/read failures and post-replace directory open/fsync/close failures.
+Unit tests inspect machine-consumed service/timer fields, including the
+`PrivateUsers` prerequisite, not prose.
 
 ```bash
 uv run --frozen python -m pytest -q \
   tests/test_company_backlog_monitor.py tests/test_company_reader_drain.py
 uv run --frozen ruff check \
   deploy/company-backlog-monitor.py tests/test_company_backlog_monitor.py
+uv run --frozen ruff check tests/fixtures/company_backlog_sandbox_probe.py
+uv run --frozen basedpyright tests/fixtures/company_backlog_sandbox_probe.py
 uv run --frozen basedpyright \
   deploy/company-backlog-monitor.py tests/test_company_backlog_monitor.py
 systemd-analyze --user verify \
@@ -199,9 +207,20 @@ Unit verification and a one-shot wrapper run prove the artifacts, not a running
 production timer. Installation, enablement and scheduled production observations
 remain operator-owned after review.
 
-### Captured pre-deployment evidence
+`tests/fixtures/company_backlog_sandbox_probe.py` is a manual runtime probe for a
+disposable user service, not a daemon requirement for the portable pytest suite.
+Give it an owned, normally writable home canary and the outer user/mount namespace
+inode numbers. Run with the template's service properties, substituting only a
+unique QA unit name, QA `StateDirectory` and the probe command. It checks changed
+user/mount namespaces, an actual `EROFS` home-write rejection, a read-only `/usr`
+mount, and the real wrapper's ability to publish a private, stdout-identical
+missing-DB error in the writable state directory. Remove only that QA state and
+canary afterward. Never reuse the production monitor unit/state name.
 
-On `jm-omachy`, focused wrapper/SQL tests: **25 passed**; Ruff clean;
+### Original pre-review evidence
+
+Before the Cursor rejection, focused wrapper/SQL tests on `jm-omachy`:
+**25 passed**; Ruff clean;
 basedpyright **0 errors, 0 warnings, 0 notes**. `systemd-analyze --user verify`
 on both templates and calendar parsing returned exit 0.
 
@@ -218,3 +237,34 @@ with an absent fixture DB returned exit 1 and an identical file/stdout
 `ERROR`/`DATABASE_READ_FAILED` record with null measurements, without creating
 the DB. Test/result directories were removed after capturing this evidence.
 No user unit was installed, enabled or started by these checks.
+
+Those checks did not cover post-replace failure or demonstrate runtime mount
+isolation. The rejection regressions reproduce the old file/stdout divergence
+for directory open/fsync/close and the missing `PrivateUsers` prerequisite.
+The revised code retains the already-visible observation on stdout while
+reporting durability failure separately; the user unit now explicitly enables
+the namespace needed for filesystem protection.
+
+### Rejection-fix evidence
+
+On `jm-omachy`, the revised focused suite passed **29 tests**; Ruff, basedpyright
+and LSP were clean. Before fixing each issue, the three post-replace failure
+cases failed with mismatched JSON and the user namespace assertion failed.
+Existing pre-replacement failure coverage remains intact.
+
+A disposable `sb-backlog-review-rVW4pk.service` ran through the actual user
+manager on **systemd 261.2** using the template's service properties, including
+`PrivateUsers=true`. Only its command, state directory and stdout/stderr
+forwarding were substituted for QA. It was collected after exit 0:
+
+```json
+{"user_namespace_changed":true,"mount_namespace_changed":true,"home_write_rejected_erofs":true,"system_mount_readonly":true,"state_result_writable":true,"wrapper_expected_read_error":true,"file_matches_stdout":true,"result_private":true,"input_not_created":true}
+```
+
+The home canary was writable outside the service; the sandbox rejected the write
+with `EROFS`. The real wrapper ran inside that sandbox and wrote its expected
+missing-DB `ERROR` snapshot into the writable QA `StateDirectory`, matching
+stdout with mode `0600`. This measures runtime enforcement on this host, not just
+unit syntax. No systemd 255 runtime was available here; the explicit prerequisite
+is covered by the portable unit regression. No production monitor unit or timer
+was installed or activated.
