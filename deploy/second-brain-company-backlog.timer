@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Second Brain company candidate backlog every fifteen minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/15:00
+AccuracySec=1min
+Persistent=true
+Unit=second-brain-company-backlog.service
+
+[Install]
+WantedBy=timers.target

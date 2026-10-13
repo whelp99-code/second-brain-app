@@ -115,6 +115,10 @@ are required; this PR does not invent that contract or activate it.
 
 ## Recurrence-monitoring proposal
 
+Runnable wrapper, user timer/service templates and the morning-report result
+contract are now provided in [COMPANY-BACKLOG-MONITOR.md](COMPANY-BACKLOG-MONITOR.md).
+This follow-up does not imply production installation or activation.
+
 No candidate-drain monitor was found in the observed user timers, or in the
 request-driven reader source. This is a bounded observation, not a claim
 about every external scheduler. Add a **jm-owned, read-only oneshot monitor**

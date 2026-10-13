@@ -1,0 +1,19 @@
+[Unit]
+Description=Read-only Second Brain company candidate backlog snapshot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I %h/.local/lib/second-brain-monitor/company-backlog-monitor.py --database %h/.local/share/second-brain-company/mail-ms/company.db --output %h/.local/state/second-brain/company-backlog-monitor/latest.json
+StateDirectory=second-brain/company-backlog-monitor
+StateDirectoryMode=0700
+TimeoutStartSec=60
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictAddressFamilies=AF_UNIX
+MemoryDenyWriteExecute=true
+UMask=0077
+StandardOutput=journal
+StandardError=journal
