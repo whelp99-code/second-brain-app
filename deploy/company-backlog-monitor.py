@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sqlite3
+import sys
 import tempfile
 from contextlib import closing
 from datetime import UTC, datetime
@@ -90,24 +91,33 @@ def inspect(database: Path, now: datetime | None = None) -> Snapshot:
     }
 
 
-def publish(output: Path, line: str) -> None:
-    """Readers see the previous complete snapshot or this complete snapshot, never a partial write."""
+def publish(output: Path, line: str) -> bool:
+    """Publish atomically; False means visible, but directory durability is unconfirmed."""
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, name = tempfile.mkstemp(prefix=".backlog-", dir=output.parent)
     temporary = Path(name)
+    published = False
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             _ = stream.write(line)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, output)
+        published = True
+    finally:
+        if not published:
+            temporary.unlink(missing_ok=True)
+    # Replacement is the visibility commit point. Never reinterpret later failures
+    # as an unpublished observation or attempt a second write to the failing storage.
+    try:
         directory = os.open(output.parent, os.O_RDONLY | os.O_DIRECTORY)
         try:
             os.fsync(directory)
         finally:
             os.close(directory)
-    finally:
-        temporary.unlink(missing_ok=True)
+    except OSError:
+        return False
+    return True
 
 
 def run(database: Path, output: Path, now: datetime | None = None) -> int:
@@ -126,11 +136,16 @@ def run(database: Path, output: Path, now: datetime | None = None) -> int:
     snapshot = inspect(database, instant)
     line = json.dumps(snapshot, separators=(",", ":"), allow_nan=False) + "\n"
     try:
-        publish(output, line)
+        durable = publish(output, line)
     except OSError:
         snapshot = error_snapshot(instant, "RESULT_PUBLISH_FAILED")
         line = json.dumps(snapshot, separators=(",", ":"), allow_nan=False) + "\n"
+        print(line, end="")
+        return 1
     print(line, end="")
+    if not durable:
+        print("RESULT_DURABILITY_UNCONFIRMED", file=sys.stderr)
+        return 1
     return 1 if snapshot["status"] == "ERROR" else 0
 
 

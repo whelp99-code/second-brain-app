@@ -4,6 +4,7 @@ import configparser
 import json
 import os
 import sqlite3
+import stat
 import subprocess
 import sys
 from collections.abc import Callable
@@ -42,7 +43,7 @@ class Report(TypedDict):
 class Monitor(Protocol):
     def inspect(self, database: Path, now: datetime | None = None) -> Report: ...
     def run(self, database: Path, output: Path, now: datetime | None = None) -> int: ...
-    def publish(self, output: Path, line: str) -> None: ...
+    def publish(self, output: Path, line: str) -> bool: ...
 
 
 @pytest.fixture
@@ -209,6 +210,59 @@ def test_result_path_cannot_replace_company_data(
     # Then input bytes are untouched and a safe error is emitted.
     assert database.read_bytes() == before
     assert decoded_object(capsys.readouterr().out.encode())["error_code"] == "OUTPUT_PATH_CONFLICT"
+
+
+@pytest.mark.parametrize("failure", ["open", "fsync", "close"])
+def test_post_replace_failure_preserves_published_stdout_and_reports_durability(
+    monitor: Monitor, database: Path, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], failure: str,
+) -> None:
+    # Given an older snapshot and a failure confined to directory finalization.
+    output = tmp_path / "state" / "latest.json"
+    assert monitor.run(database, output, NOW) == 0
+    before = output.read_bytes()
+    _ = capsys.readouterr()
+    receive(database, "pending", NOW - timedelta(days=2))
+    original_open, original_fsync, original_close = os.open, os.fsync, os.close
+    fault_reached = False
+
+    def fail_after_replace() -> None:
+        nonlocal fault_reached
+        assert decoded_object(output.read_bytes())["status"] == "STALE"
+        fault_reached = True
+        raise OSError("FORBIDDEN_DIRECTORY_DETAIL")
+
+    def open_directory(path: str | bytes | Path, flags: int, mode: int = 0o777) -> int:
+        if failure == "open" and flags & os.O_DIRECTORY:
+            fail_after_replace()
+        return original_open(path, flags, mode)
+
+    def sync_directory(descriptor: int) -> None:
+        if failure == "fsync" and stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            fail_after_replace()
+        original_fsync(descriptor)
+
+    def close_directory(descriptor: int) -> None:
+        is_directory = stat.S_ISDIR(os.fstat(descriptor).st_mode)
+        original_close(descriptor)
+        if failure == "close" and is_directory:
+            fail_after_replace()
+
+    monkeypatch.setattr(os, "open", open_directory)
+    monkeypatch.setattr(os, "fsync", sync_directory)
+    monkeypatch.setattr(os, "close", close_directory)
+    # When replacement succeeds but subsequent durability confirmation fails.
+    assert monitor.run(database, output, NOW) == 1
+    # Then stdout is the visible observation, while stderr/exit expose the failure.
+    captured = capsys.readouterr()
+    assert fault_reached and output.read_bytes() != before
+    assert captured.out.encode() == output.read_bytes()
+    assert len(captured.out.splitlines()) == 1
+    assert decoded_object(captured.out.encode())["status"] == "STALE"
+    assert captured.err == "RESULT_DURABILITY_UNCONFIRMED\n"
+    assert "FORBIDDEN_" not in captured.out + captured.err
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert not list(output.parent.glob(".backlog-*"))
 
 
 def test_inaccessible_path_is_reported_without_private_exception_text(

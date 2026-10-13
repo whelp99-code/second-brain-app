@@ -35,8 +35,9 @@ fixed output path before activation rather than silently moving the morning
 report's input.
 
 Each observation replaces this file atomically with **one JSON line**, mode
-`0600`, in a private result directory. Successful publication emits the identical
-line to stdout, so the user service journal also retains observations:
+`0600`, in a private result directory. Once replacement succeeds, stdout is
+identical to the published line, even if later directory durability confirmation
+fails. The user service journal retains the observation and any separate error:
 
 ```bash
 journalctl --user -u second-brain-company-backlog.service
@@ -79,9 +80,12 @@ Morning-report consumer rules:
 3. For fresh `STALE`, report pending count and oldest age; retain any unknown
    timestamp warning. `UNKNOWN`/`ERROR` must remain explicit. Never convert null
    measurements into zero or call them a drained queue.
-4. A failed publication cannot update `latest.json`; the previous complete file
-   may remain. Check the service's failure result or a newer journal `ERROR`
-   before treating that prior snapshot as the newest run. An absent scheduled
+4. Failure **before replacement** leaves the previous complete file, if any.
+   Failure **after replacement** leaves the new observation and identical stdout,
+   but emits `RESULT_DURABILITY_UNCONFIRMED` on stderr and exits 1. Observation
+   status is not a durability guarantee. Check the service's failure result or a
+   newer journal error before treating a snapshot as a successfully finalized run.
+   An absent scheduled
    update beyond 30 minutes is unverified even if the last status was `CLEAR`.
 
 This documents the input contract for omonyang's morning report; it does not
@@ -98,13 +102,22 @@ or changes candidates/receipts. Query/schema/file-read failures publish a fresh
 
 Results must be outside the source database directory so a mistaken output
 cannot replace the database or its sidecars/source files. Such a conflict emits
-`OUTPUT_PATH_CONFLICT` and exit 1 without writing that destination. Publication
+`OUTPUT_PATH_CONFLICT` and exit 1 without writing that destination. Pre-replacement
 failure emits `RESULT_PUBLISH_FAILED` and exit 1; inability to resolve safe input
 and output paths emits `PATH_RESOLUTION_FAILED` without writing an unchecked
 destination. Neither substitutes a
 success result. Temporary output is written/fsynced next to the target and
 renamed, so readers see an old complete or new complete JSON file, not a partial
-one. The temporary file is removed if publication fails.
+one. The temporary file is removed if publication fails before replacement.
+
+`os.replace` is the visibility commit point. Directory open/fsync/close failures
+after it do not undo publication: the wrapper keeps the published JSON as stdout,
+emits only the fixed `RESULT_DURABILITY_UNCONFIRMED` code on stderr and exits 1.
+The JSON still describes the measured backlog; it does not claim a successful
+durability check. The error is not hidden or converted into exit 0. No compensating
+rewrite is attempted on storage that just failed, and the consumed temporary name
+is not cleaned up again. This preserves file/stdout agreement without claiming
+crash durability or rollback after a committed replacement.
 
 The service uses a fixed DB path:
 `~/.local/share/second-brain-company/mail-ms/company.db`.
