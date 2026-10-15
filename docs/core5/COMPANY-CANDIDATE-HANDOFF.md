@@ -1,5 +1,12 @@
 # Company candidate handoff and restricted processor
 
+**Historical v1 document.** The current company2 approver binding, required
+policy fields, authenticated receipt read and disabled-by-default freshness
+contract are documented in [COMPANY-APPROVER-IMPLEMENTATION.md](COMPANY-APPROVER-IMPLEMENTATION.md).
+The registration/activation examples below describe the previous revision, not
+instructions to activate the current runtime. In company2 the receipt signer
+is the separately pinned approver, not the candidate data owner.
+
 Task: `TASK-SB-CANDIDATE-HANDOFF-20261013`. Refs #30, diagnosis PR #66.
 SB producer/processor implementation only. No production enrollment, keys,
 configuration, service activation or JARVIS code change is part of this PR.
