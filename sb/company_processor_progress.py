@@ -142,10 +142,7 @@ def reserve_operation(
     if (
         checkpoint is None
         or response.reservation_id is None
-        or checkpoint.operational_epoch != expected.operational_epoch
-        or checkpoint.approval_binding_digest != expected.approval_binding_digest
-        or checkpoint.approval_policy_version != expected.approval_policy_version
-        or checkpoint.intent_sequence <= expected.intent_sequence
+        or not _checkpoint_advances(expected, checkpoint)
     ):
         raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
     return operation_id, response
@@ -181,10 +178,56 @@ def finish_operation(
         or response.challenge != request.challenge
         or response.outcome == "conflict"
         or checkpoint is None
-        or checkpoint.operational_epoch != reservation.checkpoint.operational_epoch
-        or checkpoint.approval_binding_digest != reservation.checkpoint.approval_binding_digest
-        or checkpoint.approval_policy_version != reservation.checkpoint.approval_policy_version
-        or checkpoint.intent_sequence <= reservation.checkpoint.intent_sequence
+        or not _checkpoint_advances(reservation.checkpoint, checkpoint)
     ):
         raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
     return checkpoint
+
+
+def _checkpoint_advances(expected: Checkpoint, current: Checkpoint) -> bool:
+    if (
+        current.operational_epoch != expected.operational_epoch
+        or current.approval_policy_version != expected.approval_policy_version
+        or current.approval_binding_digest != expected.approval_binding_digest
+        or current.intent_sequence <= expected.intent_sequence
+        or current.intent_root == expected.intent_root
+    ):
+        return False
+    progress = [
+        (
+            expected.revocation_sequence,
+            current.revocation_sequence,
+            expected.revocation_root,
+            current.revocation_root,
+        ),
+    ]
+    for before, after in (
+        (expected.stores.jarvis, current.stores.jarvis),
+        (expected.stores.second_brain, current.stores.second_brain),
+    ):
+        progress.extend(
+            (
+                (
+                    before.receipt_sequence,
+                    after.receipt_sequence,
+                    before.receipt_root,
+                    after.receipt_root,
+                ),
+                (
+                    before.terminal_sequence,
+                    after.terminal_sequence,
+                    before.terminal_root,
+                    after.terminal_root,
+                ),
+                (
+                    before.deletion_sequence,
+                    after.deletion_sequence,
+                    before.deletion_root,
+                    after.deletion_root,
+                ),
+            )
+        )
+    return all(
+        sequence > previous or (sequence == previous and root == previous_root)
+        for previous, sequence, previous_root, root in progress
+    )

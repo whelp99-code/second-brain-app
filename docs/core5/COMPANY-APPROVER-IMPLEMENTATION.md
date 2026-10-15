@@ -149,6 +149,36 @@ when mutation freshness is unconfigured, for original fact recovery only.
 
 ## Reproducible evidence
 
+### Protected checkpoint response regression guard
+
+Nahee's follow-up on head `90034a4a` found another P1: intent advancement alone
+did not preserve the remaining checkpoint watermarks. Actual-path red evidence
+showed a reserve response with a lower revocation sequence still committed an
+accept, and a similarly regressing finish response returned success.
+
+Both success response paths now require the same complete comparison:
+
+- Epoch, policy version and binding stay exactly pinned; a normal progress
+  acknowledgment cannot authorize re-enrollment, policy/key replacement or recovery.
+- Intent sequence strictly increases and intent root must change.
+- Revocation sequence and both stores' receipt/terminal/deletion sequences never
+  decrease. At an unchanged sequence its root must remain exactly equal; a
+  different root at the same height is a fork, not progress.
+
+`tests/test_company_progress_checkpoint.py` applies 19 individually valid wire
+checkpoint changes to reserve and finish for accept/reject/mark_processed
+(114 actual product-path cases). Baselines use positive versions/counters, so
+the tested regressions are valid old values, not invalid negative wire data.
+Each case also verifies a second attempt cannot reserve/execute another effect.
+Reserve refusal leaves DB bytes/state unchanged. Finish is necessarily after
+the original effect commits: refusal withholds success/local checkpoint
+acknowledgment, preserves that original receipt, and blocks every additional
+effect. It never erases a committed fact or claims there was no original effect.
+
+The pre-existing checkpoint newline issue is explicitly excluded by the user;
+it remains separate PR work. This correction does not change serialization,
+configuration, enrollment recovery or the unavailable production provider.
+
 Fixture path: `fixtures/company-approver/company-approver-v2.test-only.json`.
 Current source: PR #89 head `3c7bafb63e5a417bfc05e3701cf416ddd8402166`,
 actually fetched after the user's five-review correction request.
@@ -175,14 +205,16 @@ uv run --frozen pytest -q -p no:cacheprovider \
   tests/test_company_memory_registration.py tests/test_company_candidate_handoff.py \
   tests/test_company_approver_binding.py tests/test_company_approver_guards.py \
   tests/test_company_freshness.py tests/test_company_test_freshness.py \
-  tests/test_company_transition_receipt.py
+  tests/test_company_transition_receipt.py tests/test_company_processor_progress.py \
+  tests/test_company_progress_checkpoint.py
 uv run --frozen python -m tests.company_approver_smoke --root <owned-empty-QA-root>
 uv run --frozen pytest -q -p no:cacheprovider tests/test_company_processor_progress.py
 uv run --frozen python -m tests.company_processor_progress_smoke --root <owned-empty-progress-QA-root>
 ```
 
-Captured on `jm-omachy` on the corrected processor-progress tree: **221 tests
-passed in 9.15 seconds**, related Ruff clean and
+Captured on `jm-omachy` after the protected checkpoint correction: **335 tests
+passed in 11.31 seconds**. Import sorting was then corrected and the 114 new
+cases rerun separately. Related Ruff clean and
 basedpyright **0 errors, 0 warnings, 0 notes**. The SB portions of T1-T13,
 T16 and T18 are exercised; JARVIS C1-C3/T14/T15/T17 implementation is not
 claimed by this SB PR. The added current-time boundary cases cover before
@@ -207,10 +239,9 @@ integration cases additionally cover reserve refusal, pre-record finish failure
 and cached receipt retries. These cases supplement, not reinterpret, the original
 subprocess receipt-read evidence.
 
-The actual repository basedpyright compiler run is clean. The editor's new-module
-import resolver retained a stale snapshot for `company_processor_progress` while
-direct file diagnostics and the compiler resolve it; no type/lint suppression or
-global editor change was made. The original 17-file editor check was clean.
+The actual repository basedpyright compiler run and all 21 changed Python-file
+editor diagnostics are clean. A temporary new-module import cache refreshed
+without any suppression or global editor change.
 Real runtime checks are not inferred from the editor or test counts.
 
 The initial security/goal gate reviewer returned **APPROVE**, no blockers, on the
