@@ -3,8 +3,10 @@ from __future__ import annotations
 import base64
 import sqlite3
 import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Barrier
@@ -13,15 +15,18 @@ from typing import Literal
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from sb.company_approver_binding import CompanyHandoffPolicy, public_key_fingerprint
 from sb.company_memory import CompanyMemoryError, CompanyMemoryStore
 from sb.company_memory_authority import CompanyAuthorityRejected, CompanyOperation
 from sb.company_memory_cli import run
-from sb.company_memory_handoff import APPROVAL_DOMAIN, CompanyHandoffPolicy, enrollment_context
+from sb.company_memory_handoff import APPROVAL_DOMAIN, enrollment_context
 from sb.effect_values import JsonObject, canonical_bytes, format_instant
 from sb.source_access import SourceAccess
 from tests.task30_clock import FrozenTask30DateTime
 from tests.test_company_memory_product import (
-    CONTEXT,
+    CONTEXT as PRODUCT_CONTEXT,
+)
+from tests.test_company_memory_product import (
     DOMAIN,
     KEY,
     KEY_ID,
@@ -36,6 +41,8 @@ ENROLL_KEY = Ed25519PrivateKey.from_private_bytes(bytes(reversed(range(32))))
 PROCESSOR_KEY = Ed25519PrivateKey.from_private_bytes(b"\x03" * 32)
 OWNER_KEY = Ed25519PrivateKey.from_private_bytes(b"\x04" * 32)
 PROCESSOR = "principal:company-processor"
+APPROVER = "principal:owner"
+CONTEXT = replace(PRODUCT_CONTEXT, principal="principal:mail-ms")
 PAGE: JsonObject = {"limit": 10, "offset": 0}
 
 
@@ -44,23 +51,39 @@ def encoded_public(key: Ed25519PrivateKey) -> str:
 
 
 def signed_request(
-    operation: CompanyOperation, arguments: JsonObject,
-    key: Ed25519PrivateKey = KEY, key_id: str = KEY_ID,
-    principal: str = CONTEXT.principal, at: datetime = NOW,
+    operation: CompanyOperation,
+    arguments: JsonObject,
+    key: Ed25519PrivateKey = KEY,
+    key_id: str = KEY_ID,
+    principal: str = CONTEXT.principal,
+    at: datetime = NOW,
 ) -> bytes:
-    claim = signed_authority(operation, arguments, {
-        "principal_id": principal, "signing_key_id": key_id,
-        "issued_at": format_instant(at), "expires_at": format_instant(at + timedelta(minutes=1)),
-    })
+    claim = signed_authority(
+        operation,
+        arguments,
+        {
+            "principal_id": principal,
+            "signing_key_id": key_id,
+            "issued_at": format_instant(at),
+            "expires_at": format_instant(at + timedelta(minutes=1)),
+        },
+    )
     del claim["signature"]
-    claim["signature"] = base64.urlsafe_b64encode(
-        key.sign(DOMAIN + canonical_bytes(claim)),
-    ).rstrip(b"=").decode()
+    claim["signature"] = (
+        base64.urlsafe_b64encode(
+            key.sign(DOMAIN + canonical_bytes(claim)),
+        )
+        .rstrip(b"=")
+        .decode()
+    )
     return canonical_bytes({"authority": claim, "arguments": arguments})
 
 
 def setup_config(root: Path) -> Path:
     cfg = config(root)
+    initial = decoded_object(cfg.read_bytes())
+    initial["principal_id"] = CONTEXT.principal
+    _ = cfg.write_bytes(canonical_bytes(initial))
     _ = run(cfg, signed_request("receive", RECEIVE), now=NOW)
     _ = (root / "legacy.json").write_bytes(cfg.read_bytes())
     value = decoded_object(cfg.read_bytes())
@@ -73,6 +96,17 @@ def setup_config(root: Path) -> Path:
         "processor_principal_id": PROCESSOR,
         "processor_keys": {"processor": encoded_public(PROCESSOR_KEY)},
         "owner_approval_keys": {"owner": encoded_public(OWNER_KEY)},
+        "approver_principal_id": APPROVER,
+        "approval_policy_version": 1,
+        "approver_keys": [
+            {
+                "key_id": "owner",
+                "algorithm": "Ed25519",
+                "purpose": "decision",
+                "public_key_fingerprint": public_key_fingerprint(OWNER_KEY.public_key()),
+            }
+        ],
+        "operator_approval_ref": "operator:TEST_ONLY",
     }
     _ = cfg.write_bytes(canonical_bytes(value))
     cfg.chmod(0o600)
@@ -85,14 +119,31 @@ def configured(tmp_path: Path) -> Path:
 
 
 def enroll(cfg: Path) -> JsonObject:
+    from tests.company_approver_test_runtime import provider_for_config
+
+    provider, observed = provider_for_config(cfg)
     return run(
-        cfg, signed_request("enroll_handoff", {}, ENROLL_KEY, "enroll"),
-        now=NOW, enroll_handoff=True,
+        cfg,
+        signed_request("enroll_handoff", {}, ENROLL_KEY, "enroll"),
+        now=NOW,
+        enroll_handoff=True,
+        freshness_provider=provider,
+        observed_checkpoint=observed,
     )
 
 
 def handoff(cfg: Path, at: datetime = NOW) -> JsonObject:
-    return run(cfg, signed_request("handoff", PAGE, at=at), now=at, handoff_only=True)
+    from tests.company_approver_test_runtime import provider_for_config
+
+    provider, observed = provider_for_config(cfg)
+    return run(
+        cfg,
+        signed_request("handoff", PAGE, at=at),
+        now=at,
+        handoff_only=True,
+        freshness_provider=provider,
+        observed_checkpoint=observed,
+    )
 
 
 def first_proposal(page: JsonObject) -> JsonObject:
@@ -104,28 +155,44 @@ def first_proposal(page: JsonObject) -> JsonObject:
 
 
 def owner_receipt(
-    proposal: JsonObject, decision: Literal["approve", "reject"] = "approve",
-    changes: JsonObject | None = None, at: datetime = NOW,
+    proposal: JsonObject,
+    decision: Literal["approve", "reject"] = "approve",
+    changes: JsonObject | None = None,
+    at: datetime = NOW,
 ) -> JsonObject:
     command = proposal["command"]
     assert isinstance(command, dict)
     value: JsonObject = {
-        "schema_version": 1, "receipt_id": "owner-receipt:1", "request_id": command["request_id"],
-        "decision": decision, "command_digest": proposal["command_digest"],
-        "signer_principal_id": CONTEXT.principal, "authenticated_session_id": "owner-session",
-        "key_id": "owner", "algorithm": "Ed25519", "issued_at": format_instant(at),
-        "not_before": format_instant(at), "expires_at": format_instant(at + timedelta(minutes=10)),
-        "nonce": "owner-decision:1", "max_uses": 1, "status": "issued",
+        "schema_version": 1,
+        "receipt_id": "owner-receipt:1",
+        "request_id": command["request_id"],
+        "decision": decision,
+        "command_digest": proposal["command_digest"],
+        "signer_principal_id": APPROVER,
+        "authenticated_session_id": "owner-session",
+        "key_id": "owner",
+        "algorithm": "Ed25519",
+        "issued_at": format_instant(at),
+        "not_before": format_instant(at),
+        "expires_at": format_instant(at + timedelta(minutes=10)),
+        "nonce": "owner-decision:1",
+        "max_uses": 1,
+        "status": "issued",
     }
     value.update(changes or {})
-    value["signature"] = base64.urlsafe_b64encode(
-        OWNER_KEY.sign(APPROVAL_DOMAIN + canonical_bytes(value)),
-    ).rstrip(b"=").decode()
+    value["signature"] = (
+        base64.urlsafe_b64encode(
+            OWNER_KEY.sign(APPROVAL_DOMAIN + canonical_bytes(value)),
+        )
+        .rstrip(b"=")
+        .decode()
+    )
     return value
 
 
 def processor_arguments(
-    proposal: JsonObject, approval: JsonObject | None = None,
+    proposal: JsonObject,
+    approval: JsonObject | None = None,
 ) -> JsonObject:
     command = proposal["command"]
     assert isinstance(command, dict)
@@ -138,11 +205,29 @@ def processor_arguments(
 
 
 def process(
-    cfg: Path, operation: CompanyOperation, arguments: JsonObject, at: datetime = NOW,
+    cfg: Path,
+    operation: CompanyOperation,
+    arguments: JsonObject,
+    at: datetime = NOW,
 ) -> JsonObject:
-    return run(cfg, signed_request(
-        operation, arguments, PROCESSOR_KEY, "processor", PROCESSOR, at,
-    ), now=at, process_only=True)
+    from tests.company_approver_test_runtime import provider_for_config
+
+    provider, observed = provider_for_config(cfg)
+    return run(
+        cfg,
+        signed_request(
+            operation,
+            arguments,
+            PROCESSOR_KEY,
+            "processor",
+            PROCESSOR,
+            at,
+        ),
+        now=at,
+        process_only=True,
+        freshness_provider=provider,
+        observed_checkpoint=observed,
+    )
 
 
 def states(cfg: Path) -> list[tuple[str, int]]:
@@ -183,7 +268,8 @@ def test_enrollment_guards_legacy_siblings_and_raw_helpers(configured: Path) -> 
         pytest.raises(CompanyMemoryError, match="COMPANY_OWNER_APPROVAL_REQUIRED"),
     ):
         _ = store.accept(
-            CONTEXT.workspace_id, "new-after-enrollment",
+            CONTEXT.workspace_id,
+            "new-after-enrollment",
             SourceAccess(CONTEXT.principal, CONTEXT.projects, CONTEXT.policy_revision),
             (CONTEXT.deletion_sequence, CONTEXT.deletion_set_root),
         )
@@ -191,7 +277,9 @@ def test_enrollment_guards_legacy_siblings_and_raw_helpers(configured: Path) -> 
     assert states(configured) == [("candidate", 2)]
 
 
-def test_owner_approved_lifecycle_replays_after_expiry_without_new_consumption(configured: Path) -> None:
+def test_owner_approved_lifecycle_replays_after_expiry_without_new_consumption(
+    configured: Path,
+) -> None:
     # Given a prepared candidate and representative approval.
     _ = enroll(configured)
     proposal = first_proposal(handoff(configured))
@@ -228,12 +316,19 @@ def test_rejection_is_terminal_and_exact_replay_is_safe(configured: Path) -> Non
     assert states(configured) == [("rejected", 1)]
 
 
-@pytest.mark.parametrize("changes", [
-    {"request_id": "different-request"}, {"command_digest": "sha256:" + "b" * 64},
-    {"signer_principal_id": PROCESSOR}, {"key_id": "untrusted"},
-    {"max_uses": 2}, {"decision": "reject"},
-    {"expires_at": format_instant(NOW)}, {"issued_at": format_instant(NOW + timedelta(seconds=1))},
-])
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"request_id": "different-request"},
+        {"command_digest": "sha256:" + "b" * 64},
+        {"signer_principal_id": PROCESSOR},
+        {"key_id": "untrusted"},
+        {"max_uses": 2},
+        {"decision": "reject"},
+        {"expires_at": format_instant(NOW)},
+        {"issued_at": format_instant(NOW + timedelta(seconds=1))},
+    ],
+)
 def test_invalid_owner_binding_never_changes_state(configured: Path, changes: JsonObject) -> None:
     # Given a signed but unacceptable owner receipt.
     _ = enroll(configured)
@@ -241,9 +336,14 @@ def test_invalid_owner_binding_never_changes_state(configured: Path, changes: Js
     before = (configured.parent / "company" / "company.db").read_bytes()
     # When attempting acceptance.
     with pytest.raises((CompanyAuthorityRejected, CompanyMemoryError, ValueError)):
-        _ = process(configured, "accept", processor_arguments(
-            proposal, owner_receipt(proposal, changes=changes),
-        ))
+        _ = process(
+            configured,
+            "accept",
+            processor_arguments(
+                proposal,
+                owner_receipt(proposal, changes=changes),
+            ),
+        )
     # Then decision consumption and state changes both roll back.
     assert (configured.parent / "company" / "company.db").read_bytes() == before
 
@@ -267,8 +367,12 @@ def test_missing_forged_or_transplanted_approval_fails(configured: Path) -> None
     assert states(configured) == [("candidate", 1)]
 
 
-@pytest.mark.parametrize("operation", ["receive", "read", "list_candidates", "handoff", "enroll_handoff"])
-def test_processor_cannot_perform_other_writes_or_reads(configured: Path, operation: CompanyOperation) -> None:
+@pytest.mark.parametrize(
+    "operation", ["receive", "read", "list_candidates", "handoff", "enroll_handoff"]
+)
+def test_processor_cannot_perform_other_writes_or_reads(
+    configured: Path, operation: CompanyOperation
+) -> None:
     # Given the dedicated processor's otherwise valid signing key.
     _ = enroll(configured)
     # When requesting any non-transition operation through its endpoint.
@@ -287,23 +391,47 @@ def test_expired_unconsumed_proposal_renews_but_old_approval_cannot_apply(config
     renewed = first_proposal(handoff(configured, later))
     assert renewed["idempotency_key"] == first["idempotency_key"]
     assert renewed["command"] != first["command"]
+    first_command = first["command"]
+    renewed_command = renewed["command"]
+    identity = first["idempotency_key"]
+    assert isinstance(identity, str)
+    assert isinstance(first_command, dict) and isinstance(renewed_command, dict)
+    assert first_command["request_id"] == identity + ":1"
+    assert renewed_command["request_id"] == identity + ":2"
     with pytest.raises(CompanyAuthorityRejected, match="COMPANY_HANDOFF_REQUIRED"):
-        _ = process(configured, "accept", processor_arguments(
-            first, owner_receipt(first, at=later),
-        ), later)
+        _ = process(
+            configured,
+            "accept",
+            processor_arguments(
+                first,
+                owner_receipt(first, at=later),
+            ),
+            later,
+        )
     # Then only the new generation can be accepted.
-    assert process(configured, "accept", processor_arguments(
-        renewed, owner_receipt(renewed, at=later),
-    ), later)["state"] == "accepted"
+    assert (
+        process(
+            configured,
+            "accept",
+            processor_arguments(
+                renewed,
+                owner_receipt(renewed, at=later),
+            ),
+            later,
+        )["state"]
+        == "accepted"
+    )
 
 
 def test_concurrent_prepare_deduplicates_without_timing_luck(configured: Path) -> None:
     # Given an enrolled candidate and two callers synchronized before execution.
     _ = enroll(configured)
     ready = Barrier(2, timeout=10)
+
     def prepare() -> JsonObject:
         _ = ready.wait()
         return handoff(configured)
+
     # When both callers prepare the same candidate on independent connections.
     with ThreadPoolExecutor(max_workers=2) as pool:
         a, b = pool.submit(prepare), pool.submit(prepare)
@@ -323,6 +451,14 @@ def test_private_config_and_separate_keys_are_required(configured: Path) -> None
     policy = document["handoff_policy"]
     assert isinstance(policy, dict)
     policy["owner_approval_keys"] = {"owner": encoded_public(PROCESSOR_KEY)}
+    policy["approver_keys"] = [
+        {
+            "key_id": "owner",
+            "algorithm": "Ed25519",
+            "purpose": "decision",
+            "public_key_fingerprint": public_key_fingerprint(PROCESSOR_KEY.public_key()),
+        }
+    ]
     _ = configured.write_bytes(canonical_bytes(document))
     with pytest.raises(CompanyMemoryError, match="KEYS_NOT_SEPARATE"):
         _ = enroll(configured)
@@ -332,17 +468,36 @@ def test_real_cli_enrollment_handoff_and_denial(configured: Path) -> None:
     # Given a private fixture config and the real CLI main in an isolated child.
     instant = FrozenTask30DateTime.now(UTC)
     requests = [
-        ("enroll-handoff", signed_request(
-            "enroll_handoff", {}, ENROLL_KEY, "enroll", at=instant,
-        )),
+        (
+            "enroll-handoff",
+            signed_request(
+                "enroll_handoff",
+                {},
+                ENROLL_KEY,
+                "enroll",
+                at=instant,
+            ),
+        ),
         ("handoff", signed_request("handoff", PAGE, at=instant)),
     ]
     outputs: list[JsonObject] = []
     # When enrolling and exporting through stdin/stdout.
     for action, payload in requests:
         result = subprocess.run(
-            [*CLI_COMMAND, action, "--config", str(configured)],
-            input=payload, capture_output=True, timeout=15, check=False,
+            [
+                sys.executable,
+                "-m",
+                "tests.company_approver_test_cli",
+                "--test-now",
+                format_instant(instant),
+                action,
+                "--config",
+                str(configured),
+            ],
+            input=payload,
+            capture_output=True,
+            timeout=15,
+            check=False,
         )
         assert result.returncode == 0, result.stderr.decode()
         outputs.append(decoded_object(result.stdout))
@@ -350,9 +505,12 @@ def test_real_cli_enrollment_handoff_and_denial(configured: Path) -> None:
     proposal = first_proposal(outputs[1])
     result = subprocess.run(
         [*CLI_COMMAND, "process", "--config", str(configured)],
-        input=signed_request("accept", processor_arguments(proposal),
-                             PROCESSOR_KEY, "processor", PROCESSOR, instant),
-        capture_output=True, timeout=15, check=False,
+        input=signed_request(
+            "accept", processor_arguments(proposal), PROCESSOR_KEY, "processor", PROCESSOR, instant
+        ),
+        capture_output=True,
+        timeout=15,
+        check=False,
     )
     assert result.returncode == 2
     assert "error" in decoded_object(result.stderr)
@@ -365,30 +523,47 @@ def test_empty_page_and_missing_enrollment(configured: Path) -> None:
         _ = handoff(configured)
     _ = enroll(configured)
     proposal = first_proposal(handoff(configured))
-    _ = process(configured, "reject", processor_arguments(proposal, owner_receipt(proposal, "reject")))
+    _ = process(
+        configured, "reject", processor_arguments(proposal, owner_receipt(proposal, "reject"))
+    )
     # When no pending candidates remain.
     page = handoff(configured)
     # Then the empty result is explicit and the rejection is not queued again.
     assert page["count"] == 0 and page["handoffs"] == []
 
 
-@pytest.mark.parametrize("principal,key,key_id", [
-    (CONTEXT.principal, PROCESSOR_KEY, "processor"),
-    (PROCESSOR, KEY, KEY_ID),
-    (PROCESSOR, OWNER_KEY, "owner"),
-])
+@pytest.mark.parametrize(
+    "principal,key,key_id",
+    [
+        (CONTEXT.principal, PROCESSOR_KEY, "processor"),
+        (PROCESSOR, KEY, KEY_ID),
+        (PROCESSOR, OWNER_KEY, "owner"),
+    ],
+)
 def test_wrong_processor_identity_or_key_cannot_transition(
-    configured: Path, principal: str, key: Ed25519PrivateKey, key_id: str,
+    configured: Path,
+    principal: str,
+    key: Ed25519PrivateKey,
+    key_id: str,
 ) -> None:
     # Given a valid owner receipt but the wrong executor identity.
     _ = enroll(configured)
     proposal = first_proposal(handoff(configured))
     args = processor_arguments(proposal, owner_receipt(proposal))
     before = (configured.parent / "company" / "company.db").read_bytes()
+    from tests.company_approver_test_runtime import provider_for_config
+
+    provider, observed = provider_for_config(configured)
     # When submitting that otherwise bound decision.
     with pytest.raises(CompanyAuthorityRejected, match="COMPANY_AUTHORITY_REQUIRED"):
-        _ = run(configured, signed_request("accept", args, key, key_id, principal),
-                now=NOW, process_only=True)
+        _ = run(
+            configured,
+            signed_request("accept", args, key, key_id, principal),
+            now=NOW,
+            process_only=True,
+            freshness_provider=provider,
+            observed_checkpoint=observed,
+        )
     # Then neither approval consumption nor transition happens.
     assert (configured.parent / "company" / "company.db").read_bytes() == before
 
@@ -425,11 +600,19 @@ def test_consumed_owner_key_revocation_blocks_completion_and_replay(configured: 
     policy = document["handoff_policy"]
     assert isinstance(policy, dict)
     policy["owner_approval_keys"] = {"rotated-owner": encoded_public(OWNER_KEY)}
+    policy["approver_keys"] = [
+        {
+            "key_id": "rotated-owner",
+            "algorithm": "Ed25519",
+            "purpose": "decision",
+            "public_key_fingerprint": public_key_fingerprint(OWNER_KEY.public_key()),
+        }
+    ]
     _ = configured.write_bytes(canonical_bytes(document))
     # When the old signer has been removed from current trust.
-    with pytest.raises(CompanyAuthorityRejected, match="OWNER_APPROVAL_REQUIRED"):
+    with pytest.raises(CompanyAuthorityRejected, match="ENROLLMENT_REQUIRED"):
         _ = process(configured, "mark_processed", processor_arguments(proposal))
-    with pytest.raises(CompanyAuthorityRejected, match="OWNER_APPROVAL_REQUIRED"):
+    with pytest.raises(CompanyAuthorityRejected, match="ENROLLMENT_REQUIRED"):
         _ = process(configured, "accept", args)
     # Then durable consumption does not evade key removal.
     assert states(configured) == [("accepted", 1)]
@@ -448,8 +631,11 @@ def test_conflicting_enrollment_does_not_replace_owner_context(configured: Path)
         _ = enroll(configured)
     # Then legacy keys still cannot transition that workspace.
     with pytest.raises(CompanyMemoryError, match="OWNER_APPROVAL_REQUIRED"):
-        _ = run(configured.parent / "legacy.json",
-                signed_request("accept", {"candidate_id": RECEIVE["candidate_id"]}), now=NOW)
+        _ = run(
+            configured.parent / "legacy.json",
+            signed_request("accept", {"candidate_id": RECEIVE["candidate_id"]}),
+            now=NOW,
+        )
 
 
 def test_failed_receipt_commit_rolls_back_decision_and_transition(configured: Path) -> None:
@@ -492,7 +678,9 @@ def test_corrupt_persisted_handoff_is_not_reexported(configured: Path) -> None:
     _ = enroll(configured)
     _ = handoff(configured)
     with closing(sqlite3.connect(configured.parent / "company" / "company.db")) as db:
-        _ = db.execute("UPDATE company_handoff_outbox SET command_digest=?", ("sha256:" + "c" * 64,))
+        _ = db.execute(
+            "UPDATE company_handoff_outbox SET command_digest=?", ("sha256:" + "c" * 64,)
+        )
         db.commit()
     # When exporting it again.
     with pytest.raises(CompanyAuthorityRejected, match="HANDOFF_CONFLICT"):
@@ -504,6 +692,7 @@ def test_corrupt_persisted_handoff_is_not_reexported(configured: Path) -> None:
 def test_enrollment_rejects_numbers_javascript_cannot_represent(configured: Path) -> None:
     # Given a deletion sequence above JavaScript's exact integer range.
     from dataclasses import replace
+
     document = decoded_object(configured.read_bytes())
     policy = CompanyHandoffPolicy.model_validate(document["handoff_policy"])
     # When constructing the cross-language enrollment context.

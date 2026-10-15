@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 import os
+import sqlite3
 import stat
 import sys
 from contextlib import closing, nullcontext
@@ -12,11 +13,22 @@ from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
+from uuid import uuid4
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import Field, ValidationError
 
-from sb.company_memory import CompanyMemoryError, CompanyMemoryStore
+from sb.company_approver_binding import CompanyHandoffPolicy, binding_digest
+from sb.company_freshness import (
+    Checkpoint,
+    CompanyFreshnessProvider,
+    FreshnessProviderConfig,
+    FreshnessScope,
+    ReadFreshnessRequest,
+    provider_from_config,
+    require_freshness,
+)
+from sb.company_memory import CompanyMemoryError, CompanyMemoryStore, MemoryCandidate
 from sb.company_memory_authority import (
     CompanyAuthorityContext,
     CompanyAuthorityRejected,
@@ -26,15 +38,29 @@ from sb.company_memory_authority import (
     verify_company_authority,
 )
 from sb.company_memory_handoff import (
-    CompanyHandoffPolicy,
     authorize_transition,
-    enrollment_context,
+    enroll_policy,
     prepare_handoff,
     require_enrollment,
 )
 from sb.company_memory_reader import list_mail_candidates
 from sb.company_memory_registration import register_original, registration_lock
 from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
+from sb.company_processor_finish import (
+    PendingFinish,
+    resume_pending_finish,
+    save_pending_finish,
+)
+from sb.company_processor_progress import (
+    local_checkpoint,
+    reserve_operation,
+    save_checkpoint,
+)
+from sb.company_transition_receipt import (
+    TransitionReceiptSelector,
+    read_original_receipt,
+    read_transition_receipt,
+)
 from sb.effect_values import (
     CanonicalValueError,
     JsonObject,
@@ -67,6 +93,9 @@ class CompanyCliConfigV1(ClosedModel):
     source_profile: CompanySourceProfile | None = None
     key_scopes: dict[str, CompanyKeyScope] = Field(default_factory=dict)
     handoff_policy: CompanyHandoffPolicy | None = None
+    freshness_provider: FreshnessProviderConfig = Field(
+        default_factory=lambda: FreshnessProviderConfig(schema_version=2, kind="unconfigured"),
+    )
 
 
 def _object(value: JsonValue, code: str) -> JsonObject:
@@ -122,16 +151,34 @@ def _trusted_keys(values: dict[str, str]) -> dict[str, Ed25519PublicKey]:
 
 
 def _validate_arguments(
-    operation: str, arguments: JsonObject, keys_only: bool, processor: bool = False,
+    operation: str,
+    arguments: JsonObject,
+    keys_only: bool,
+    processor: bool = False,
 ) -> None:
     if processor:
+        if operation == "read_transition_receipt":
+            expected = {
+                "candidate_id",
+                "handoff_id",
+                "operation",
+                "transition_request_digest",
+                "command_digest",
+                "content_digest",
+                "approval_policy_version",
+                "approval_binding_digest",
+            }
+            if set(arguments) != expected:
+                raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
+            return
         if operation not in {"accept", "reject", "mark_processed"}:
             raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
         expected = {"candidate_id", "handoff_id"}
         if operation != "mark_processed":
             expected.add("approval")
         if (
-            set(arguments) != expected or not isinstance(arguments["candidate_id"], str)
+            set(arguments) != expected
+            or not isinstance(arguments["candidate_id"], str)
             or not isinstance(arguments["handoff_id"], str)
         ):
             raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
@@ -194,13 +241,24 @@ def run(
     handoff_only: bool = False,
     enroll_handoff: bool = False,
     process_only: bool = False,
+    receipt_only: bool = False,
+    freshness_provider: CompanyFreshnessProvider | None = None,
+    observed_checkpoint: Checkpoint | None = None,
 ) -> JsonObject:
     """Serialize registrations before reading trusted config; legacy calls stay read-only."""
     with registration_lock(config_path) if register_source else nullcontext():
         return _run(
-            config_path, raw_request, now=now, register_source=register_source,
+            config_path,
+            raw_request,
+            now=now,
+            register_source=register_source,
             candidates_only=candidates_only,
-            handoff_only=handoff_only, enroll_handoff=enroll_handoff, process_only=process_only,
+            handoff_only=handoff_only,
+            enroll_handoff=enroll_handoff,
+            process_only=process_only,
+            receipt_only=receipt_only,
+            freshness_provider=freshness_provider,
+            observed_checkpoint=observed_checkpoint,
         )
 
 
@@ -214,13 +272,29 @@ def _run(
     handoff_only: bool,
     enroll_handoff: bool,
     process_only: bool,
+    receipt_only: bool,
+    freshness_provider: CompanyFreshnessProvider | None,
+    observed_checkpoint: Checkpoint | None,
 ) -> JsonObject:
-    if sum((register_source, candidates_only, handoff_only, enroll_handoff, process_only)) > 1:
+    if (
+        sum(
+            (
+                register_source,
+                candidates_only,
+                handoff_only,
+                enroll_handoff,
+                process_only,
+                receipt_only,
+            )
+        )
+        > 1
+    ):
         raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
-    if handoff_only or enroll_handoff or process_only:
+    if handoff_only or enroll_handoff or process_only or receipt_only:
         info = config_path.lstat()
         if (
-            not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600
+            not stat.S_ISREG(info.st_mode)
+            or stat.S_IMODE(info.st_mode) != 0o600
             or info.st_uid != os.getuid()
         ):
             raise CompanyMemoryError("COMPANY_HANDOFF_CONFIG_PRIVATE_REQUIRED")
@@ -242,7 +316,7 @@ def _run(
     policy = config.handoff_policy
     owner_keys: dict[str, Ed25519PublicKey] = {}
     processor_keys: dict[str, Ed25519PublicKey] = {}
-    if handoff_only or enroll_handoff or process_only:
+    if handoff_only or enroll_handoff or process_only or receipt_only:
         if policy is None or policy.processor_principal_id == config.principal_id:
             raise CompanyMemoryError("COMPANY_HANDOFF_POLICY_REQUIRED")
         owner_keys = _trusted_keys(policy.owner_approval_keys)
@@ -252,8 +326,13 @@ def _run(
             {key.public_bytes_raw() for key in group.values()}
             for group in (owner_keys, processor_keys, legacy_keys)
         ]
-        if any(groups[i] & groups[j] for i, j in ((0, 1), (0, 2), (1, 2))):
+        id_groups = [set(group) for group in (owner_keys, processor_keys, legacy_keys)]
+        if any(
+            groups[i] & groups[j] or id_groups[i] & id_groups[j]
+            for i, j in ((0, 1), (0, 2), (1, 2))
+        ):
             raise CompanyMemoryError("COMPANY_HANDOFF_KEYS_NOT_SEPARATE")
+        _ = binding_digest(context, policy)
     content = ""
     if register_source:
         envelope = _object(strict_loads(raw_request, _MAX_REQUEST), "COMPANY_REQUEST_INVALID")
@@ -263,47 +342,161 @@ def _run(
         if not isinstance(payload, str):
             raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
         content = payload
-        raw_request = canonical_bytes({
-            "authority": envelope["authority"], "arguments": envelope["arguments"],
-        })
+        raw_request = canonical_bytes(
+            {
+                "authority": envelope["authority"],
+                "arguments": envelope["arguments"],
+            }
+        )
     authority, authority_value, arguments = _request(
-        raw_request, register_source or config.source_profile is not None, process_only,
+        raw_request,
+        register_source or config.source_profile is not None,
+        process_only or receipt_only,
     )
     instant = now or datetime.now(UTC)
-    if process_only:
+    provider = freshness_provider or provider_from_config(config.freshness_provider)
+    # Preserve the unavailable product's early refusal. Recovery below is only
+    # reached after authenticating a caller that can finish committed work.
+    if freshness_provider is None and (handoff_only or enroll_handoff or process_only):
+        assert policy is not None
+        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
+    if process_only or receipt_only:
         assert policy is not None
         _ = verify_company_authority(
-            authority_value, arguments, processor_keys,
-            replace(context, principal=policy.processor_principal_id), instant,
-            key_scopes={key: CompanyKeyScope(
-                operations=["accept", "reject", "mark_processed"], source_systems=["mail"],
-            ) for key in processor_keys},
+            authority_value,
+            arguments,
+            processor_keys,
+            replace(context, principal=policy.processor_principal_id),
+            instant,
+            key_scopes={
+                key: CompanyKeyScope(
+                    operations=["read_transition_receipt"]
+                    if receipt_only
+                    else [
+                        "accept",
+                        "reject",
+                        "mark_processed",
+                    ],
+                    source_systems=["mail"],
+                )
+                for key in processor_keys
+            },
         )
+        if receipt_only:
+            if authority.operation != "read_transition_receipt":
+                raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
+            return read_transition_receipt(database, context, policy, authority, arguments)
         match authority.operation:
             case "accept" | "reject" | "mark_processed" as operation:
                 pass
             case _:
                 raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
+        resume_pending_finish(database, context, policy, provider)
+        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
         with closing(CompanyMemoryStore(database)) as store:
+
+            def authorize(db: sqlite3.Connection, candidate: MemoryCandidate) -> None:
+                assert policy is not None
+                checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+                checkpoint = _check_freshness(
+                    provider,
+                    checkpoint,
+                    context,
+                    policy,
+                    authority.nonce,
+                )
+
+                def verify_original(selector: JsonObject) -> None:
+                    assert policy is not None
+                    original = read_original_receipt(
+                        db, context, policy, TransitionReceiptSelector.model_validate(selector)
+                    )
+                    if original is None:
+                        raise CompanyAuthorityRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+
+                authorize_transition(
+                    db,
+                    candidate,
+                    context,
+                    policy,
+                    owner_keys,
+                    operation,
+                    arguments,
+                    authority.request_digest,
+                    instant,
+                    verify_original,
+                )
+                # A verified cached receipt is an original fact read, not another effect.
+                if db.execute(
+                    "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
+                    (context.workspace_id, authority.request_digest),
+                ).fetchone():
+                    return
+                command_row = cast(
+                    tuple[str],
+                    db.execute(
+                        """SELECT command_digest FROM company_handoff_outbox
+                        WHERE workspace_id=? AND candidate_id=? AND request_id=?""",
+                        (context.workspace_id, candidate.candidate_id, arguments["handoff_id"]),
+                    ).fetchone(),
+                )
+                assert isinstance(arguments["handoff_id"], str)
+                operation_id, reservation = reserve_operation(
+                    provider,
+                    FreshnessScope(
+                        provider_instance_id=context.provider,
+                        workspace_id=context.workspace_id,
+                    ),
+                    operation,
+                    arguments["handoff_id"],
+                    command_row[0],
+                    authority.request_digest,
+                    checkpoint,
+                )
+                assert reservation.checkpoint is not None
+                # Intent acknowledgment precedes the SQL effect; its checkpoint commits
+                # with the original receipt so a restored DB cannot echo a newer head.
+                save_checkpoint(db, context.workspace_id, reservation.checkpoint, checkpoint)
+                save_pending_finish(
+                    db,
+                    context.workspace_id,
+                    authority.request_digest,
+                    PendingFinish(
+                        operation=operation,
+                        operation_id=operation_id,
+                        reservation=reservation,
+                    ),
+                )
+
             receipt = store.execute(
-                workspace_id=config.workspace_id, request_digest=authority.request_digest,
-                operation=operation, arguments=arguments, current=scope,
-                deletion=(config.deletion_sequence, config.deletion_set_root), now=instant,
-                authorization=lambda db, candidate: authorize_transition(
-                    db, candidate, context, policy, owner_keys, operation, arguments,
-                    authority.request_digest, instant,
-                ),
+                workspace_id=config.workspace_id,
+                request_digest=authority.request_digest,
+                operation=operation,
+                arguments=arguments,
+                current=scope,
+                deletion=(config.deletion_sequence, config.deletion_set_root),
+                now=instant,
+                authorization=authorize,
             )
+            resume_pending_finish(database, context, policy, provider)
         # Processor never returns candidate content or the content-bearing legacy receipt.
         return {
-            "receipt_id": receipt.receipt_id, "receipt_digest": receipt.receipt_digest,
-            "operation": receipt.operation, "state": receipt.result["state"],
+            "receipt_id": receipt.receipt_id,
+            "receipt_digest": receipt.receipt_digest,
+            "operation": receipt.operation,
+            "state": receipt.result["state"],
             "handoff_id": arguments["handoff_id"],
         }
     if policy is not None and authority.operation in {"accept", "reject", "mark_processed"}:
         raise CompanyAuthorityRejected("COMPANY_PROCESSOR_REQUIRED")
     verified, current = verify_company_authority(
-        authority_value, arguments, _trusted_keys(config.trusted_keys), context, instant,
+        authority_value,
+        arguments,
+        _trusted_keys(config.trusted_keys),
+        context,
+        instant,
         key_scopes=config.key_scopes,
     )
     if verified != authority:
@@ -312,21 +505,30 @@ def _run(
         expected = "enroll_handoff" if enroll_handoff else "handoff"
         key_scope = config.key_scopes.get(authority.signing_key_id)
         if (
-            not (handoff_only or enroll_handoff) or authority.operation != expected
-            or key_scope is None or key_scope.operations != [expected]
-            or key_scope.source_systems != ["mail"] or policy is None
+            not (handoff_only or enroll_handoff)
+            or authority.operation != expected
+            or key_scope is None
+            or key_scope.operations != [expected]
+            or key_scope.source_systems != ["mail"]
+            or policy is None
         ):
             raise CompanyAuthorityRejected("COMPANY_HANDOFF_OPERATION_DENIED")
+        resume_pending_finish(database, context, policy, provider)
+        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
         with closing(CompanyMemoryStore(database)) as store, store.db:
             _ = store.db.execute("BEGIN IMMEDIATE")
+            checkpoint = _check_freshness(
+                provider,
+                local_checkpoint(database, context.workspace_id, observed_checkpoint),
+                context,
+                policy,
+                authority.nonce,
+            )
             if enroll_handoff:
-                _ = store.db.execute(
-                    """INSERT INTO company_handoff_enrollment VALUES(?,?)
-                    ON CONFLICT(workspace_id) DO NOTHING""",
-                    (context.workspace_id, enrollment_context(context, policy)),
-                )
-                require_enrollment(store.db, context, policy)
-                return {"enrolled": True, "approval_required": True}
+                result = enroll_policy(store.db, context, policy, authority_value, instant)
+                save_checkpoint(store.db, context.workspace_id, checkpoint)
+                return result
             require_enrollment(store.db, context, policy)
             page = list_mail_candidates(database, context, arguments)
             rows = page["candidates"]
@@ -335,7 +537,9 @@ def _run(
             for row in rows:
                 assert isinstance(row, dict) and isinstance(row["candidate_id"], str)
                 candidate = store.get(
-                    context.workspace_id, row["candidate_id"], scope,
+                    context.workspace_id,
+                    row["candidate_id"],
+                    scope,
                     (context.deletion_sequence, context.deletion_set_root),
                 )
                 handoffs.append(prepare_handoff(store.db, candidate, context, policy, instant))
@@ -364,9 +568,17 @@ def _run(
         document = model_object(config)
         if "handoff_policy" not in config.model_fields_set:
             del document["handoff_policy"]
+        if "freshness_provider" not in config.model_fields_set:
+            del document["freshness_provider"]
         return register_original(
-            config_path, document, database, config.source_profile,
-            arguments, content, _MAX_CONFIG, config.personal_data_roots,
+            config_path,
+            document,
+            database,
+            config.source_profile,
+            arguments,
+            content,
+            _MAX_CONFIG,
+            config.personal_data_roots,
         )
     if authority.operation == "receive" and config.source_profile is not None:
         arguments = {
@@ -393,32 +605,89 @@ def _run(
         store.close()
 
 
-def main(argv: list[str] | None = None) -> int:
+def _check_freshness(
+    provider: CompanyFreshnessProvider,
+    checkpoint: Checkpoint | None,
+    context: CompanyAuthorityContext,
+    policy: CompanyHandoffPolicy,
+    challenge: str,
+) -> Checkpoint:
+    if checkpoint is not None and (
+        checkpoint.approval_policy_version != policy.approval_policy_version
+        or checkpoint.approval_binding_digest != binding_digest(context, policy)
+    ):
+        raise CompanyAuthorityRejected("COMPANY_HANDOFF_ENROLLMENT_REQUIRED")
+    verified = require_freshness(
+        provider,
+        ReadFreshnessRequest(
+            schema_version=2,
+            scope=FreshnessScope(
+                provider_instance_id=context.provider,
+                workspace_id=context.workspace_id,
+            ),
+            installation_id=context.provider,
+            challenge=f"{challenge}:{uuid4().hex}",
+            observed_checkpoint=checkpoint,
+        ),
+    )
+    if (
+        verified.approval_policy_version != policy.approval_policy_version
+        or verified.approval_binding_digest != binding_digest(context, policy)
+    ):
+        raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
+    return verified
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    freshness_provider: CompanyFreshnessProvider | None = None,
+    observed_checkpoint: Checkpoint | None = None,
+    now: datetime | None = None,
+) -> int:
     parser = argparse.ArgumentParser(prog="sb-company")
     _ = parser.add_argument(
-        "action", nargs="?",
-        choices=["register-source", "candidates", "enroll-handoff", "handoff", "process"],
+        "action",
+        nargs="?",
+        choices=[
+            "register-source",
+            "candidates",
+            "enroll-handoff",
+            "handoff",
+            "process",
+            "receipt",
+        ],
     )
     _ = parser.add_argument("--config", type=Path)
     args = parser.parse_args(argv)
     action = cast(str | None, args.action)
     config_path = cast(Path | None, args.config)
     if config_path is None:
-        variable = "SB_COMPANY_PROCESSOR_CONFIG" if action == "process" else (
-            "SB_COMPANY_HANDOFF_CONFIG" if action in {"handoff", "enroll-handoff"} else None
+        variable = (
+            "SB_COMPANY_PROCESSOR_CONFIG"
+            if action in {"process", "receipt"}
+            else ("SB_COMPANY_HANDOFF_CONFIG" if action in {"handoff", "enroll-handoff"} else None)
         )
         configured = os.environ.get(variable, "") if variable else ""
         if not configured:
-            parser.error("--config is required (or the action-specific config environment variable)")
+            parser.error(
+                "--config is required (or the action-specific config environment variable)"
+            )
         config_path = Path(configured)
     previous_umask = os.umask(0o077)
     try:
         result = run(
-            config_path, sys.stdin.buffer.read(_MAX_REQUEST + 1),
+            config_path,
+            sys.stdin.buffer.read(_MAX_REQUEST + 1),
+            now=now,
             register_source=action == "register-source",
             candidates_only=action == "candidates",
-            handoff_only=action == "handoff", enroll_handoff=action == "enroll-handoff",
+            handoff_only=action == "handoff",
+            enroll_handoff=action == "enroll-handoff",
             process_only=action == "process",
+            receipt_only=action == "receipt",
+            freshness_provider=freshness_provider,
+            observed_checkpoint=observed_checkpoint,
         )
         _ = sys.stdout.buffer.write(canonical_bytes(result) + b"\n")
         return 0
