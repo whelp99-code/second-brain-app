@@ -25,6 +25,7 @@ from sb.company_freshness import (
     FreshnessProviderConfig,
     FreshnessScope,
     ReadFreshnessRequest,
+    ReserveProgressResponse,
     provider_from_config,
     require_freshness,
 )
@@ -46,6 +47,12 @@ from sb.company_memory_handoff import (
 from sb.company_memory_reader import list_mail_candidates
 from sb.company_memory_registration import register_original, registration_lock
 from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
+from sb.company_processor_progress import (
+    finish_operation,
+    local_checkpoint,
+    reserve_operation,
+    save_checkpoint,
+)
 from sb.company_transition_receipt import (
     TransitionReceiptSelector,
     read_original_receipt,
@@ -347,7 +354,8 @@ def _run(
     provider = freshness_provider or provider_from_config(config.freshness_provider)
     if handoff_only or enroll_handoff or process_only:
         assert policy is not None
-        _check_freshness(provider, observed_checkpoint, context, policy, "startup")
+        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
     if process_only or receipt_only:
         assert policy is not None
         _ = verify_company_authority(
@@ -380,10 +388,18 @@ def _run(
             case _:
                 raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
         with closing(CompanyMemoryStore(database)) as store:
+            reservations: list[tuple[str, ReserveProgressResponse]] = []
 
             def authorize(db: sqlite3.Connection, candidate: MemoryCandidate) -> None:
                 assert policy is not None
-                _check_freshness(provider, observed_checkpoint, context, policy, authority.nonce)
+                checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+                checkpoint = _check_freshness(
+                    provider,
+                    checkpoint,
+                    context,
+                    policy,
+                    authority.nonce,
+                )
 
                 def verify_original(selector: JsonObject) -> None:
                     assert policy is not None
@@ -405,6 +421,38 @@ def _run(
                     instant,
                     verify_original,
                 )
+                # A verified cached receipt is an original fact read, not another effect.
+                if db.execute(
+                    "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
+                    (context.workspace_id, authority.request_digest),
+                ).fetchone():
+                    return
+                command_row = cast(
+                    tuple[str],
+                    db.execute(
+                        """SELECT command_digest FROM company_handoff_outbox
+                        WHERE workspace_id=? AND candidate_id=? AND request_id=?""",
+                        (context.workspace_id, candidate.candidate_id, arguments["handoff_id"]),
+                    ).fetchone(),
+                )
+                assert isinstance(arguments["handoff_id"], str)
+                operation_id, reservation = reserve_operation(
+                    provider,
+                    FreshnessScope(
+                        provider_instance_id=context.provider,
+                        workspace_id=context.workspace_id,
+                    ),
+                    operation,
+                    arguments["handoff_id"],
+                    command_row[0],
+                    authority.request_digest,
+                    checkpoint,
+                )
+                assert reservation.checkpoint is not None
+                # Intent acknowledgment precedes the SQL effect; its checkpoint commits
+                # with the original receipt so a restored DB cannot echo a newer head.
+                save_checkpoint(db, context.workspace_id, reservation.checkpoint, checkpoint)
+                reservations.append((operation_id, reservation))
 
             receipt = store.execute(
                 workspace_id=config.workspace_id,
@@ -416,6 +464,22 @@ def _run(
                 now=instant,
                 authorization=authorize,
             )
+            if reservations:
+                operation_id, reservation = reservations[0]
+                checkpoint = finish_operation(
+                    provider,
+                    operation,
+                    reservation,
+                    operation_id,
+                    receipt.receipt_digest,
+                )
+                with store.db:
+                    save_checkpoint(
+                        store.db,
+                        context.workspace_id,
+                        checkpoint,
+                        reservation.checkpoint,
+                    )
         # Processor never returns candidate content or the content-bearing legacy receipt.
         return {
             "receipt_id": receipt.receipt_id,
@@ -450,9 +514,17 @@ def _run(
             raise CompanyAuthorityRejected("COMPANY_HANDOFF_OPERATION_DENIED")
         with closing(CompanyMemoryStore(database)) as store, store.db:
             _ = store.db.execute("BEGIN IMMEDIATE")
-            _check_freshness(provider, observed_checkpoint, context, policy, authority.nonce)
+            checkpoint = _check_freshness(
+                provider,
+                local_checkpoint(database, context.workspace_id, observed_checkpoint),
+                context,
+                policy,
+                authority.nonce,
+            )
             if enroll_handoff:
-                return enroll_policy(store.db, context, policy, authority_value, instant)
+                result = enroll_policy(store.db, context, policy, authority_value, instant)
+                save_checkpoint(store.db, context.workspace_id, checkpoint)
+                return result
             require_enrollment(store.db, context, policy)
             page = list_mail_candidates(database, context, arguments)
             rows = page["candidates"]
@@ -535,7 +607,12 @@ def _check_freshness(
     context: CompanyAuthorityContext,
     policy: CompanyHandoffPolicy,
     challenge: str,
-) -> None:
+) -> Checkpoint:
+    if checkpoint is not None and (
+        checkpoint.approval_policy_version != policy.approval_policy_version
+        or checkpoint.approval_binding_digest != binding_digest(context, policy)
+    ):
+        raise CompanyAuthorityRejected("COMPANY_HANDOFF_ENROLLMENT_REQUIRED")
     verified = require_freshness(
         provider,
         ReadFreshnessRequest(
@@ -554,6 +631,7 @@ def _check_freshness(
         or verified.approval_binding_digest != binding_digest(context, policy)
     ):
         raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
+    return verified
 
 
 def main(

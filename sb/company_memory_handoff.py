@@ -51,6 +51,10 @@ CREATE TABLE IF NOT EXISTS company_handoff_enrollment (
     workspace_id TEXT PRIMARY KEY,
     context_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS company_processor_checkpoint (
+    workspace_id TEXT PRIMARY KEY,
+    checkpoint_json TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS company_approver_enrollment_audit (
     workspace_id TEXT PRIMARY KEY,
     evidence_json TEXT NOT NULL

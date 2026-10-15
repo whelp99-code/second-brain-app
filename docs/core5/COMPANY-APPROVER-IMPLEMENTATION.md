@@ -65,8 +65,9 @@ Startup and each enrollment/handoff/C4 boundary perform a fresh challenge check,
 without caching readiness. A restored DB/config or locally matching old pin does
 not prove current authority: the default runtime refuses mutations before opening
 the writable store. Normal and malicious restoration tests exercise this directly.
-There is no production freshness backend, activation/recovery API, or independent
-rollback/progress-storage claim in this PR.
+There is no production freshness backend or activation/recovery API in this PR.
+The processor now uses the required reserve/effect/finish ordering below; its
+local checkpoint is comparison state, not independent progress storage.
 
 The shared `TEST_ONLY_memory` definition is implemented **only under tests**.
 Its scope/seed, read, reserve/finish CAS/idempotency and intent-root algorithm are
@@ -81,6 +82,46 @@ changing the head or erasing the reservation.
 The explicit test CLI injects it and a fixed clock into the actual product CLI;
 the product entry point does not import that implementation or expose its flags.
 Volatile test memory is not operational freshness evidence.
+
+### Actual processor reserve/effect/finish ordering
+
+Nahee's review of PR69 head `918332ee` found that the first revision checked
+freshness but did not call the progress methods on the actual processor path.
+The earlier 203-test gate and its APPROVE did not establish that connection.
+The correction keeps the same PR and existing interfaces, not a new provider.
+
+For a new accept/reject/mark_processed operation, the CLI now:
+
+1. Loads its local checkpoint from the existing DB, ignoring a caller's newer
+   observed copy when a durable local record exists; rechecks freshness and C4.
+2. Reserves the stable `company-operation/v1` identity over fixed scope, actual
+   command request ID/digest and operation. Event digest is the original signed
+   transition request digest. Only `reserved` grants one effect.
+3. Commits the reserved checkpoint with the original candidate transition and
+   receipt. Reserve error/conflict/already_reserved cannot change those records.
+4. Calls finish with the reservation and exact committed receipt digest, using
+   the operation's closed terminal state. It saves the returned checkpoint with
+   a local CAS only after the independent finish acknowledgment, before success.
+
+Timeout/unknown finish retains uncertainty. A lost response after finish was
+actually recorded leaves the local reserved checkpoint behind the external head,
+so restart refuses rather than repeating an effect. Restoring an older DB with
+the same config/binding also leaves a stale checkpoint and cannot use a caller's
+latest echo to reopen processing. The two stores do not share an ACID transaction.
+An exact verified cached receipt is an original-fact read, not another reservation
+or effect. Receipt-only lookup remains independent and never finishes an intent.
+
+Local checkpoint initialization is part of the authenticated first enrollment.
+An enrolled DB without its checkpoint is unprovable and blocked, not automatically
+re-enrolled or reseeded. Recovery/reenabling remains separate operator work.
+
+`tests/test_company_processor_progress.py` exercises the actual product
+`run(process_only=True)` with ONE surviving TEST_ONLY registry across calls.
+Its spies read committed SQLite state before reserve and the real committed
+receipt before finish. Success, reserve refusal, finish-before-record failure,
+recorded-finish response loss, cached retry and same-binding DB restoration are
+tested without recreating the provider. The separate subprocess receipt smoke
+uses a fresh declared test factory and is not outside-restore registry proof.
 
 ## Authenticated original receipt lookup
 
@@ -136,10 +177,12 @@ uv run --frozen pytest -q -p no:cacheprovider \
   tests/test_company_freshness.py tests/test_company_test_freshness.py \
   tests/test_company_transition_receipt.py
 uv run --frozen python -m tests.company_approver_smoke --root <owned-empty-QA-root>
+uv run --frozen pytest -q -p no:cacheprovider tests/test_company_processor_progress.py
+uv run --frozen python -m tests.company_processor_progress_smoke --root <owned-empty-progress-QA-root>
 ```
 
-Captured on `jm-omachy` on the final PR89-aligned tree: **203 tests passed in
-8.31 seconds**, related Ruff clean and
+Captured on `jm-omachy` on the corrected processor-progress tree: **221 tests
+passed in 9.15 seconds**, related Ruff clean and
 basedpyright **0 errors, 0 warnings, 0 notes**. The SB portions of T1-T13,
 T16 and T18 are exercised; JARVIS C1-C3/T14/T15/T17 implementation is not
 claimed by this SB PR. The added current-time boundary cases cover before
@@ -155,15 +198,26 @@ and original `2026-09-22T10:00:00.000Z` decision time with unchanged DB bytes,
 no candidate body, no mutation resend and no reject completion.
 The unconfigured product CLI separately refused enrollment with unchanged DB.
 
-Final editor LSP diagnostics and the actual repository basedpyright compiler
-run are clean. Initial new-file resolver snapshots were stale and subsequently
-refreshed; no type/lint suppression was added. Real runtime checks are not
-inferred from the editor or test counts.
+The new actual processor library smoke also ran all three transitions with normal
+finish and recorded-finish acknowledgment loss (six scenarios). Every scenario
+kept one provider object outside the restored DB, measured reserve before the
+effect and committed receipt before finish, then refused same-binding/config DB
+restoration without another reservation, finish or effect. The 18 added processor
+integration cases additionally cover reserve refusal, pre-record finish failure
+and cached receipt retries. These cases supplement, not reinterpret, the original
+subprocess receipt-read evidence.
 
-The single security/goal gate reviewer returned **APPROVE**, no blockers, on the
-locked implementation tree. Its read-only audit checked the actual full diff,
-source and CLI transcript. It did not rerun the suite. The parent captured all
-17 LSP results separately. A documentation-only follow-up corrected the fixture
+The actual repository basedpyright compiler run is clean. The editor's new-module
+import resolver retained a stale snapshot for `company_processor_progress` while
+direct file diagnostics and the compiler resolve it; no type/lint suppression or
+global editor change was made. The original 17-file editor check was clean.
+Real runtime checks are not inferred from the editor or test counts.
+
+The initial security/goal gate reviewer returned **APPROVE**, no blockers, on the
+pre-correction locked tree, but missed the processor progress omission described
+above. It is historical evidence, not approval of the later corrected tree.
+The parent captured all 17 original LSP results separately. A documentation-only
+follow-up corrected the fixture
 size from JavaScript code units to measured UTF-8 bytes; fixture/hash/code did not
 change.
 
