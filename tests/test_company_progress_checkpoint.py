@@ -177,6 +177,8 @@ def test_actual_processor_rejects_each_regressing_checkpoint(
             local_checkpoint(database, settings.workspace_id, None) == provider.reserved_checkpoint
         )
     events = provider.events.copy()
+    before_retry = database.read_bytes()
     with pytest.raises(CompanyAuthorityRejected):
         invoke(config, provider, operation, arguments)
-    assert provider.events == events
+    assert database.read_bytes() == before_retry
+    assert provider.events == events + (["finish"] if phase == "finish" else [])

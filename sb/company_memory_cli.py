@@ -25,7 +25,6 @@ from sb.company_freshness import (
     FreshnessProviderConfig,
     FreshnessScope,
     ReadFreshnessRequest,
-    ReserveProgressResponse,
     provider_from_config,
     require_freshness,
 )
@@ -47,8 +46,12 @@ from sb.company_memory_handoff import (
 from sb.company_memory_reader import list_mail_candidates
 from sb.company_memory_registration import register_original, registration_lock
 from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
+from sb.company_processor_finish import (
+    PendingFinish,
+    resume_pending_finish,
+    save_pending_finish,
+)
 from sb.company_processor_progress import (
-    finish_operation,
     local_checkpoint,
     reserve_operation,
     save_checkpoint,
@@ -352,7 +355,9 @@ def _run(
     )
     instant = now or datetime.now(UTC)
     provider = freshness_provider or provider_from_config(config.freshness_provider)
-    if handoff_only or enroll_handoff or process_only:
+    # Preserve the unavailable product's early refusal. Recovery below is only
+    # reached after authenticating a caller that can finish committed work.
+    if freshness_provider is None and (handoff_only or enroll_handoff or process_only):
         assert policy is not None
         observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
         _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
@@ -387,8 +392,10 @@ def _run(
                 pass
             case _:
                 raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
+        resume_pending_finish(database, context, policy, provider)
+        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
         with closing(CompanyMemoryStore(database)) as store:
-            reservations: list[tuple[str, ReserveProgressResponse]] = []
 
             def authorize(db: sqlite3.Connection, candidate: MemoryCandidate) -> None:
                 assert policy is not None
@@ -452,7 +459,16 @@ def _run(
                 # Intent acknowledgment precedes the SQL effect; its checkpoint commits
                 # with the original receipt so a restored DB cannot echo a newer head.
                 save_checkpoint(db, context.workspace_id, reservation.checkpoint, checkpoint)
-                reservations.append((operation_id, reservation))
+                save_pending_finish(
+                    db,
+                    context.workspace_id,
+                    authority.request_digest,
+                    PendingFinish(
+                        operation=operation,
+                        operation_id=operation_id,
+                        reservation=reservation,
+                    ),
+                )
 
             receipt = store.execute(
                 workspace_id=config.workspace_id,
@@ -464,22 +480,7 @@ def _run(
                 now=instant,
                 authorization=authorize,
             )
-            if reservations:
-                operation_id, reservation = reservations[0]
-                checkpoint = finish_operation(
-                    provider,
-                    operation,
-                    reservation,
-                    operation_id,
-                    receipt.receipt_digest,
-                )
-                with store.db:
-                    save_checkpoint(
-                        store.db,
-                        context.workspace_id,
-                        checkpoint,
-                        reservation.checkpoint,
-                    )
+            resume_pending_finish(database, context, policy, provider)
         # Processor never returns candidate content or the content-bearing legacy receipt.
         return {
             "receipt_id": receipt.receipt_id,
@@ -512,6 +513,9 @@ def _run(
             or policy is None
         ):
             raise CompanyAuthorityRejected("COMPANY_HANDOFF_OPERATION_DENIED")
+        resume_pending_finish(database, context, policy, provider)
+        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
+        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
         with closing(CompanyMemoryStore(database)) as store, store.db:
             _ = store.db.execute("BEGIN IMMEDIATE")
             checkpoint = _check_freshness(

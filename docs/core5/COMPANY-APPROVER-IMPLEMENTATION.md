@@ -74,7 +74,11 @@ Its scope/seed, read, reserve/finish CAS/idempotency and intent-root algorithm a
 verified against every upstream fixture case and concurrent one-winner tests.
 An unresolved reservation always returns `uncertain` with null checkpoint,
 including when the observed checkpoint matches the head. Only its original
-finish can remove uncertainty. Finish uses the remembered reservation operation,
+finish can remove uncertainty. The processor persists that reservation's IDs and
+expected checkpoint in the same transaction as the original effect/receipt.
+Authenticated mutation startup retries this original finish with its committed
+receipt digest before asking for fresh readiness; it never reserves or executes
+the effect again. Finish uses the remembered reservation operation,
 not a caller-chosen operation: approved/rejected/accepted/completed/
 processed_complete/deleted are the closed states, with the exact shared mapping.
 Unknown state is invalid; a known but wrong operation/state pair conflicts without
@@ -92,35 +96,48 @@ The correction keeps the same PR and existing interfaces, not a new provider.
 
 For a new accept/reject/mark_processed operation, the CLI now:
 
-1. Loads its local checkpoint from the existing DB, ignoring a caller's newer
-   observed copy when a durable local record exists; rechecks freshness and C4.
+1. Authenticates the caller, resumes any locally proved committed pending finish,
+   and loads its local checkpoint, ignoring a caller's newer observed copy;
+   rechecks freshness and current C4.
 2. Reserves the stable `company-operation/v1` identity over fixed scope, actual
    command request ID/digest and operation. Event digest is the original signed
    transition request digest. Only `reserved` grants one effect.
-3. Commits the reserved checkpoint with the original candidate transition and
-   receipt. Reserve error/conflict/already_reserved cannot change those records.
+3. Commits the reserved checkpoint, operation/reservation IDs and original
+   reservation response with the original candidate transition/receipt.
+   Reserve error/conflict/already_reserved cannot change those records.
 4. Calls finish with the reservation and exact committed receipt digest, using
    the operation's closed terminal state. It saves the returned checkpoint with
    a local CAS only after the independent finish acknowledgment, before success.
+   The same transaction retires the pending finish record.
 
-Timeout/unknown finish retains uncertainty. A lost response after finish was
-actually recorded leaves the local reserved checkpoint behind the external head,
-so restart refuses rather than repeating an effect. Restoring an older DB with
-the same config/binding also leaves a stale checkpoint and cannot use a caller's
-latest echo to reopen processing. The two stores do not share an ACID transaction.
+Timeout/unknown finish retains the original durable reservation and receipt.
+Next authenticated mutation startup retries that same finish exactly once:
+`recorded` after a pre-record loss, `already_recorded` after a recorded response
+loss. Its original reservation ID, expected checkpoint, terminal state and receipt
+digest are unchanged. After validated acknowledgment/CAS, other candidates can
+proceed. Restoring an older DB without that receipt/reservation leaves no replay
+proof and still refuses, even with the same binding/config and a caller's latest
+head echo. The two stores do not share an ACID transaction.
 An exact verified cached receipt is an original-fact read, not another reservation
 or effect. Receipt-only lookup remains independent and never finishes an intent.
 
 Local checkpoint initialization is part of the authenticated first enrollment.
 An enrolled DB without its checkpoint is unprovable and blocked, not automatically
-re-enrolled or reseeded. Recovery/reenabling remains separate operator work.
+re-enrolled or reseeded. Installation reenrollment/reenabling remains separate
+operator work; completing an already committed original finish grants neither.
+
+Remaining limit: if reserve succeeds but the effect transaction rolls back, no
+committed receipt/reservation survives locally. Automatic finish retry cannot
+prove that operation and remains fail-closed. This change documents that limit;
+it does not add recovery for an uncommitted effect.
 
 `tests/test_company_processor_progress.py` exercises the actual product
 `run(process_only=True)` with ONE surviving TEST_ONLY registry across calls.
 Its spies read committed SQLite state before reserve and the real committed
 receipt before finish. Success, reserve refusal, finish-before-record failure,
-recorded-finish response loss, cached retry and same-binding DB restoration are
-tested without recreating the provider. The separate subprocess receipt smoke
+recorded-finish response loss, automatic original finish retry, another candidate,
+cached retry and same-binding DB restoration are tested without recreating the
+provider. The separate subprocess receipt smoke
 uses a fresh declared test factory and is not outside-restore registry proof.
 
 ## Authenticated original receipt lookup
@@ -148,6 +165,24 @@ Missing records never authorize a resend. Authenticated read remains available
 when mutation freshness is unconfigured, for original fact recovery only.
 
 ## Reproducible evidence
+
+### Finish response-loss availability correction
+
+TASK-SB-FINISH-RETRY-20261015 captured **343 related tests passed in 11.22s**,
+Ruff clean and basedpyright **0 errors, 0 warnings, 0 notes**. The actual public
+processor smoke ran normal/lost_before/lost_after for all three operations:
+9 scenarios, each original effect once; both losses finish exactly once more,
+returning recorded/already_recorded respectively, then another candidate succeeds.
+The same-binding pre-effect DB restore remains refused with no new progress call.
+Eight invalid-authority/missing/corrupt-local-evidence cases remain closed.
+Original subprocess accept/reject receipt recovery and installed default
+unconfigured denial also passed. That real CLI caught an early-refusal error
+precedence regression during this change; the production guard was restored,
+not its test weakened. Raw command/results are retained under
+`.omo/evidence/TASK-SB-FINISH-RETRY-20261015-*`.
+
+This bare-ulw task uses parent self-review, not a new reviewer approval. Earlier
+gate approvals apply to their recorded older heads, not this correction.
 
 ### Protected checkpoint response regression guard
 
@@ -212,7 +247,7 @@ uv run --frozen pytest -q -p no:cacheprovider tests/test_company_processor_progr
 uv run --frozen python -m tests.company_processor_progress_smoke --root <owned-empty-progress-QA-root>
 ```
 
-Captured on `jm-omachy` after the protected checkpoint correction: **335 tests
+Historical capture before the finish-retry availability correction: **335 tests
 passed in 11.31 seconds**. Import sorting was then corrected and the 114 new
 cases rerun separately. Related Ruff clean and
 basedpyright **0 errors, 0 warnings, 0 notes**. The SB portions of T1-T13,
