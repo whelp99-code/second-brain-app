@@ -111,7 +111,7 @@ when mutation freshness is unconfigured, for original fact recovery only.
 Fixture path: `fixtures/company-approver/company-approver-v2.test-only.json`.
 Current source: PR #89 head `3c7bafb63e5a417bfc05e3701cf416ddd8402166`,
 actually fetched after the user's five-review correction request.
-Fixture size is 65,271 bytes. It includes exact accept/reject argument and digest
+Fixture size is 65,299 UTF-8 bytes. It includes exact accept/reject argument and digest
 vectors, terminal mapping/negative cases, signed request-ID mismatch cases,
 generation cases and pending-reservation recovery reads.
 Exact byte SHA-256:
@@ -159,6 +159,13 @@ Final editor LSP diagnostics and the actual repository basedpyright compiler
 run are clean. Initial new-file resolver snapshots were stale and subsequently
 refreshed; no type/lint suppression was added. Real runtime checks are not
 inferred from the editor or test counts.
+
+The single security/goal gate reviewer returned **APPROVE**, no blockers, on the
+locked implementation tree. Its read-only audit checked the actual full diff,
+source and CLI transcript. It did not rerun the suite. The parent captured all
+17 LSP results separately. A documentation-only follow-up corrected the fixture
+size from JavaScript code units to measured UTF-8 bytes; fixture/hash/code did not
+change.
 
 The previous v1 handoff document and its measurements are historical. They do
 not authorize enrolling or activating this revision. Key replacement,
