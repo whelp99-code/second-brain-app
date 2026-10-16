@@ -185,10 +185,23 @@ def _visible_envelope(directory: int, name: str) -> MemoryWriteInboxEnvelopeV1:
 
 def _scan_pending(directory: int, request: MemoryWriteRequestV1) -> MemoryWriteResultV1 | None:
     before = os.fstat(directory)
+    scan: int | None = None
     try:
-        names = os.listdir(directory)
+        # A pre-lock directory OFD can retain a stale enumeration on btrfs.
+        # Keep the lock and envelope reads anchored, but enumerate a fresh OFD.
+        scan = os.open(
+            ".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=directory,
+        )
+        observed = os.fstat(scan)
+        if not _safe_dir(observed) or not _same(before, observed):
+            reject("WRITE_REQUEST_INBOX_UNSAFE")
+        names = os.listdir(scan)
     except OSError as exc:
         raise WriteRequestRejected("WRITE_REQUEST_INBOX_UNSAFE") from exc
+    finally:
+        if scan is not None:
+            os.close(scan)
     if len(names) > 1_024:
         reject("WRITE_REQUEST_INBOX_UNSAFE")
     replay: MemoryWriteInboxEnvelopeV1 | None = None
