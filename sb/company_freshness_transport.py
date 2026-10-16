@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, TypeAdapter, field_validator
 
-from sb.company_freshness import (
+from sb.company_freshness_models import (
     FinishProgressRequest,
     FreshnessScope,
     ReadFreshnessRequest,
@@ -64,27 +64,39 @@ _ENVELOPE = TypeAdapter[FreshnessEnvelope](FreshnessEnvelope)
 
 
 def authenticated_freshness_envelope(
-    raw_request: bytes, config: CompanyCliConfigV1, now: datetime,
+    raw_request: bytes,
+    config: CompanyCliConfigV1,
+    now: datetime,
 ) -> FreshnessEnvelope:
     envelope = _ENVELOPE.validate_python(strict_loads(raw_request, 1_048_576), strict=True)
-    if config.principal_id != "principal:jarvis-company-progress":
-        raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
     _ = canonical_workspace_id(config.workspace_id)
     expected_scope = FreshnessScope(
-        provider_instance_id=config.provider_instance_id, workspace_id=config.workspace_id,
+        provider_instance_id=config.provider_instance_id,
+        workspace_id=config.workspace_id,
     )
     if envelope.request.scope != expected_scope or envelope.authority.operation != envelope.method:
         raise CompanyAuthorityRejected("COMPANY_CONTRACT_INVALID")
     context = CompanyAuthorityContext(
-        config.provider_instance_id, config.workspace_id, config.principal_id,
-        config.agent_id, config.session_id, tuple(config.projects), config.policy_revision,
-        config.deletion_sequence, config.deletion_set_root,
+        config.provider_instance_id,
+        config.workspace_id,
+        "principal:jarvis-company-progress",
+        config.agent_id,
+        config.session_id,
+        tuple(config.projects),
+        config.policy_revision,
+        config.deletion_sequence,
+        config.deletion_set_root,
     )
     arguments: JsonObject = {
-        "request": model_object(envelope.request), "evidence": envelope.evidence,
+        "request": model_object(envelope.request),
+        "evidence": envelope.evidence,
     }
     _ = verify_company_authority(
-        model_object(envelope.authority), arguments, company_trusted_keys(config.trusted_keys),
-        context, now, key_scopes=config.key_scopes,
+        model_object(envelope.authority),
+        arguments,
+        company_trusted_keys(config.trusted_keys),
+        context,
+        now,
+        key_scopes=config.key_scopes,
     )
     return envelope

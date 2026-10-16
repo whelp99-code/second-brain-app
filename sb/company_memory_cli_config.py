@@ -10,7 +10,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import Field, ValidationError
 
 from sb.company_approver_binding import CompanyHandoffPolicy
-from sb.company_freshness import FreshnessProviderConfig
+from sb.company_auto_settings import InternalAutoPolicyV1
+from sb.company_freshness_models import FreshnessProviderConfig
 from sb.company_memory import CompanyMemoryError
 from sb.company_memory_authority import CompanyKeyScope
 from sb.company_memory_sources import CompanySourceProfile
@@ -37,6 +38,8 @@ class CompanyCliConfigV1(ClosedModel):
     source_profile: CompanySourceProfile | None = None
     key_scopes: dict[str, CompanyKeyScope] = Field(default_factory=dict)
     handoff_policy: CompanyHandoffPolicy | None = None
+    internal_auto_policy: InternalAutoPolicyV1 | None = None
+    policy_auto_key_id: str | None = None
     freshness_provider: FreshnessProviderConfig = Field(
         default_factory=lambda: FreshnessProviderConfig(schema_version=2, kind="unconfigured"),
     )

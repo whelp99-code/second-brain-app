@@ -26,19 +26,23 @@ PROGRESS = "principal:jarvis-company-progress"
 
 
 def progress_config(root: Path) -> Path:
-    return config(root, {
-        "principal_id": PROGRESS,
-        "key_scopes": {
-            KEY_ID: {"operations": ["read_freshness"], "source_systems": ["mail"]},
+    return config(
+        root,
+        {
+            "principal_id": PROGRESS,
+            "key_scopes": {
+                KEY_ID: {"operations": ["read_freshness"], "source_systems": ["mail"]},
+            },
         },
-    })
+    )
 
 
 def read_envelope() -> JsonObject:
     request: JsonObject = {
         "schema_version": 2,
         "scope": {
-            "provider_instance_id": CONTEXT.provider, "workspace_id": CONTEXT.workspace_id,
+            "provider_instance_id": CONTEXT.provider,
+            "workspace_id": CONTEXT.workspace_id,
         },
         "installation_id": "installation:jarvis",
         "challenge": "challenge:transport",
@@ -46,7 +50,9 @@ def read_envelope() -> JsonObject:
     }
     arguments: JsonObject = {"request": request, "evidence": None}
     return {
-        "schema_version": 1, "method": "read_freshness", **arguments,
+        "schema_version": 1,
+        "method": "read_freshness",
+        **arguments,
         "authority": signed_authority("read_freshness", arguments, {"principal_id": PROGRESS}),
     }
 
@@ -59,15 +65,20 @@ def test_signed_freshness_envelope_reaches_typed_method(tmp_path: Path) -> None:
     assert not (tmp_path / "company" / "company.db").exists()
 
 
-@pytest.mark.parametrize("field,value", [
-    ("schema_version", True),
-    ("schema_version", "1"),
-    ("method", "freshness-bootstrap"),
-    ("argv", ["--config", "/some/other/config"]),
-    ("evidence", {"allow": True}),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema_version", True),
+        ("schema_version", "1"),
+        ("method", "freshness-bootstrap"),
+        ("argv", ["--config", "/some/other/config"]),
+        ("evidence", {"allow": True}),
+    ],
+)
 def test_broker_rejects_malformed_or_override_envelopes(
-    tmp_path: Path, field: str, value: JsonValue,
+    tmp_path: Path,
+    field: str,
+    value: JsonValue,
 ) -> None:
     cfg = load_company_config(progress_config(tmp_path))
     envelope: JsonObject = {**read_envelope(), field: value}
@@ -86,7 +97,7 @@ def test_changed_challenge_does_not_reuse_authenticated_response(tmp_path: Path)
         _ = authenticated_freshness_envelope(canonical_bytes(envelope), cfg, NOW)
 
 
-def test_data_owner_config_cannot_become_progress_receiver(tmp_path: Path) -> None:
+def test_unscoped_data_owner_key_cannot_become_progress_receiver(tmp_path: Path) -> None:
     cfg = load_company_config(config(tmp_path))
     with pytest.raises(CompanyAuthorityRejected, match="COMPANY_KEY_OPERATION_DENIED"):
         _ = authenticated_freshness_envelope(canonical_bytes(read_envelope()), cfg, NOW)

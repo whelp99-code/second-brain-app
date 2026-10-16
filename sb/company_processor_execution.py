@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import nullcontext
 from datetime import datetime
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from sb.company_approver_binding import CompanyHandoffPolicy
-from sb.company_freshness import (
+from sb.company_db_freshness import CompanyDbFreshnessProvider
+from sb.company_freshness_models import (
     Checkpoint,
     CompanyFreshnessProvider,
     FreshnessScope,
@@ -56,7 +58,10 @@ def execute_processor_transition(
 
     def verify_original(selector: JsonObject) -> None:
         original = read_original_receipt(
-            store.db, context, policy, TransitionReceiptSelector.model_validate(selector),
+            store.db,
+            context,
+            policy,
+            TransitionReceiptSelector.model_validate(selector),
         )
         if original is None:
             raise CompanyAuthorityRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
@@ -64,8 +69,17 @@ def execute_processor_transition(
     # This validation must perform no decision consumption or candidate effect.
     candidate = store.get(context.workspace_id, candidate_id, scope, deletion)
     authorize_transition(
-        store.db, candidate, context, policy, owner_keys, operation,
-        arguments, authority.request_digest, now, verify_original, consume=False,
+        store.db,
+        candidate,
+        context,
+        policy,
+        owner_keys,
+        operation,
+        arguments,
+        authority.request_digest,
+        now,
+        verify_original,
+        consume=False,
     )
     cached: list[tuple[int]] = store.db.execute(
         "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
@@ -81,13 +95,36 @@ def execute_processor_transition(
         ).fetchall()
         if not commands:
             raise CompanyAuthorityRejected("COMPANY_HANDOFF_REQUIRED")
+        if isinstance(provider, CompanyDbFreshnessProvider) and operation == "mark_processed":
+            provider.require_completed_handoff(
+                FreshnessScope(
+                    provider_instance_id=context.provider, workspace_id=context.workspace_id
+                ),
+                handoff_id,
+                commands[0][0],
+            )
         operation_id, reservation = reserve_operation(
             provider,
             FreshnessScope(
                 provider_instance_id=context.provider,
                 workspace_id=context.workspace_id,
             ),
-            operation, handoff_id, commands[0][0], authority.request_digest, checkpoint,
+            operation,
+            handoff_id,
+            commands[0][0],
+            authority.request_digest,
+            checkpoint,
+            resume_original=(
+                isinstance(provider, CompanyDbFreshnessProvider)
+                and provider.has_original_reservation(
+                    FreshnessScope(
+                        provider_instance_id=context.provider, workspace_id=context.workspace_id
+                    ),
+                    operation,
+                    authority.request_digest,
+                    checkpoint,
+                )
+            ),
         )
 
     def authorize(db: sqlite3.Connection, current: MemoryCandidate) -> None:
@@ -99,8 +136,16 @@ def execute_processor_transition(
         if not local or local[0][0] != canonical_bytes(model_object(checkpoint)).decode():
             raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
         authorize_transition(
-            db, current, context, policy, owner_keys, operation,
-            arguments, authority.request_digest, now, verify_original,
+            db,
+            current,
+            context,
+            policy,
+            owner_keys,
+            operation,
+            arguments,
+            authority.request_digest,
+            now,
+            verify_original,
         )
         existing: list[tuple[int]] = db.execute(
             "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
@@ -116,17 +161,32 @@ def execute_processor_transition(
             context.workspace_id,
             authority.request_digest,
             PendingFinish(
-                operation=operation, operation_id=operation_id, reservation=reservation,
+                operation=operation,
+                operation_id=operation_id,
+                reservation=reservation,
+                original_reservation_retry=reservation.outcome == "already_reserved",
             ),
         )
 
-    return store.execute(
-        workspace_id=context.workspace_id,
-        request_digest=authority.request_digest,
-        operation=operation,
-        arguments=arguments,
-        current=scope,
-        deletion=deletion,
-        now=now,
-        authorization=authorize,
+    guard = (
+        provider.effect_guard(
+            FreshnessScope(
+                provider_instance_id=context.provider, workspace_id=context.workspace_id
+            ),
+            operation_id,
+            reservation,
+        )
+        if isinstance(provider, CompanyDbFreshnessProvider) and reservation is not None
+        else nullcontext()
     )
+    with guard:
+        return store.execute(
+            workspace_id=context.workspace_id,
+            request_digest=authority.request_digest,
+            operation=operation,
+            arguments=arguments,
+            current=scope,
+            deletion=deletion,
+            now=now,
+            authorization=authorize,
+        )

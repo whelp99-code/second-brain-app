@@ -170,9 +170,17 @@ class CompanyMemoryStore:
     def _guard_transition(
         self, workspace_id: str, permit: _TransitionPermit | None,
     ) -> None:
-        if permit is not _APPROVED_TRANSITION and self.db.execute(
+        if permit is _APPROVED_TRANSITION:
+            return
+        if self.db.execute(
             "SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?", (workspace_id,),
         ).fetchone():
+            raise CompanyMemoryError("COMPANY_OWNER_APPROVAL_REQUIRED")
+        migrated: list[tuple[int]] = self.db.execute(
+            """SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='company_component_migrations'""",
+        ).fetchall()
+        if migrated:
             raise CompanyMemoryError("COMPANY_OWNER_APPROVAL_REQUIRED")
 
     def receive(

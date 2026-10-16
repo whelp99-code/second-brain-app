@@ -17,14 +17,21 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pydantic import ValidationError
 
 from sb.company_approver_binding import CompanyHandoffPolicy, binding_digest
+from sb.company_auto_cli import run_auto_route
+from sb.company_db_freshness import CompanyDbFreshnessProvider
 from sb.company_freshness import (
     Checkpoint,
     CompanyFreshnessProvider,
     FreshnessScope,
+    ProgressOperation,
     ReadFreshnessRequest,
     provider_from_config,
+    require_company_db_freshness,
     require_freshness,
 )
+from sb.company_freshness_anchor import AnchorRejected
+from sb.company_freshness_cli import run_freshness
+from sb.company_freshness_operator import run_operator
 from sb.company_memory import CompanyMemoryError, CompanyMemoryStore
 from sb.company_memory_authority import (
     CompanyAuthorityContext,
@@ -277,7 +284,10 @@ def _run(
         process_only or receipt_only,
     )
     instant = now or datetime.now(UTC)
-    provider = freshness_provider or provider_from_config(config.freshness_provider)
+    provider = freshness_provider or provider_from_config(
+        config.freshness_provider,
+        company_database=database,
+    )
     if process_only or receipt_only:
         assert policy is not None
         _ = verify_company_authority(
@@ -311,7 +321,14 @@ def _run(
                 raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
         resume_pending_finish(database, context, policy, provider)
         observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
-        checkpoint = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
+        checkpoint = _check_freshness(
+            provider,
+            observed_checkpoint,
+            context,
+            policy,
+            "startup",
+            reserved_transition=(operation, authority.request_digest),
+        )
         with closing(CompanyMemoryStore(database)) as store:
             receipt = execute_processor_transition(
                 store,
@@ -406,10 +423,14 @@ def _run(
         ):
             raise CompanyAuthorityRejected("COMPANY_SOURCE_REGISTRATION_DENIED")
         document = model_object(config)
-        if "handoff_policy" not in config.model_fields_set:
-            del document["handoff_policy"]
-        if "freshness_provider" not in config.model_fields_set:
-            del document["freshness_provider"]
+        for field in (
+            "handoff_policy",
+            "freshness_provider",
+            "internal_auto_policy",
+            "policy_auto_key_id",
+        ):
+            if field not in config.model_fields_set:
+                del document[field]
         return register_original(
             config_path,
             document,
@@ -451,25 +472,50 @@ def _check_freshness(
     context: CompanyAuthorityContext,
     policy: CompanyHandoffPolicy,
     challenge: str,
+    *,
+    reserved_transition: tuple[ProgressOperation, str] | None = None,
 ) -> Checkpoint:
     if checkpoint is not None and (
         checkpoint.approval_policy_version != policy.approval_policy_version
         or checkpoint.approval_binding_digest != binding_digest(context, policy)
     ):
         raise CompanyAuthorityRejected("COMPANY_HANDOFF_ENROLLMENT_REQUIRED")
-    verified = require_freshness(
-        provider,
-        ReadFreshnessRequest(
-            schema_version=2,
-            scope=FreshnessScope(
-                provider_instance_id=context.provider,
-                workspace_id=context.workspace_id,
-            ),
-            installation_id=context.provider,
-            challenge=f"{challenge}:{uuid4().hex}",
-            observed_checkpoint=checkpoint,
+    request = ReadFreshnessRequest(
+        schema_version=2,
+        scope=FreshnessScope(
+            provider_instance_id=context.provider,
+            workspace_id=context.workspace_id,
         ),
+        installation_id=(
+            provider.installation_id
+            if isinstance(provider, CompanyDbFreshnessProvider)
+            else context.provider
+        ),
+        challenge=f"{challenge}:{uuid4().hex}",
+        observed_checkpoint=checkpoint,
     )
+    if isinstance(provider, CompanyDbFreshnessProvider):
+        if (
+            reserved_transition is not None
+            and checkpoint is not None
+            and provider.has_original_reservation(
+                request.scope,
+                reserved_transition[0],
+                reserved_transition[1],
+                checkpoint,
+            )
+        ):
+            return checkpoint
+        verified = require_company_db_freshness(provider, request, actor_store="second_brain")
+        if verified != checkpoint:
+            import sqlite3
+
+            with closing(sqlite3.connect(provider.database)) as db, db:
+                if checkpoint is None:
+                    raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
+                save_checkpoint(db, context.workspace_id, verified, checkpoint)
+    else:
+        verified = require_freshness(provider, request)
     if (
         verified.approval_policy_version != policy.approval_policy_version
         or verified.approval_binding_digest != binding_digest(context, policy)
@@ -496,6 +542,13 @@ def main(
             "handoff",
             "process",
             "receipt",
+            "freshness",
+            "auto-internal",
+            "auto-report",
+            "freshness-migrate",
+            "freshness-bootstrap",
+            "auto-policy-install",
+            "freshness-revoke",
         ],
     )
     _ = parser.add_argument("--config", type=Path)
@@ -516,23 +569,64 @@ def main(
         config_path = Path(configured)
     previous_umask = os.umask(0o077)
     try:
-        result = run(
-            config_path,
-            sys.stdin.buffer.read(_MAX_REQUEST + 1),
-            now=now,
-            register_source=action == "register-source",
-            candidates_only=action == "candidates",
-            handoff_only=action == "handoff",
-            enroll_handoff=action == "enroll-handoff",
-            process_only=action == "process",
-            receipt_only=action == "receipt",
-            freshness_provider=freshness_provider,
-            observed_checkpoint=observed_checkpoint,
+        raw_request = sys.stdin.buffer.read(_MAX_REQUEST + 1)
+        bounded_provider = (
+            freshness_provider
+            if isinstance(freshness_provider, CompanyDbFreshnessProvider)
+            else None
         )
+        current_time = now if now is not None else datetime.now(UTC)
+        if action == "freshness":
+            result = run_freshness(
+                config_path,
+                raw_request,
+                current_time,
+                provider=bounded_provider,
+            )
+        elif action in {"auto-internal", "auto-report"}:
+            result = run_auto_route(
+                action,
+                config_path,
+                raw_request,
+                current_time,
+                provider=bounded_provider,
+                clock=(lambda: current_time) if now is not None else None,
+            )
+        elif action in {
+            "freshness-migrate",
+            "freshness-bootstrap",
+            "auto-policy-install",
+            "freshness-revoke",
+        }:
+            result = run_operator(action, config_path, raw_request, current_time)
+        else:
+            result = run(
+                config_path,
+                raw_request,
+                now=now,
+                register_source=action == "register-source",
+                candidates_only=action == "candidates",
+                handoff_only=action == "handoff",
+                enroll_handoff=action == "enroll-handoff",
+                process_only=action == "process",
+                receipt_only=action == "receipt",
+                freshness_provider=freshness_provider,
+                observed_checkpoint=observed_checkpoint,
+            )
         _ = sys.stdout.buffer.write(canonical_bytes(result) + b"\n")
         return 0
-    except (CompanyMemoryError, CompanyAuthorityRejected, CanonicalValueError, ValueError) as exc:
-        code = str(exc) or "COMPANY_MEMORY_FAILED"
+    except (
+        CompanyMemoryError,
+        CompanyAuthorityRejected,
+        CanonicalValueError,
+        AnchorRejected,
+        ValueError,
+    ) as exc:
+        code = (
+            "COMPANY_CONTRACT_INVALID"
+            if isinstance(exc, ValidationError)
+            else str(exc) or "COMPANY_MEMORY_FAILED"
+        )
         _ = sys.stderr.buffer.write(canonical_bytes({"error": code}) + b"\n")
         return 2
     finally:

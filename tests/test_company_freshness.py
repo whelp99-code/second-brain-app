@@ -25,6 +25,7 @@ from sb.company_freshness import (
     require_freshness,
 )
 from sb.company_memory_authority import CompanyAuthorityRejected
+from sb.effect_values import strict_loads
 
 _FIXTURE = (
     Path(__file__).resolve().parents[1]
@@ -37,6 +38,24 @@ _SCOPE = FreshnessScope(
     provider_instance_id="provider:TEST_ONLY",
     workspace_id="11111111-1111-4111-8111-111111111111",
 )
+
+
+def test_public_company_db_configuration_cases() -> None:
+    extension = strict_loads(
+        _FIXTURE.with_name("company-db-freshness-v1.test-only.json").read_bytes(),
+        1_048_576,
+    )
+    assert isinstance(extension, dict)
+    cases = extension["configuration_cases"]
+    assert isinstance(cases, list) and cases
+    for case in cases:
+        assert isinstance(case, dict)
+        if case["valid"] is True:
+            config = FreshnessProviderConfig.model_validate(case["config"], strict=True)
+            assert config.model_dump(mode="json") == case["config"]
+        else:
+            with pytest.raises(ValidationError):
+                _ = FreshnessProviderConfig.model_validate(case["config"], strict=True)
 
 
 def _store() -> StoreProgress:
