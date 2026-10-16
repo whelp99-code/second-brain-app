@@ -61,6 +61,7 @@ def scenario(root: Path, operation: str) -> JsonObject:
             {},
             ENROLL_KEY,
             "enroll",
+            at=datetime.now(UTC),
         ),
         test_provider=False,
     )
