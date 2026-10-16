@@ -49,6 +49,7 @@ from sb.uploads import (
     supported_suffixes,
 )
 from sb.vault import GitCommandError, PathEscapeError, Vault, VaultLintError
+from sb.vault_owner import require_vault_owner
 
 MAX_BODY_BYTES: Final = 1024 * 1024
 DEFAULT_HOST: Final = "127.0.0.1"
@@ -1094,6 +1095,7 @@ def build_server(
 ) -> SecondBrainHTTPServer:
     """Build a local console server; non-loopback binding requires a token."""
     chosen = load_config() if config is None else config
+    require_vault_owner(Path(chosen.vault_root))
     token = os.environ.get("SB_WEB_TOKEN") or None
     if not _is_loopback(host) and token is None:
         raise ValueError("non-loopback web binding requires SB_WEB_TOKEN")

@@ -248,4 +248,9 @@ def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, 
     second = _call(server, "sb_remember", {"content": "예시기록", "title": "ExampleAlpha"})
     first_path = _mapping(happy["sb_remember"].structured_content or {})["inbox_path"]
     second_path = _mapping(second.structured_content or {})["inbox_path"]
+    dynamic = _mapping(_entry("sb_remember")["dynamic_fields"])
+    pattern = _mapping(dynamic["inbox_path"])["pattern"]
+    assert isinstance(pattern, str)
+    assert isinstance(first_path, str) and re.fullmatch(pattern, first_path)
+    assert isinstance(second_path, str) and re.fullmatch(pattern, second_path)
     assert first_path != second_path
