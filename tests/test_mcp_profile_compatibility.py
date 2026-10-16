@@ -87,7 +87,10 @@ def test_legacy_mode_preserves_task29_tool_and_v1_write_schemas(
     def archived_open_conflicts() -> dict[str, list[dict[str, str]]]:
         return {"conflicts": []}
 
-    def archived_remember(content: str, title: str | None = None) -> dict[str, str]:
+    def archived_remember(
+        content: str, title: str | None = None, request_id: str | None = None,
+    ) -> dict[str, str]:
+        del request_id
         return {"inbox_path": title or content}
 
     def archived_write_request(request: MemoryWriteRequestModel) -> MemoryWriteResultModel:
