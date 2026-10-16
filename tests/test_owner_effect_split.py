@@ -27,7 +27,13 @@ def test_backup_v1_with_packed_history_is_inspected(tmp_path: Path) -> None:
     needle = b"M13PACKEDHISTORY"
     page = root / "wiki" / "historical.md"
     _ = page.write_bytes(needle)
-    for args in (("add", "wiki/historical.md"), ("commit", "-qm", "historical")):
+    for args in (
+        ("config", "--local", "user.name", "second-brain-test"),
+        ("config", "--local", "user.email", "test@example.invalid"),
+        ("config", "--local", "commit.gpgsign", "false"),
+        ("add", "wiki/historical.md"),
+        ("commit", "-qm", "historical"),
+    ):
         _ = subprocess.run(["git", "-C", str(root), *args], check=True)
     page.unlink()
     for args in (("add", "-u"), ("commit", "-qm", "removed"), ("gc", "--prune=now")):
