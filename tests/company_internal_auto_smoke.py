@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
                 provider.database,
                 "retry:" + name,
                 "event:retry:" + name,
-                progress_body().replace("Internal review", "Recovery " + name),
+                progress_body().replace("Internal review", "Internal note #recovery-" + name),
             )
             try:
                 _ = run_auto_internal(provider.database, settings, context, transport, trigger())

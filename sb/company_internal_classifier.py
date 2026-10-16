@@ -31,7 +31,41 @@ _PROGRESS_KEYS: Final[tuple[str, ...]] = (
 _OPTIONAL_CONTACT: Final[frozenset[str]] = frozenset({"phone", "department"})
 _TIMEZONES: Final[frozenset[str]] = frozenset({"Asia/Seoul", "UTC"})
 _STATUSES: Final[frozenset[str]] = frozenset({"noted", "in_progress", "waiting_internal"})
-_EMAIL: Final = re.compile(r"[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\Z")
+_EMAIL: Final = re.compile(
+    r"[A-Za-z0-9_+-]+(?:\.[A-Za-z0-9_+-]+)*@"
+    + r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    + r"[A-Za-z](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\Z"
+)
+_CONTACT_NAME: Final = re.compile(
+    r"(?:[A-Z][A-Za-z'-]{0,39}(?: [A-Z][A-Za-z'-]{0,39}){0,3}|[가-힣]{2,5})\Z"
+)
+_PHONE: Final = re.compile(r"\+[1-9][0-9]{6,14}\Z")
+_DEPARTMENTS: Final = frozenset(
+    {"Engineering", "Operations", "Sales", "Support", "Finance", "HR", "개발", "운영", "인사"}
+)
+_CALENDAR_TITLES: Final = frozenset(
+    {"Internal standup", "Internal review", "Internal planning", "내부 정기 회의", "내부 검토 회의"}
+)
+_PROGRESS_SUBJECTS: Final = frozenset(
+    {
+        "Internal review",
+        "Internal note",
+        "Internal status",
+        "내부 검토",
+        "내부 메모",
+        "내부 진행 현황",
+    }
+)
+_INTERNAL_ACTIONS: Final = frozenset(
+    {
+        "file the note",
+        "record internal status",
+        "review internal note",
+        "내부 메모 정리",
+        "내부 진행 상태 기록",
+    }
+)
+_LOCAL_REFERENCE: Final = re.compile(r"[a-z][a-z0-9_-]{0,31}\Z")
 _VETO: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     (
         "prompt_injection",
@@ -43,30 +77,37 @@ _VETO: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     (
         "money",
         re.compile(
-            r"금액|견적|할인|지급|결제|환불|청구|송금|정산|급여|수당|₩|[$£€¥]|"
+            r"금액|예산|집행|견적|할인|지급|결제|환불|청구|송금|정산|급여|수당|₩|[$£€¥]|"
             + r"\d+\s*(?:원|%|퍼센트)|\b(?:USD|KRW|EUR|GBP|JPY|CNY|"
-            + r"payment|pay|paid|quote|quotation|discount|invoice|refund|"
-            + r"salary|compensation|transfer funds|bank transfer)\b",
+            + r"payments?|pay|paid|quotes?|quotations?|discounts?|invoices?|refunds?|"
+            + r"salary|compensations?|wire|remit|remittance|transfer funds|bank transfers?)\b",
             re.IGNORECASE,
         ),
     ),
     (
         "contract",
-        re.compile(r"계약|\b(?:contract|agreement|NDA|MOU|purchase order)\b", re.IGNORECASE),
+        re.compile(
+            r"계약|발주|\b(?:contracts?|agreements?|NDAs?|MOUs?|purchase orders?)\b", re.IGNORECASE
+        ),
     ),
-    ("tax", re.compile(r"세금|세무|부가세|\btax\b|\bVAT\b", re.IGNORECASE)),
+    ("tax", re.compile(r"세금|세무|부가세|\btax(?:es)?\b|\bVAT\b", re.IGNORECASE)),
     ("invite", re.compile(r"초대|\binvite\b", re.IGNORECASE)),
     (
         "outgoing",
         re.compile(
             r"발송|송신|외부 참석|external attendee|"
-            + r"\b(?:send|email|notify|contact|call)\s+(?:an?\s+|the\s+)?(?:customer|client|vendor|email)\b",
+            + r"\b(?:send|email|notify|contact|call|forward|share)\s+(?:an?\s+|the\s+)?"
+            + r"(?:(?:mail|e-?mail|message|attachment|file|note)\s+to\s+)?"
+            + r"(?:customer|client|vendor|email)\b",
             re.IGNORECASE,
         ),
     ),
     (
         "customer_deletion",
-        re.compile(r"고객\s*삭제|고객정보\s*삭제|delete\s+customer|고객\s*비활성화", re.IGNORECASE),
+        re.compile(
+            r"고객\s*(?:정보\s*)?(?:삭제|제거|비활성화)|delete\s+(?:the\s+)?customers?\b",
+            re.IGNORECASE,
+        ),
     ),
 )
 
@@ -185,9 +226,18 @@ def _structural_reasons(kind: RecordKind, fields: dict[str, str]) -> list[str]:
     match kind:
         case "contact":
             email = fields.get("email", "")
-            if _EMAIL.fullmatch(email) is None:
+            if (
+                _EMAIL.fullmatch(email) is None
+                or len(email.partition("@")[0]) > 64
+                or len(email) > 254
+                or _CONTACT_NAME.fullmatch(fields["name"]) is None
+                or ("phone" in fields and _PHONE.fullmatch(fields["phone"]) is None)
+                or ("department" in fields and fields["department"] not in _DEPARTMENTS)
+            ):
                 reasons.append("ambiguous")
         case "calendar":
+            if not _internal_label(fields["title"], _CALENDAR_TITLES):
+                reasons.append("ambiguous")
             if fields.get("timezone") not in _TIMEZONES:
                 reasons.append("timezone_unknown")
             start = _instant(fields.get("starts_at", ""))
@@ -195,9 +245,18 @@ def _structural_reasons(kind: RecordKind, fields: dict[str, str]) -> list[str]:
             if start is None or end is None or end <= start:
                 reasons.append("ambiguous")
         case "progress":
-            if fields.get("status") not in _STATUSES:
+            if (
+                fields.get("status") not in _STATUSES
+                or not _internal_label(fields["subject"], _PROGRESS_SUBJECTS)
+                or fields["next_internal_action"] not in _INTERNAL_ACTIONS
+            ):
                 reasons.append("ambiguous")
     return reasons
+
+
+def _internal_label(value: str, allowed: frozenset[str]) -> bool:
+    topic, separator, reference = value.partition(" #")
+    return topic in allowed and (not separator or _LOCAL_REFERENCE.fullmatch(reference) is not None)
 
 
 def _kind(value: str) -> RecordKind | None:
