@@ -31,6 +31,7 @@ type ProgressTerminalState = Literal[
     "completed",
     "processed_complete",
     "deleted",
+    "cancelled",
 ]
 TERMINAL_STATE_BY_OPERATION: Final[dict[ProgressOperation, ProgressTerminalState]] = {
     "decide_approve": "approved",

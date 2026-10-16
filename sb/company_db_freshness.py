@@ -713,7 +713,10 @@ class CompanyDbFreshnessProvider:
             return _conflict_finish(request)
         if existing.actor_store != self.actor_store:
             return _conflict_finish(request)
-        if request.terminal_state != TERMINAL_STATE_BY_OPERATION[existing.operation]:
+        if request.terminal_state not in {
+            TERMINAL_STATE_BY_OPERATION[existing.operation],
+            "cancelled",
+        }:
             return _conflict_finish(request)
         if existing.state == "finished":
             if (
@@ -749,7 +752,12 @@ class CompanyDbFreshnessProvider:
         if request.evidence_digest != verified.source_digest:
             return _conflict_finish(request)
         evidence = _finish_evidence(
-            request.scope, existing.operation, self.actor_store, head, verified
+            request.scope,
+            existing.operation,
+            self.actor_store,
+            head,
+            verified,
+            request.terminal_state,
         )
         after = _apply_finish(head, record, self.actor_store, evidence)
         self._publish_new(
@@ -784,6 +792,8 @@ class CompanyDbFreshnessProvider:
                 if context is None or policy is None or self.actor_store != "jarvis":
                     raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
                 return _verify_sidecar(connection, sidecar, request, existing, context, policy)
+            if request.terminal_state == "cancelled":
+                raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
             if existing.operation == "delete" and self.actor_store == "second_brain":
                 return verify_original_deletion(
                     self._registry(),
@@ -1728,21 +1738,26 @@ def _finish_evidence(
     actor_store: ActorStore,
     head: Checkpoint,
     verified: VerifiedEvidence,
+    terminal_state: ProgressTerminalState,
 ) -> list[JsonObject]:
     store = head.stores.second_brain if actor_store == "second_brain" else head.stores.jarvis
-    rows = [
-        _stream_projection(
-            scope,
-            actor_store,
-            "receipt",
-            store.receipt_root,
-            store.receipt_sequence + 1,
-            verified.source_record_id,
-            verified.source_digest,
-            verified.metadata | {"original_at": verified.original_at},
-        ),
-    ]
-    if operation in _TERMINAL_OPS:
+    rows: list[JsonObject] = (
+        []
+        if terminal_state == "cancelled"
+        else [
+            _stream_projection(
+                scope,
+                actor_store,
+                "receipt",
+                store.receipt_root,
+                store.receipt_sequence + 1,
+                verified.source_record_id,
+                verified.source_digest,
+                verified.metadata | {"original_at": verified.original_at},
+            ),
+        ]
+    )
+    if operation in _TERMINAL_OPS or terminal_state == "cancelled":
         rows.append(
             _stream_projection(
                 scope,

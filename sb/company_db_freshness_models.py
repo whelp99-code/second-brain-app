@@ -102,7 +102,7 @@ class JarvisSidecarEvidence(ClosedModel):
     """Original record, not a new signature pretending to be human approval."""
 
     schema_version: Literal[1]
-    kind: Literal["representative_receipt", "completion"]
+    kind: Literal["representative_receipt", "completion", "cancellation"]
     source_record_id: str = Field(min_length=1, max_length=512)
     original_at: str = Field(min_length=24, max_length=24)
     command: CompanyControlRequest
@@ -118,6 +118,31 @@ class JarvisCompletionV2(ClosedModel):
     content_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     acceptance_receipt_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     effect_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+
+
+class JarvisCommandRevocationV1(ClosedModel):
+    """The original immutable control_command_revocations row, not an approval."""
+
+    revocation_id: str = Field(min_length=1, max_length=512)
+    request_id: str = Field(min_length=1, max_length=512)
+    receipt_id: str | None = Field(min_length=1, max_length=512)
+    command_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    reason: str = Field(min_length=1, max_length=4096)
+    revoked_by: str = Field(min_length=1, max_length=512)
+    revoked_at: str = Field(min_length=1, max_length=128)
+    payload_json: str
+    payload_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    created_at: str = Field(min_length=24, max_length=24)
+
+
+class JarvisCancellationV1(ClosedModel):
+    """Authenticated peer projection of an unclaimed, cancelled original request."""
+
+    schema_version: Literal[1]
+    state: Literal["cancelled"]
+    lease_fence: int = Field(strict=True, ge=0, le=0)
+    effect_record_id: None
+    revocation: JarvisCommandRevocationV1
 
 
 @dataclass(frozen=True, slots=True)

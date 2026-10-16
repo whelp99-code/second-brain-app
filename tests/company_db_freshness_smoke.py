@@ -12,6 +12,9 @@ from typing import cast
 import pytest
 
 from tests.company_db_freshness_support import SIMULATED_ANCHOR_LABEL
+from tests.test_company_db_cancellation import (
+    test_original_cancelled_reservation_releases_slot_once,
+)
 from tests.test_company_db_concurrency import test_process_cas_and_permanent_operation_dedup
 from tests.test_company_db_finish_recovery import test_original_finish_recovers_once
 from tests.test_company_db_human_integration import (
@@ -63,6 +66,28 @@ def main(argv: list[str] | None = None) -> int:
         restored.mkdir(mode=0o700)
         test_database_and_witness_restore_cannot_rewind_surviving_anchor(restored)
         print("database_and_spool_restore_live_anchor_rejected=PASS")
+        cancelled = root / "cancelled"
+        cancelled.mkdir(mode=0o700)
+        test_original_cancelled_reservation_releases_slot_once(cancelled)
+        with closing(sqlite3.connect(cancelled / "company" / "company.db")) as db:
+            cancellation_states: list[tuple[str, str, int]] = db.execute(
+                """SELECT state,coalesce(terminal_state,'pending'),count(*)
+                FROM company_freshness_operations GROUP BY state,terminal_state ORDER BY state""",
+            ).fetchall()
+            cancellation_evidence: list[tuple[str, int]] = db.execute(
+                """SELECT stream,count(*) FROM company_freshness_evidence
+                WHERE store='jarvis' GROUP BY stream ORDER BY stream""",
+            ).fetchall()
+        assert cancellation_states == [("finished", "cancelled", 1), ("reserved", "pending", 1)]
+        assert cancellation_evidence == [("terminal", 1)]
+        print("cancelled_source=synthetic_control_command_revocations")
+        print(
+            "cancelled_original_finish_retry_cold_reopen=PASS states=" + repr(cancellation_states)
+        )
+        print(
+            "cancelled_no_approval_projection_next_request=PASS evidence="
+            + repr(cancellation_evidence)
+        )
         return 0
     finally:
         _ = os.umask(previous)

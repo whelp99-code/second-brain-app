@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sb.company_approver_binding import (
@@ -18,6 +18,7 @@ from sb.company_db_freshness_hash import RECEIPT_DOMAIN, operation_id_for, prefi
 from sb.company_db_freshness_models import (
     EvidenceRejected,
     FreshnessRegistry,
+    JarvisCancellationV1,
     JarvisCompletionV2,
     JarvisSidecarEvidence,
     OperationRow,
@@ -131,6 +132,7 @@ def verify_jarvis_sidecar(
     )
     if (
         expected_id != request.operation_id
+        or (request.terminal_state == "cancelled") != (sidecar.kind == "cancellation")
         or command.target.provider_instance_id != context.provider
         or command.target.workspace_id != context.workspace_id
         or command.args.owner != context.principal
@@ -146,6 +148,61 @@ def verify_jarvis_sidecar(
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
     try:
         match reservation.operation, sidecar.kind:
+            case (("decide_approve" | "decide_reject" | "complete"), "cancellation"):
+                cancelled = JarvisCancellationV1.model_validate(sidecar.record)
+                revocation = cancelled.revocation
+                payload = strict_loads(revocation.payload_json, 16_384)
+                expected_payload: JsonObject = {
+                    "request_id": command.request_id,
+                    "reason": revocation.reason,
+                    "revoked_by": revocation.revoked_by,
+                    "revoked_at": revocation.revoked_at,
+                }
+                payload_bytes = revocation.payload_json.encode("utf-8")
+                payload_digest = "sha256:" + hashlib.sha256(payload_bytes).hexdigest()
+                revoked_at = datetime.fromisoformat(revocation.revoked_at)
+                if revocation.revoked_at[:10] != revoked_at.date().isoformat():
+                    raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+                if revoked_at.tzinfo is None:
+                    if revocation.revoked_at != revoked_at.date().isoformat():
+                        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+                    revoked_at = revoked_at.replace(tzinfo=UTC)
+                original_at = format_instant(revoked_at)
+                if (
+                    payload != expected_payload
+                    or payload_bytes != canonical_bytes(payload)
+                    or revocation.request_id != command.request_id
+                    or revocation.command_digest != digest
+                    or revocation.payload_digest != payload_digest
+                    or revocation.payload_digest != request.evidence_digest
+                    or revocation.revocation_id
+                    != "control-revocation:" + payload_digest.removeprefix("sha256:")
+                    or sidecar.source_record_id != revocation.revocation_id
+                    or sidecar.original_at != original_at
+                    or parse_instant(revocation.created_at) < parse_instant(original_at)
+                    or not revocation.reason.strip()
+                    or not revocation.revoked_by.strip()
+                    or (reservation.operation != "complete" and revocation.receipt_id is not None)
+                ):
+                    raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+                return VerifiedEvidence(
+                    revocation.revocation_id,
+                    payload_digest,
+                    original_at,
+                    {
+                        "kind": "cancellation",
+                        "source_table": "control_command_revocations",
+                        "request_id": command.request_id,
+                        "command_digest": digest,
+                        "revocation_id": revocation.revocation_id,
+                        "payload_digest": payload_digest,
+                        "receipt_id": revocation.receipt_id,
+                        "revoked_at": revocation.revoked_at,
+                        "state": cancelled.state,
+                        "lease_fence": cancelled.lease_fence,
+                        "effect_record_id": None,
+                    },
+                )
             case (("decide_approve" | "decide_reject"), "representative_receipt"):
                 approval = CommandApprovalReceipt.model_validate(sidecar.record)
                 key = decode_key(policy.owner_approval_keys.get(approval.key_id, ""))
@@ -248,5 +305,11 @@ def verify_jarvis_sidecar(
                 raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
     except EvidenceRejected:
         raise
-    except (CompanyAuthorityRejected, CompanyMemoryError, DelegationRejected, ValueError) as exc:
+    except (
+        CompanyAuthorityRejected,
+        CompanyMemoryError,
+        DelegationRejected,
+        ValueError,
+        OverflowError,
+    ) as exc:
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID") from exc
