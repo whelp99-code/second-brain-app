@@ -240,10 +240,24 @@ def test_cursor_codec_roundtrips_tab_collision_keys() -> None:
     }
 
     # When: the map is dumped and parsed.
-    roundtrip = decode_source_cursor(encode_source_cursor(original))
+    encoded = encode_source_cursor(original)
+    roundtrip = decode_source_cursor(encoded)
 
     # Then: both keys and tokens survive losslessly.
     assert roundtrip == original
+    assert all(ord(char) >= 32 for char in encoded)
+
+
+def test_empty_cursor_is_a_nonempty_receipt_checkpoint() -> None:
+    encoded = encode_source_cursor({})
+    assert encoded
+    assert decode_source_cursor(encoded) == {}
+
+
+def test_legacy_cursor_preserves_controls_and_literal_escape_text() -> None:
+    path = "literal\\x0a\tand\nnewline.md"
+    legacy = f"{len(path)}:{path}{len(_TOKEN_A)}:{_TOKEN_A}"
+    assert decode_source_cursor(legacy) == {path: _TOKEN_A}
 
 
 def test_parse_cursor_rejects_malformed_payload() -> None:

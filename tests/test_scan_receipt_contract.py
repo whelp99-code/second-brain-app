@@ -129,3 +129,10 @@ def test_unchanged_scan_is_a_new_receipt_not_exhaustion_or_publication():
     with pytest.raises(FrozenInstanceError):
         second.__setattr__("exhausted", True)
     assert "searchable" not in second.as_dict()
+
+
+@pytest.mark.parametrize("field", ["checkpoint_before", "checkpoint_after"])
+@pytest.mark.parametrize("token", ["", "cursor\t2", "cursor\x002"])
+def test_empty_and_control_checkpoints_are_rejected(field: str, token: str) -> None:
+    with pytest.raises(ObservationError, match="^CHECKPOINT_INVALID$"):
+        parse_scan_receipt(receipt(**{field: token}))

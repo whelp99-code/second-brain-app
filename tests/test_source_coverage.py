@@ -6,11 +6,13 @@ from pathlib import Path
 
 import pytest
 
+from sb.connectors.markdown_vault import decode_source_cursor
 from sb.personal_observation import ScanReceiptV1, parse_scan_receipt
 from sb.source_coverage import (
     assemble_coverage,
     coverage_by_source,
     list_scan_receipts,
+    receipt_params,
     record_scan_receipt,
     set_stage_coverage,
 )
@@ -191,3 +193,24 @@ def test_coverage_exposes_captured_parsed_published_searchable_eligible_separate
         view["accepted"],
     }
     assert len(distinct) == 6
+
+
+@pytest.mark.parametrize("path", [None, "tab\tand\nnewline.md"])
+def test_legacy_receipts_are_read_without_mutating_stored_checkpoints(
+    tmp_path: Path, path: str | None,
+) -> None:
+    legacy = "" if path is None else f"{len(path)}:{path}5:token"
+    row = list(receipt_params(_receipt()))
+    row[6] = row[7] = legacy
+    with Ledger(tmp_path) as ledger:
+        ledger.insert_scan_receipt(tuple(row))
+        ledger.set_cursor("mail", legacy, _AT)
+        before = ledger.fetch_scan_receipt_rows("mail")
+        stored = list_scan_receipts(ledger, "mail")[0]
+        assert stored.checkpoint_before == stored.checkpoint_after
+        checkpoint = stored.checkpoint_after
+        assert checkpoint and all(ord(char) >= 32 for char in checkpoint)
+        assert decode_source_cursor(checkpoint) == ({} if path is None else {path: "token"})
+        assert ledger.fetch_scan_receipt_rows("mail") == before
+        assert ledger.get_cursor("mail") == legacy
+    assert coverage_by_source(tmp_path)["mail"]["last_state"] == "ok"
