@@ -23,7 +23,8 @@ signatures, canonical bytes, and public TEST_ONLY equality vectors are unchanged
 The public `company-db-freshness-v1.test-only.json` appendix extends the contract
 without changing any byte of `company-approver-v2.test-only.json`.
 
-The actor is pinned by the server route: JARVIS owns `decide` and `complete`;
+The actor is pinned by the server route: JARVIS owns `decide_approve`,
+`decide_reject`, and `complete`;
 SB owns `accept`, `reject`, `mark_processed`, and the internal deletion bridge.
 SB's policy-authorized `complete` is separately admitted only with its original
 signed policy receipt and real internal SQL evidence. It is not a human approval.

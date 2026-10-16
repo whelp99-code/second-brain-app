@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import override
+from typing import Literal, override
 
 import pytest
 
@@ -15,6 +15,7 @@ from sb.company_db_freshness import (
     GenesisInventory,
     bootstrap_company_scope,
 )
+from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_migrations import apply_component_migration
 from sb.company_freshness_models import (
     FreshnessScope,
@@ -156,3 +157,35 @@ def test_actual_human_original_reserve_retry_has_one_effect(tmp_path: Path, afte
             "SELECT count(*) FROM company_memory_receipts WHERE operation='accept'",
         ).fetchall()
     assert receipts == [(1,)]
+
+
+@pytest.mark.parametrize("operation", ["accept", "reject"])
+def test_finished_human_stage_rejects_restored_database_and_spool(
+    tmp_path: Path, operation: Literal["accept", "reject"]
+) -> None:
+    cfg, provider = human_runtime(tmp_path)
+    proposal = first_proposal(
+        run(
+            cfg,
+            signed_request("handoff", PAGE),
+            now=NOW,
+            handoff_only=True,
+            freshness_provider=provider,
+        )
+    )
+    approval = owner_receipt(proposal, "approve" if operation == "accept" else "reject")
+    request = signed_request(
+        operation, processor_arguments(proposal, approval), PROCESSOR_KEY, "processor", PROCESSOR
+    )
+    before_database = provider.database.read_bytes()
+    spool = provider.witness_dir / "frames.jsonl"
+    before_spool = spool.read_bytes()
+    result = run(cfg, request, now=NOW, process_only=True, freshness_provider=provider)
+    assert result["state"] == ("accepted" if operation == "accept" else "rejected")
+    surviving_anchor = provider.anchor.read_value()
+    _ = provider.database.write_bytes(before_database)
+    _ = spool.write_bytes(before_spool)
+    with pytest.raises(AnchorRejected, match="COMPANY_FRESHNESS_REQUIRED"):
+        _ = run(cfg, request, now=NOW, process_only=True, freshness_provider=provider)
+    assert provider.database.read_bytes() == before_database
+    assert provider.anchor.read_value() == surviving_anchor

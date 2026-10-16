@@ -70,6 +70,9 @@ def test_registered_deletion_records_original_times_then_closes_unsafe_enrollmen
         }
     )
     _ = provider.registry_path.write_bytes(canonical_bytes(model_object(registry)))
+    before_database = provider.database.read_bytes()
+    spool = provider.witness_dir / "frames.jsonl"
+    before_spool = spool.read_bytes()
     result = provider.bridge_deletion(
         scope=PROVIDER_SCOPE,
         deletion_plan_digest=RECEIPT_BINDING,
@@ -102,6 +105,18 @@ def test_registered_deletion_records_original_times_then_closes_unsafe_enrollmen
         ).status
         == "mismatch"
     )
+    surviving_anchor = provider.anchor.read_value()
+    _ = provider.database.write_bytes(before_database)
+    _ = spool.write_bytes(before_spool)
+    replay = provider.bridge_deletion(
+        scope=PROVIDER_SCOPE,
+        deletion_plan_digest=RECEIPT_BINDING,
+        expected_checkpoint=before,
+        challenge="deletion:restored",
+    )
+    assert replay.outcome == "error"
+    assert provider.anchor.read_value() == surviving_anchor
+    assert provider.database.read_bytes() == before_database
 
 
 def test_unregistered_deletion_cannot_reserve(tmp_path: Path) -> None:

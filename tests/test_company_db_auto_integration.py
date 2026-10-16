@@ -25,6 +25,7 @@ from sb.company_freshness import (
     ReserveProgressRequest,
     ReserveProgressResponse,
 )
+from sb.company_freshness_anchor import AnchorRejected
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import contact_body, receive, trigger
 
@@ -206,6 +207,46 @@ def test_original_auto_reserve_recovers_without_duplicate_effect(
         ).fetchall()
     assert effects == [(1,)]
     assert remaining == [(0,)]
+
+
+@pytest.mark.parametrize("terminal", ["accepted", "completed", "processed_complete"])
+def test_finished_auto_stage_cannot_resume_from_restored_database_and_spool(
+    tmp_path: Path, terminal: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider, settings, context = real_company_runtime(tmp_path)
+    receive(provider.database, "restore:stage", "event:restore:stage", contact_body())
+    before_database = provider.database.read_bytes()
+    spool = provider.witness_dir / "frames.jsonl"
+    before_spool = spool.read_bytes()
+    finish = provider.finish_progress
+
+    def stop_after_stage(
+        request: FinishProgressRequest,
+    ) -> FinishProgressResponse | FreshnessWireError:
+        response = finish(request)
+        if request.terminal_state == terminal:
+            assert response.outcome == "recorded"
+            raise TimeoutError("isolated acknowledgment loss at requested finished stage")
+        return response
+
+    monkeypatch.setattr(provider, "finish_progress", stop_after_stage)
+    with pytest.raises(AutoInternalRejected, match="COMPANY_PROGRESS_UNCERTAIN"):
+        _ = run_auto_internal(provider.database, settings, context, provider, trigger())
+    with closing(sqlite3.connect(provider.database)) as db:
+        finished: list[tuple[int]] = db.execute(
+            """SELECT count(*) FROM company_freshness_operations
+            WHERE state='finished' AND terminal_state=?""",
+            (terminal,),
+        ).fetchall()
+    assert finished == [(1,)]
+    surviving_anchor = provider.anchor.read_value()
+    _ = provider.database.write_bytes(before_database)
+    _ = spool.write_bytes(before_spool)
+    monkeypatch.setattr(provider, "finish_progress", finish)
+    with pytest.raises(AnchorRejected, match="COMPANY_FRESHNESS_REQUIRED"):
+        _ = run_auto_internal(provider.database, settings, context, provider, trigger())
+    assert provider.database.read_bytes() == before_database
+    assert provider.anchor.read_value() == surviving_anchor
 
 
 def test_trigger_expiring_after_reserve_cannot_commit_and_fresh_trigger_resumes(
