@@ -8,17 +8,32 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 
 
-def file_identities(paths: list[Path]) -> dict[tuple[int, int], str]:
-    identities = {}
+def file_identities(paths: list[Path], *, mapped: bool = False) -> dict[tuple[int, int], str]:
+    identities: dict[tuple[int, int], str] = {}
+    mounts: list[tuple[Path, int]] = []
+    if mapped:
+        for line in Path('/proc/self/mountinfo').read_text().splitlines():
+            fields = line.split()
+            major, minor = fields[2].split(':')
+            mount = re.sub(r'\\(040|011|012|134)', lambda match: chr(int(match[1], 8)), fields[4])
+            mounts.append((Path(mount), os.makedev(int(major), int(minor))))
     for path in paths:
         try:
             metadata = path.stat()
-            identities[(metadata.st_dev, metadata.st_ino)] = path.name
         except FileNotFoundError:
             continue
+        device = metadata.st_dev
+        if mapped:
+            # btrfs stat uses a subvolume device; maps uses the mount's device.
+            resolved = path.resolve()
+            covering = [(mount, dev) for mount, dev in mounts if resolved.is_relative_to(mount)]
+            if covering:
+                device = max(covering, key=lambda entry: len(entry[0].parts))[1]
+        identities[(device, metadata.st_ino)] = path.name
     return identities
 
 
@@ -44,6 +59,7 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
     database = requested_database.resolve(strict=True)
     paths = [database, *(Path(str(database) + suffix) for suffix in ('-wal', '-shm', '-journal'))]
     identities = file_identities(paths)
+    mapped_identities = file_identities(paths, mapped=True)
     matches, mapped, unreadable = [], [], []
     denied: dict[int, set[str]] = {}
 
@@ -90,7 +106,7 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
             fields = line.split(maxsplit=5)
             major, minor = fields[3].split(':')
             identity = (os.makedev(int(major, 16), int(minor, 16)), int(fields[4]))
-            target = identities.get(identity)
+            target = mapped_identities.get(identity)
             if target is not None:
                 mapped_names.add(target)
         mapped.extend({'pid': int(process.name), 'file': name} for name in sorted(mapped_names))
@@ -117,7 +133,8 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
             'holder_processes': [process_owner(pid) for pid in holders],
             'unreadable_pids': sorted(set(unreadable)),
             'unreadable_processes': diagnostics,
-            'target_identity_changed': target_path_changed or file_identities(paths) != identities,
+            'target_identity_changed': target_path_changed or file_identities(paths) != identities
+                or file_identities(paths, mapped=True) != mapped_identities,
             'scope': 'selected-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion',
             'drain_authorized': False}
 

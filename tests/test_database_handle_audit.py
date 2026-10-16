@@ -42,6 +42,7 @@ class DatabaseReport(TypedDict):
 
 @runtime_checkable
 class DatabaseAudit(Protocol):
+    def file_identities(self, paths: list[Path], *, mapped: bool = False) -> dict[tuple[int, int], str]: ...
     def inspect(self, database: Path, uid: int | None = None) -> DatabaseReport: ...
     def process_owner(self, pid: int) -> Owner: ...
 
@@ -112,6 +113,25 @@ def test_mapping_without_open_fd_is_still_reported(tmp_path: Path) -> None:
         assert result.returncode == (2 if report['unreadable_pids'] else 1)
     finally:
         assert libc.munmap(address, 4096) == 0
+
+
+def test_mapping_device_uses_longest_covering_mount(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    database = tmp_path / 'space here' / 'mapped.sqlite'
+    database.parent.mkdir()
+    _ = database.write_bytes(bytes(4096))
+    metadata = database.stat()
+    original = Path.read_text
+    escaped = str(database.parent).replace(' ', r'\040')
+
+    def mountinfo(path: Path, encoding: str | None = None, errors: str | None = None) -> str:
+        if path == Path('/proc/self/mountinfo'):
+            return f'1 0 0:35 / / rw - btrfs none rw\n2 1 0:36 / {escaped} rw - btrfs none rw\n'
+        return original(path, encoding=encoding, errors=errors)
+
+    monkeypatch.setattr(Path, 'read_text', mountinfo)
+    audit = audit_api()
+    assert audit.file_identities([database]) == {(metadata.st_dev, metadata.st_ino): database.name}
+    assert audit.file_identities([database], mapped=True) == {(os.makedev(0, 36), metadata.st_ino): database.name}
 
 
 @pytest.mark.parametrize('change', ['replace', 'remove', 'sidecar'])
