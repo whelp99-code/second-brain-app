@@ -12,7 +12,7 @@ from typing import Final
 from pydantic import TypeAdapter
 from typing_extensions import TypedDict
 
-from sb.personal_observation import ScanReceiptV1, parse_scan_receipt
+from sb.personal_observation import ObservationError, ScanReceiptV1, parse_scan_receipt
 from sb.store import SourceCoverage
 from sb.store.ledger import Ledger, LedgerCorrupt
 from sb.store.life_rows import Row, integer, iter_rows, string
@@ -72,6 +72,18 @@ class CoverageSnapshot(TypedDict, closed=True):
     exhausted: bool
     last_scan: ScanSummary | None
     stage_counts_measured: bool
+
+
+def checkpoint_for_receipt(checkpoint: str | None) -> str | None:
+    """Preserve safe tokens and encode only legacy Markdown empty/C0 cursors."""
+    if checkpoint is None or (checkpoint and all(ord(char) >= 32 for char in checkpoint)):
+        return checkpoint
+    from sb.connectors.markdown_vault import MarkdownVaultError, receipt_cursor
+
+    try:
+        return receipt_cursor(checkpoint)
+    except MarkdownVaultError as exc:
+        raise ObservationError("CHECKPOINT_INVALID") from exc
 
 
 def record_scan_receipt(ledger: Ledger, receipt: ScanReceiptV1, *, cursor_updated_at: str) -> None:
@@ -200,6 +212,10 @@ def _receipt_from_row(row: Row) -> ScanReceiptV1:
             payload[name] = bool(value)
         else:
             payload[name] = value
+    for name in ("checkpoint_before", "checkpoint_after"):
+        checkpoint = payload[name]
+        if isinstance(checkpoint, str):
+            payload[name] = checkpoint_for_receipt(checkpoint)
     return parse_scan_receipt(payload)
 
 

@@ -179,3 +179,36 @@ def test_incomplete_scan_does_not_publish_deletion_candidates(tmp_path: Path) ->
         )
         assert list_scan_receipts(ledger, "notes")[-1].state == "unavailable"
     assert (tmp_path / "retained.md").read_text() == "# SBSTEP1\nretained\n"
+
+
+@pytest.mark.parametrize("offline", [False, True])
+def test_legacy_opaque_cursor_survives_resume_and_offline_receipt(
+    tmp_path: Path, offline: bool,
+) -> None:
+    from sb.connectors.markdown_vault import decode_source_cursor
+
+    config, source, file = configured(tmp_path)
+    filename = "tab\tand\nnewline.md"
+    body = b"# SBSTEP1\nretained legacy source\n"
+    page = source / filename
+    _ = page.write_bytes(body)
+    assert _ingest(file).returncode == 0
+    metadata = page.stat()
+    token = f"{metadata.st_mtime_ns}:{metadata.st_size}:{hashlib.sha256(body).hexdigest()}"
+    legacy = f"{len(filename)}:{filename}{len(token)}:{token}"
+    with Ledger(config.vault_root) as ledger:
+        ledger.set_cursor("notes", legacy, "2026-10-16T00:00:00.000Z")
+    retained = source
+    if offline:
+        retained = source.rename(tmp_path / "offline-legacy")
+    resumed = _ingest(file)
+    assert resumed.returncode == (1 if offline else 0), resumed.stdout + resumed.stderr
+    with Ledger(config.vault_root) as ledger:
+        last = list_scan_receipts(ledger, "notes")[-1]
+        assert last.state == ("unavailable" if offline else "ok")
+        assert decode_source_cursor(last.checkpoint_before) == {filename: token}
+        assert last.checkpoint_after == ledger.get_cursor("notes")
+        assert len(ledger.list_source_items()) == 1
+        for checkpoint in (last.checkpoint_before, last.checkpoint_after):
+            assert checkpoint and all(ord(char) >= 32 for char in checkpoint)
+    assert (retained / filename).read_bytes() == body

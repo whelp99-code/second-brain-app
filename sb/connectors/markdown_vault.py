@@ -19,6 +19,7 @@ DEFAULT_SOURCE_ID: Final = "me-wiki"
 DEFAULT_ROOT: Final = Path("/Volumes/DevSpace/me-wiki")
 _MARKDOWN_ADAPTERS: Final = frozenset({"markdown-vault", "markdown_vault", "markdown"})
 _CANONICAL_LEN: Final = re.compile(r"^(0|[1-9][0-9]*)$")
+_CURSOR_V2: Final = "v2:"
 
 
 class _ConnectorConfig(Protocol):
@@ -57,13 +58,13 @@ class MarkdownVaultAdapter:
         self._exclude: tuple[str, ...] = exclude
         self._observe_deletions: bool = observe_deletions
         self.source_id: str = source_id
-        self._next_cursor: str = ""
+        self._next_cursor: str = _CURSOR_V2
         self._fs: SafeSourceFilesystem = SafeSourceFilesystem((root,))
 
     def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
         previous = decode_source_cursor(cursor)
         if not self._root.exists():
-            self._next_cursor = cursor or ""
+            self._next_cursor = cursor or _CURSOR_V2
             yield (
                 SourceRef(self.source_id, "", "source-unavailable"),
                 b"",
@@ -178,11 +179,31 @@ def _pattern_match(path: str, pattern: str) -> bool:
 
 
 def encode_source_cursor(current: dict[str, str]) -> str:
-    """Encode path/token pairs with length prefixes (lossless for any filename)."""
+    """Encode lossless path/token pairs without empty or C0 checkpoint text."""
     chunks: list[str] = []
     for path, token in sorted(current.items()):
-        chunks.append(f"{len(path)}:{path}{len(token)}:{token}")
-    return "".join(chunks)
+        escaped_path = _escape_cursor_text(path)
+        escaped_token = _escape_cursor_text(token)
+        chunks.append(f"{len(escaped_path)}:{escaped_path}{len(escaped_token)}:{escaped_token}")
+    return _CURSOR_V2 + "".join(chunks)
+
+
+def _escape_cursor_text(value: str) -> str:
+    return "".join(
+        f"\\x{ord(char):02x}" if char == "\\" or ord(char) < 32 else char for char in value
+    )
+
+
+def _unescape_cursor_text(value: str) -> str:
+    decoded = re.sub(r"\\x([0-9a-f]{2})", lambda match: chr(int(match[1], 16)), value)
+    if _escape_cursor_text(decoded) != value:
+        raise MarkdownVaultError("malformed cursor")
+    return decoded
+
+
+def receipt_cursor(cursor: str | None) -> str | None:
+    """Canonicalize a legacy Markdown cursor without changing its resume map."""
+    return None if cursor is None else encode_source_cursor(decode_source_cursor(cursor))
 
 
 def _read_prefixed(cursor: str, index: int) -> tuple[str, int]:
@@ -201,14 +222,19 @@ def _read_prefixed(cursor: str, index: int) -> tuple[str, int]:
 
 
 def decode_source_cursor(cursor: str | None) -> dict[str, str]:
-    """Decode a length-prefixed cursor. None and empty string are an empty map."""
+    """Decode v2 escaped text or legacy raw prefixes; None/empty remain empty."""
     if cursor is None or cursor == "":
         return {}
+    escaped = cursor.startswith(_CURSOR_V2)
+    payload = cursor[len(_CURSOR_V2):] if escaped else cursor
     parsed: dict[str, str] = {}
     index = 0
-    while index < len(cursor):
-        path, index = _read_prefixed(cursor, index)
-        token, index = _read_prefixed(cursor, index)
+    while index < len(payload):
+        path, index = _read_prefixed(payload, index)
+        token, index = _read_prefixed(payload, index)
+        if escaped:
+            path = _unescape_cursor_text(path)
+            token = _unescape_cursor_text(token)
         if not path or not token or path in parsed:
             raise MarkdownVaultError("malformed cursor")
         parsed[path] = token

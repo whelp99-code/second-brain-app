@@ -36,6 +36,7 @@ from sb.life_json import LifePayload, decode_json
 from sb.llm import LLMClient, LLMUnavailable
 from sb.page_ids import git_rel
 from sb.parsers import DocumentParseResult
+from sb.source_coverage import checkpoint_for_receipt
 from sb.store import (
     DerivationOutput,
     DerivStatus,
@@ -492,8 +493,8 @@ def _scan_receipt_row(
         started_at=stamp,
         finished_at=stamp,
         state=state,
-        checkpoint_before=checkpoint_before,
-        checkpoint_after=checkpoint_after,
+        checkpoint_before=checkpoint_for_receipt(checkpoint_before),
+        checkpoint_after=checkpoint_for_receipt(checkpoint_after),
         scanned=scanned,
         accepted=accepted,
         unchanged=unchanged,
@@ -1045,6 +1046,9 @@ def _note_source_unavailable(
             )
         )
         checkpoint = ledger.get_cursor(source_id)
+        canonical = checkpoint_for_receipt(checkpoint)
+        if canonical is not None and canonical != checkpoint:
+            ledger.set_cursor(source_id, canonical, format_instant(datetime.now(UTC)))
         receipt = _scan_receipt_row(
             run_id, source_id, format_instant(datetime.now(UTC)), "unavailable",
             checkpoint, checkpoint, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1161,6 +1165,10 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
                     position, updated_at = prepared.cursor
                     ledger.set_cursor(adapter.source_id, position, updated_at)
                 if prepared.receipt is not None:
+                    checkpoint = ledger.get_cursor(adapter.source_id)
+                    canonical = checkpoint_for_receipt(checkpoint)
+                    if canonical is not None and canonical != checkpoint:
+                        ledger.set_cursor(adapter.source_id, canonical, format_instant(datetime.now(UTC)))
                     ledger.insert_scan_receipt(prepared.receipt)
             if isinstance(adapter, AcknowledgingSourceAdapter):
                 try:
