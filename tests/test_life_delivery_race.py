@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 from datetime import timedelta
+from typing import ClassVar, Literal, assert_never
 
 import pytest
 
@@ -16,6 +17,7 @@ from sb.life_delivery import (
     send_claimed,
     send_notification,
 )
+from sb.life_journal_contracts import JournalRow
 from sb.store.ledger import Ledger
 from sb.store.life_journal import LifeJournal
 from tests.test_life_contracts import NOW, payload, policy
@@ -35,7 +37,7 @@ class _Response:
 class _Conn:
     calls = 0
     status = 200
-    headers: dict[str, str]
+    headers: ClassVar[dict[str, str]] = {}
     fail = False
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -65,6 +67,18 @@ def _patch_transport(monkeypatch: pytest.MonkeyPatch) -> None:
         "getaddrinfo",
         lambda *_a, **_k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("1.1.1.1", 443))],
     )
+
+
+def _flag(row: JournalRow, name: Literal["sent", "send_allowed"]) -> bool:
+    match name:
+        case "sent":
+            assert "sent" in row
+            return row["sent"]
+        case "send_allowed":
+            assert "send_allowed" in row
+            return row["send_allowed"]
+        case unreachable:
+            assert_never(unreachable)
 
 
 def _claimed(store):
@@ -114,7 +128,7 @@ def test_correction_between_prepare_and_finish_marks_stale_and_never_sends(tmp_p
             now=NOW,
         )
         assert sent == []
-        assert result["sent"] is False
+        assert _flag(result, "sent") is False
         assert result["body"]["state"] == "stale"
         assert result["body"]["provider_message_id"] is None
         direct = finish(
@@ -153,7 +167,7 @@ def test_forget_between_prepare_and_finish_marks_stale(tmp_path):
         )
         assert sent == []
         assert result["body"]["state"] == "stale"
-        assert result["sent"] is False
+        assert _flag(result, "sent") is False
 
 
 @pytest.mark.parametrize(
@@ -211,7 +225,7 @@ def test_429_retry_after_is_hold_not_resend(tmp_path, monkeypatch):
             now=NOW,
         )
         assert sent == []
-        assert again["sent"] is False
+        assert _flag(again, "sent") is False
         assert again["body"]["state"] == "retry_after"
 
 
@@ -261,7 +275,7 @@ def test_expired_briefing_is_not_resent(tmp_path):
             source_ids=SOURCES,
             now=later,
         )
-        assert claim["send_allowed"] is False
+        assert _flag(claim, "send_allowed") is False
         assert claim["body"]["state"] == "expired"
         assert claim["body"]["attempt_count"] == 0
         again = prepare(
@@ -272,7 +286,7 @@ def test_expired_briefing_is_not_resent(tmp_path):
             source_ids=SOURCES,
             now=later + timedelta(minutes=5),
         )
-        assert again["send_allowed"] is False
+        assert _flag(again, "send_allowed") is False
         assert sent == []
         assert again["body"]["state"] == "expired"
 
