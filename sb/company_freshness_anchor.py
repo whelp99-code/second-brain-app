@@ -150,10 +150,19 @@ def append_witness_frame(witness_dir: Path, body: JsonObject) -> None:
             or info.st_uid not in {0, os.geteuid()}
         ):
             raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-        written = os.write(descriptor, payload)
-        if written != len(payload):
-            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-        os.fsync(descriptor)
+        offset = info.st_size
+        try:
+            written = 0
+            while written < len(payload):
+                count = os.write(descriptor, payload[written:])
+                if count <= 0:
+                    raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+                written += count
+            os.fsync(descriptor)
+        except (OSError, AnchorRejected):
+            os.ftruncate(descriptor, offset)
+            os.fsync(descriptor)
+            raise
     finally:
         os.close(descriptor)
     require_trusted_file(path, mode=0o600)

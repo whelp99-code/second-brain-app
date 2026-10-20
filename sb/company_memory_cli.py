@@ -6,6 +6,7 @@ import argparse
 import os
 import stat
 import sys
+from collections.abc import Callable
 from contextlib import closing, nullcontext
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
@@ -174,6 +175,7 @@ def run(
     receipt_only: bool = False,
     freshness_provider: CompanyFreshnessProvider | None = None,
     observed_checkpoint: Checkpoint | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> JsonObject:
     """Serialize registrations before reading trusted config; legacy calls stay read-only."""
     with registration_lock(config_path) if register_source else nullcontext():
@@ -189,6 +191,7 @@ def run(
             receipt_only=receipt_only,
             freshness_provider=freshness_provider,
             observed_checkpoint=observed_checkpoint,
+            clock=clock,
         )
 
 
@@ -205,6 +208,7 @@ def _run(
     receipt_only: bool,
     freshness_provider: CompanyFreshnessProvider | None,
     observed_checkpoint: Checkpoint | None,
+    clock: Callable[[], datetime] | None,
 ) -> JsonObject:
     if (
         sum(
@@ -283,7 +287,7 @@ def _run(
         register_source or config.source_profile is not None,
         process_only or receipt_only,
     )
-    instant = now or datetime.now(UTC)
+    instant = clock() if clock is not None else now or datetime.now(UTC)
     provider = freshness_provider or provider_from_config(
         config.freshness_provider,
         company_database=database,
@@ -341,6 +345,7 @@ def _run(
                 arguments=arguments,
                 checkpoint=checkpoint,
                 now=instant,
+                clock=clock or ((lambda: instant) if now is not None else None),
             )
             resume_pending_finish(database, context, policy, provider)
         # Processor never returns candidate content or the content-bearing legacy receipt.

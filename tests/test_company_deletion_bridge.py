@@ -7,8 +7,13 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 
+import pytest
+
+import sb.company_db_freshness as freshness
 from sb.company_db_freshness_models import FreshnessRegistry, RegistryDeletionSource
+from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_deletion import DeletionFact
+from sb.company_freshness_models import Checkpoint, FinishProgressRequest
 from sb.effect_values import canonical_bytes
 from sb.effect_write_values import model_object
 from tests.test_company_db_freshness import (
@@ -19,8 +24,13 @@ from tests.test_company_db_freshness import (
 )
 
 
+@pytest.mark.parametrize("boundary", [None, "witness", "extend", "publication"])
+@pytest.mark.parametrize("challenge_length", [249, 250, 256])
 def test_registered_deletion_records_original_times_then_closes_unsafe_enrollment(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str | None,
+    challenge_length: int,
 ) -> None:
     provider = provider_at(tmp_path)
     before = provider.read_freshness(freshness_read(provider)).checkpoint
@@ -73,15 +83,43 @@ def test_registered_deletion_records_original_times_then_closes_unsafe_enrollmen
     before_database = provider.database.read_bytes()
     spool = provider.witness_dir / "frames.jsonl"
     before_spool = spool.read_bytes()
+    finish = provider.finish_progress
+
+    def interrupted_finish(request: FinishProgressRequest):
+        def fail(*_args: object, **_kwargs: object) -> None:
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+
+        with monkeypatch.context() as fault:
+            name = {
+                "witness": "append_witness_frame",
+                "extend": "extend_if_needed",
+                "publication": "_finish_operation",
+            }[boundary]
+            fault.setattr(freshness, name, fail)
+            return finish(request)
+
+    if boundary is not None:
+        monkeypatch.setattr(provider, "finish_progress", interrupted_finish)
     result = provider.bridge_deletion(
         scope=PROVIDER_SCOPE,
         deletion_plan_digest=RECEIPT_BINDING,
         expected_checkpoint=before,
-        challenge="deletion:original",
+        challenge="d" * challenge_length,
     )
-    assert result.outcome == "recorded"
-    assert result.checkpoint is not None
-    assert result.checkpoint.stores.second_brain.deletion_sequence == 2
+    if boundary is None:
+        assert result.outcome == "recorded"
+        checkpoint = result.checkpoint
+    else:
+        assert result.outcome == "error"
+        # Recovery must publish closure with the finish, without another bridge call.
+        assert provider.read_freshness(freshness_read(provider)).status == "mismatch"
+        with closing(sqlite3.connect(provider.database)) as db:
+            raw = db.execute(
+                "SELECT finished_checkpoint_json FROM company_freshness_operations"
+            ).fetchone()[0]
+        checkpoint = Checkpoint.model_validate_json(raw)
+    assert checkpoint is not None
+    assert checkpoint.stores.second_brain.deletion_sequence == 2
     with closing(sqlite3.connect(provider.database)) as db:
         evidence: list[tuple[str, str]] = db.execute(
             """SELECT source_record_id,json_extract(evidence_json,'$.metadata.original_at')
@@ -101,7 +139,7 @@ def test_registered_deletion_records_original_times_then_closes_unsafe_enrollmen
     ]
     assert (
         provider.read_freshness(
-            freshness_read(provider).model_copy(update={"observed_checkpoint": result.checkpoint}),
+            freshness_read(provider).model_copy(update={"observed_checkpoint": checkpoint}),
         ).status
         == "mismatch"
     )

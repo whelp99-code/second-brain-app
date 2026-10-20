@@ -81,7 +81,8 @@ def assessment_snapshot(
           'reason_codes',json(a.reason_codes_json),
           'record_kind',(SELECT r.record_kind FROM company_internal_records r
             WHERE r.provider_instance_id=a.provider_instance_id AND r.workspace_id=a.workspace_id
-              AND r.source_event_id=c.source_event_id ORDER BY r.record_id LIMIT 1),
+              AND r.source_event_id=c.source_event_id AND r.source_candidate_id=a.candidate_id
+            ORDER BY r.record_id LIMIT 1),
           'operation_id',COALESCE(
             (SELECT e.operation_id FROM company_internal_effects e
               WHERE e.provider_instance_id=a.provider_instance_id

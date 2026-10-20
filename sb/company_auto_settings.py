@@ -4,7 +4,7 @@ import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Final, Literal
+from typing import Annotated, Final, Literal
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from pydantic import Field
@@ -30,7 +30,17 @@ class AutoInternalRejected(ValueError):
 class InternalAutoPolicyV1(ClosedModel):
     schema_version: Literal["company-internal-auto/v1"]
     policy_version: int = Field(ge=1, le=9_007_199_254_740_991)
-    internal_email_suffixes: list[str] = Field(min_length=1)
+    internal_email_suffixes: list[
+        Annotated[
+            str,
+            Field(
+                pattern=(
+                    r"^[@.][a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+                    r"(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$"
+                )
+            ),
+        ]
+    ] = Field(min_length=1)
     internal_assignees: list[str] = Field(min_length=1)
     allowed_kinds: list[Literal["contact", "calendar", "progress"]] = Field(min_length=1)
 

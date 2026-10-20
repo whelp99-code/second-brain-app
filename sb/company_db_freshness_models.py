@@ -8,12 +8,13 @@ from typing import Literal, Protocol
 
 from pydantic import Field
 
-from sb.company_approver_binding import Digest
+from sb.company_approver_binding import CompanyHandoffPolicy, Digest
 from sb.company_freshness_models import (
     FreshnessScope,
     ProgressOperation,
     ProgressTerminalState,
 )
+from sb.company_memory_authority import CompanyAuthorityContext
 from sb.company_memory_handoff import CompanyControlRequest
 from sb.effect_values import JsonObject
 from sb.effect_write_models import ClosedModel
@@ -107,6 +108,12 @@ class JarvisSidecarEvidence(ClosedModel):
     original_at: str = Field(min_length=24, max_length=24)
     command: CompanyControlRequest
     record: JsonObject
+
+
+class JarvisRecoveryEvidence(ClosedModel):
+    sidecar: JarvisSidecarEvidence
+    context: CompanyAuthorityContext
+    policy: CompanyHandoffPolicy
 
 
 class JarvisCompletionV2(ClosedModel):

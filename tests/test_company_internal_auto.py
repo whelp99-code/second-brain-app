@@ -112,9 +112,13 @@ def test_human_outbox_blocks_auto_claim(tmp_path: Path) -> None:
             ),
         )
     result = run_auto_internal(database, bound, context(provider.checkpoint), provider, trigger())
-    assert result.outcomes[0].classification == "skipped_human"
+    assert result.outcomes == ()
+    assert provider.reserves == provider.finishes == 0
     with sqlite3.connect(database) as db:
         assert db.execute("SELECT COUNT(*) FROM company_internal_records").fetchone() == (0,)
+        assert db.execute("SELECT COUNT(*) FROM company_candidate_execution_claims").fetchone() == (
+            0,
+        )
 
 
 def test_conflicting_existing_value_is_not_overwritten(tmp_path: Path) -> None:

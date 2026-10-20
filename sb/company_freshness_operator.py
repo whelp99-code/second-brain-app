@@ -22,7 +22,7 @@ from sb.company_freshness_migrations import apply_component_migration
 from sb.company_internal_effects import install_auto_policy
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_memory_cli_config import company_database_path, load_company_config
-from sb.company_processor_progress import local_checkpoint, save_checkpoint
+from sb.company_processor_progress import local_checkpoint
 from sb.effect_values import JsonObject, format_instant
 from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
@@ -76,8 +76,6 @@ def run_operator(
         with closing(sqlite3.connect(database)) as db, db:
             digest = install_auto_policy(db, settings, config.workspace_id, now)
         after = selected.install_auto_policy_pin(scope)
-        with closing(sqlite3.connect(database)) as db, db:
-            save_checkpoint(db, config.workspace_id, after, before)
         return {"policy_digest": digest, "checkpoint": model_object(after)}
     if action != "freshness-bootstrap" or config.handoff_policy is None:
         raise CompanyAuthorityRejected("COMPANY_CONTRACT_INVALID")

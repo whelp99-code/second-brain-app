@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from contextlib import nullcontext
-from datetime import datetime
+from datetime import UTC, datetime
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -47,6 +48,7 @@ def execute_processor_transition(
     arguments: JsonObject,
     checkpoint: Checkpoint,
     now: datetime,
+    clock: Callable[[], datetime] | None = None,
 ) -> CompanyMemoryReceipt:
     """Only the durable reservation acknowledgment grants a new SQL effect."""
     candidate_id = arguments["candidate_id"]
@@ -144,7 +146,7 @@ def execute_processor_transition(
             operation,
             arguments,
             authority.request_digest,
-            now,
+            clock() if clock is not None else datetime.now(UTC),
             verify_original,
         )
         existing: list[tuple[int]] = db.execute(

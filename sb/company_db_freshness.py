@@ -51,6 +51,7 @@ from sb.company_db_freshness_models import (
     FreshnessRegistry,
     GenesisEntry,
     GenesisInventory,
+    JarvisRecoveryEvidence,
     JarvisSidecarEvidence,
     RegistryScopePin,
     RegistryTpmPin,
@@ -96,6 +97,7 @@ from sb.company_freshness_models import (
     StoreHeads,
     StoreProgress,
 )
+from sb.company_freshness_progress import is_other_store_prefix
 from sb.company_freshness_registry import (
     current_auto_pin,
     latest_auto_pins,
@@ -106,6 +108,7 @@ from sb.company_freshness_registry import (
 from sb.company_freshness_storage import open_company_database as _connect
 from sb.company_freshness_tpm import TpmNvExtendAnchor
 from sb.company_memory_authority import CompanyAuthorityContext
+from sb.company_processor_progress import save_checkpoint
 from sb.effect_values import JsonObject, JsonValue, canonical_bytes, format_instant, strict_loads
 from sb.effect_write_values import model_object
 
@@ -368,9 +371,12 @@ class CompanyDbFreshnessProvider:
         operation_id = deletion_operation_id(scope, deletion_plan_digest)
         try:
             source = deletion_source(self._registry(), scope, operation_id)
-            intent, event = original_deletion_fact(source, "intent")
+            _intent, event = original_deletion_fact(source, "intent")
         except (ValueError, AnchorRejected, OSError):
             return _wire_error()
+        finish_challenge = "deletion-finish:" + prefixed_digest(
+            b"second-brain/company-deletion-challenge/v1\0", challenge
+        )
         request = ReserveProgressRequest(
             schema_version=2,
             scope=scope,
@@ -398,15 +404,9 @@ class CompanyDbFreshnessProvider:
                 expected_checkpoint=reserved.checkpoint,
                 evidence_digest=source.completion_digest,
                 terminal_state="deleted",
-                challenge=challenge + ":finish",
+                challenge=finish_challenge,
             )
         )
-        if (
-            isinstance(result, FinishProgressResponse)
-            and result.checkpoint is not None
-            and not self._deletion_fence_safe(scope, intent.source_fence, intent.source_root)
-        ):
-            self._close_scope(scope, "deletion_fence")
         return result
 
     def publish_assessment(
@@ -504,12 +504,25 @@ class CompanyDbFreshnessProvider:
                 previous = latest_auto_pins(load_journal(connection)).get(
                     (scope.provider_instance_id, scope.workspace_id),
                 )
+                local_row = connection.execute(
+                    "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
+                    (scope.workspace_id,),
+                ).fetchone()
             finally:
                 connection.close()
             if previous == pin:
                 return head
             require_forward_pin(previous, pin)
-            record: JsonObject = {"kind": "internal_auto_policy", "pin": model_object(pin)}
+            if local_row is None:
+                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            local = Checkpoint.model_validate_json(local_row[0], strict=True)
+            if not is_other_store_prefix(local, head, "second_brain"):
+                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            record: JsonObject = {
+                "kind": "internal_auto_policy",
+                "pin": model_object(pin),
+                "processor_checkpoint_before": checkpoint_object(local),
+            }
             digest = prefixed_digest(b"second-brain/company-auto-policy-registration/v1\0", record)
             evidence = [
                 _stream_projection(
@@ -749,6 +762,18 @@ class CompanyDbFreshnessProvider:
             "terminal_state": request.terminal_state,
             "state": "finished",
         }
+        if sidecar is not None and context is not None and policy is not None:
+            record["jarvis_evidence"] = model_object(
+                JarvisRecoveryEvidence(sidecar=sidecar, context=context, policy=policy)
+            )
+        if existing.operation == "delete" and self.actor_store == "second_brain":
+            source = deletion_source(self._registry(), request.scope, existing.operation_id)
+            intent, _ = original_deletion_fact(source, "intent")
+            if not self._deletion_fence_safe(
+                request.scope, intent.source_fence, intent.source_root
+            ):
+                record["closed"] = True
+                record["reason"] = "deletion_fence"
         if request.evidence_digest != verified.source_digest:
             return _conflict_finish(request)
         evidence = _finish_evidence(
@@ -918,6 +943,15 @@ class CompanyDbFreshnessProvider:
             _ = connection.execute("BEGIN IMMEDIATE")
             _insert_evidence_rows(connection, scope, evidence, operation_id, created_at)
             _upsert_scope(connection, scope, after, sequence, created_at)
+            if record.get("kind") == "internal_auto_policy":
+                save_checkpoint(
+                    connection,
+                    scope.workspace_id,
+                    after,
+                    Checkpoint.model_validate(
+                        record.get("processor_checkpoint_before"), strict=True
+                    ),
+                )
             if phase == "finish" and evidence_digest is not None and terminal_state is not None:
                 _finish_operation(
                     connection,
@@ -1047,6 +1081,48 @@ class CompanyDbFreshnessProvider:
                             evidence_digest=evidence_digest,
                             terminal_state=terminal_state,
                         )
+            jarvis_operations = {
+                (
+                    item.scope.provider_instance_id,
+                    item.scope.workspace_id,
+                    item.row.operation_id,
+                ): item.row
+                for item in operations
+                if item.row.actor_store == "jarvis"
+            }
+            for entry in entries:
+                if entry.phase != "finish":
+                    continue
+                original = jarvis_operations.get(
+                    (entry.scope.provider_instance_id, entry.scope.workspace_id, entry.operation_id)
+                )
+                if original is None:
+                    continue
+                if entry.before is None:
+                    raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+                recovered = JarvisRecoveryEvidence.model_validate_json(
+                    canonical_bytes(entry.record.get("jarvis_evidence")), strict=True
+                )
+                request = FinishProgressRequest.model_validate(
+                    {
+                        "schema_version": 2,
+                        "scope": scope_object(entry.scope),
+                        "operation_id": entry.operation_id,
+                        "reservation_id": original.reservation_id,
+                        "expected_checkpoint": checkpoint_object(entry.before),
+                        "evidence_digest": entry.record.get("evidence_digest"),
+                        "terminal_state": entry.record.get("terminal_state"),
+                        "challenge": "recovery",
+                    }
+                )
+                _ = _verify_sidecar(
+                    connection,
+                    recovered.sidecar,
+                    request,
+                    original,
+                    recovered.context,
+                    recovered.policy,
+                )
             row = _unpublished_row(connection)
         finally:
             connection.close()
@@ -1077,6 +1153,15 @@ class CompanyDbFreshnessProvider:
                 original = entries[-1]
                 if original.phase == "bootstrap":
                     _seed_bootstrap_checkpoint(connection, row.scope, row.after)
+                if original.record.get("kind") == "internal_auto_policy":
+                    save_checkpoint(
+                        connection,
+                        row.scope.workspace_id,
+                        row.after,
+                        Checkpoint.model_validate(
+                            original.record.get("processor_checkpoint_before"), strict=True
+                        ),
+                    )
                 if original.phase == "finish":
                     record = original.record
                     reservation_id = record.get("reservation_id")
@@ -1217,7 +1302,8 @@ class CompanyDbFreshnessProvider:
         try:
             rows: list[tuple[str]] = connection.execute(
                 """SELECT record_json FROM company_freshness_log
-                   WHERE provider_instance_id = ? AND workspace_id = ? AND phase = 'registry'""",
+                   WHERE provider_instance_id = ? AND workspace_id = ?
+                     AND phase IN ('registry','finish')""",
                 (scope.provider_instance_id, scope.workspace_id),
             ).fetchall()
         except sqlite3.Error:
@@ -1302,32 +1388,6 @@ class CompanyDbFreshnessProvider:
         return (
             pin.source_deletion_sequence == source_fence and pin.source_deletion_root == source_root
         )
-
-    def _close_scope(self, scope: FreshnessScope, reason: str) -> None:
-        head = self._head(scope)
-        if head is None or self._closed(scope):
-            return
-        record: JsonObject = {"closed": True, "reason": reason}
-        try:
-            with self._locked():
-                self._publish_new(
-                    scope=scope,
-                    phase="registry",
-                    operation_id="sha256:" + "0" * 64,
-                    record=record,
-                    evidence=[],
-                    before=head,
-                    after=head,
-                    challenge="closure",
-                    reservation_id="closure",
-                    operation="delete",
-                    event_digest="sha256:" + "0" * 64,
-                    expected_json=checkpoint_text(head),
-                    terminal_state=None,
-                    evidence_digest=None,
-                )
-        except (AnchorRejected, OSError, sqlite3.Error, ValidationError):
-            return
 
     def bootstrap_scope(
         self,

@@ -725,6 +725,18 @@ def _candidate_ids(
             """SELECT c.candidate_id FROM company_memory_candidates c
             WHERE c.workspace_id=? AND c.owner=? AND c.policy_revision=?
               AND c.source_system='mail' AND c.state IN ('candidate','accepted')
+              AND c.deletion_sequence=? AND c.deletion_set_root=?
+              AND NOT EXISTS(SELECT 1 FROM company_handoff_outbox h
+                WHERE h.workspace_id=c.workspace_id AND h.candidate_id=c.candidate_id)
+              AND NOT EXISTS(SELECT 1 FROM company_handoff_decisions h
+                WHERE h.workspace_id=c.workspace_id AND h.candidate_id=c.candidate_id)
+              AND NOT EXISTS(SELECT 1 FROM company_candidate_execution_claims h
+                WHERE h.provider_instance_id=? AND h.workspace_id=c.workspace_id
+                  AND h.candidate_id=c.candidate_id AND h.path='human')
+              AND (c.state='candidate' OR EXISTS(SELECT 1 FROM company_auto_policy_receipts r
+                WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
+                  AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
+                  AND r.policy_digest=?))
               AND NOT EXISTS(SELECT 1 FROM json_each(c.projects_json) p
                 WHERE p.value NOT IN (SELECT value FROM json_each(?)))
             ORDER BY EXISTS(SELECT 1 FROM company_auto_assessments a
@@ -735,6 +747,11 @@ def _candidate_ids(
                 context.workspace_id,
                 context.owner,
                 context.policy_revision,
+                context.deletion_sequence,
+                context.deletion_set_root,
+                settings.provider_instance_id,
+                settings.provider_instance_id,
+                policy_digest(settings.policy),
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 settings.provider_instance_id,
                 policy_digest(settings.policy),

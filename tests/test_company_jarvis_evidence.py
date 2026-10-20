@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
 
+import sb.company_db_freshness as freshness
 from sb.company_db_freshness import CompanyDbFreshnessProvider, JarvisSidecarEvidence
 from sb.company_db_freshness_hash import operation_id_for
+from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_models import (
     Checkpoint,
     FinishProgressRequest,
@@ -41,6 +45,9 @@ def complete_sidecar(
     digest: str,
     checkpoint: Checkpoint,
     cfg: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str | None = None,
+    damage: str | None = None,
 ) -> Checkpoint:
     config = load_company_config(cfg)
     assert config.handoff_policy is not None
@@ -48,27 +55,84 @@ def complete_sidecar(
     assert reserved.outcome == "reserved"
     assert reserved.reservation_id is not None and reserved.checkpoint is not None
     terminal = "completed" if request.operation == "complete" else "approved"
-    result = provider.finish_with_jarvis_sidecar(
-        FinishProgressRequest(
-            schema_version=2,
-            scope=request.scope,
-            operation_id=request.operation_id,
-            reservation_id=reserved.reservation_id,
-            expected_checkpoint=reserved.checkpoint,
-            evidence_digest=digest,
-            terminal_state=terminal,
-            challenge="finish:" + request.operation_id,
-        ),
-        sidecar,
-        context=CONTEXT,
-        policy=config.handoff_policy,
+    finish_request = FinishProgressRequest(
+        schema_version=2,
+        scope=request.scope,
+        operation_id=request.operation_id,
+        reservation_id=reserved.reservation_id,
+        expected_checkpoint=reserved.checkpoint,
+        evidence_digest=digest,
+        terminal_state=terminal,
+        challenge="finish:" + request.operation_id,
     )
-    assert result.outcome == "recorded"
+
+    def finish():
+        return provider.finish_with_jarvis_sidecar(
+            finish_request,
+            sidecar,
+            context=CONTEXT,
+            policy=config.handoff_policy,
+        )
+
+    if boundary is not None:
+
+        def fail(*_args: object, **_kwargs: object) -> None:
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+
+        if boundary == "finished":
+            assert finish().outcome == "recorded"
+        else:
+            with monkeypatch.context() as fault:
+                fault.setattr(
+                    freshness,
+                    "append_witness_frame" if boundary == "witness" else "_finish_operation",
+                    fail,
+                )
+                assert finish().outcome == "error"
+        if damage is not None:
+            with closing(sqlite3.connect(provider.database)) as db, db:
+                if damage == "missing_receipt":
+                    db.execute("DELETE FROM company_memory_receipts WHERE operation='accept'")
+                else:
+                    db.execute(
+                        "UPDATE company_memory_receipts SET receipt_digest='corrupt' WHERE operation='accept'"
+                    )
+            nv = provider.anchor.read_value()
+            assert finish().outcome == "error"
+            assert provider.anchor.read_value() == nv
+            with closing(sqlite3.connect(provider.database)) as db:
+                assert db.execute("""SELECT count(*) FROM company_freshness_log l
+                    LEFT JOIN company_freshness_publication p USING(global_sequence)
+                    WHERE l.phase='finish' AND p.global_sequence IS NULL""").fetchone() == (
+                    (0,) if boundary == "finished" else (1,)
+                )
+            return checkpoint
+    result = finish()
+    assert result.outcome == ("recorded" if boundary is None else "already_recorded")
     assert result.checkpoint is not None and result.checkpoint != checkpoint
     return result.checkpoint
 
 
-def test_original_approval_and_completion_prove_human_mark_processed(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "boundary,damage",
+    [
+        (None, None),
+        ("witness", None),
+        ("publication", None),
+        ("witness", "missing_receipt"),
+        ("publication", "missing_receipt"),
+        ("witness", "corrupt_receipt"),
+        ("publication", "corrupt_receipt"),
+        ("finished", "missing_receipt"),
+        ("finished", "corrupt_receipt"),
+    ],
+)
+def test_original_approval_and_completion_prove_human_mark_processed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str | None,
+    damage: str | None,
+) -> None:
     cfg, sb = human_runtime(tmp_path)
     jarvis = CompanyDbFreshnessProvider(
         database=sb.database,
@@ -126,6 +190,8 @@ def test_original_approval_and_completion_prove_human_mark_processed(tmp_path: P
         approval_digest,
         before,
         cfg,
+        monkeypatch,
+        boundary,
     )
     accepted = run(
         cfg,
@@ -191,6 +257,13 @@ def test_original_approval_and_completion_prove_human_mark_processed(tmp_path: P
         effect_digest,
         accepted_head,
         cfg,
+        monkeypatch,
+        boundary,
+        damage,
     )
+    if damage is not None:
+        with pytest.raises(ValueError):
+            run(cfg, mark_request, now=NOW, process_only=True, freshness_provider=sb)
+        return
     marked = run(cfg, mark_request, now=NOW, process_only=True, freshness_provider=sb)
     assert marked["state"] == "processed_complete"

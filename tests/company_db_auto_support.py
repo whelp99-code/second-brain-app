@@ -24,7 +24,6 @@ from sb.company_freshness import FreshnessScope
 from sb.company_freshness_migrations import apply_component_migration
 from sb.company_internal_effects import install_auto_policy
 from sb.company_memory import CompanyMemoryStore
-from sb.company_processor_progress import save_checkpoint
 from sb.effect_values import canonical_bytes
 from sb.effect_write_values import model_object
 from tests.company_db_freshness_support import (
@@ -73,7 +72,7 @@ def real_company_runtime(
         }
     )
     _ = registry.write_bytes(canonical_bytes(model_object(registered)))
-    initial = bootstrap_company_scope(
+    _ = bootstrap_company_scope(
         database=database,
         registry_path=registry,
         witness_dir=witness,
@@ -116,6 +115,4 @@ def real_company_runtime(
     )
     _ = registry.write_bytes(canonical_bytes(model_object(registered)))
     active = provider.install_auto_policy_pin(scope)
-    with closing(sqlite3.connect(database)) as db, db:
-        save_checkpoint(db, WORKSPACE, active, initial)
     return provider, bound, context(active)

@@ -130,6 +130,8 @@ def read_auto_report(
             cutoff_from = _cutoff(db, scope, query.from_global_sequence)
             cutoff_to = _cutoff(db, scope, head)
             uncertain = _uncertain_candidates(db, scope, head)
+    except AutoInternalRejected:
+        raise
     except (sqlite3.Error, OSError, ValueError) as exc:
         raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED") from exc
     if cursor is not None and (cursor.cutoff_from != cutoff_from or cursor.cutoff_to != cutoff_to):

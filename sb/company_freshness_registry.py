@@ -78,6 +78,20 @@ def require_scope_pins(registry: FreshnessRegistry, entries: list[JournalEntry])
 
 
 def require_current_auto_pins(registry: FreshnessRegistry, entries: list[JournalEntry]) -> None:
-    for pin in latest_auto_pins(entries).values():
+    pins = latest_auto_pins(entries)
+    if entries:
+        pending = entries[-1]
+        if (
+            pending.phase == "registry"
+            and pending.published_sequence is None
+            and pending.record.get("kind") == "internal_auto_policy"
+        ):
+            pin = RegistryAutoPolicyPin.model_validate(pending.record.get("pin"), strict=True)
+            if pin.scope != pending.scope:
+                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            key = (pin.scope.provider_instance_id, pin.scope.workspace_id)
+            require_forward_pin(pins.get(key), pin)
+            pins[key] = pin
+    for pin in pins.values():
         if pin != current_auto_pin(registry, pin.scope):
             raise AnchorRejected("COMPANY_POLICY_REGISTRATION_REQUIRED")
