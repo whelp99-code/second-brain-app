@@ -30,6 +30,7 @@ from sb.effect_values import (
     canonical_bytes,
     format_instant,
     is_json_object,
+    parse_instant,
     strict_loads,
 )
 from tests.test_company_candidate_handoff import CONTEXT, PAGE, first_proposal, signed_request
@@ -306,16 +307,17 @@ def test_cancellation_is_not_an_approval_or_rejection(tmp_path: Path, disguised:
 
 
 @pytest.mark.parametrize(
-    ("original_at", "normalized_at"),
+    ("original_at", "normalized_at", "outcome"),
     [
-        ("2026-09-22T19:00:00+09:00", "2026-09-22T10:00:00.000Z"),
-        ("2026-09-22", "2026-09-22T00:00:00.000Z"),
+        ("2026-09-22T19:00:00+09:00", "2026-09-22T10:00:00.000Z", "recorded"),
+        ("2026-09-22", "2026-09-22T00:00:00.000Z", "conflict"),
     ],
 )
 def test_original_revocation_payload_time_is_not_rewritten(
     tmp_path: Path,
     original_at: str,
     normalized_at: str,
+    outcome: str,
 ) -> None:
     provider, cfg, raw, proof = cancelled_runtime(tmp_path)
     record = proof["record"]
@@ -338,8 +340,10 @@ def test_original_revocation_payload_time_is_not_rewritten(
     proof["original_at"] = normalized_at
     raw["evidence_digest"] = original_digest
     result = finish_with_proof(provider, cfg, raw, proof)
-    assert isinstance(result, FinishProgressResponse) and result.outcome == "recorded"
+    assert isinstance(result, FinishProgressResponse) and result.outcome == outcome
     assert revocation["payload_json"] == original_json
+    if outcome != "recorded":
+        return
     with closing(sqlite3.connect(provider.database)) as db:
         sources: list[tuple[str]] = db.execute(
             "SELECT source_digest FROM company_freshness_evidence WHERE source_record_id=?",
@@ -382,3 +386,33 @@ def test_shared_cancellation_fixture_uses_original_revocation_payload() -> None:
         malformed["terminal_state"] = value
         with pytest.raises(ValidationError):
             _ = FinishProgressRequest.model_validate(malformed)
+def test_revocation_before_command_is_rejected(tmp_path: Path) -> None:
+    from datetime import timedelta
+
+    provider, cfg, raw, proof = cancelled_runtime(tmp_path)
+    record = proof["record"]
+    assert is_json_object(record)
+    revocation = record["revocation"]
+    assert is_json_object(revocation)
+    command = proof["command"]
+    assert is_json_object(command)
+    requested_at = command["requested_at"]
+    assert isinstance(requested_at, str)
+    earlier = format_instant(parse_instant(requested_at) - timedelta(seconds=1))
+    payload_json = revocation["payload_json"]
+    assert isinstance(payload_json, str)
+    payload = strict_loads(payload_json, 16_384)
+    assert is_json_object(payload)
+    payload["revoked_at"] = earlier
+    encoded = canonical_bytes(payload)
+    digest = "sha256:" + hashlib.sha256(encoded).hexdigest()
+    revocation["revoked_at"] = earlier
+    revocation["payload_json"] = encoded.decode("utf-8")
+    revocation["payload_digest"] = digest
+    revocation["revocation_id"] = "control-revocation:" + digest.removeprefix("sha256:")
+    revocation["created_at"] = earlier
+    proof["source_record_id"] = revocation["revocation_id"]
+    proof["original_at"] = earlier
+    raw["evidence_digest"] = digest
+    result = finish_with_proof(provider, cfg, raw, proof)
+    assert isinstance(result, FinishProgressResponse) and result.outcome == "conflict"

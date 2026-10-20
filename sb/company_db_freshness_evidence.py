@@ -180,6 +180,7 @@ def verify_jarvis_sidecar(
                     or sidecar.source_record_id != revocation.revocation_id
                     or sidecar.original_at != original_at
                     or parse_instant(revocation.created_at) < parse_instant(original_at)
+                    or parse_instant(original_at) < parse_instant(command.requested_at)
                     or not revocation.reason.strip()
                     or not revocation.revoked_by.strip()
                     or (reservation.operation != "complete" and revocation.receipt_id is not None)
