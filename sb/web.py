@@ -345,6 +345,8 @@ def _admission_status(exc: AdmissionError) -> HTTPStatus:
 class Handler(BaseHTTPRequestHandler):
     connection: socket
     _life_actor: LifeActor | None = None
+    _defer_response: bool = False
+    _pending_response: tuple[HTTPStatus, JsonInput] | None = None
     context: ClassVar[WebContext]
     life_config: Config
 
@@ -368,6 +370,9 @@ class Handler(BaseHTTPRequestHandler):
         del format, args
 
     def json_response(self, status: HTTPStatus, payload: JsonInput) -> None:
+        if self._defer_response:
+            self._pending_response = (status, payload)
+            return
         if (
             200 <= int(status) < 300
             and self._life_actor is not None
@@ -449,20 +454,37 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if not self._authorized():
             return
+        self._pending_response = None
         try:
             if urlsplit(self.path).path in {"/", "/health", "/ready"}:
                 self._get(self.context.root)
-            else:
+                return
+            self._defer_response = True
+            try:
                 with read_root(self.context.config) as pinned:
                     self._get(pinned)
+            finally:
+                self._defer_response = False
         except PageNotFoundError as exc:
-            self.json_response(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+            self._pending_response = (HTTPStatus.NOT_FOUND, {"error": str(exc)})
         except (ValueError, PathEscapeError) as exc:
-            self.json_response(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            self._pending_response = (HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
+            self._pending_response = None
+            return
         except (OSError, GitCommandError, RuntimeError) as exc:
-            self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
+            self._pending_response = (
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": type(exc).__name__},
+            )
+        pending = self._pending_response
+        self._pending_response = None
+        if pending is not None:
+            # Materialize under the reader pin, but release its generation lock
+            # before socket backpressure can block an owner-effect writer.
+            # json_response still rechecks life authorization at emission time.
+            self.json_response(*pending)
 
     def get_response(self, root: Path) -> None:
         parsed = urlsplit(self.path)
