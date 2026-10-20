@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
+import multiprocessing
 import os
 import subprocess
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, datetime
+from multiprocessing.synchronize import Barrier
 from pathlib import Path
 
 import pytest
@@ -106,6 +109,20 @@ def _accept_process(item: tuple[str, dict[str, JsonValue]]) -> tuple[bool, bool,
         return True, result.replayed, ""
     except WriteRequestRejected as exc:
         return False, False, exc.code
+
+
+def _arm_preopened_directory_barrier(barrier: Barrier) -> None:
+    real_flock = fcntl.flock
+    first = True
+
+    def flock(fd: int, operation: int) -> None:
+        nonlocal first
+        if operation == fcntl.LOCK_EX and first:
+            first = False
+            _ = barrier.wait(timeout=20)
+        real_flock(fd, operation)
+
+    fcntl.flock = flock
 
 
 def test_accepts_each_operation_once_and_exact_replay(tmp_path: Path) -> None:
@@ -256,12 +273,14 @@ def test_32_changed_contenders_under_one_key_publish_once(tmp_path: Path) -> Non
     changed["payload"] = {"content": "contending canonical body"}
     _rederive(changed)
     requests = [original if index % 2 == 0 else changed for index in range(32)]
+    barrier = multiprocessing.Barrier(8)
 
-    # When
-    with ProcessPoolExecutor(max_workers=8) as pool:
+    # When: every worker has opened pending before any writer acquires its lock.
+    with ProcessPoolExecutor(max_workers=8, initializer=_arm_preopened_directory_barrier, initargs=(barrier,)) as pool:
         results = list(pool.map(_accept_process, [(str(tmp_path), request) for request in requests]))
     # Then
     assert sum(accepted and not replayed for accepted, replayed, _code in results) == 1
+    assert sum(accepted and replayed for accepted, replayed, _code in results) == 15
     assert sum(code == "WRITE_REQUEST_REPLAY_CONFLICT" for _accepted, _replayed, code in results) == 16
     assert len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 1
 
