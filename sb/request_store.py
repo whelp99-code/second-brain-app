@@ -1101,6 +1101,18 @@ class RequestStore:
         rows = cast(list[tuple[str, int]], raw_rows)
         return tuple((lease_id, process_id) for lease_id, process_id in rows)
 
+    def reader_diagnostic_metadata(
+        self, generation_id: str,
+    ) -> dict[tuple[str, int], tuple[str, str | None]]:
+        """Enrich an already observed denial; never use this query to authorize disposal."""
+        rows = cast(list[tuple[str, int, str, str | None]], self.db.execute(
+            "SELECT r.lease_id,r.process_id,r.opened_at,p.process_identity "
+            + "FROM reader_leases r LEFT JOIN reader_process_identities p USING(lease_id) "
+            + "WHERE r.generation_id=?", (generation_id,),
+        ).fetchall())
+        return {(lease_id, pid): (opened_at, identity)
+                for lease_id, pid, opened_at, identity in rows}
+
     def prune_dead_readers(self, generation_id: str) -> int:
         """Retire leases only when death or a changed boot/start identity is observed.
 

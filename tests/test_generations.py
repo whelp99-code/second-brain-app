@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
+import sqlite3
 import stat
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +14,7 @@ import pytest
 from sb.generations import (
     Generation,
     GenerationError,
+    GenerationReaderDrainError,
     GenerationStore,
     _private_directory,
     _regular_files,
@@ -118,7 +122,22 @@ def test_fresh_generation_has_orphan_git_and_atomic_pointer(tmp_path: Path) -> N
     store.close()
 
 
-def test_reader_lease_blocks_predecessor_disposal(tmp_path: Path) -> None:
+def assert_drain_log(
+    caplog: pytest.LogCaptureFixture, error: GenerationReaderDrainError,
+) -> None:
+    records = [record for record in caplog.records if record.name == "sb.generations"]
+    assert len(records) == 1
+    line = records[0].getMessage()
+    assert len(line.splitlines()) == 1
+    assert json.loads(line) == error.diagnostics
+    assert str(error) == "GENERATION_READER_DRAIN_REQUIRED"
+    assert error.args == ("GENERATION_READER_DRAIN_REQUIRED",)
+    assert isinstance(error, GenerationError)
+
+
+def test_reader_lease_blocks_predecessor_disposal(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
     requests = RequestStore(tmp_path / "requests")
     store = GenerationStore(
         tmp_path / "state", tmp_path / "share",
@@ -128,16 +147,33 @@ def test_reader_lease_blocks_predecessor_disposal(tmp_path: Path) -> None:
     first = build_generation(store, text="first")
     store.activate(first, None, NOW)
     second = build_generation(store, first, "second")
-    requests.register_reader("reader:1", first.generation_id, os.getpid(), NOW)
-    with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
+    lease_id = "reader:1\nFORBIDDEN_LOG_LINE"
+    requests.register_reader(lease_id, first.generation_id, os.getpid(), NOW)
+    expected = requests.reader_diagnostic_metadata(first.generation_id)[(lease_id, os.getpid())]
+    try:
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert caught.value.diagnostics["readers"] == [{
+            "lease_id": lease_id, "pid": os.getpid(), "opened_at": expected[0],
+            "process_identity": expected[1], "metadata_available": True,
+            "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+        }]
+        assert caught.value.diagnostics["generation_id"] == first.generation_id
+        assert caught.value.diagnostics["phase"] == "predecessor-disposal"
+        assert first.root.is_dir()
+        requests.release_reader(lease_id)
         store.activate(second, first, NOW)
-    requests.release_reader("reader:1")
-    assert store.active().generation_id == second.generation_id
-    store.close()
-    requests.close()
+        assert not first.root.exists()
+        assert store.active().generation_id == second.generation_id
+    finally:
+        store.close()
+        requests.close()
 
 
-def test_open_predecessor_descriptor_blocks_disposal(tmp_path: Path) -> None:
+def test_open_predecessor_descriptor_blocks_disposal(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
     store = GenerationStore(
         tmp_path / "state", tmp_path / "share",
         provider_instance_id="provider:test", provider_release_sha="a" * 40,
@@ -146,12 +182,109 @@ def test_open_predecessor_descriptor_blocks_disposal(tmp_path: Path) -> None:
     store.activate(first, None, NOW)
     second = build_generation(store, first, "second")
     descriptor = os.open(first.root, os.O_RDONLY | os.O_DIRECTORY)
+    outside = tmp_path / "FORBIDDEN_OUTSIDE_PATH"
+    outside.mkdir()
+    outside_descriptor = os.open(outside, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
+        with pytest.raises(GenerationReaderDrainError) as caught:
             store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert caught.value.diagnostics["descriptors"] == [{
+            "pid": os.getpid(), "fd": descriptor, "path": str(first.root.resolve()),
+            "path_status": "observed-at-decision", "source": "/proc/self/fd",
+        }]
+        assert "FORBIDDEN_OUTSIDE_PATH" not in caplog.text
         assert first.root.is_dir()
     finally:
+        os.close(outside_descriptor)
         os.close(descriptor)
+        store.close()
+
+
+@pytest.mark.parametrize("failure", ["metadata", "log-oserror", "log-closed-stream"])
+def test_drain_diagnostic_failure_preserves_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        first = build_generation(store, text="first")
+        store.activate(first, None, NOW)
+        second = build_generation(store, first, "second")
+        requests.register_reader("reader:1", first.generation_id, os.getpid(), NOW)
+        if failure == "metadata":
+            def unavailable(
+                _store: RequestStore, _generation_id: str,
+            ) -> dict[tuple[str, int], tuple[str, str | None]]:
+                raise sqlite3.OperationalError("FORBIDDEN_DATABASE_DETAIL")
+            monkeypatch.setattr(RequestStore, "reader_diagnostic_metadata", unavailable)
+        else:
+            def unavailable_log(*_args: object, **_kwargs: object) -> None:
+                if failure == "log-oserror":
+                    raise OSError("FORBIDDEN_SINK_DETAIL")
+                raise ValueError("I/O operation on closed file")
+            monkeypatch.setattr(logging.getLogger("sb.generations"), "warning", unavailable_log)
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert str(caught.value) == "GENERATION_READER_DRAIN_REQUIRED"
+        assert first.root.is_dir()
+        assert requests.readers(first.generation_id) == (("reader:1", os.getpid()),)
+        assert "FORBIDDEN_" not in json.dumps(caught.value.diagnostics)
+        if failure == "metadata":
+            assert caught.value.diagnostics["reader_metadata_status"] == "unavailable-sqlite-error"
+            assert caught.value.diagnostics["readers"] == [{
+                "lease_id": "reader:1", "pid": os.getpid(), "opened_at": None,
+                "process_identity": None, "metadata_available": False,
+                "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+            }]
+    finally:
+        store.close()
+        requests.close()
+
+
+def test_drain_keeps_same_descriptor_observation_after_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share",
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    held: int | None = None
+    try:
+        first = build_generation(store, text="FORBIDDEN_GENERATION_CONTENT")
+        store.activate(first, None, NOW)
+        second = build_generation(store, first, "second")
+        held = os.open(first.root, os.O_RDONLY | os.O_DIRECTORY)
+        descriptor = held
+        original_readlink = os.readlink
+        inspected = []
+
+        def close_after_observation(path: str | Path, *, dir_fd: int | None = None) -> str:
+            nonlocal held
+            target = original_readlink(path, dir_fd=dir_fd)
+            if str(path) == f"/proc/self/fd/{descriptor}" and held is not None:
+                inspected.append(str(path))
+                os.close(held)
+                held = None
+            return target
+
+        monkeypatch.setattr(os, "readlink", close_after_observation)
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert inspected == [f"/proc/self/fd/{descriptor}"]
+        assert caught.value.diagnostics["descriptors"] == [{
+            "pid": os.getpid(), "fd": descriptor, "path": str(first.root.resolve()),
+            "path_status": "observed-at-decision", "source": "/proc/self/fd",
+        }]
+        assert "FORBIDDEN_GENERATION_CONTENT" not in caplog.text
+        assert first.root.is_dir()
+    finally:
+        if held is not None:
+            os.close(held)
         store.close()
 
 
