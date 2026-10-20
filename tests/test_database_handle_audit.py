@@ -394,10 +394,54 @@ def test_snapshot_pathname_with_other_subvolume_is_not_the_live_database(
     monkeypatch.setattr(
         audit, "subvolume_id", lambda path: {live.resolve(): 5, snap.resolve(): 9}.get(path, 0)
     )
-    assert audit._mapping_is_selected([live], str(snap), live.name) is False
-    assert audit._mapping_is_selected([live], str(live), live.name) is True
-    assert audit._mapping_is_selected([live], "", live.name) is True
+    pid = os.getpid()
+    assert audit._mapping_is_selected([live], str(snap), live.name, pid) is False
+    assert audit._mapping_is_selected([live], str(live), live.name, pid) is True
+    assert audit._mapping_is_selected([live], "", live.name, pid) is True
     same = tmp_path / "alias" / "fixture.sqlite"
     same.parent.mkdir()
     os.link(live, same)
-    assert audit._mapping_is_selected([live], str(same), live.name) is True
+    assert audit._mapping_is_selected([live], str(same), live.name, pid) is True
+
+
+def test_holder_namespace_keeps_mapping_hidden_from_auditor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A genuine holder path must not be resolved in the auditor namespace.
+
+    The maps pathname exists in both namespaces, but only the holder root names
+    the live file. Resolving the bare pathname would land on the auditor's
+    sibling subvolume and drop the mmap-only holder.
+    """
+    live = tmp_path / "holder" / "fixture.sqlite"
+    auditor_copy = tmp_path / "auditor" / "fixture.sqlite"
+    live.parent.mkdir()
+    auditor_copy.parent.mkdir()
+    _ = live.write_bytes(b"live")
+    _ = auditor_copy.write_bytes(b"auditor sibling")
+    audit = audit_api()
+    holder_root = tmp_path / "proc-root"
+    (holder_root / "data").mkdir(parents=True)
+    (holder_root / "auditor").mkdir()
+    holder_file = holder_root / "data" / "fixture.sqlite"
+    os.link(live, holder_file)
+    os.link(auditor_copy, holder_root / "auditor" / auditor_copy.name)
+    monkeypatch.setattr(audit, "_holder_root", lambda _pid: holder_root)
+    monkeypatch.setattr(
+        audit,
+        "subvolume_id",
+        lambda path: {
+            holder_file.resolve(): 5,
+            auditor_copy.resolve(): 9,
+            live.resolve(): 5,
+            (holder_root / "auditor" / auditor_copy.name).resolve(): 9,
+        }.get(path, 0),
+    )
+    assert audit._mapping_is_selected([live], "/data/fixture.sqlite", live.name, 4242) is True
+    assert (
+        audit._mapping_is_selected([live], f"/auditor/{auditor_copy.name}", live.name, 4242)
+        is False
+    )
+    assert audit._mapping_is_selected([live], "/missing/fixture.sqlite", live.name, 4242) is True
+    foreign = bytes([0xFF])
+    assert audit._mapping_is_selected([live], os.fsdecode(b"/" + foreign), live.name, 4242) is True
