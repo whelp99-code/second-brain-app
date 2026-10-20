@@ -1,6 +1,11 @@
 """Local owner receipts retry the admitted effect, including a lost HTTP result."""
+import fcntl
+import os
+import socket
+import threading
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from pytest import MonkeyPatch
@@ -69,9 +74,91 @@ def test_same_receipt_resumes_and_scrubs_pending_correction(
         store.close()
 
 
+def test_owner_effect_does_not_wait_for_blocked_get_socket(
+    tmp_path: Path, monkeypatch: MonkeyPatch,
+) -> None:
+    """Real TCP backpressure must not retain the GET's generation reader lock."""
+    config, root = ready(tmp_path)
+    monkeypatch.setenv("SB_WEB_TOKEN", "owner-test-token")
+    # Bound both TCP buffers and exceed their capacity without a client reader.
+    monkeypatch.setattr("sb.web._latest_briefing", lambda _root: "x" * (4 * 1024 * 1024))
+    entered = threading.Event()
+    finished = threading.Event()
+    sendall = socket.socket.sendall
+
+    def tracked_sendall(sock: socket.socket, data: bytes, flags: int = 0) -> None:
+        if not data.startswith(b'{"briefing":'):
+            return sendall(sock, data, flags)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+        entered.set()
+        try:
+            sendall(sock, data, flags)
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(socket.socket, "sendall", tracked_sendall)
+    with running(config) as base:
+        _, page = request(base + URL, token="owner-test-token")
+        replacement = "M13SOCKET corrected appointment."
+        payload = payload_for(page, replacement)
+        address = urlsplit(base)
+        assert address.hostname is not None and address.port is not None
+        with socket.socket() as slow:
+            slow.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+            slow.settimeout(5)
+            slow.connect((address.hostname, address.port))
+            slow.sendall(
+                b"GET /api/briefing/latest HTTP/1.0\r\nHost: localhost\r\n"
+                b"Authorization: Bearer owner-test-token\r\n\r\n",
+            )
+            try:
+                assert entered.wait(5), "GET never reached its real socket write"
+                assert not finished.is_set(), "GET did not encounter TCP backpressure"
+                descriptor = os.open(Path(config.state_root) / "generation.lock", os.O_RDWR)
+                try:
+                    try:
+                        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        reader_lock_held = False
+                    except BlockingIOError:
+                        reader_lock_held = True
+                finally:
+                    os.close(descriptor)
+                # Keep the shared helper's original three-second HTTP timeout.
+                try:
+                    status, result = request(
+                        base + URL + "/correct",
+                        method="POST",
+                        payload=payload,
+                        token="owner-test-token",
+                    )
+                except TimeoutError as exc:
+                    exc.add_note(
+                        f"reader_lock_held={reader_lock_held}; "
+                        f"GET_socket_write_finished={finished.is_set()}",
+                    )
+                    raise
+                assert status == 200 and isinstance(result, dict)
+                assert result["corrected"] == PAGE and result["tombstone_sequence"] == 1
+                assert not reader_lock_held
+                assert not finished.is_set(), "writer only completed after GET drained"
+                assert request(
+                    base + URL + "/correct",
+                    method="POST",
+                    payload=payload,
+                    token="owner-test-token",
+                ) == (200, result)
+            finally:
+                slow.shutdown(socket.SHUT_RDWR)
+                slow.close()
+                assert finished.wait(5), "blocked GET did not terminate on disconnect"
+        assert replacement in (root / (PAGE + ".md")).read_text()
+
+
 @pytest.mark.parametrize("operation", ["correct", "forget"])
 def test_effect_requires_auth_and_current_page_receipt(
-    tmp_path: Path, monkeypatch: MonkeyPatch, operation: str,
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    operation: str,
 ) -> None:
     config, _ = ready(tmp_path)
     monkeypatch.setenv("SB_WEB_TOKEN", "owner-test-token")
