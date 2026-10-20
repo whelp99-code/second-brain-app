@@ -143,27 +143,116 @@ def _covers(resolved: Path, mount: Path) -> bool:
         return False
 
 
-def _mapping_is_selected(paths: list[Path], pathname: str, name: str) -> bool:
+def _holder_root(pid: int) -> Path | None:
+    """Mount root of the observed process, not the auditor.
+
+    ``/proc/<pid>/maps`` pathnames are interpreted in that process's mount
+    namespace. ``/proc/<pid>/root`` is a magic link: resolving it alone lands
+    on the auditor's ``/``. Callers must join the maps pathname first so the
+    kernel follows the holder's mounts in one step. An inaccessible root is
+    not the auditor root.
+    """
+    root = Path("/proc") / str(pid) / "root"
+    try:
+        if root.is_dir():
+            return root
+    except OSError:
+        return None
+    return None
+
+
+def _proc_root_anchor(root: Path) -> Path | None:
+    """Unresolved ``/proc/<pid>/root``, or None when this is not that link."""
+    if len(root.parts) != 4 or root.parts[1] != "proc" or root.parts[3] != "root":
+        return None
+    if not root.parts[2].isdigit():
+        return None
+    return Path("/") / "proc" / root.parts[2] / "root"
+
+
+def _mapping_path(pid: int, pathname: str) -> Path | None:
+    """Resolve a maps pathname inside the holder namespace.
+
+    Returns None when the holder path cannot be resolved. Callers keep those
+    mappings reported: a missing view is not evidence of a snapshot copy.
+    """
+    raw = os.fsencode(pathname).split(b" (deleted)", 1)[0]
+    decoded = os.fsdecode(raw)
+    holder_root = _holder_root(pid)
+    if holder_root is None:
+        return None
+    if decoded.startswith("/"):
+        candidate = holder_root.joinpath(*Path(decoded).parts[1:])
+    else:
+        candidate = holder_root / decoded
+    # Never Path.resolve() a /proc/<pid>/root prefix. That walks the magic
+    # link to the auditor root before the remainder is considered, so a
+    # holder-only mount disappears and a same-named auditor file can be
+    # selected instead. os.path.realpath follows the joined magic link in
+    # one kernel step. A different namespace often canonicalizes to a path
+    # the auditor cannot stat; that mapping stays reported. ``map_files``
+    # names the same vnode, but following it is EPERM for an unprivileged
+    # observer, so it is not a substitute for the joined root path.
+    if _proc_root_anchor(holder_root) is not None:
+        try:
+            mapped_path = Path(os.path.realpath(candidate, strict=True))
+        except (OSError, RuntimeError):
+            return None
+        if not _same_file(candidate, mapped_path):
+            return None
+        return mapped_path
+    try:
+        return candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+
+
+def _same_file(joined: Path, canonical: Path) -> bool:
+    """True when the canonical path is the file the joined magic link names.
+
+    Both paths must remain accessible and identify the same file. Otherwise
+    the caller keeps the mapping reported instead of trusting an auditor
+    namespace path that could hide the holder.
+    """
+    try:
+        joined_stat = joined.stat()
+    except OSError:
+        return False
+    try:
+        canonical_stat = canonical.stat()
+    except OSError:
+        return False
+    return (joined_stat.st_dev, joined_stat.st_ino) == (
+        canonical_stat.st_dev,
+        canonical_stat.st_ino,
+    )
+
+
+def _mapping_is_selected(paths: list[Path], pathname: str, name: str, pid: int) -> bool:
     """Reject a snapshot copy that maps only shares device and inode with.
 
-    maps has no subvolume field. A different resolved path is the selected file
-    when it is the same subvolume, including a hard link. A different subvolume
-    is a snapshot false positive. Anonymous or unresolvable mappings stay reported.
+    maps has no subvolume field. Pathnames are resolved through the holder's
+    ``/proc/<pid>/root`` so a sibling mount namespace cannot be compared as if
+    it were the auditor's. A different resolved path is the selected file when
+    it is the same subvolume, including a hard link. A different subvolume is a
+    snapshot false positive. Anonymous or unresolvable mappings stay reported.
     """
     if not pathname or pathname.startswith("["):
         return True
-    decoded = Path(os.fsdecode(pathname.split(" (deleted)", 1)[0]))
-    try:
-        mapped_path = decoded.resolve(strict=True)
-    except (OSError, RuntimeError):
+    mapped_path = _mapping_path(pid, pathname)
+    if mapped_path is None:
         return True
     selected = [path for path in paths if path.name == name]
     if not selected:
         return True
-    if any(mapped_path == path.resolve() for path in selected):
+    try:
+        selected_paths = [path.resolve(strict=True) for path in selected]
+    except (OSError, RuntimeError):
+        return True
+    if mapped_path in selected_paths:
         return True
     mapped_subvolume = subvolume_id(mapped_path)
-    selected_subvolume = subvolume_id(selected[0])
+    selected_subvolume = subvolume_id(selected_paths[0])
     if mapped_subvolume == 0 or selected_subvolume == 0:
         return True
     return mapped_subvolume == selected_subvolume
@@ -247,7 +336,9 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
             identity = (os.makedev(int(major, 16), int(minor, 16)), int(fields[4]))
             target = mapped_identities.get(identity)
             pathname = fields[5] if len(fields) > 5 else ""
-            if target is not None and _mapping_is_selected(paths, pathname, target):
+            if target is not None and _mapping_is_selected(
+                paths, pathname, target, int(process.name)
+            ):
                 mapped_names.add(target)
         mapped.extend({"pid": int(process.name), "file": name} for name in sorted(mapped_names))
     diagnostics = []
