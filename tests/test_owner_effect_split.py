@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tarfile
 import zipfile
@@ -22,16 +23,42 @@ from tests.test_web_effect_recovery import payload_for
 from tests.test_web_lifecycle import URL, ready
 
 
+def _commit(root: Path, *args: str) -> None:
+    _ = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=second-brain-test",
+            "-c",
+            "user.email=sb-test@local",
+            *args,
+        ],
+        check=True,
+        env={
+            **os.environ,
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "GIT_AUTHOR_NAME": "second-brain-test",
+            "GIT_AUTHOR_EMAIL": "sb-test@local",
+            "GIT_COMMITTER_NAME": "second-brain-test",
+            "GIT_COMMITTER_EMAIL": "sb-test@local",
+        },
+    )
+
+
 def test_backup_v1_with_packed_history_is_inspected(tmp_path: Path) -> None:
     root, _ = _seed_vault(tmp_path)
     needle = b"M13PACKEDHISTORY"
     page = root / "wiki" / "historical.md"
     _ = page.write_bytes(needle)
-    for args in (("add", "wiki/historical.md"), ("commit", "-qm", "historical")):
-        _ = subprocess.run(["git", "-C", str(root), *args], check=True)
+    _commit(root, "add", "wiki/historical.md")
+    _commit(root, "commit", "-qm", "historical")
     page.unlink()
-    for args in (("add", "-u"), ("commit", "-qm", "removed"), ("gc", "--prune=now")):
-        _ = subprocess.run(["git", "-C", str(root), *args], check=True)
+    _commit(root, "add", "-u")
+    _commit(root, "commit", "-qm", "removed")
+    _ = subprocess.run(["git", "-C", str(root), "gc", "--prune=now"], check=True)
     archive = tmp_path / "production-format.tar.gz"
     _ = create_backup(root, archive)
     with tarfile.open(archive) as bundle:
