@@ -152,7 +152,7 @@ def test_reader_lease_blocks_predecessor_disposal(
     second = build_generation(store, first, "second")
     lease_id = "reader:1\nFORBIDDEN_LOG_LINE"
     requests.register_reader(lease_id, first.generation_id, os.getpid(), NOW)
-    expected = requests.reader_diagnostic_metadata(first.generation_id)[(lease_id, os.getpid())]
+    expected = requests.reader_diagnostic_metadata(first.generation_id, limit=32)[(lease_id, os.getpid())]
     try:
         with pytest.raises(GenerationReaderDrainError) as caught:
             store.activate(second, first, NOW)
@@ -166,6 +166,151 @@ def test_reader_lease_blocks_predecessor_disposal(
         assert caught.value.diagnostics["phase"] == "predecessor-disposal"
         assert first.root.is_dir()
         requests.release_reader(lease_id)
+        store.activate(second, first, NOW)
+        assert not first.root.exists()
+        assert store.active().generation_id == second.generation_id
+    finally:
+        store.close()
+        requests.close()
+
+
+@pytest.mark.parametrize("count", [0, 1, 32, 33, 4096])
+def test_reader_diagnostics_bound_metadata_before_serialization(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, count: int,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        generation = build_generation(store)
+        # Deliberately insert out of order; selection must follow readers(),
+        # not insertion order or process id (all leases share a live process).
+        for index in reversed(range(count)):
+            requests.register_reader(f"reader:{index:05d}", generation.generation_id, os.getpid(), NOW)
+        readers = requests.readers(generation.generation_id)
+        assert len(readers) == count
+        expected = requests.reader_diagnostic_metadata(generation.generation_id, limit=32)
+        fetched_rows = []
+        queries = []
+
+        def collect_row(_cursor: sqlite3.Cursor, row: tuple[object, ...]) -> tuple[object, ...]:
+            fetched_rows.append(row)
+            return row
+
+        original_row_factory = requests.db.row_factory
+        requests.db.row_factory = collect_row
+        requests.db.set_trace_callback(queries.append)
+        try:
+            error = _reader_drain_error(
+                generation, "predecessor-disposal", readers, (), [], requests,
+            )
+        finally:
+            requests.db.row_factory = original_row_factory
+            requests.db.set_trace_callback(None)
+        # Count rows at SQLite fetch time, before building the metadata dict
+        # and before constructing or serializing detailed reader objects.
+        assert len(fetched_rows) == min(count, 32)
+        assert len(queries) == (1 if count else 0)
+        if count:
+            assert "ORDER BY r.lease_id LIMIT 32" in queries[0]
+        assert_drain_log(caplog, error)
+        assert error.diagnostics["readers_total"] == count
+        assert error.diagnostics["readers_omitted"] == max(count - 32, 0)
+        assert error.diagnostics["readers"] == [{
+            "lease_id": lease_id, "pid": pid, "opened_at": expected[(lease_id, pid)][0],
+            "process_identity": expected[(lease_id, pid)][1], "metadata_available": True,
+            "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+        } for lease_id, pid in readers[:32]]
+        assert error.diagnostics["reader_metadata_status"] == (
+            "queried-after-denial-observation" if count else "not-needed"
+        )
+        assert error.diagnostics["readers_status"] == "observed-at-decision"
+        assert error.diagnostics["descriptors"] == []
+        assert error.diagnostics["descriptors_total"] == 0
+        assert error.diagnostics["descriptors_omitted"] == 0
+        assert requests.readers(generation.generation_id) == readers
+    finally:
+        store.close()
+        requests.close()
+
+
+@pytest.mark.parametrize("failure", ["sqlite", "missing"])
+def test_bounded_readers_keep_unavailable_metadata_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    failure: str,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        generation = build_generation(store)
+        readers = tuple((f"reader:{index:02d}", os.getpid()) for index in range(33))
+
+        def unavailable(
+            _store: RequestStore, _generation_id: str, *, limit: int,
+        ) -> dict[tuple[str, int], tuple[str, str | None]]:
+            assert limit == 32
+            if failure == "sqlite":
+                raise sqlite3.OperationalError("FORBIDDEN_DATABASE_DETAIL")
+            return {}
+
+        monkeypatch.setattr(RequestStore, "reader_diagnostic_metadata", unavailable)
+        error = _reader_drain_error(generation, "predecessor-disposal", readers, (), [], requests)
+        assert_drain_log(caplog, error)
+        assert error.diagnostics["readers_total"] == 33
+        assert error.diagnostics["readers_omitted"] == 1
+        assert error.diagnostics["reader_metadata_status"] == (
+            "unavailable-sqlite-error" if failure == "sqlite" else "queried-after-denial-observation"
+        )
+        assert error.diagnostics["readers"] == [{
+            "lease_id": lease_id, "pid": pid, "opened_at": None,
+            "process_identity": None, "metadata_available": False,
+            "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+        } for lease_id, pid in readers[:32]]
+        assert "FORBIDDEN_" not in caplog.text
+    finally:
+        store.close()
+        requests.close()
+
+
+def test_omitted_reader_still_blocks_disposal_until_released(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        first = build_generation(store, text="first")
+        store.activate(first, None, NOW)
+        second = build_generation(store, first, "second")
+        leases = [f"reader:{index:02d}" for index in range(33)]
+        for lease in reversed(leases):
+            requests.register_reader(lease, first.generation_id, os.getpid(), NOW)
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert caught.value.diagnostics["readers_total"] == 33
+        assert caught.value.diagnostics["readers_omitted"] == 1
+        assert [item["lease_id"] for item in caught.value.diagnostics["readers"]] == leases[:32]
+        assert first.root.is_dir()
+        for lease in leases[:32]:
+            requests.release_reader(lease)
+        caplog.clear()
+        with pytest.raises(GenerationReaderDrainError) as remaining:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, remaining.value)
+        assert remaining.value.diagnostics["readers_total"] == 1
+        assert remaining.value.diagnostics["readers_omitted"] == 0
+        assert remaining.value.diagnostics["readers"][0]["lease_id"] == leases[-1]
+        assert requests.readers(first.generation_id) == ((leases[-1], os.getpid()),)
+        assert first.root.is_dir()
+        requests.release_reader(leases[-1])
         store.activate(second, first, NOW)
         assert not first.root.exists()
         assert store.active().generation_id == second.generation_id
@@ -223,7 +368,7 @@ def test_drain_diagnostic_failure_preserves_denial(
         requests.register_reader("reader:1", first.generation_id, os.getpid(), NOW)
         if failure == "metadata":
             def unavailable(
-                _store: RequestStore, _generation_id: str,
+                _store: RequestStore, _generation_id: str, *, limit: int,
             ) -> dict[tuple[str, int], tuple[str, str | None]]:
                 raise sqlite3.OperationalError("FORBIDDEN_DATABASE_DETAIL")
             monkeypatch.setattr(RequestStore, "reader_diagnostic_metadata", unavailable)

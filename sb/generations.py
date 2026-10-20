@@ -550,7 +550,7 @@ def _seal_modes(root: Path) -> None:
     root.chmod(0o500)
 
 
-_DESCRIPTOR_DETAILS_LIMIT = 32
+_DRAIN_DETAILS_LIMIT = 32
 
 
 @dataclass(frozen=True, slots=True)
@@ -593,7 +593,7 @@ def _proc_descriptors(
                     resolved_target = target.resolve()
                     if resolved_target.is_relative_to(resolved):
                         found.append((pid, fd))
-                        if observations is not None and len(observations) < _DESCRIPTOR_DETAILS_LIMIT:
+                        if observations is not None and len(observations) < _DRAIN_DETAILS_LIMIT:
                             observations.append(_DescriptorObservation(pid, fd, raw_target))
             except (OSError, ValueError):
                 continue
@@ -614,12 +614,16 @@ def _reader_drain_error(
     metadata_status = "not-needed"
     if readers and requests is not None:
         try:
-            metadata = requests.reader_diagnostic_metadata(generation.generation_id)
+            metadata = requests.reader_diagnostic_metadata(
+                generation.generation_id, limit=_DRAIN_DETAILS_LIMIT,
+            )
             metadata_status = "queried-after-denial-observation"
         except sqlite3.Error:
             metadata_status = "unavailable-sqlite-error"
     reader_details: list[JsonValue] = []
-    for lease_id, pid in readers:
+    # Keep the complete denial observation, but bound enrichment and objects
+    # before serialization while retaining the existing lease-id order.
+    for lease_id, pid in readers[:_DRAIN_DETAILS_LIMIT]:
         detail = metadata.get((lease_id, pid))
         reader_details.append({
             "lease_id": lease_id, "pid": pid,
@@ -642,6 +646,8 @@ def _reader_drain_error(
         "readers_status": "not-checked" if phase == "obsolete-sealed" else "observed-at-decision",
         "reader_metadata_status": metadata_status,
         "readers": reader_details,
+        "readers_total": len(readers),
+        "readers_omitted": len(readers) - len(reader_details),
         "descriptors": descriptor_details,
         "descriptors_total": len(descriptors),
         "descriptors_omitted": len(descriptors) - len(descriptor_details),
