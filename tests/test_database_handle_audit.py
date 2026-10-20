@@ -391,17 +391,29 @@ def test_snapshot_pathname_with_other_subvolume_is_not_the_live_database(
     _ = live.write_bytes(b"live")
     _ = snap.write_bytes(b"live")
     audit = audit_api()
+    live_id = (11, 100, 5)
+    snap_id = (11, 100, 9)
+    hardlink_id = (11, 100, 5)
     monkeypatch.setattr(
-        audit, "subvolume_id", lambda path: {live.resolve(): 5, snap.resolve(): 9}.get(path, 0)
+        audit,
+        "_map_file_identity",
+        lambda _pid, address_range: {"aaa-bbb": snap_id, "ccc-ddd": live_id, "eee-fff": hardlink_id}[
+            address_range
+        ],
+    )
+    monkeypatch.setattr(
+        audit,
+        "_selected_identity",
+        lambda path: live_id if path == live else None,
     )
     pid = os.getpid()
-    assert audit._mapping_is_selected([live], str(snap), live.name, pid) is False
-    assert audit._mapping_is_selected([live], str(live), live.name, pid) is True
-    assert audit._mapping_is_selected([live], "", live.name, pid) is True
+    assert audit._mapping_is_selected([live], str(snap), live.name, pid, "aaa-bbb") is False
+    assert audit._mapping_is_selected([live], str(live), live.name, pid, "ccc-ddd") is True
+    assert audit._mapping_is_selected([live], "", live.name, pid, "aaa-bbb") is True
     same = tmp_path / "alias" / "fixture.sqlite"
     same.parent.mkdir()
     os.link(live, same)
-    assert audit._mapping_is_selected([live], str(same), live.name, pid) is True
+    assert audit._mapping_is_selected([live], str(same), live.name, pid, "eee-fff") is True
 
 
 def test_holder_namespace_keeps_mapping_hidden_from_auditor(
@@ -437,11 +449,12 @@ def test_holder_namespace_keeps_mapping_hidden_from_auditor(
             (holder_root / "auditor" / auditor_copy.name).resolve(): 9,
         }.get(path, 0),
     )
-    assert audit._mapping_is_selected([live], "/data/fixture.sqlite", live.name, 4242) is True
+    assert audit._mapping_path(4242, "/data/fixture.sqlite") == holder_file.resolve()
     assert (
-        audit._mapping_is_selected([live], f"/auditor/{auditor_copy.name}", live.name, 4242)
-        is False
+        audit._mapping_path(4242, f"/auditor/{auditor_copy.name}")
+        == (holder_root / "auditor" / auditor_copy.name).resolve()
     )
+    assert audit._mapping_path(4242, "/missing/fixture.sqlite") is None
     assert audit._mapping_is_selected([live], "/missing/fixture.sqlite", live.name, 4242) is True
     foreign = bytes([0xFF])
     assert audit._mapping_is_selected([live], os.fsdecode(b"/" + foreign), live.name, 4242) is True
@@ -680,3 +693,138 @@ def test_live_mount_namespace_magic_link_order() -> None:
     assert "joined-readable" in report
     assert "resolve-first-absent" in report
     assert "root-resolves-to-auditor-slash" in report
+
+def test_namespace_independent_snapshot_is_excluded_by_map_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A foreign-namespace snapshot that shares device and inode is not a holder.
+
+    The maps pathname is the same string the auditor would resolve to its own
+    copy. That string is not consulted. ``map_files`` reports the sibling
+    subvolume directly, so the mapping is excluded even though device and
+    inode match the live file.
+    """
+    live = tmp_path / "live" / "fixture.sqlite"
+    live.parent.mkdir()
+    _ = live.write_bytes(b"live")
+    audit = audit_api()
+    observed: list[tuple[int, str]] = []
+
+    def mapped_identity(pid: int, address_range: str) -> tuple[int, int, int]:
+        observed.append((pid, address_range))
+        return (8, 77, 9)
+
+    monkeypatch.setattr(audit, "_map_file_identity", mapped_identity)
+    monkeypatch.setattr(audit, "_selected_identity", lambda _path: (8, 77, 5))
+    assert (
+        audit._mapping_is_selected(
+            [live], "/data/fixture.sqlite", live.name, 4242, "7f1000-7f2000"
+        )
+        is False
+    )
+    assert observed == [(4242, "7f1000-7f2000")]
+
+
+def test_map_files_same_file_stays_holder_without_dev_inode_shortcut(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    live = tmp_path / "live" / "fixture.sqlite"
+    live.parent.mkdir()
+    _ = live.write_bytes(b"live")
+    audit = audit_api()
+    monkeypatch.setattr(audit, "_map_file_identity", lambda _pid, _address_range: (8, 77, 5))
+    monkeypatch.setattr(audit, "_selected_identity", lambda _path: (8, 77, 5))
+    assert (
+        audit._mapping_is_selected([live], "/other/fixture.sqlite", live.name, 7, "10-20")
+        is True
+    )
+
+
+def test_map_files_denial_keeps_mapping_without_pathname_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    live = tmp_path / "live" / "fixture.sqlite"
+    sibling = tmp_path / "sibling" / "fixture.sqlite"
+    live.parent.mkdir()
+    sibling.parent.mkdir()
+    _ = live.write_bytes(b"live")
+    _ = sibling.write_bytes(b"sibling")
+    audit = audit_api()
+    monkeypatch.setattr(audit, "_map_file_identity", lambda _pid, _address_range: None)
+    monkeypatch.setattr(audit, "_selected_identity", lambda _path: (1, 2, 3))
+
+    def forbidden_path(*_args: object, **_kwargs: object) -> Path:
+        raise AssertionError("pathname must not identify a map_files denial")
+
+    monkeypatch.setattr(audit, "_mapping_path", forbidden_path)
+    assert audit._mapping_is_selected([live], str(sibling), live.name, 4242, "aa-bb") is True
+
+
+def test_maps_range_is_passed_verbatim_to_map_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    audit = audit_api()
+    seen: list[str] = []
+    monkeypatch.setattr(
+        audit,
+        "_map_file_identity",
+        lambda _pid, address_range: seen.append(address_range) or (1, 2, 3),
+    )
+    monkeypatch.setattr(audit, "_selected_identity", lambda _path: (1, 2, 9))
+    selected = Path("/tmp/not-consulted/fixture.sqlite")
+    assert (
+        audit._mapping_is_selected(
+            [selected], "/tmp/not-consulted/fixture.sqlite", selected.name, 9, "00ab-00cd"
+        )
+        is False
+    )
+    assert seen == ["00ab-00cd"]
+    assert audit._map_files_link(9, "00ab-00cd") == Path("/proc/9/map_files/00ab-00cd")
+    assert audit._map_files_link(9, "/tmp/not-consulted/fixture.sqlite") is None
+    assert audit._map_files_link(9, "") is None
+
+
+def test_shared_dev_inode_without_subvolume_is_not_a_snapshot_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    live = tmp_path / "live" / "fixture.sqlite"
+    live.parent.mkdir()
+    _ = live.write_bytes(b"live")
+    audit = audit_api()
+    monkeypatch.setattr(audit, "_map_file_identity", lambda _pid, _address_range: (8, 77, 0))
+    monkeypatch.setattr(audit, "_selected_identity", lambda _path: (8, 77, 5))
+    assert audit._mapping_is_selected([live], "/snap/fixture.sqlite", live.name, 3, "1-2") is True
+    assert audit._identities_differ((8, 77, 5), (8, 77, 5)) is False
+    assert audit._identities_differ((8, 77, 9), (4, 1, 5)) is True
+
+
+def test_live_map_files_follow_is_denied_without_opening_foreign_files() -> None:
+    """Record the local map_files follow result without touching other files.
+
+    On this host Yama ptrace_scope and missing CAP_CHECKPOINT_RESTORE make
+    stat of ``/proc/self/map_files/<range>`` EPERM even for this process.
+    The denial is unidentified, so a same-named sibling path is not opened
+    and the mapping stays a holder. A permitted follow must name this
+    process's own mapped file, not an auditor pathname.
+    """
+    audit = audit_api()
+    pid = os.getpid()
+    own_maps = Path(f"/proc/{pid}/maps").read_text(encoding="utf-8", errors="surrogateescape")
+    published = {entry.name for entry in (Path("/proc") / str(pid) / "map_files").iterdir()}
+    ranged = next(
+        fields[0]
+        for line in own_maps.splitlines()
+        if len(fields := line.split()) >= 6
+        and fields[0] in published
+        and audit._MAP_RANGE.fullmatch(fields[0])
+    )
+    link = audit._map_files_link(pid, ranged)
+    assert link == Path("/proc") / str(pid) / "map_files" / ranged
+    try:
+        followed = link.stat()
+    except PermissionError as exc:
+        assert exc.errno == 1
+        assert audit._map_file_identity(pid, ranged) is None
+        assert audit._map_files_link(pid, "/etc/passwd") is None
+        return
+    identity = audit._map_file_identity(pid, ranged)
+    assert identity is not None
+    assert (followed.st_dev, followed.st_ino) == (identity[0], identity[1])
