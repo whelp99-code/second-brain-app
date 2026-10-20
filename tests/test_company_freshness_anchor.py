@@ -20,7 +20,7 @@ _PUBLIC = """
     friendly: sha256
     value: 0xB
   attributes:
-    friendly: nt=extend|policydelete|written|ownerread
+    friendly: nt=extend|policydelete|written|ownerread|ownerwrite
     value: 0x200
   size: 32
   name: abcd
@@ -28,7 +28,9 @@ _PUBLIC = """
 
 
 def test_extend_only_gate_rejects_plain_write() -> None:
-    assert nv_public_is_extend_only(frozenset({"nt=extend", "policydelete", "written"}))
+    assert nv_public_is_extend_only(
+        frozenset({"nt=extend", "policydelete", "written", "ownerread", "ownerwrite"})
+    )
     assert not nv_public_is_extend_only(frozenset({"nt=ordinary", "policydelete", "written"}))
     assert not nv_public_is_extend_only(frozenset({"nt=extend", "policydelete"}))
 

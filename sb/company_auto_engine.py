@@ -739,6 +739,7 @@ def _candidate_ids(
                   AND r.policy_digest=?))
               AND NOT EXISTS(SELECT 1 FROM json_each(c.projects_json) p
                 WHERE p.value NOT IN (SELECT value FROM json_each(?)))
+              AND (json_array_length(c.projects_json)>0 OR ?='[]')
             ORDER BY EXISTS(SELECT 1 FROM company_auto_assessments a
                 WHERE a.provider_instance_id=? AND a.workspace_id=c.workspace_id
                   AND a.candidate_id=c.candidate_id AND a.policy_digest=?),
@@ -752,6 +753,7 @@ def _candidate_ids(
                 settings.provider_instance_id,
                 settings.provider_instance_id,
                 policy_digest(settings.policy),
+                canonical_bytes(list(context.projects)).decode("utf-8"),
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 settings.provider_instance_id,
                 policy_digest(settings.policy),
@@ -785,7 +787,7 @@ def _allowlist(
         return ("policy_denied",)
     match kind:
         case "contact":
-            email = fields.get("email", "")
+            email = fields.get("email", "").lower()
             if not any(
                 email.endswith(suffix) for suffix in settings.policy.internal_email_suffixes
             ):

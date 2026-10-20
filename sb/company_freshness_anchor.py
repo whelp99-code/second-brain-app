@@ -40,7 +40,9 @@ def nv_public_is_extend_only(attributes: frozenset[str]) -> bool:
         or "written" not in attributes
     ):
         return False
-    return "nt=ordinary" not in attributes and "uninitialized" not in attributes
+    return {"ownerread", "ownerwrite"} <= attributes and not attributes.intersection(
+        {"nt=ordinary", "uninitialized", "authwrite", "policywrite", "ppwrite"}
+    )
 
 
 def tpm_nvextend_argv(handle: str) -> list[str]:

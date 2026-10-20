@@ -43,7 +43,12 @@ from sb.company_db_freshness_hash import (
     reservation_id_for,
     scope_object,
 )
-from sb.company_db_freshness_integrity import audit_journal, audit_operation_cache, load_journal
+from sb.company_db_freshness_integrity import (
+    JournalEntry,
+    audit_journal,
+    audit_operation_cache,
+    load_journal,
+)
 from sb.company_db_freshness_models import (
     ActorStore,
     EvidenceRejected,
@@ -328,6 +333,70 @@ class CompanyDbFreshnessProvider:
             ):
                 raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
             yield
+
+    def cancel_unapplied_under_guard(
+        self,
+        scope: FreshnessScope,
+        operation_id: str,
+        reservation: ReserveProgressResponse,
+        processor_before: Checkpoint,
+    ) -> None:
+        """Caller holds effect_guard after SQL rollback, never for a resumed effect."""
+        original = self._operation(scope, operation_id)
+        head = self._require_head(scope)
+        if (
+            original is None
+            or original.state != "reserved"
+            or original.actor_store != "second_brain"
+            or self.actor_store != "second_brain"
+            or original.operation not in {"accept", "reject", "mark_processed"}
+            or reservation.outcome != "reserved"
+            or original.reservation_id != reservation.reservation_id
+            or original.reserve_expected_json != checkpoint_text(processor_before)
+            or reservation.checkpoint != head
+        ):
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        record: JsonObject = {
+            "kind": "unapplied_processor_cancellation",
+            "operation_id": operation_id,
+            "reservation_id": original.reservation_id,
+            "event_digest": original.event_digest,
+            "original_at": self.clock(),
+            "processor_checkpoint_before": checkpoint_object(processor_before),
+            "terminal_state": "cancelled",
+            "state": "finished",
+        }
+        connection = _connect(self.database)
+        try:
+            verified = _verify_unapplied_cancellation(connection, scope, original, record)
+            local = connection.execute(
+                "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
+                (scope.workspace_id,),
+            ).fetchone()
+            if local is None or local[0] != checkpoint_text(processor_before):
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        finally:
+            connection.close()
+        record["evidence_digest"] = verified.source_digest
+        evidence = _finish_evidence(
+            scope, original.operation, "second_brain", head, verified, "cancelled"
+        )
+        self._publish_new(
+            scope=scope,
+            phase="finish",
+            operation_id=operation_id,
+            record=record,
+            evidence=evidence,
+            before=head,
+            after=_apply_finish(head, record, "second_brain", evidence),
+            challenge="unapplied-authorization-rejected",
+            reservation_id=original.reservation_id,
+            operation=original.operation,
+            event_digest=original.event_digest,
+            expected_json=checkpoint_text(head),
+            terminal_state="cancelled",
+            evidence_digest=verified.source_digest,
+        )
 
     def finish_progress(
         self,
@@ -943,7 +1012,7 @@ class CompanyDbFreshnessProvider:
             _ = connection.execute("BEGIN IMMEDIATE")
             _insert_evidence_rows(connection, scope, evidence, operation_id, created_at)
             _upsert_scope(connection, scope, after, sequence, created_at)
-            if record.get("kind") == "internal_auto_policy":
+            if record.get("kind") in {"internal_auto_policy", "unapplied_processor_cancellation"}:
                 save_checkpoint(
                     connection,
                     scope.workspace_id,
@@ -1018,8 +1087,33 @@ class CompanyDbFreshnessProvider:
                 and entries[-1].published_sequence is None
                 else None
             )
+            cancellations: dict[tuple[str, str, str | None], JournalEntry] = {}
+            for entry in entries:
+                if entry.record.get("kind") == "unapplied_processor_cancellation":
+                    key = (
+                        entry.scope.provider_instance_id,
+                        entry.scope.workspace_id,
+                        entry.operation_id,
+                    )
+                    if key in cancellations:
+                        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+                    cancellations[key] = entry
             for item in operations:
                 original = item.row
+                cancellation = cancellations.get(
+                    (
+                        item.scope.provider_instance_id,
+                        item.scope.workspace_id,
+                        original.operation_id,
+                    )
+                )
+                if cancellation is not None:
+                    verified = _verify_unapplied_cancellation(
+                        connection, item.scope, original, cancellation.record
+                    )
+                    if cancellation.record.get("evidence_digest") != verified.source_digest:
+                        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+                    continue
                 pending_original = (
                     prepared_finish
                     if prepared_finish is not None
@@ -1153,7 +1247,10 @@ class CompanyDbFreshnessProvider:
                 original = entries[-1]
                 if original.phase == "bootstrap":
                     _seed_bootstrap_checkpoint(connection, row.scope, row.after)
-                if original.record.get("kind") == "internal_auto_policy":
+                if original.record.get("kind") in {
+                    "internal_auto_policy",
+                    "unapplied_processor_cancellation",
+                }:
                     save_checkpoint(
                         connection,
                         row.scope.workspace_id,
@@ -1399,6 +1496,7 @@ class CompanyDbFreshnessProvider:
         now: str,
     ) -> Checkpoint:
         with self._locked():
+            pin = _pin(self._registry(), scope)
             self._recover()
             if self._head(scope) is not None:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
@@ -1411,7 +1509,6 @@ class CompanyDbFreshnessProvider:
                 verify_owned_genesis(connection, scope, inventory, exact=True)
             finally:
                 connection.close()
-            pin = _pin(self._registry(), scope)
             checkpoint = _genesis_checkpoint(
                 scope,
                 approval_policy_version=approval_policy_version,
@@ -2204,11 +2301,54 @@ def _history_present(database: Path, scope: FreshnessScope) -> bool:
         connection.close()
 
 
+def _verify_unapplied_cancellation(
+    connection: sqlite3.Connection,
+    scope: FreshnessScope,
+    original: _OperationRow,
+    record: JsonObject,
+) -> VerifiedEvidence:
+    if (
+        original.actor_store != "second_brain"
+        or original.operation not in {"accept", "reject", "mark_processed"}
+        or record.get("operation_id") != original.operation_id
+        or record.get("reservation_id") != original.reservation_id
+        or record.get("event_digest") != original.event_digest
+        or record.get("terminal_state") != "cancelled"
+    ):
+        raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+    for table in ("company_memory_receipts", "company_processor_pending_finish"):
+        if (
+            connection.execute(
+                f"SELECT 1 FROM {table} WHERE workspace_id=? AND request_digest=?",
+                (scope.workspace_id, original.event_digest),
+            ).fetchone()
+            is not None
+        ):
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+    instant = record.get("original_at")
+    if not isinstance(instant, str):
+        raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+    digest = prefixed_digest(
+        b"second-brain/company-unapplied-cancellation/v1\0",
+        {
+            key: value
+            for key, value in record.items()
+            if key not in {"evidence_digest", "transport"}
+        },
+    )
+    return VerifiedEvidence(
+        source_record_id=original.operation_id,
+        source_digest=digest,
+        original_at=instant,
+        metadata={"kind": "unapplied_processor_cancellation"},
+    )
+
+
 def _pin(registry: FreshnessRegistry, scope: FreshnessScope) -> RegistryScopePin:
-    for pin in registry.scopes:
-        if _scope_matches(pin, scope):
-            return pin
-    raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+    pins = [pin for pin in registry.scopes if _scope_matches(pin, scope)]
+    if len(pins) != 1:
+        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+    return pins[0]
 
 
 def _scope_matches(pin: RegistryScopePin, scope: FreshnessScope) -> bool:

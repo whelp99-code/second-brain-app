@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from sb.company_approver_binding import CompanyHandoffPolicy, Digest
 from sb.company_freshness_models import (
@@ -16,7 +16,7 @@ from sb.company_freshness_models import (
 )
 from sb.company_memory_authority import CompanyAuthorityContext
 from sb.company_memory_handoff import CompanyControlRequest
-from sb.effect_values import JsonObject
+from sb.effect_values import JsonObject, format_instant, parse_instant
 from sb.effect_write_models import ClosedModel
 
 type ActorStore = Literal["jarvis", "second_brain"]
@@ -87,6 +87,13 @@ class GenesisEntry(ClosedModel):
     source_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     original_at: str = Field(min_length=24, max_length=24)
     metadata: JsonObject = Field(default_factory=dict)
+
+    @field_validator("original_at")
+    @classmethod
+    def canonical_original_at(cls, value: str) -> str:
+        if format_instant(parse_instant(value)) != value:
+            raise ValueError("noncanonical genesis timestamp")
+        return value
 
 
 class GenesisInventory(ClosedModel):

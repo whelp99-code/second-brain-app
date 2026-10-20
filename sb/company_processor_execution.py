@@ -129,7 +129,10 @@ def execute_processor_transition(
             ),
         )
 
+    authorization_rejected = False
+
     def authorize(db: sqlite3.Connection, current: MemoryCandidate) -> None:
+        nonlocal authorization_rejected
         # Recheck local CAS and every signed decision/scope/fence after reserving.
         local: list[tuple[str]] = db.execute(
             "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
@@ -137,18 +140,22 @@ def execute_processor_transition(
         ).fetchall()
         if not local or local[0][0] != canonical_bytes(model_object(checkpoint)).decode():
             raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
-        authorize_transition(
-            db,
-            current,
-            context,
-            policy,
-            owner_keys,
-            operation,
-            arguments,
-            authority.request_digest,
-            clock() if clock is not None else datetime.now(UTC),
-            verify_original,
-        )
+        try:
+            authorize_transition(
+                db,
+                current,
+                context,
+                policy,
+                owner_keys,
+                operation,
+                arguments,
+                authority.request_digest,
+                clock() if clock is not None else datetime.now(UTC),
+                verify_original,
+            )
+        except CompanyAuthorityRejected:
+            authorization_rejected = True
+            raise
         existing: list[tuple[int]] = db.execute(
             "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
             (context.workspace_id, authority.request_digest),
@@ -182,13 +189,30 @@ def execute_processor_transition(
         else nullcontext()
     )
     with guard:
-        return store.execute(
-            workspace_id=context.workspace_id,
-            request_digest=authority.request_digest,
-            operation=operation,
-            arguments=arguments,
-            current=scope,
-            deletion=deletion,
-            now=now,
-            authorization=authorize,
-        )
+        try:
+            return store.execute(
+                workspace_id=context.workspace_id,
+                request_digest=authority.request_digest,
+                operation=operation,
+                arguments=arguments,
+                current=scope,
+                deletion=deletion,
+                now=now,
+                authorization=authorize,
+            )
+        except CompanyAuthorityRejected:
+            if (
+                authorization_rejected
+                and isinstance(provider, CompanyDbFreshnessProvider)
+                and reservation is not None
+                and reservation.outcome == "reserved"
+            ):
+                provider.cancel_unapplied_under_guard(
+                    FreshnessScope(
+                        provider_instance_id=context.provider, workspace_id=context.workspace_id
+                    ),
+                    operation_id,
+                    reservation,
+                    checkpoint,
+                )
+            raise

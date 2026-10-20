@@ -123,9 +123,9 @@ def read_auto_report(
                 WHERE l.provider_instance_id=? AND l.workspace_id=?
                   AND l.phase='registry'
                   AND json_extract(l.record_json,'$.kind')='internal_auto_assessment'
-                  AND l.global_sequence>? AND l.global_sequence<=?
+                  AND l.global_sequence<=?
                 ORDER BY l.global_sequence,l.operation_id""",
-                (provider_instance_id, workspace_id, query.from_global_sequence, head),
+                (provider_instance_id, workspace_id, head),
             ).fetchall()
             cutoff_from = _cutoff(db, scope, query.from_global_sequence)
             cutoff_to = _cutoff(db, scope, head)
@@ -145,6 +145,8 @@ def read_auto_report(
             snapshot = snapshot.model_copy(
                 update={"state": "uncertain", "operation_id": operation_id}
             )
+        if sequence <= query.from_global_sequence:
+            continue
         latest[snapshot.candidate_id] = AutoReportRow.model_validate(
             {
                 **model_object(snapshot),

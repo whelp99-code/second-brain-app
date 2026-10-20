@@ -9,8 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from sb.company_approver_binding import binding_digest
+from sb.company_approver_binding import binding_digest, public_key_fingerprint
 from sb.company_auto_cli import auto_settings
+from sb.company_auto_policy import policy_digest
 from sb.company_db_freshness import (
     CompanyDbFreshnessProvider,
     GenesisInventory,
@@ -19,6 +20,7 @@ from sb.company_db_freshness import (
 from sb.company_freshness import FreshnessScope, provider_from_config
 from sb.company_freshness_anchor import require_trusted_file
 from sb.company_freshness_migrations import apply_component_migration
+from sb.company_freshness_registry import current_auto_pin
 from sb.company_internal_effects import install_auto_policy
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_memory_cli_config import company_database_path, load_company_config
@@ -70,6 +72,15 @@ def run_operator(
         return {"checkpoint": model_object(selected.record_approval_revocations(scope))}
     if action == "auto-policy-install":
         settings = auto_settings(config, selected)
+        pin = current_auto_pin(selected._registry(), scope)
+        if (
+            pin.policy_digest != policy_digest(settings.policy)
+            or pin.key_id != settings.signer.key_id
+            or pin.public_key_fingerprint != public_key_fingerprint(settings.signer.public_key)
+            or pin.policy_digest in pin.revoked_policy_digests
+            or pin.public_key_fingerprint in pin.revoked_key_fingerprints
+        ):
+            raise CompanyAuthorityRejected("COMPANY_POLICY_REGISTRATION_REQUIRED")
         before = local_checkpoint(database, config.workspace_id, None)
         if before is None:
             raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
