@@ -11,12 +11,15 @@ from typing import cast
 
 import pytest
 
+from sb import generations
 from sb.generations import (
     Generation,
     GenerationError,
     GenerationReaderDrainError,
     GenerationStore,
     _private_directory,
+    _proc_descriptors,
+    _reader_drain_error,
     _regular_files,
 )
 from sb.request_store import RequestStore
@@ -201,7 +204,10 @@ def test_open_predecessor_descriptor_blocks_disposal(
         store.close()
 
 
-@pytest.mark.parametrize("failure", ["metadata", "log-oserror", "log-closed-stream"])
+@pytest.mark.parametrize("failure", [
+    "metadata", "log-oserror", "log-closed-stream", "handler-runtime", "filter-runtime",
+    "keyboard-interrupt", "system-exit",
+])
 def test_drain_diagnostic_failure_preserves_denial(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
 ) -> None:
@@ -221,12 +227,35 @@ def test_drain_diagnostic_failure_preserves_denial(
             ) -> dict[tuple[str, int], tuple[str, str | None]]:
                 raise sqlite3.OperationalError("FORBIDDEN_DATABASE_DETAIL")
             monkeypatch.setattr(RequestStore, "reader_diagnostic_metadata", unavailable)
+        elif failure in {"handler-runtime", "filter-runtime"}:
+            class RaisingHandler(logging.Handler):
+                def emit(self, record: logging.LogRecord) -> None:
+                    raise RuntimeError("FORBIDDEN_HANDLER_DETAIL")
+
+            class RaisingFilter(logging.Filter):
+                def filter(self, record: logging.LogRecord) -> bool:
+                    raise RuntimeError("FORBIDDEN_FILTER_DETAIL")
+
+            logger = logging.getLogger("sb.generations")
+            monkeypatch.setattr(logger, "handlers", [RaisingHandler()])
+            if failure == "filter-runtime":
+                monkeypatch.setattr(logger, "filters", [RaisingFilter()])
         else:
             def unavailable_log(*_args: object, **_kwargs: object) -> None:
                 if failure == "log-oserror":
                     raise OSError("FORBIDDEN_SINK_DETAIL")
+                if failure == "keyboard-interrupt":
+                    raise KeyboardInterrupt
+                if failure == "system-exit":
+                    raise SystemExit
                 raise ValueError("I/O operation on closed file")
             monkeypatch.setattr(logging.getLogger("sb.generations"), "warning", unavailable_log)
+        if failure in {"keyboard-interrupt", "system-exit"}:
+            with pytest.raises(KeyboardInterrupt if failure == "keyboard-interrupt" else SystemExit):
+                store.activate(second, first, NOW)
+            assert first.root.is_dir()
+            assert requests.readers(first.generation_id) == (("reader:1", os.getpid()),)
+            return
         with pytest.raises(GenerationReaderDrainError) as caught:
             store.activate(second, first, NOW)
         assert str(caught.value) == "GENERATION_READER_DRAIN_REQUIRED"
@@ -243,6 +272,84 @@ def test_drain_diagnostic_failure_preserves_denial(
     finally:
         store.close()
         requests.close()
+
+
+@pytest.mark.parametrize(("count", "target_kind"), [
+    (0, "normal"), (32, "normal"), (33, "normal"), (4096, "normal"),
+    (1, "misleading"), (1, "relative"), (1, "deleted"),
+])
+def test_descriptor_capture_is_bounded_and_preserves_holder_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    count: int, target_kind: str,
+) -> None:
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share",
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        generation = build_generation(store)
+        alias = tmp_path / "holder-namespace-alias"
+        alias.symlink_to(generation.root, target_is_directory=True)
+        raw_target = {
+            "normal": str(generation.root),
+            "misleading": str(alias) + "/wiki/../wiki/value.md",
+            "relative": "wiki/value.md",
+            "deleted": str(generation.root / "wiki/value.md") + " (deleted)",
+        }[target_kind]
+        pid = os.getpid() + 1000000
+        process = Path(f"/proc/{pid}")
+        original_iterdir = Path.iterdir
+        original_stat = Path.stat
+        original_readlink = os.readlink
+        original_observation = generations._DescriptorObservation
+        allocations = []
+        reads = []
+
+        def iterdir(path: Path):
+            if path == Path("/proc"):
+                return iter([process])
+            if path == process / "fd":
+                return (path / str(fd) for fd in reversed(range(count)))
+            return original_iterdir(path)
+
+        def metadata(path: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+            return original_stat(tmp_path if path == process else path, follow_symlinks=follow_symlinks)
+
+        def readlink(path: str | Path, *, dir_fd: int | None = None) -> str:
+            if Path(path).parent == process / "fd":
+                reads.append(int(Path(path).name))
+                return raw_target
+            return original_readlink(path, dir_fd=dir_fd)
+
+        def observation(pid: int, fd: int, path: str):
+            allocations.append((pid, fd, path))
+            return original_observation(pid, fd, path)
+
+        monkeypatch.setattr(Path, "iterdir", iterdir)
+        monkeypatch.setattr(Path, "stat", metadata)
+        monkeypatch.setattr(os, "readlink", readlink)
+        monkeypatch.setattr(generations, "_DescriptorObservation", observation)
+        observations = []
+        found = _proc_descriptors(generation.root, observations=observations)
+        # This is the pre-existing decision, even for misleading foreign paths:
+        # absolute targets resolve locally; relative targets do not match.
+        total = 0 if target_kind == "relative" else count
+        assert found == tuple((pid, fd) for fd in range(total))
+        assert reads == list(reversed(range(count)))
+        assert len(allocations) == len(observations) == min(total, 32)
+        assert _proc_descriptors(generation.root) == found
+        assert len(allocations) == min(total, 32)
+        error = _reader_drain_error(generation, "predecessor-disposal", (), found, observations, None)
+        assert_drain_log(caplog, error)
+        assert error.diagnostics["descriptors_total"] == total
+        assert error.diagnostics["descriptors_omitted"] == max(total - 32, 0)
+        assert error.diagnostics["descriptors"] == [{
+            "pid": pid, "fd": fd, "path": raw_target,
+            "path_status": "holder-namespace-observed-at-decision",
+            "source": "same-uid-proc-fd-scan",
+        } for fd in range(max(total - 32, 0), total)]
+    finally:
+        store.close()
 
 
 def test_drain_keeps_same_descriptor_observation_after_close(

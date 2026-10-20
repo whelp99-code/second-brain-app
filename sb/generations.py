@@ -14,7 +14,7 @@ import sqlite3
 import stat
 import subprocess
 from collections.abc import Callable, Generator, Iterable, Sequence
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager, nullcontext, suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -550,6 +550,9 @@ def _seal_modes(root: Path) -> None:
     root.chmod(0o500)
 
 
+_DESCRIPTOR_DETAILS_LIMIT = 32
+
+
 @dataclass(frozen=True, slots=True)
 class _DescriptorObservation:
     pid: int
@@ -584,13 +587,14 @@ def _proc_descriptors(
                 # Keep the same all-process scan. For our own entries use the
                 # explicit self alias, not a second scan after the denial.
                 link = Path("/proc/self/fd") / descriptor.name if pid == os.getpid() else descriptor
-                target = Path(os.readlink(link).removesuffix(" (deleted)"))
+                raw_target = os.readlink(link)
+                target = Path(raw_target.removesuffix(" (deleted)"))
                 if target.is_absolute():
                     resolved_target = target.resolve()
                     if resolved_target.is_relative_to(resolved):
                         found.append((pid, fd))
-                        if observations is not None:
-                            observations.append(_DescriptorObservation(pid, fd, str(resolved_target)))
+                        if observations is not None and len(observations) < _DESCRIPTOR_DETAILS_LIMIT:
+                            observations.append(_DescriptorObservation(pid, fd, raw_target))
             except (OSError, ValueError):
                 continue
     return tuple(sorted(found))
@@ -625,12 +629,12 @@ def _reader_drain_error(
             "call_location": None,
             "call_location_status": "not-recorded-by-lease-schema",
         })
-    paths = {(item.pid, item.fd): item.path for item in observations}
     descriptor_details: list[JsonValue] = [{
-        "pid": pid, "fd": fd, "path": paths.get((pid, fd)),
-        "path_status": "observed-at-decision" if (pid, fd) in paths else "unavailable",
-        "source": "/proc/self/fd" if pid == os.getpid() else "same-uid-proc-fd-scan",
-    } for pid, fd in descriptors]
+        "pid": item.pid, "fd": item.fd, "path": item.path,
+        "path_status": ("observed-at-decision" if item.pid == os.getpid()
+                        else "holder-namespace-observed-at-decision"),
+        "source": "/proc/self/fd" if item.pid == os.getpid() else "same-uid-proc-fd-scan",
+    } for item in sorted(observations, key=lambda item: (item.pid, item.fd))]
     diagnostics: dict[str, JsonValue] = {
         "code": "GENERATION_READER_DRAIN_REQUIRED",
         "generation_id": generation.generation_id,
@@ -639,17 +643,18 @@ def _reader_drain_error(
         "reader_metadata_status": metadata_status,
         "readers": reader_details,
         "descriptors": descriptor_details,
+        "descriptors_total": len(descriptors),
+        "descriptors_omitted": len(descriptors) - len(descriptor_details),
     }
     error = GenerationReaderDrainError(diagnostics)
-    try:
+    # Sink, handler and filter failures must not mask the original denial.
+    # Process-control BaseExceptions intentionally still propagate.
+    with suppress(Exception):
         # ASCII JSON escapes identifier/path newlines and non-NFC filenames;
         # no content, environment,
-        # arbitrary locals, process cmdlines or paths outside the blocked root.
+        # arbitrary locals or process cmdlines. Foreign paths are raw holder
+        # namespace text, not claims about paths in our namespace.
         logging.getLogger(__name__).warning("%s", json.dumps(diagnostics, sort_keys=True, ensure_ascii=True))
-    except (OSError, ValueError):
-        # A closed/full log sink (including a closed Python stream) must not
-        # mask the original denial. The payload contains only JSON primitives.
-        pass
     return error
 
 
