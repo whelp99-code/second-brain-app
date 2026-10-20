@@ -445,3 +445,238 @@ def test_holder_namespace_keeps_mapping_hidden_from_auditor(
     assert audit._mapping_is_selected([live], "/missing/fixture.sqlite", live.name, 4242) is True
     foreign = bytes([0xFF])
     assert audit._mapping_is_selected([live], os.fsdecode(b"/" + foreign), live.name, 4242) is True
+
+
+_NAMESPACE_PROBE = r"""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+base = Path("/tmp") / f"sb86-ns-{os.getpid()}"
+src = base / "src"
+dst = base / "dst"
+src.mkdir(parents=True)
+dst.mkdir()
+(src / "fixture.sqlite").write_bytes(b"holder-only")
+code = r'''
+import ctypes
+import os
+import sys
+from pathlib import Path
+
+src = os.environ["SRC"]
+dst = os.environ["DST"]
+libc = ctypes.CDLL(None, use_errno=True)
+if libc.mount(src.encode(), dst.encode(), None, 4096, None) != 0:
+    print("mount-failed", ctypes.get_errno(), file=sys.stderr)
+    raise SystemExit(2)
+print("READY", os.getpid(), flush=True)
+sys.stdin.read(1)
+'''
+env = os.environ.copy()
+env["SRC"] = str(src)
+env["DST"] = str(dst)
+try:
+    child = subprocess.Popen(
+        [
+            "unshare",
+            "--user",
+            "--map-root-user",
+            "--mount",
+            "--propagation",
+            "private",
+            sys.executable,
+            "-c",
+            code,
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+except OSError as exc:
+    print(exc, file=sys.stderr)
+    raise SystemExit(2)
+assert child.stdout is not None and child.stdin is not None
+ready = child.stdout.readline()
+if not ready.startswith("READY"):
+    print(child.stderr.read() if child.stderr is not None else ready, file=sys.stderr)
+    raise SystemExit(2)
+pid = int(ready.split()[1])
+root = Path("/proc") / str(pid) / "root"
+if root.resolve() != Path("/"):
+    print(root.resolve(), file=sys.stderr)
+    raise SystemExit(1)
+print("root-resolves-to-auditor-slash")
+joined = root.joinpath(*dst.parts[1:]) / "fixture.sqlite"
+resolved_first = root.resolve().joinpath(*dst.parts[1:]) / "fixture.sqlite"
+if not resolved_first.exists():
+    print("resolve-first-absent")
+else:
+    print("resolve-first-present", file=sys.stderr)
+    raise SystemExit(1)
+try:
+    payload = joined.read_bytes()
+except OSError as exc:
+    print(exc, file=sys.stderr)
+    raise SystemExit(1)
+if payload != b"holder-only":
+    raise SystemExit(1)
+print("joined-readable")
+child.stdin.write("x")
+child.stdin.close()
+child.wait(timeout=5)
+raise SystemExit(child.returncode)
+"""
+
+
+def test_proc_root_is_joined_before_resolve(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The maps pathname must be appended before any resolve of the magic link.
+
+    ``/proc/<pid>/root`` resolves to the auditor ``/``. Resolving that link
+    and then joining the pathname follows the auditor namespace. A plain
+    directory stand-in for ``_holder_root`` never executes that order, so
+    this records the path handed to ``os.path.realpath``.
+    """
+    audit = audit_api()
+    pid = os.getpid()
+    seen: list[str] = []
+    original = os.path.realpath
+
+    def tracing_realpath(path: object, *, strict: bool = False) -> str:
+        seen.append(os.fsdecode(os.fsencode(path)))  # type: ignore[arg-type]
+        return original(path, strict=strict)  # type: ignore[arg-type]
+
+    executable = Path(sys.executable).resolve(strict=True)
+    monkeypatch.setattr(audit.os.path, "realpath", tracing_realpath)
+    mapped = audit._mapping_path(pid, str(executable))
+    assert mapped == executable
+    joined = f"/proc/{pid}/root{executable}"
+    assert seen == [joined]
+    assert audit._holder_root(pid) == Path("/proc") / str(pid) / "root"
+
+
+def test_unstatable_joined_mapping_is_not_canonicalized(
+    tmp_path: Path,
+) -> None:
+    audit = audit_api()
+    visible = tmp_path / "fixture.sqlite"
+    visible.write_bytes(b"auditor")
+    missing = tmp_path / "missing"
+    assert audit._same_file(missing, visible) is False
+    assert audit._same_file(visible, missing) is False
+
+
+def test_inaccessible_holder_root_is_not_the_auditor_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed root view must not fall back to ``/`` and drop the holder.
+
+    The auditor has a same-named sibling subvolume at the maps pathname.
+    Treating an inaccessible ``/proc/<pid>/root`` as ``/`` would resolve that
+    sibling and reject the mapping.
+    """
+    live = tmp_path / "live" / "fixture.sqlite"
+    sibling = tmp_path / "auditor-sibling" / "fixture.sqlite"
+    live.parent.mkdir()
+    sibling.parent.mkdir()
+    _ = live.write_bytes(b"live")
+    _ = sibling.write_bytes(b"sibling")
+    audit = audit_api()
+    monkeypatch.setattr(audit, "_holder_root", lambda _pid: None)
+    monkeypatch.setattr(
+        audit,
+        "subvolume_id",
+        lambda path: {live.resolve(): 5, sibling.resolve(): 9}.get(path, 0),
+    )
+    assert audit._mapping_path(4242, str(sibling)) is None
+    assert audit._mapping_is_selected([live], str(sibling), live.name, 4242) is True
+    assert audit._mapping_is_selected([live], str(live), live.name, 4242) is True
+
+
+def test_oserror_on_holder_root_does_not_substitute_auditor_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = audit_api()
+    original = Path.is_dir
+
+    def denied(path: Path) -> bool:
+        if path == Path("/proc/4242/root"):
+            raise OSError("root inaccessible")
+        return original(path)
+
+    monkeypatch.setattr(Path, "is_dir", denied)
+    assert audit._holder_root(4242) is None
+    assert audit._mapping_path(4242, "/data/fixture.sqlite") is None
+    assert (
+        audit._mapping_is_selected(
+            [Path("/data/fixture.sqlite")],
+            "/data/fixture.sqlite",
+            "fixture.sqlite",
+            4242,
+        )
+        is True
+    )
+
+
+def test_different_namespace_mapping_stays_reported_when_unresolvable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A foreign namespace path that realpath cannot see stays a holder.
+
+    This is the auditor-visible half of a mount namespace the observer cannot
+    enter. The joined magic-link path is what gets canonicalized; the bare
+    maps pathname is not.
+    """
+    audit = audit_api()
+    pid = 5150
+    joined = Path(f"/proc/{pid}/root/data/fixture.sqlite")
+    seen: list[str] = []
+    original_is_dir = Path.is_dir
+
+    def root_visible(path: Path) -> bool:
+        if path == Path(f"/proc/{pid}/root"):
+            return True
+        return original_is_dir(path)
+
+    def missing_realpath(path: object, *, strict: bool = False) -> str:
+        del strict
+        seen.append(os.fsdecode(os.fsencode(path)))  # type: ignore[arg-type]
+        raise FileNotFoundError(path)
+
+    monkeypatch.setattr(Path, "is_dir", root_visible)
+    monkeypatch.setattr(audit.os.path, "realpath", missing_realpath)
+    assert audit._mapping_path(pid, "/data/fixture.sqlite") is None
+    assert seen == [str(joined)]
+    assert (
+        audit._mapping_is_selected(
+            [Path("/data/fixture.sqlite")], "/data/fixture.sqlite", "fixture.sqlite", pid
+        )
+        is True
+    )
+
+
+def test_live_mount_namespace_magic_link_order() -> None:
+    """Follow a private bind through ``/proc/<pid>/root`` when permitted.
+
+    ``unshare`` without a user namespace is EPERM here. A user namespace can
+    still create a private bind. The parent must read the holder's file
+    through the joined magic link, and must not find that file by resolving
+    ``/proc/<pid>/root`` first. Skip only the live half when that probe is
+    not permitted; the order regression above still runs.
+    """
+    probe = subprocess.run(
+        [sys.executable, "-c", _NAMESPACE_PROBE],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if probe.returncode == 2:
+        pytest.skip(probe.stderr.strip() or "mount namespace probe not permitted")
+    assert probe.returncode == 0, probe.stderr
+    report = probe.stdout.splitlines()
+    assert "joined-readable" in report
+    assert "resolve-first-absent" in report
+    assert "root-resolves-to-auditor-slash" in report

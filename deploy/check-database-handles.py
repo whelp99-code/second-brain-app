@@ -143,20 +143,31 @@ def _covers(resolved: Path, mount: Path) -> bool:
         return False
 
 
-def _holder_root(pid: int) -> Path:
+def _holder_root(pid: int) -> Path | None:
     """Mount root of the observed process, not the auditor.
 
     ``/proc/<pid>/maps`` pathnames are interpreted in that process's mount
-    namespace. ``/proc/<pid>/root`` follows the holder's mounts; ``map_files``
-    names the same mapping when the pathname itself cannot be joined.
+    namespace. ``/proc/<pid>/root`` is a magic link: resolving it alone lands
+    on the auditor's ``/``. Callers must join the maps pathname first so the
+    kernel follows the holder's mounts in one step. An inaccessible root is
+    not the auditor root.
     """
     root = Path("/proc") / str(pid) / "root"
     try:
         if root.is_dir():
             return root
     except OSError:
-        return Path("/")
-    return Path("/")
+        return None
+    return None
+
+
+def _proc_root_anchor(root: Path) -> Path | None:
+    """Unresolved ``/proc/<pid>/root``, or None when this is not that link."""
+    if len(root.parts) != 4 or root.parts[1] != "proc" or root.parts[3] != "root":
+        return None
+    if not root.parts[2].isdigit():
+        return None
+    return Path("/") / "proc" / root.parts[2] / "root"
 
 
 def _mapping_path(pid: int, pathname: str) -> Path | None:
@@ -168,23 +179,53 @@ def _mapping_path(pid: int, pathname: str) -> Path | None:
     raw = os.fsencode(pathname).split(b" (deleted)", 1)[0]
     decoded = os.fsdecode(raw)
     holder_root = _holder_root(pid)
-    try:
-        root = holder_root.resolve(strict=True)
-    except (OSError, RuntimeError):
-        root = holder_root
+    if holder_root is None:
+        return None
     if decoded.startswith("/"):
-        candidate = root.joinpath(*Path(decoded).parts[1:])
+        candidate = holder_root.joinpath(*Path(decoded).parts[1:])
     else:
-        candidate = root / decoded
+        candidate = holder_root / decoded
+    # Never Path.resolve() a /proc/<pid>/root prefix. That walks the magic
+    # link to the auditor root before the remainder is considered, so a
+    # holder-only mount disappears and a same-named auditor file can be
+    # selected instead. os.path.realpath follows the joined magic link in
+    # one kernel step. A different namespace often canonicalizes to a path
+    # the auditor cannot stat; that mapping stays reported. ``map_files``
+    # names the same vnode, but following it is EPERM for an unprivileged
+    # observer, so it is not a substitute for the joined root path.
+    if _proc_root_anchor(holder_root) is not None:
+        try:
+            mapped_path = Path(os.path.realpath(candidate, strict=True))
+        except (OSError, RuntimeError):
+            return None
+        if not _same_file(candidate, mapped_path):
+            return None
+        return mapped_path
     try:
-        mapped_path = candidate.resolve(strict=True)
+        return candidate.resolve(strict=True)
     except (OSError, RuntimeError):
         return None
+
+
+def _same_file(joined: Path, canonical: Path) -> bool:
+    """True when the canonical path is the file the joined magic link names.
+
+    Both paths must remain accessible and identify the same file. Otherwise
+    the caller keeps the mapping reported instead of trusting an auditor
+    namespace path that could hide the holder.
+    """
     try:
-        mapped_path.relative_to(root)
-    except ValueError:
-        return None
-    return mapped_path
+        joined_stat = joined.stat()
+    except OSError:
+        return False
+    try:
+        canonical_stat = canonical.stat()
+    except OSError:
+        return False
+    return (joined_stat.st_dev, joined_stat.st_ino) == (
+        canonical_stat.st_dev,
+        canonical_stat.st_ino,
+    )
 
 
 def _mapping_is_selected(paths: list[Path], pathname: str, name: str, pid: int) -> bool:
