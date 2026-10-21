@@ -956,14 +956,11 @@ def build_server(
                 revoked_delegations=config.revoked_delegation_ids,
                 external_public_keys=external_public_keys,
                 barrier_sink=barrier_sink,
+                generation_pin=pin_generation() if is_effect else None,
             )
 
         try:
-            if is_effect:
-                with pin_generation():
-                    result = accept()
-            else:
-                result = accept()
+            result = accept()
         except WriteRequestRejected as exc:
             raw_id = raw.get("request_id")
             request_id = (
