@@ -132,6 +132,15 @@ def test_blocked_candidates_cannot_starve_current_batch(tmp_path: Path, blocked:
                 f"UPDATE company_memory_candidates SET {assignments[blocked]} WHERE candidate_id LIKE 'a:%'"
             )
     assert _candidate_ids(provider.database, context, settings) == ("z:eligible",)
+    if blocked == "decision":
+        # Synthetic decisions without commands/signatures/transitions are corrupt,
+        # not authenticated human ownership. Selection still excludes them, but
+        # the provider must reject this restored snapshot before any batch write.
+        before = provider.database.read_bytes()
+        with pytest.raises(AnchorRejected, match="COMPANY_PROGRESS_UNCERTAIN"):
+            run_auto_internal(provider.database, settings, context, provider, trigger())
+        assert provider.database.read_bytes() == before
+        return
     result = run_auto_internal(provider.database, settings, context, provider, trigger())
     assert result is not None
     with closing(sqlite3.connect(provider.database)) as db:

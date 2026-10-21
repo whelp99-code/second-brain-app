@@ -44,6 +44,7 @@ from sb.company_auto_settings import (
     source_context_digest,
 )
 from sb.company_db_freshness import CompanyDbFreshnessProvider
+from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_models import (
     TERMINAL_STATE_BY_OPERATION,
     Checkpoint,
@@ -602,13 +603,24 @@ def _transition(
         # policy before acquiring the SQL writer; never recursively take flock.
         # Anchored acceptances intentionally retain their original public authority.
         if continuation is None:
-            provider.require_auto_policy_under_guard(
-                scope,
-                policy_digest(settings.policy),
-                settings.signer.key_id,
-                public_key_fingerprint(settings.signer.public_key),
-                source_context_digest(settings.provider_instance_id, context),
-            )
+            try:
+                provider.require_auto_policy_under_guard(
+                    scope,
+                    policy_digest(settings.policy),
+                    settings.signer.key_id,
+                    public_key_fingerprint(settings.signer.public_key),
+                    source_context_digest(settings.provider_instance_id, context),
+                )
+            except (AnchorRejected, AutoInternalRejected):
+                # Reserve is already durable. Close only a proven zero-effect
+                # attempt; the provider rejects cancellation on ambiguous SQL.
+                if operation in {"accept", "complete"} and isinstance(
+                    provider, CompanyDbFreshnessProvider
+                ):
+                    provider.cancel_unapplied_under_guard(
+                        scope, operation_id, reservation, checkpoint
+                    )
+                raise
         _ = db.execute("BEGIN IMMEDIATE")
         authorization_rejected = False
         try:
@@ -1009,7 +1021,6 @@ def _candidate_ids(
                   AND w.workflow_request_id=r.auto_request_id AND w.path='auto_internal'
                 WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
                   AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
-                  AND json_extract(r.receipt_json,'$.expires_at')<=?
                   AND EXISTS(SELECT 1 FROM company_freshness_log l
                     JOIN company_freshness_publication f ON f.global_sequence=l.global_sequence
                     WHERE l.provider_instance_id=r.provider_instance_id AND l.workspace_id=r.workspace_id
@@ -1035,7 +1046,6 @@ def _candidate_ids(
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 settings.provider_instance_id,
                 settings.provider_instance_id,
-                format_instant(context.now),
                 settings.provider_instance_id,
                 settings.provider_instance_id,
                 policy_digest(settings.policy),

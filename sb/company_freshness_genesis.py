@@ -16,6 +16,7 @@ from sb.company_approver_binding import (
 from sb.company_auto_intents import PendingAutoReserve
 from sb.company_auto_policy import (
     PolicyAutoReceiptV1,
+    auto_command,
     auto_request_id,
     command_digest,
     policy_digest,
@@ -38,6 +39,7 @@ from sb.company_freshness_models import Checkpoint, FreshnessScope, ReserveProgr
 from sb.company_internal_effects import candidate_result, memory_request_digest
 from sb.company_memory import MemoryCandidate
 from sb.company_memory_authority import CompanyAuthorityContext, company_request_digest
+from sb.company_memory_handoff import CompanyControlRequest, enrollment_context
 from sb.company_transition_receipt import TransitionReceiptSelector, read_original_receipt
 from sb.effect_values import canonical_bytes, parse_instant, strict_loads
 
@@ -184,6 +186,7 @@ def audit_owned_receipts(
         if bootstrap.phase != "bootstrap":
             continue
         scope = bootstrap.scope
+        _audit_handoff_workflow(db, scope)
         inventory = GenesisInventory.model_validate(bootstrap.record.get("inventory"), strict=True)
         defaults = bootstrap.record.get("default_transition_receipts", [])
         if (
@@ -291,6 +294,102 @@ def audit_owned_receipts(
         receipts, _ = owned_genesis_receipts(db, scope)
         if wanted != {entry.source_record_id: entry for entry in receipts}:
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+
+
+def _audit_handoff_workflow(db: sqlite3.Connection, scope: FreshnessScope) -> None:
+    """Enrollment is atomic; every consumed decision has its original transition.
+
+    Unconsumed outboxes and a committed transition awaiting finish are legitimate.
+    A decision alone is not: consumption and its receipt share one SQL commit.
+    Historical default receipts remain governed by their issuance-time markers.
+    """
+    tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    enrollment = (
+        db.execute(
+            "SELECT context_json FROM company_handoff_enrollment WHERE workspace_id=?",
+            (scope.workspace_id,),
+        ).fetchall()
+        if "company_handoff_enrollment" in tables
+        else []
+    )
+    audits = (
+        db.execute(
+            "SELECT evidence_json FROM company_approver_enrollment_audit WHERE workspace_id=?",
+            (scope.workspace_id,),
+        ).fetchall()
+        if "company_approver_enrollment_audit" in tables
+        else []
+    )
+    decisions = (
+        db.execute(
+            """SELECT candidate_id,request_id,request_digest,decision
+            FROM company_handoff_decisions WHERE workspace_id=?""",
+            (scope.workspace_id,),
+        ).fetchall()
+        if "company_handoff_decisions" in tables
+        else []
+    )
+    if not enrollment and not audits and not decisions:
+        return
+    try:
+        if len(enrollment) != 1 or len(audits) != 1:
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        evidence = strict_loads(audits[0][0], 1_048_576)
+        enrolled = strict_loads(enrollment[0][0], 1_048_576)
+        if not isinstance(evidence, dict) or not isinstance(enrolled, dict):
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        policy = CompanyHandoffPolicy.model_validate(evidence.get("policy"), strict=True)
+        context = CompanyAuthorityContext(
+            provider=enrolled["provider"],
+            workspace_id=enrolled["workspace"],
+            principal=enrolled["owner"],
+            agent="workflow-audit",
+            session="workflow-audit",
+            projects=tuple(enrolled["projects"]),
+            policy_revision=enrolled["policy"],
+            deletion_sequence=enrolled["deletion_sequence"],
+            deletion_set_root=enrolled["deletion_root"],
+        )
+        binding = binding_digest(context, policy)
+        if (
+            context.workspace_id != scope.workspace_id
+            or enrollment[0][0] != enrollment_context(context, policy)
+            or evidence.get("schema_version") != 2
+            or evidence.get("context_json") != enrollment[0][0]
+            or evidence.get("approval_binding_digest") != binding
+            or evidence.get("operator_approval_ref") != policy.operator_approval_ref
+        ):
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        for candidate_id, request_id, request_digest, decision in decisions:
+            if context.provider != scope.provider_instance_id:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            outbox = db.execute(
+                """SELECT command_json,command_digest FROM company_handoff_outbox
+                WHERE workspace_id=? AND candidate_id=? AND request_id=?""",
+                (scope.workspace_id, candidate_id, request_id),
+            ).fetchone()
+            if outbox is None:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            command = CompanyControlRequest.model_validate_json(outbox[0], strict=True)
+            original = read_original_receipt(
+                db,
+                context,
+                policy,
+                TransitionReceiptSelector(
+                    candidate_id=candidate_id,
+                    handoff_id=request_id,
+                    operation="accept" if decision == "approve" else "reject",
+                    transition_request_digest=request_digest,
+                    command_digest=outbox[1],
+                    content_digest=command.target.content_digest,
+                    approval_policy_version=policy.approval_policy_version,
+                    approval_binding_digest=binding,
+                ),
+            )
+            if original is None:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+    except (ValueError, sqlite3.Error, KeyError, TypeError) as exc:
+        raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT") from exc
 
 
 def _require_transition_authority(
@@ -570,6 +669,89 @@ def audit_owned_pending(
         for item in operations
     }
     tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "company_candidate_execution_claims" in tables:
+        for provider, workspace, candidate_id, content_digest, request_id in db.execute(
+            """SELECT provider_instance_id,workspace_id,candidate_id,content_digest,workflow_request_id
+            FROM company_candidate_execution_claims WHERE path='auto_internal'"""
+        ):
+            scope = FreshnessScope(provider_instance_id=provider, workspace_id=workspace)
+            rows = db.execute(
+                """SELECT r.receipt_json,r.auto_command_json,p.policy_json,
+                  c.deletion_sequence,c.deletion_set_root,r.policy_digest,r.assessment_digest
+                FROM company_auto_policy_receipts r
+                JOIN company_memory_candidates c ON c.workspace_id=r.workspace_id
+                  AND c.candidate_id=r.candidate_id AND c.content_digest=r.content_digest
+                JOIN company_auto_policies p ON p.provider_instance_id=r.provider_instance_id
+                  AND p.workspace_id=r.workspace_id AND p.policy_digest=r.policy_digest
+                WHERE r.provider_instance_id=? AND r.workspace_id=? AND r.candidate_id=?
+                  AND r.content_digest=? AND r.auto_request_id=?""",
+                (provider, workspace, candidate_id, content_digest, request_id),
+            ).fetchall()
+            if len(rows) != 1:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            receipt = PolicyAutoReceiptV1.model_validate_json(rows[0][0], strict=True)
+            command = strict_loads(rows[0][1], 1_048_576)
+            policy = InternalAutoPolicyV1.model_validate_json(rows[0][2], strict=True)
+            if (
+                receipt.scope != scope
+                or receipt.candidate_id != candidate_id
+                or receipt.content_digest != content_digest
+                or receipt.auto_request_id != request_id
+                or receipt.policy_digest != rows[0][5]
+                or receipt.assessment_digest != rows[0][6]
+                or receipt.policy_digest != policy_digest(policy)
+                or receipt.policy_version != policy.policy_version
+                or not isinstance(command, dict)
+                or auto_request_id(scope, candidate_id, content_digest, receipt.policy_digest)
+                != request_id
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            candidate = TypeAdapter(MemoryCandidate).validate_json(
+                canonical_bytes(
+                    candidate_result(db, workspace, candidate_id, (rows[0][3], rows[0][4]))
+                ),
+                strict=True,
+            )
+            verified = False
+            for entry in entries:
+                if (
+                    entry.scope != scope
+                    or entry.published_sequence is None
+                    or entry.record.get("kind") != "internal_auto_policy"
+                ):
+                    continue
+                pin = RegistryAutoPolicyPin.model_validate(entry.record.get("pin"), strict=True)
+                if pin.policy_digest != receipt.policy_digest:
+                    continue
+                key = decode_key(pin.public_key)
+                if (
+                    pin.scope != scope
+                    or public_key_fingerprint(key) != pin.public_key_fingerprint
+                    or pin.policy_digest in pin.revoked_policy_digests
+                    or pin.public_key_fingerprint in pin.revoked_key_fingerprints
+                ):
+                    continue
+                try:
+                    verify_policy_receipt(receipt, key)
+                except ValueError:
+                    continue
+                verified = True
+                break
+            if not verified:
+                raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+            payload = verify_auto_assessment_evidence(db, scope, candidate, receipt, command)
+            # Signed claims predating reserve intents remain original evidence;
+            # absence of an intent never grants permission to renew issuance.
+            if command != auto_command(
+                scope=scope,
+                request_id=request_id,
+                candidate_id=candidate_id,
+                content_digest=content_digest,
+                policy_digest_value=receipt.policy_digest,
+                assessment_digest_value=receipt.assessment_digest,
+                record_kind=payload.record_kind,
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
     if "company_internal_pending_reserve" in tables:
         for provider, workspace, raw in db.execute(
             "SELECT provider_instance_id,workspace_id,intent_json FROM company_internal_pending_reserve"

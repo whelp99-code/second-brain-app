@@ -9,7 +9,6 @@ from typing import Literal
 from sb.company_auto_policy import (
     PolicyAutoReceiptV1,
     policy_digest,
-    receipt_expired,
     verify_policy_receipt,
 )
 from sb.company_auto_recovery import AcceptedAutoAuthority, accepted_auto_authority
@@ -18,7 +17,7 @@ from sb.company_db_freshness_evidence import verify_memory_receipt
 from sb.company_freshness_models import FreshnessScope
 from sb.company_internal_effects import memory_request_digest
 from sb.company_memory import MemoryCandidate
-from sb.effect_values import format_instant, strict_loads
+from sb.effect_values import parse_instant, strict_loads
 
 
 def require_auto_transaction(
@@ -125,6 +124,11 @@ def require_auto_transaction(
         or receipt.policy_digest != policy_digest(settings.policy)
         or (not continuation and receipt.policy_digest in settings.revoked_policy_digests)
         or operation not in receipt.allowed_operations
-        or (operation == "accept" and receipt_expired(receipt, format_instant(context.now)))
+        or (
+            operation == "accept"
+            and not parse_instant(receipt.issued_at)
+            <= context.now
+            < parse_instant(receipt.expires_at)
+        )
     ):
         raise AutoInternalRejected("POLICY_RECEIPT_REJECTED")
