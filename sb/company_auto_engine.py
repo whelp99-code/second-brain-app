@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
-from contextlib import closing
+from contextlib import AbstractContextManager, closing, nullcontext
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, cast
@@ -365,7 +365,11 @@ def _one(
             reason_codes=reasons,
             payload=payload,
         )
-        with closing(sqlite3.connect(database)) as db, db:
+        with (
+            _policy_guard(provider, scope, settings, context),
+            closing(sqlite3.connect(database)) as db,
+            db,
+        ):
             insert_assessment(
                 db,
                 scope,
@@ -433,7 +437,11 @@ def _one(
         raise AutoInternalRejected("POLICY_RECEIPT_CONFLICT")
     if candidate.state == "candidate" and receipt_expired(receipt, format_instant(context.now)):
         raise AutoInternalRejected("POLICY_RECEIPT_EXPIRED")
-    with closing(sqlite3.connect(database)) as db, db:
+    with (
+        _policy_guard(provider, scope, settings, context, continuation=continuation),
+        closing(sqlite3.connect(database)) as db,
+        db,
+    ):
         if not claim_auto(
             db,
             scope,
@@ -567,7 +575,11 @@ def _transition(
         raise AutoInternalRejected("POLICY_REVOKED")
     operation_id = _operation_identity(scope, request_id, command_digest_value, operation)
     request_digest = memory_request_digest(operation, candidate.candidate_id, request_id)
-    with closing(sqlite3.connect(database)) as db, db:
+    with (
+        _policy_guard(provider, scope, settings, context, continuation=continuation),
+        closing(sqlite3.connect(database)) as db,
+        db,
+    ):
         _ = db.execute("BEGIN IMMEDIATE")
         intent = prepare_auto_reserve(
             db,
@@ -586,6 +598,17 @@ def _transition(
         provider.effect_guard(scope, operation_id, reservation),
         closing(sqlite3.connect(database)) as db,
     ):
+        # effect_guard already owns registry exclusion. Recheck the live anchored
+        # policy before acquiring the SQL writer; never recursively take flock.
+        # Anchored acceptances intentionally retain their original public authority.
+        if continuation is None:
+            provider.require_auto_policy_under_guard(
+                scope,
+                policy_digest(settings.policy),
+                settings.signer.key_id,
+                public_key_fingerprint(settings.signer.public_key),
+                source_context_digest(settings.provider_instance_id, context),
+            )
         _ = db.execute("BEGIN IMMEDIATE")
         authorization_rejected = False
         try:
@@ -890,6 +913,25 @@ def _require_ready(
         with closing(sqlite3.connect(database)) as db, db:
             save_checkpoint(db, context.workspace_id, ready, context.observed_checkpoint)
     return ready
+
+
+def _policy_guard(
+    provider: InternalAutoJournal,
+    scope: FreshnessScope,
+    settings: AutoInternalSettings,
+    context: AutoInternalContext,
+    *,
+    continuation: AcceptedAutoAuthority | None = None,
+) -> AbstractContextManager[None]:
+    if continuation is not None:
+        return nullcontext()
+    return provider.auto_policy_guard(
+        scope,
+        policy_digest(settings.policy),
+        settings.signer.key_id,
+        public_key_fingerprint(settings.signer.public_key),
+        source_context_digest(settings.provider_instance_id, context),
+    )
 
 
 def _require_installed_policy(

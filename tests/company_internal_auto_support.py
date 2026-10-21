@@ -162,6 +162,31 @@ class SimulatedAnchorProvider:
         assert source_context_digest.startswith("sha256:")
         self.policies.append((policy_digest, key_id, key_fingerprint))
 
+    def auto_policy_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> AbstractContextManager[None]:
+        self.require_auto_policy(
+            scope, policy_digest, key_id, key_fingerprint, source_context_digest
+        )
+        return nullcontext()
+
+    def require_auto_policy_under_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> None:
+        self.require_auto_policy(
+            scope, policy_digest, key_id, key_fingerprint, source_context_digest
+        )
+
     def publish_completed_assessments(
         self, scope: FreshnessScope, expected: Checkpoint
     ) -> Checkpoint:

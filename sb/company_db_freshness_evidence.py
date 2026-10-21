@@ -25,7 +25,11 @@ from sb.company_db_freshness_models import (
     VerifiedEvidence,
 )
 from sb.company_freshness_models import FinishProgressRequest, FreshnessScope, ProgressOperation
-from sb.company_internal_effects import memory_request_digest, verify_internal_readback
+from sb.company_internal_effects import (
+    candidate_result,
+    memory_request_digest,
+    verify_internal_readback,
+)
 from sb.company_memory import CompanyMemoryError
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_memory_handoff import APPROVAL_DOMAIN, CommandApprovalReceipt
@@ -74,12 +78,99 @@ def verify_memory_receipt(
         RECEIPT_DOMAIN, body
     ) != evidence_digest or rid != "cmreceipt:v1:" + evidence_digest.removeprefix("sha256:"):
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    if operation in {"accept", "reject", "mark_processed"}:
+        try:
+            _require_candidate_snapshot(db, scope, candidate, operation, result, created_at)
+        except (ValueError, sqlite3.Error, TypeError, KeyError) as exc:
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT") from exc
     return VerifiedEvidence(
         rid,
         evidence_digest,
         created_at,
         {"candidate_id": candidate, "operation": operation},
     )
+
+
+def _require_candidate_snapshot(
+    db: sqlite3.Connection,
+    scope: FreshnessScope,
+    candidate: str,
+    operation: str,
+    snapshot: JsonObject,
+    created_at: str,
+) -> None:
+    """An accept snapshot remains valid after a proved mark_processed, not rollback.
+
+    Lifecycle rank, not receipt ID or tied wall-clock timestamps, determines the
+    latest transition. Every later snapshot is independently hash checked and
+    compared in full, including the original acceptance time.
+    """
+    sequence = snapshot["deletion_sequence"]
+    root = snapshot["deletion_set_root"]
+    if not isinstance(sequence, int) or isinstance(sequence, bool) or not isinstance(root, str):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    current = candidate_result(db, scope.workspace_id, candidate, (sequence, root))
+    if (
+        snapshot.get("workspace_id") != scope.workspace_id
+        or snapshot.get("candidate_id") != candidate
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    state, time_field = {
+        "accept": ("accepted", "accepted_at"),
+        "reject": ("rejected", "rejected_at"),
+        "mark_processed": ("processed_complete", "processed_at"),
+    }[operation]
+    instant = snapshot.get(time_field)
+    if (
+        snapshot.get("state") != state
+        or not isinstance(instant, str)
+        or format_instant(parse_instant(instant)) != instant
+        or parse_instant(created_at) < parse_instant(instant)
+        or (operation != "reject" and snapshot.get("rejected_at") is not None)
+        or (operation == "reject" and snapshot.get("accepted_at") is not None)
+        or (operation != "mark_processed" and snapshot.get("processed_at") is not None)
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    if operation == "mark_processed":
+        accepted = snapshot.get("accepted_at")
+        if not isinstance(accepted, str) or parse_instant(accepted) > parse_instant(instant):
+            raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    expected = snapshot
+    if operation == "accept" and current.get("state") == "processed_complete":
+        later = db.execute(
+            """SELECT request_digest,receipt_id,receipt_digest,result_json,created_at
+            FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
+            AND operation='mark_processed'""",
+            (scope.workspace_id, candidate),
+        ).fetchall()
+        if not later:
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        for request, rid, digest, raw, at in later:
+            result = strict_loads(raw, 1_048_576)
+            if not isinstance(result, dict):
+                raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+            body: JsonObject = {
+                "schema_version": 1,
+                "workspace_id": scope.workspace_id,
+                "request_digest": request,
+                "operation": "mark_processed",
+                "candidate_id": candidate,
+                "result": result,
+                "created_at": at,
+            }
+            if (
+                prefixed_digest(RECEIPT_DOMAIN, body) != digest
+                or rid != "cmreceipt:v1:" + digest.removeprefix("sha256:")
+                or result
+                != snapshot
+                | {"state": "processed_complete", "processed_at": result.get("processed_at")}
+                or parse_instant(at) < parse_instant(created_at)
+            ):
+                raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+            _require_candidate_snapshot(db, scope, candidate, "mark_processed", result, at)
+            expected = result
+    if current != expected:
+        raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
 
 
 def verify_internal_effect(

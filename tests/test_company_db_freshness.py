@@ -16,15 +16,18 @@ from sb.company_freshness import (
     ReserveProgressRequest,
 )
 from sb.company_freshness_anchor import AnchorRejected, append_witness_frame
-from sb.effect_values import JsonObject
+from sb.company_memory import CompanyMemoryStore
+from sb.company_memory_authority import company_request_digest
+from sb.effect_values import parse_instant
 from tests.company_db_freshness_support import (
     SIMULATED_ANCHOR_LABEL,
     SimulatedNvAnchor,
     provider_for,
 )
+from tests.company_internal_auto_support import ACCESS, DELETION, WORKSPACE, contact_body, receive
 
-PROVIDER_SCOPE = FreshnessScope(provider_instance_id="provider.one", workspace_id="workspace.one")
-RECEIPT_BINDING = "sha256:" + "ab" * 32
+PROVIDER_SCOPE = FreshnessScope(provider_instance_id="provider.one", workspace_id=WORKSPACE)
+RECEIPT_BINDING = company_request_digest("accept", {"candidate_id": "cand-1"})
 _NOW = "2026-10-16T00:00:01.000Z"
 
 
@@ -280,39 +283,20 @@ def test_other_store_prefix_is_ready_and_own_loss_is_mismatch(tmp_path: Path) ->
 
 
 def insert_receipt(database: Path) -> str:
+    # Real source and transition snapshots are required even for publication tests.
+    receive(database, "cand-1", "fixture:event", contact_body())
+    with closing(CompanyMemoryStore(database)) as store:
+        receipt = store.execute(
+            workspace_id=PROVIDER_SCOPE.workspace_id,
+            request_digest=RECEIPT_BINDING,
+            operation="accept",
+            arguments={"candidate_id": "cand-1"},
+            current=ACCESS,
+            deletion=DELETION,
+            now=parse_instant(_NOW),
+        )
+    real = receipt.receipt_digest
     connection = sqlite3.connect(database)
-    _ = connection.execute(
-        """CREATE TABLE IF NOT EXISTS company_memory_receipts (
-            workspace_id TEXT, request_digest TEXT, receipt_id TEXT, receipt_digest TEXT,
-            operation TEXT, candidate_id TEXT, result_json TEXT, created_at TEXT
-        )""",
-    )
-    result = "{}"
-    from sb.company_db_freshness_hash import prefixed_digest
-
-    body: JsonObject = {
-        "schema_version": 1,
-        "workspace_id": PROVIDER_SCOPE.workspace_id,
-        "request_digest": RECEIPT_BINDING,
-        "operation": "accept",
-        "candidate_id": "cand-1",
-        "result": {},
-        "created_at": _NOW,
-    }
-    real = prefixed_digest(b"second-brain/company-memory-receipt/v1\0", body)
-    _ = connection.execute(
-        "INSERT INTO company_memory_receipts VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            PROVIDER_SCOPE.workspace_id,
-            body["request_digest"],
-            "cmreceipt:v1:" + real.removeprefix("sha256:"),
-            real,
-            "accept",
-            "cand-1",
-            result,
-            _NOW,
-        ),
-    )
     # Model a real atomic apply: its original reservation and pending finish
     # accompany the SQL receipt. An unrelated receipt intentionally has neither.
     operation = connection.execute(

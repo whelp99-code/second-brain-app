@@ -414,6 +414,7 @@ def enroll_policy(
     evidence: JsonObject = {
         "schema_version": 2,
         "context_json": exact,
+        "policy": model_object(policy),
         "registered_at": format_instant(now),
         "authority": authority,
         "operator_approval_ref": policy.operator_approval_ref,

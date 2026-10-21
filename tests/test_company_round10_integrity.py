@@ -29,7 +29,7 @@ from sb.company_freshness_migrations import apply_component_migration
 from sb.company_freshness_models import FinishProgressRequest, ReserveProgressRequest
 from sb.company_internal_effects import insert_memory_receipt
 from sb.company_memory import CompanyMemoryStore
-from sb.company_memory_authority import CompanyAuthorityContext
+from sb.company_memory_authority import CompanyAuthorityContext, company_request_digest
 from sb.company_memory_cli import run
 from sb.company_memory_cli_config import load_company_config
 from sb.company_memory_handoff import ControlArguments, ControlTarget, handoff_key
@@ -388,16 +388,18 @@ def test_nonempty_owned_genesis_remains_readable(tmp_path: Path):
     from sb.company_freshness_models import FreshnessScope, ReadFreshnessRequest
 
     scope = FreshnessScope(provider_instance_id=PROVIDER, workspace_id=WORKSPACE)
-    with closing(sqlite3.connect(database)) as db, db:
-        insert_memory_receipt(
-            db,
+    receive(database, "genesis:mail", "genesis:event", contact_body())
+    with closing(CompanyMemoryStore(database)) as store:
+        store.execute(
             workspace_id=WORKSPACE,
-            request_digest="sha256:" + "cf" * 32,
+            request_digest=company_request_digest("reject", {"candidate_id": "genesis:mail"}),
             operation="reject",
-            candidate_id="genesis:mail",
-            result={"state": "rejected"},
-            created_at=format_instant(NOW),
+            arguments={"candidate_id": "genesis:mail"},
+            current=ACCESS,
+            deletion=DELETION,
+            now=NOW,
         )
+    with closing(sqlite3.connect(database)) as db:
         receipts, terminals = owned_genesis_receipts(db, scope)
     inventory = GenesisInventory(second_brain_receipts=receipts, second_brain_terminals=terminals)
     binding = "sha256:" + "11" * 32

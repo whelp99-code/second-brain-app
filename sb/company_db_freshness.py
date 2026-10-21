@@ -768,26 +768,56 @@ class CompanyDbFreshnessProvider:
         key_fingerprint: str,
         source_context_digest: str,
     ) -> None:
+        with self.auto_policy_guard(
+            scope, policy_digest, key_id, key_fingerprint, source_context_digest
+        ):
+            pass
+
+    @contextmanager
+    def auto_policy_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> Generator[None, None, None]:
+        """Keep registry exclusion through the caller's SQL commit, never SQL first."""
         with self._locked():
             self._recover()
-            pin = current_auto_pin(self._registry(), scope)
-            connection = _connect(self.database)
-            try:
-                installed = latest_auto_pins(load_journal(connection)).get(
-                    (scope.provider_instance_id, scope.workspace_id),
-                )
-            finally:
-                connection.close()
-            if (
-                installed != pin
-                or pin.policy_digest != policy_digest
-                or pin.key_id != key_id
-                or pin.public_key_fingerprint != key_fingerprint
-                or policy_digest in pin.revoked_policy_digests
-                or key_fingerprint in pin.revoked_key_fingerprints
-                or _pin(self._registry(), scope).source_context_digest != source_context_digest
-            ):
-                raise AnchorRejected("COMPANY_POLICY_REGISTRATION_REQUIRED")
+            self.require_auto_policy_under_guard(
+                scope, policy_digest, key_id, key_fingerprint, source_context_digest
+            )
+            yield
+
+    def require_auto_policy_under_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> None:
+        """Caller holds effect_guard or auto_policy_guard; no recursive flock or writer."""
+        registry = self._registry()
+        pin = current_auto_pin(registry, scope)
+        connection = _connect(self.database)
+        try:
+            installed = latest_auto_pins(load_journal(connection)).get(
+                (scope.provider_instance_id, scope.workspace_id),
+            )
+        finally:
+            connection.close()
+        if (
+            installed != pin
+            or pin.policy_digest != policy_digest
+            or pin.key_id != key_id
+            or pin.public_key_fingerprint != key_fingerprint
+            or policy_digest in pin.revoked_policy_digests
+            or key_fingerprint in pin.revoked_key_fingerprints
+            or _pin(registry, scope).source_context_digest != source_context_digest
+        ):
+            raise AnchorRejected("COMPANY_POLICY_REGISTRATION_REQUIRED")
 
     def record_approval_revocations(self, scope: FreshnessScope) -> Checkpoint:
         """Operator-only forward revocation; no new epoch or restored authority."""
@@ -1691,7 +1721,13 @@ class CompanyDbFreshnessProvider:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             connection = _connect(self.database)
             try:
-                verify_owned_genesis(connection, scope, inventory, exact=True)
+                verify_owned_genesis(
+                    connection,
+                    scope,
+                    inventory,
+                    exact=True,
+                    approval_binding_digest=approval_binding_digest,
+                )
             finally:
                 connection.close()
             checkpoint = _genesis_checkpoint(

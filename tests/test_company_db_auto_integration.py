@@ -85,6 +85,30 @@ class LoseOneFinishAcknowledgment:
     ) -> Checkpoint:
         return self.inner.publish_completed_assessments(scope, expected)
 
+    def auto_policy_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> AbstractContextManager[None]:
+        return self.inner.auto_policy_guard(
+            scope, policy_digest, key_id, key_fingerprint, source_context_digest
+        )
+
+    def require_auto_policy_under_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> None:
+        self.inner.require_auto_policy_under_guard(
+            scope, policy_digest, key_id, key_fingerprint, source_context_digest
+        )
+
     def publish_assessment(
         self,
         scope: FreshnessScope,

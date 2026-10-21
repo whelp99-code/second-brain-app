@@ -52,6 +52,24 @@ class InternalAutoJournal(CompanyFreshnessProvider, Protocol):
         source_context_digest: str,
     ) -> None: ...
 
+    def auto_policy_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> AbstractContextManager[None]: ...
+
+    def require_auto_policy_under_guard(
+        self,
+        scope: FreshnessScope,
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+        source_context_digest: str,
+    ) -> None: ...
+
     def publish_assessment(
         self,
         scope: FreshnessScope,
