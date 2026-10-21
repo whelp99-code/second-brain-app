@@ -72,7 +72,7 @@ def test_uppercase_internal_domain_is_processed(tmp_path):
     )
     run_auto_internal(provider.database, settings, context, provider, trigger())
     page = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -99,7 +99,7 @@ def test_incremental_report_includes_earlier_assessment(tmp_path, monkeypatch):
             "SELECT MAX(global_sequence) FROM company_freshness_log WHERE phase='registry' AND json_extract(record_json,'$.kind')='internal_auto_assessment'"
         ).fetchone()[0]
     full = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -107,7 +107,7 @@ def test_incremental_report_includes_earlier_assessment(tmp_path, monkeypatch):
     )
     assert full.uncertain == 1
     incremental = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),

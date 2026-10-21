@@ -32,7 +32,7 @@ def test_report_is_body_free_and_uses_actual_publication(tmp_path: Path) -> None
     receive(provider.database, "mail:1", "event:1", contact_body())
     _ = run_auto_internal(provider.database, settings, context, provider, trigger())
     page = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -63,7 +63,7 @@ def test_stable_report_pages_and_counts_during_head_growth(tmp_path: Path, count
     if count > 100:
         _ = run_auto_internal(provider.database, settings, context, provider, trigger())
     first = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -77,7 +77,7 @@ def test_stable_report_pages_and_counts_during_head_growth(tmp_path: Path, count
     receive(provider.database, "mail:new", "event:new", "Tax payment requires approval.")
     _ = run_auto_internal(provider.database, settings, context, provider, trigger())
     second = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -91,7 +91,7 @@ def test_stable_report_pages_and_counts_during_head_growth(tmp_path: Path, count
     assert len({row.candidate_id for row in [*first.rows, *second.rows]}) == 101
     with pytest.raises(AutoInternalRejected):
         _ = read_auto_report(
-            provider.database,
+            provider,
             provider_instance_id=PROVIDER,
             workspace_id=WORKSPACE,
             grant=report_grant(),
@@ -101,7 +101,7 @@ def test_stable_report_pages_and_counts_during_head_growth(tmp_path: Path, count
         )
     with pytest.raises(AutoInternalRejected):
         _ = read_auto_report(
-            provider.database,
+            provider,
             provider_instance_id=PROVIDER,
             workspace_id="other-workspace",
             grant=report_grant(),
@@ -115,9 +115,11 @@ def test_limit_above_100_is_rejected() -> None:
 
 
 def test_missing_publication_is_not_ready(tmp_path: Path) -> None:
+    provider, _, _ = real_company_runtime(tmp_path)
+    provider.database = tmp_path / "absent.db"
     with pytest.raises(AutoInternalRejected, match="COMPANY_FRESHNESS_REQUIRED"):
         _ = read_auto_report(
-            tmp_path / "absent.db",
+            provider,
             provider_instance_id=PROVIDER,
             workspace_id=WORKSPACE,
             grant=report_grant(),

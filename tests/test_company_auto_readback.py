@@ -67,7 +67,7 @@ def test_report_marks_actual_unfinished_readback_uncertain(
     result = run_auto_internal(provider.database, settings, context, provider, trigger())
     assert result.outcomes[0].uncertain
     report = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),

@@ -19,7 +19,7 @@ from sb.company_auto_settings import (
     bind_policy_signer,
 )
 from sb.company_db_freshness import CompanyDbFreshnessProvider
-from sb.company_freshness import FreshnessScope, provider_from_config
+from sb.company_freshness import provider_from_config
 from sb.company_freshness_anchor import require_trusted_file
 from sb.company_memory_authority import (
     CompanyAuthorityContext,
@@ -137,15 +137,9 @@ def run_auto_route(
         raise CompanyAuthorityRejected("COMPANY_FRESHNESS_REQUIRED")
     if action == "auto-report":
         query = AutoReportQuery.model_validate(envelope.arguments, strict=True)
-        selected.verify_read_only_report(
-            FreshnessScope(
-                provider_instance_id=config.provider_instance_id,
-                workspace_id=config.workspace_id,
-            )
-        )
         return model_object(
             read_auto_report(
-                database,
+                selected,
                 provider_instance_id=config.provider_instance_id,
                 workspace_id=config.workspace_id,
                 grant=AutoReportGrant(

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import base64
 import sqlite3
-from contextlib import closing
-from pathlib import Path
 
 from pydantic import Field, ValidationError
 
 from sb.company_auto_publication import PublishedAssessment
 from sb.company_auto_settings import AutoInternalRejected, AutoReportGrant
+from sb.company_db_freshness import CompanyDbFreshnessProvider
+from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_models import Checkpoint, FreshnessScope
 from sb.company_internal_effects import memory_request_digest
 from sb.effect_values import canonical_bytes
@@ -76,7 +76,7 @@ class _Cursor(ClosedModel):
 
 
 def read_auto_report(
-    database: Path,
+    provider: CompanyDbFreshnessProvider,
     *,
     provider_instance_id: str,
     workspace_id: str,
@@ -92,9 +92,7 @@ def read_auto_report(
         raise AutoInternalRejected("REPORT_REJECTED")
     scope = FreshnessScope(provider_instance_id=provider_instance_id, workspace_id=workspace_id)
     try:
-        with closing(sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True)) as db:
-            _ = db.execute("PRAGMA query_only=ON")
-            _ = db.execute("BEGIN")
+        with provider.read_only_report(scope) as db:
             heads: list[tuple[str, int]] = db.execute(
                 """SELECT s.checkpoint_json,MAX(p.global_sequence)
                 FROM company_freshness_scopes s
@@ -132,7 +130,7 @@ def read_auto_report(
             uncertain = _uncertain_candidates(db, scope, head)
     except AutoInternalRejected:
         raise
-    except (sqlite3.Error, OSError, ValueError) as exc:
+    except (sqlite3.Error, OSError, ValueError, AnchorRejected) as exc:
         raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED") from exc
     if cursor is not None and (cursor.cutoff_from != cutoff_from or cursor.cutoff_to != cutoff_to):
         raise AutoInternalRejected("REPORT_REJECTED")

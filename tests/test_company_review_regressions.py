@@ -150,7 +150,7 @@ def test_shared_source_event_does_not_attribute_another_candidates_record(tmp_pa
     receive(provider.database, "mail:second", "event:shared", contact_body())
     run_auto_internal(provider.database, settings, context, provider, trigger())
     report = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -167,7 +167,7 @@ def test_invalid_report_cursor_keeps_permanent_rejection(tmp_path: Path, cursor:
     provider, _, _ = real_company_runtime(tmp_path)
     with pytest.raises(AutoInternalRejected, match="^REPORT_REJECTED$"):
         read_auto_report(
-            provider.database,
+            provider,
             provider_instance_id=PROVIDER,
             workspace_id=WORKSPACE,
             grant=report_grant(),
@@ -184,7 +184,7 @@ def test_cursor_binding_errors_are_not_freshness_outages(tmp_path: Path, field: 
         )
     run_auto_internal(provider.database, settings, context, provider, trigger())
     page = read_auto_report(
-        provider.database,
+        provider,
         provider_instance_id=PROVIDER,
         workspace_id=WORKSPACE,
         grant=report_grant(),
@@ -200,7 +200,7 @@ def test_cursor_binding_errors_are_not_freshness_outages(tmp_path: Path, field: 
     changed = base64.urlsafe_b64encode(canonical_bytes(body)).rstrip(b"=").decode()
     with pytest.raises(AutoInternalRejected, match="^REPORT_REJECTED$"):
         read_auto_report(
-            provider.database,
+            provider,
             provider_instance_id=PROVIDER,
             workspace_id=WORKSPACE,
             grant=report_grant(),
@@ -272,7 +272,8 @@ def test_policy_checkpoint_recovers_with_publication(
         with pytest.raises(AnchorRejected):
             provider.install_auto_policy_pin(scope)
     assert local_checkpoint(provider.database, WORKSPACE, None) == before
-    provider.verify_read_only_report(scope)  # read-only reports do not repair publication
+    with provider.read_only_report(scope):  # read-only reports do not repair publication
+        pass
     assert local_checkpoint(provider.database, WORKSPACE, None) == before
     response = provider.read_freshness(
         ReadFreshnessRequest(

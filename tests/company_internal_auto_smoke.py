@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             _ = run_auto_internal(provider.database, settings, context, transport, trigger())
             print(f"original_{name}_retry=PASS duplicate_effects=0")
         report = read_auto_report(
-            provider.database,
+            provider,
             provider_instance_id=PROVIDER,
             workspace_id=WORKSPACE,
             grant=report_grant(),

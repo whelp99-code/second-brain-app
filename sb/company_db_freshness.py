@@ -4,7 +4,7 @@ import fcntl
 import os
 import sqlite3
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +46,7 @@ from sb.company_db_freshness_hash import (
     scope_object,
 )
 from sb.company_db_freshness_integrity import (
+    CachedOperation,
     JournalEntry,
     audit_journal,
     audit_operation_cache,
@@ -307,11 +308,24 @@ class CompanyDbFreshnessProvider:
             ):
                 raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
 
-    def verify_read_only_report(self, scope: FreshnessScope) -> None:
-        with self._locked():
-            self._recover(read_only=True)
-            if self._head(scope) is None:
+    @contextmanager
+    def read_only_report(self, scope: FreshnessScope) -> Generator[sqlite3.Connection, None, None]:
+        with (
+            self._locked(),
+            closing(sqlite3.connect(f"{self.database.resolve().as_uri()}?mode=ro", uri=True)) as db,
+        ):
+            _ = db.execute("PRAGMA query_only=ON")
+            _ = db.execute("BEGIN")
+            self._audit_snapshot(db)
+            if (
+                db.execute(
+                    "SELECT 1 FROM company_freshness_scopes WHERE provider_instance_id=? AND workspace_id=?",
+                    (scope.provider_instance_id, scope.workspace_id),
+                ).fetchone()
+                is None
+            ):
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            yield db
 
     @contextmanager
     def effect_guard(
@@ -1075,6 +1089,29 @@ class CompanyDbFreshnessProvider:
         finally:
             connection.close()
 
+    def _audit_snapshot(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        allow_policy_update: bool = False,
+        allow_approval_revocation: bool = False,
+    ) -> tuple[list[JournalEntry], list[CachedOperation], list[JsonObject]]:
+        self._require_anchor_pin()
+        frames = read_witness_frames(self.witness_dir)
+        entries = audit_journal(
+            connection,
+            frames,
+            self.anchor.read_value(),
+            bytes.fromhex(self._registry().tpm.initial_value_hex),
+        )
+        require_scope_pins(self._registry(), entries)
+        _ = approval_revocation_inventory(
+            self._registry(), entries, allow_pending=allow_approval_revocation
+        )
+        if not allow_policy_update:
+            require_current_auto_pins(self._registry(), entries)
+        return entries, audit_operation_cache(connection, entries), frames
+
     def _recover(
         self,
         *,
@@ -1084,28 +1121,14 @@ class CompanyDbFreshnessProvider:
     ) -> None:
         if not migration_applied(self.database, "freshness"):
             raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-        self._require_anchor_pin()
         connection = _connect(self.database)
         try:
-            frames = read_witness_frames(self.witness_dir)
-            entries = audit_journal(
+            entries, operations, frames = self._audit_snapshot(
                 connection,
-                frames,
-                self.anchor.read_value(),
-                bytes.fromhex(self._registry().tpm.initial_value_hex),
+                allow_policy_update=allow_policy_update,
+                allow_approval_revocation=allow_approval_revocation,
             )
-            require_scope_pins(self._registry(), entries)
-            _ = approval_revocation_inventory(
-                self._registry(),
-                entries,
-                allow_pending=allow_approval_revocation,
-            )
-            if not allow_policy_update:
-                require_current_auto_pins(self._registry(), entries)
-            operations = audit_operation_cache(connection, entries)
             if read_only:
-                # Reports project already published facts. They never classify,
-                # verify a new effect, initialize or recover a prepared record.
                 return
             for entry in entries:
                 if entry.phase == "bootstrap":
@@ -1255,7 +1278,7 @@ class CompanyDbFreshnessProvider:
             row = _unpublished_row(connection)
         finally:
             connection.close()
-        if row is None or read_only:
+        if row is None:
             return
         sequences: set[int] = set()
         for item in frames:
