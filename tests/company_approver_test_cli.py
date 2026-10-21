@@ -1,4 +1,4 @@
-"""Run the actual CLI with the shared provider and explicit test clock only."""
+"""Run the actual CLI with an explicit test clock and optional shared provider."""
 
 from __future__ import annotations
 
@@ -15,6 +15,9 @@ def main() -> int:
     clock = arguments.index("--test-now")
     instant = parse_instant(arguments[clock + 1])
     del arguments[clock : clock + 2]
+    if "--test-no-provider" in arguments:
+        arguments.remove("--test-no-provider")
+        return cli.main(arguments, now=instant)
     config_path = Path(arguments[arguments.index("--config") + 1])
     provider, observed = provider_for_config(config_path)
     return cli.main(
