@@ -70,19 +70,31 @@ def execute_processor_transition(
 
     # This validation must perform no decision consumption or candidate effect.
     candidate = store.get(context.workspace_id, candidate_id, scope, deletion)
-    authorize_transition(
-        store.db,
-        candidate,
-        context,
-        policy,
-        owner_keys,
-        operation,
-        arguments,
-        authority.request_digest,
-        now,
-        verify_original,
-        consume=False,
+    freshness_scope = FreshnessScope(
+        provider_instance_id=context.provider, workspace_id=context.workspace_id
     )
+    original_reservation = isinstance(provider, CompanyDbFreshnessProvider) and provider.has_original_reservation(
+        freshness_scope, operation, authority.request_digest, checkpoint
+    )
+    preflight_rejection: CompanyAuthorityRejected | None = None
+    try:
+        authorize_transition(
+            store.db,
+            candidate,
+            context,
+            policy,
+            owner_keys,
+            operation,
+            arguments,
+            authority.request_digest,
+            now,
+            verify_original,
+            consume=False,
+        )
+    except CompanyAuthorityRejected as exc:
+        if not original_reservation:
+            raise
+        preflight_rejection = exc
     cached: list[tuple[int]] = store.db.execute(
         "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
         (context.workspace_id, authority.request_digest),
@@ -116,17 +128,7 @@ def execute_processor_transition(
             commands[0][0],
             authority.request_digest,
             checkpoint,
-            resume_original=(
-                isinstance(provider, CompanyDbFreshnessProvider)
-                and provider.has_original_reservation(
-                    FreshnessScope(
-                        provider_instance_id=context.provider, workspace_id=context.workspace_id
-                    ),
-                    operation,
-                    authority.request_digest,
-                    checkpoint,
-                )
-            ),
+            resume_original=original_reservation,
         )
 
     authorization_rejected = False
@@ -190,6 +192,9 @@ def execute_processor_transition(
     )
     with guard:
         try:
+            if preflight_rejection is not None:
+                authorization_rejected = True
+                raise preflight_rejection
             return store.execute(
                 workspace_id=context.workspace_id,
                 request_digest=authority.request_digest,
@@ -205,7 +210,6 @@ def execute_processor_transition(
                 authorization_rejected
                 and isinstance(provider, CompanyDbFreshnessProvider)
                 and reservation is not None
-                and reservation.outcome == "reserved"
             ):
                 provider.cancel_unapplied_under_guard(
                     FreshnessScope(
@@ -214,5 +218,10 @@ def execute_processor_transition(
                     operation_id,
                     reservation,
                     checkpoint,
+                    processor_binding={
+                        "candidate_id": candidate_id,
+                        "content_digest": candidate.content_digest,
+                        "handoff_id": handoff_id,
+                    },
                 )
             raise

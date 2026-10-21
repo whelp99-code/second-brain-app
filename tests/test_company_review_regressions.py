@@ -272,7 +272,11 @@ def test_policy_checkpoint_recovers_with_publication(
         with pytest.raises(AnchorRejected):
             provider.install_auto_policy_pin(scope)
     assert local_checkpoint(provider.database, WORKSPACE, None) == before
-    with provider.read_only_report(scope):  # read-only reports do not repair publication
+    # Read-only reports neither repair nor accept a pending publication.
+    with (
+        pytest.raises(AnchorRejected, match="COMPANY_PROGRESS_UNCERTAIN"),
+        provider.read_only_report(scope),
+    ):
         pass
     assert local_checkpoint(provider.database, WORKSPACE, None) == before
     response = provider.read_freshness(

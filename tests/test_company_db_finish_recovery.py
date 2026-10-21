@@ -20,10 +20,12 @@ from tests.test_company_db_freshness import (
 
 
 @pytest.mark.parametrize("boundary", ["witness", "extend", "publication"])
+@pytest.mark.parametrize("recovery_crash", [False, True])
 def test_original_finish_recovers_once(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     boundary: str,
+    recovery_crash: bool,
 ) -> None:
     provider = provider_at(tmp_path)
     head = provider.read_freshness(freshness_read(provider)).checkpoint
@@ -75,6 +77,13 @@ def test_original_finish_recovers_once(
         assert provider.anchor.read_value() != extended
     else:
         assert provider.anchor.read_value() == extended
+    if recovery_crash:
+        with monkeypatch.context() as fault:
+            def crash(*_args: object, **_kwargs: object) -> None:
+                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+
+            fault.setattr(freshness, "_finish_operation", crash)
+            assert provider.finish_progress(request).outcome == "error"
     resumed = provider.finish_progress(request)
     assert resumed.outcome == "already_recorded"
     assert resumed.checkpoint is not None

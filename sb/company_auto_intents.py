@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
-from contextlib import closing
-from pathlib import Path
 
 from sb.company_auto_settings import AutoInternalRejected
 from sb.company_freshness_models import FreshnessScope, ReserveProgressRequest
-from sb.company_processor_progress import local_checkpoint
 from sb.effect_values import canonical_bytes
 from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
@@ -37,35 +34,36 @@ def pending_auto_reserve(
     return intent
 
 
-def prepare_auto_reserve(database: Path, intent: PendingAutoReserve) -> PendingAutoReserve:
+def prepare_auto_reserve(db: sqlite3.Connection, intent: PendingAutoReserve) -> PendingAutoReserve:
     scope = intent.request.scope
-    with closing(sqlite3.connect(database)) as db, db:
-        _ = db.execute("BEGIN IMMEDIATE")
-        existing = pending_auto_reserve(db, scope)
-        if existing is not None:
-            equivalent = intent.model_copy(
-                update={
-                    "request": intent.request.model_copy(
-                        update={"challenge": existing.request.challenge}
-                    ),
-                }
-            )
-            if existing != equivalent:
-                raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
-            return existing
-        if (
-            local_checkpoint(database, scope.workspace_id, None)
-            != intent.request.expected_checkpoint
-        ):
-            raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
-        _ = db.execute(
-            "INSERT INTO company_internal_pending_reserve VALUES(?,?,?)",
-            (
-                scope.provider_instance_id,
-                scope.workspace_id,
-                canonical_bytes(model_object(intent)).decode(),
-            ),
+    existing = pending_auto_reserve(db, scope)
+    if existing is not None:
+        equivalent = intent.model_copy(
+            update={
+                "request": intent.request.model_copy(
+                    update={"challenge": existing.request.challenge}
+                ),
+            }
         )
+        if existing != equivalent:
+            raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
+        return existing
+    checkpoint = db.execute(
+        "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
+        (scope.workspace_id,),
+    ).fetchone()
+    if checkpoint is None or checkpoint[0] != canonical_bytes(
+        model_object(intent.request.expected_checkpoint)
+    ).decode():
+        raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
+    _ = db.execute(
+        "INSERT INTO company_internal_pending_reserve VALUES(?,?,?)",
+        (
+            scope.provider_instance_id,
+            scope.workspace_id,
+            canonical_bytes(model_object(intent)).decode(),
+        ),
+    )
     return intent
 
 

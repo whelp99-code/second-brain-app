@@ -402,6 +402,12 @@ def _one(
                 candidate_id, "skipped_human", 0, (), ("human_path",), False
             ), checkpoint
         _ = save_policy_receipt(db, scope, receipt, command, format_instant(context.now))
+        if candidate.state == "candidate":
+            prepare_auto_reserve(
+                db,
+                _reserve_intent(scope, candidate.candidate_id, request_id,
+                                command_digest(command), "accept", checkpoint),
+            )
     receipts: list[str] = []
     if candidate_state_of(database, scope.workspace_id, candidate.candidate_id) == "candidate":
         checkpoint, evidence = _transition(
@@ -498,23 +504,13 @@ def _transition(
         raise AutoInternalRejected("POLICY_REVOKED")
     operation_id = _operation_identity(scope, request_id, command_digest_value, operation)
     request_digest = memory_request_digest(operation, candidate.candidate_id, request_id)
-    intent = prepare_auto_reserve(
-        database,
-        PendingAutoReserve(
-            candidate_id=candidate.candidate_id,
-            auto_request_id=request_id,
-            command_digest=command_digest_value,
-            request=ReserveProgressRequest(
-                schema_version=2,
-                scope=scope,
-                operation_id=operation_id,
-                operation=operation,
-                expected_checkpoint=checkpoint,
-                event_digest=request_digest,
-                challenge="reserve:" + uuid4().hex,
-            ),
-        ),
-    )
+    with closing(sqlite3.connect(database)) as db, db:
+        _ = db.execute("BEGIN IMMEDIATE")
+        intent = prepare_auto_reserve(
+            db,
+            _reserve_intent(scope, candidate.candidate_id, request_id,
+                            command_digest_value, operation, checkpoint),
+        )
     reservation = _reserve(provider, intent.request)
     evidence = ""
     with (
@@ -648,6 +644,27 @@ def _skip_expired_attempt(
 ) -> tuple[AutoCandidateOutcome, Checkpoint]:
     with closing(sqlite3.connect(database)) as db:
         intent = pending_auto_reserve(db, scope)
+        if intent is None:
+            rows = db.execute(
+                """SELECT r.auto_request_id,r.receipt_json FROM company_auto_policy_receipts r
+                JOIN company_candidate_execution_claims w
+                  ON w.provider_instance_id=r.provider_instance_id AND w.workspace_id=r.workspace_id
+                  AND w.candidate_id=r.candidate_id AND w.content_digest=r.content_digest
+                  AND w.workflow_request_id=r.auto_request_id AND w.path='auto_internal'
+                WHERE r.provider_instance_id=? AND r.workspace_id=? AND r.candidate_id=?""",
+                (scope.provider_instance_id, scope.workspace_id, candidate_id),
+            ).fetchall()
+            if len(rows) != 1 or not isinstance(provider, CompanyDbFreshnessProvider):
+                raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
+            receipt = PolicyAutoReceiptV1.model_validate_json(rows[0][1], strict=True)
+            # Reconstruct only the immutable acceptance identity. This grants cancellation,
+            # never a renewed receipt or an acceptance after its authorization expired.
+            intent = prepare_auto_reserve(
+                db,
+                _reserve_intent(scope, candidate_id, rows[0][0],
+                                receipt.command_digest, "accept", checkpoint),
+            )
+            db.commit()
     if intent is not None:
         if intent.candidate_id != candidate_id or not isinstance(
             provider, CompanyDbFreshnessProvider
@@ -665,6 +682,30 @@ def _skip_expired_attempt(
     return _outcome(
         candidate_id, "skipped_expired", 0, (), ("policy_receipt_expired",), False
     ), checkpoint
+
+
+def _reserve_intent(
+    scope: FreshnessScope,
+    candidate_id: str,
+    request_id: str,
+    command_digest_value: str,
+    operation: Literal["accept", "complete", "mark_processed"],
+    checkpoint: Checkpoint,
+) -> PendingAutoReserve:
+    return PendingAutoReserve(
+        candidate_id=candidate_id,
+        auto_request_id=request_id,
+        command_digest=command_digest_value,
+        request=ReserveProgressRequest(
+            schema_version=2,
+            scope=scope,
+            operation_id=_operation_identity(scope, request_id, command_digest_value, operation),
+            operation=operation,
+            expected_checkpoint=checkpoint,
+            event_digest=memory_request_digest(operation, candidate_id, request_id),
+            challenge="reserve:" + uuid4().hex,
+        ),
+    )
 
 
 def _reserve(
@@ -847,8 +888,16 @@ def _candidate_ids(
                   AND w.workflow_request_id=r.auto_request_id AND w.path='auto_internal'
                 WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
                   AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
-                  AND json_extract(r.receipt_json,'$.expires_at')<=?))
+                  AND json_extract(r.receipt_json,'$.expires_at')<=?
+                  AND EXISTS(SELECT 1 FROM company_freshness_log l
+                    JOIN company_freshness_publication f ON f.global_sequence=l.global_sequence
+                    WHERE l.provider_instance_id=r.provider_instance_id AND l.workspace_id=r.workspace_id
+                      AND json_extract(l.record_json,'$.kind')='unapplied_processor_cancellation'
+                      AND json_extract(l.record_json,'$.auto_intent.auto_request_id')=r.auto_request_id)))
             ORDER BY (c.state='accepted') DESC,
+              EXISTS(SELECT 1 FROM company_auto_policy_receipts r
+                WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
+                  AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest) DESC,
               EXISTS(SELECT 1 FROM company_auto_assessments a
                 WHERE a.provider_instance_id=? AND a.workspace_id=c.workspace_id
                   AND a.candidate_id=c.candidate_id AND a.policy_digest=?),
@@ -865,6 +914,7 @@ def _candidate_ids(
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 settings.provider_instance_id,
                 format_instant(context.now),
+                settings.provider_instance_id,
                 settings.provider_instance_id,
                 policy_digest(settings.policy),
                 FIXED_TRIGGER_LIMIT,

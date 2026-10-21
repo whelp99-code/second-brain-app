@@ -317,6 +317,8 @@ class CompanyDbFreshnessProvider:
             _ = db.execute("PRAGMA query_only=ON")
             _ = db.execute("BEGIN")
             self._audit_snapshot(db)
+            if _unpublished_row(db) is not None:
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
             if (
                 db.execute(
                     "SELECT 1 FROM company_freshness_scopes WHERE provider_instance_id=? AND workspace_id=?",
@@ -356,6 +358,8 @@ class CompanyDbFreshnessProvider:
         operation_id: str,
         reservation: ReserveProgressResponse,
         processor_before: Checkpoint,
+        *,
+        processor_binding: JsonObject | None = None,
     ) -> None:
         """Caller holds effect_guard; resumed auto acceptance requires full zero-effect proof."""
         original = self._operation(scope, operation_id)
@@ -382,6 +386,8 @@ class CompanyDbFreshnessProvider:
             "terminal_state": "cancelled",
             "state": "finished",
         }
+        if processor_binding is not None:
+            record["processor_binding"] = processor_binding
         connection = _connect(self.database)
         try:
             if connection.execute(
@@ -398,7 +404,9 @@ class CompanyDbFreshnessProvider:
                             f"SELECT 1 FROM {table} WHERE workspace_id=?", (scope.workspace_id,)
                         ).fetchone():
                             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
-            if reservation.outcome == "already_reserved" and "auto_intent" not in record:
+            if reservation.outcome == "already_reserved" and not (
+                "auto_intent" in record or "processor_binding" in record
+            ):
                 raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
             verified = _verify_unapplied_cancellation(connection, scope, original, record)
             local = connection.execute(
@@ -2385,6 +2393,59 @@ def _verify_unapplied_cancellation(
     record: JsonObject,
 ) -> VerifiedEvidence:
     verify_auto_cancellation(connection, scope, original, record)
+    binding = record.get("processor_binding")
+    if binding is not None:
+        if not isinstance(binding, dict):
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        rows = connection.execute(
+            """SELECT c.state,c.content_digest,h.command_digest FROM company_memory_candidates c
+            JOIN company_handoff_outbox h ON h.workspace_id=c.workspace_id
+              AND h.candidate_id=c.candidate_id
+            WHERE c.workspace_id=? AND c.candidate_id=? AND h.request_id=?""",
+            (scope.workspace_id, binding.get("candidate_id"), binding.get("handoff_id")),
+        ).fetchall()
+        expected_state = "accepted" if original.operation == "mark_processed" else "candidate"
+        if (
+            len(rows) != 1
+            or rows[0][0] != expected_state
+            or rows[0][1] != binding.get("content_digest")
+            or original.operation_id != operation_id_for(
+                scope,
+                request_id=binding["handoff_id"],
+                command_digest=rows[0][2],
+                operation=original.operation,
+            )
+        ):
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        if original.operation in {"accept", "reject"} and connection.execute(
+            """SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
+            AND operation IN ('accept','reject','mark_processed')""",
+            (scope.workspace_id, binding.get("candidate_id")),
+        ).fetchone():
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        if original.operation in {"accept", "reject"} and connection.execute(
+            "SELECT 1 FROM company_handoff_decisions WHERE workspace_id=? AND candidate_id=?",
+            (scope.workspace_id, binding.get("candidate_id")),
+        ).fetchone():
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        for table in ("company_processor_pending_finish", "company_internal_pending_finish"):
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone() and connection.execute(
+                f"SELECT 1 FROM {table} WHERE workspace_id=?", (scope.workspace_id,)
+            ).fetchone():
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        for table, column in (
+            ("company_internal_effects", "candidate_id"),
+            ("company_internal_records", "source_candidate_id"),
+        ):
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone() and connection.execute(
+                f"SELECT 1 FROM {table} WHERE workspace_id=? AND {column}=?",
+                (scope.workspace_id, binding.get("candidate_id")),
+            ).fetchone():
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
     if (
         original.actor_store != "second_brain"
         or original.operation not in {"accept", "reject", "mark_processed"}

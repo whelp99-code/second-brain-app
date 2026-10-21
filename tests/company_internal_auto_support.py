@@ -29,6 +29,7 @@ from sb.company_freshness import (
     StoreHeads,
     StoreProgress,
 )
+from sb.company_freshness_migrations import apply_component_migration
 from sb.company_internal_effects import install_auto_policy
 from sb.company_internal_migrations import apply_internal_auto_migration
 from sb.company_memory import CompanyMemoryStore
@@ -42,19 +43,6 @@ DELETION = (2, "sha256:" + "ab" * 32)
 NOW = datetime(2026, 10, 16, 8, 0, tzinfo=UTC)
 ACCESS = SourceAccess("principal:mail-ms", ("project:company",), "policy:1")
 SIMULATED_ANCHOR = "SIMULATED_ANCHOR"
-
-
-def note_freshness_marker(db: sqlite3.Connection) -> None:
-    _ = db.execute(
-        """CREATE TABLE IF NOT EXISTS company_component_migrations (
-        component TEXT NOT NULL, version INTEGER NOT NULL, checksum TEXT NOT NULL,
-        applied_at TEXT NOT NULL, PRIMARY KEY (component, version))""",
-    )
-    _ = db.execute(
-        "INSERT OR IGNORE INTO company_component_migrations VALUES('freshness',1,?,?)",
-        ("sha256:" + "cd" * 32, "2026-10-16T00:00:00.000Z"),
-    )
-    db.commit()
 
 
 def policy() -> InternalAutoPolicyV1:
@@ -281,8 +269,8 @@ def _advance(current: Checkpoint, token: str, phase: str) -> Checkpoint:
 def prepare(database: Path, bound: AutoInternalSettings) -> None:
     store = CompanyMemoryStore(database)
     store.close()
+    apply_component_migration(database, "freshness", now=format_instant(NOW))
     with sqlite3.connect(database) as db:
-        note_freshness_marker(db)
         _ = apply_internal_auto_migration(db, NOW)
         _ = install_auto_policy(db, bound, WORKSPACE, NOW)
         save_checkpoint(db, WORKSPACE, initial_checkpoint())
