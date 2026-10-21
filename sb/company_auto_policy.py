@@ -16,6 +16,7 @@ from sb.company_auto_settings import (
     InternalAutoPolicyV1,
 )
 from sb.company_freshness_models import FreshnessScope
+from sb.company_internal_classifier import CLASSIFIER_VERSION
 from sb.delegations import DelegationRejected, verify_signed_object
 from sb.effect_values import JsonObject, canonical_bytes, format_instant, parse_instant
 from sb.effect_write_models import ClosedModel
@@ -42,6 +43,7 @@ class PolicyAutoReceiptV1(ClosedModel):
     policy_version: int = Field(ge=1)
     policy_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     assessment_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    classifier_version: str = Field(min_length=1, max_length=128)
     allowed_operations: list[Literal["accept", "complete", "mark_processed"]]
     issuer_principal_id: Literal["principal:company-internal-automation"]
     issued_at: str
@@ -76,6 +78,7 @@ def assessment_digest(
     classification: str,
     reason_codes: tuple[str, ...],
     payload: JsonObject | None,
+    classifier_version: str = CLASSIFIER_VERSION,
 ) -> str:
     body: JsonObject = {
         "candidate_id": candidate_id,
@@ -84,6 +87,7 @@ def assessment_digest(
         "policy_digest": policy_digest_value,
         "reason_codes": list(reason_codes),
         "typed_payload": payload,
+        "classifier_version": classifier_version,
     }
     return "sha256:" + hashlib.sha256(ASSESSMENT_DOMAIN + canonical_bytes(body)).hexdigest()
 
@@ -183,6 +187,7 @@ def build_unsigned_receipt(
             policy_version=settings.policy.policy_version,
             policy_digest=digest,
             assessment_digest=assessment_digest_value,
+            classifier_version=CLASSIFIER_VERSION,
             allowed_operations=["accept", "complete", "mark_processed"],
             issuer_principal_id=POLICY_ISSUER,
             issued_at=issued_at,

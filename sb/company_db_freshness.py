@@ -627,7 +627,8 @@ class CompanyDbFreshnessProvider:
             pin = current_auto_pin(self._registry(), scope)
             connection = _connect(self.database)
             try:
-                previous = latest_auto_pins(load_journal(connection)).get(
+                journal = load_journal(connection)
+                previous = latest_auto_pins(journal).get(
                     (scope.provider_instance_id, scope.workspace_id),
                 )
                 local_row = connection.execute(
@@ -642,7 +643,12 @@ class CompanyDbFreshnessProvider:
             if local_row is None:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             local = Checkpoint.model_validate_json(local_row[0], strict=True)
-            if not is_other_store_prefix(local, head, "second_brain"):
+            if not is_other_store_prefix(local, head, "second_brain") or not any(
+                entry.scope == scope
+                and entry.published_sequence is not None
+                and entry.after == local
+                for entry in journal
+            ):
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             record: JsonObject = {
                 "kind": "internal_auto_policy",
@@ -1126,11 +1132,36 @@ class CompanyDbFreshnessProvider:
         allow_approval_revocation: bool = False,
     ) -> tuple[list[JournalEntry], list[CachedOperation], list[JsonObject]]:
         self._require_anchor_pin()
-        frames = read_witness_frames(self.witness_dir)
+        live = self.anchor.read_value()
+        journal = load_journal(connection)
+        unpublished_frame = None
+        if journal and journal[-1].published_sequence is None:
+            entry = journal[-1]
+            # A torn append cannot have extended the anchor. Never discard
+            # bytes committed by NV or a publication, even at the final frame.
+            if live.hex() == entry.previous_nv:
+                transport = WitnessTransport.model_validate(
+                    entry.record.get("transport"), strict=True
+                )
+                unpublished_frame = _frame_body(
+                    sequence=entry.sequence,
+                    scope=entry.scope,
+                    epoch=entry.after.operational_epoch,
+                    operation_id=entry.operation_id,
+                    reservation_id=transport.reservation_id,
+                    record_digest=entry.digest,
+                    after=entry.after,
+                    evidence=entry.evidence,
+                    terminal_state=transport.terminal_state,
+                    previous=bytes.fromhex(entry.previous_nv),
+                    nxt=bytes.fromhex(entry.next_nv),
+                    challenge=transport.challenge,
+                )
+        frames = read_witness_frames(self.witness_dir, unpublished_frame=unpublished_frame)
         entries = audit_journal(
             connection,
             frames,
-            self.anchor.read_value(),
+            live,
             bytes.fromhex(self._registry().tpm.initial_value_hex),
         )
         require_scope_pins(self._registry(), entries)

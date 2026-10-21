@@ -11,6 +11,9 @@ from sb.effect_values import parse_instant
 
 RecordKind = Literal["contact", "calendar", "progress"]
 Classification = Literal["auto_internal", "human_required"]
+# Bump whenever classification or payload/span semantics change. Historical
+# signed receipts must never be evaluated with another version's rules.
+CLASSIFIER_VERSION: Final = "mail-classifier:v1"
 
 _HEADER: Final = "sb-internal-mail/v1"
 _KINDS: Final[frozenset[str]] = frozenset({"contact", "calendar", "progress"})

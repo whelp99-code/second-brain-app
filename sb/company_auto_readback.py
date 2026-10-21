@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter
 
 from sb.company_approver_binding import decode_key, public_key_fingerprint
 from sb.company_auto_policy import (
@@ -21,7 +21,7 @@ from sb.company_db_freshness_models import (
     RegistryAutoPolicyPin,
 )
 from sb.company_freshness_models import FreshnessScope
-from sb.company_internal_classifier import classify_mail_candidate
+from sb.company_internal_classifier import CLASSIFIER_VERSION, classify_mail_candidate
 from sb.company_internal_effects import candidate_result
 from sb.company_memory import MemoryCandidate
 from sb.effect_values import JsonObject, canonical_bytes, strict_loads
@@ -34,6 +34,19 @@ class _Assessment(ClosedModel):
     classification: str
     reasons: list[str]
     payload: JsonObject
+    classifier_version: str
+
+
+class _Span(ClosedModel):
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+
+
+class _Payload(ClosedModel):
+    schema_version: int
+    record_kind: str
+    fields: dict[str, str]
+    spans: dict[str, _Span]
 
 
 def verify_auto_authority(
@@ -130,7 +143,8 @@ def verify_auto_authority(
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
     assessments: list[tuple[str]] = db.execute(
         """SELECT json_object('classification',classification,'reasons',json(reason_codes_json),
-        'payload',json(typed_payload_json)) FROM company_auto_assessments
+        'payload',json(typed_payload_json),'classifier_version',classifier_version)
+        FROM company_auto_assessments
         WHERE provider_instance_id=? AND workspace_id=? AND candidate_id=?
           AND content_digest=? AND policy_digest=? AND assessment_digest=?""",
         (
@@ -145,22 +159,10 @@ def verify_auto_authority(
     if len(assessments) != 1:
         raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
     assessment = _Assessment.model_validate_json(assessments[0][0], strict=True)
-    classified = classify_mail_candidate(candidate)
-    field_values: JsonObject = dict(classified.fields)
-    spans: JsonObject = {
-        key: {"start": span.start, "end": span.end} for key, span in classified.spans.items()
-    }
-    expected: JsonObject = {
-        "schema_version": 1,
-        "record_kind": classified.record_kind,
-        "fields": field_values,
-        "spans": spans,
-    }
     if (
-        classified.classification != "auto_internal"
-        or assessment.classification != "auto_internal"
+        assessment.classification != "auto_internal"
         or assessment.reasons
-        or expected != assessment.payload
+        or assessment.classifier_version != receipt.classifier_version
         or assessment_digest(
             candidate_id=candidate_id,
             content_digest=candidate.content_digest,
@@ -168,10 +170,42 @@ def verify_auto_authority(
             classification=assessment.classification,
             reason_codes=tuple(assessment.reasons),
             payload=assessment.payload,
+            classifier_version=assessment.classifier_version,
         )
         != receipt.assessment_digest
     ):
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    payload = _Payload.model_validate(assessment.payload, strict=True)
+    # Even retired classifier versions retain source-byte and typed-effect
+    # integrity checks. Only their historical classification decision is trusted
+    # to the already verified, registered policy signature above.
+    if (
+        payload.schema_version != 1
+        or payload.record_kind not in {"contact", "calendar", "progress"}
+        or command.get("record_kind") != payload.record_kind
+        or not payload.fields
+        or payload.fields.keys() != payload.spans.keys()
+        or any(
+            not 0 <= span.start < span.end <= len(candidate.content)
+            or candidate.content[span.start : span.end] != payload.fields[key]
+            for key, span in payload.spans.items()
+        )
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    if receipt.classifier_version == CLASSIFIER_VERSION:
+        classified = classify_mail_candidate(candidate)
+        expected: JsonObject = {
+            "schema_version": 1,
+            "record_kind": classified.record_kind,
+            "fields": dict(classified.fields),
+            "spans": {
+                key: {"start": span.start, "end": span.end}
+                for key, span in classified.spans.items()
+            },
+        }
+        if classified.classification != "auto_internal" or expected != assessment.payload:
+            raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    field_values: JsonObject = dict(payload.fields)
     records: list[tuple[str]] = db.execute(
         """SELECT r.payload_json FROM company_internal_records r
         JOIN company_internal_effects e ON e.provider_instance_id=r.provider_instance_id

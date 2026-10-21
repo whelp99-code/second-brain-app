@@ -61,7 +61,16 @@ class TpmNvExtendAnchor:
             if output.is_symlink() or not 1 <= output.stat().st_size <= 16_384:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             identity = "sha256:" + hashlib.sha256(output.read_bytes()).hexdigest()
-        if identity != proof.identity or self.public_name().hex() != proof.public_name_hex:
+        try:
+            metadata = parse_nvreadpublic(_command(tpm_nvreadpublic_argv()).decode("ascii"))
+        except (UnicodeError, ValueError) as exc:
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED") from exc
+        if (
+            identity != proof.identity
+            or metadata["name"] != proof.public_name_hex
+            or metadata["authorization_policy"]
+            != proof.deletion_policy_digest.removeprefix("sha256:")
+        ):
             raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
         return identity
 

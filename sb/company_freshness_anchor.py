@@ -86,6 +86,7 @@ def parse_nvreadpublic(text: str, handle: str = NV_HANDLE) -> dict[str, str]:
         "hash_algorithm": "sha256",
         "size": "32",
         "name": name,
+        "authorization_policy": block.get("authorization policy", ""),
     }
 
 
@@ -142,7 +143,7 @@ def append_witness_frame(witness_dir: Path, body: JsonObject) -> None:
     require_trusted_dir(witness_dir)
     path = witness_dir / "frames.jsonl"
     payload = frame_line(body)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC
+    flags = os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW | os.O_CLOEXEC
     descriptor = os.open(path, flags, 0o600)
     try:
         info = os.fstat(descriptor)
@@ -153,6 +154,17 @@ def append_witness_frame(witness_dir: Path, body: JsonObject) -> None:
         ):
             raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
         offset = info.st_size
+        raw = os.pread(descriptor, offset, 0)
+        if raw and not raw.endswith(b"\n"):
+            tail_start = raw.rfind(b"\n") + 1
+            tail = raw[tail_start:]
+            if len(tail) >= len(payload) or not payload.startswith(tail):
+                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            # The caller has audited this exact unpublished journal entry and
+            # the preceding published prefix before retrying its append.
+            os.ftruncate(descriptor, tail_start)
+            os.fsync(descriptor)
+            offset = tail_start
         try:
             written = 0
             while written < len(payload):
@@ -175,14 +187,26 @@ def append_witness_frame(witness_dir: Path, body: JsonObject) -> None:
         os.close(directory)
 
 
-def read_witness_frames(witness_dir: Path) -> list[JsonObject]:
+def read_witness_frames(
+    witness_dir: Path, *, unpublished_frame: JsonObject | None = None
+) -> list[JsonObject]:
     require_trusted_dir(witness_dir)
     path = witness_dir / "frames.jsonl"
     if not path.exists():
         return []
     require_trusted_file(path, mode=0o600)
     frames: list[JsonObject] = []
-    for line in path.read_bytes().splitlines():
+    raw = path.read_bytes()
+    if raw and not raw.endswith(b"\n"):
+        tail_start = raw.rfind(b"\n") + 1
+        tail = raw[tail_start:]
+        expected = frame_line(unpublished_frame) if unpublished_frame is not None else b""
+        if len(tail) >= len(expected) or not expected.startswith(tail):
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        raw = raw[:tail_start]
+    else:
+        tail = b""
+    for line in raw.splitlines():
         if not line:
             continue
         from sb.effect_values import strict_loads
@@ -195,6 +219,10 @@ def read_witness_frames(witness_dir: Path) -> list[JsonObject]:
         if checksum != hashlib.sha256(canonical_bytes(body)).hexdigest():
             raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
         frames.append(body)
+    if tail and (
+        unpublished_frame is None or unpublished_frame.get("global_sequence") != len(frames) + 1
+    ):
+        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
     return frames
 
 

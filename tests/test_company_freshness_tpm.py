@@ -13,9 +13,11 @@ from sb.company_freshness_anchor import AnchorRejected
 from sb.effect_values import canonical_bytes
 
 
+@pytest.mark.parametrize("policy", ["cd" * 32, "ef" * 32, "", "xyz"])
 def test_adapter_reads_live_public_and_extends_raw_digest_without_secret_argv(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    policy: str,
 ) -> None:
     # Given: only the OS command boundary is replaced with a TPM-shaped device.
     credential = tmp_path / "owner.auth"
@@ -48,6 +50,7 @@ def test_adapter_reads_live_public_and_extends_raw_digest_without_secret_argv(
         + "\n  hash algorithm:\n    friendly: sha256\n"
         + "  attributes:\n    friendly: nt=extend|policydelete|written|ownerread|ownerwrite\n"
         + "  size: 32\n"
+        + ("  authorization policy: " + policy + "\n" if policy else "")
     ).encode()
     live = b"\x11" * 32
     commands: list[list[str]] = []
@@ -97,6 +100,11 @@ def test_adapter_reads_live_public_and_extends_raw_digest_without_secret_argv(
 
     monkeypatch.setattr("sb.company_freshness_tpm.subprocess.run", command)
     anchor = tpm.TpmNvExtendAnchor()
+    if policy != "cd" * 32:
+        with pytest.raises(AnchorRejected, match="COMPANY_FRESHNESS_REQUIRED"):
+            anchor.identity()
+        assert not any(argv[0].endswith("/tpm2_nvextend") for argv in commands)
+        return
     assert anchor.identity() == identity
     assert anchor.public_name() == bytes.fromhex(name)
     assert anchor.read_value() == b"\x11" * 32

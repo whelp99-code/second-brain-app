@@ -176,6 +176,7 @@ CREATE TABLE company_auto_assessments (
     reason_codes_json TEXT NOT NULL CHECK (json_valid(reason_codes_json)),
     typed_payload_json TEXT CHECK (typed_payload_json IS NULL OR json_valid(typed_payload_json)),
     created_at TEXT NOT NULL,
+    classifier_version TEXT NOT NULL,
     PRIMARY KEY (provider_instance_id, workspace_id, candidate_id, content_digest, policy_digest)
 );
 CREATE TRIGGER company_auto_assessments_no_update

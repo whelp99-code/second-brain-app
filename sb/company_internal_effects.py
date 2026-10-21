@@ -10,6 +10,7 @@ from typing import Literal, cast
 from sb.company_auto_policy import PolicyAutoReceiptV1, policy_digest
 from sb.company_auto_settings import AutoInternalRejected, AutoInternalSettings, SourceContext
 from sb.company_freshness_models import FreshnessScope
+from sb.company_internal_classifier import CLASSIFIER_VERSION
 from sb.company_memory import CandidateRow
 from sb.company_memory_authority import company_request_digest
 from sb.effect_values import JsonObject, JsonValue, canonical_bytes, format_instant, strict_loads
@@ -115,7 +116,7 @@ def insert_assessment(
         return
     _ = db.execute(
         """INSERT INTO company_auto_assessments
-        VALUES(?,?,?,?,?,?,?,?,?,?)""",
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
         (
             scope.provider_instance_id,
             scope.workspace_id,
@@ -127,6 +128,7 @@ def insert_assessment(
             reasons,
             payload_json,
             created_at,
+            CLASSIFIER_VERSION,
         ),
     )
 

@@ -28,6 +28,7 @@ class PublishedAssessment(ClosedModel):
     record_kind: str | None
     operation_id: str
     assessment_digest: str
+    classifier_version: str
 
 
 class InternalAutoJournal(CompanyFreshnessProvider, Protocol):
@@ -88,7 +89,7 @@ def assessment_snapshot(
               WHERE e.provider_instance_id=a.provider_instance_id
                 AND e.workspace_id=a.workspace_id AND e.candidate_id=a.candidate_id),
             'assessment:' || a.assessment_digest),
-          'assessment_digest',a.assessment_digest)
+          'assessment_digest',a.assessment_digest,'classifier_version',a.classifier_version)
         FROM company_auto_assessments a
         JOIN company_memory_candidates c
           ON c.workspace_id=a.workspace_id AND c.candidate_id=a.candidate_id
