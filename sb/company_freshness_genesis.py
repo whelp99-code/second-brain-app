@@ -136,6 +136,35 @@ def default_transition_unenrolled(db: sqlite3.Connection, workspace_id: str) -> 
     return True
 
 
+def _legacy_default_receipts(
+    db: sqlite3.Connection, scope: FreshnessScope, inventory: GenesisInventory
+) -> list[str]:
+    """Select only exact default receipts already committed by an old bootstrap.
+
+    The caller supplies an authenticated, published inventory. The normal
+    genesis audit still verifies each original receipt's bytes and metadata.
+    """
+    defaults: list[str] = []
+    for entry in inventory.second_brain_receipts:
+        operation = entry.metadata.get("operation")
+        candidate = entry.metadata.get("candidate_id")
+        if operation not in ("accept", "reject") or not isinstance(candidate, str):
+            continue
+        if db.execute(
+            """SELECT 1 FROM company_memory_receipts WHERE workspace_id=?
+            AND receipt_id=? AND receipt_digest=? AND operation=? AND request_digest=?""",
+            (
+                scope.workspace_id,
+                entry.source_record_id,
+                entry.source_digest,
+                operation,
+                company_request_digest(operation, {"candidate_id": candidate}),
+            ),
+        ).fetchone():
+            defaults.append(entry.source_record_id)
+    return defaults
+
+
 def audit_owned_receipts(
     db: sqlite3.Connection,
     entries: list[JournalEntry],
@@ -157,6 +186,11 @@ def audit_owned_receipts(
         scope = bootstrap.scope
         inventory = GenesisInventory.model_validate(bootstrap.record.get("inventory"), strict=True)
         defaults = bootstrap.record.get("default_transition_receipts", [])
+        if (
+            "default_transition_receipts" not in bootstrap.record
+            and bootstrap.published_sequence is not None
+        ):
+            defaults = _legacy_default_receipts(db, scope, inventory)
         if not isinstance(defaults, list) or not all(isinstance(value, str) for value in defaults):
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         verify_owned_genesis(
@@ -239,6 +273,10 @@ def audit_owned_receipts(
                         default_transition_unenrolled(db, scope.workspace_id)
                         if finish is None
                         else finish.record.get("default_transition_authority") is True
+                        or (
+                            "default_transition_authority" not in finish.record
+                            and finish.published_sequence is not None
+                        )
                     ),
                 )
             entry = GenesisEntry(
