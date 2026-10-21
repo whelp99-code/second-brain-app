@@ -446,16 +446,16 @@ def insert_effect(
             raise AutoInternalRejected("EFFECT_CONFLICT")
         return digest
     conflict = cast(
-        tuple[str] | None,
+        tuple[str, str] | None,
         db.execute(
-            """SELECT payload_json FROM company_internal_records
+            """SELECT payload_json, source_candidate_id FROM company_internal_records
         WHERE provider_instance_id=? AND workspace_id=? AND entity_key=?
         AND record_kind=?""",
             (scope.provider_instance_id, scope.workspace_id, entity_key, record_kind),
         ).fetchone(),
     )
     payload_json = canonical_bytes(payload).decode("utf-8")
-    if conflict is not None and conflict[0] != payload_json:
+    if conflict is not None and (conflict[0] != payload_json or conflict[1] != candidate_id):
         raise AutoInternalRejected("INTERNAL_RECORD_CONFLICT")
     _ = db.execute(
         "INSERT INTO company_internal_effects VALUES(?,?,?,?,?,?,?,?)",

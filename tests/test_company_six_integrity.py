@@ -207,13 +207,19 @@ def test_cancellation_source_reuse_is_rejected_before_irreversible_publication(
 
 
 @pytest.mark.parametrize("crash", [False, True])
+@pytest.mark.parametrize("same_payload", [False, True])
 def test_stale_preflight_conflict_does_not_leave_reserved_slot(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, crash: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, crash: bool, same_payload: bool
 ) -> None:
     provider, settings, context = real_company_runtime(tmp_path)
     receive(provider.database, "mail:winner", "event:winner", contact_body())
     engine.run_auto_internal(provider.database, settings, context, provider, trigger())
-    receive(provider.database, "mail:loser", "event:loser", contact_body(name="Different Name"))
+    receive(
+        provider.database,
+        "mail:loser",
+        "event:loser",
+        contact_body(name="Ada Lovelace" if same_payload else "Different Name"),
+    )
     # Replay the preflight observation made before the other writer committed.
     with monkeypatch.context() as stale:
         stale.setattr(engine, "_record_conflict", lambda *args: False)

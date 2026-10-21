@@ -73,6 +73,8 @@ def audit_journal(
     if not entries:
         if frames or live_nv != initial_nv:
             raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        _audit_epoch_cache(db, entries)
+        _audit_scope_cache(db, entries)
         return entries
     if len(frames) > len(entries):
         raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
@@ -112,7 +114,8 @@ def audit_journal(
         previous = following
     if not pending and live_nv != previous:
         raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-    _audit_scope_cache(db, heads)
+    _audit_epoch_cache(db, entries)
+    _audit_scope_cache(db, entries)
     _audit_evidence_cache(db, entries)
     return entries
 
@@ -181,26 +184,72 @@ def _audit_frame(frame: JsonObject, entry: JournalEntry) -> None:
         raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
 
 
+def _audit_epoch_cache(db: sqlite3.Connection, entries: list[JournalEntry]) -> None:
+    # Bootstrap prepares the epoch and journal in one transaction, before witness/NV.
+    # Include the unpublished bootstrap tail so recovery remains possible.
+    expected: list[bytes] = []
+    for entry in entries:
+        if entry.phase != "bootstrap":
+            continue
+        if entry.before is not None or entry.after.operational_epoch != 1:
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        expected.append(
+            canonical_bytes(
+                [
+                    entry.scope.provider_instance_id,
+                    entry.scope.workspace_id,
+                    1,
+                    None,
+                    None,
+                    checkpoint_text(entry.after),
+                    entry.after.intent_root,
+                    entry.created_at,
+                ]
+            )
+        )
+    rows = db.execute(
+        """SELECT provider_instance_id,workspace_id,epoch,previous_epoch,
+        previous_checkpoint_digest,genesis_json,registry_binding_digest,created_at
+        FROM company_freshness_epochs"""
+    ).fetchall()
+    if sorted(canonical_bytes(list(row)) for row in rows) != sorted(expected):
+        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+
+
 def _audit_scope_cache(
     db: sqlite3.Connection,
-    heads: dict[tuple[str, str], Checkpoint],
+    entries: list[JournalEntry],
 ) -> None:
-    rows: list[tuple[str, str, str, str]] = db.execute(
-        """SELECT provider_instance_id,workspace_id,checkpoint_json,checkpoint_digest
+    expected: dict[tuple[str, str], bytes] = {}
+    initialized: dict[tuple[str, str], str] = {}
+    for entry in entries:
+        if entry.published_sequence is None:
+            continue
+        key = (entry.scope.provider_instance_id, entry.scope.workspace_id)
+        if entry.phase == "bootstrap":
+            initialized[key] = entry.created_at
+        if key not in initialized:
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        expected[key] = canonical_bytes(
+            [
+                *key,
+                entry.after.operational_epoch,
+                checkpoint_text(entry.after),
+                prefixed_digest(
+                    b"second-brain/company-db-checkpoint/v1\0",
+                    checkpoint_object(entry.after),
+                ),
+                entry.sequence,
+                initialized[key],
+            ]
+        )
+    rows = db.execute(
+        """SELECT provider_instance_id,workspace_id,epoch,checkpoint_json,checkpoint_digest,
+        last_global_sequence,initialized_at
         FROM company_freshness_scopes""",
     ).fetchall()
-    for provider, workspace, raw, digest in rows:
-        expected = heads.get((provider, workspace))
-        if (
-            expected is None
-            or Checkpoint.model_validate_json(raw, strict=True) != expected
-            or digest
-            != prefixed_digest(
-                b"second-brain/company-db-checkpoint/v1\0",
-                checkpoint_object(expected),
-            )
-        ):
-            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+    if sorted(canonical_bytes(list(row)) for row in rows) != sorted(expected.values()):
+        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
 
 
 def audit_operation_cache(

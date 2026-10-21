@@ -56,7 +56,7 @@ def freshness_read(
     )
 
 
-def test_bootstrap_ignores_caller_checkpoint_and_missing_head_is_mismatch(tmp_path: Path) -> None:
+def test_bootstrap_ignores_caller_checkpoint_and_missing_head_fails_closed(tmp_path: Path) -> None:
     provider = provider_at(tmp_path)
     response = provider.read_freshness(freshness_read(provider))
     assert response.status == "ready"
@@ -75,7 +75,8 @@ def test_bootstrap_ignores_caller_checkpoint_and_missing_head_is_mismatch(tmp_pa
             observed_checkpoint=response.checkpoint,
         ),
     )
-    assert missing.status == "mismatch"
+    assert missing.status == "unavailable"
+    assert missing.checkpoint is None
 
 
 def test_same_reserve_is_idempotent_and_other_bytes_conflict(tmp_path: Path) -> None:
