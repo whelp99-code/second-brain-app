@@ -31,6 +31,7 @@ from sb.company_auto_policy import (
     verify_policy_receipt,
 )
 from sb.company_auto_publication import InternalAutoJournal
+from sb.company_auto_readback import verified_auto_assessment
 from sb.company_auto_recovery import AcceptedAutoAuthority, accepted_auto_authority
 from sb.company_auto_settings import (
     FIXED_TRIGGER_LIMIT,
@@ -74,7 +75,7 @@ from sb.company_internal_migrations import internal_auto_checksum
 from sb.company_memory import CompanyMemoryStore, MemoryCandidate
 from sb.company_memory_authority import CompanyAuthorityRejected
 from sb.company_processor_progress import local_checkpoint, save_checkpoint
-from sb.effect_values import JsonObject, canonical_bytes, format_instant
+from sb.effect_values import JsonObject, canonical_bytes, format_instant, strict_loads
 from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
@@ -266,8 +267,9 @@ def _one(
             ):
                 return _skip_expired_attempt(database, provider, scope, candidate_id, checkpoint)
         if candidate.state == "accepted":
-            original_auto: list[tuple[str, str]] = db.execute(
-                """SELECT r.policy_digest,r.auto_request_id FROM company_auto_policy_receipts r
+            original_auto: list[tuple[str, str, str, str]] = db.execute(
+                """SELECT r.policy_digest,r.auto_request_id,r.receipt_json,r.auto_command_json
+                FROM company_auto_policy_receipts r
                 JOIN company_candidate_execution_claims c
                   ON c.provider_instance_id=r.provider_instance_id
                   AND c.workspace_id=r.workspace_id AND c.candidate_id=r.candidate_id
@@ -310,46 +312,68 @@ def _one(
                     ), checkpoint
             elif len(original_auto) != 1 or original_auto[0][0] != policy_digest(settings.policy):
                 raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
-    classified = classify_mail_candidate(candidate)
-    kind = classified.record_kind
-    reasons = classified.reason_codes
-    fields = classified.fields
-    if classified.classification == "auto_internal" and kind is not None:
-        denied = _allowlist(settings, kind, fields)
-        if denied:
-            reasons = denied
-            kind = None
-        elif _record_conflict(database, scope, candidate, kind, fields):
-            reasons = ("conflict",)
-            kind = None
-    classification: Literal["auto_internal", "human_required"] = (
-        "auto_internal" if kind is not None and not reasons else "human_required"
-    )
-    payload = (
-        _payload(kind, fields, classified) if classification == "auto_internal" and kind else None
-    )
+            accepted_receipt = PolicyAutoReceiptV1.model_validate_json(
+                original_auto[0][2], strict=True
+            )
+            accepted_command = strict_loads(original_auto[0][3], 1_048_576)
+            if not isinstance(accepted_command, dict):
+                raise AutoInternalRejected("POLICY_RECEIPT_REJECTED")
+            accepted_payload = verified_auto_assessment(
+                db, scope, candidate, accepted_receipt, accepted_command
+            )
     digest = policy_digest(settings.policy)
-    assessed = assessment_digest(
-        candidate_id=candidate.candidate_id,
-        content_digest=candidate.content_digest,
-        policy_digest_value=digest,
-        classification=classification,
-        reason_codes=reasons,
-        payload=payload,
-    )
-    with closing(sqlite3.connect(database)) as db, db:
-        insert_assessment(
-            db,
-            scope,
+    classification: Literal["auto_internal", "human_required"]
+    if candidate.state == "accepted":
+        kind = accepted_payload.record_kind
+        fields = accepted_payload.fields
+        reasons: tuple[str, ...] = ()
+        classification = "auto_internal"
+        payload = model_object(accepted_payload)
+        assessed = accepted_receipt.assessment_digest
+        if _allowlist(settings, kind, fields) or _record_conflict(
+            database, scope, candidate, kind, fields
+        ):
+            raise AutoInternalRejected("ASSESSMENT_CONFLICT")
+    else:
+        classified = classify_mail_candidate(candidate)
+        kind = classified.record_kind
+        reasons = classified.reason_codes
+        fields = classified.fields
+        if classified.classification == "auto_internal" and kind is not None:
+            denied = _allowlist(settings, kind, fields)
+            if denied:
+                reasons = denied
+                kind = None
+            elif _record_conflict(database, scope, candidate, kind, fields):
+                reasons = ("conflict",)
+                kind = None
+        classification = "auto_internal" if kind is not None and not reasons else "human_required"
+        payload = (
+            _payload(kind, fields, classified)
+            if classification == "auto_internal" and kind
+            else None
+        )
+        assessed = assessment_digest(
             candidate_id=candidate.candidate_id,
             content_digest=candidate.content_digest,
             policy_digest_value=digest,
-            assessment_digest_value=assessed,
             classification=classification,
             reason_codes=reasons,
             payload=payload,
-            created_at=format_instant(context.now),
         )
+        with closing(sqlite3.connect(database)) as db, db:
+            insert_assessment(
+                db,
+                scope,
+                candidate_id=candidate.candidate_id,
+                content_digest=candidate.content_digest,
+                policy_digest_value=digest,
+                assessment_digest_value=assessed,
+                classification=classification,
+                reason_codes=reasons,
+                payload=payload,
+                created_at=format_instant(context.now),
+            )
     with closing(sqlite3.connect(database)) as db:
         reserved_intent = pending_auto_reserve(db, scope)
     if reserved_intent is None:

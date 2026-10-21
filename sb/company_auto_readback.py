@@ -141,6 +141,42 @@ def verify_auto_authority(
         break
     if not verified:
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    payload = verified_auto_assessment(db, scope, candidate, receipt, command)
+    field_values: JsonObject = dict(payload.fields)
+    records: list[tuple[str]] = db.execute(
+        """SELECT r.payload_json FROM company_internal_records r
+        JOIN company_internal_effects e ON e.provider_instance_id=r.provider_instance_id
+          AND e.workspace_id=r.workspace_id AND e.operation_id=r.effect_operation_id
+        WHERE e.provider_instance_id=? AND e.workspace_id=? AND e.auto_request_id=?""",
+        (scope.provider_instance_id, scope.workspace_id, request_id),
+    ).fetchall()
+    if len(records) != 1 or strict_loads(records[0][0], 1_048_576) != field_values:
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+
+
+def verified_auto_assessment(
+    db: sqlite3.Connection,
+    scope: FreshnessScope,
+    candidate: MemoryCandidate,
+    receipt: PolicyAutoReceiptV1,
+    command: JsonObject,
+) -> _Payload:
+    """Verify original assessment bytes; never reclassify a retired version.
+
+    Receipt signature/acceptance authority is verified separately by the caller.
+    Both accepted resumption and completed-effect readback use this same check.
+    """
+    candidate_id = candidate.candidate_id
+    if (
+        receipt.scope != scope
+        or receipt.candidate_id != candidate_id
+        or receipt.source_event_id != candidate.source_event_id
+        or receipt.content_digest != candidate.content_digest
+        or "sha256:" + hashlib.sha256(candidate.content.encode()).hexdigest()
+        != candidate.content_digest
+        or command_digest(command) != receipt.command_digest
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
     assessments: list[tuple[str]] = db.execute(
         """SELECT json_object('classification',classification,'reasons',json(reason_codes_json),
         'payload',json(typed_payload_json),'classifier_version',classifier_version)
@@ -205,13 +241,4 @@ def verify_auto_authority(
         }
         if classified.classification != "auto_internal" or expected != assessment.payload:
             raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
-    field_values: JsonObject = dict(payload.fields)
-    records: list[tuple[str]] = db.execute(
-        """SELECT r.payload_json FROM company_internal_records r
-        JOIN company_internal_effects e ON e.provider_instance_id=r.provider_instance_id
-          AND e.workspace_id=r.workspace_id AND e.operation_id=r.effect_operation_id
-        WHERE e.provider_instance_id=? AND e.workspace_id=? AND e.auto_request_id=?""",
-        (scope.provider_instance_id, scope.workspace_id, request_id),
-    ).fetchall()
-    if len(records) != 1 or strict_loads(records[0][0], 1_048_576) != field_values:
-        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    return payload
