@@ -185,10 +185,13 @@ def test_prior_briefing_prose_is_not_evidence() -> None:
     prose = "PRIOR_BRIEFING_PROSE_NOT_EVIDENCE"
     cite = f"origin=notes:old.md hash={'cd' * 32} [^{'cd' * 4}] text={prose}"
     spec = generate_briefing(
-        BriefingInputs(("origin=notes:live.md hash=" + "ab" * 32 + " [^aaaaaaaa] text=live"), (), (), (), cite, "ok"),
-        FakeLLM(["- keep [^aaaaaaaa]\n- keep [^aaaaaaaa]\n- keep [^aaaaaaaa]\n"]),
+        BriefingInputs(("origin=notes:live.md hash=" + "ab" * 32 + " [^abababab] text=live",), (), (), (), cite, "ok"),
+        FakeLLM(["- keep [^abababab]\n- keep [^abababab]\n- keep [^abababab]\n"]),
         Config(raw={"llm": {"prompt_version": "v1", "model_id": "fake"}}),
     )
+    assert [(item.origin, item.hash) for item in spec.sources] == [
+        ("notes:live.md", "ab" * 32),
+    ]
     assert all(item.origin != "notes:old.md" for item in spec.sources)
     assert prose not in " ".join(item.origin for item in spec.sources)
     assert all(prose not in (item.hash) for item in spec.sources)

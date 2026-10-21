@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from sb.config import Config
+from sb.effect_values import JsonObject
 from sb.life_attachments import MAX_ATTACHMENT_BYTES
 from sb.life_contracts import LifeInputError
 from sb.life_exports import FORMAT_FAILURE_CODES, parse_export
@@ -15,15 +17,18 @@ from sb.life_ingest import EXPORT_RETRY_LIMIT, resume_quarantine
 from sb.pipeline import run_ingest
 from sb.store.ledger import Ledger
 from sb.store.life_journal import LifeJournal, identity
+from tests.json_fixtures import parse_object
+from tests.life_test_support import config_table, json_int, json_object
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import life_config
 
 FIXTURES = Path(__file__).parent / "fixtures" / "life-exports"
 
 
-def _config(tmp_path: Path, source: Path, *, kind: str = "google-calendar"):
+def _config(tmp_path: Path, source: Path, *, kind: str = "google-calendar") -> tuple[Config, Path]:
     config, root = life_config(tmp_path)
-    life = config.raw["life"]
+    life = config_table(config.raw["life"])
+    notes = config_table(config_table(life["sources"])["test-notes"])
     return replace(
         config,
         raw={
@@ -40,7 +45,7 @@ def _config(tmp_path: Path, source: Path, *, kind: str = "google-calendar"):
                 **life,
                 "sources": {
                     "test-notes": {
-                        **life["sources"]["test-notes"],
+                        **notes,
                         "allowed_types": [
                             "calendar_event",
                             "note_saved",
@@ -56,7 +61,7 @@ def _config(tmp_path: Path, source: Path, *, kind: str = "google-calendar"):
     ), root
 
 
-def _body(root: Path) -> dict[str, object]:
+def _body(root: Path) -> JsonObject:
     with Ledger(root) as ledger:
         record = LifeJournal(ledger.life_store()).raw(
             "collection", identity("collection", "test-notes")
@@ -83,13 +88,19 @@ def test_one_bad_item_does_not_block_cursor_for_accepted_items(tmp_path: Path) -
     outcome = run_ingest(config, sources=["test-notes"])
     assert outcome.errors > 0
     with Ledger(root) as ledger:
-        cursor = json.loads(ledger.get_cursor("test-notes"))
+        stored = ledger.get_cursor("test-notes")
+        assert stored is not None
+        cursor = parse_object(stored)
         events = ledger.life_store().events(scopes=("principal:owner",), now=NOW)
     assert len(events) == 1 and events[0].title == "수용된 일정"
     assert "good.json" in cursor and "bad.json" not in cursor
     body = _body(root)
-    assert body["received"] == body["accepted"] + body["quarantined"] + body["retrying"]
-    assert body["accepted"] == 1 and body["retrying"] == 1
+    received = json_int(body["received"])
+    accepted = json_int(body["accepted"])
+    quarantined = json_int(body["quarantined"])
+    retrying = json_int(body["retrying"])
+    assert received == accepted + quarantined + retrying
+    assert accepted == 1 and retrying == 1
 
 
 def test_bounded_retry_then_quarantine_then_manual_resume(tmp_path: Path) -> None:
@@ -100,10 +111,11 @@ def test_bounded_retry_then_quarantine_then_manual_resume(tmp_path: Path) -> Non
     config, root = _config(tmp_path, source)
     for _ in range(EXPORT_RETRY_LIMIT - 1):
         run_ingest(config, sources=["test-notes"])
-        assert "bad.json" in _body(root)["retries"]
+        assert "bad.json" in json_object(_body(root)["retries"])
     run_ingest(config, sources=["test-notes"])
-    assert "bad.json" in _body(root)["quarantine"]
-    assert "bad.json" not in _body(root)["retries"]
+    settled = _body(root)
+    assert "bad.json" in json_object(settled["quarantine"])
+    assert "bad.json" not in json_object(settled["retries"])
     path.write_text(
         json.dumps(
             {
@@ -133,11 +145,15 @@ def test_source_counts_received_accepted_quarantined_reconcile(tmp_path: Path) -
     config, root = _config(tmp_path, source, kind="kakao-export")
     run_ingest(config, sources=["test-notes"])
     body = _body(root)
-    assert body["received"] == 3
-    assert body["accepted"] == 2
-    assert body["quarantined"] == 1
-    assert body["retrying"] == 0
-    assert body["received"] == body["accepted"] + body["quarantined"] + body["retrying"]
+    received = json_int(body["received"])
+    accepted = json_int(body["accepted"])
+    quarantined = json_int(body["quarantined"])
+    retrying = json_int(body["retrying"])
+    assert received == 3
+    assert accepted == 2
+    assert quarantined == 1
+    assert retrying == 0
+    assert received == accepted + quarantined + retrying
 
 
 def test_mime_path_encoding_size_boundaries_per_format() -> None:
