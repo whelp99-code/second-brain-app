@@ -262,7 +262,8 @@ def test_original_approval_and_completion_prove_human_mark_processed(
         damage,
     )
     if damage is not None:
-        with pytest.raises(ValueError):
+        # Exact receipt audit may reject before the later CLI evidence check.
+        with pytest.raises((ValueError, AnchorRejected)):
             run(cfg, mark_request, now=NOW, process_only=True, freshness_provider=sb)
         return
     marked = run(cfg, mark_request, now=NOW, process_only=True, freshness_provider=sb)

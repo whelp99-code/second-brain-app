@@ -37,6 +37,8 @@ from tests.company_internal_auto_support import NOW, PROVIDER, WORKSPACE, contex
 
 def real_company_runtime(
     root: Path,
+    *,
+    approval_binding: str = "sha256:" + "11" * 32,
 ) -> tuple[CompanyDbFreshnessProvider, AutoInternalSettings, AutoInternalContext]:
     database, registry, witness, lock = write_tree(root)
     with closing(CompanyMemoryStore(database)):
@@ -48,7 +50,7 @@ def real_company_runtime(
         _ = install_auto_policy(db, bound, WORKSPACE, NOW)
     scope = FreshnessScope(provider_instance_id=PROVIDER, workspace_id=WORKSPACE)
     anchor = SimulatedNvAnchor(b"\x22" * 32, b"\x11" * 32)
-    genesis = empty_genesis(scope, "sha256:" + "11" * 32)
+    genesis = empty_genesis(scope, approval_binding)
     write_registry(
         registry,
         registry_id="company-freshness:linux:v1",
@@ -81,7 +83,7 @@ def real_company_runtime(
         registry_id="company-freshness:linux:v1",
         scope=scope,
         approval_policy_version=1,
-        approval_binding_digest="sha256:" + "11" * 32,
+        approval_binding_digest=approval_binding,
         inventory=GenesisInventory(),
         now="2026-10-16T08:00:00.000Z",
     )

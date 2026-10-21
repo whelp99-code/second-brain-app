@@ -53,7 +53,8 @@ def test_receipt_from_another_request_cannot_finish_reservation(tmp_path: Path) 
             challenge="finish:unrelated",
         )
     )
-    assert result.outcome == "conflict"
+    # The orphan SQL receipt now invalidates the snapshot before finish verification.
+    assert result.outcome == "error"
 
 
 def test_lost_own_receipt_cannot_be_hidden_by_matching_checkpoint(tmp_path: Path) -> None:

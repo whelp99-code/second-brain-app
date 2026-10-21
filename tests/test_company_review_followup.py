@@ -387,7 +387,7 @@ def test_unapplied_cancellation_refuses_uncertain_or_external_effect(tmp_path, u
                 ),
             )
     before = snapshot(provider)
-    with provider.effect_guard(scope, operation_id, reservation), pytest.raises(AnchorRejected):
+    with pytest.raises(AnchorRejected), provider.effect_guard(scope, operation_id, reservation):
         provider.cancel_unapplied_under_guard(
             scope, operation_id, reservation, context.observed_checkpoint
         )

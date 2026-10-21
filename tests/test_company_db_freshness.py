@@ -313,6 +313,40 @@ def insert_receipt(database: Path) -> str:
             _NOW,
         ),
     )
+    # Model a real atomic apply: its original reservation and pending finish
+    # accompany the SQL receipt. An unrelated receipt intentionally has neither.
+    operation = connection.execute(
+        """SELECT operation_id,reservation_id,reserved_checkpoint_json
+        FROM company_freshness_operations WHERE workspace_id=? AND event_digest=?
+        AND operation='accept' AND state='reserved'""",
+        (PROVIDER_SCOPE.workspace_id, RECEIPT_BINDING),
+    ).fetchone()
+    if operation is not None:
+        from sb.company_freshness_models import ReserveProgressResponse
+        from sb.company_processor_finish import PendingFinish, save_pending_finish
+
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS company_processor_pending_finish (
+            workspace_id TEXT, request_digest TEXT, pending_json TEXT,
+            PRIMARY KEY(workspace_id,request_digest))"""
+        )
+        save_pending_finish(
+            connection,
+            PROVIDER_SCOPE.workspace_id,
+            RECEIPT_BINDING,
+            PendingFinish(
+                operation="accept",
+                operation_id=operation[0],
+                reservation=ReserveProgressResponse(
+                    schema_version=2,
+                    scope=PROVIDER_SCOPE,
+                    outcome="reserved",
+                    checkpoint=Checkpoint.model_validate_json(operation[2], strict=True),
+                    reservation_id=operation[1],
+                    challenge="fixture:original-reserve",
+                ),
+            ),
+        )
     connection.commit()
     connection.close()
     return real

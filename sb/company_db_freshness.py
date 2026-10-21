@@ -18,7 +18,7 @@ from sb.company_approval_revocations import (
 )
 from sb.company_approver_binding import CompanyHandoffPolicy
 from sb.company_auto_cancellation import verify_auto_cancellation
-from sb.company_auto_intents import pending_auto_reserve
+from sb.company_auto_intents import consume_auto_reserve, pending_auto_reserve, prepare_auto_reserve
 from sb.company_auto_publication import assessment_snapshot
 from sb.company_db_freshness_evidence import (
     verify_internal_effect as _verify_internal_effect,
@@ -86,7 +86,7 @@ from sb.company_freshness_deletion import (
     original_deletion_fact,
     verify_original_deletion,
 )
-from sb.company_freshness_genesis import verify_owned_genesis
+from sb.company_freshness_genesis import audit_owned_receipts, verify_owned_genesis
 from sb.company_freshness_migrations import migration_applied
 from sb.company_freshness_models import (
     TERMINAL_STATE_BY_OPERATION,
@@ -279,9 +279,77 @@ class CompanyDbFreshnessProvider:
                 ).fetchall()
             finally:
                 connection.close()
+
             return len(rows) == 1 and Checkpoint.model_validate_json(
                 rows[0][0], strict=True
             ) == self._head(scope)
+
+    def rebase_unreserved_auto_intent(self, scope: FreshnessScope, expected: Checkpoint) -> None:
+        """Change only a never-reserved intent, under the publication lock and SQL CAS."""
+        with self._locked():
+            self._recover()
+            connection = _connect(self.database)
+            try:
+                _ = connection.execute("BEGIN IMMEDIATE")
+                intent = pending_auto_reserve(connection, scope)
+                if intent is None or intent.request.expected_checkpoint == expected:
+                    return
+                request = intent.request
+                if (
+                    self.actor_store != "second_brain"
+                    or self._closed(scope)
+                    or self._require_head(scope) != expected
+                    or not is_other_store_prefix(
+                        request.expected_checkpoint, expected, "second_brain"
+                    )
+                    or self._operation(scope, request.operation_id) is not None
+                    or not any(
+                        entry.scope == scope
+                        and entry.published_sequence is not None
+                        and entry.after == request.expected_checkpoint
+                        for entry in load_journal(connection)
+                    )
+                ):
+                    raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+                for table in (
+                    "company_memory_receipts",
+                    "company_processor_pending_finish",
+                    "company_internal_pending_finish",
+                ):
+                    if connection.execute(
+                        f"SELECT 1 FROM {table} WHERE workspace_id=? AND request_digest=?",
+                        (scope.workspace_id, request.event_digest),
+                    ).fetchone():
+                        raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+                if connection.execute(
+                    """SELECT 1 FROM company_internal_effects
+                    WHERE provider_instance_id=? AND workspace_id=? AND operation_id=?""",
+                    (scope.provider_instance_id, scope.workspace_id, request.operation_id),
+                ).fetchone():
+                    raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+                if request.operation in {"accept", "complete"}:
+                    for table, column in (
+                        ("company_internal_effects", "candidate_id"),
+                        ("company_internal_records", "source_candidate_id"),
+                    ):
+                        if connection.execute(
+                            f"SELECT 1 FROM {table} WHERE provider_instance_id=? "
+                            f"AND workspace_id=? AND {column}=?",
+                            (scope.provider_instance_id, scope.workspace_id, intent.candidate_id),
+                        ).fetchone():
+                            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+                consume_auto_reserve(connection, intent)
+                prepare_auto_reserve(
+                    connection,
+                    intent.model_copy(
+                        update={
+                            "request": request.model_copy(update={"expected_checkpoint": expected})
+                        }
+                    ),
+                )
+                connection.commit()
+            finally:
+                connection.close()
 
     def require_completed_handoff(
         self,
@@ -1170,7 +1238,12 @@ class CompanyDbFreshnessProvider:
         )
         if not allow_policy_update:
             require_current_auto_pins(self._registry(), entries)
-        return entries, audit_operation_cache(connection, entries), frames
+        operations = audit_operation_cache(connection, entries)
+        try:
+            audit_owned_receipts(connection, entries, operations)
+        except EvidenceRejected as exc:
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
+        return entries, operations, frames
 
     def _recover(
         self,
@@ -1190,14 +1263,6 @@ class CompanyDbFreshnessProvider:
             )
             if read_only:
                 return
-            for entry in entries:
-                if entry.phase == "bootstrap":
-                    verify_owned_genesis(
-                        connection,
-                        entry.scope,
-                        GenesisInventory.model_validate(entry.record.get("inventory"), strict=True),
-                        exact=False,
-                    )
             prepared_finish = (
                 entries[-1]
                 if entries

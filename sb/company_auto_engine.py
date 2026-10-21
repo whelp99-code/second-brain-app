@@ -144,6 +144,8 @@ def run_auto_internal(
         raise AutoInternalRejected("COMPANY_OPERATIONAL_ROLLBACK")
     context = replace(context, observed_checkpoint=checkpoint)
     checkpoint = _require_ready(database, provider, settings, context, scope)
+    if isinstance(provider, CompanyDbFreshnessProvider):
+        provider.rebase_unreserved_auto_intent(scope, checkpoint)
     with closing(sqlite3.connect(database)) as db:
         pending_reserve = pending_auto_reserve(db, scope)
     if pending_reserve is None:
