@@ -16,6 +16,7 @@ from pathlib import Path
 
 _MOUNT_ESCAPE = re.compile(rb"\\([0-7]{3})")
 _STATX_SUBVOL = 0x00008000
+_MAP_RANGE = re.compile(r"^[0-9a-fA-F]+-[0-9a-fA-F]+$")
 
 
 class _Statx(ctypes.Structure):
@@ -143,30 +144,207 @@ def _covers(resolved: Path, mount: Path) -> bool:
         return False
 
 
-def _mapping_is_selected(paths: list[Path], pathname: str, name: str) -> bool:
-    """Reject a snapshot copy that maps only shares device and inode with.
+def _holder_root(pid: int) -> Path | None:
+    """Mount root of the observed process, not the auditor.
 
-    maps has no subvolume field. A different resolved path is the selected file
-    when it is the same subvolume, including a hard link. A different subvolume
-    is a snapshot false positive. Anonymous or unresolvable mappings stay reported.
+    ``/proc/<pid>/maps`` pathnames are interpreted in that process's mount
+    namespace. ``/proc/<pid>/root`` is a magic link: resolving it alone lands
+    on the auditor's ``/``. Callers must join the maps pathname first so the
+    kernel follows the holder's mounts in one step. An inaccessible root is
+    not the auditor root.
+    """
+    root = Path("/proc") / str(pid) / "root"
+    try:
+        if root.is_dir():
+            return root
+    except OSError:
+        return None
+    return None
+
+
+def _proc_root_anchor(root: Path) -> Path | None:
+    """Unresolved ``/proc/<pid>/root``, or None when this is not that link."""
+    if len(root.parts) != 4 or root.parts[1] != "proc" or root.parts[3] != "root":
+        return None
+    if not root.parts[2].isdigit():
+        return None
+    return Path("/") / "proc" / root.parts[2] / "root"
+
+
+def _map_files_link(pid: int, address_range: str) -> Path | None:
+    """``/proc/<pid>/map_files/<range>`` for a range taken from maps.
+
+    The range is the address field already parsed from that process's maps.
+    A missing or non-range field is not a pathname and is not an auditor path.
+    """
+    if not _MAP_RANGE.fullmatch(address_range):
+        return None
+    return Path("/proc") / str(pid) / "map_files" / address_range
+
+
+def _map_file_stat(link: Path) -> tuple[int, int, int] | None:
+    """Follow ``map_files`` and return ``(device, inode, subvolume)``.
+
+    ``None`` when the magic link cannot be followed. An ``O_PATH`` descriptor
+    of the symlink itself is not this file: its device and inode belong to
+    procfs. Subvolume 0 means the filesystem did not expose one.
+    """
+    libc_name = ctypes.util.find_library("c")
+    if libc_name is None:
+        return None
+    libc = ctypes.CDLL(libc_name, use_errno=True)
+    statx = libc.statx
+    statx.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_uint,
+        ctypes.POINTER(_Statx),
+    ]
+    statx.restype = ctypes.c_int
+    info = _Statx()
+    if statx(0, os.fsencode(link), 0, _STATX_SUBVOL, ctypes.byref(info)) != 0:
+        return None
+    populated = info.stx_mask & 0x00000001 and info.stx_mask & 0x00000100
+    if not populated:
+        return None
+    device = os.makedev(int(info.stx_dev_major), int(info.stx_dev_minor))
+    subvolume = int(info.stx_subvol) if info.stx_mask & _STATX_SUBVOL else 0
+    return device, int(info.stx_ino), subvolume
+
+
+def _map_file_identity(pid: int, address_range: str) -> tuple[int, int, int] | None:
+    """Identity of the vnode a parsed maps range names.
+
+    Direct identification is ``statx`` of ``/proc/<pid>/map_files/<range>``
+    with follow. That call is EPERM without ``CAP_SYS_ADMIN`` or
+    ``CAP_CHECKPOINT_RESTORE`` in the initial user namespace, including for
+    the observer's own pid when Yama restricts ptrace. ENOENT means the VMA
+    is gone. Either failure is unidentified, not a pathname match.
+
+    Device and inode alone are not a snapshot decision. Btrfs snapshots can
+    share both. The subvolume id is recorded with them and compared only
+    against another directly identified subvolume.
+    """
+    link = _map_files_link(pid, address_range)
+    if link is None:
+        return None
+    return _map_file_stat(link)
+
+def _selected_identity(path: Path) -> tuple[int, int, int] | None:
+    """Direct statx of a selected database path, including its subvolume."""
+    return _map_file_stat(path)
+
+
+def _identities_differ(
+    mapped: tuple[int, int, int], selected: tuple[int, int, int]
+) -> bool:
+    """True only when both observations name different files.
+
+    Equal device and inode are not enough to call them the same file, and
+    unequal device and inode are not enough to call a Btrfs snapshot
+    different: snapshots can share that pair. A subvolume id of 0 was not
+    exposed, so the pair stays unidentified.
+    """
+    mapped_device, mapped_inode, mapped_subvolume = mapped
+    selected_device, selected_inode, selected_subvolume = selected
+    if mapped_subvolume == 0 or selected_subvolume == 0:
+        return False
+    return (mapped_device, mapped_inode, mapped_subvolume) != (
+        selected_device,
+        selected_inode,
+        selected_subvolume,
+    )
+
+def _mapping_path(pid: int, pathname: str) -> Path | None:
+    """Resolve a maps pathname inside the holder namespace.
+
+    Returns None when the holder path cannot be resolved. Callers keep those
+    mappings reported: a missing view is not evidence of a snapshot copy.
+    """
+    raw = os.fsencode(pathname).split(b" (deleted)", 1)[0]
+    decoded = os.fsdecode(raw)
+    holder_root = _holder_root(pid)
+    if holder_root is None:
+        return None
+    if decoded.startswith("/"):
+        candidate = holder_root.joinpath(*Path(decoded).parts[1:])
+    else:
+        candidate = holder_root / decoded
+    # Never Path.resolve() a /proc/<pid>/root prefix. That walks the magic
+    # link to the auditor root before the remainder is considered, so a
+    # holder-only mount disappears and a same-named auditor file can be
+    # selected instead. os.path.realpath follows the joined magic link in
+    # one kernel step. A different namespace often canonicalizes to a path
+    # the auditor cannot stat; that mapping stays reported. ``map_files``
+    # is the mapped vnode. The joined root path does not identify it, and
+    # an auditor pathname is not a fallback when map_files cannot be followed.
+    if _proc_root_anchor(holder_root) is not None:
+        try:
+            mapped_path = Path(os.path.realpath(candidate, strict=True))
+        except (OSError, RuntimeError):
+            return None
+        if not _same_file(candidate, mapped_path):
+            return None
+        return mapped_path
+    try:
+        return candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+
+
+def _same_file(joined: Path, canonical: Path) -> bool:
+    """True when the canonical path is the file the joined magic link names.
+
+    Both paths must remain accessible and identify the same file. Otherwise
+    the caller keeps the mapping reported instead of trusting an auditor
+    namespace path that could hide the holder.
+    """
+    try:
+        joined_stat = joined.stat()
+    except OSError:
+        return False
+    try:
+        canonical_stat = canonical.stat()
+    except OSError:
+        return False
+    return (joined_stat.st_dev, joined_stat.st_ino) == (
+        canonical_stat.st_dev,
+        canonical_stat.st_ino,
+    )
+
+
+def _mapping_is_selected(
+    paths: list[Path], pathname: str, name: str, pid: int, address_range: str = ""
+) -> bool:
+    """Reject a mapped file that is not the selected database path.
+
+    The mapped vnode is ``/proc/<pid>/map_files/<range>``, where ``range`` is
+    the address field parsed from that process's maps. Device and inode from
+    maps are not this identity: a Btrfs snapshot can share both with the live
+    file, including across mount namespaces. An unrelated sibling subvolume
+    is excluded only when both subvolume ids were read from the files
+    themselves. Equal device and inode never prove a holder by themselves.
+
+    Direct identification that fails (EPERM, EACCES, ENOENT, or any other
+    error) keeps the mapping reported. The joined ``/proc/<pid>/root`` path
+    and the auditor's own pathname are not fallbacks for that failure.
+    Anonymous mappings have no map_files entry and stay reported.
     """
     if not pathname or pathname.startswith("["):
         return True
-    decoded = Path(os.fsdecode(pathname.split(" (deleted)", 1)[0]))
-    try:
-        mapped_path = decoded.resolve(strict=True)
-    except (OSError, RuntimeError):
+    if not address_range:
+        return True
+    mapped_identity = _map_file_identity(pid, address_range)
+    if mapped_identity is None:
         return True
     selected = [path for path in paths if path.name == name]
     if not selected:
         return True
-    if any(mapped_path == path.resolve() for path in selected):
+    selected_identity = _selected_identity(selected[0])
+    if selected_identity is None:
         return True
-    mapped_subvolume = subvolume_id(mapped_path)
-    selected_subvolume = subvolume_id(selected[0])
-    if mapped_subvolume == 0 or selected_subvolume == 0:
-        return True
-    return mapped_subvolume == selected_subvolume
+    return not _identities_differ(mapped_identity, selected_identity)
 
 
 def process_owner(pid: int) -> dict[str, object]:
@@ -247,7 +425,9 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
             identity = (os.makedev(int(major, 16), int(minor, 16)), int(fields[4]))
             target = mapped_identities.get(identity)
             pathname = fields[5] if len(fields) > 5 else ""
-            if target is not None and _mapping_is_selected(paths, pathname, target):
+            if target is not None and _mapping_is_selected(
+                paths, pathname, target, int(process.name), fields[0]
+            ):
                 mapped_names.add(target)
         mapped.extend({"pid": int(process.name), "file": name} for name in sorted(mapped_names))
     diagnostics = []

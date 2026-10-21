@@ -414,8 +414,8 @@ _RECALL_STATES: Final = (
 
 def recall_response_schema() -> JsonObject:
     """K5 RecallResponseV1 subset. Obligation fields stay out of this digest."""
-    text = {"type": "string", "minLength": 1, "maxLength": 4096}
-    ref = {
+    text: JsonObject = {"type": "string", "minLength": 1, "maxLength": 4096}
+    ref: JsonObject = {
         "additionalProperties": False,
         "properties": {
             "observation_id": text,

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import subprocess
 from contextlib import closing
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -317,4 +318,74 @@ def test_future_durable_command_is_not_reexported(configured: Path) -> None:
     with pytest.raises(CompanyAuthorityRejected, match="OWNER_APPROVAL_EXPIRED"):
         _ = handoff(configured, NOW - timedelta(seconds=1))
     # Then current-time validation is not merely a TTL-length assertion.
+    assert database(configured).read_bytes() == before
+
+
+@pytest.mark.parametrize("operation", ["accept", "reject"])
+@pytest.mark.parametrize("wall_seconds", [-1, 61])
+def test_smoke_uses_signed_instant_despite_child_wall_clock_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str, wall_seconds: int
+) -> None:
+    from tests import company_approver_smoke as smoke
+
+    def wall_clock_forbidden(*args: object, **kwargs: object) -> datetime:
+        pytest.fail("smoke signing must not read the wall clock")
+
+    class NoWallClock(datetime):
+        now = staticmethod(wall_clock_forbidden)
+
+    monkeypatch.setattr(smoke, "datetime", NoWallClock, raising=False)
+    run = subprocess.run
+    instants: list[str] = []
+
+    def changed_wall_clock(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        # Advance the child's wall clock past the one-minute authority lifetime,
+        # or move it before issuance, without waiting or changing the host clock.
+        assert command[1:3] == ["-m", "tests.company_approver_test_cli"]
+        at = command[command.index("--test-now") + 1]
+        payload = decoded_object(kwargs["input"])
+        authority = payload["authority"]
+        assert isinstance(authority, dict)
+        assert authority["issued_at"] == at
+        instants.append(at)
+        script = (
+            "import runpy; from datetime import datetime, timedelta; "
+            "from unittest.mock import patch; "
+            "from tests.test_company_memory_product import NOW; "
+            f"clock = type('WallClock', (datetime,), {{'now': staticmethod(lambda tz=None: "
+            f"NOW + timedelta(seconds={wall_seconds}))}}); "
+            "patch('sb.company_memory_cli.datetime', clock).start(); "
+            "runpy.run_module('tests.company_approver_test_cli', run_name='__main__')"
+        )
+        return run([command[0], "-c", script, *command[3:]], **kwargs)
+
+    monkeypatch.setattr(smoke.subprocess, "run", changed_wall_clock)
+    result = smoke.scenario(tmp_path / "smoke", operation)
+    assert result["default_runtime_disabled"] is True
+    assert result["original_receipt_recovered"] is True
+    assert instants == [format_instant(NOW)] * 4 + [format_instant(NOW + timedelta(hours=25))]
+
+
+@pytest.mark.parametrize("invalid", ["future", "expired", "signature"])
+def test_smoke_disabled_provider_preserves_authority_rejection(
+    configured: Path, invalid: str
+) -> None:
+    from tests.company_approver_smoke import invoke
+
+    at = NOW
+    if invalid == "future":
+        at += timedelta(seconds=1)
+    elif invalid == "expired":
+        at -= timedelta(minutes=1)
+    payload = signed("enroll_handoff", {}, ENROLL_KEY, "enroll", at=at)
+    if invalid == "signature":
+        envelope = decoded_object(payload)
+        authority = envelope["authority"]
+        assert isinstance(authority, dict)
+        authority["signature"] = "A" * 86
+        payload = canonical_bytes(envelope)
+    before = database(configured).read_bytes()
+    result = invoke(configured, "enroll-handoff", payload, test_provider=False)
+    assert result.returncode == 2
+    assert decoded_object(result.stderr)["error"] == "COMPANY_AUTHORITY_REQUIRED"
     assert database(configured).read_bytes() == before

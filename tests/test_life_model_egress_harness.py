@@ -6,16 +6,20 @@ import argparse
 import json
 import socket
 import sys
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
 from sb import life_cli, llm
-from sb.config import load_config
+from sb.config import Config, load_config
+from sb.effect_values import JsonInput
 from sb.life_auth import device
+from sb.life_cli_contracts import Callbacks, LifeRunOutcome
 from sb.life_config import policies
 from sb.life_contracts import LifeInputError
+from sb.life_json import LifePayload
 from sb.life_model_policy import settle
 from sb.pipeline import run_life_batch, run_life_workflow
 from sb.store.ledger import Ledger
@@ -112,7 +116,34 @@ revoked = false
     return config, root, path, args
 
 
-def _unused_surface(*args, **kwargs):
+def _unused_workflow(
+    config: Config,
+    command: str,
+    data: Mapping[str, JsonInput],
+    *,
+    source_ids: tuple[str, ...],
+    scopes: tuple[str, ...],
+) -> tuple[LifeRunOutcome, LifePayload]:
+    _ = (config, command, data, source_ids, scopes)
+    raise AssertionError("model command reached an unrelated writer")
+
+
+def _unused_importer(
+    config: Config, source_id: str, kind: str, raw: bytes, *, filename: str
+) -> tuple[LifeRunOutcome, LifePayload]:
+    _ = (config, source_id, kind, raw, filename)
+    raise AssertionError("model command reached an unrelated writer")
+
+
+def _unused_ingest(config: Config, sources: Sequence[str] | None) -> LifeRunOutcome:
+    _ = (config, sources)
+    raise AssertionError("model command reached an unrelated writer")
+
+
+def _unused_maintainer(
+    config: Config, *, source_ids: tuple[str, ...], scopes: tuple[str, ...]
+) -> tuple[LifeRunOutcome, LifePayload]:
+    _ = (config, source_ids, scopes)
     raise AssertionError("model command reached an unrelated writer")
 
 
@@ -132,11 +163,24 @@ def test_real_cli_surface_local_failure_settles_without_retry(tmp_path, monkeypa
     monkeypatch.setattr(socket.socket, "connect", reject_connect)
     monkeypatch.setattr(llm, "_run_subprocess", runner)
 
-    def workflow(*args, **kwargs):
-        return run_life_workflow(*args, now=NOW, **kwargs)
+    def workflow(
+        config: Config,
+        command: str,
+        data: Mapping[str, JsonInput],
+        *,
+        source_ids: tuple[str, ...],
+        scopes: tuple[str, ...],
+    ) -> tuple[LifeRunOutcome, LifePayload]:
+        return run_life_workflow(
+            config, command, data, source_ids=source_ids, scopes=scopes, now=NOW
+        )
 
-    callbacks = {"workflow": workflow, "importer": _unused_surface,
-                 "ingest": _unused_surface, "maintainer": _unused_surface}
+    callbacks: Callbacks = {
+        "workflow": workflow,
+        "importer": _unused_importer,
+        "ingest": _unused_ingest,
+        "maintainer": _unused_maintainer,
+    }
     assert life_cli.run(args, config, **callbacks) == 1
     assert json.loads(capsys.readouterr().out) == {
         "state": "failed", "error": "LIFE_MODEL_UNAVAILABLE",
@@ -172,8 +216,17 @@ def test_revoked_device_or_source_mid_reservation_blocks_cli_provider(
     monkeypatch.setattr(llm, "_run_subprocess", runner)
     reservations = []
 
-    def workflow(fresh, command, body, **kwargs):
-        outcome, result = run_life_workflow(fresh, command, body, now=NOW, **kwargs)
+    def workflow(
+        config: Config,
+        command: str,
+        data: Mapping[str, JsonInput],
+        *,
+        source_ids: tuple[str, ...],
+        scopes: tuple[str, ...],
+    ) -> tuple[LifeRunOutcome, LifePayload]:
+        outcome, result = run_life_workflow(
+            config, command, data, now=NOW, source_ids=source_ids, scopes=scopes
+        )
         assert outcome.exit_code == 0, outcome
         assert command == "model_reserve"
         reservations.append(result["object_id"])
@@ -187,8 +240,14 @@ def test_revoked_device_or_source_mid_reservation_blocks_cli_provider(
         return outcome, result
 
     with pytest.raises(LifeInputError, match="LIFE_AUTH_CONFIG_CHANGED"):
-        life_cli.dispatch(args, config, workflow=workflow, importer=_unused_surface,
-                          ingest=_unused_surface, maintainer=_unused_surface)
+        life_cli.dispatch(
+            args,
+            config,
+            workflow=workflow,
+            importer=_unused_importer,
+            ingest=_unused_ingest,
+            maintainer=_unused_maintainer,
+        )
     assert not invocations
     assert len(reservations) == 1
     with Ledger(root) as ledger:
