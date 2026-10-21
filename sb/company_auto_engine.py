@@ -331,6 +331,7 @@ def _one(
         classification = "auto_internal"
         payload = model_object(accepted_payload)
         assessed = accepted_receipt.assessment_digest
+        assessment_version = accepted_receipt.classifier_version
         if _allowlist(settings, kind, fields):
             raise AutoInternalRejected("ASSESSMENT_CONFLICT")
         # A collision is not a new assessment of the accepted source. Let the
@@ -371,7 +372,7 @@ def _one(
             closing(sqlite3.connect(database)) as db,
             db,
         ):
-            insert_assessment(
+            assessed, assessment_version = insert_assessment(
                 db,
                 scope,
                 candidate_id=candidate.candidate_id,
@@ -421,6 +422,7 @@ def _one(
             assessment_digest_value=assessed,
             command_digest_value=command_digest(command),
             issued_at=format_instant(context.now),
+            classifier_version=assessment_version,
         )
         receipt = sign_policy_receipt(settings.signer, unsigned)
     verify_policy_receipt(

@@ -169,6 +169,7 @@ def build_unsigned_receipt(
     assessment_digest_value: str,
     command_digest_value: str,
     issued_at: str,
+    classifier_version: str | None = None,
 ) -> PolicyAutoReceiptV1:
     digest = policy_digest(settings.policy)
     request_id = auto_request_id(scope, candidate_id, content_digest, digest)
@@ -187,7 +188,9 @@ def build_unsigned_receipt(
             policy_version=settings.policy.policy_version,
             policy_digest=digest,
             assessment_digest=assessment_digest_value,
-            classifier_version=CLASSIFIER_VERSION,
+            classifier_version=CLASSIFIER_VERSION
+            if classifier_version is None
+            else classifier_version,
             allowed_operations=["accept", "complete", "mark_processed"],
             issuer_principal_id=POLICY_ISSUER,
             issued_at=issued_at,

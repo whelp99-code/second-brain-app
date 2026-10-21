@@ -104,15 +104,113 @@ def test_report_refuses_anchored_unpublished_snapshot(tmp_path, monkeypatch, bou
         assert db.execute("SELECT count(*) FROM company_internal_effects").fetchone() == (1,)
 
 
+def expiry_command(db, context):
+    from pydantic import TypeAdapter
+
+    from sb.company_auto_policy import command_digest
+    from sb.company_internal_effects import candidate_result
+    from sb.company_memory import MemoryCandidate
+    from sb.company_memory_handoff import (
+        CompanyControlRequest,
+        ControlArguments,
+        ControlTarget,
+        handoff_key,
+    )
+    from sb.effect_values import canonical_bytes
+    from sb.effect_write_values import model_object
+
+    candidate = TypeAdapter(MemoryCandidate).validate_json(
+        canonical_bytes(
+            candidate_result(
+                db, WORKSPACE, "mail:expiry", (context.deletion_sequence, context.deletion_set_root)
+            )
+        ),
+        strict=True,
+    )
+    target = ControlTarget(
+        provider_instance_id=PROVIDER,
+        workspace_id=WORKSPACE,
+        candidate_id=candidate.candidate_id,
+        content_digest=candidate.content_digest,
+    )
+    args = ControlArguments(
+        owner=context.owner,
+        projects=list(context.projects),
+        policy_revision=context.policy_revision,
+        deletion_sequence=context.deletion_sequence,
+        deletion_set_root=context.deletion_set_root,
+        processor_principal_id="processor:test",
+        operations=("accept", "reject", "mark_processed"),
+        approver_principal_id="approver:test",
+        approval_policy_version=1,
+        approval_binding_digest="sha256:" + "ab" * 32,
+    )
+    identity = handoff_key(target, args)
+    handoff_id = identity + ":1"
+    command = CompanyControlRequest(
+        schema_version=2,
+        request_id=handoff_id,
+        action="company.candidate.transition",
+        action_level=3,
+        target=target,
+        args=args,
+        reversible=False,
+        requested_by=context.owner,
+        requested_at=format_instant(context.now),
+        expires_at=format_instant(context.now + timedelta(days=1)),
+        nonce=handoff_id,
+    )
+    body = model_object(command)
+    db.execute(
+        "INSERT INTO company_handoff_outbox VALUES(?,?,?,?,?,?,?,?)",
+        (
+            WORKSPACE,
+            candidate.candidate_id,
+            identity.removeprefix("company-handoff:v2:"),
+            1,
+            handoff_id,
+            canonical_bytes(body).decode(),
+            command_digest(body),
+            command.expires_at,
+        ),
+    )
+    return handoff_id
+
+
 @pytest.mark.parametrize("expired_at_entry", [False, True])
-@pytest.mark.parametrize("unsafe", [None, "receipt", "effect", "processor_finish", "internal_finish", "binding", "decision"])
-def test_resumed_processor_zero_effect_expiry_cancels_original(tmp_path, monkeypatch, expired_at_entry, unsafe):
+@pytest.mark.parametrize(
+    "unsafe",
+    [None, "receipt", "effect", "processor_finish", "internal_finish", "binding", "decision"],
+)
+def test_resumed_processor_zero_effect_expiry_cancels_original(
+    tmp_path, monkeypatch, expired_at_entry, unsafe
+):
     provider, _, context = real_company_runtime(tmp_path)
     receive(provider.database, "mail:expiry", "event:expiry", contact_body())
     with closing(sqlite3.connect(provider.database)) as db, db:
-        db.execute("INSERT INTO company_handoff_outbox SELECT workspace_id,candidate_id,content_digest,1,'handoff:expiry','{}',content_digest,? FROM company_memory_candidates", (format_instant(context.now),))
-    authority_context = CompanyAuthorityContext(PROVIDER, WORKSPACE, context.owner, "agent", "session", context.projects, context.policy_revision, context.deletion_sequence, context.deletion_set_root)
-    kwargs = {"context": authority_context, "policy": None, "owner_keys": {}, "authority": SimpleNamespace(request_digest="sha256:" + "ab" * 32), "operation": "accept", "arguments": {"candidate_id": "mail:expiry", "handoff_id": "handoff:expiry"}, "checkpoint": context.observed_checkpoint, "now": context.now, "clock": lambda: context.now}
+        handoff_id = expiry_command(db, context)
+    authority_context = CompanyAuthorityContext(
+        PROVIDER,
+        WORKSPACE,
+        context.owner,
+        "agent",
+        "session",
+        context.projects,
+        context.policy_revision,
+        context.deletion_sequence,
+        context.deletion_set_root,
+    )
+    kwargs = {
+        "context": authority_context,
+        "policy": None,
+        "owner_keys": {},
+        "authority": SimpleNamespace(request_digest="sha256:" + "ab" * 32),
+        "operation": "accept",
+        "arguments": {"candidate_id": "mail:expiry", "handoff_id": handoff_id},
+        "checkpoint": context.observed_checkpoint,
+        "now": context.now,
+        "clock": lambda: context.now,
+    }
     monkeypatch.setattr(execution, "authorize_transition", lambda *a, **kw: None)
     reserve = execution.reserve_operation
 
@@ -147,7 +245,7 @@ def test_resumed_processor_zero_effect_expiry_cancels_original(tmp_path, monkeyp
             elif unsafe == "binding":
                 store.db.execute("UPDATE company_handoff_outbox SET command_digest=?", ("sha256:" + "cd" * 32,))
             elif unsafe == "decision":
-                store.db.execute("INSERT INTO company_handoff_decisions VALUES(?,?,?,?,?,?,?)", (WORKSPACE, "mail:expiry", "handoff:expiry", "other-receipt", "other-request", "approve", "{}"))
+                store.db.execute("INSERT INTO company_handoff_decisions VALUES(?,?,?,?,?,?,?)", (WORKSPACE, "mail:expiry", handoff_id, "other-receipt", "other-request", "approve", "{}"))
         before = provider.database.read_bytes()
         with pytest.raises((AnchorRejected, CompanyAuthorityRejected) if unsafe else CompanyAuthorityRejected, match="UNCERTAIN|ROLLBACK" if unsafe else "EXPIRED"):
             execution.execute_processor_transition(store, provider, **kwargs)

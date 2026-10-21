@@ -21,7 +21,7 @@ from sb.company_freshness_models import FreshnessScope, ReadFreshnessRequest
 from sb.company_memory import CompanyMemoryStore
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_processor_progress import local_checkpoint
-from sb.effect_values import canonical_bytes, format_instant
+from sb.effect_values import canonical_bytes
 from sb.effect_write_values import model_object
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_db_freshness_support import (
@@ -223,11 +223,10 @@ def test_expiry_after_real_reserve_releases_only_new_unapplied_operation(tmp_pat
     provider, _settings, context = real_company_runtime(tmp_path)
     receive(provider.database, "mail:expiry", "event:expiry", contact_body())
     digest = "sha256:" + "ab" * 32
+    from tests.test_company_crash_boundaries import expiry_command
+
     with closing(sqlite3.connect(provider.database)) as db, db:
-        db.execute(
-            "INSERT INTO company_handoff_outbox SELECT workspace_id,candidate_id,content_digest,1,'handoff:expiry','{}',content_digest,? FROM company_memory_candidates",
-            (format_instant(context.now),),
-        )
+        handoff_id = expiry_command(db, context)
     calls = 0
 
     def authorize(*args, **kwargs):
@@ -258,7 +257,7 @@ def test_expiry_after_real_reserve_releases_only_new_unapplied_operation(tmp_pat
                 owner_keys={},
                 authority=SimpleNamespace(request_digest=digest),
                 operation="accept",
-                arguments={"candidate_id": "mail:expiry", "handoff_id": "handoff:expiry"},
+                arguments={"candidate_id": "mail:expiry", "handoff_id": handoff_id},
                 checkpoint=context.observed_checkpoint,
                 now=context.now,
                 clock=lambda: context.now,

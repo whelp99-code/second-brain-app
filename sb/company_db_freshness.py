@@ -19,6 +19,7 @@ from sb.company_approval_revocations import (
 from sb.company_approver_binding import CompanyHandoffPolicy
 from sb.company_auto_cancellation import verify_auto_cancellation
 from sb.company_auto_intents import consume_auto_reserve, pending_auto_reserve, prepare_auto_reserve
+from sb.company_auto_policy import command_digest
 from sb.company_auto_publication import assessment_snapshot
 from sb.company_db_freshness_evidence import (
     verify_internal_effect as _verify_internal_effect,
@@ -121,6 +122,7 @@ from sb.company_freshness_registry import (
 from sb.company_freshness_storage import open_company_database as _connect
 from sb.company_freshness_tpm import TpmNvExtendAnchor
 from sb.company_memory_authority import CompanyAuthorityContext
+from sb.company_memory_handoff import CompanyControlRequest
 from sb.company_processor_progress import save_checkpoint
 from sb.effect_values import JsonObject, JsonValue, canonical_bytes, format_instant, strict_loads
 from sb.effect_write_values import model_object
@@ -355,6 +357,31 @@ class CompanyDbFreshnessProvider:
                 connection.commit()
             finally:
                 connection.close()
+
+    def reserved_processor_command(
+        self,
+        scope: FreshnessScope,
+        operation: ProgressOperation,
+        event_digest: str,
+        observed: Checkpoint,
+    ) -> CompanyControlRequest:
+        with self._locked():
+            self._recover()
+            with closing(_connect(self.database)) as db:
+                matches = [
+                    item
+                    for item in load_journal(db)
+                    if item.scope == scope
+                    and item.phase == "reserve"
+                    and item.record.get("operation") == operation
+                    and item.record.get("event_digest") == event_digest
+                    and item.before == observed
+                ]
+                if len(matches) != 1 or matches[0].operation_id is None:
+                    raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+                return CompanyControlRequest.model_validate_json(
+                    canonical_bytes(matches[0].record.get("processor_command")), strict=True
+                )
 
     def require_completed_handoff(
         self,
@@ -919,6 +946,38 @@ class CompanyDbFreshnessProvider:
             "actor_store": self.actor_store,
             "state": "reserved",
         }
+        if self.actor_store == "second_brain" and request.operation in {
+            "accept",
+            "reject",
+            "mark_processed",
+        }:
+            with closing(_connect(self.database)) as db:
+                if db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_handoff_outbox'"
+                ).fetchone():
+                    for request_id, raw, digest in db.execute(
+                        "SELECT request_id,command_json,command_digest FROM company_handoff_outbox WHERE workspace_id=?",
+                        (request.scope.workspace_id,),
+                    ).fetchall():
+                        if (
+                            operation_id_for(
+                                request.scope,
+                                request_id=request_id,
+                                command_digest=digest,
+                                operation=request.operation,
+                            )
+                            == request.operation_id
+                        ):
+                            command = CompanyControlRequest.model_validate_json(raw, strict=True)
+                            if (
+                                command.request_id != request_id
+                                or command.target.provider_instance_id
+                                != request.scope.provider_instance_id
+                                or command.target.workspace_id != request.scope.workspace_id
+                                or command_digest(model_object(command)) != digest
+                            ):
+                                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+                            record["processor_command"] = model_object(command)
         deletion_intent: VerifiedEvidence | None = None
         if request.operation == "delete":
             source = deletion_source(self._registry(), request.scope, request.operation_id)
@@ -1290,6 +1349,44 @@ class CompanyDbFreshnessProvider:
                 ): item.row
                 for item in operations
             }
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_internal_effects'"
+            ).fetchone():
+                effects = connection.execute(
+                    """SELECT provider_instance_id,workspace_id,operation_id,effect_digest
+                    FROM company_internal_effects"""
+                ).fetchall()
+                record_counts = {
+                    (provider, workspace, operation): count
+                    for provider, workspace, operation, count in connection.execute(
+                        """SELECT provider_instance_id,workspace_id,effect_operation_id,count(*)
+                        FROM company_internal_records
+                        GROUP BY provider_instance_id,workspace_id,effect_operation_id"""
+                    ).fetchall()
+                }
+                if record_counts != {tuple(row[:3]): 1 for row in effects}:
+                    raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+                for provider, workspace, operation, digest in effects:
+                    original = indexed.get((provider, workspace, operation))
+                    if (
+                        original is None
+                        or original.actor_store != "second_brain"
+                        or original.operation != "complete"
+                        or original.terminal_state == "cancelled"
+                    ):
+                        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+                    # SQL may have committed before finish publication. The
+                    # anchored reservation still must own exactly this effect.
+                    if original.state == "reserved":
+                        _verify_internal_effect(
+                            connection,
+                            FreshnessScope(provider_instance_id=provider, workspace_id=workspace),
+                            operation,
+                            original.event_digest,
+                            digest,
+                            self._registry(),
+                            reclassify=False,
+                        )
             for entry in entries:
                 if entry.phase != "finish" or entry.record.get("terminal_state") == "cancelled":
                     continue
@@ -1364,7 +1461,11 @@ class CompanyDbFreshnessProvider:
                 )
                 if cancellation is not None:
                     verified = _verify_unapplied_cancellation(
-                        connection, item.scope, original, cancellation.record
+                        connection,
+                        item.scope,
+                        original,
+                        cancellation.record,
+                        historical=original.state == "finished",
                     )
                     if cancellation.record.get("evidence_digest") != verified.source_digest:
                         raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
@@ -2587,35 +2688,59 @@ def _verify_unapplied_cancellation(
     scope: FreshnessScope,
     original: _OperationRow,
     record: JsonObject,
+    *,
+    historical: bool = False,
 ) -> VerifiedEvidence:
     verify_auto_cancellation(connection, scope, original, record)
     binding = record.get("processor_binding")
     if binding is not None:
         if not isinstance(binding, dict):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        reserved = [
+            entry
+            for entry in load_journal(connection)
+            if entry.scope == scope
+            and entry.phase == "reserve"
+            and entry.operation_id == original.operation_id
+        ]
+        if len(reserved) != 1:
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        command = CompanyControlRequest.model_validate_json(
+            canonical_bytes(reserved[0].record.get("processor_command")), strict=True
+        )
         rows = connection.execute(
-            """SELECT c.state,c.content_digest,h.command_digest FROM company_memory_candidates c
-            JOIN company_handoff_outbox h ON h.workspace_id=c.workspace_id
-              AND h.candidate_id=c.candidate_id
-            WHERE c.workspace_id=? AND c.candidate_id=? AND h.request_id=?""",
-            (scope.workspace_id, binding.get("candidate_id"), binding.get("handoff_id")),
+            """SELECT state,content_digest FROM company_memory_candidates
+            WHERE workspace_id=? AND candidate_id=?""",
+            (scope.workspace_id, binding.get("candidate_id")),
         ).fetchall()
         expected_state = "accepted" if original.operation == "mark_processed" else "candidate"
+        current = connection.execute(
+            "SELECT command_digest FROM company_handoff_outbox WHERE workspace_id=? AND request_id=?",
+            (scope.workspace_id, command.request_id),
+        ).fetchall()
+        if current and current != [(command_digest(model_object(command)),)]:
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
         if (
             len(rows) != 1
-            or rows[0][0] != expected_state
+            or (not historical and rows[0][0] != expected_state)
             or rows[0][1] != binding.get("content_digest")
+            or command.target.provider_instance_id != scope.provider_instance_id
+            or command.target.workspace_id != scope.workspace_id
+            or command.target.candidate_id != binding.get("candidate_id")
+            or command.target.content_digest != binding.get("content_digest")
+            or command.request_id != binding.get("handoff_id")
             or original.operation_id
             != operation_id_for(
                 scope,
                 request_id=binding["handoff_id"],
-                command_digest=rows[0][2],
+                command_digest=command_digest(model_object(command)),
                 operation=original.operation,
             )
         ):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
         if (
-            original.operation in {"accept", "reject"}
+            not historical
+            and original.operation in {"accept", "reject"}
             and connection.execute(
                 """SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
             AND operation IN ('accept','reject','mark_processed')""",
@@ -2626,14 +2751,15 @@ def _verify_unapplied_cancellation(
         if (
             original.operation in {"accept", "reject"}
             and connection.execute(
-                "SELECT 1 FROM company_handoff_decisions WHERE workspace_id=? AND candidate_id=?",
-                (scope.workspace_id, binding.get("candidate_id")),
+                "SELECT 1 FROM company_handoff_decisions WHERE workspace_id=? AND candidate_id=? AND request_id=?",
+                (scope.workspace_id, binding.get("candidate_id"), binding.get("handoff_id")),
             ).fetchone()
         ):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
         for table in ("company_processor_pending_finish", "company_internal_pending_finish"):
             if (
-                connection.execute(
+                not historical
+                and connection.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
                 ).fetchone()
                 and connection.execute(
@@ -2646,7 +2772,8 @@ def _verify_unapplied_cancellation(
             ("company_internal_records", "source_candidate_id"),
         ):
             if (
-                connection.execute(
+                not historical
+                and connection.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
                 ).fetchone()
                 and connection.execute(

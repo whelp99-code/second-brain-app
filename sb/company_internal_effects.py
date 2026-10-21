@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
-from sb.company_auto_policy import PolicyAutoReceiptV1, policy_digest
+from sb.company_auto_policy import PolicyAutoReceiptV1, assessment_digest, policy_digest
 from sb.company_auto_settings import AutoInternalRejected, AutoInternalSettings, SourceContext
 from sb.company_freshness_models import FreshnessScope
 from sb.company_internal_classifier import CLASSIFIER_VERSION
@@ -92,7 +92,7 @@ def insert_assessment(
     reason_codes: tuple[str, ...],
     payload: JsonObject | None,
     created_at: str,
-) -> None:
+) -> tuple[str, str]:
     existing = cast(
         tuple[str, str, str, str | None, str] | None,
         db.execute(
@@ -112,15 +112,23 @@ def insert_assessment(
     payload_json = None if payload is None else canonical_bytes(payload).decode("utf-8")
     reasons = canonical_bytes(list(reason_codes)).decode("utf-8")
     if existing is not None:
-        if existing != (
-            assessment_digest_value,
+        original_digest = assessment_digest(
+            candidate_id=candidate_id,
+            content_digest=content_digest,
+            policy_digest_value=policy_digest_value,
+            classification=classification,
+            reason_codes=reason_codes,
+            payload=payload,
+            classifier_version=existing[4],
+        )
+        if existing[:4] != (
+            original_digest,
             classification,
             reasons,
             payload_json,
-            CLASSIFIER_VERSION,
         ):
             raise AutoInternalRejected("ASSESSMENT_CONFLICT")
-        return
+        return existing[0], existing[4]
     _ = db.execute(
         """INSERT INTO company_auto_assessments
         VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
@@ -138,6 +146,7 @@ def insert_assessment(
             CLASSIFIER_VERSION,
         ),
     )
+    return assessment_digest_value, CLASSIFIER_VERSION
 
 
 def claim_auto(
@@ -529,18 +538,19 @@ def verify_internal_readback(
             return False
         if not isinstance(parsed, dict):
             return False
-        record = cast(
-            tuple[str, str, str, str | bytes, str, str, str, str] | None,
+        records = cast(
+            list[tuple[str, str, str, str | bytes, str, str, str, str]],
             db.execute(
                 """SELECT record_id, record_kind, entity_key, payload_json, source_event_id,
             source_candidate_id, content_digest, source_slot
             FROM company_internal_records
             WHERE provider_instance_id=? AND workspace_id=? AND effect_operation_id=?""",
                 (scope.provider_instance_id, scope.workspace_id, operation_id),
-            ).fetchone(),
+            ).fetchall(),
         )
-        if record is None or record[7] != "primary":
+        if len(records) != 1 or records[0][7] != "primary":
             return False
+        record = records[0]
         if not isinstance(record[3], str):
             return False
         payload_digest = "sha256:" + hashlib.sha256(record[3].encode("utf-8")).hexdigest()

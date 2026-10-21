@@ -73,7 +73,9 @@ def execute_processor_transition(
     freshness_scope = FreshnessScope(
         provider_instance_id=context.provider, workspace_id=context.workspace_id
     )
-    original_reservation = isinstance(provider, CompanyDbFreshnessProvider) and provider.has_original_reservation(
+    original_reservation = isinstance(
+        provider, CompanyDbFreshnessProvider
+    ) and provider.has_original_reservation(
         freshness_scope, operation, authority.request_digest, checkpoint
     )
     preflight_rejection: CompanyAuthorityRejected | None = None
@@ -107,6 +109,19 @@ def execute_processor_transition(
             WHERE workspace_id=? AND candidate_id=? AND request_id=?""",
             (context.workspace_id, candidate_id, handoff_id),
         ).fetchall()
+        if original_reservation and isinstance(provider, CompanyDbFreshnessProvider):
+            from sb.company_auto_policy import command_digest
+
+            original_command = provider.reserved_processor_command(
+                freshness_scope, operation, authority.request_digest, checkpoint
+            )
+            if (
+                original_command.request_id != handoff_id
+                or original_command.target.candidate_id != candidate_id
+                or original_command.target.content_digest != candidate.content_digest
+            ):
+                raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
+            commands = [(command_digest(model_object(original_command)),)]
         if not commands:
             raise CompanyAuthorityRejected("COMPANY_HANDOFF_REQUIRED")
         if isinstance(provider, CompanyDbFreshnessProvider) and operation == "mark_processed":
