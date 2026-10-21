@@ -10,6 +10,7 @@ import secrets
 import stat
 from collections.abc import Mapping
 from collections.abc import Set as AbstractSet
+from contextlib import AbstractContextManager, ExitStack
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -237,8 +238,9 @@ def accept_effect_request(
     revoked_delegations: AbstractSet[str] | None = None,
     external_public_keys: Mapping[str, Ed25519PublicKey] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
+    generation_pin: AbstractContextManager[object] | None = None,
 ) -> MemoryEffectWriteAcceptedV2:
-    """Verify, atomically publish, and globally journal one V2 request."""
+    """Publish under pending -> optional generation pin -> journal lock order."""
     stamp = format_instant(accepted_at)
     request = parse_effect_request(
         value,
@@ -266,8 +268,16 @@ def accept_effect_request(
         store.close()
         os.close(directory)
         raise EffectRequestRejected("EFFECT_REQUEST_OVERSIZE", request.request_id)
-    try:
+    with ExitStack() as cleanup:
+        _ = cleanup.callback(store.close)
+        _ = cleanup.callback(os.close, directory)
         fcntl.flock(directory, fcntl.LOCK_EX)
+        _ = cleanup.callback(fcntl.flock, directory, fcntl.LOCK_UN)
+        # Never wait for publication while pinned: backup and cancellation own
+        # pending before draining generation readers. Keep the pin through the
+        # atomic file publication and journal acceptance, releasing it first.
+        if generation_pin is not None:
+            _ = cleanup.enter_context(generation_pin)
         identity = request_identity(request)
         previous = store.replay_status(identity)
         if previous is not None:
@@ -327,10 +337,6 @@ def accept_effect_request(
             result = MemoryEffectWriteAcceptedV2.model_validate(loaded)
             return result.model_copy(update={"replayed": True})
         return accepted
-    finally:
-        fcntl.flock(directory, fcntl.LOCK_UN)
-        os.close(directory)
-        store.close()
 
 
 # Compatibility names for existing internal consumers.
