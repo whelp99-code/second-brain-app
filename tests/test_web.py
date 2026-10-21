@@ -35,6 +35,9 @@ from tests.knowledge import stamp_knowledge
 
 classified = test_memory_access.classified
 TERM = "웹콘솔계약검색"
+# Upper bound for one loopback HTTP exchange. A ceiling, not a sleep: passing runs
+# return at once, while a loaded CI host no longer times out a healthy server.
+HTTP_TIMEOUT = 30
 
 
 def test_status_exposes_held_brief_failures_without_changing_rows(tmp_path: Path) -> None:
@@ -187,7 +190,7 @@ def running(config: Config, host: str = "127.0.0.1") -> Generator[str, None, Non
     finally:
         server.shutdown()
         server.server_close()
-        thread.join(timeout=3)
+        thread.join(timeout=HTTP_TIMEOUT)
 
 
 def request(
@@ -203,7 +206,7 @@ def request(
     data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        response = cast(HTTPResponse, urllib.request.urlopen(request, timeout=3))
+        response = cast(HTTPResponse, urllib.request.urlopen(request, timeout=HTTP_TIMEOUT))
         with response:
             status = response.status
             body = parse_json(response.read())
@@ -234,7 +237,7 @@ def test_search_query_errors_are_http_400(tmp_path: Path, query: str) -> None:
 def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> None:
     config, root = _ready(tmp_path)
     with _running(config) as base:
-        response = cast(HTTPResponse, urllib.request.urlopen(f"{base}/", timeout=3))
+        response = cast(HTTPResponse, urllib.request.urlopen(f"{base}/", timeout=HTTP_TIMEOUT))
         with response:
             html = response.read().decode("utf-8")
         assert "Second Brain" in html
@@ -576,7 +579,7 @@ def test_request_body_budget_is_enforced(tmp_path: Path) -> None:
     with _running(config) as base:
         parsed = urllib.parse.urlsplit(base)
         assert parsed.hostname is not None and parsed.port is not None
-        connection = HTTPConnection(parsed.hostname, parsed.port, timeout=3)
+        connection = HTTPConnection(parsed.hostname, parsed.port, timeout=HTTP_TIMEOUT)
         connection.putrequest("POST", "/api/remember")
         connection.putheader("Content-Type", "application/json")
         connection.putheader("Content-Length", str(MAX_BODY_BYTES + 1))
