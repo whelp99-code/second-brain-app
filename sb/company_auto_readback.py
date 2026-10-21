@@ -26,6 +26,7 @@ from sb.company_internal_effects import candidate_result
 from sb.company_memory import MemoryCandidate
 from sb.effect_values import JsonObject, canonical_bytes, strict_loads
 from sb.effect_write_models import ClosedModel
+from sb.effect_write_values import model_object
 
 _CANDIDATE = TypeAdapter[MemoryCandidate](MemoryCandidate)
 
@@ -166,6 +167,35 @@ def verified_auto_assessment(
     Receipt signature/acceptance authority is verified separately by the caller.
     Both accepted resumption and completed-effect readback use this same check.
     """
+    payload = verify_auto_assessment_evidence(db, scope, candidate, receipt, command)
+    if receipt.classifier_version == CLASSIFIER_VERSION:
+        classified = classify_mail_candidate(candidate)
+        expected: JsonObject = {
+            "schema_version": 1,
+            "record_kind": classified.record_kind,
+            "fields": dict(classified.fields),
+            "spans": {
+                key: {"start": span.start, "end": span.end}
+                for key, span in classified.spans.items()
+            },
+        }
+        if classified.classification != "auto_internal" or expected != model_object(payload):
+            raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    return payload
+
+
+def verify_auto_assessment_evidence(
+    db: sqlite3.Connection,
+    scope: FreshnessScope,
+    candidate: MemoryCandidate,
+    receipt: PolicyAutoReceiptV1,
+    command: JsonObject,
+) -> _Payload:
+    """Check signed original assessment and source spans without classifying.
+
+    The caller verifies receipt signature and issuing policy first. Read-only
+    freshness audits must not invoke the current classifier or write effects.
+    """
     candidate_id = candidate.candidate_id
     if (
         receipt.scope != scope
@@ -228,17 +258,4 @@ def verified_auto_assessment(
         )
     ):
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
-    if receipt.classifier_version == CLASSIFIER_VERSION:
-        classified = classify_mail_candidate(candidate)
-        expected: JsonObject = {
-            "schema_version": 1,
-            "record_kind": classified.record_kind,
-            "fields": dict(classified.fields),
-            "spans": {
-                key: {"start": span.start, "end": span.end}
-                for key, span in classified.spans.items()
-            },
-        }
-        if classified.classification != "auto_internal" or expected != assessment.payload:
-            raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
     return payload

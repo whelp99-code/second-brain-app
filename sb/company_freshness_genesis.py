@@ -5,20 +5,38 @@ from __future__ import annotations
 import sqlite3
 from typing import Literal
 
-from sb.company_approver_binding import CompanyHandoffPolicy, binding_digest
+from pydantic import TypeAdapter
+
+from sb.company_approver_binding import (
+    CompanyHandoffPolicy,
+    binding_digest,
+    decode_key,
+    public_key_fingerprint,
+)
+from sb.company_auto_policy import (
+    PolicyAutoReceiptV1,
+    auto_request_id,
+    policy_digest,
+    verify_policy_receipt,
+)
+from sb.company_auto_readback import verify_auto_assessment_evidence
+from sb.company_auto_settings import InternalAutoPolicyV1
 from sb.company_db_freshness_evidence import verify_memory_receipt
+from sb.company_db_freshness_hash import operation_id_for
 from sb.company_db_freshness_integrity import CachedOperation, JournalEntry
 from sb.company_db_freshness_models import (
     EvidenceRejected,
     GenesisEntry,
     GenesisInventory,
     OperationRow,
+    RegistryAutoPolicyPin,
 )
 from sb.company_freshness_models import Checkpoint, FreshnessScope, ReserveProgressResponse
 from sb.company_internal_effects import memory_request_digest
+from sb.company_memory import MemoryCandidate
 from sb.company_memory_authority import CompanyAuthorityContext, company_request_digest
 from sb.company_transition_receipt import TransitionReceiptSelector, read_original_receipt
-from sb.effect_values import canonical_bytes, strict_loads
+from sb.effect_values import canonical_bytes, parse_instant, strict_loads
 
 
 def owned_genesis_receipts(
@@ -246,6 +264,7 @@ def _require_transition_authority(
             if len(claims) == 1 and request_digest == memory_request_digest(
                 "accept", candidate, claims[0][0]
             ):
+                _require_auto_authority(db, scope, candidate, claims[0][0], raw)
                 return
         enrollment = db.execute(
             "SELECT evidence_json FROM company_approver_enrollment_audit WHERE workspace_id=?",
@@ -304,6 +323,110 @@ def _require_transition_authority(
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
     except (ValueError, sqlite3.Error, KeyError, TypeError) as exc:
         raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT") from exc
+
+
+def _require_auto_authority(
+    db: sqlite3.Connection,
+    scope: FreshnessScope,
+    candidate_id: str,
+    request_id: str,
+    snapshot_raw: str,
+) -> None:
+    """Audit original issuance, including a committed accept awaiting finish.
+
+    accepted_auto_authority requires a finished acceptance and cannot be used
+    while auditing the pending-finish recovery path. Reuse signature and
+    assessment verification without issuing receipts or re-running effects.
+    """
+    candidate = TypeAdapter(MemoryCandidate).validate_json(snapshot_raw, strict=True)
+    rows = db.execute(
+        """SELECT r.receipt_json,r.auto_command_json,p.policy_json,r.policy_digest
+        FROM company_auto_policy_receipts r
+        JOIN company_auto_policies p
+          ON p.provider_instance_id=r.provider_instance_id AND p.workspace_id=r.workspace_id
+          AND p.policy_digest=r.policy_digest
+        JOIN company_candidate_execution_claims c
+          ON c.provider_instance_id=r.provider_instance_id AND c.workspace_id=r.workspace_id
+          AND c.candidate_id=r.candidate_id AND c.content_digest=r.content_digest
+          AND c.path='auto_internal' AND c.workflow_request_id=r.auto_request_id
+        WHERE r.provider_instance_id=? AND r.workspace_id=? AND r.candidate_id=?
+          AND r.auto_request_id=? AND r.content_digest=?""",
+        (
+            scope.provider_instance_id,
+            scope.workspace_id,
+            candidate_id,
+            request_id,
+            candidate.content_digest,
+        ),
+    ).fetchall()
+    if len(rows) != 1:
+        raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+    receipt = PolicyAutoReceiptV1.model_validate_json(rows[0][0], strict=True)
+    command = strict_loads(rows[0][1], 1_048_576)
+    policy = InternalAutoPolicyV1.model_validate_json(rows[0][2], strict=True)
+    if (
+        receipt.auto_request_id != request_id
+        or receipt.policy_digest != rows[0][3]
+        or receipt.policy_digest != policy_digest(policy)
+        or receipt.policy_version != policy.policy_version
+        or request_id
+        != auto_request_id(scope, candidate_id, candidate.content_digest, policy_digest(policy))
+        or not isinstance(command, dict)
+        or "accept" not in receipt.allowed_operations
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    operation_id = operation_id_for(
+        scope, request_id=request_id, command_digest=receipt.command_digest, operation="accept"
+    )
+    reserved = db.execute(
+        """SELECT l.global_sequence,m.created_at FROM company_freshness_log l
+        JOIN company_freshness_publication f ON f.global_sequence=l.global_sequence
+        JOIN company_freshness_operations o
+          ON o.provider_instance_id=l.provider_instance_id AND o.workspace_id=l.workspace_id
+          AND o.operation_id=l.operation_id
+          AND json_extract(l.record_json,'$.reservation_id')=o.reservation_id
+        JOIN company_memory_receipts m
+          ON m.workspace_id=o.workspace_id AND m.request_digest=o.event_digest
+        WHERE l.provider_instance_id=? AND l.workspace_id=? AND l.operation_id=?
+          AND l.phase='reserve' AND o.operation='accept' AND o.actor_store='second_brain'
+          AND m.operation='accept' AND m.candidate_id=? AND m.request_digest=?""",
+        (
+            scope.provider_instance_id,
+            scope.workspace_id,
+            operation_id,
+            candidate_id,
+            memory_request_digest("accept", candidate_id, request_id),
+        ),
+    ).fetchall()
+    if len(reserved) != 1 or not (
+        parse_instant(receipt.issued_at)
+        <= parse_instant(reserved[0][1])
+        < parse_instant(receipt.expires_at)
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    # Validate the policy/key active at issuance, never the currently rotated pin.
+    pins = db.execute(
+        """SELECT json_extract(l.record_json,'$.pin') FROM company_freshness_log l
+        JOIN company_freshness_publication p ON p.global_sequence=l.global_sequence
+        WHERE l.provider_instance_id=? AND l.workspace_id=? AND l.phase='registry'
+          AND json_extract(l.record_json,'$.kind')='internal_auto_policy'
+          AND l.global_sequence<? ORDER BY l.global_sequence DESC LIMIT 1""",
+        (scope.provider_instance_id, scope.workspace_id, reserved[0][0]),
+    ).fetchall()
+    if len(pins) != 1:
+        raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+    pin = RegistryAutoPolicyPin.model_validate_json(pins[0][0], strict=True)
+    key = decode_key(pin.public_key)
+    if (
+        pin.scope != scope
+        or pin.policy_digest != receipt.policy_digest
+        or public_key_fingerprint(key) != pin.public_key_fingerprint
+        or pin.policy_digest in pin.revoked_policy_digests
+        or pin.public_key_fingerprint in pin.revoked_key_fingerprints
+    ):
+        raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+    verify_policy_receipt(receipt, key)
+    verify_auto_assessment_evidence(db, scope, candidate, receipt, command)
 
 
 def _require_pending_receipt(
