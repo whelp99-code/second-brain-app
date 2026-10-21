@@ -83,6 +83,7 @@ def apply_component_migration(
         if existing is not None:
             if str(existing[0]) != checksum:
                 raise CompanyMemoryError("COMPANY_MEMORY_SCHEMA_UPGRADE_REQUIRED")
+            _reject_partial(connection, component, marked=True)
             connection.commit()
             return checksum
         _reject_partial(connection, component)
@@ -157,7 +158,9 @@ def _ensure_marker_table(connection: sqlite3.Connection) -> None:
     )
 
 
-def _reject_partial(connection: sqlite3.Connection, component: ComponentName) -> None:
+def _reject_partial(
+    connection: sqlite3.Connection, component: ComponentName, *, marked: bool = False
+) -> None:
     expected = _FRESHNESS_TABLES if component == "freshness" else _INTERNAL_TABLES
     present = {
         str(row[0])
@@ -168,7 +171,7 @@ def _reject_partial(connection: sqlite3.Connection, component: ComponentName) ->
             ).fetchall(),
         )
     }
-    if present & set(expected):
+    if (marked and not set(expected) <= present) or (not marked and present & set(expected)):
         raise CompanyMemoryError("COMPANY_MEMORY_SCHEMA_UPGRADE_REQUIRED")
     unknown = (
         present

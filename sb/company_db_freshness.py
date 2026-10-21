@@ -560,6 +560,21 @@ class CompanyDbFreshnessProvider:
             expected = self.publish_assessment(scope, digest, expected)
         return expected
 
+    def validate_auto_policy_pin(self, scope: FreshnessScope) -> None:
+        """Reject invalid operator advancement before writing any local policy row."""
+        with self._locked():
+            self._recover(allow_policy_update=True, read_only=True)
+            pin = current_auto_pin(self._registry(), scope)
+            connection = _connect(self.database)
+            try:
+                previous = latest_auto_pins(load_journal(connection)).get(
+                    (scope.provider_instance_id, scope.workspace_id),
+                )
+            finally:
+                connection.close()
+            if pin != previous:
+                require_forward_pin(previous, pin)
+
     def install_auto_policy_pin(self, scope: FreshnessScope) -> Checkpoint:
         """Operator-only activation of the exact protected registry entry."""
         with self._locked():
@@ -1021,6 +1036,8 @@ class CompanyDbFreshnessProvider:
                         record.get("processor_checkpoint_before"), strict=True
                     ),
                 )
+            if record.get("kind") == "unapplied_processor_cancellation":
+                _consume_cancelled_auto_reserve(connection, scope, operation_id)
             if phase == "finish" and evidence_digest is not None and terminal_state is not None:
                 _finish_operation(
                     connection,
@@ -1261,6 +1278,8 @@ class CompanyDbFreshnessProvider:
                     )
                 if original.phase == "finish":
                     record = original.record
+                    if record.get("kind") == "unapplied_processor_cancellation":
+                        _consume_cancelled_auto_reserve(connection, row.scope, row.operation_id)
                     reservation_id = record.get("reservation_id")
                     evidence_digest = record.get("evidence_digest")
                     terminal_state = record.get("terminal_state")
@@ -2301,6 +2320,23 @@ def _history_present(database: Path, scope: FreshnessScope) -> bool:
         connection.close()
 
 
+def _consume_cancelled_auto_reserve(
+    connection: sqlite3.Connection, scope: FreshnessScope, operation_id: str | None
+) -> None:
+    if (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_internal_pending_reserve'"
+        ).fetchone()
+        is not None
+    ):
+        _ = connection.execute(
+            """DELETE FROM company_internal_pending_reserve
+            WHERE provider_instance_id=? AND workspace_id=?
+              AND json_extract(intent_json,'$.request.operation_id')=?""",
+            (scope.provider_instance_id, scope.workspace_id, operation_id),
+        )
+
+
 def _verify_unapplied_cancellation(
     connection: sqlite3.Connection,
     scope: FreshnessScope,
@@ -2316,7 +2352,20 @@ def _verify_unapplied_cancellation(
         or record.get("terminal_state") != "cancelled"
     ):
         raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
-    for table in ("company_memory_receipts", "company_processor_pending_finish"):
+    for table in (
+        "company_memory_receipts",
+        "company_processor_pending_finish",
+        "company_internal_pending_finish",
+    ):
+        if (
+            connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()
+            is None
+        ):
+            if table != "company_internal_pending_finish":
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+            continue
         if (
             connection.execute(
                 f"SELECT 1 FROM {table} WHERE workspace_id=? AND request_digest=?",
@@ -2325,6 +2374,19 @@ def _verify_unapplied_cancellation(
             is not None
         ):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+    if (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_internal_effects'"
+        ).fetchone()
+        is not None
+        and connection.execute(
+            """SELECT 1 FROM company_internal_effects
+        WHERE provider_instance_id=? AND workspace_id=? AND operation_id=?""",
+            (scope.provider_instance_id, scope.workspace_id, original.operation_id),
+        ).fetchone()
+        is not None
+    ):
+        raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
     instant = record.get("original_at")
     if not isinstance(instant, str):
         raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")

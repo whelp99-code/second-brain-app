@@ -84,6 +84,7 @@ def run_operator(
         before = local_checkpoint(database, config.workspace_id, None)
         if before is None:
             raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
+        selected.validate_auto_policy_pin(scope)
         with closing(sqlite3.connect(database)) as db, db:
             digest = install_auto_policy(db, settings, config.workspace_id, now)
         after = selected.install_auto_policy_pin(scope)

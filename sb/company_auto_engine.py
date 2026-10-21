@@ -41,6 +41,7 @@ from sb.company_auto_settings import (
     require_live_trigger,
     source_context_digest,
 )
+from sb.company_db_freshness import CompanyDbFreshnessProvider
 from sb.company_freshness_models import (
     TERMINAL_STATE_BY_OPERATION,
     Checkpoint,
@@ -227,16 +228,20 @@ def _one(
                 candidate_id, "skipped_human", 0, (), ("human_path",), False
             ), checkpoint
         if candidate.state == "accepted":
-            original_auto: list[tuple[int]] = db.execute(
-                """SELECT 1 FROM company_auto_policy_receipts
-                WHERE provider_instance_id=? AND workspace_id=? AND candidate_id=?
-                  AND content_digest=? AND policy_digest=?""",
+            original_auto: list[tuple[str]] = db.execute(
+                """SELECT r.policy_digest FROM company_auto_policy_receipts r
+                JOIN company_candidate_execution_claims c
+                  ON c.provider_instance_id=r.provider_instance_id
+                  AND c.workspace_id=r.workspace_id AND c.candidate_id=r.candidate_id
+                  AND c.content_digest=r.content_digest AND c.path='auto_internal'
+                  AND c.workflow_request_id=r.auto_request_id
+                WHERE r.provider_instance_id=? AND r.workspace_id=? AND r.candidate_id=?
+                  AND r.content_digest=?""",
                 (
                     scope.provider_instance_id,
                     scope.workspace_id,
                     candidate_id,
                     candidate.content_digest,
-                    policy_digest(settings.policy),
                 ),
             ).fetchall()
             if not original_auto:
@@ -247,6 +252,10 @@ def _one(
                     (),
                     ("human_path",),
                     False,
+                ), checkpoint
+            if len(original_auto) != 1 or original_auto[0][0] != policy_digest(settings.policy):
+                return _outcome(
+                    candidate_id, "blocked_policy", 0, (), ("policy_changed",), False
                 ), checkpoint
     classified = classify_mail_candidate(candidate)
     kind = classified.record_kind
@@ -467,22 +476,27 @@ def _transition(
         closing(sqlite3.connect(database)) as db,
     ):
         _ = db.execute("BEGIN IMMEDIATE")
+        authorization_rejected = False
         try:
             if context.clock is not None:
                 context = replace(context, now=context.clock())
             require_live_trigger(trigger, context.now)
             if reservation.checkpoint is None:
                 raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
-            require_auto_transaction(
-                db,
-                scope,
-                settings,
-                context,
-                candidate,
-                request_id,
-                command_digest_value,
-                operation,
-            )
+            try:
+                require_auto_transaction(
+                    db,
+                    scope,
+                    settings,
+                    context,
+                    candidate,
+                    request_id,
+                    command_digest_value,
+                    operation,
+                )
+            except AutoInternalRejected:
+                authorization_rejected = True
+                raise
             save_checkpoint(db, scope.workspace_id, reservation.checkpoint, checkpoint)
             match operation:
                 case "accept" | "mark_processed":
@@ -559,6 +573,13 @@ def _transition(
             raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
         except AutoInternalRejected:
             db.rollback()
+            if (
+                authorization_rejected
+                and operation == "accept"
+                and reservation.outcome == "reserved"
+                and isinstance(provider, CompanyDbFreshnessProvider)
+            ):
+                provider.cancel_unapplied_under_guard(scope, operation_id, reservation, checkpoint)
             raise
     if operation == "complete" and not verify_internal_readback(
         database,
@@ -734,13 +755,22 @@ def _candidate_ids(
                 WHERE h.provider_instance_id=? AND h.workspace_id=c.workspace_id
                   AND h.candidate_id=c.candidate_id AND h.path='human')
               AND (c.state='candidate' OR EXISTS(SELECT 1 FROM company_auto_policy_receipts r
+                JOIN company_candidate_execution_claims w
+                  ON w.provider_instance_id=r.provider_instance_id
+                  AND w.workspace_id=r.workspace_id AND w.candidate_id=r.candidate_id
+                  AND w.content_digest=r.content_digest AND w.path='auto_internal'
+                  AND w.workflow_request_id=r.auto_request_id
                 WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
-                  AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
-                  AND r.policy_digest=?))
+                  AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest))
               AND NOT EXISTS(SELECT 1 FROM json_each(c.projects_json) p
                 WHERE p.value NOT IN (SELECT value FROM json_each(?)))
               AND (json_array_length(c.projects_json)>0 OR ?='[]')
-            ORDER BY EXISTS(SELECT 1 FROM company_auto_assessments a
+            ORDER BY (c.state='accepted' AND NOT EXISTS(
+                SELECT 1 FROM company_auto_policy_receipts r
+                WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
+                  AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
+                  AND r.policy_digest=?)),
+              EXISTS(SELECT 1 FROM company_auto_assessments a
                 WHERE a.provider_instance_id=? AND a.workspace_id=c.workspace_id
                   AND a.candidate_id=c.candidate_id AND a.policy_digest=?),
               c.candidate_id LIMIT ?""",
@@ -752,9 +782,10 @@ def _candidate_ids(
                 context.deletion_set_root,
                 settings.provider_instance_id,
                 settings.provider_instance_id,
+                canonical_bytes(list(context.projects)).decode("utf-8"),
+                canonical_bytes(list(context.projects)).decode("utf-8"),
+                settings.provider_instance_id,
                 policy_digest(settings.policy),
-                canonical_bytes(list(context.projects)).decode("utf-8"),
-                canonical_bytes(list(context.projects)).decode("utf-8"),
                 settings.provider_instance_id,
                 policy_digest(settings.policy),
                 FIXED_TRIGGER_LIMIT,
