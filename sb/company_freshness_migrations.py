@@ -134,7 +134,14 @@ def migration_applied(database: Path, component: ComponentName) -> bool:
                 (component,),
             ).fetchone(),
         )
-        return found is not None and str(found[0]) == component_checksum(component)
+        if found is None or str(found[0]) != component_checksum(component):
+            return False
+        if component == "freshness":
+            try:
+                _reject_partial(connection, component, marked=True)
+            except CompanyMemoryError:
+                return False
+        return True
     finally:
         connection.close()
 
@@ -184,3 +191,17 @@ def _reject_partial(
     )
     if component == "freshness" and unknown - set(_INTERNAL_TABLES):
         raise CompanyMemoryError("COMPANY_MEMORY_SCHEMA_UPGRADE_REQUIRED")
+    if component == "freshness" and marked:
+        # The marker is not proof that a partial restore retained the guards.
+        # Compare actual definitions, not just names (a no-op trigger is absent protection).
+        with closing(sqlite3.connect(":memory:")) as canonical:
+            canonical.executescript(FRESHNESS_SQL)
+            required = canonical.execute(
+                "SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL"
+            ).fetchall()
+        for kind, name, sql in required:
+            actual = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type=? AND name=?", (kind, name)
+            ).fetchone()
+            if actual is None or " ".join(actual[0].split()) != " ".join(sql.split()):
+                raise CompanyMemoryError("COMPANY_MEMORY_SCHEMA_UPGRADE_REQUIRED")

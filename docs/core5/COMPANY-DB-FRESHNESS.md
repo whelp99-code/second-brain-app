@@ -49,6 +49,10 @@ Component migrations store version and canonical checksum in the company DB,
 separately from its existing schema version. Bootstrap requires inventory,
 confirmed upgraded writers, and installed root-owned pins. Owned legacy receipt
 and terminal history is checked, not replaced with an empty genesis.
+Re-entry validates the canonical freshness tables, single-reservation unique
+index, and immutable/operation triggers, not just the migration marker or object
+names. Missing or substituted guards require a schema upgrade; they are not
+silently recreated on a read or migration retry.
 
 Each operation uses registry lock, DB prepare, checksummed witness fsync,
 TPM NV extend, and DB publication. Original pending operation fields survive
@@ -57,6 +61,12 @@ extend or create another effect. The live NV value must match the complete
 retained journal and witness chain. Restoring DB and witness together cannot
 restore the independent NV state. Missing evidence, contradictory prefixes,
 revocations, or hardware failures close the scope.
+Every published evidence projection (including identity, source, roots, bytes,
+and original time) must exactly match its anchored journal entry. A prepared
+unpublished tail has no projection rows yet. Partial evidence restores cannot
+become ready or be silently repaired. Reusing an already consumed evidence source
+for another finish is rejected before journal prepare, witness append, or NV
+extension, rather than failing a uniqueness constraint after commitment.
 
 Provider reserve and anchor I/O occur outside the SQL effect writer. The effect
 writer rechecks original authorization and source/deletion fences, then commits
@@ -88,6 +98,13 @@ issuer, nonce, and a five-minute first-accept window. Retries retain its origina
 bytes/time. Independent readback checks that signature and the actual immutable
 SQL record/manifest, source, owner/projects, and deletion fence before completion.
 Human and auto paths compete for the same exclusive execution claim.
+If a completion loses an internal-record conflict after its advisory preflight,
+its rolled-back, zero-effect reservation is durably cancelled under the provider
+guard. This retains the original anchored acceptance and signed policy receipt;
+it neither invents an effect nor cancels an applied/pending effect. Recovery can
+finish that cancellation, release the scope slot, and keep the candidate
+human-required without reclassifying its immutable assessment or retrying the
+cancelled completion.
 
 `sb-company auto-internal --config <installed-config>` requires a fresh signed
 `auto_process_internal` authority, purpose `company_internal_auto_trigger`, and
@@ -102,6 +119,12 @@ Opaque cursors bind scope, epoch, the initial cutoff/head, and the last
 `(published_global_sequence,operation_id)`. Pages read body-free immutable
 assessment publications, not mutable candidates. The route audits read-only
 journal/NV state; it never classifies, initializes, materializes, or recovers.
+The pinned head cannot exceed the query's requested upper bound, even in a
+caller-modified cursor. A published automatic cancellation carries the last
+body-free assessment forward as `cancelled` at the cancellation's sequence and
+operation ID, so incremental reports include it even without a new assessment.
+Older pinned cuts retain their original candidate/uncertain state, and cancelled
+rows do not count as completed records or uncertain reservations.
 
 ## Operator-only preparation and stop
 

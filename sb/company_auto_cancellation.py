@@ -1,4 +1,4 @@
-"""Prove an expired auto accept unapplied without modifying its claim or signed audit."""
+"""Prove an automatic transition unapplied without changing its claim or signed audit."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from sb.company_auto_policy import (
     command_digest,
     verify_policy_receipt,
 )
+from sb.company_auto_recovery import accepted_auto_authority
+from sb.company_auto_settings import AutoInternalRejected
 from sb.company_db_freshness_hash import checkpoint_text, operation_id_for
 from sb.company_db_freshness_models import OperationRow, RegistryAutoPolicyPin
 from sb.company_freshness_anchor import AnchorRejected
@@ -57,15 +59,15 @@ def verify_auto_cancellation(
     content_digest, content, state, event_id = rows[0][2:]
     if (
         request.scope != scope
-        or request.operation != "accept"
-        or original.operation != "accept"
+        or request.operation not in {"accept", "complete"}
+        or original.operation != request.operation
         or original.operation_id != request.operation_id
         or original.reserve_expected_json != checkpoint_text(request.expected_checkpoint)
         or original.event_digest != request.event_digest
         or receipt.scope != scope
         or receipt.candidate_id != intent.candidate_id
         or receipt.content_digest != content_digest
-        or state != "candidate"
+        or state != ("candidate" if request.operation == "accept" else "accepted")
         or receipt.source_event_id != event_id
         or content_digest != "sha256:" + hashlib.sha256(content.encode()).hexdigest()
         or receipt.auto_request_id != intent.auto_request_id
@@ -78,17 +80,29 @@ def verify_auto_cancellation(
             scope,
             request_id=intent.auto_request_id,
             command_digest=intent.command_digest,
-            operation="accept",
+            operation=request.operation,
         )
         != original.operation_id
-        or memory_request_digest("accept", intent.candidate_id, intent.auto_request_id)
+        or memory_request_digest(request.operation, intent.candidate_id, intent.auto_request_id)
         != original.event_digest
         or human_path_blocks(db, scope, intent.candidate_id)
     ):
         raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+    # A cancelled completion retains its original, anchored acceptance, but no completion
+    # receipt or effect may exist. Cancellation never authorizes a replacement workflow.
+    if request.operation == "complete":
+        try:
+            accepted_auto_authority(db, scope, intent.candidate_id)
+        except AutoInternalRejected as exc:
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
+    if db.execute(
+        """SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
+        AND (?='accept' OR operation!='accept')""",
+        (scope.workspace_id, intent.candidate_id, request.operation),
+    ).fetchone():
+        raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
     # Complete uses another operation ID: prove zero effects across the entire candidate.
     for table, column in (
-        ("company_memory_receipts", "candidate_id"),
         ("company_internal_effects", "candidate_id"),
         ("company_internal_records", "source_candidate_id"),
     ):

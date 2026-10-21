@@ -369,7 +369,7 @@ class CompanyDbFreshnessProvider:
             or original.state != "reserved"
             or original.actor_store != "second_brain"
             or self.actor_store != "second_brain"
-            or original.operation not in {"accept", "reject", "mark_processed"}
+            or original.operation not in {"accept", "reject", "mark_processed", "complete"}
             or reservation.outcome not in {"reserved", "already_reserved"}
             or original.reservation_id != reservation.reservation_id
             or original.reserve_expected_json != checkpoint_text(processor_before)
@@ -407,6 +407,8 @@ class CompanyDbFreshnessProvider:
             if reservation.outcome == "already_reserved" and not (
                 "auto_intent" in record or "processor_binding" in record
             ):
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+            if original.operation == "complete" and "auto_intent" not in record:
                 raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
             verified = _verify_unapplied_cancellation(connection, scope, original, record)
             local = connection.execute(
@@ -908,6 +910,25 @@ class CompanyDbFreshnessProvider:
             verified,
             request.terminal_state,
         )
+        connection = _connect(self.database)
+        try:
+            for item in evidence:
+                if connection.execute(
+                    """SELECT 1 FROM company_freshness_evidence
+                    WHERE provider_instance_id=? AND workspace_id=? AND store=? AND stream=?
+                      AND (sequence=? OR source_record_id=?)""",
+                    (
+                        request.scope.provider_instance_id,
+                        request.scope.workspace_id,
+                        item["store"],
+                        item["stream"],
+                        item["sequence"],
+                        item["source_record_id"],
+                    ),
+                ).fetchone():
+                    return _conflict_finish(request)
+        finally:
+            connection.close()
         after = _apply_finish(head, record, self.actor_store, evidence)
         self._publish_new(
             scope=request.scope,
@@ -2409,7 +2430,8 @@ def _verify_unapplied_cancellation(
             len(rows) != 1
             or rows[0][0] != expected_state
             or rows[0][1] != binding.get("content_digest")
-            or original.operation_id != operation_id_for(
+            or original.operation_id
+            != operation_id_for(
                 scope,
                 request_id=binding["handoff_id"],
                 command_digest=rows[0][2],
@@ -2417,38 +2439,51 @@ def _verify_unapplied_cancellation(
             )
         ):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
-        if original.operation in {"accept", "reject"} and connection.execute(
-            """SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
+        if (
+            original.operation in {"accept", "reject"}
+            and connection.execute(
+                """SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
             AND operation IN ('accept','reject','mark_processed')""",
-            (scope.workspace_id, binding.get("candidate_id")),
-        ).fetchone():
+                (scope.workspace_id, binding.get("candidate_id")),
+            ).fetchone()
+        ):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
-        if original.operation in {"accept", "reject"} and connection.execute(
-            "SELECT 1 FROM company_handoff_decisions WHERE workspace_id=? AND candidate_id=?",
-            (scope.workspace_id, binding.get("candidate_id")),
-        ).fetchone():
+        if (
+            original.operation in {"accept", "reject"}
+            and connection.execute(
+                "SELECT 1 FROM company_handoff_decisions WHERE workspace_id=? AND candidate_id=?",
+                (scope.workspace_id, binding.get("candidate_id")),
+            ).fetchone()
+        ):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
         for table in ("company_processor_pending_finish", "company_internal_pending_finish"):
-            if connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ).fetchone() and connection.execute(
-                f"SELECT 1 FROM {table} WHERE workspace_id=?", (scope.workspace_id,)
-            ).fetchone():
+            if (
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+                ).fetchone()
+                and connection.execute(
+                    f"SELECT 1 FROM {table} WHERE workspace_id=?", (scope.workspace_id,)
+                ).fetchone()
+            ):
                 raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
         for table, column in (
             ("company_internal_effects", "candidate_id"),
             ("company_internal_records", "source_candidate_id"),
         ):
-            if connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ).fetchone() and connection.execute(
-                f"SELECT 1 FROM {table} WHERE workspace_id=? AND {column}=?",
-                (scope.workspace_id, binding.get("candidate_id")),
-            ).fetchone():
+            if (
+                connection.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+                ).fetchone()
+                and connection.execute(
+                    f"SELECT 1 FROM {table} WHERE workspace_id=? AND {column}=?",
+                    (scope.workspace_id, binding.get("candidate_id")),
+                ).fetchone()
+            ):
                 raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
     if (
         original.actor_store != "second_brain"
-        or original.operation not in {"accept", "reject", "mark_processed"}
+        or original.operation not in {"accept", "reject", "mark_processed", "complete"}
+        or (original.operation == "complete" and record.get("auto_intent") is None)
         or record.get("operation_id") != original.operation_id
         or record.get("reservation_id") != original.reservation_id
         or record.get("event_digest") != original.event_digest

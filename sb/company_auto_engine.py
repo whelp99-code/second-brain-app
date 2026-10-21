@@ -264,8 +264,8 @@ def _one(
             ):
                 return _skip_expired_attempt(database, provider, scope, candidate_id, checkpoint)
         if candidate.state == "accepted":
-            original_auto: list[tuple[str]] = db.execute(
-                """SELECT r.policy_digest FROM company_auto_policy_receipts r
+            original_auto: list[tuple[str, str]] = db.execute(
+                """SELECT r.policy_digest,r.auto_request_id FROM company_auto_policy_receipts r
                 JOIN company_candidate_execution_claims c
                   ON c.provider_instance_id=r.provider_instance_id
                   AND c.workspace_id=r.workspace_id AND c.candidate_id=r.candidate_id
@@ -292,6 +292,20 @@ def _one(
             if isinstance(provider, CompanyDbFreshnessProvider):
                 continuation = accepted_auto_authority(db, scope, candidate_id)
                 settings = replace(settings, policy=continuation.policy)
+                if db.execute(
+                    """SELECT 1 FROM company_freshness_operations
+                    WHERE provider_instance_id=? AND workspace_id=? AND operation='complete'
+                      AND actor_store='second_brain' AND state='finished'
+                      AND terminal_state='cancelled' AND event_digest=?""",
+                    (
+                        scope.provider_instance_id,
+                        scope.workspace_id,
+                        memory_request_digest("complete", candidate_id, original_auto[0][1]),
+                    ),
+                ).fetchone():
+                    return _outcome(
+                        candidate_id, "human_required", 0, (), ("conflict",), False
+                    ), checkpoint
             elif len(original_auto) != 1 or original_auto[0][0] != policy_digest(settings.policy):
                 raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
     classified = classify_mail_candidate(candidate)
@@ -405,8 +419,14 @@ def _one(
         if candidate.state == "candidate":
             prepare_auto_reserve(
                 db,
-                _reserve_intent(scope, candidate.candidate_id, request_id,
-                                command_digest(command), "accept", checkpoint),
+                _reserve_intent(
+                    scope,
+                    candidate.candidate_id,
+                    request_id,
+                    command_digest(command),
+                    "accept",
+                    checkpoint,
+                ),
             )
     receipts: list[str] = []
     if candidate_state_of(database, scope.workspace_id, candidate.candidate_id) == "candidate":
@@ -508,8 +528,14 @@ def _transition(
         _ = db.execute("BEGIN IMMEDIATE")
         intent = prepare_auto_reserve(
             db,
-            _reserve_intent(scope, candidate.candidate_id, request_id,
-                            command_digest_value, operation, checkpoint),
+            _reserve_intent(
+                scope,
+                candidate.candidate_id,
+                request_id,
+                command_digest_value,
+                operation,
+                checkpoint,
+            ),
         )
     reservation = _reserve(provider, intent.request)
     evidence = ""
@@ -614,13 +640,12 @@ def _transition(
         except sqlite3.IntegrityError as exc:
             db.rollback()
             raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
-        except AutoInternalRejected:
+        except AutoInternalRejected as exc:
             db.rollback()
             if (
-                authorization_rejected
-                and operation == "accept"
-                and isinstance(provider, CompanyDbFreshnessProvider)
-            ):
+                (authorization_rejected and operation == "accept")
+                or (operation == "complete" and exc.code == "INTERNAL_RECORD_CONFLICT")
+            ) and isinstance(provider, CompanyDbFreshnessProvider):
                 provider.cancel_unapplied_under_guard(scope, operation_id, reservation, checkpoint)
             raise
     if operation == "complete" and not verify_internal_readback(
@@ -661,8 +686,9 @@ def _skip_expired_attempt(
             # never a renewed receipt or an acceptance after its authorization expired.
             intent = prepare_auto_reserve(
                 db,
-                _reserve_intent(scope, candidate_id, rows[0][0],
-                                receipt.command_digest, "accept", checkpoint),
+                _reserve_intent(
+                    scope, candidate_id, rows[0][0], receipt.command_digest, "accept", checkpoint
+                ),
             )
             db.commit()
     if intent is not None:

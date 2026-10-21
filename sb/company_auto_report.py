@@ -112,7 +112,11 @@ def read_auto_report(
                 if cursor is None
                 else cursor.head_sequence
             )
-            if head > heads[0][1] or head < query.from_global_sequence:
+            if (
+                head > heads[0][1]
+                or head > query.to_global_sequence
+                or head < query.from_global_sequence
+            ):
                 raise AutoInternalRejected("REPORT_REJECTED")
             rows: list[tuple[int, str, str]] = db.execute(
                 """SELECT l.global_sequence,json_extract(l.record_json,'$.snapshot'),l.created_at
@@ -127,7 +131,7 @@ def read_auto_report(
             ).fetchall()
             cutoff_from = _cutoff(db, scope, query.from_global_sequence)
             cutoff_to = _cutoff(db, scope, head)
-            uncertain = _uncertain_candidates(db, scope, head)
+            dispositions = _candidate_dispositions(db, scope, head)
     except AutoInternalRejected:
         raise
     except (sqlite3.Error, OSError, ValueError, AnchorRejected) as exc:
@@ -138,11 +142,13 @@ def read_auto_report(
     latest: dict[str, AutoReportRow] = {}
     for sequence, raw, _created_at in rows:
         snapshot = PublishedAssessment.model_validate_json(raw, strict=True)
-        if snapshot.candidate_id in uncertain:
-            sequence, operation_id = uncertain[snapshot.candidate_id]
-            snapshot = snapshot.model_copy(
-                update={"state": "uncertain", "operation_id": operation_id}
-            )
+        if snapshot.candidate_id in dispositions:
+            disposition_sequence, operation_id, state = dispositions[snapshot.candidate_id]
+            if disposition_sequence > sequence:
+                sequence = disposition_sequence
+                snapshot = snapshot.model_copy(
+                    update={"state": state, "operation_id": operation_id}
+                )
         if sequence <= query.from_global_sequence:
             continue
         latest[snapshot.candidate_id] = AutoReportRow.model_validate(
@@ -258,11 +264,11 @@ def _decode(query: AutoReportQuery, scope: FreshnessScope, epoch: int) -> _Curso
     return cursor
 
 
-def _uncertain_candidates(
+def _candidate_dispositions(
     db: sqlite3.Connection,
     scope: FreshnessScope,
     head: int,
-) -> dict[str, tuple[int, str]]:
+) -> dict[str, tuple[int, str, str]]:
     authorities: list[tuple[str, str]] = db.execute(
         """SELECT candidate_id,auto_request_id FROM company_auto_policy_receipts
         WHERE provider_instance_id=? AND workspace_id=?""",
@@ -273,8 +279,10 @@ def _uncertain_candidates(
         for candidate, request_id in authorities
         for operation in ("accept", "complete", "mark_processed")
     }
-    log: list[tuple[int, str, str, str | None]] = db.execute(
-        """SELECT l.global_sequence,l.phase,l.operation_id,json_extract(l.record_json,'$.event_digest')
+    log: list[tuple[int, str, str, str | None, str | None]] = db.execute(
+        """SELECT l.global_sequence,l.phase,l.operation_id,
+        json_extract(l.record_json,'$.event_digest'),
+        json_extract(l.record_json,'$.terminal_state')
         FROM company_freshness_log l
         JOIN company_freshness_publication p ON p.global_sequence=l.global_sequence
         WHERE l.provider_instance_id=? AND l.workspace_id=? AND l.global_sequence<=?
@@ -282,12 +290,17 @@ def _uncertain_candidates(
         (scope.provider_instance_id, scope.workspace_id, head),
     ).fetchall()
     pending: dict[str, tuple[str, int]] = {}
-    for sequence, phase, operation_id, digest in log:
+    dispositions: dict[str, tuple[int, str, str]] = {}
+    for sequence, phase, operation_id, digest, terminal_state in log:
         if phase == "finish":
-            _ = pending.pop(operation_id, None)
+            reserved = pending.pop(operation_id, None)
+            if reserved is not None:
+                candidate, _ = reserved
+                if terminal_state == "cancelled":
+                    dispositions[candidate] = (sequence, operation_id, "cancelled")
+                else:
+                    _ = dispositions.pop(candidate, None)
         elif digest is not None and digest in events:
             pending[operation_id] = (events[digest], sequence)
-    return {
-        candidate: (sequence, operation_id)
-        for operation_id, (candidate, sequence) in pending.items()
-    }
+            dispositions[events[digest]] = (sequence, operation_id, "uncertain")
+    return dispositions

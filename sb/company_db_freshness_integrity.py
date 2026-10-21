@@ -18,7 +18,7 @@ from sb.company_db_freshness_hash import (
 from sb.company_db_freshness_models import OperationRow, WitnessTransport
 from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_models import Checkpoint, FreshnessScope
-from sb.effect_values import JsonObject, JsonValue
+from sb.effect_values import JsonObject, JsonValue, canonical_bytes
 from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
 
@@ -36,6 +36,7 @@ class JournalEntry(ClosedModel):
     before: Checkpoint | None
     after: Checkpoint
     published_sequence: int | None
+    created_at: str
 
 
 class CachedOperation(ClosedModel):
@@ -53,7 +54,7 @@ def load_journal(db: sqlite3.Connection) -> list[JournalEntry]:
             'record',json(l.record_json),'evidence',json(l.evidence_json),
             'digest',l.record_digest,'previous_nv',l.previous_nv,'next_nv',l.next_nv,
             'before',json(l.before_checkpoint_json),'after',json(l.after_checkpoint_json),
-            'published_sequence',p.global_sequence)
+            'published_sequence',p.global_sequence,'created_at',l.created_at)
         FROM company_freshness_log l
         LEFT JOIN company_freshness_publication p ON p.global_sequence=l.global_sequence
         ORDER BY l.global_sequence""",
@@ -112,7 +113,45 @@ def audit_journal(
     if not pending and live_nv != previous:
         raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
     _audit_scope_cache(db, heads)
+    _audit_evidence_cache(db, entries)
     return entries
+
+
+def _audit_evidence_cache(db: sqlite3.Connection, entries: list[JournalEntry]) -> None:
+    """Publication commits every projection atomically; a prepared tail commits none."""
+    expected: list[bytes] = []
+    for entry in entries:
+        if entry.published_sequence is None:
+            continue
+        for item in entry.evidence:
+            metadata = item.get("metadata")
+            original = metadata.get("original_at") if isinstance(metadata, dict) else None
+            expected.append(
+                canonical_bytes(
+                    [
+                        entry.scope.provider_instance_id,
+                        entry.scope.workspace_id,
+                        item["store"],
+                        item["stream"],
+                        item["sequence"],
+                        item["root"],
+                        item["previous_root"],
+                        entry.operation_id,
+                        item["source_record_id"],
+                        item["source_digest"],
+                        canonical_bytes(item).decode("utf-8"),
+                        original if isinstance(original, str) else entry.created_at,
+                    ]
+                )
+            )
+    rows = db.execute(
+        """SELECT provider_instance_id,workspace_id,store,stream,sequence,root,previous_root,
+        operation_id,source_record_id,source_digest,evidence_json,created_at
+        FROM company_freshness_evidence"""
+    ).fetchall()
+    actual = [canonical_bytes(list(row)) for row in rows]
+    if sorted(actual) != sorted(expected):
+        raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
 
 
 def _audit_frame(frame: JsonObject, entry: JournalEntry) -> None:
