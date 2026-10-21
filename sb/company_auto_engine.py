@@ -330,10 +330,14 @@ def _one(
         classification = "auto_internal"
         payload = model_object(accepted_payload)
         assessed = accepted_receipt.assessment_digest
-        if _allowlist(settings, kind, fields) or _record_conflict(
-            database, scope, candidate, kind, fields
-        ):
+        if _allowlist(settings, kind, fields):
             raise AutoInternalRejected("ASSESSMENT_CONFLICT")
+        # A collision is not a new assessment of the accepted source. Let the
+        # guarded completion prove it unapplied and publish its cancellation.
+        if _record_conflict(database, scope, candidate, kind, fields) and _effect_exists(
+            database, scope, accepted_receipt.auto_request_id
+        ):
+            raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
     else:
         classified = classify_mail_candidate(candidate)
         kind = classified.record_kind
@@ -492,6 +496,19 @@ def _one(
                 continuation=continuation,
             )
         except AutoInternalRejected as exc:
+            if (
+                exc.code == "INTERNAL_RECORD_CONFLICT"
+                and candidate.state == "accepted"
+                and isinstance(provider, CompanyDbFreshnessProvider)
+            ):
+                # _transition returns this error only after guarded zero-effect
+                # cancellation succeeds. Never continue on a failed proof.
+                current = local_checkpoint(database, scope.workspace_id, None)
+                if current is None:
+                    raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
+                return _outcome(
+                    candidate_id, "human_required", 0, tuple(receipts), ("conflict",), False
+                ), current
             if exc.code != "READBACK_FAILED":
                 raise
             return _outcome(
@@ -932,6 +949,16 @@ def _candidate_ids(
               AND NOT EXISTS(SELECT 1 FROM json_each(c.projects_json) p
                 WHERE p.value NOT IN (SELECT value FROM json_each(?)))
               AND (json_array_length(c.projects_json)>0 OR ?='[]')
+              AND NOT (c.state='accepted' AND EXISTS(
+                SELECT 1 FROM company_auto_policy_receipts r
+                JOIN company_freshness_log l
+                  ON l.provider_instance_id=r.provider_instance_id AND l.workspace_id=r.workspace_id
+                JOIN company_freshness_publication f ON f.global_sequence=l.global_sequence
+                WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
+                  AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
+                  AND json_extract(l.record_json,'$.kind')='unapplied_processor_cancellation'
+                  AND json_extract(l.record_json,'$.auto_intent.request.operation')='complete'
+                  AND json_extract(l.record_json,'$.auto_intent.auto_request_id')=r.auto_request_id))
               AND NOT (c.state='candidate' AND EXISTS(
                 SELECT 1 FROM company_auto_policy_receipts r
                 JOIN company_candidate_execution_claims w
@@ -964,6 +991,7 @@ def _candidate_ids(
                 settings.provider_instance_id,
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 canonical_bytes(list(context.projects)).decode("utf-8"),
+                settings.provider_instance_id,
                 settings.provider_instance_id,
                 format_instant(context.now),
                 settings.provider_instance_id,

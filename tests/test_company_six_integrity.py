@@ -252,7 +252,7 @@ def test_stale_preflight_conflict_does_not_leave_reserved_slot(
         assert db.execute("SELECT count(*) FROM company_internal_records").fetchone() == (1,)
     assert provider.read_freshness(read_request(provider, settings)).status == "ready"
     result = engine.run_auto_internal(provider.database, settings, context, provider, trigger())
-    assert result.outcomes[0].classification == "human_required"
+    assert result.outcomes == ()
     receive(
         provider.database,
         "mail:unrelated",
