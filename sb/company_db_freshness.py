@@ -17,6 +17,8 @@ from sb.company_approval_revocations import (
     pending_approval_revocations,
 )
 from sb.company_approver_binding import CompanyHandoffPolicy
+from sb.company_auto_cancellation import verify_auto_cancellation
+from sb.company_auto_intents import pending_auto_reserve
 from sb.company_auto_publication import assessment_snapshot
 from sb.company_db_freshness_evidence import (
     verify_internal_effect as _verify_internal_effect,
@@ -341,7 +343,7 @@ class CompanyDbFreshnessProvider:
         reservation: ReserveProgressResponse,
         processor_before: Checkpoint,
     ) -> None:
-        """Caller holds effect_guard after SQL rollback, never for a resumed effect."""
+        """Caller holds effect_guard; resumed auto acceptance requires full zero-effect proof."""
         original = self._operation(scope, operation_id)
         head = self._require_head(scope)
         if (
@@ -350,7 +352,7 @@ class CompanyDbFreshnessProvider:
             or original.actor_store != "second_brain"
             or self.actor_store != "second_brain"
             or original.operation not in {"accept", "reject", "mark_processed"}
-            or reservation.outcome != "reserved"
+            or reservation.outcome not in {"reserved", "already_reserved"}
             or original.reservation_id != reservation.reservation_id
             or original.reserve_expected_json != checkpoint_text(processor_before)
             or reservation.checkpoint != head
@@ -368,6 +370,22 @@ class CompanyDbFreshnessProvider:
         }
         connection = _connect(self.database)
         try:
+            if connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_internal_pending_reserve'"
+            ).fetchone():
+                intent = pending_auto_reserve(connection, scope)
+                if intent is not None:
+                    record["auto_intent"] = model_object(intent)
+                    for table in (
+                        "company_internal_pending_finish",
+                        "company_processor_pending_finish",
+                    ):
+                        if connection.execute(
+                            f"SELECT 1 FROM {table} WHERE workspace_id=?", (scope.workspace_id,)
+                        ).fetchone():
+                            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+            if reservation.outcome == "already_reserved" and "auto_intent" not in record:
+                raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
             verified = _verify_unapplied_cancellation(connection, scope, original, record)
             local = connection.execute(
                 "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
@@ -2343,6 +2361,7 @@ def _verify_unapplied_cancellation(
     original: _OperationRow,
     record: JsonObject,
 ) -> VerifiedEvidence:
+    verify_auto_cancellation(connection, scope, original, record)
     if (
         original.actor_store != "second_brain"
         or original.operation not in {"accept", "reject", "mark_processed"}

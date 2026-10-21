@@ -81,22 +81,21 @@ def test_expired_during_accept_reserve_is_cancelled(
         assert provider.read_freshness(request).status != "uncertain"
     with closing(sqlite3.connect(provider.database)) as db:
         assert db.execute("SELECT count(*) FROM company_internal_pending_reserve").fetchone() == (
-            int(resumed),
+            0,
         )
         assert db.execute(
             "SELECT state,terminal_state FROM company_freshness_operations"
-        ).fetchall() == ([("reserved", None)] if resumed else [("finished", "cancelled")])
+        ).fetchall() == [("finished", "cancelled")]
         assert db.execute("SELECT count(*) FROM company_memory_receipts").fetchone() == (0,)
     scope = FreshnessScope(
         provider_instance_id=settings.provider_instance_id, workspace_id=WORKSPACE
     )
-    if not resumed:
-        assert local_checkpoint(provider.database, WORKSPACE, None) == provider._head(scope)
+    assert local_checkpoint(provider.database, WORKSPACE, None) == provider._head(scope)
 
 
-@pytest.mark.parametrize("rotate", [False, True])
-def test_accepted_workflow_remains_visible_after_policy_rotation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rotate: bool
+@pytest.mark.parametrize("rotate", [False, "policy", "key"])
+def test_accepted_workflow_completes_after_policy_rotation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rotate: bool | str
 ) -> None:
     provider, settings, context = real_company_runtime(tmp_path)
     receive(provider.database, "mail:1", "event:1", contact_body())
@@ -111,6 +110,12 @@ def test_accepted_workflow_remains_visible_after_policy_rotation(
         fault.setattr(engine, "_transition", crash)
         with pytest.raises(RuntimeError):
             engine.run_auto_internal(provider.database, settings, context, provider, trigger())
+    with closing(sqlite3.connect(provider.database)) as db:
+        authority_before = db.execute("SELECT * FROM company_auto_policy_receipts").fetchall()
+        claims_before = db.execute("SELECT * FROM company_candidate_execution_claims").fetchall()
+        accepts_before = db.execute("SELECT * FROM company_memory_receipts").fetchall()
+        assert db.execute("SELECT count(*) FROM company_internal_effects").fetchone() == (0,)
+        assert db.execute("SELECT state FROM company_memory_candidates").fetchone() == ("accepted",)
     rotated = replace(
         settings,
         policy=settings.policy.model_copy(
@@ -122,11 +127,7 @@ def test_accepted_workflow_remains_visible_after_policy_rotation(
         provider_instance_id=settings.provider_instance_id, workspace_id=WORKSPACE
     )
     checkpoint = local_checkpoint(provider.database, WORKSPACE, None)
-    blocked, after = engine._one(
-        provider.database, rotated, context, provider, scope, "mail:1", checkpoint, trigger()
-    )
-    assert blocked.reason_codes == ("policy_changed",)
-    assert blocked.effect_count == 0 and after == checkpoint
+    assert checkpoint is not None
     if rotate:
         from sb.company_internal_effects import install_auto_policy
 
@@ -139,6 +140,29 @@ def test_accepted_workflow_remains_visible_after_policy_rotation(
                 "revoked_policy_digests": [old.policy_digest],
             }
         )
+        if rotate == "key":
+            import base64
+
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+            from sb.company_auto_settings import bind_policy_signer
+
+            signer = bind_policy_signer(
+                "principal:company-internal-automation",
+                "policy-auto:rotated",
+                Ed25519PrivateKey.from_private_bytes(b"r" * 32),
+            )
+            rotated = replace(rotated, signer=signer, revoked_policy_digests=(old.policy_digest,))
+            pin = pin.model_copy(
+                update={
+                    "key_id": signer.key_id,
+                    "public_key": base64.urlsafe_b64encode(signer.public_key.public_bytes_raw())
+                    .rstrip(b"=")
+                    .decode(),
+                    "public_key_fingerprint": public_key_fingerprint(signer.public_key),
+                    "revoked_key_fingerprints": [old.public_key_fingerprint],
+                }
+            )
         provider.registry_path.write_bytes(
             canonical_bytes(model_object(registry.model_copy(update={"auto_policies": [pin]})))
         )
@@ -146,22 +170,59 @@ def test_accepted_workflow_remains_visible_after_policy_rotation(
         with closing(sqlite3.connect(provider.database)) as db, db:
             install_auto_policy(db, rotated, WORKSPACE, context.now)
         provider.install_auto_policy_pin(scope)
-        receive(provider.database, "mail:new", "event:new", contact_body())
+        for index in range(100):
+            receive(provider.database, f"mail:new:{index:03}", f"event:new:{index}", contact_body())
+        assert engine._candidate_ids(provider.database, context, rotated)[0] == "mail:1"
+        assert len(engine._candidate_ids(provider.database, context, rotated)) == 100
+        if rotate == "key":
+            finish = provider.finish_progress
+
+            def lost(request):
+                result = finish(request)
+                if request.terminal_state == "completed":
+                    raise OSError("lost complete acknowledgment")
+                return result
+
+            with monkeypatch.context() as fault:
+                fault.setattr(provider, "finish_progress", lost)
+                with pytest.raises(AutoInternalRejected, match="COMPANY_PROGRESS_UNCERTAIN"):
+                    engine.run_auto_internal(
+                        provider.database, rotated, context, provider, trigger()
+                    )
         result = engine.run_auto_internal(provider.database, rotated, context, provider, trigger())
-        assert [(row.candidate_id, row.classification) for row in result.outcomes] == [
-            ("mail:new", "auto_internal"),
-            ("mail:1", "blocked_policy"),
-        ]
+        assert result.outcomes[0].candidate_id == "mail:1"
+        assert result.outcomes[0].classification == "auto_internal"
+        assert result.outcomes[0].effect_count == 1
         with closing(sqlite3.connect(provider.database)) as db:
             assert db.execute(
                 "SELECT state FROM company_memory_candidates WHERE candidate_id='mail:1'"
-            ).fetchone() == ("accepted",)
+            ).fetchone() == ("processed_complete",)
             assert db.execute(
                 "SELECT count(*) FROM company_auto_policy_receipts WHERE candidate_id='mail:1'"
             ).fetchone() == (1,)
             assert db.execute(
                 "SELECT count(*) FROM company_internal_effects WHERE candidate_id='mail:1'"
-            ).fetchone() == (0,)
+            ).fetchone() == (1,)
+            assert (
+                db.execute(
+                    "SELECT * FROM company_auto_policy_receipts WHERE candidate_id='mail:1'"
+                ).fetchall()
+                == authority_before
+            )
+            assert (
+                db.execute(
+                    "SELECT * FROM company_candidate_execution_claims WHERE candidate_id='mail:1'"
+                ).fetchall()
+                == claims_before
+            )
+            assert (
+                db.execute(
+                    "SELECT * FROM company_memory_receipts WHERE candidate_id='mail:1' AND operation='accept'"
+                ).fetchall()
+                == accepts_before
+            )
+        replay = engine.run_auto_internal(provider.database, rotated, context, provider, trigger())
+        assert all(row.candidate_id != "mail:1" for row in replay.outcomes)
         with pytest.raises(AnchorRejected):
             engine.run_auto_internal(provider.database, settings, context, provider, trigger())
         return
@@ -171,6 +232,76 @@ def test_accepted_workflow_remains_visible_after_policy_rotation(
         assert db.execute("SELECT state FROM company_memory_candidates").fetchone() == (
             "processed_complete",
         )
+
+
+@pytest.mark.parametrize(
+    "column,value",
+    [
+        ("event_digest", "sha256:" + "ff" * 32),
+        ("reservation_id", "reservation:unrelated"),
+        ("reserve_expected_json", "{}"),
+    ],
+)
+def test_accepted_resume_rejects_changed_original_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, column: str, value: str
+) -> None:
+    provider, settings, context = real_company_runtime(tmp_path)
+    receive(provider.database, "mail:1", "event:1", contact_body())
+    transition = engine._transition
+
+    def crash(*args, **kwargs):
+        if args[7] == "complete":
+            raise RuntimeError("accepted only")
+        return transition(*args, **kwargs)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(engine, "_transition", crash)
+        with pytest.raises(RuntimeError, match="accepted only"):
+            engine.run_auto_internal(provider.database, settings, context, provider, trigger())
+    with closing(sqlite3.connect(provider.database)) as db, db:
+        # Fixture-only corrupt restore: bypass SQL guards to exercise anchor/cache auditing.
+        db.execute("DROP TRIGGER company_freshness_operation_finish_once")
+        db.execute("DROP TRIGGER company_freshness_operation_identity")
+        db.execute(f"UPDATE company_freshness_operations SET {column}=?", (value,))
+    with pytest.raises((AnchorRejected, AutoInternalRejected), match="COMPANY_"):
+        engine.run_auto_internal(provider.database, settings, context, provider, trigger())
+    with closing(sqlite3.connect(provider.database)) as db:
+        assert db.execute("SELECT state FROM company_memory_candidates").fetchall() == [
+            ("accepted",)
+        ]
+        assert db.execute("SELECT count(*) FROM company_internal_effects").fetchone() == (0,)
+        assert db.execute("SELECT count(*) FROM company_auto_policy_receipts").fetchone() == (1,)
+        assert db.execute("SELECT count(*) FROM company_candidate_execution_claims").fetchone() == (
+            1,
+        )
+
+
+def test_human_acceptance_is_not_an_auto_continuation(tmp_path: Path) -> None:
+    provider, settings, context = real_company_runtime(tmp_path)
+    receive(provider.database, "mail:human", "event:human", contact_body())
+    scope = FreshnessScope(
+        provider_instance_id=settings.provider_instance_id, workspace_id=WORKSPACE
+    )
+    with closing(sqlite3.connect(provider.database)) as db, db:
+        db.execute("UPDATE company_memory_candidates SET state='accepted'")
+        db.execute(
+            """INSERT INTO company_candidate_execution_claims
+            SELECT ?,workspace_id,candidate_id,content_digest,'human','original-human-request',?
+            FROM company_memory_candidates""",
+            (settings.provider_instance_id, format_instant(context.now)),
+        )
+    assert engine._candidate_ids(provider.database, context, settings) == ()
+    before = local_checkpoint(provider.database, WORKSPACE, None)
+    assert before is not None
+    outcome, after = engine._one(
+        provider.database, settings, context, provider, scope, "mail:human", before, trigger()
+    )
+    assert outcome.classification == "skipped_human" and outcome.effect_count == 0
+    assert after == before
+    with closing(sqlite3.connect(provider.database)) as db:
+        assert db.execute("SELECT state FROM company_memory_candidates").fetchone() == ("accepted",)
+        assert db.execute("SELECT count(*) FROM company_internal_effects").fetchone() == (0,)
+        assert db.execute("SELECT count(*) FROM company_auto_policy_receipts").fetchone() == (0,)
 
 
 @pytest.mark.parametrize(

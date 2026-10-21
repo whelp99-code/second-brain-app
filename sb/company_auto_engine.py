@@ -31,6 +31,7 @@ from sb.company_auto_policy import (
     verify_policy_receipt,
 )
 from sb.company_auto_publication import InternalAutoJournal
+from sb.company_auto_recovery import AcceptedAutoAuthority, accepted_auto_authority
 from sb.company_auto_settings import (
     FIXED_TRIGGER_LIMIT,
     AutoInternalContext,
@@ -138,6 +139,9 @@ def run_auto_internal(
         public_key_fingerprint(settings.signer.public_key),
         source_context_digest(settings.provider_instance_id, context),
     )
+    checkpoint = local_checkpoint(database, context.workspace_id, None)
+    if checkpoint is None:
+        raise AutoInternalRejected("COMPANY_OPERATIONAL_ROLLBACK")
     context = replace(context, observed_checkpoint=checkpoint)
     checkpoint = _require_ready(database, provider, settings, context, scope)
     with closing(sqlite3.connect(database)) as db:
@@ -145,7 +149,7 @@ def run_auto_internal(
     if pending_reserve is None:
         checkpoint = provider.publish_completed_assessments(scope, checkpoint)
     outcomes: list[AutoCandidateOutcome] = []
-    candidates = (
+    candidates = list(
         (pending_reserve.candidate_id,)
         if pending_reserve is not None
         else _candidate_ids(database, context, settings)
@@ -167,6 +171,14 @@ def run_auto_internal(
         outcomes.append(outcome)
         if outcome.uncertain:
             break
+        if pending_reserve is not None and outcome.classification == "skipped_expired":
+            candidates.extend(
+                candidate
+                for candidate in _candidate_ids(database, context, settings)
+                if candidate != candidate_id
+            )
+            del candidates[FIXED_TRIGGER_LIMIT:]
+            pending_reserve = None
     return AutoRunResult(tuple(outcomes), checkpoint)
 
 
@@ -218,6 +230,7 @@ def _one(
             candidate_id, "human_required", 0, (), ("source_unknown",), False
         ), checkpoint
     candidate, deletion = loaded
+    continuation: AcceptedAutoAuthority | None = None
     if deletion != (context.deletion_sequence, context.deletion_set_root):
         return _outcome(
             candidate_id, "human_required", 0, (), ("fence_advanced",), False
@@ -227,6 +240,29 @@ def _one(
             return _outcome(
                 candidate_id, "skipped_human", 0, (), ("human_path",), False
             ), checkpoint
+        if candidate.state == "candidate":
+            expired = db.execute(
+                """SELECT r.receipt_json FROM company_auto_policy_receipts r
+                JOIN company_candidate_execution_claims w
+                  ON w.provider_instance_id=r.provider_instance_id AND w.workspace_id=r.workspace_id
+                  AND w.candidate_id=r.candidate_id AND w.content_digest=r.content_digest
+                  AND w.workflow_request_id=r.auto_request_id AND w.path='auto_internal'
+                WHERE r.provider_instance_id=? AND r.workspace_id=? AND r.candidate_id=?
+                  AND r.content_digest=?""",
+                (
+                    scope.provider_instance_id,
+                    scope.workspace_id,
+                    candidate_id,
+                    candidate.content_digest,
+                ),
+            ).fetchall()
+            if len(expired) > 1:
+                raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
+            if expired and receipt_expired(
+                PolicyAutoReceiptV1.model_validate_json(expired[0][0], strict=True),
+                format_instant(context.now),
+            ):
+                return _skip_expired_attempt(database, provider, scope, candidate_id, checkpoint)
         if candidate.state == "accepted":
             original_auto: list[tuple[str]] = db.execute(
                 """SELECT r.policy_digest FROM company_auto_policy_receipts r
@@ -253,10 +289,11 @@ def _one(
                     ("human_path",),
                     False,
                 ), checkpoint
-            if len(original_auto) != 1 or original_auto[0][0] != policy_digest(settings.policy):
-                return _outcome(
-                    candidate_id, "blocked_policy", 0, (), ("policy_changed",), False
-                ), checkpoint
+            if isinstance(provider, CompanyDbFreshnessProvider):
+                continuation = accepted_auto_authority(db, scope, candidate_id)
+                settings = replace(settings, policy=continuation.policy)
+            elif len(original_auto) != 1 or original_auto[0][0] != policy_digest(settings.policy):
+                raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
     classified = classify_mail_candidate(candidate)
     kind = classified.record_kind
     reasons = classified.reason_codes
@@ -324,6 +361,8 @@ def _one(
     if original:
         receipt = PolicyAutoReceiptV1.model_validate_json(original[0][0])
     else:
+        if candidate.state == "accepted":
+            raise AutoInternalRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         unsigned = build_unsigned_receipt(
             settings,
             scope=scope,
@@ -335,7 +374,9 @@ def _one(
             issued_at=format_instant(context.now),
         )
         receipt = sign_policy_receipt(settings.signer, unsigned)
-    verify_policy_receipt(receipt, settings.signer.public_key)
+    verify_policy_receipt(
+        receipt, continuation.public_key if continuation is not None else settings.signer.public_key
+    )
     if (
         receipt.scope != scope
         or receipt.auto_request_id != request_id
@@ -396,6 +437,7 @@ def _one(
                 deletion,
                 (kind, fields, candidate.source_event_id),
                 trigger=trigger,
+                continuation=continuation,
             )
         except AutoInternalRejected as exc:
             if exc.code != "READBACK_FAILED":
@@ -421,6 +463,7 @@ def _one(
             deletion,
             None,
             trigger=trigger,
+            continuation=continuation,
         )
         receipts.append("cmreceipt:v1:" + evidence.removeprefix("sha256:"))
     checkpoint = provider.publish_assessment(scope, assessed, checkpoint)
@@ -444,11 +487,14 @@ def _transition(
     effect: tuple[str, dict[str, str], str] | None,
     *,
     trigger: AutoTriggerGrant,
+    continuation: AcceptedAutoAuthority | None = None,
 ) -> tuple[Checkpoint, str]:
     if context.clock is not None:
         context = replace(context, now=context.clock())
     require_live_trigger(trigger, context.now)
-    if policy_digest(settings.policy) in settings.revoked_policy_digests:
+    if continuation and operation == "accept":
+        raise AutoInternalRejected("POLICY_RECEIPT_REJECTED")
+    if not continuation and policy_digest(settings.policy) in settings.revoked_policy_digests:
         raise AutoInternalRejected("POLICY_REVOKED")
     operation_id = _operation_identity(scope, request_id, command_digest_value, operation)
     request_digest = memory_request_digest(operation, candidate.candidate_id, request_id)
@@ -493,6 +539,7 @@ def _transition(
                     request_id,
                     command_digest_value,
                     operation,
+                    continuation=continuation,
                 )
             except AutoInternalRejected:
                 authorization_rejected = True
@@ -576,7 +623,6 @@ def _transition(
             if (
                 authorization_rejected
                 and operation == "accept"
-                and reservation.outcome == "reserved"
                 and isinstance(provider, CompanyDbFreshnessProvider)
             ):
                 provider.cancel_unapplied_under_guard(scope, operation_id, reservation, checkpoint)
@@ -591,6 +637,34 @@ def _transition(
     finished = _finish(provider, pending)
     _delete_pending(database, context.workspace_id, scope, pending, finished)
     return finished, evidence
+
+
+def _skip_expired_attempt(
+    database: Path,
+    provider: InternalAutoJournal,
+    scope: FreshnessScope,
+    candidate_id: str,
+    checkpoint: Checkpoint,
+) -> tuple[AutoCandidateOutcome, Checkpoint]:
+    with closing(sqlite3.connect(database)) as db:
+        intent = pending_auto_reserve(db, scope)
+    if intent is not None:
+        if intent.candidate_id != candidate_id or not isinstance(
+            provider, CompanyDbFreshnessProvider
+        ):
+            raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
+        reservation = _reserve(provider, intent.request)
+        with provider.effect_guard(scope, intent.request.operation_id, reservation):
+            provider.cancel_unapplied_under_guard(
+                scope, intent.request.operation_id, reservation, checkpoint
+            )
+        current = local_checkpoint(database, scope.workspace_id, None)
+        if current is None:
+            raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
+        checkpoint = current
+    return _outcome(
+        candidate_id, "skipped_expired", 0, (), ("policy_receipt_expired",), False
+    ), checkpoint
 
 
 def _reserve(
@@ -765,11 +839,16 @@ def _candidate_ids(
               AND NOT EXISTS(SELECT 1 FROM json_each(c.projects_json) p
                 WHERE p.value NOT IN (SELECT value FROM json_each(?)))
               AND (json_array_length(c.projects_json)>0 OR ?='[]')
-            ORDER BY (c.state='accepted' AND NOT EXISTS(
+              AND NOT (c.state='candidate' AND EXISTS(
                 SELECT 1 FROM company_auto_policy_receipts r
+                JOIN company_candidate_execution_claims w
+                  ON w.provider_instance_id=r.provider_instance_id AND w.workspace_id=r.workspace_id
+                  AND w.candidate_id=r.candidate_id AND w.content_digest=r.content_digest
+                  AND w.workflow_request_id=r.auto_request_id AND w.path='auto_internal'
                 WHERE r.provider_instance_id=? AND r.workspace_id=c.workspace_id
                   AND r.candidate_id=c.candidate_id AND r.content_digest=c.content_digest
-                  AND r.policy_digest=?)),
+                  AND json_extract(r.receipt_json,'$.expires_at')<=?))
+            ORDER BY (c.state='accepted') DESC,
               EXISTS(SELECT 1 FROM company_auto_assessments a
                 WHERE a.provider_instance_id=? AND a.workspace_id=c.workspace_id
                   AND a.candidate_id=c.candidate_id AND a.policy_digest=?),
@@ -785,7 +864,7 @@ def _candidate_ids(
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 canonical_bytes(list(context.projects)).decode("utf-8"),
                 settings.provider_instance_id,
-                policy_digest(settings.policy),
+                format_instant(context.now),
                 settings.provider_instance_id,
                 policy_digest(settings.policy),
                 FIXED_TRIGGER_LIMIT,

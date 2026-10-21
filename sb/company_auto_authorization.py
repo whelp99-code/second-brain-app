@@ -12,6 +12,7 @@ from sb.company_auto_policy import (
     receipt_expired,
     verify_policy_receipt,
 )
+from sb.company_auto_recovery import AcceptedAutoAuthority, accepted_auto_authority
 from sb.company_auto_settings import AutoInternalContext, AutoInternalRejected, AutoInternalSettings
 from sb.company_db_freshness_evidence import verify_memory_receipt
 from sb.company_freshness_models import FreshnessScope
@@ -29,7 +30,18 @@ def require_auto_transaction(
     request_id: str,
     command_digest: str,
     operation: Literal["accept", "complete", "mark_processed"],
+    *,
+    continuation: AcceptedAutoAuthority | None = None,
 ) -> None:
+    if continuation:
+        if operation == "accept":
+            raise AutoInternalRejected("POLICY_RECEIPT_REJECTED")
+        original = accepted_auto_authority(db, scope, candidate.candidate_id)
+        if (
+            policy_digest(original.policy) != policy_digest(settings.policy)
+            or original.public_key.public_bytes_raw() != continuation.public_key.public_bytes_raw()
+        ):
+            raise AutoInternalRejected("POLICY_RECEIPT_REJECTED")
     rows: list[
         tuple[
             str,
@@ -100,7 +112,9 @@ def require_auto_transaction(
     if len(originals) != 1:
         raise AutoInternalRejected("POLICY_RECEIPT_REJECTED")
     receipt = PolicyAutoReceiptV1.model_validate_json(originals[0][0], strict=True)
-    verify_policy_receipt(receipt, settings.signer.public_key)
+    verify_policy_receipt(
+        receipt, continuation.public_key if continuation is not None else settings.signer.public_key
+    )
     if (
         receipt.scope != scope
         or receipt.auto_request_id != request_id
@@ -109,7 +123,7 @@ def require_auto_transaction(
         or receipt.source_event_id != candidate.source_event_id
         or receipt.command_digest != command_digest
         or receipt.policy_digest != policy_digest(settings.policy)
-        or receipt.policy_digest in settings.revoked_policy_digests
+        or (not continuation and receipt.policy_digest in settings.revoked_policy_digests)
         or operation not in receipt.allowed_operations
         or (operation == "accept" and receipt_expired(receipt, format_instant(context.now)))
     ):
