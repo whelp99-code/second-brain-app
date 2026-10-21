@@ -1,4 +1,4 @@
-"""Actual processor-path progress ordering with a surviving TEST_ONLY registry."""
+"""Config-factory processor ordering with a surviving TEST_ONLY registry."""
 
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ def scenario(
     proposal = first_proposal(handoff(config))
     provider = ObservedProvider(config)
     arguments = operation_arguments(config, proposal, provider, operation)
+    selections_before = len(provider.factory_configs)
     database = root / "company" / "company.db"
     backup, fixed_config = database.read_bytes(), config.read_bytes()
     provider.finish_mode = finish
@@ -87,9 +88,13 @@ def scenario(
     assert restored == database.read_bytes() and config.read_bytes() == fixed_config
     assert len(provider.reservations) == expected_reservations == 2
     assert len(provider.finishes) == expected_finishes
+    factory_selections = len(provider.factory_configs) - selections_before
+    assert factory_selections == 3 + (finish != "normal")
     return {
         "operation": operation,
         "finish": finish,
+        "configuration_selected": True,
+        "factory_selections": factory_selections,
         "reserve_before_effect": True,
         "effect_committed_before_finish": True,
         "same_provider_survived_restore": True,

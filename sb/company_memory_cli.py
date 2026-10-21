@@ -355,12 +355,6 @@ def _run(
     )
     instant = now or datetime.now(UTC)
     provider = freshness_provider or provider_from_config(config.freshness_provider)
-    # Preserve the unavailable product's early refusal. Recovery below is only
-    # reached after authenticating a caller that can finish committed work.
-    if freshness_provider is None and (handoff_only or enroll_handoff or process_only):
-        assert policy is not None
-        observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
-        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
     if process_only or receipt_only:
         assert policy is not None
         _ = verify_company_authority(

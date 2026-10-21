@@ -6,7 +6,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 from sb.company_memory_authority import company_request_digest
@@ -30,15 +30,15 @@ def invoke(
     config: Path, action: str, payload: bytes, *, later: bool = False, test_provider: bool = True
 ) -> subprocess.CompletedProcess[bytes]:
     at = NOW + timedelta(hours=25) if later else NOW
-    command = (
-        [sys.executable, "-m", "tests.company_approver_test_cli", "--test-now", format_instant(at)]
-        if test_provider
-        else [
-            sys.executable,
-            "-m",
-            "sb.company_memory_cli",
-        ]
-    )
+    command = [
+        sys.executable,
+        "-m",
+        "tests.company_approver_test_cli",
+        "--test-now",
+        format_instant(at),
+    ]
+    if not test_provider:
+        command.append("--test-no-provider")
     return subprocess.run(
         [*command, action, "--config", str(config)],
         input=payload,
@@ -61,6 +61,7 @@ def scenario(root: Path, operation: str) -> JsonObject:
             {},
             ENROLL_KEY,
             "enroll",
+            at=NOW,
         ),
         test_provider=False,
     )
@@ -113,7 +114,7 @@ def scenario(root: Path, operation: str) -> JsonObject:
         "approval_policy_version": command["args"]["approval_policy_version"],
         "approval_binding_digest": command["args"]["approval_binding_digest"],
     }
-    read_at = datetime.now(UTC)
+    read_at = NOW + timedelta(hours=25)
     fresh_read = signed_request(
         "read_transition_receipt",
         selector,
@@ -123,7 +124,7 @@ def scenario(root: Path, operation: str) -> JsonObject:
         read_at,
     )
     before_read = database.read_bytes()
-    recovered = invoke(config, "receipt", fresh_read, test_provider=False)
+    recovered = invoke(config, "receipt", fresh_read, later=True, test_provider=False)
     assert recovered.returncode == 0, recovered.stderr.decode()
     response = decoded_object(recovered.stdout)
     receipt = response["receipt"]
