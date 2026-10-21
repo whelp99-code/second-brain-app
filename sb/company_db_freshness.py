@@ -86,7 +86,12 @@ from sb.company_freshness_deletion import (
     original_deletion_fact,
     verify_original_deletion,
 )
-from sb.company_freshness_genesis import audit_owned_receipts, verify_owned_genesis
+from sb.company_freshness_genesis import (
+    audit_owned_pending,
+    audit_owned_receipts,
+    default_transition_unenrolled,
+    verify_owned_genesis,
+)
 from sb.company_freshness_migrations import migration_applied
 from sb.company_freshness_models import (
     TERMINAL_STATE_BY_OPERATION,
@@ -992,6 +997,11 @@ class CompanyDbFreshnessProvider:
             "terminal_state": request.terminal_state,
             "state": "finished",
         }
+        if self.actor_store == "second_brain" and existing.operation in {"accept", "reject"}:
+            with closing(_connect(self.database)) as db:
+                record["default_transition_authority"] = default_transition_unenrolled(
+                    db, request.scope.workspace_id
+                )
         if sidecar is not None and context is not None and policy is not None:
             record["jarvis_evidence"] = model_object(
                 JarvisRecoveryEvidence(sidecar=sidecar, context=context, policy=policy)
@@ -1271,7 +1281,39 @@ class CompanyDbFreshnessProvider:
         operations = audit_operation_cache(connection, entries)
         try:
             audit_owned_receipts(connection, entries, operations)
-        except EvidenceRejected as exc:
+            audit_owned_pending(connection, entries, operations, self._registry())
+            indexed = {
+                (
+                    item.scope.provider_instance_id,
+                    item.scope.workspace_id,
+                    item.row.operation_id,
+                ): item.row
+                for item in operations
+            }
+            for entry in entries:
+                if entry.phase != "finish" or entry.record.get("terminal_state") == "cancelled":
+                    continue
+                original = indexed.get(
+                    (entry.scope.provider_instance_id, entry.scope.workspace_id, entry.operation_id)
+                )
+                if (
+                    original is not None
+                    and original.actor_store == "second_brain"
+                    and original.operation == "complete"
+                ):
+                    digest = entry.record.get("evidence_digest")
+                    if not isinstance(digest, str):
+                        raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+                    _verify_internal_effect(
+                        connection,
+                        entry.scope,
+                        original.operation_id,
+                        original.event_digest,
+                        digest,
+                        self._registry(),
+                        reclassify=False,
+                    )
+        except (EvidenceRejected, ValueError) as exc:
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
         return entries, operations, frames
 
@@ -1721,7 +1763,7 @@ class CompanyDbFreshnessProvider:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             connection = _connect(self.database)
             try:
-                verify_owned_genesis(
+                default_transition_receipts = verify_owned_genesis(
                     connection,
                     scope,
                     inventory,
@@ -1742,6 +1784,7 @@ class CompanyDbFreshnessProvider:
                 "phase": "bootstrap",
                 "epoch": 1,
                 "inventory": model_object(inventory),
+                "default_transition_receipts": default_transition_receipts,
                 "source_deletion_sequence": pin.source_deletion_sequence,
                 "source_deletion_root": pin.source_deletion_root,
                 "source_context_digest": pin.source_context_digest,

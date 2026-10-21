@@ -97,7 +97,8 @@ def verify_auto_cancellation(
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
     if db.execute(
         """SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND candidate_id=?
-        AND (?='accept' OR operation!='accept')""",
+        AND (operation NOT IN ('receive','read','accept')
+          OR (operation='accept' AND ?='accept'))""",
         (scope.workspace_id, intent.candidate_id, request.operation),
     ).fetchone():
         raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")

@@ -56,6 +56,8 @@ def verify_auto_authority(
     scope: FreshnessScope,
     request_id: str,
     candidate_id: str,
+    *,
+    reclassify: bool = True,
 ) -> None:
     scope_pins = [
         pin
@@ -142,7 +144,11 @@ def verify_auto_authority(
         break
     if not verified:
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
-    payload = verified_auto_assessment(db, scope, candidate, receipt, command)
+    payload = (
+        verified_auto_assessment(db, scope, candidate, receipt, command)
+        if reclassify
+        else verify_auto_assessment_evidence(db, scope, candidate, receipt, command)
+    )
     field_values: JsonObject = dict(payload.fields)
     records: list[tuple[str]] = db.execute(
         """SELECT r.payload_json FROM company_internal_records r

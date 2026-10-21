@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
-from contextlib import closing
+from contextlib import closing, nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
@@ -94,9 +94,10 @@ def insert_assessment(
     created_at: str,
 ) -> None:
     existing = cast(
-        tuple[str, str] | None,
+        tuple[str, str, str, str | None, str] | None,
         db.execute(
-            """SELECT assessment_digest, classification FROM company_auto_assessments
+            """SELECT assessment_digest, classification, reason_codes_json,
+            typed_payload_json, classifier_version FROM company_auto_assessments
         WHERE provider_instance_id=? AND workspace_id=? AND candidate_id=?
         AND content_digest=? AND policy_digest=?""",
             (
@@ -111,7 +112,13 @@ def insert_assessment(
     payload_json = None if payload is None else canonical_bytes(payload).decode("utf-8")
     reasons = canonical_bytes(list(reason_codes)).decode("utf-8")
     if existing is not None:
-        if existing[0] != assessment_digest_value or existing[1] != classification:
+        if existing != (
+            assessment_digest_value,
+            classification,
+            reasons,
+            payload_json,
+            CLASSIFIER_VERSION,
+        ):
             raise AutoInternalRejected("ASSESSMENT_CONFLICT")
         return
     _ = db.execute(
@@ -492,14 +499,19 @@ def insert_effect(
 
 
 def verify_internal_readback(
-    database: Path,
+    database: Path | sqlite3.Connection,
     scope: FreshnessScope,
     operation_id: str,
     expected_digest: str,
 ) -> bool:
-    uri = f"{database.resolve().as_uri()}?mode=ro"
-    with closing(sqlite3.connect(uri, uri=True)) as db:
-        _ = db.execute("PRAGMA query_only=ON")
+    connection = (
+        nullcontext(database)
+        if isinstance(database, sqlite3.Connection)
+        else closing(sqlite3.connect(f"{database.resolve().as_uri()}?mode=ro", uri=True))
+    )
+    with connection as db:
+        if not isinstance(database, sqlite3.Connection):
+            _ = db.execute("PRAGMA query_only=ON")
         effect = cast(
             tuple[str, str, str, str] | None,
             db.execute(

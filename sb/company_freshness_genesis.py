@@ -13,9 +13,11 @@ from sb.company_approver_binding import (
     decode_key,
     public_key_fingerprint,
 )
+from sb.company_auto_intents import PendingAutoReserve
 from sb.company_auto_policy import (
     PolicyAutoReceiptV1,
     auto_request_id,
+    command_digest,
     policy_digest,
     verify_policy_receipt,
 )
@@ -26,13 +28,14 @@ from sb.company_db_freshness_hash import operation_id_for
 from sb.company_db_freshness_integrity import CachedOperation, JournalEntry
 from sb.company_db_freshness_models import (
     EvidenceRejected,
+    FreshnessRegistry,
     GenesisEntry,
     GenesisInventory,
     OperationRow,
     RegistryAutoPolicyPin,
 )
 from sb.company_freshness_models import Checkpoint, FreshnessScope, ReserveProgressResponse
-from sb.company_internal_effects import memory_request_digest
+from sb.company_internal_effects import candidate_result, memory_request_digest
 from sb.company_memory import MemoryCandidate
 from sb.company_memory_authority import CompanyAuthorityContext, company_request_digest
 from sb.company_transition_receipt import TransitionReceiptSelector, read_original_receipt
@@ -77,7 +80,8 @@ def verify_owned_genesis(
     *,
     exact: bool,
     approval_binding_digest: str,
-) -> None:
+    default_transition_receipts: tuple[str, ...] = (),
+) -> list[str]:
     receipts, terminals = owned_genesis_receipts(db, scope)
     for expected, actual in (
         (inventory.second_brain_receipts, receipts),
@@ -92,6 +96,8 @@ def verify_owned_genesis(
             else any(observed.get(key) != value for key, value in wanted.items())
         ):
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+    defaults: list[str] = []
+    unenrolled = exact and default_transition_unenrolled(db, scope.workspace_id)
     for entry in inventory.second_brain_receipts:
         row = db.execute(
             """SELECT operation,request_digest FROM company_memory_receipts
@@ -100,10 +106,34 @@ def verify_owned_genesis(
         ).fetchone()
         if row is None:
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
-        if row[0] in {"accept", "reject"}:
-            _require_transition_authority(
-                db, scope, row[0], row[1], entry.source_digest, approval_binding_digest
-            )
+        if row[0] in {"accept", "reject"} and _require_transition_authority(
+            db,
+            scope,
+            row[0],
+            row[1],
+            entry.source_digest,
+            approval_binding_digest,
+            allow_default=bool(unenrolled) or entry.source_record_id in default_transition_receipts,
+        ):
+            defaults.append(entry.source_record_id)
+    if not exact and set(defaults) != set(default_transition_receipts):
+        raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+    return defaults
+
+
+def default_transition_unenrolled(db: sqlite3.Connection, workspace_id: str) -> bool:
+    """Absence of both live enrollment and its immutable audit at issuance."""
+    for table in ("company_handoff_enrollment", "company_approver_enrollment_audit"):
+        if (
+            db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()
+            and db.execute(
+                f"SELECT 1 FROM {table} WHERE workspace_id=?", (workspace_id,)
+            ).fetchone()
+        ):
+            return False
+    return True
 
 
 def audit_owned_receipts(
@@ -126,12 +156,16 @@ def audit_owned_receipts(
             continue
         scope = bootstrap.scope
         inventory = GenesisInventory.model_validate(bootstrap.record.get("inventory"), strict=True)
+        defaults = bootstrap.record.get("default_transition_receipts", [])
+        if not isinstance(defaults, list) or not all(isinstance(value, str) for value in defaults):
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         verify_owned_genesis(
             db,
             scope,
             inventory,
             exact=False,
             approval_binding_digest=bootstrap.after.approval_binding_digest,
+            default_transition_receipts=tuple(defaults),
         )
         wanted = {entry.source_record_id: entry for entry in inventory.second_brain_receipts}
         for item in operations:
@@ -201,6 +235,11 @@ def audit_owned_receipts(
                     original.event_digest,
                     digest,
                     bootstrap.after.approval_binding_digest,
+                    allow_default=(
+                        default_transition_unenrolled(db, scope.workspace_id)
+                        if finish is None
+                        else finish.record.get("default_transition_authority") is True
+                    ),
                 )
             entry = GenesisEntry(
                 source_record_id=verified.source_record_id,
@@ -223,7 +262,9 @@ def _require_transition_authority(
     request_digest: str,
     receipt_digest: str,
     anchored_binding: str,
-) -> None:
+    *,
+    allow_default: bool = False,
+) -> bool:
     """Bind the original human SQL receipt to its outbox and pinned signed decision.
 
     Only the exact auto request digest can select the separate policy-receipt path.
@@ -239,16 +280,13 @@ def _require_transition_authority(
         if row is None:
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         candidate, raw = row
-        # The default un-enrolled memory writer remains a separate path. Its
-        # exact request preimage cannot be substituted for a signed handoff.
+        # Published default authority belongs only to this original receipt,
+        # never inferred from today's enrollment or reused for a new operation.
         if (
             request_digest == company_request_digest(operation, {"candidate_id": candidate})
-            and not db.execute(
-                "SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?",
-                (scope.workspace_id,),
-            ).fetchone()
+            and allow_default
         ):
-            return
+            return True
         if (
             operation == "accept"
             and db.execute(
@@ -265,7 +303,7 @@ def _require_transition_authority(
                 "accept", candidate, claims[0][0]
             ):
                 _require_auto_authority(db, scope, candidate, claims[0][0], raw)
-                return
+                return False
         enrollment = db.execute(
             "SELECT evidence_json FROM company_approver_enrollment_audit WHERE workspace_id=?",
             (scope.workspace_id,),
@@ -321,6 +359,7 @@ def _require_transition_authority(
         )
         if original is None or original.get("receipt_digest") != receipt_digest:
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        return False
     except (ValueError, sqlite3.Error, KeyError, TypeError) as exc:
         raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT") from exc
 
@@ -475,3 +514,239 @@ def _require_pending_receipt(
             pending_count += 1
     if pending_count != 1:
         raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+
+
+def audit_owned_pending(
+    db: sqlite3.Connection,
+    entries: list[JournalEntry],
+    operations: list[CachedOperation],
+    registry: FreshnessRegistry,
+) -> None:
+    """Pending SQL is recovery evidence only when bound to the original issuance.
+
+    Permit pre-reserve and post-finish/pre-cleanup crashes, but never an orphan
+    row that can monopolize the automatic batch or manufacture a finish.
+    """
+    indexed = {
+        (item.scope.provider_instance_id, item.scope.workspace_id, item.row.operation_id): item.row
+        for item in operations
+    }
+    tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "company_internal_pending_reserve" in tables:
+        for provider, workspace, raw in db.execute(
+            "SELECT provider_instance_id,workspace_id,intent_json FROM company_internal_pending_reserve"
+        ):
+            intent = PendingAutoReserve.model_validate_json(raw, strict=True)
+            request = intent.request
+            scope = request.scope
+            original = indexed.get((provider, workspace, request.operation_id))
+            if (
+                (provider, workspace) != (scope.provider_instance_id, scope.workspace_id)
+                or request.operation not in {"accept", "complete", "mark_processed"}
+                or request.event_digest
+                != memory_request_digest(
+                    request.operation, intent.candidate_id, intent.auto_request_id
+                )
+                or request.operation_id
+                != operation_id_for(
+                    scope,
+                    request_id=intent.auto_request_id,
+                    command_digest=intent.command_digest,
+                    operation=request.operation,
+                )
+                or not any(
+                    entry.scope == scope
+                    and entry.published_sequence is not None
+                    and entry.after == request.expected_checkpoint
+                    for entry in entries
+                )
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            if original is not None and (
+                original.state != "reserved"
+                or original.actor_store != "second_brain"
+                or original.operation != request.operation
+                or original.event_digest != request.event_digest
+                or original.reserve_expected_json
+                != canonical_bytes(request.expected_checkpoint.model_dump(mode="json")).decode()
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            rows = db.execute(
+                """SELECT r.receipt_json,r.auto_command_json FROM company_auto_policy_receipts r
+                JOIN company_candidate_execution_claims c
+                  ON c.provider_instance_id=r.provider_instance_id AND c.workspace_id=r.workspace_id
+                  AND c.candidate_id=r.candidate_id AND c.content_digest=r.content_digest
+                  AND c.path='auto_internal' AND c.workflow_request_id=r.auto_request_id
+                WHERE r.provider_instance_id=? AND r.workspace_id=? AND r.candidate_id=?
+                  AND r.auto_request_id=?""",
+                (provider, workspace, intent.candidate_id, intent.auto_request_id),
+            ).fetchall()
+            if len(rows) != 1:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            receipt = PolicyAutoReceiptV1.model_validate_json(rows[0][0], strict=True)
+            command = strict_loads(rows[0][1], 1_048_576)
+            pins = [
+                pin
+                for pin in registry.scopes
+                if pin.provider_instance_id == provider and pin.workspace_id == workspace
+            ]
+            if (
+                len(pins) != 1
+                or pins[0].source_deletion_sequence is None
+                or pins[0].source_deletion_root is None
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            candidate = TypeAdapter(MemoryCandidate).validate_json(
+                canonical_bytes(
+                    candidate_result(
+                        db,
+                        workspace,
+                        intent.candidate_id,
+                        (pins[0].source_deletion_sequence, pins[0].source_deletion_root),
+                    )
+                ),
+                strict=True,
+            )
+            policy_pins = [
+                RegistryAutoPolicyPin.model_validate(entry.record.get("pin"), strict=True)
+                for entry in entries
+                if entry.scope == scope
+                and entry.published_sequence is not None
+                and entry.record.get("kind") == "internal_auto_policy"
+                and entry.record.get("pin", {}).get("policy_digest") == receipt.policy_digest
+            ]
+            if (
+                not isinstance(command, dict)
+                or command_digest(command) != intent.command_digest
+                or receipt.command_digest != intent.command_digest
+                or receipt.auto_request_id != intent.auto_request_id
+                or auto_request_id(
+                    scope, candidate.candidate_id, candidate.content_digest, receipt.policy_digest
+                )
+                != intent.auto_request_id
+                or request.operation not in receipt.allowed_operations
+                or candidate.state != ("candidate" if request.operation == "accept" else "accepted")
+            ):
+                raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+            verified = False
+            for pin in policy_pins:
+                key = decode_key(pin.public_key)
+                if public_key_fingerprint(key) != pin.public_key_fingerprint:
+                    raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+                try:
+                    verify_policy_receipt(receipt, key)
+                except ValueError:
+                    continue
+                verified = True
+                break
+            if not verified:
+                raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
+            verify_auto_assessment_evidence(db, scope, candidate, receipt, command)
+            if (
+                db.execute(
+                    "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
+                    (workspace, request.event_digest),
+                ).fetchone()
+                or db.execute(
+                    "SELECT 1 FROM company_internal_effects WHERE provider_instance_id=? AND workspace_id=? AND operation_id=?",
+                    (provider, workspace, request.operation_id),
+                ).fetchone()
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+    for table in ("company_processor_pending_finish", "company_internal_pending_finish"):
+        if table not in tables:
+            continue
+        provider_column = (
+            "provider_instance_id" if table == "company_internal_pending_finish" else "NULL"
+        )
+        for provider, workspace, digest, raw in db.execute(
+            f"SELECT {provider_column},workspace_id,request_digest,pending_json FROM {table}"
+        ):
+            pending = strict_loads(raw, 1_048_576)
+            if not isinstance(pending, dict) or not isinstance(pending.get("operation_id"), str):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            reservation = ReserveProgressResponse.model_validate(
+                pending.get("reservation"), strict=True
+            )
+            scope = reservation.scope
+            original = indexed.get(
+                (scope.provider_instance_id, workspace, pending.get("operation_id"))
+            )
+            checkpoint = (
+                db.execute(
+                    "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
+                    (workspace,),
+                ).fetchone()
+                if "company_processor_checkpoint" in tables
+                else None
+            )
+            if (
+                scope.workspace_id != workspace
+                or original is None
+                or (provider is not None and provider != scope.provider_instance_id)
+                or original.actor_store != "second_brain"
+                or original.event_digest != digest
+                or (checkpoint is None and table == "company_internal_pending_finish")
+                or (
+                    table == "company_internal_pending_finish"
+                    and checkpoint is not None
+                    and Checkpoint.model_validate_json(checkpoint[0], strict=True)
+                    != reservation.checkpoint
+                )
+                or original.terminal_state == "cancelled"
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            if table == "company_internal_pending_finish" and (
+                pending.get("request_digest") != digest
+                or pending.get("operation") != original.operation
+                or original.operation not in {"accept", "complete", "mark_processed"}
+                or reservation.outcome not in {"reserved", "already_reserved"}
+                or reservation.reservation_id != original.reservation_id
+                or canonical_bytes(pending.get("before_checkpoint")).decode()
+                != original.reserve_expected_json
+                or not isinstance(pending.get("candidate_id"), str)
+                or not isinstance(pending.get("auto_request_id"), str)
+                or memory_request_digest(
+                    original.operation, pending["candidate_id"], pending["auto_request_id"]
+                )
+                != digest
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            if table == "company_internal_pending_finish":
+                candidate = db.execute(
+                    "SELECT content_digest FROM company_memory_candidates WHERE workspace_id=? AND candidate_id=?",
+                    (workspace, pending["candidate_id"]),
+                ).fetchone()
+                if candidate is None or candidate[0] != pending.get("content_digest"):
+                    raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            if original.operation == "complete":
+                from sb.company_db_freshness_evidence import verify_internal_effect
+
+                if (
+                    pending.get("operation") != "complete"
+                    or reservation.reservation_id != original.reservation_id
+                    or pending.get("request_digest") != digest
+                    or pending.get("evidence_digest") is None
+                    or reservation.checkpoint
+                    != Checkpoint.model_validate_json(
+                        original.reserved_checkpoint_json, strict=True
+                    )
+                ):
+                    raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+                verify_internal_effect(
+                    db,
+                    scope,
+                    original.operation_id,
+                    digest,
+                    pending["evidence_digest"],
+                    registry,
+                    reclassify=False,
+                )
+            else:
+                row = db.execute(
+                    "SELECT receipt_digest FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
+                    (workspace, digest),
+                ).fetchone()
+                if row is None:
+                    raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+                _require_pending_receipt(db, scope, original, row[0])

@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from sb.company_approver_binding import (
     CompanyHandoffPolicy,
@@ -180,6 +179,8 @@ def verify_internal_effect(
     event_digest: str,
     evidence_digest: str,
     registry: FreshnessRegistry,
+    *,
+    reclassify: bool = True,
 ) -> VerifiedEvidence:
     rows: list[tuple[str, str, str]] = db.execute(
         """SELECT auto_request_id,candidate_id,created_at FROM company_internal_effects
@@ -189,13 +190,10 @@ def verify_internal_effect(
     if len(rows) != 1:
         raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
     request_id, candidate, created_at = rows[0]
-    verify_auto_authority(db, registry, scope, request_id, candidate)
-    files: list[tuple[int, str, str]] = db.execute("PRAGMA database_list").fetchall()
-    if (
-        not files
-        or memory_request_digest("complete", candidate, request_id) != event_digest
-        or not verify_internal_readback(Path(files[0][2]), scope, operation_id, evidence_digest)
-    ):
+    verify_auto_authority(db, registry, scope, request_id, candidate, reclassify=reclassify)
+    if memory_request_digest(
+        "complete", candidate, request_id
+    ) != event_digest or not verify_internal_readback(db, scope, operation_id, evidence_digest):
         raise EvidenceRejected("COMPANY_VERIFIER_INVALID")
     return VerifiedEvidence(
         request_id,
