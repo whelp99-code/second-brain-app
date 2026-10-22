@@ -16,6 +16,7 @@ from sb.company_memory import CompanyMemoryStore
 from sb.company_memory_authority import CompanyAuthorityRejected
 from sb.company_memory_cli import run
 from sb.company_processor_progress import local_checkpoint
+from sb.effect_values import format_instant
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import contact_body, receive, trigger
 from tests.test_company_candidate_handoff import (
@@ -33,10 +34,25 @@ from tests.test_company_memory_product import NOW
 
 
 @pytest.mark.parametrize("expired_at_entry", [False, True])
-def test_signed_owner_expiry_after_resumed_reserve_releases_slot(tmp_path, monkeypatch, expired_at_entry):
+def test_signed_owner_expiry_after_resumed_reserve_releases_slot(
+    tmp_path, monkeypatch, expired_at_entry
+):
     cfg, provider = human_runtime(tmp_path)
-    proposal = first_proposal(run(cfg, signed_request("handoff", PAGE), now=NOW, handoff_only=True, freshness_provider=provider))
-    arguments = processor_arguments(proposal, owner_receipt(proposal))
+    proposal = first_proposal(
+        run(
+            cfg,
+            signed_request("handoff", PAGE),
+            now=NOW,
+            handoff_only=True,
+            freshness_provider=provider,
+        )
+    )
+    arguments = processor_arguments(
+        proposal,
+        owner_receipt(
+            proposal, changes={"expires_at": format_instant(NOW + timedelta(seconds=30))}
+        ),
+    )
     request = signed_request("accept", arguments, PROCESSOR_KEY, "processor", PROCESSOR)
 
     def crash(*args, **kwargs):
@@ -46,19 +62,44 @@ def test_signed_owner_expiry_after_resumed_reserve_releases_slot(tmp_path, monke
         fault.setattr(CompanyMemoryStore, "execute", crash)
         with pytest.raises(Crash):
             run(cfg, request, now=NOW, process_only=True, freshness_provider=provider)
-    later = NOW + timedelta(minutes=11)
+    later = NOW + timedelta(seconds=45)
     times = iter([later, later] if expired_at_entry else [NOW, later])
     if expired_at_entry:
-        request = signed_request("accept", arguments, PROCESSOR_KEY, "processor", PROCESSOR, at=later)
+        request = signed_request(
+            "accept", arguments, PROCESSOR_KEY, "processor", PROCESSOR, at=later
+        )
     with pytest.raises(CompanyAuthorityRejected, match="EXPIRED"):
-        run(cfg, request, now=NOW, clock=lambda: next(times), process_only=True, freshness_provider=provider)
+        run(
+            cfg,
+            request,
+            now=NOW,
+            clock=lambda: next(times),
+            process_only=True,
+            freshness_provider=provider,
+        )
     from tests.test_company_candidate_handoff import CONTEXT
+
     scope = FreshnessScope(provider_instance_id=CONTEXT.provider, workspace_id=CONTEXT.workspace_id)
     checkpoint = local_checkpoint(provider.database, scope.workspace_id, None)
-    assert provider.read_freshness(ReadFreshnessRequest(schema_version=2, scope=scope, installation_id=provider.installation_id, challenge="after-expiry", observed_checkpoint=checkpoint)).status == "ready"
+    assert (
+        provider.read_freshness(
+            ReadFreshnessRequest(
+                schema_version=2,
+                scope=scope,
+                installation_id=provider.installation_id,
+                challenge="after-expiry",
+                observed_checkpoint=checkpoint,
+            )
+        ).status
+        == "ready"
+    )
     with closing(sqlite3.connect(provider.database)) as db:
-        assert db.execute("SELECT state,terminal_state FROM company_freshness_operations").fetchall() == [("finished", "cancelled")]
-        assert db.execute("SELECT count(*) FROM company_memory_receipts WHERE operation='accept'").fetchone() == (0,)
+        assert db.execute(
+            "SELECT state,terminal_state FROM company_freshness_operations"
+        ).fetchall() == [("finished", "cancelled")]
+        assert db.execute(
+            "SELECT count(*) FROM company_memory_receipts WHERE operation='accept'"
+        ).fetchone() == (0,)
         assert db.execute("SELECT count(*) FROM company_handoff_decisions").fetchone() == (0,)
 
 

@@ -416,9 +416,10 @@ class CompanyMemoryStore:
         current: SourceAccess,
         deletion: tuple[int, str],
         now: datetime,
-        authorization: Callable[[sqlite3.Connection, MemoryCandidate], None] | None = None,
+        authorization: Callable[[sqlite3.Connection, MemoryCandidate], datetime | None]
+        | None = None,
     ) -> CompanyMemoryReceipt:
-        """Apply one verified operation and persist its receipt atomically."""
+        """Apply atomically, using the authorization's live effect time when supplied."""
         if _DIGEST.fullmatch(request_digest) is None:
             raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
         candidate_id = arguments.get("candidate_id")
@@ -429,10 +430,12 @@ class CompanyMemoryStore:
             permit = None
             if operation in {"accept", "reject", "mark_processed"}:
                 if authorization is not None:
-                    authorization(
+                    authorized_at = authorization(
                         self.db,
                         self.get(workspace_id, candidate_id, current, deletion),
                     )
+                    if authorized_at is not None:
+                        now = authorized_at
                     permit = _APPROVED_TRANSITION
                 self._guard_transition(workspace_id, permit)
             existing = cast(

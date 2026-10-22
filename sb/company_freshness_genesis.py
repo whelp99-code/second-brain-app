@@ -39,9 +39,16 @@ from sb.company_freshness_models import Checkpoint, FreshnessScope, ReserveProgr
 from sb.company_internal_effects import candidate_result, memory_request_digest
 from sb.company_memory import MemoryCandidate
 from sb.company_memory_authority import CompanyAuthorityContext, company_request_digest
-from sb.company_memory_handoff import CompanyControlRequest, enrollment_context
+from sb.company_memory_handoff import (
+    CompanyControlRequest,
+    ControlArguments,
+    ControlTarget,
+    enrollment_context,
+    handoff_key,
+)
 from sb.company_transition_receipt import TransitionReceiptSelector, read_original_receipt
 from sb.effect_values import canonical_bytes, parse_instant, strict_loads
+from sb.effect_write_values import model_object
 
 
 def owned_genesis_receipts(
@@ -329,7 +336,17 @@ def _audit_handoff_workflow(db: sqlite3.Connection, scope: FreshnessScope) -> No
         if "company_handoff_decisions" in tables
         else []
     )
-    if not enrollment and not audits and not decisions:
+    outboxes = (
+        db.execute(
+            """SELECT candidate_id,identity_digest,generation,request_id,
+            command_json,command_digest,expires_at FROM company_handoff_outbox
+            WHERE workspace_id=?""",
+            (scope.workspace_id,),
+        ).fetchall()
+        if "company_handoff_outbox" in tables
+        else []
+    )
+    if not enrollment and not audits and not decisions and not outboxes:
         return
     try:
         if len(enrollment) != 1 or len(audits) != 1:
@@ -360,6 +377,56 @@ def _audit_handoff_workflow(db: sqlite3.Connection, scope: FreshnessScope) -> No
             or evidence.get("operator_approval_ref") != policy.operator_approval_ref
         ):
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        for candidate_id, identity, generation, request_id, raw, digest, expires in outboxes:
+            if context.provider != scope.provider_instance_id:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            command = CompanyControlRequest.model_validate_json(raw, strict=True)
+            candidate = db.execute(
+                """SELECT content_digest,owner,projects_json,policy_revision,
+                deletion_sequence,deletion_set_root FROM company_memory_candidates
+                WHERE workspace_id=? AND candidate_id=?""",
+                (scope.workspace_id, candidate_id),
+            ).fetchone()
+            if candidate is None:
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            projects = strict_loads(candidate[2], 1_048_576)
+            target = ControlTarget(
+                provider_instance_id=context.provider,
+                workspace_id=scope.workspace_id,
+                candidate_id=candidate_id,
+                content_digest=candidate[0],
+            )
+            args = ControlArguments(
+                owner=candidate[1],
+                projects=projects,
+                policy_revision=candidate[3],
+                deletion_sequence=candidate[4],
+                deletion_set_root=candidate[5],
+                processor_principal_id=policy.processor_principal_id,
+                operations=("accept", "reject", "mark_processed"),
+                approver_principal_id=policy.approver_principal_id,
+                approval_policy_version=policy.approval_policy_version,
+                approval_binding_digest=binding,
+            )
+            key = handoff_key(target, args)
+            if (
+                command.target != target
+                or command.args != args
+                or command.requested_by != context.principal
+                or args.owner != context.principal
+                or args.policy_revision != context.policy_revision
+                or not set(args.projects).issubset(context.projects)
+                or (args.deletion_sequence, args.deletion_set_root)
+                != (context.deletion_sequence, context.deletion_set_root)
+                or identity != key.removeprefix("company-handoff:v2:")
+                or type(generation) is not int
+                or generation < 1
+                or request_id != f"{key}:{generation}"
+                or command.request_id != request_id
+                or digest != command_digest(model_object(command))
+                or expires != command.expires_at
+            ):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         for candidate_id, request_id, request_digest, decision in decisions:
             if context.provider != scope.provider_instance_id:
                 raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")

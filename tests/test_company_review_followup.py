@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,7 +22,7 @@ from sb.company_freshness_models import FreshnessScope, ReadFreshnessRequest
 from sb.company_memory import CompanyMemoryStore
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_processor_progress import local_checkpoint
-from sb.effect_values import canonical_bytes
+from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_values import model_object
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_db_freshness_support import (
@@ -223,10 +224,10 @@ def test_expiry_after_real_reserve_releases_only_new_unapplied_operation(tmp_pat
     provider, _settings, context = real_company_runtime(tmp_path)
     receive(provider.database, "mail:expiry", "event:expiry", contact_body())
     digest = "sha256:" + "ab" * 32
-    from tests.test_company_crash_boundaries import expiry_command
+    from tests.test_company_crash_boundaries import prepare_test_handoffs
 
     with closing(sqlite3.connect(provider.database)) as db, db:
-        handoff_id = expiry_command(db, context)
+        handoff_id = prepare_test_handoffs(db, context, tmp_path, ("mail:expiry",))[0]
     calls = 0
 
     def authorize(*args, **kwargs):
@@ -255,7 +256,11 @@ def test_expiry_after_real_reserve_releases_only_new_unapplied_operation(tmp_pat
                 context=authority_context,
                 policy=None,
                 owner_keys={},
-                authority=SimpleNamespace(request_digest=digest),
+                authority=SimpleNamespace(
+                    request_digest=digest,
+                    issued_at=format_instant(context.now),
+                    expires_at=format_instant(context.now + timedelta(minutes=5)),
+                ),
                 operation="accept",
                 arguments={"candidate_id": "mail:expiry", "handoff_id": handoff_id},
                 checkpoint=context.observed_checkpoint,

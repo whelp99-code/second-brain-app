@@ -31,7 +31,7 @@ from sb.company_processor_progress import (
     save_checkpoint,
 )
 from sb.company_transition_receipt import TransitionReceiptSelector, read_original_receipt
-from sb.effect_values import JsonObject, canonical_bytes
+from sb.effect_values import JsonObject, canonical_bytes, parse_instant
 from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
 
@@ -148,7 +148,7 @@ def execute_processor_transition(
 
     authorization_rejected = False
 
-    def authorize(db: sqlite3.Connection, current: MemoryCandidate) -> None:
+    def authorize(db: sqlite3.Connection, current: MemoryCandidate) -> datetime:
         nonlocal authorization_rejected
         # Recheck local CAS and every signed decision/scope/fence after reserving.
         local: list[tuple[str]] = db.execute(
@@ -158,6 +158,13 @@ def execute_processor_transition(
         if not local or local[0][0] != canonical_bytes(model_object(checkpoint)).decode():
             raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
         try:
+            live_now = clock() if clock is not None else datetime.now(UTC)
+            if (
+                not parse_instant(authority.issued_at)
+                <= live_now
+                < parse_instant(authority.expires_at)
+            ):
+                raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED")
             authorize_transition(
                 db,
                 current,
@@ -167,7 +174,7 @@ def execute_processor_transition(
                 operation,
                 arguments,
                 authority.request_digest,
-                clock() if clock is not None else datetime.now(UTC),
+                live_now,
                 verify_original,
             )
         except CompanyAuthorityRejected:
@@ -178,7 +185,7 @@ def execute_processor_transition(
             (context.workspace_id, authority.request_digest),
         ).fetchall()
         if existing:
-            return
+            return live_now
         if reservation is None or reservation.checkpoint is None:
             raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
         save_checkpoint(db, context.workspace_id, reservation.checkpoint, checkpoint)
@@ -193,6 +200,7 @@ def execute_processor_transition(
                 original_reservation_retry=reservation.outcome == "already_reserved",
             ),
         )
+        return live_now
 
     guard = (
         provider.effect_guard(

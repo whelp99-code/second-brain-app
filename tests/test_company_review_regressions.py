@@ -94,7 +94,8 @@ def test_domain_bound_email_suffixes_remain_supported(suffix: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "blocked", ["human", "outbox", "decision", "accepted", "stale_sequence", "stale_root"]
+    "blocked",
+    ["human", "outbox", "corrupt_outbox", "decision", "accepted", "stale_sequence", "stale_root"],
 )
 def test_blocked_candidates_cannot_starve_current_batch(tmp_path: Path, blocked: str) -> None:
     provider, settings, context = real_company_runtime(tmp_path)
@@ -110,6 +111,10 @@ def test_blocked_candidates_cannot_starve_current_batch(tmp_path: Path, blocked:
                 (PROVIDER, format_instant(context.now)),
             )
         elif blocked == "outbox":
+            from tests.test_company_crash_boundaries import prepare_test_handoffs
+
+            prepare_test_handoffs(db, context, tmp_path, tuple(f"a:{i:03}" for i in range(100)))
+        elif blocked == "corrupt_outbox":
             db.execute(
                 """INSERT INTO company_handoff_outbox
                 SELECT workspace_id,candidate_id,content_digest,1,candidate_id,'{}',content_digest,?
@@ -132,8 +137,8 @@ def test_blocked_candidates_cannot_starve_current_batch(tmp_path: Path, blocked:
                 f"UPDATE company_memory_candidates SET {assignments[blocked]} WHERE candidate_id LIKE 'a:%'"
             )
     assert _candidate_ids(provider.database, context, settings) == ("z:eligible",)
-    if blocked == "decision":
-        # Synthetic decisions without commands/signatures/transitions are corrupt,
+    if blocked in {"decision", "corrupt_outbox"}:
+        # Synthetic decisions or outboxes without enrollment/commands are corrupt,
         # not authenticated human ownership. Selection still excludes them, but
         # the provider must reject this restored snapshot before any batch write.
         before = provider.database.read_bytes()
