@@ -139,7 +139,12 @@ def invoke(
     operation: Literal["accept", "reject", "mark_processed"],
     arguments: JsonObject,
 ) -> None:
-    def select_provider(configured: FreshnessProviderConfig) -> ObservedProvider:
+    def select_provider(
+        configured: FreshnessProviderConfig,
+        *,
+        company_database: object = None,
+    ) -> ObservedProvider:
+        del company_database
         assert configured == FreshnessProviderConfig(schema_version=2, kind="unconfigured")
         provider.factory_configs.append(configured)
         return provider

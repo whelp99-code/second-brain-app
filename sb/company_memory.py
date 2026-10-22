@@ -21,8 +21,24 @@ _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _RECEIPT_DOMAIN = b"second-brain/company-memory-receipt/v1\0"
 
 type CandidateRow = tuple[
-    str, str, str, str, str, str, str, str, str, str, str, str, int, str,
-    str, str | None, str | None, str | None,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    str,
+    int,
+    str,
+    str,
+    str | None,
+    str | None,
+    str | None,
 ]
 type ReceiptRow = tuple[str, str, str, str, str, str]
 
@@ -168,10 +184,15 @@ class CompanyMemoryStore:
         self.db.close()
 
     def _guard_transition(
-        self, workspace_id: str, permit: _TransitionPermit | None,
+        self,
+        workspace_id: str,
+        permit: _TransitionPermit | None,
     ) -> None:
-        if permit is not _APPROVED_TRANSITION and self.db.execute(
-            "SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?", (workspace_id,),
+        if permit is _APPROVED_TRANSITION:
+            return
+        if self.db.execute(
+            "SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?",
+            (workspace_id,),
         ).fetchone():
             raise CompanyMemoryError("COMPANY_OWNER_APPROVAL_REQUIRED")
 
@@ -266,8 +287,7 @@ class CompanyMemoryStore:
                AND (? OR NOT EXISTS (
                    SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?
                ))""",
-            (timestamp, workspace_id, candidate_id,
-             _permit is _APPROVED_TRANSITION, workspace_id),
+            (timestamp, workspace_id, candidate_id, _permit is _APPROVED_TRANSITION, workspace_id),
         )
         if changed.rowcount != 1:
             self.db.rollback()
@@ -301,8 +321,7 @@ class CompanyMemoryStore:
                AND (? OR NOT EXISTS (
                    SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?
                ))""",
-            (timestamp, workspace_id, candidate_id,
-             _permit is _APPROVED_TRANSITION, workspace_id),
+            (timestamp, workspace_id, candidate_id, _permit is _APPROVED_TRANSITION, workspace_id),
         )
         if changed.rowcount != 1:
             self.db.rollback()
@@ -336,8 +355,7 @@ class CompanyMemoryStore:
                AND (? OR NOT EXISTS (
                    SELECT 1 FROM company_handoff_enrollment WHERE workspace_id=?
                ))""",
-            (timestamp, workspace_id, candidate_id,
-             _permit is _APPROVED_TRANSITION, workspace_id),
+            (timestamp, workspace_id, candidate_id, _permit is _APPROVED_TRANSITION, workspace_id),
         )
         if changed.rowcount != 1:
             self.db.rollback()
@@ -398,9 +416,10 @@ class CompanyMemoryStore:
         current: SourceAccess,
         deletion: tuple[int, str],
         now: datetime,
-        authorization: Callable[[sqlite3.Connection, MemoryCandidate], None] | None = None,
+        authorization: Callable[[sqlite3.Connection, MemoryCandidate], datetime | None]
+        | None = None,
     ) -> CompanyMemoryReceipt:
-        """Apply one verified operation and persist its receipt atomically."""
+        """Apply atomically, using the authorization's live effect time when supplied."""
         if _DIGEST.fullmatch(request_digest) is None:
             raise CompanyMemoryError("COMPANY_REQUEST_INVALID")
         candidate_id = arguments.get("candidate_id")
@@ -411,9 +430,12 @@ class CompanyMemoryStore:
             permit = None
             if operation in {"accept", "reject", "mark_processed"}:
                 if authorization is not None:
-                    authorization(
-                        self.db, self.get(workspace_id, candidate_id, current, deletion),
+                    authorized_at = authorization(
+                        self.db,
+                        self.get(workspace_id, candidate_id, current, deletion),
                     )
+                    if authorized_at is not None:
+                        now = authorized_at
                     permit = _APPROVED_TRANSITION
                 self._guard_transition(workspace_id, permit)
             existing = cast(
@@ -443,17 +465,24 @@ class CompanyMemoryStore:
                     "result": raw_result,
                     "created_at": existing[5],
                 }
-                observed = "sha256:" + hashlib.sha256(
-                    _RECEIPT_DOMAIN + canonical_bytes(replay_body)
-                ).hexdigest()
+                observed = (
+                    "sha256:"
+                    + hashlib.sha256(_RECEIPT_DOMAIN + canonical_bytes(replay_body)).hexdigest()
+                )
                 if existing[1] != observed or existing[0] != (
                     "cmreceipt:v1:" + observed.removeprefix("sha256:")
                 ):
                     raise CompanyMemoryError("COMPANY_RECEIPT_CORRUPT")
                 self.db.commit()
                 return CompanyMemoryReceipt(
-                    existing[0], existing[1], workspace_id, request_digest, operation,
-                    candidate_id, raw_result, existing[5],
+                    existing[0],
+                    existing[1],
+                    workspace_id,
+                    request_digest,
+                    operation,
+                    candidate_id,
+                    raw_result,
+                    existing[5],
                 )
             if operation == "receive":
                 candidate = self.receive(
@@ -473,17 +502,32 @@ class CompanyMemoryStore:
                 candidate = self.get(workspace_id, candidate_id, current, deletion)
             elif operation == "accept":
                 candidate = self.accept(
-                    workspace_id, candidate_id, current, deletion, now=now, _commit=False,
+                    workspace_id,
+                    candidate_id,
+                    current,
+                    deletion,
+                    now=now,
+                    _commit=False,
                     _permit=permit,
                 )
             elif operation == "reject":
                 candidate = self.reject(
-                    workspace_id, candidate_id, current, deletion, now=now, _commit=False,
+                    workspace_id,
+                    candidate_id,
+                    current,
+                    deletion,
+                    now=now,
+                    _commit=False,
                     _permit=permit,
                 )
             elif operation == "mark_processed":
                 candidate = self.mark_processed(
-                    workspace_id, candidate_id, current, deletion, now=now, _commit=False,
+                    workspace_id,
+                    candidate_id,
+                    current,
+                    deletion,
+                    now=now,
+                    _commit=False,
                     _permit=permit,
                 )
             else:
@@ -499,9 +543,10 @@ class CompanyMemoryStore:
                 "result": result,
                 "created_at": created_at,
             }
-            receipt_digest = "sha256:" + hashlib.sha256(
-                _RECEIPT_DOMAIN + canonical_bytes(receipt_body)
-            ).hexdigest()
+            receipt_digest = (
+                "sha256:"
+                + hashlib.sha256(_RECEIPT_DOMAIN + canonical_bytes(receipt_body)).hexdigest()
+            )
             receipt_id = "cmreceipt:v1:" + receipt_digest.removeprefix("sha256:")
             result_json = canonical_bytes(result).decode("utf-8")
             _ = self.db.execute(
@@ -543,8 +588,7 @@ def _required_text(arguments: JsonObject, name: str) -> str:
 
 def _locator(value: JsonValue | None) -> dict[str, str | int]:
     if not isinstance(value, dict) or not all(
-        isinstance(item, (str, int)) and not isinstance(item, bool)
-        for item in value.values()
+        isinstance(item, (str, int)) and not isinstance(item, bool) for item in value.values()
     ):
         raise CompanyMemoryError("MEMORY_CANDIDATE_INVALID")
     return cast(dict[str, str | int], value)

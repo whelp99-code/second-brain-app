@@ -54,6 +54,11 @@ same handoff key's generation and cannot revive a decided candidate.
 
 ## Freshness: production remains disabled
 
+The following describes the original PR69 baseline. The SB-1/SB-2 extension,
+including the additional closed `sb_company_db` configuration, is documented in
+[`COMPANY-DB-FRESHNESS.md`](COMPANY-DB-FRESHNESS.md). Production activation still
+requires separate operator work; the original TEST_ONLY vectors are unchanged.
+
 `freshness_provider` accepts only `{schema_version:2,kind:"unconfigured"}`.
 Missing configuration selects the same provider. It returns unavailable with
 null checkpoint; reserve/finish return the exact

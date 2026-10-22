@@ -6,7 +6,7 @@ import os
 import socket
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -57,9 +57,13 @@ def executor_config(tmp_path: Path) -> ExecutorConfig:
 def provider_fixture(tmp_path: Path) -> ProviderProcessFixture:
     config_values = executor_config(tmp_path)
     private_key = base64.urlsafe_b64encode(bytes(range(32))).rstrip(b"=").decode("ascii")
-    public_key = base64.urlsafe_b64encode(
-        config_values.jarvis_public_keys["jarvis:fixture"].public_bytes_raw()
-    ).rstrip(b"=").decode("ascii")
+    public_key = (
+        base64.urlsafe_b64encode(
+            config_values.jarvis_public_keys["jarvis:fixture"].public_bytes_raw()
+        )
+        .rstrip(b"=")
+        .decode("ascii")
+    )
     config = tmp_path / "config.toml"
     _ = config.write_text(
         "\n".join(
@@ -154,7 +158,9 @@ def spawn(fixture: ProviderProcessFixture, control: Path | None) -> subprocess.P
     if control is not None:
         argv.extend(("--test-control-socket", str(control)))
     env = {**os.environ, "SB_CONFIG": str(fixture.config)}
-    return subprocess.Popen(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    return subprocess.Popen(
+        argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+    )
 
 
 def spawn_publication(
@@ -173,7 +179,7 @@ def spawn_publication(
 
 
 @contextmanager
-def listener(tmp_path: Path) -> Iterator[tuple[socket.socket, Path, str]]:
+def listener(tmp_path: Path) -> Generator[tuple[socket.socket, Path, str], None, None]:
     with (
         TemporaryDirectory(prefix="sb-t30-", dir="/tmp") as directory,
         socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as owner,

@@ -3,32 +3,37 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import os
-import sqlite3
 import stat
 import sys
+from collections.abc import Callable
 from contextlib import closing, nullcontext
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, cast
+from typing import cast
 from uuid import uuid4
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from pydantic import Field, ValidationError
+from pydantic import ValidationError
 
 from sb.company_approver_binding import CompanyHandoffPolicy, binding_digest
+from sb.company_auto_cli import run_auto_route
+from sb.company_db_freshness import CompanyDbFreshnessProvider
 from sb.company_freshness import (
     Checkpoint,
     CompanyFreshnessProvider,
-    FreshnessProviderConfig,
     FreshnessScope,
+    ProgressOperation,
     ReadFreshnessRequest,
     provider_from_config,
+    require_company_db_freshness,
     require_freshness,
 )
-from sb.company_memory import CompanyMemoryError, CompanyMemoryStore, MemoryCandidate
+from sb.company_freshness_anchor import AnchorRejected
+from sb.company_freshness_cli import run_freshness
+from sb.company_freshness_operator import run_operator
+from sb.company_memory import CompanyMemoryError, CompanyMemoryStore
 from sb.company_memory_authority import (
     CompanyAuthorityContext,
     CompanyAuthorityRejected,
@@ -37,30 +42,25 @@ from sb.company_memory_authority import (
     canonical_workspace_id,
     verify_company_authority,
 )
+from sb.company_memory_cli_config import CompanyCliConfigV1
+from sb.company_memory_cli_config import company_database_path as _database_path
+from sb.company_memory_cli_config import company_trusted_keys as _trusted_keys
+from sb.company_memory_cli_config import load_company_config as _load_config
 from sb.company_memory_handoff import (
-    authorize_transition,
     enroll_policy,
     prepare_handoff,
     require_enrollment,
 )
 from sb.company_memory_reader import list_mail_candidates
 from sb.company_memory_registration import register_original, registration_lock
-from sb.company_memory_sources import CompanySourceProfile, resolve_company_source
-from sb.company_processor_finish import (
-    PendingFinish,
-    resume_pending_finish,
-    save_pending_finish,
-)
+from sb.company_memory_sources import resolve_company_source
+from sb.company_processor_execution import execute_processor_transition
+from sb.company_processor_finish import resume_pending_finish
 from sb.company_processor_progress import (
     local_checkpoint,
-    reserve_operation,
     save_checkpoint,
 )
-from sb.company_transition_receipt import (
-    TransitionReceiptSelector,
-    read_original_receipt,
-    read_transition_receipt,
-)
+from sb.company_transition_receipt import read_transition_receipt
 from sb.effect_values import (
     CanonicalValueError,
     JsonObject,
@@ -68,7 +68,6 @@ from sb.effect_values import (
     canonical_bytes,
     strict_loads,
 )
-from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
 
@@ -76,78 +75,10 @@ _MAX_CONFIG = 65_536
 _MAX_REQUEST = 1_048_576
 
 
-class CompanyCliConfigV1(ClosedModel):
-    schema_version: Literal[1]
-    company_database: str
-    personal_data_roots: list[str]
-    provider_instance_id: str
-    workspace_id: str
-    principal_id: str
-    agent_id: str
-    session_id: str
-    projects: list[str]
-    policy_revision: str
-    deletion_sequence: int
-    deletion_set_root: str
-    trusted_keys: dict[str, str]
-    source_profile: CompanySourceProfile | None = None
-    key_scopes: dict[str, CompanyKeyScope] = Field(default_factory=dict)
-    handoff_policy: CompanyHandoffPolicy | None = None
-    freshness_provider: FreshnessProviderConfig = Field(
-        default_factory=lambda: FreshnessProviderConfig(schema_version=2, kind="unconfigured"),
-    )
-
-
 def _object(value: JsonValue, code: str) -> JsonObject:
     if not isinstance(value, dict):
         raise CompanyMemoryError(code)
     return value
-
-
-def _load_config(path: Path) -> CompanyCliConfigV1:
-    try:
-        config = CompanyCliConfigV1.model_validate(
-            _object(strict_loads(path.read_bytes(), _MAX_CONFIG), "COMPANY_CONFIG_INVALID")
-        )
-        if not config.key_scopes.keys() <= config.trusted_keys.keys():
-            raise CompanyMemoryError("COMPANY_CONFIG_INVALID")
-        return config
-    except (OSError, ValueError, ValidationError, CanonicalValueError) as exc:
-        raise CompanyMemoryError("COMPANY_CONFIG_INVALID") from exc
-
-
-def _database_path(config: CompanyCliConfigV1) -> Path:
-    database = Path(config.company_database)
-    roots = [Path(value) for value in config.personal_data_roots]
-    if not database.is_absolute() or not roots or any(not root.is_absolute() for root in roots):
-        raise CompanyMemoryError("COMPANY_DATABASE_ISOLATION_REQUIRED")
-    resolved_database = database.resolve(strict=False)
-    if database.is_symlink() or any(
-        resolved_database == root.resolve(strict=False)
-        or resolved_database.is_relative_to(root.resolve(strict=False))
-        for root in roots
-    ):
-        raise CompanyMemoryError("COMPANY_DATABASE_ISOLATION_REQUIRED")
-    if not resolved_database.parent.is_dir():
-        raise CompanyMemoryError("COMPANY_DATABASE_PARENT_REQUIRED")
-    return resolved_database
-
-
-def _trusted_keys(values: dict[str, str]) -> dict[str, Ed25519PublicKey]:
-    result: dict[str, Ed25519PublicKey] = {}
-    try:
-        for key_id, encoded in values.items():
-            if not key_id or len(encoded) != 43 or "=" in encoded:
-                raise ValueError("invalid key")
-            raw = base64.urlsafe_b64decode(encoded + "=")
-            if len(raw) != 32:
-                raise ValueError("invalid key")
-            result[key_id] = Ed25519PublicKey.from_public_bytes(raw)
-    except (TypeError, ValueError) as exc:
-        raise CompanyMemoryError("COMPANY_CONFIG_INVALID") from exc
-    if not result:
-        raise CompanyMemoryError("COMPANY_CONFIG_INVALID")
-    return result
 
 
 def _validate_arguments(
@@ -244,6 +175,7 @@ def run(
     receipt_only: bool = False,
     freshness_provider: CompanyFreshnessProvider | None = None,
     observed_checkpoint: Checkpoint | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> JsonObject:
     """Serialize registrations before reading trusted config; legacy calls stay read-only."""
     with registration_lock(config_path) if register_source else nullcontext():
@@ -259,6 +191,7 @@ def run(
             receipt_only=receipt_only,
             freshness_provider=freshness_provider,
             observed_checkpoint=observed_checkpoint,
+            clock=clock,
         )
 
 
@@ -275,6 +208,7 @@ def _run(
     receipt_only: bool,
     freshness_provider: CompanyFreshnessProvider | None,
     observed_checkpoint: Checkpoint | None,
+    clock: Callable[[], datetime] | None,
 ) -> JsonObject:
     if (
         sum(
@@ -298,7 +232,7 @@ def _run(
             or info.st_uid != os.getuid()
         ):
             raise CompanyMemoryError("COMPANY_HANDOFF_CONFIG_PRIVATE_REQUIRED")
-    config = _load_config(config_path)
+    config: CompanyCliConfigV1 = _load_config(config_path)
     database = _database_path(config)
     _ = canonical_workspace_id(config.workspace_id)
     scope = SourceAccess(config.principal_id, tuple(config.projects), config.policy_revision)
@@ -353,8 +287,11 @@ def _run(
         register_source or config.source_profile is not None,
         process_only or receipt_only,
     )
-    instant = now or datetime.now(UTC)
-    provider = freshness_provider or provider_from_config(config.freshness_provider)
+    instant = clock() if clock is not None else now or datetime.now(UTC)
+    provider = freshness_provider or provider_from_config(
+        config.freshness_provider,
+        company_database=database,
+    )
     if process_only or receipt_only:
         assert policy is not None
         _ = verify_company_authority(
@@ -388,91 +325,27 @@ def _run(
                 raise CompanyAuthorityRejected("COMPANY_PROCESSOR_OPERATION_DENIED")
         resume_pending_finish(database, context, policy, provider)
         observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
-        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
+        checkpoint = _check_freshness(
+            provider,
+            observed_checkpoint,
+            context,
+            policy,
+            "startup",
+            reserved_transition=(operation, authority.request_digest),
+        )
         with closing(CompanyMemoryStore(database)) as store:
-
-            def authorize(db: sqlite3.Connection, candidate: MemoryCandidate) -> None:
-                assert policy is not None
-                checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
-                checkpoint = _check_freshness(
-                    provider,
-                    checkpoint,
-                    context,
-                    policy,
-                    authority.nonce,
-                )
-
-                def verify_original(selector: JsonObject) -> None:
-                    assert policy is not None
-                    original = read_original_receipt(
-                        db, context, policy, TransitionReceiptSelector.model_validate(selector)
-                    )
-                    if original is None:
-                        raise CompanyAuthorityRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
-
-                authorize_transition(
-                    db,
-                    candidate,
-                    context,
-                    policy,
-                    owner_keys,
-                    operation,
-                    arguments,
-                    authority.request_digest,
-                    instant,
-                    verify_original,
-                )
-                # A verified cached receipt is an original fact read, not another effect.
-                if db.execute(
-                    "SELECT 1 FROM company_memory_receipts WHERE workspace_id=? AND request_digest=?",
-                    (context.workspace_id, authority.request_digest),
-                ).fetchone():
-                    return
-                command_row = cast(
-                    tuple[str],
-                    db.execute(
-                        """SELECT command_digest FROM company_handoff_outbox
-                        WHERE workspace_id=? AND candidate_id=? AND request_id=?""",
-                        (context.workspace_id, candidate.candidate_id, arguments["handoff_id"]),
-                    ).fetchone(),
-                )
-                assert isinstance(arguments["handoff_id"], str)
-                operation_id, reservation = reserve_operation(
-                    provider,
-                    FreshnessScope(
-                        provider_instance_id=context.provider,
-                        workspace_id=context.workspace_id,
-                    ),
-                    operation,
-                    arguments["handoff_id"],
-                    command_row[0],
-                    authority.request_digest,
-                    checkpoint,
-                )
-                assert reservation.checkpoint is not None
-                # Intent acknowledgment precedes the SQL effect; its checkpoint commits
-                # with the original receipt so a restored DB cannot echo a newer head.
-                save_checkpoint(db, context.workspace_id, reservation.checkpoint, checkpoint)
-                save_pending_finish(
-                    db,
-                    context.workspace_id,
-                    authority.request_digest,
-                    PendingFinish(
-                        operation=operation,
-                        operation_id=operation_id,
-                        reservation=reservation,
-                    ),
-                )
-
-            receipt = store.execute(
-                workspace_id=config.workspace_id,
-                request_digest=authority.request_digest,
+            receipt = execute_processor_transition(
+                store,
+                provider,
+                context=context,
+                policy=policy,
+                owner_keys=owner_keys,
+                authority=authority,
                 operation=operation,
                 arguments=arguments,
-                current=scope,
-                deletion=(config.deletion_sequence, config.deletion_set_root),
+                checkpoint=checkpoint,
                 now=instant,
-                authorization=authorize,
+                clock=clock or ((lambda: instant) if now is not None else None),
             )
             resume_pending_finish(database, context, policy, provider)
         # Processor never returns candidate content or the content-bearing legacy receipt.
@@ -509,16 +382,11 @@ def _run(
             raise CompanyAuthorityRejected("COMPANY_HANDOFF_OPERATION_DENIED")
         resume_pending_finish(database, context, policy, provider)
         observed_checkpoint = local_checkpoint(database, context.workspace_id, observed_checkpoint)
-        _ = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
+        checkpoint = _check_freshness(provider, observed_checkpoint, context, policy, "startup")
         with closing(CompanyMemoryStore(database)) as store, store.db:
             _ = store.db.execute("BEGIN IMMEDIATE")
-            checkpoint = _check_freshness(
-                provider,
-                local_checkpoint(database, context.workspace_id, observed_checkpoint),
-                context,
-                policy,
-                authority.nonce,
-            )
+            if local_checkpoint(database, context.workspace_id, observed_checkpoint) != checkpoint:
+                raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN")
             if enroll_handoff:
                 result = enroll_policy(store.db, context, policy, authority_value, instant)
                 save_checkpoint(store.db, context.workspace_id, checkpoint)
@@ -560,10 +428,14 @@ def _run(
         ):
             raise CompanyAuthorityRejected("COMPANY_SOURCE_REGISTRATION_DENIED")
         document = model_object(config)
-        if "handoff_policy" not in config.model_fields_set:
-            del document["handoff_policy"]
-        if "freshness_provider" not in config.model_fields_set:
-            del document["freshness_provider"]
+        for field in (
+            "handoff_policy",
+            "freshness_provider",
+            "internal_auto_policy",
+            "policy_auto_key_id",
+        ):
+            if field not in config.model_fields_set:
+                del document[field]
         return register_original(
             config_path,
             document,
@@ -605,25 +477,50 @@ def _check_freshness(
     context: CompanyAuthorityContext,
     policy: CompanyHandoffPolicy,
     challenge: str,
+    *,
+    reserved_transition: tuple[ProgressOperation, str] | None = None,
 ) -> Checkpoint:
     if checkpoint is not None and (
         checkpoint.approval_policy_version != policy.approval_policy_version
         or checkpoint.approval_binding_digest != binding_digest(context, policy)
     ):
         raise CompanyAuthorityRejected("COMPANY_HANDOFF_ENROLLMENT_REQUIRED")
-    verified = require_freshness(
-        provider,
-        ReadFreshnessRequest(
-            schema_version=2,
-            scope=FreshnessScope(
-                provider_instance_id=context.provider,
-                workspace_id=context.workspace_id,
-            ),
-            installation_id=context.provider,
-            challenge=f"{challenge}:{uuid4().hex}",
-            observed_checkpoint=checkpoint,
+    request = ReadFreshnessRequest(
+        schema_version=2,
+        scope=FreshnessScope(
+            provider_instance_id=context.provider,
+            workspace_id=context.workspace_id,
         ),
+        installation_id=(
+            provider.installation_id
+            if isinstance(provider, CompanyDbFreshnessProvider)
+            else context.provider
+        ),
+        challenge=f"{challenge}:{uuid4().hex}",
+        observed_checkpoint=checkpoint,
     )
+    if isinstance(provider, CompanyDbFreshnessProvider):
+        if (
+            reserved_transition is not None
+            and checkpoint is not None
+            and provider.has_original_reservation(
+                request.scope,
+                reserved_transition[0],
+                reserved_transition[1],
+                checkpoint,
+            )
+        ):
+            return checkpoint
+        verified = require_company_db_freshness(provider, request, actor_store="second_brain")
+        if verified != checkpoint:
+            import sqlite3
+
+            with closing(sqlite3.connect(provider.database)) as db, db:
+                if checkpoint is None:
+                    raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
+                save_checkpoint(db, context.workspace_id, verified, checkpoint)
+    else:
+        verified = require_freshness(provider, request)
     if (
         verified.approval_policy_version != policy.approval_policy_version
         or verified.approval_binding_digest != binding_digest(context, policy)
@@ -650,6 +547,13 @@ def main(
             "handoff",
             "process",
             "receipt",
+            "freshness",
+            "auto-internal",
+            "auto-report",
+            "freshness-migrate",
+            "freshness-bootstrap",
+            "auto-policy-install",
+            "freshness-revoke",
         ],
     )
     _ = parser.add_argument("--config", type=Path)
@@ -670,23 +574,64 @@ def main(
         config_path = Path(configured)
     previous_umask = os.umask(0o077)
     try:
-        result = run(
-            config_path,
-            sys.stdin.buffer.read(_MAX_REQUEST + 1),
-            now=now,
-            register_source=action == "register-source",
-            candidates_only=action == "candidates",
-            handoff_only=action == "handoff",
-            enroll_handoff=action == "enroll-handoff",
-            process_only=action == "process",
-            receipt_only=action == "receipt",
-            freshness_provider=freshness_provider,
-            observed_checkpoint=observed_checkpoint,
+        raw_request = sys.stdin.buffer.read(_MAX_REQUEST + 1)
+        bounded_provider = (
+            freshness_provider
+            if isinstance(freshness_provider, CompanyDbFreshnessProvider)
+            else None
         )
+        current_time = now if now is not None else datetime.now(UTC)
+        if action == "freshness":
+            result = run_freshness(
+                config_path,
+                raw_request,
+                current_time,
+                provider=bounded_provider,
+            )
+        elif action in {"auto-internal", "auto-report"}:
+            result = run_auto_route(
+                action,
+                config_path,
+                raw_request,
+                current_time,
+                provider=bounded_provider,
+                clock=(lambda: current_time) if now is not None else None,
+            )
+        elif action in {
+            "freshness-migrate",
+            "freshness-bootstrap",
+            "auto-policy-install",
+            "freshness-revoke",
+        }:
+            result = run_operator(action, config_path, raw_request, current_time)
+        else:
+            result = run(
+                config_path,
+                raw_request,
+                now=now,
+                register_source=action == "register-source",
+                candidates_only=action == "candidates",
+                handoff_only=action == "handoff",
+                enroll_handoff=action == "enroll-handoff",
+                process_only=action == "process",
+                receipt_only=action == "receipt",
+                freshness_provider=freshness_provider,
+                observed_checkpoint=observed_checkpoint,
+            )
         _ = sys.stdout.buffer.write(canonical_bytes(result) + b"\n")
         return 0
-    except (CompanyMemoryError, CompanyAuthorityRejected, CanonicalValueError, ValueError) as exc:
-        code = str(exc) or "COMPANY_MEMORY_FAILED"
+    except (
+        CompanyMemoryError,
+        CompanyAuthorityRejected,
+        CanonicalValueError,
+        AnchorRejected,
+        ValueError,
+    ) as exc:
+        code = (
+            "COMPANY_CONTRACT_INVALID"
+            if isinstance(exc, ValidationError)
+            else str(exc) or "COMPANY_MEMORY_FAILED"
+        )
         _ = sys.stderr.buffer.write(canonical_bytes({"error": code}) + b"\n")
         return 2
     finally:
