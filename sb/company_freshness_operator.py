@@ -20,7 +20,6 @@ from sb.company_db_freshness import (
 from sb.company_freshness import FreshnessScope, provider_from_config
 from sb.company_freshness_anchor import require_trusted_file
 from sb.company_freshness_migrations import apply_component_migration
-from sb.company_freshness_registry import current_auto_pin
 from sb.company_internal_effects import install_auto_policy
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_memory_cli_config import company_database_path, load_company_config
@@ -72,22 +71,21 @@ def run_operator(
         return {"checkpoint": model_object(selected.record_approval_revocations(scope))}
     if action == "auto-policy-install":
         settings = auto_settings(config, selected)
-        pin = current_auto_pin(selected._registry(), scope)
-        if (
-            pin.policy_digest != policy_digest(settings.policy)
-            or pin.key_id != settings.signer.key_id
-            or pin.public_key_fingerprint != public_key_fingerprint(settings.signer.public_key)
-            or pin.policy_digest in pin.revoked_policy_digests
-            or pin.public_key_fingerprint in pin.revoked_key_fingerprints
-        ):
-            raise CompanyAuthorityRejected("COMPANY_POLICY_REGISTRATION_REQUIRED")
         before = local_checkpoint(database, config.workspace_id, None)
         if before is None:
             raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
-        selected.validate_auto_policy_pin(scope)
-        with closing(sqlite3.connect(database)) as db, db:
-            digest = install_auto_policy(db, settings, config.workspace_id, now)
-        after = selected.install_auto_policy_pin(scope)
+
+        def commit_policy() -> str:
+            with closing(sqlite3.connect(database)) as db, db:
+                return install_auto_policy(db, settings, config.workspace_id, now)
+
+        digest, after = selected.install_auto_policy(
+            scope,
+            commit_policy,
+            policy_digest(settings.policy),
+            settings.signer.key_id,
+            public_key_fingerprint(settings.signer.public_key),
+        )
         return {"policy_digest": digest, "checkpoint": model_object(after)}
     if action != "freshness-bootstrap" or config.handoff_policy is None:
         raise CompanyAuthorityRejected("COMPANY_CONTRACT_INVALID")
