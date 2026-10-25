@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -126,3 +128,67 @@ def test_missing_publication_is_not_ready(tmp_path: Path) -> None:
             query=query(),
         )
     assert not (tmp_path / "absent.db").exists()
+
+
+@pytest.mark.parametrize("restore", ["none", "receipt", "authority", "assessment"])
+def test_reserved_auto_report_requires_original_policy_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, restore: str
+) -> None:
+    import sb.company_auto_engine as engine
+
+    provider, settings, context = real_company_runtime(tmp_path)
+    receive(provider.database, "mail:reserved", "event:reserved", contact_body())
+    reserve = engine._reserve
+
+    class Crash(BaseException):
+        pass
+
+    def crash_after_reserve(*args, **kwargs):
+        result = reserve(*args, **kwargs)
+        assert result.outcome == "reserved"
+        raise Crash("anchored reserve before SQL effects")
+
+    monkeypatch.setattr(engine, "_reserve", crash_after_reserve)
+    with pytest.raises(Crash):
+        engine.run_auto_internal(provider.database, settings, context, provider, trigger())
+    before = (provider.anchor.read_value(), (provider.witness_dir / "frames.jsonl").read_bytes())
+    if restore != "none":
+        # Restore the authority tables to their pre-issuance contents, retaining
+        # the anchored reservation and its published assessment.
+        with closing(sqlite3.connect(provider.database)) as db, db:
+            damaged = [("company_auto_policy_receipts_no_delete", "company_auto_policy_receipts")]
+            if restore != "receipt":
+                damaged.append(
+                    ("company_candidate_claims_no_delete", "company_candidate_execution_claims")
+                )
+            if restore == "assessment":
+                damaged.append(("company_auto_assessments_no_delete", "company_auto_assessments"))
+            for trigger_name, table in damaged:
+                sql = db.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?", (trigger_name,)
+                ).fetchone()[0]
+                db.execute(f"DROP TRIGGER {trigger_name}")
+                db.execute(f"DELETE FROM {table}")
+                db.execute(sql)
+            db.execute("DELETE FROM company_internal_pending_reserve")
+
+    def report():
+        return read_auto_report(
+            provider,
+            provider_instance_id=PROVIDER,
+            workspace_id=WORKSPACE,
+            grant=report_grant(),
+            query=query(),
+        )
+
+    if restore != "none":
+        with pytest.raises(AutoInternalRejected, match="COMPANY_FRESHNESS_REQUIRED"):
+            report()
+    else:
+        page = report()
+        assert page.uncertain == 1
+        assert page.rows[0].candidate_id == "mail:reserved"
+    assert (
+        provider.anchor.read_value(),
+        (provider.witness_dir / "frames.jsonl").read_bytes(),
+    ) == before

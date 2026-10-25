@@ -7,6 +7,7 @@ import sqlite3
 
 from pydantic import Field, ValidationError
 
+from sb.company_auto_policy import auto_request_id
 from sb.company_auto_publication import PublishedAssessment
 from sb.company_auto_settings import AutoInternalRejected, AutoReportGrant
 from sb.company_db_freshness import CompanyDbFreshnessProvider
@@ -279,6 +280,32 @@ def _candidate_dispositions(
         for candidate, request_id in authorities
         for operation in ("accept", "complete", "mark_processed")
     }
+    # Authority tables can be restored together to a point before issuance.
+    # Derive expected identities independently of those rows, then require the
+    # original receipt for every matching anchored reservation at this cut.
+    assessments: list[tuple[str, str | None, str | None]] = db.execute(
+        """SELECT json_extract(l.record_json,'$.snapshot.candidate_id'),
+          a.content_digest,a.policy_digest
+        FROM company_freshness_log l
+        JOIN company_freshness_publication p ON p.global_sequence=l.global_sequence
+        LEFT JOIN company_auto_assessments a
+          ON a.provider_instance_id=l.provider_instance_id AND a.workspace_id=l.workspace_id
+          AND a.assessment_digest=json_extract(l.record_json,'$.snapshot.assessment_digest')
+          AND a.candidate_id=json_extract(l.record_json,'$.snapshot.candidate_id')
+        WHERE l.provider_instance_id=? AND l.workspace_id=? AND l.global_sequence<=?
+          AND json_extract(l.record_json,'$.kind')='internal_auto_assessment'
+          AND json_extract(l.record_json,'$.snapshot.classification')='auto_internal'""",
+        (scope.provider_instance_id, scope.workspace_id, head),
+    ).fetchall()
+    expected_events: set[str] = set()
+    for candidate, content, policy in assessments:
+        if content is None or policy is None:
+            raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED")
+        request_id = auto_request_id(scope, candidate, content, policy)
+        expected_events.update(
+            memory_request_digest(operation, candidate, request_id)
+            for operation in ("accept", "complete", "mark_processed")
+        )
     log: list[tuple[int, str, str, str | None, str | None]] = db.execute(
         """SELECT l.global_sequence,l.phase,l.operation_id,
         json_extract(l.record_json,'$.event_digest'),
@@ -292,6 +319,8 @@ def _candidate_dispositions(
     pending: dict[str, tuple[str, int]] = {}
     dispositions: dict[str, tuple[int, str, str]] = {}
     for sequence, phase, operation_id, digest, terminal_state in log:
+        if phase == "reserve" and digest in expected_events and digest not in events:
+            raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED")
         if phase == "finish":
             reserved = pending.pop(operation_id, None)
             if reserved is not None:
