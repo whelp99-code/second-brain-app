@@ -58,9 +58,12 @@ def _install_fault(fault: pytest.MonkeyPatch, outcome: str, evidence: Path) -> N
             raise OSError(errno.EIO, "synthetic mode restoration failure")
         real_chmod(path, mode, follow_symlinks=follow_symlinks)
 
-    def sealed_publish(root: Path, note: ParsedRemember, identity: RememberIdentity) -> Path:
+    def sealed_publish(
+        root: Path, note: ParsedRemember, identity: RememberIdentity,
+        *, config: Config | None = None,
+    ) -> Path:
         real_chmod(root / "inbox", 0o500)
-        return real_publish(root, note, identity)
+        return real_publish(root, note, identity, config=config)
 
     if outcome == "followup":
         fault.setattr(inbox_module, "_fsync_directory", fail_fsync)

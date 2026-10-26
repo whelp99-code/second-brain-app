@@ -70,10 +70,12 @@ class GenerationMutationService:
         store: GenerationStore,
         requests: RequestStore,
         lifecycle: ProviderLifecycle,
+        *, config: Config | None = None,
     ) -> None:
         self.store = store
         self.requests = requests
         self.lifecycle = lifecycle
+        self.config = config
 
     @classmethod
     def from_config(cls, config: Config, *, maintenance_only: bool = False) -> GenerationMutationService:
@@ -88,7 +90,7 @@ class GenerationMutationService:
             hybrid=config.search_hybrid,
         )
         exports = ExportPublisher(paths.exports, config.provider_release_sha, requests.exports)
-        return cls(store, requests, ProviderLifecycle(exports))
+        return cls(store, requests, ProviderLifecycle(exports), config=config)
 
     def close(self) -> None:
         self.store.close()
@@ -106,7 +108,7 @@ class GenerationMutationService:
                 operation=GenerationOperation.INBOX,
                 now=now,
                 authority=GenerationAuthority(None, None),
-                apply=lambda root: publish_inbox(root, note, identity),
+                apply=lambda root: publish_inbox(root, note, identity, config=self.config),
             )
         )
         return result.value

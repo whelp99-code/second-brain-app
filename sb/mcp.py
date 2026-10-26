@@ -850,7 +850,7 @@ def build_server(
             cause = type(exc.__cause__).__name__ if exc.__cause__ is not None else type(exc).__name__
             if isinstance(exc, RememberRejected):
                 return ToolError(str(exc))
-            state, path = observe_remember(root, content, title, identity)
+            state, path = observe_remember(root, content, title, identity, config=runtime_config)
             if isinstance(exc, InboxModeRestoreError):
                 saved = path
                 if saved is None and exc.saved is not None:
@@ -907,7 +907,7 @@ def build_server(
                     raise
                 reingress.close()
             if vault_root is not None and not root.is_symlink() and root.name != "vault":
-                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
+                return {"inbox_path": write_inbox(root, content, title, identity, config=runtime_config).as_posix()}
             mutations = GenerationMutationService.from_config(runtime_config)
             try:
                 rel = mutations.remember(content, title, datetime.now(UTC), identity)

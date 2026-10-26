@@ -12,11 +12,19 @@ import errno
 import hashlib
 import os
 import re
+import sqlite3
 import stat
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal, assert_never, override
+
+from sb.config import Config
+from sb.connectors.inbox_documents import InboxDocumentsAdapter
+from sb.connectors.inbox_documents import create as create_inbox_adapter
+from sb.parsers import ParseError, parser_for
+from sb.sqlite_values import SQL_ROWS
 
 MAX_REMEMBER_BYTES: Final = 1024 * 1024
 _SLUG_RE: Final = re.compile(r"[^0-9A-Za-z가-힣]+")
@@ -194,6 +202,7 @@ def observe_page(path: Path, expected: bytes) -> PageState:
 
 def observe_remember(
     root: Path, content: str, title: str | None, request_id: RememberIdentity,
+    *, config: Config | None = None,
 ) -> tuple[PageState, str | None]:
     """Return the final-path state and, when present, the vault-relative path."""
     try:
@@ -206,12 +215,91 @@ def observe_remember(
         return "absent", None
     dest = root / "inbox" / name
     state = observe_page(dest, data)
+    if state == "absent" and request_id.kind == "explicit":
+        try:
+            if _consumed_remember(root.resolve(), Path("inbox") / name, data, config):
+                return "present", (Path("inbox") / name).as_posix()
+        except RememberOutcomeUnknown:
+            return "unknown", None
     if state != "present":
         return state, None
     try:
         return state, dest.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return "unknown", None
+
+
+def _consumed_remember(
+    root: Path, relative: Path, data: bytes, config: Config | None,
+) -> bool:
+    """Reconcile an exact explicit filename against ack or committed ingestion."""
+    try:
+        if (root / "inbox").is_symlink():
+            raise OSError("unsafe inbox directory")
+        done = root / "inbox" / ".done"
+        if done.is_symlink():
+            raise OSError("unsafe acknowledgement directory")
+        archived = done / relative.name
+        state = observe_page(archived, data)
+        if state == "present":
+            metadata = archived.stat()
+            if metadata.st_uid != os.getuid() or metadata.st_nlink != 1:
+                raise OSError("unsafe acknowledged page")
+            return True
+        if state != "absent":
+            raise OSError("unverifiable acknowledged page")
+        ledger = root / ".sb" / "ledger.db"
+        if ledger.parent.is_symlink() or ledger.is_symlink():
+            raise OSError("unsafe ingestion ledger")
+        try:
+            metadata = ledger.stat()
+        except FileNotFoundError:
+            return False
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or metadata.st_nlink != 1:
+            raise OSError("unsafe ingestion ledger")
+        with closing(sqlite3.connect(ledger.as_uri() + "?mode=ro", uri=True)) as connection:
+            rows = SQL_ROWS.validate_python(connection.execute(
+                "SELECT source_id,source_version,content_hash FROM source_item WHERE source_uri=?",
+                (relative.name,),
+            ).fetchall(), strict=True)
+        if not rows:
+            return False
+        if config is None:
+            raise ValueError("inbox source identity unavailable")
+        adapter = create_inbox_adapter(config)
+        if not isinstance(adapter, InboxDocumentsAdapter):
+            raise TypeError("inbox adapter identity unavailable")
+        if "sources" in config.raw and not any(
+            row.get("id") == adapter.source_id
+            and (row.get("adapter") or row.get("type")) in adapter.accepted_adapters
+            for row in config.source_roots
+        ):
+            raise ValueError("inbox source is not selected by configuration")
+        if adapter.root.resolve() != (Path(config.vault_root) / "inbox").resolve():
+            raise ValueError("configured source does not consume the publication inbox")
+        rows = [row for row in rows if row[0] == adapter.source_id]
+        if not rows:
+            raise ValueError("no ingestion evidence for configured inbox source")
+        raw_hash = hashlib.sha256(data).hexdigest()
+        parsed_hash = hashlib.sha256(parser_for(".md")(data).encode()).hexdigest() if rows else ""
+        for _source_id, version, digest in rows:
+            if not isinstance(version, str) or not isinstance(digest, str):
+                raise TypeError("invalid ingestion evidence")
+            parts = version.split(":")
+            if (len(parts) != 3 or not parts[0].isdecimal()
+                    or parts[1:] != [str(len(data)), raw_hash]
+                    or digest != parsed_hash):
+                raise ValueError("ingestion identity mismatch")
+            raw = root / "raw" / digest[:2] / digest
+            if raw.parent.parent.is_symlink() or raw.parent.is_symlink():
+                raise OSError("unsafe ingested content")
+            metadata = raw.lstat()
+            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid()
+                    or metadata.st_nlink != 1 or hashlib.sha256(_read_file(raw)).hexdigest() != digest):
+                raise OSError("unverifiable ingested content")
+        return bool(rows)
+    except (OSError, sqlite3.Error, TypeError, ValueError, ParseError) as exc:
+        raise RememberOutcomeUnknown(relative) from exc
 
 
 def _saved_page(dest: Path) -> Path | None:
@@ -316,7 +404,10 @@ def _ensure_page(dest: Path, data: bytes, *, retry: bool) -> None:
     _exclusive_create(dest, data)
 
 
-def publish_inbox(root: Path, note: ParsedRemember, request_id: RememberIdentity) -> Path:
+def publish_inbox(
+    root: Path, note: ParsedRemember, request_id: RememberIdentity,
+    *, config: Config | None = None,
+) -> Path:
     """Publish one final name without replacing another note."""
     data = note.data
     vault = root.resolve()
@@ -328,6 +419,9 @@ def publish_inbox(root: Path, note: ParsedRemember, request_id: RememberIdentity
     if not dest.resolve().is_relative_to(inbox):
         raise RememberRejected("inbox escapes vault")
     relative = dest.relative_to(vault)
+    if (request_id.kind == "explicit" and observe_page(dest, data) == "absent"
+            and _consumed_remember(vault, relative, data, config)):
+        return relative
     mode = stat.S_IMODE(os.lstat(inbox).st_mode)
     changed = False
     attempt: BaseException | None = None
@@ -381,11 +475,12 @@ def promote_published(root: Path, relative: Path, title: str | None) -> Path:
 def write_inbox(
     root: Path, content: str, title: str | None,
     request_id: str | RememberIdentity | None = None,
+    *, config: Config | None = None,
 ) -> Path:
     """Write UTF-8 text <=1MB to an exclusive inbox page. Never overwrites."""
     note = parse_remember(content, title)
     identity = remember_identity(request_id)
-    relative = publish_inbox(root, note, identity)
+    relative = publish_inbox(root, note, identity, config=config)
     return promote_published(root, relative, title)
 
 

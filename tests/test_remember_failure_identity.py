@@ -34,8 +34,9 @@ def test_remember_json_failure_preserves_only_explicit_identity(
     def fail_write(
         root: Path, content: str, title: str | None,
         request_id: str | RememberIdentity | None = None,
+        *, config: Config | None = None,
     ) -> Path:
-        saved = real_write(root, content, title, request_id)
+        saved = real_write(root, content, title, request_id, config=config)
         if outcome == "mode_written":
             raise InboxModeRestoreError(root / "inbox", 0o500, saved)
         raise OSError("synthetic post-publication failure")
