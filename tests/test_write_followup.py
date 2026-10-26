@@ -515,6 +515,127 @@ def test_unreadable_existing_page_is_unknown_and_not_duplicated(
     assert page.read_bytes() == _MARKER_BODY.encode()
 
 
+@pytest.mark.parametrize("root_name", ["notes", "vault"])
+@pytest.mark.parametrize("link_errno", [None, errno.EXDEV, errno.EPERM, errno.ENOTSUP])
+def test_remember_real_link_or_rename_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_name: str,
+    link_errno: int | None,
+) -> None:
+    root = init_vault(tmp_path / root_name).root
+    (root / "inbox").chmod(0o500)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_link = os.link
+    refused: list[Path] = []
+
+    def unsupported_inbox_link(src: Path, dst: Path) -> None:
+        if dst.parent.name == "inbox" and dst.suffix == ".md":
+            assert src.is_file()
+            assert link_errno is not None
+            refused.append(dst)
+            raise OSError(link_errno, "synthetic unsupported inbox link")
+        real_link(src, dst)
+
+    if link_errno is not None:
+        monkeypatch.setattr(os, "link", unsupported_inbox_link)
+    arguments: dict[str, object] = {
+        "content": _MARKER_BODY,
+        "title": "note",
+        "request_id": "fallback-same",
+    }
+    result = _call(server, "sb_remember", arguments)
+    pages = _inbox_pages(root)
+    assert result.is_error is False, {
+        "response": _error_text(result),
+        "active_generation": root.is_symlink(),
+        "published_pages": [page.name for page in pages],
+        "link_refusals": len(refused),
+    }
+    assert root.is_symlink() is (root_name == "vault")
+    assert len(pages) == 1
+    assert pages[0].read_bytes() == _MARKER_BODY.encode()
+    assert pages[0].stat().st_nlink == 1
+    assert stat.S_IMODE((root / "inbox").stat().st_mode) == 0o500
+    assert not list((root / "inbox").glob("*.tmp"))
+    payload = cast(object, json.loads(_error_text(result)))
+    assert payload == {"inbox_path": pages[0].relative_to(root).as_posix()}
+    retried = _call(server, "sb_remember", arguments)
+    assert retried.is_error is False
+    again = _inbox_pages(root)
+    assert len(again) == 1
+    assert again[0].name == pages[0].name
+    assert again[0].read_bytes() == _MARKER_BODY.encode()
+    assert again[0].stat().st_nlink == 1
+    assert stat.S_IMODE((root / "inbox").stat().st_mode) == 0o500
+    assert not list((root / "inbox").glob("*.tmp"))
+    assert len(refused) == (0 if link_errno is None else 1)
+
+
+@pytest.mark.parametrize("link_errno", [errno.EXDEV, errno.EPERM, errno.ENOTSUP])
+@pytest.mark.parametrize("destination_kind", ["file", "directory"])
+def test_real_rename_fallback_refuses_existing_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    link_errno: int,
+    destination_kind: str,
+) -> None:
+    from sb.inbox import _exclusive_create
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    destination = inbox / "existing.md"
+    if destination_kind == "file":
+        _ = destination.write_bytes(b"existing publication")
+    else:
+        destination.mkdir()
+    before = destination.stat()
+
+    def unsupported_link(src: Path, dst: Path) -> None:
+        assert src.is_file()
+        assert dst == destination
+        raise OSError(link_errno, "synthetic unsupported inbox link")
+
+    monkeypatch.setattr(os, "link", unsupported_link)
+    with pytest.raises(FileExistsError):
+        _exclusive_create(destination, b"rejected publication")
+    assert destination.stat().st_ino == before.st_ino
+    assert destination.stat().st_mode == before.st_mode
+    assert list(inbox.iterdir()) == [destination]
+    if destination_kind == "file":
+        assert destination.read_bytes() == b"existing publication"
+    else:
+        assert list(destination.iterdir()) == []
+
+
+@pytest.mark.parametrize("link_errno", [errno.EXDEV, errno.EPERM, errno.ENOTSUP])
+def test_real_rename_fallback_completes_exclusive_create(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, link_errno: int
+) -> None:
+    from sb.inbox import RememberFollowupError, _exclusive_create
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    destination = inbox / "published.md"
+    body = b"real exclusive rename publication"
+
+    def unsupported_link(src: Path, dst: Path) -> None:
+        assert src.is_file()
+        assert dst == destination
+        raise OSError(link_errno, "synthetic unsupported inbox link")
+
+    monkeypatch.setattr(os, "link", unsupported_link)
+    try:
+        _exclusive_create(destination, body)
+    except RememberFollowupError:
+        assert destination.read_bytes() == body
+        assert list(inbox.iterdir()) == [destination]
+        raise
+    assert destination.read_bytes() == body
+    assert destination.stat().st_nlink == 1
+    assert list(inbox.iterdir()) == [destination]
+
+
 def test_rename_noreplace_failure_does_not_duplicate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

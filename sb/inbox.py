@@ -248,7 +248,7 @@ def _rename_noreplace(src: Path, dst: Path) -> None:
         raise OSError(err, os.strerror(err), str(dst))
 
 
-def _link_noreplace(src: Path, dst: Path) -> None:
+def _link_noreplace(src: Path, dst: Path) -> bool:
     """Publish by exclusive link. Fall back to renameat2 only if link cannot work."""
     try:
         os.link(src, dst)
@@ -258,6 +258,8 @@ def _link_noreplace(src: Path, dst: Path) -> None:
         if exc.errno not in _LINK_FALLBACK:
             raise
         _rename_noreplace(src, dst)
+        return True
+    return False
 
 
 def _exclusive_create(dest: Path, data: bytes) -> None:
@@ -278,7 +280,7 @@ def _exclusive_create(dest: Path, data: bytes) -> None:
         raise
     os.close(descriptor)
     try:
-        _link_noreplace(temporary, dest)
+        moved = _link_noreplace(temporary, dest)
     except FileExistsError:
         temporary.unlink(missing_ok=True)
         raise
@@ -287,7 +289,8 @@ def _exclusive_create(dest: Path, data: bytes) -> None:
         raise
     try:
         _fsync_directory(dest.parent)
-        temporary.unlink()
+        if not moved:
+            temporary.unlink()
         _fsync_directory(dest.parent)
     except OSError as exc:
         raise RememberFollowupError(dest.relative_to(dest.parent.parent)) from exc
