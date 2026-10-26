@@ -49,11 +49,14 @@ class LifeRecordsAdapter:
             self._next = cursor or "0"
             return
         try:
-            previous = decode_json(cursor) if cursor and cursor != "0" else {}
-            if not isinstance(previous, dict) or any(
-                not isinstance(v, str) for v in previous.values()
-            ):
-                raise ValueError
+            decoded = decode_json(cursor) if cursor and cursor != "0" else {}
+            if not isinstance(decoded, dict):
+                raise TypeError
+            previous: dict[str, str] = {}
+            for key, value in decoded.items():
+                if not isinstance(value, str):
+                    raise TypeError
+                previous[key] = value
         except (ValueError, TypeError, RecursionError):
             yield (
                 SourceRef(self.source_id, "", "bad-cursor"),

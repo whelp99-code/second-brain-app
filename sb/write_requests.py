@@ -12,6 +12,7 @@ import secrets
 import stat
 import subprocess
 from collections.abc import Set as AbstractSet
+from contextlib import AbstractContextManager
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -185,10 +186,23 @@ def _visible_envelope(directory: int, name: str) -> MemoryWriteInboxEnvelopeV1:
 
 def _scan_pending(directory: int, request: MemoryWriteRequestV1) -> MemoryWriteResultV1 | None:
     before = os.fstat(directory)
+    scan: int | None = None
     try:
-        names = os.listdir(directory)
+        # A pre-lock directory OFD can retain a stale enumeration on btrfs.
+        # Keep the lock and envelope reads anchored, but enumerate a fresh OFD.
+        scan = os.open(
+            ".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=directory,
+        )
+        observed = os.fstat(scan)
+        if not _safe_dir(observed) or not _same(before, observed):
+            reject("WRITE_REQUEST_INBOX_UNSAFE")
+        names = os.listdir(scan)
     except OSError as exc:
         raise WriteRequestRejected("WRITE_REQUEST_INBOX_UNSAFE") from exc
+    finally:
+        if scan is not None:
+            os.close(scan)
     if len(names) > 1_024:
         reject("WRITE_REQUEST_INBOX_UNSAFE")
     replay: MemoryWriteInboxEnvelopeV1 | None = None
@@ -304,6 +318,7 @@ def accept_memory_write_request(
     revoked_delegations: AbstractSet[str] | None = None,
     external_public_keys: dict[str, Ed25519PublicKey] | None = None,
     barrier_sink: Task30BarrierSink | None = None,
+    generation_pin: AbstractContextManager[object] | None = None,
 ) -> MemoryWriteResultV1 | MemoryWriteResultV3 | MemoryEffectWriteAcceptedV2:
     """Dispatch the additive V1/V2/V3 union without mutating existing request bytes."""
     if not is_json_object(value):
@@ -331,6 +346,7 @@ def accept_memory_write_request(
                 revoked_delegations=revoked_delegations,
                 external_public_keys=external_public_keys,
                 barrier_sink=barrier_sink,
+                generation_pin=generation_pin,
             )
         except ValueError as exc:
             raise WriteRequestRejected(str(exc)) from exc

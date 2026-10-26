@@ -236,16 +236,16 @@ def _load_approval(
     command: CompanyControlRequest,
 ) -> CommandApprovalReceipt:
     rows = cast(
-        list[tuple[str, str, str]],
+        list[tuple[str, str, str, str]],
         db.execute(
-            """SELECT request_digest,decision,approval_json FROM company_handoff_decisions
+            """SELECT request_digest,decision,approval_json,receipt_id FROM company_handoff_decisions
             WHERE workspace_id=? AND candidate_id=? AND request_id=?""",
             (context.workspace_id, selector.candidate_id, selector.handoff_id),
         ).fetchall(),
     )
     if len(rows) != 1:
         raise CompanyMemoryError("COMPANY_RECEIPT_EVIDENCE_ABSENT")
-    request_digest, decision, approval_json = rows[0]
+    request_digest, decision, approval_json, receipt_id = rows[0]
     expected_decision = "reject" if selector.operation == "reject" else "approve"
     if decision != expected_decision or request_digest != selector.transition_request_digest:
         raise CompanyMemoryError("COMPANY_RECEIPT_EVIDENCE_ABSENT")
@@ -261,6 +261,7 @@ def _load_approval(
     }
     if (
         approval_json.encode() != canonical_bytes(approval_object)
+        or approval.receipt_id != receipt_id
         or approval.request_id != selector.handoff_id
         or approval.command_digest != selector.command_digest
         or approval.signer_principal_id != policy.approver_principal_id

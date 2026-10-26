@@ -8,7 +8,7 @@ from contextlib import closing
 from pathlib import Path
 
 from sb.company_approver_binding import CompanyHandoffPolicy, Digest, binding_digest
-from sb.company_freshness import (
+from sb.company_freshness_models import (
     Checkpoint,
     CompanyFreshnessProvider,
     FreshnessScope,
@@ -30,6 +30,7 @@ class PendingFinish(ClosedModel):
     operation: ProcessorOperation
     operation_id: Digest
     reservation: ReserveProgressResponse
+    original_reservation_retry: bool = False
 
 
 def save_pending_finish(
@@ -83,7 +84,12 @@ def resume_pending_finish(
             raise CompanyAuthorityRejected("COMPANY_PROGRESS_UNCERTAIN") from exc
         reservation = pending.reservation
         if (
-            reservation.outcome != "reserved"
+            (
+                reservation.outcome != "reserved"
+                and not (
+                    reservation.outcome == "already_reserved" and pending.original_reservation_retry
+                )
+            )
             or reservation.scope
             != FreshnessScope(
                 provider_instance_id=context.provider,

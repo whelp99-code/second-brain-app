@@ -22,6 +22,7 @@ from sb.company_approver_binding import (
     public_key_fingerprint,
     validate_candidate_id,
 )
+from sb.company_execution_claims import claim_human_execution
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.delegations import DelegationRejected, verify_signed_object
 from sb.effect_values import JsonObject, JsonValue, canonical_bytes, format_instant, parse_instant
@@ -320,6 +321,7 @@ def prepare_handoff(
                 ).hexdigest()
             ):
                 raise CompanyAuthorityRejected("COMPANY_HANDOFF_CONFLICT")
+            claim_human_execution(db, candidate, context, command.request_id, now)
             return {
                 "idempotency_key": key,
                 "command": model_object(command),
@@ -348,6 +350,7 @@ def prepare_handoff(
     )
     raw = canonical_bytes(model_object(command))
     command_digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+    claim_human_execution(db, candidate, context, command.request_id, now)
     _ = db.execute(
         """INSERT INTO company_handoff_outbox VALUES(?,?,?,?,?,?,?,?)
         ON CONFLICT(workspace_id,candidate_id) DO UPDATE SET
@@ -411,6 +414,7 @@ def enroll_policy(
     evidence: JsonObject = {
         "schema_version": 2,
         "context_json": exact,
+        "policy": model_object(policy),
         "registered_at": format_instant(now),
         "authority": authority,
         "operator_approval_ref": policy.operator_approval_ref,
@@ -439,6 +443,8 @@ def authorize_transition(
     request_digest: str,
     now: datetime,
     verify_original: Callable[[JsonObject], None],
+    *,
+    consume: bool = True,
 ) -> None:
     """Verify/consume the owner decision in the same transaction as the state change."""
     require_enrollment(db, context, policy)
@@ -557,6 +563,8 @@ def authorize_transition(
         (approval.receipt_id,),
     ).fetchone():
         raise CompanyAuthorityRejected("COMPANY_OWNER_RECEIPT_REUSED")
+    if not consume:
+        return
     _ = db.execute(
         "INSERT INTO company_handoff_decisions VALUES(?,?,?,?,?,?,?)",
         (

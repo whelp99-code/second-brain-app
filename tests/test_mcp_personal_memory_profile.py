@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,8 +13,10 @@ import anyio
 import pytest
 from jsonschema import Draft202012Validator
 from mcp.client import Client
+from mcp.server.mcpserver import MCPServer
 
 from sb.config import load_config
+from sb.effect_values import JsonInput, JsonObject, JsonValue
 from sb.life_config import policies
 from sb.mcp import LEGACY_TOOLS, build_server
 from sb.mcp_contract import (
@@ -28,6 +31,7 @@ from sb.personal_observation import parse_scan_receipt
 from sb.source_coverage import record_scan_receipt
 from sb.store.ledger import Ledger
 from sb.vault import init_vault
+from tests.mcp_test_support import json_content
 from tests.test_life_contracts import payload
 from tests.test_mcp_contract import (
     test_contract_freezes_stable_error_codes_and_classes,
@@ -122,18 +126,17 @@ def _exhaust(root: Path) -> None:
         record_scan_receipt(ledger, receipt, cursor_updated_at="2026-09-23T00:01:00.000Z")
 
 
-def _accept(root: Path, **changes: object) -> None:
+def _accept(root: Path, **changes: JsonValue) -> None:
     policy = policies(load_config())["test-notes"]
     with Ledger(root) as ledger:
         ledger.life_store().accept(payload(**changes), policy, key=str(changes["source_item_id"]), now=NOW)
 
 
-async def _call(server, arguments: dict[str, object]) -> dict[str, object]:
+async def _call(server: MCPServer, arguments: Mapping[str, JsonInput]) -> JsonObject:
     async with Client(server, mode="legacy", cache=None) as client:
-        result = await client.call_tool("sb_recall", arguments)
+        result = await client.call_tool("sb_recall", dict(arguments))
     assert result.is_error is False, result
-    body = result.structured_content
-    assert isinstance(body, dict)
+    body = json_content(result)
     SCHEMA.validate(body)
     return body
 
@@ -186,15 +189,21 @@ def test_sb_recall_returns_k5_states_answered_ambiguous_not_found_coverage_incom
     answered = anyio.run(_call, server, {"query": "AlphaEngineer"})
     assert answered["state"] == "answered"
     assert answered["answer"] == "AlphaEngineer builds tools"
-    assert len(answered["evidence_refs"]) == 1
+    answered_refs = answered["evidence_refs"]
+    assert isinstance(answered_refs, list)
+    assert len(answered_refs) == 1
     assert answered["uncertainty_reasons"] == []
 
     _accept(root, source_item_id="item-2", title="AlphaEngineer other", body="AlphaEngineer also appears")
     ambiguous = anyio.run(_call, server, {"query": "AlphaEngineer"})
     assert ambiguous["state"] == "ambiguous"
     assert ambiguous["answer"] is None
-    assert len(ambiguous["evidence_refs"]) == 2
-    assert "MULTIPLE_MATCHES" in ambiguous["uncertainty_reasons"]
+    ambiguous_refs = ambiguous["evidence_refs"]
+    assert isinstance(ambiguous_refs, list)
+    assert len(ambiguous_refs) == 2
+    uncertainty = ambiguous["uncertainty_reasons"]
+    assert isinstance(uncertainty, list)
+    assert "MULTIPLE_MATCHES" in uncertainty
 
 
 def test_profile_sidecar_digest_frozen() -> None:

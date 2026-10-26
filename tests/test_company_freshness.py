@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from sb.company_freshness import (
     MAX_SAFE_INTEGER,
@@ -14,6 +14,7 @@ from sb.company_freshness import (
     FreshnessProviderConfig,
     FreshnessScope,
     FreshnessWireError,
+    ProgressOperation,
     ReadFreshnessRequest,
     ReadFreshnessResponse,
     ReserveProgressRequest,
@@ -25,6 +26,7 @@ from sb.company_freshness import (
     require_freshness,
 )
 from sb.company_memory_authority import CompanyAuthorityRejected
+from sb.effect_values import strict_loads
 
 _FIXTURE = (
     Path(__file__).resolve().parents[1]
@@ -37,6 +39,31 @@ _SCOPE = FreshnessScope(
     provider_instance_id="provider:TEST_ONLY",
     workspace_id="11111111-1111-4111-8111-111111111111",
 )
+
+
+def test_public_company_db_configuration_cases() -> None:
+    extension = strict_loads(
+        _FIXTURE.with_name("company-db-freshness-v1.test-only.json").read_bytes(),
+        1_048_576,
+    )
+    assert isinstance(extension, dict)
+    cases = extension["configuration_cases"]
+    assert isinstance(cases, list) and cases
+    for case in cases:
+        assert isinstance(case, dict)
+        if case["valid"] is True:
+            config = FreshnessProviderConfig.model_validate(case["config"], strict=True)
+            assert config.model_dump(mode="json") == case["config"]
+        else:
+            with pytest.raises(ValidationError):
+                _ = FreshnessProviderConfig.model_validate(case["config"], strict=True)
+    actors = extension["actor_operations"]
+    assert isinstance(actors, dict)
+    operations = TypeAdapter[ProgressOperation](ProgressOperation)
+    for values in actors.values():
+        assert isinstance(values, list) and values
+        for value in values:
+            assert operations.validate_python(value, strict=True) == value
 
 
 def _store() -> StoreProgress:

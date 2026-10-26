@@ -54,6 +54,11 @@ same handoff key's generation and cannot revive a decided candidate.
 
 ## Freshness: production remains disabled
 
+The following describes the original PR69 baseline. The SB-1/SB-2 extension,
+including the additional closed `sb_company_db` configuration, is documented in
+[`COMPANY-DB-FRESHNESS.md`](COMPANY-DB-FRESHNESS.md). Production activation still
+requires separate operator work; the original TEST_ONLY vectors are unchanged.
+
 `freshness_provider` accepts only `{schema_version:2,kind:"unconfigured"}`.
 Missing configuration selects the same provider. It returns unavailable with
 null checkpoint; reserve/finish return the exact
@@ -86,6 +91,37 @@ changing the head or erasing the reservation.
 The explicit test CLI injects it and a fixed clock into the actual product CLI;
 the product entry point does not import that implementation or expose its flags.
 Volatile test memory is not operational freshness evidence.
+
+### Config-selected provider startup order (P2)
+
+Startup ordering does not depend on whether a provider was passed as a Python
+argument or selected by `provider_from_config`. Both mutation branches verify
+the caller, retry any committed original finish, reload the durable checkpoint,
+then request fresh readiness. There is no earlier readiness check for the
+configuration-factory path: it would reject a pending or already-recorded finish
+before that finish could recover the checkpoint.
+
+The factory-selected `lost_before`/`lost_after` cases for all three processor
+operations were first red at that early check, while the former injected-provider
+tests passed. The owner helper and actual processor smoke now select their
+surviving TEST_ONLY backend at the configuration factory boundary, without the
+public `freshness_provider` argument. The nine real SQLite scenarios verify
+factory selections alongside original finish IDs/digest, one effect, continued
+processing and same-binding restoration refusal. This is a factory-path proof,
+not a live external-provider integration or a new production config kind.
+
+The unavailable product still refuses a valid signed mutation with
+`COMPANY_FRESHNESS_REQUIRED` before writable effects. Its actual CLI smoke signs
+that request at the real clock; the historical expired fixture accidentally
+asserted which gate rejected first. Expired or invalid authority is now rejected
+by authentication before any recovery, and the original receipt lookup remains
+readonly.
+
+P2 capture: **343 related tests passed in 13.39s**, Ruff clean, basedpyright
+0 errors/warnings/notes and four changed Python-file LSP diagnostics clean. All
+nine config-factory recovery scenarios and the actual installed unavailable and
+original-receipt CLI surfaces passed. Captures and exact invocations are retained
+under `.omo/evidence/TASK-SB-FRESHNESS-ORDER-P2-20261016-*`.
 
 ### Actual processor reserve/effect/finish ordering
 
@@ -176,9 +212,10 @@ returning recorded/already_recorded respectively, then another candidate succeed
 The same-binding pre-effect DB restore remains refused with no new progress call.
 Eight invalid-authority/missing/corrupt-local-evidence cases remain closed.
 Original subprocess accept/reject receipt recovery and installed default
-unconfigured denial also passed. That real CLI caught an early-refusal error
+unconfigured denial also passed. Historically that real CLI caught an early-refusal error
 precedence regression during this change; the production guard was restored,
-not its test weakened. Raw command/results are retained under
+not its test weakened. The P2 correction above supersedes that early guard while
+retaining valid-request denial and unchanged-DB assertions. Raw historical command/results are retained under
 `.omo/evidence/TASK-SB-FINISH-RETRY-20261015-*`.
 
 This bare-ulw task uses parent self-review, not a new reviewer approval. Earlier

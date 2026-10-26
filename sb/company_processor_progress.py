@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from sb.company_freshness import (
+from sb.company_freshness_models import (
     TERMINAL_STATE_BY_OPERATION,
     Checkpoint,
     CompanyFreshnessProvider,
@@ -21,6 +21,7 @@ from sb.company_freshness import (
     ReserveProgressRequest,
     ReserveProgressResponse,
 )
+from sb.company_freshness_progress import checkpoint_advances
 from sb.company_memory_authority import CompanyAuthorityRejected
 from sb.effect_values import JsonObject, canonical_bytes
 from sb.effect_write_values import model_object
@@ -104,6 +105,8 @@ def reserve_operation(
     command_digest: str,
     event_digest: str,
     expected: Checkpoint,
+    *,
+    resume_original: bool = False,
 ) -> tuple[str, ReserveProgressResponse]:
     identity: JsonObject = {
         "scope": model_object(scope),
@@ -134,7 +137,7 @@ def reserve_operation(
         raise CompanyAuthorityRejected(response.code)
     if response.scope != scope or response.challenge != request.challenge:
         raise CompanyAuthorityRejected("COMPANY_FRESHNESS_REQUIRED")
-    if response.outcome == "already_reserved":
+    if response.outcome == "already_reserved" and not resume_original:
         raise CompanyAuthorityRejected("COMPANY_DUPLICATE_OPERATION")
     if response.outcome == "conflict":
         raise CompanyAuthorityRejected("COMPANY_OPERATIONAL_ROLLBACK")
@@ -185,49 +188,4 @@ def finish_operation(
 
 
 def _checkpoint_advances(expected: Checkpoint, current: Checkpoint) -> bool:
-    if (
-        current.operational_epoch != expected.operational_epoch
-        or current.approval_policy_version != expected.approval_policy_version
-        or current.approval_binding_digest != expected.approval_binding_digest
-        or current.intent_sequence <= expected.intent_sequence
-        or current.intent_root == expected.intent_root
-    ):
-        return False
-    progress = [
-        (
-            expected.revocation_sequence,
-            current.revocation_sequence,
-            expected.revocation_root,
-            current.revocation_root,
-        ),
-    ]
-    for before, after in (
-        (expected.stores.jarvis, current.stores.jarvis),
-        (expected.stores.second_brain, current.stores.second_brain),
-    ):
-        progress.extend(
-            (
-                (
-                    before.receipt_sequence,
-                    after.receipt_sequence,
-                    before.receipt_root,
-                    after.receipt_root,
-                ),
-                (
-                    before.terminal_sequence,
-                    after.terminal_sequence,
-                    before.terminal_root,
-                    after.terminal_root,
-                ),
-                (
-                    before.deletion_sequence,
-                    after.deletion_sequence,
-                    before.deletion_root,
-                    after.deletion_root,
-                ),
-            )
-        )
-    return all(
-        sequence > previous or (sequence == previous and root == previous_root)
-        for previous, sequence, previous_root, root in progress
-    )
+    return checkpoint_advances(expected, current)

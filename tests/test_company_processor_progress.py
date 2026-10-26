@@ -12,6 +12,7 @@ from sb.company_freshness import (
     FinishOutcome,
     FinishProgressRequest,
     FinishProgressResponse,
+    FreshnessProviderConfig,
     FreshnessWireError,
     ReadFreshnessRequest,
     ReadFreshnessResponse,
@@ -59,6 +60,7 @@ class ObservedProvider:
         self.reservations: list[ReserveProgressRequest] = []
         self.finishes: list[FinishProgressRequest] = []
         self.finish_outcomes: list[FinishOutcome] = []
+        self.factory_configs: list[FreshnessProviderConfig] = []
         self.before: list[tuple[str, int]] = states(config)
         self.after: str = "accepted"
         self.after_states: list[tuple[str, int]] | None = None
@@ -137,16 +139,27 @@ def invoke(
     operation: Literal["accept", "reject", "mark_processed"],
     arguments: JsonObject,
 ) -> None:
-    _ = run(
-        config,
-        signed_request(operation, arguments, PROCESSOR_KEY, "processor", PROCESSOR),
-        now=NOW,
-        process_only=True,
-        freshness_provider=provider,
-        # Deliberately pass the newest provider head. The product must still compare
-        # its durable local checkpoint, not trust this as a restoration bypass.
-        observed_checkpoint=provider.inner.checkpoint,
-    )
+    def select_provider(
+        configured: FreshnessProviderConfig,
+        *,
+        company_database: object = None,
+    ) -> ObservedProvider:
+        del company_database
+        assert configured == FreshnessProviderConfig(schema_version=2, kind="unconfigured")
+        provider.factory_configs.append(configured)
+        return provider
+
+    # Model the configuration factory's backend, not the run() injection argument.
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("sb.company_memory_cli.provider_from_config", select_provider)
+        _ = run(
+            config,
+            signed_request(operation, arguments, PROCESSOR_KEY, "processor", PROCESSOR),
+            now=NOW,
+            process_only=True,
+            # The newest outside head must not bypass a restored durable checkpoint.
+            observed_checkpoint=provider.inner.checkpoint,
+        )
 
 
 @pytest.fixture
@@ -236,7 +249,7 @@ def test_processor_reserve_refusal_never_applies_effect(
 
 @pytest.mark.parametrize("finish", ["lost_before", "lost_after"])
 @pytest.mark.parametrize("operation", ["accept", "reject", "mark_processed"])
-def test_finish_response_loss_retries_original_finish_and_blocks_same_binding_restore(
+def test_configuration_selected_finish_retry_preserves_effect_and_restore_guard(
     prepared: tuple[Path, JsonObject],
     finish: Literal["lost_before", "lost_after"],
     operation: Literal["accept", "reject", "mark_processed"],
