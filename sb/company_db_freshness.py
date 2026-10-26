@@ -1856,8 +1856,19 @@ class CompanyDbFreshnessProvider:
         with self._locked():
             pin = _pin(self._registry(), scope)
             self._recover()
-            if self._head(scope) is not None:
+            checkpoint = _genesis_checkpoint(
+                scope,
+                approval_policy_version=approval_policy_version,
+                approval_binding_digest=approval_binding_digest,
+                inventory=inventory,
+            )
+            if checkpoint.intent_root != pin.genesis_digest or pin.epoch != 1:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            head = self._head(scope)
+            if head is not None:
+                if head != checkpoint:
+                    raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+                return head
             if len(self.anchor.read_value()) != 32:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             if _history_present(self.database, scope):
@@ -1873,14 +1884,6 @@ class CompanyDbFreshnessProvider:
                 )
             finally:
                 connection.close()
-            checkpoint = _genesis_checkpoint(
-                scope,
-                approval_policy_version=approval_policy_version,
-                approval_binding_digest=approval_binding_digest,
-                inventory=inventory,
-            )
-            if checkpoint.intent_root != pin.genesis_digest or pin.epoch != 1:
-                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             record: JsonObject = {
                 "phase": "bootstrap",
                 "epoch": 1,

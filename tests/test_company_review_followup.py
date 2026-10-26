@@ -6,8 +6,10 @@ import sqlite3
 from contextlib import closing
 from dataclasses import replace
 from datetime import timedelta
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Literal
 
 import pytest
 
@@ -18,7 +20,7 @@ from sb.company_auto_report import read_auto_report
 from sb.company_db_freshness import GenesisInventory, bootstrap_company_scope
 from sb.company_db_freshness_models import FreshnessRegistry, GenesisEntry
 from sb.company_freshness_anchor import AnchorRejected, nv_public_is_extend_only
-from sb.company_freshness_models import FreshnessScope, ReadFreshnessRequest
+from sb.company_freshness_models import Checkpoint, FreshnessScope, ReadFreshnessRequest
 from sb.company_memory import CompanyMemoryStore
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
 from sb.company_processor_progress import local_checkpoint
@@ -396,3 +398,119 @@ def test_unapplied_cancellation_refuses_uncertain_or_external_effect(tmp_path, u
             scope, operation_id, reservation, context.observed_checkpoint
         )
     assert snapshot(provider) == before
+
+
+@pytest.mark.parametrize("crash_at", [None, "anchor", "published"])
+def test_bootstrap_retry_recovers_original_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, crash_at: Literal["anchor", "published"] | None
+) -> None:
+    import sb.company_db_freshness as freshness
+    from sb.company_freshness_migrations import apply_component_migration
+
+    database, registry, witness, lock = write_tree(tmp_path)
+    scope = FreshnessScope(provider_instance_id=PROVIDER, workspace_id=WORKSPACE)
+    anchor = SimulatedNvAnchor(b"\x22" * 32, b"\x11" * 32)
+    binding = "sha256:" + "11" * 32
+    expected = empty_genesis(scope, binding)
+    write_registry(
+        registry,
+        registry_id="company-freshness:linux:v1",
+        installation_id="install-1",
+        anchor=anchor,
+        scope=scope,
+        genesis=expected,
+    )
+    _ = apply_component_migration(database, "freshness", now="2026-10-16T00:00:00.000Z")
+    attempt = partial(
+        bootstrap_company_scope,
+        database=database,
+        registry_path=registry,
+        witness_dir=witness,
+        lock_path=lock,
+        anchor=anchor,
+        registry_id="company-freshness:linux:v1",
+        scope=scope,
+        approval_policy_version=1,
+        approval_binding_digest=binding,
+        inventory=GenesisInventory(),
+        now="2026-10-16T00:00:00.000Z",
+    )
+
+    class WorkerStopped(BaseException):
+        pass
+
+    bootstrap = freshness.CompanyDbFreshnessProvider.bootstrap_scope
+
+    def lost_response(
+        self: freshness.CompanyDbFreshnessProvider,
+        *,
+        scope: FreshnessScope,
+        approval_policy_version: int,
+        approval_binding_digest: str,
+        inventory: GenesisInventory,
+        now: str,
+    ) -> Checkpoint:
+        assert (
+            bootstrap(
+                self,
+                scope=scope,
+                approval_policy_version=approval_policy_version,
+                approval_binding_digest=approval_binding_digest,
+                inventory=inventory,
+                now=now,
+            )
+            == expected
+        )
+        raise WorkerStopped("original bootstrap published before response")
+
+    def stop_before_publication(
+        _connection: sqlite3.Connection, _scope: FreshnessScope, _checkpoint: Checkpoint
+    ) -> None:
+        raise WorkerStopped("original bootstrap anchored before publication")
+
+    with monkeypatch.context() as fault:
+        if crash_at == "anchor":
+            fault.setattr(freshness, "_seed_bootstrap_checkpoint", stop_before_publication)
+        elif crash_at == "published":
+            fault.setattr(freshness.CompanyDbFreshnessProvider, "bootstrap_scope", lost_response)
+        if crash_at is None:
+            assert attempt() == expected
+        else:
+            with pytest.raises(WorkerStopped):
+                _ = attempt()
+    assert anchor.extend_count == 1
+    assert attempt() == expected
+    provider = freshness.CompanyDbFreshnessProvider(
+        database=database,
+        actor_store="second_brain",
+        registry_path=registry,
+        witness_dir=witness,
+        lock_path=lock,
+        anchor=anchor,
+        registry_id="company-freshness:linux:v1",
+    )
+    before = snapshot(provider)
+    assert attempt() == expected
+    assert snapshot(provider) == before and anchor.extend_count == 1
+    with closing(sqlite3.connect(database)) as db:
+        assert db.execute("SELECT count(*) FROM company_freshness_log").fetchone() == (1,)
+        assert db.execute("SELECT count(*) FROM company_freshness_publication").fetchone() == (1,)
+    for mismatched in [
+        partial(attempt, approval_policy_version=2),
+        partial(attempt, approval_binding_digest="sha256:" + "33" * 32),
+        partial(
+            attempt,
+            inventory=GenesisInventory(
+                revocations=[
+                    GenesisEntry(
+                        source_record_id="different",
+                        source_digest="sha256:" + "44" * 32,
+                        original_at="2026-10-16T00:00:00.000Z",
+                    )
+                ]
+            ),
+        ),
+    ]:
+        with pytest.raises(AnchorRejected, match="COMPANY_FRESHNESS_REQUIRED"):
+            _ = mismatched()
+        assert snapshot(provider) == before
