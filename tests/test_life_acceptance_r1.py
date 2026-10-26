@@ -684,7 +684,7 @@ def test_ac18_21_delete_then_old_backup_restore_and_offline_client_reconnect_no_
                     "token_env": "SB_FIXTURE_DEVICE_TOKEN",
                     "source_ids": ["test-notes"],
                     "can_write": True,
-                    "expires_at": (NOW + timedelta(days=30)).isoformat(),
+                    "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
                     "revoked": False,
                 }
             },
