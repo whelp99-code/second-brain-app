@@ -9,7 +9,7 @@ import sqlite3
 import subprocess
 import sys
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sb.config import load_config
@@ -527,7 +527,7 @@ def test_ac15_out_of_scope_title_node_edge_leak_zero(tmp_path: Path, monkeypatch
                     "token_env": "SB_FIXTURE_DEVICE_TOKEN",
                     "source_ids": ["src-visible"],
                     "can_write": False,
-                    "expires_at": (NOW + timedelta(days=30)).isoformat(),
+                    "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
                     "revoked": False,
                 }
             },
