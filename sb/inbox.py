@@ -36,7 +36,7 @@ class RememberRejected(Exception):
         return self.reason
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class RememberFollowupError(Exception):
     """Final page is present; a later step failed. Not NOTHING_WRITTEN."""
 

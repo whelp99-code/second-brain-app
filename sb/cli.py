@@ -23,7 +23,12 @@ from sb.effect_values import JsonObject, JsonValue
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
-from sb.inbox import RememberRejected
+from sb.inbox import (
+    InboxModeRestoreError,
+    RememberFollowupError,
+    RememberOutcomeUnknown,
+    RememberRejected,
+)
 from sb.metrics import record_command
 from sb.metrics import summary as metrics_summary
 from sb.ops import (
@@ -725,6 +730,9 @@ def main(argv: list[str] | None = None) -> int:
         GenerationIndexError,
         PostCompactHookError,
         VaultOwnerMismatch,
+        RememberFollowupError,
+        RememberOutcomeUnknown,
+        InboxModeRestoreError,
     ) as exc:
         print(str(exc), file=sys.stderr)
         return 1
