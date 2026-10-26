@@ -293,6 +293,11 @@ def _exclusive_create(dest: Path, data: bytes) -> None:
             temporary.unlink()
         _fsync_directory(dest.parent)
     except OSError as exc:
+        if not moved:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
         raise RememberFollowupError(dest.relative_to(dest.parent.parent)) from exc
 
 
