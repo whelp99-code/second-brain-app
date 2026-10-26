@@ -12,7 +12,7 @@ import os
 import sqlite3
 import sys
 from collections.abc import Callable, Generator, Mapping
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -578,7 +578,11 @@ def build_server(
             mutations = GenerationMutationService.from_config(runtime_config, maintenance_only=read_only)
             try:
                 _ = mutations.maintain_if_idle(now) if read_only else mutations.maintain(now)
-            finally:
+            except BaseException:
+                with suppress(Exception):
+                    mutations.close()
+                raise
+            else:
                 mutations.close()
             return
         store = RequestStore(requests, maintenance_only=read_only or initial_scoped_policy is not None)
@@ -589,7 +593,11 @@ def build_server(
                 store.exports,
             )
             _ = ProviderLifecycle(publisher).maintain(now)
-        finally:
+        except BaseException:
+            with suppress(Exception):
+                store.close()
+            raise
+        else:
             store.close()
 
     @contextmanager
@@ -806,18 +814,6 @@ def build_server(
         content: str, title: str | None = None, request_id: str | None = None,
     ) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
-        maintain(datetime.now(UTC))
-        if not task30_enabled and high_water()[0] != 0:
-            raise ToolError("TOMBSTONE_FENCE_REQUIRED")
-        if task30_enabled:
-            reingress = ReingressGate(runtime_state_root / "reingress.db")
-            try:
-                reingress.check_content(content.encode("utf-8"))
-            except ErasureError as exc:
-                raise ToolError(str(exc)) from exc
-            finally:
-                reingress.close()
-
         def remember_json(payload: dict[str, object]) -> ToolError:
             return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
@@ -895,23 +891,36 @@ def build_server(
             identity = remember_identity(request_id, now=datetime.now(UTC))
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
-        if vault_root is not None and not root.is_symlink() and root.name != "vault":
-            try:
-                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
-            except RememberRejected as exc:
-                raise ToolError(str(exc)) from exc
-            except Exception as exc:
-                raise remember_failure(exc) from exc
-        mutations = GenerationMutationService.from_config(runtime_config)
         try:
-            rel = mutations.remember(content, title, datetime.now(UTC), identity)
-            rel = promote_published(root, rel, title)
-        except RememberRejected as exc:
+            maintain(datetime.now(UTC))
+            if not task30_enabled and high_water()[0] != 0:
+                raise ToolError("TOMBSTONE_FENCE_REQUIRED")
+            if task30_enabled:
+                reingress = ReingressGate(runtime_state_root / "reingress.db")
+                try:
+                    reingress.check_content(content.encode("utf-8"))
+                except BaseException:
+                    with suppress(Exception):
+                        reingress.close()
+                    raise
+                reingress.close()
+            if vault_root is not None and not root.is_symlink() and root.name != "vault":
+                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
+            mutations = GenerationMutationService.from_config(runtime_config)
+            try:
+                rel = mutations.remember(content, title, datetime.now(UTC), identity)
+                rel = promote_published(root, rel, title)
+            except BaseException:
+                with suppress(Exception):
+                    mutations.close()
+                raise
+            mutations.close()
+        except (RememberRejected, ErasureError) as exc:
             raise ToolError(str(exc)) from exc
+        except ToolError:
+            raise
         except Exception as exc:
             raise remember_failure(exc) from exc
-        finally:
-            mutations.close()
         return {"inbox_path": rel.as_posix()}
 
     def sb_generation_status(
@@ -1144,8 +1153,6 @@ def build_server(
             return cast(ToolResult, target.as_dict())
 
     def accept_request(raw: JsonObject, is_effect: bool) -> ToolResult:
-        maintain(datetime.now(UTC))
-
         def accept() -> MemoryEffectWriteAcceptedV2 | MemoryWriteResultV1 | MemoryWriteResultV3:
             return accept_memory_write_request(
                 root,
@@ -1161,6 +1168,7 @@ def build_server(
             )
 
         try:
+            maintain(datetime.now(UTC))
             result = accept()
         except WriteRequestRejected as exc:
             raise ToolError(
