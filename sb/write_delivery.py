@@ -1,30 +1,40 @@
-"""Write-tool result when the provider published nothing.
+"""Evidence-bound write-tool failure outcomes.
 
-JARVIS reconcile must treat this payload as not delivered. It is not an
-uncertain mid-apply failure: no durable request file was published, so the
-lane may stop reconciling (outcome code ``NOTHING_WRITTEN``).
-
-Tool error text is strict JSON, one object, no prefix:
-
-* ``written`` is always false
-* ``delivery`` is always ``"not_written"``
-* ``code`` is ``NOTHING_WRITTEN`` when the failure is not an already-catalogued
-  rejection, otherwise the catalogue code is kept and ``cause`` repeats it
-* ``retryable`` is false
-
-A successful accept (``kind: accepted``) means a request file was published.
-Do not treat transport loss after that accept as ``not_written``.
+Only an exact validated request artifact or journal identity proves delivery.
+An unreadable or malformed observation remains unknown, never success or absence.
+A known nonmatching request is not delivery evidence for the rejected submission.
+These read-only lookups neither accept a request nor retry its effects.
 """
 
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import stat
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+from sb.effect_values import (
+    JsonObject,
+    canonical_bytes,
+    is_json_object,
+    parse_instant,
+    strict_loads,
+)
+from sb.effect_write_values import MAX_EFFECT_FILE_BYTES, model_object, parse_effect_request
+from sb.request_publication import recover_publication
+from sb.stable_requests import request_value
+from sb.write_request_values import (
+    DIGEST,
+    WriteRequestRejected,
+    parse_remember_envelope,
+    parse_request,
+    parse_request_v3,
+)
 
 NOTHING_WRITTEN: Final = "NOTHING_WRITTEN"
 WRITTEN_WITH_FOLLOWUP_ERROR: Final = "WRITTEN_WITH_FOLLOWUP_ERROR"
@@ -124,17 +134,18 @@ def _names(identity: str, schema_version: object) -> tuple[str, ...]:
     )
 
 
-def _scan_dir(directory: Path, identity: str, names: tuple[str, ...]) -> Evidence | Path:
+def _scan_dir(directory: Path, identity: str, names: tuple[str, ...]) -> Evidence | list[Path]:
     kind = _stat_kind(directory)
-    if kind == "missing" or kind == "other":
+    if kind == "missing":
         return "absent"
-    if kind == "error" or kind == "file":
-        return "unknown" if kind == "error" else "absent"
+    if kind != "dir":
+        return "unknown"
     try:
         entries = list(directory.iterdir())
     except OSError:
         return "unknown"
     suffixes = {name for name in names}
+    found: list[Path] = []
     for entry in entries:
         matched = entry.name in suffixes or (
             entry.name.startswith(f"{identity}.") and entry.name.endswith(".json")
@@ -143,13 +154,46 @@ def _scan_dir(directory: Path, identity: str, names: tuple[str, ...]) -> Evidenc
             continue
         file_kind = _stat_kind(entry)
         if file_kind == "file":
-            return entry
-        if file_kind == "error":
+            found.append(entry)
+        else:
             return "unknown"
-    return "absent"
+    return found
 
 
-def _journal_hit(request_root: Path, identity: str) -> Evidence | str:
+def _validated_request(
+    raw: JsonObject,
+    accepted: str,
+    *,
+    public_keys: Mapping[str, Ed25519PublicKey] | None,
+    provider_instance_id: str | None,
+    external_public_keys: Mapping[str, Ed25519PublicKey] | None,
+) -> JsonObject:
+    version = raw.get("schema_version")
+    if version == 1:
+        return request_value(parse_request(raw, parse_instant(accepted)))
+    if version == 3:
+        return request_value(parse_request_v3(raw, parse_instant(accepted)))
+    if version == 2:
+        return model_object(
+            parse_effect_request(
+                raw,
+                now=accepted,
+                public_keys=public_keys,
+                expected_provider=provider_instance_id,
+                external_public_keys=external_public_keys,
+            )
+        )
+    raise ValueError("WRITE_REQUEST_INVALID")
+
+
+def _journal_hit(
+    request_root: Path,
+    raw: JsonObject,
+    *,
+    public_keys: Mapping[str, Ed25519PublicKey] | None,
+    provider_instance_id: str | None,
+    external_public_keys: Mapping[str, Ed25519PublicKey] | None,
+) -> Evidence | str:
     database = request_root / "journal.db"
     kind = _stat_kind(database)
     if kind == "missing":
@@ -159,36 +203,102 @@ def _journal_hit(request_root: Path, identity: str) -> Evidence | str:
     try:
         uri = database.resolve().as_uri() + "?mode=ro"
         with sqlite3.connect(uri, uri=True) as connection:
-            row = connection.execute(
-                "SELECT result_json FROM requests WHERE request_id=?",
-                (identity,),
-            ).fetchone()
+            row = cast(
+                tuple[object, ...] | None,
+                connection.execute(
+                    "SELECT schema_version,request_digest,envelope_digest,idempotency_key,accepted_at,result_json FROM requests WHERE request_id=?",
+                    (raw.get("request_id"),),
+                ).fetchone(),
+            )
     except (OSError, sqlite3.Error):
         return "unknown"
     if row is None:
         return "absent"
-    raw = row[0]
-    if isinstance(raw, str):
-        try:
-            loaded = json.loads(raw)
-        except json.JSONDecodeError:
-            loaded = None
-        if isinstance(loaded, dict):
-            inbox = loaded.get("inbox_path")
-            if isinstance(inbox, str) and inbox:
-                return inbox
-    return f"journal.db#{identity}"
+    version, request_digest, envelope_digest, idempotency_key, accepted, result_json = row
+    if not isinstance(accepted, str) or not isinstance(result_json, str):
+        return "unknown"
+    if (
+        version not in (1, 2, 3)
+        or not isinstance(request_digest, str)
+        or DIGEST.fullmatch(request_digest) is None
+        or not isinstance(idempotency_key, str)
+    ):
+        return "unknown"
+    if (
+        version == 2
+        and (not isinstance(envelope_digest, str) or DIGEST.fullmatch(envelope_digest) is None)
+        or version != 2
+        and envelope_digest is not None
+    ):
+        return "unknown"
+    try:
+        _ = parse_instant(accepted)
+        loaded = strict_loads(result_json, MAX_EFFECT_FILE_BYTES)
+    except ValueError:
+        return "unknown"
+    if not is_json_object(loaded) or loaded.get("kind") != "accepted":
+        return "unknown"
+    expected: dict[str, object] = {
+        "schema_version": version,
+        "request_id": raw.get("request_id"),
+        "request_digest": request_digest,
+        "idempotency_key": idempotency_key,
+        "accepted_at": accepted,
+    }
+    if version == 2:
+        expected["envelope_digest"] = envelope_digest
+    for field, value in expected.items():
+        if loaded.get(field) != value:
+            return "unknown"
+    locator = loaded.get("queue_locator" if version == 2 else "inbox_path")
+    if (
+        not isinstance(locator, str)
+        or not locator
+        or Path(locator).is_absolute()
+        or ".." in Path(locator).parts
+    ):
+        return "unknown"
+    try:
+        request = _validated_request(
+            raw,
+            accepted,
+            public_keys=public_keys,
+            provider_instance_id=provider_instance_id,
+            external_public_keys=external_public_keys,
+        )
+    except (ValueError, WriteRequestRejected):
+        return "absent"
+    if (version, request_digest, envelope_digest, idempotency_key) != (
+        request["schema_version"],
+        request["request_digest"],
+        request.get("envelope_digest"),
+        request["idempotency_key"],
+    ):
+        return "absent"
+    if loaded.get("operation") != request["operation"]:
+        return "unknown"
+    return locator
 
 
 def classify_delivery(
-    request_root: Path, vault_root: Path, request_id: object, schema_version: object
+    request_root: Path,
+    vault_root: Path,
+    raw: JsonObject,
+    *,
+    public_keys: Mapping[str, Ed25519PublicKey] | None = None,
+    provider_instance_id: str | None = None,
+    external_public_keys: Mapping[str, Ed25519PublicKey] | None = None,
 ) -> DeliveryLookup:
-    """Decide from pending, processing, receipts, and the journal. Lookup errors are unknown."""
-    identity = _safe_request_id(request_id)
+    """Only exact validated request evidence is present; unreadable evidence is unknown."""
+    identity = _safe_request_id(raw.get("request_id"))
     if identity is None:
         return DeliveryLookup("absent")
-    names = _names(identity, schema_version)
+    names = _names(identity, raw.get("schema_version"))
     uncertain = False
+
+    def validate_json(payload: bytes, _expected: bytes) -> None:
+        _ = strict_loads(payload, MAX_EFFECT_FILE_BYTES)
+
     directories = (
         request_root / "pending",
         request_root / "processing",
@@ -197,11 +307,60 @@ def classify_delivery(
     )
     for directory in directories:
         found = _scan_dir(directory, identity, names)
-        if isinstance(found, Path):
-            return DeliveryLookup("present", _relative(found, request_root, vault_root), identity)
+        if isinstance(found, list):
+            for path in found:
+                try:
+                    payload = recover_publication(
+                        path,
+                        b"",
+                        max_bytes=MAX_EFFECT_FILE_BYTES,
+                        validate_recovery=validate_json,
+                    )
+                    envelope = strict_loads(payload, MAX_EFFECT_FILE_BYTES)
+                    if not is_json_object(envelope):
+                        raise ValueError("WRITE_REQUEST_INVALID")
+                    accepted = envelope.get("accepted_at")
+                    if not isinstance(accepted, str) or envelope.get("state") != "pending":
+                        raise ValueError("WRITE_REQUEST_INVALID")
+                    if envelope.get("schema_version") in (1, 3):
+                        stored = request_value(parse_remember_envelope(payload).request)
+                    else:
+                        value = envelope.get("request")
+                        if envelope.get("schema_version") != 2 or not is_json_object(value):
+                            raise ValueError("WRITE_REQUEST_INVALID")
+                        stored = _validated_request(
+                            value,
+                            accepted,
+                            public_keys=public_keys,
+                            provider_instance_id=provider_instance_id,
+                            external_public_keys=external_public_keys,
+                        )
+                except (OSError, ValueError, WriteRequestRejected):
+                    uncertain = True
+                    continue
+                try:
+                    submitted = _validated_request(
+                        raw,
+                        accepted,
+                        public_keys=public_keys,
+                        provider_instance_id=provider_instance_id,
+                        external_public_keys=external_public_keys,
+                    )
+                except (ValueError, WriteRequestRejected):
+                    continue
+                if canonical_bytes(stored) == canonical_bytes(submitted):
+                    return DeliveryLookup(
+                        "present", _relative(path, request_root, vault_root), identity
+                    )
         if found == "unknown":
             uncertain = True
-    journal = _journal_hit(request_root, identity)
+    journal = _journal_hit(
+        request_root,
+        raw,
+        public_keys=public_keys,
+        provider_instance_id=provider_instance_id,
+        external_public_keys=external_public_keys,
+    )
     if isinstance(journal, str) and journal not in {"absent", "unknown"}:
         return DeliveryLookup("present", journal, identity)
     if journal == "unknown":

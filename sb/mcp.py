@@ -369,9 +369,17 @@ def _write_failure(
     cause: str | None,
     request_root: Path,
     vault_root: Path,
+    public_keys: dict[str, Ed25519PublicKey] | None,
+    provider_instance_id: str,
+    external_public_keys: dict[str, Ed25519PublicKey] | None,
 ) -> str:
     lookup = classify_delivery(
-        request_root, vault_root, raw.get("request_id"), raw.get("schema_version")
+        request_root,
+        vault_root,
+        raw,
+        public_keys=public_keys,
+        provider_instance_id=provider_instance_id,
+        external_public_keys=external_public_keys,
     )
     reported = code if cause is None else cause
     if lookup.evidence == "present" and lookup.path is not None and lookup.request_id is not None:
@@ -1157,7 +1165,15 @@ def build_server(
         except WriteRequestRejected as exc:
             raise ToolError(
                 _write_failure(
-                    raw, is_effect, exc.code, cause=None, request_root=requests, vault_root=root
+                    raw,
+                    is_effect,
+                    exc.code,
+                    cause=None,
+                    request_root=requests,
+                    vault_root=root,
+                    public_keys=public_keys,
+                    provider_instance_id=config.provider_instance_id,
+                    external_public_keys=external_public_keys,
                 )
             ) from exc
         except Exception as exc:
@@ -1169,6 +1185,9 @@ def build_server(
                     cause=type(exc).__name__,
                     request_root=requests,
                     vault_root=root,
+                    public_keys=public_keys,
+                    provider_instance_id=config.provider_instance_id,
+                    external_public_keys=external_public_keys,
                 )
             ) from exc
         if isinstance(result, MemoryEffectWriteAcceptedV2):

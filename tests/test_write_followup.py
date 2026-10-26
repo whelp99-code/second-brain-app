@@ -5,7 +5,6 @@ from __future__ import annotations
 import errno
 import json
 import os
-import sqlite3
 import stat
 import subprocess
 import sys
@@ -277,35 +276,43 @@ def test_lookup_error_is_unknown_not_nothing_written(
     assert isinstance(payload["retry"], str)
 
 
-def test_processing_and_journal_count_as_written(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_processing_and_journal_count_as_written(tmp_path: Path, version: int) -> None:
+    from sb.effect_values import is_json_object
+    from sb.effect_write_values import frozen_correction_vector
+    from sb.mcp_remember_contract import remember_fixture_request
     from sb.write_delivery import classify_delivery
+    from sb.write_requests import accept_memory_write_request
 
     request_root = tmp_path / "requests"
+    request = (
+        write_fixture_request()
+        if version == 1
+        else remember_fixture_request("synthetic evidence")
+        if version == 3
+        else frozen_correction_vector()["request"]
+    )
+    assert is_json_object(request)
+    accepted = accept_memory_write_request(
+        tmp_path / "vault",
+        request_root,
+        request,
+        FrozenTask30DateTime.now(),
+    )
     processing = request_root / "processing"
-    processing.mkdir(parents=True)
-    identity = "memreq:pos:v2:" + "ab" * 32
-    v2 = processing / f"{identity}.1.v2.json"
-    _ = v2.write_text("{}", encoding="utf-8")
-    found = classify_delivery(request_root, tmp_path / "vault", identity, 2)
+    processing.mkdir(exist_ok=True)
+    pending = next((request_root / "pending").glob("*.json"))
+    original = pending.read_bytes()
+    moved = pending.rename(processing / f"{accepted.request_id}.1.v{version}.json")
+    found = classify_delivery(request_root, tmp_path / "vault", request)
     assert found.evidence == "present"
-    assert found.path is not None and found.path.endswith(".v2.json")
-    v2.unlink()
-    v3 = processing / f"{identity}.2.v3.json"
-    _ = v3.write_text("{}", encoding="utf-8")
-    assert classify_delivery(request_root, tmp_path / "vault", identity, 3).evidence == "present"
-    v3.unlink()
-    database = request_root / "journal.db"
-    with sqlite3.connect(database) as connection:
-        _ = connection.execute(
-            "CREATE TABLE requests(request_id TEXT PRIMARY KEY, result_json TEXT NOT NULL)"
-        )
-        _ = connection.execute(
-            "INSERT INTO requests VALUES (?, ?)",
-            (identity, json.dumps({"inbox_path": "pending/kept.json"})),
-        )
-    journal = classify_delivery(request_root, tmp_path / "vault", identity, 1)
+    assert found.path == moved.relative_to(request_root).as_posix()
+    assert moved.read_bytes() == original
+    moved.unlink()
+    journal = classify_delivery(request_root, tmp_path / "vault", request)
     assert journal.evidence == "present"
-    assert journal.path == "pending/kept.json"
+    assert journal.request_id == str(accepted.request_id)
+    assert journal.path is not None and str(accepted.request_id) in journal.path
 
 
 def test_remember_retry_requires_same_title_and_survives_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
