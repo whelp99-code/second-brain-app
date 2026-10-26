@@ -26,13 +26,9 @@ from tests.test_web_lifecycle import URL, ready
 def _commit(root: Path, *args: str) -> None:
     _ = subprocess.run(
         [
-            "git",
-            "-C",
-            str(root),
-            "-c",
-            "user.name=second-brain-test",
-            "-c",
-            "user.email=sb-test@local",
+            "git", "-C", str(root),
+            "-c", "user.name=second-brain-test",
+            "-c", "user.email=sb-test@local",
             *args,
         ],
         check=True,
@@ -46,7 +42,6 @@ def _commit(root: Path, *args: str) -> None:
             "GIT_COMMITTER_EMAIL": "sb-test@local",
         },
     )
-
 
 def test_backup_v1_with_packed_history_is_inspected(tmp_path: Path) -> None:
     root, _ = _seed_vault(tmp_path)
