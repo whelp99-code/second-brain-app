@@ -815,6 +815,8 @@ def build_server(
     ) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
         def remember_json(payload: dict[str, object]) -> ToolError:
+            if request_id is not None:
+                payload["request_id"] = request_id
             return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
         def written_payload(path: str, cause: str, generation_id: str | None) -> ToolError:
