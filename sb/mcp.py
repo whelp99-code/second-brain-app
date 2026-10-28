@@ -71,6 +71,7 @@ from sb.inbox import (
     remember_request_id,
     write_inbox,
 )
+from sb.legacy_search_values import SearchHitDict as LegacySearchHitDict
 from sb.mcp_remember_models import MemoryRememberWriteRequest
 from sb.mcp_write_models import (
     MemoryWriteRequest,
@@ -1160,14 +1161,11 @@ def build_server(
                 revoked_delegations=config.revoked_delegation_ids,
                 external_public_keys=external_public_keys,
                 barrier_sink=barrier_sink,
+                generation_pin=pin_generation() if is_effect else None,
             )
 
         try:
-            if is_effect:
-                with pin_generation():
-                    result = accept()
-            else:
-                result = accept()
+            result = accept()
         except WriteRequestRejected as exc:
             raise ToolError(
                 _write_failure(
@@ -1209,7 +1207,27 @@ def build_server(
         if high_water()[0] != 0:
             raise ToolError("TOMBSTONE_FENCE_REQUIRED")
 
-    def legacy_search(query: str, limit: int = 10) -> dict[str, list[SearchHitDict]]:
+    @contextmanager
+    def pin_local_search() -> Generator[Path, None, None]:
+        """Pin one local search/read without accepting a caller fence.
+
+        Legacy Task29 remains keyless. Desktop still rejects an unsealed vault
+        or a restored stale snapshot. Check again before returning so a journal
+        change cannot leak collected hits. Signed/scoped profiles retain their
+        separate caller-authentication fences.
+        """
+        with pin_generation() as (current_root, generation):
+            current = high_water()
+            if generation_store is None:
+                require_legacy_genesis()
+            else:
+                require_active_high_water(generation, current)
+            yield current_root
+            if high_water() != current:
+                raise ToolError("TOMBSTONE_SET_STALE")
+            require_active_high_water(generation, current)
+
+    def legacy_search(query: str, limit: int = 10) -> dict[str, list[LegacySearchHitDict]]:
         """Search the compiled wiki, daily briefs, and conflict pages for `query`.
 
         Use this to answer questions about what the user has recorded before.
@@ -1217,12 +1235,12 @@ def build_server(
         `sb_read_page`.
         """
         _ = query_plan(query)
-        with pin_generation() as (current_root, _generation):
-            require_legacy_genesis()
+        with pin_local_search() as current_root:
             hits = SearchIndex(vault_root=current_root, hybrid=config.search_hybrid,
                                registry_path=Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None,
                                 min_similarity=config.search_min_similarity).search(query, limit, scope="reference")
-            return {"results": [hit.as_dict() for hit in hits]}
+            return {"results": [{"page_id": hit.page_id, "section": hit.section,
+                "snippet": hit.snippet, "score": hit.score} for hit in hits]}
 
     def legacy_read_page(id: str) -> dict[str, dict[str, str] | str]:
         """Read one committed page whole, with its citation frontmatter.
@@ -1281,8 +1299,7 @@ def build_server(
     def desktop_search(query: str, limit: int = 10, scope: Literal["active", "candidate", "reference"] = "reference") -> dict[str, list[SearchHitDict]]:
         """Search cited knowledge, distinguishing verified and reference results."""
         _ = query_plan(query)
-        with pin_generation() as (current_root, _generation):
-            require_legacy_genesis()
+        with pin_local_search() as current_root:
             return {"results": [hit.as_dict() for hit in SearchIndex(current_root, hybrid=config.search_hybrid,
                 registry_path=Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None,
                                 min_similarity=config.search_min_similarity).search(query, limit, scope=scope)]}
