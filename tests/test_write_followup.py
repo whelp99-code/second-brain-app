@@ -5,7 +5,6 @@ from __future__ import annotations
 import errno
 import json
 import os
-import sqlite3
 import stat
 import subprocess
 import sys
@@ -277,35 +276,43 @@ def test_lookup_error_is_unknown_not_nothing_written(
     assert isinstance(payload["retry"], str)
 
 
-def test_processing_and_journal_count_as_written(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_processing_and_journal_count_as_written(tmp_path: Path, version: int) -> None:
+    from sb.effect_values import is_json_object
+    from sb.effect_write_values import frozen_correction_vector
+    from sb.mcp_remember_contract import remember_fixture_request
     from sb.write_delivery import classify_delivery
+    from sb.write_requests import accept_memory_write_request
 
     request_root = tmp_path / "requests"
+    request = (
+        write_fixture_request()
+        if version == 1
+        else remember_fixture_request("synthetic evidence")
+        if version == 3
+        else frozen_correction_vector()["request"]
+    )
+    assert is_json_object(request)
+    accepted = accept_memory_write_request(
+        tmp_path / "vault",
+        request_root,
+        request,
+        FrozenTask30DateTime.now(),
+    )
     processing = request_root / "processing"
-    processing.mkdir(parents=True)
-    identity = "memreq:pos:v2:" + "ab" * 32
-    v2 = processing / f"{identity}.1.v2.json"
-    _ = v2.write_text("{}", encoding="utf-8")
-    found = classify_delivery(request_root, tmp_path / "vault", identity, 2)
+    processing.mkdir(exist_ok=True)
+    pending = next((request_root / "pending").glob("*.json"))
+    original = pending.read_bytes()
+    moved = pending.rename(processing / f"{accepted.request_id}.1.v{version}.json")
+    found = classify_delivery(request_root, tmp_path / "vault", request)
     assert found.evidence == "present"
-    assert found.path is not None and found.path.endswith(".v2.json")
-    v2.unlink()
-    v3 = processing / f"{identity}.2.v3.json"
-    _ = v3.write_text("{}", encoding="utf-8")
-    assert classify_delivery(request_root, tmp_path / "vault", identity, 3).evidence == "present"
-    v3.unlink()
-    database = request_root / "journal.db"
-    with sqlite3.connect(database) as connection:
-        _ = connection.execute(
-            "CREATE TABLE requests(request_id TEXT PRIMARY KEY, result_json TEXT NOT NULL)"
-        )
-        _ = connection.execute(
-            "INSERT INTO requests VALUES (?, ?)",
-            (identity, json.dumps({"inbox_path": "pending/kept.json"})),
-        )
-    journal = classify_delivery(request_root, tmp_path / "vault", identity, 1)
+    assert found.path == moved.relative_to(request_root).as_posix()
+    assert moved.read_bytes() == original
+    moved.unlink()
+    journal = classify_delivery(request_root, tmp_path / "vault", request)
     assert journal.evidence == "present"
-    assert journal.path == "pending/kept.json"
+    assert journal.request_id == str(accepted.request_id)
+    assert journal.path is not None and str(accepted.request_id) in journal.path
 
 
 def test_remember_retry_requires_same_title_and_survives_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -515,6 +522,127 @@ def test_unreadable_existing_page_is_unknown_and_not_duplicated(
     assert page.read_bytes() == _MARKER_BODY.encode()
 
 
+@pytest.mark.parametrize("root_name", ["notes", "vault"])
+@pytest.mark.parametrize("link_errno", [None, errno.EXDEV, errno.EPERM, errno.ENOTSUP])
+def test_remember_real_link_or_rename_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    root_name: str,
+    link_errno: int | None,
+) -> None:
+    root = init_vault(tmp_path / root_name).root
+    (root / "inbox").chmod(0o500)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_link = os.link
+    refused: list[Path] = []
+
+    def unsupported_inbox_link(src: Path, dst: Path) -> None:
+        if dst.parent.name == "inbox" and dst.suffix == ".md":
+            assert src.is_file()
+            assert link_errno is not None
+            refused.append(dst)
+            raise OSError(link_errno, "synthetic unsupported inbox link")
+        real_link(src, dst)
+
+    if link_errno is not None:
+        monkeypatch.setattr(os, "link", unsupported_inbox_link)
+    arguments: dict[str, object] = {
+        "content": _MARKER_BODY,
+        "title": "note",
+        "request_id": "fallback-same",
+    }
+    result = _call(server, "sb_remember", arguments)
+    pages = _inbox_pages(root)
+    assert result.is_error is False, {
+        "response": _error_text(result),
+        "active_generation": root.is_symlink(),
+        "published_pages": [page.name for page in pages],
+        "link_refusals": len(refused),
+    }
+    assert root.is_symlink() is (root_name == "vault")
+    assert len(pages) == 1
+    assert pages[0].read_bytes() == _MARKER_BODY.encode()
+    assert pages[0].stat().st_nlink == 1
+    assert stat.S_IMODE((root / "inbox").stat().st_mode) == 0o500
+    assert not list((root / "inbox").glob("*.tmp"))
+    payload = cast(object, json.loads(_error_text(result)))
+    assert payload == {"inbox_path": pages[0].relative_to(root).as_posix()}
+    retried = _call(server, "sb_remember", arguments)
+    assert retried.is_error is False
+    again = _inbox_pages(root)
+    assert len(again) == 1
+    assert again[0].name == pages[0].name
+    assert again[0].read_bytes() == _MARKER_BODY.encode()
+    assert again[0].stat().st_nlink == 1
+    assert stat.S_IMODE((root / "inbox").stat().st_mode) == 0o500
+    assert not list((root / "inbox").glob("*.tmp"))
+    assert len(refused) == (0 if link_errno is None else 1)
+
+
+@pytest.mark.parametrize("link_errno", [errno.EXDEV, errno.EPERM, errno.ENOTSUP])
+@pytest.mark.parametrize("destination_kind", ["file", "directory"])
+def test_real_rename_fallback_refuses_existing_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    link_errno: int,
+    destination_kind: str,
+) -> None:
+    from sb.inbox import _exclusive_create
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    destination = inbox / "existing.md"
+    if destination_kind == "file":
+        _ = destination.write_bytes(b"existing publication")
+    else:
+        destination.mkdir()
+    before = destination.stat()
+
+    def unsupported_link(src: Path, dst: Path) -> None:
+        assert src.is_file()
+        assert dst == destination
+        raise OSError(link_errno, "synthetic unsupported inbox link")
+
+    monkeypatch.setattr(os, "link", unsupported_link)
+    with pytest.raises(FileExistsError):
+        _exclusive_create(destination, b"rejected publication")
+    assert destination.stat().st_ino == before.st_ino
+    assert destination.stat().st_mode == before.st_mode
+    assert list(inbox.iterdir()) == [destination]
+    if destination_kind == "file":
+        assert destination.read_bytes() == b"existing publication"
+    else:
+        assert list(destination.iterdir()) == []
+
+
+@pytest.mark.parametrize("link_errno", [errno.EXDEV, errno.EPERM, errno.ENOTSUP])
+def test_real_rename_fallback_completes_exclusive_create(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, link_errno: int
+) -> None:
+    from sb.inbox import RememberFollowupError, _exclusive_create
+
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    destination = inbox / "published.md"
+    body = b"real exclusive rename publication"
+
+    def unsupported_link(src: Path, dst: Path) -> None:
+        assert src.is_file()
+        assert dst == destination
+        raise OSError(link_errno, "synthetic unsupported inbox link")
+
+    monkeypatch.setattr(os, "link", unsupported_link)
+    try:
+        _exclusive_create(destination, body)
+    except RememberFollowupError:
+        assert destination.read_bytes() == body
+        assert list(inbox.iterdir()) == [destination]
+        raise
+    assert destination.read_bytes() == body
+    assert destination.stat().st_nlink == 1
+    assert list(inbox.iterdir()) == [destination]
+
+
 def test_rename_noreplace_failure_does_not_duplicate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -719,6 +847,125 @@ def test_generation_pointer_replace_failure_then_retry(
     bodies = [path.read_bytes() for path in pages]
     assert bodies.count(_MARKER_BODY.encode()) == 1
     assert len(pages) == 1
+
+
+@pytest.mark.parametrize("failure", ["first-fsync", "unlink-once", "unlink-always", "second-fsync"])
+def test_hardlink_followup_cleanup_preserves_original_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    import sb.inbox as inbox_module
+    from sb.generation_runtime_models import GenerationMutationError
+    from sb.generation_staging import copy_pending_inbox
+    from sb.inbox import RememberFollowupError
+
+    root = init_vault(tmp_path / "notes").root
+    inbox = root / "inbox"
+    inbox.chmod(0o500)
+    real_link = os.link
+    real_unlink = Path.unlink
+    real_fsync_directory = inbox_module._fsync_directory
+    published: list[tuple[Path, Path]] = []
+    unlink_attempts: list[Path] = []
+    directory_syncs: list[Path] = []
+    original_error = OSError(errno.EIO, "synthetic post-link failure")
+
+    def observe_link(src: Path, dst: Path) -> None:
+        real_link(src, dst)
+        if dst.parent == inbox:
+            assert src.stat().st_ino == dst.stat().st_ino
+            assert src.stat().st_nlink == dst.stat().st_nlink == 2
+            published.append((src, dst))
+
+    def fail_sync(directory: Path) -> None:
+        if directory == inbox:
+            directory_syncs.append(directory)
+            if (failure == "first-fsync" and len(directory_syncs) == 1) or (
+                failure == "second-fsync" and len(directory_syncs) == 2
+            ):
+                raise original_error
+        real_fsync_directory(directory)
+
+    def fail_unlink(path: Path, missing_ok: bool = False) -> None:
+        if published and path == published[0][0]:
+            unlink_attempts.append(path)
+            if failure == "unlink-always" or (
+                failure == "unlink-once" and len(unlink_attempts) == 1
+            ):
+                raise original_error
+        real_unlink(path, missing_ok=missing_ok)
+
+    monkeypatch.setattr(os, "link", observe_link)
+    monkeypatch.setattr(inbox_module, "_fsync_directory", fail_sync)
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+    with pytest.raises(RememberFollowupError) as caught:
+        _ = write_inbox(root, _MARKER_BODY, "note", "hardlink-followup")
+    cause: BaseException = caught.value
+    while cause.__cause__ is not None:
+        cause = cause.__cause__
+    assert cause is original_error
+    assert len(published) == 1
+    temporary, final = published[0]
+    assert final.read_bytes() == _MARKER_BODY.encode()
+    assert final.stat().st_uid == os.getuid()
+    assert stat.S_IMODE(final.stat().st_mode) == 0o600
+    assert stat.S_IMODE(inbox.stat().st_mode) == 0o500
+    assert len(directory_syncs) == (2 if failure == "second-fsync" else 1)
+    destination = tmp_path / "copied"
+    if failure == "unlink-always":
+        assert temporary.stat().st_ino == final.stat().st_ino
+        assert final.stat().st_nlink == 2
+        with pytest.raises(GenerationMutationError, match="GENERATION_SOURCE_UNSAFE"):
+            copy_pending_inbox(root, destination, tmp_path / "copy-state")
+        assert not destination.exists()
+        assert len(unlink_attempts) == 2
+    else:
+        assert not temporary.exists()
+        assert final.stat().st_nlink == 1
+        copy_pending_inbox(root, destination, tmp_path / "copy-state")
+        assert (destination / "inbox" / final.name).read_bytes() == _MARKER_BODY.encode()
+        assert list((destination / "inbox").iterdir()) == [destination / "inbox" / final.name]
+        if failure != "second-fsync":
+            assert len(unlink_attempts) == (2 if failure == "unlink-once" else 1)
+
+
+def test_mcp_hardlink_followup_cleanup_keeps_written_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sb.generation_staging import copy_pending_inbox
+
+    root = init_vault(tmp_path / "notes").root
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_fsync = os.fsync
+
+    def fail_directory(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(errno.EIO, "synthetic post-link directory failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_directory)
+    failed = _call(
+        server,
+        "sb_remember",
+        {
+            "content": _MARKER_BODY,
+            "title": "note",
+            "request_id": "hardlink-followup",
+        },
+    )
+    assert failed.is_error is True
+    payload = _error_payload(_error_text(failed))
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert payload["written"] is True
+    final = root / str(payload["path"])
+    assert final.read_bytes() == _MARKER_BODY.encode()
+    assert final.stat().st_nlink == 1
+    assert list((root / "inbox").iterdir()) == [final]
+    monkeypatch.setattr(os, "fsync", real_fsync)
+    copy_pending_inbox(root, tmp_path / "copied", tmp_path / "copy-state")
+    assert (tmp_path / "copied" / "inbox" / final.name).read_bytes() == _MARKER_BODY.encode()
 
 
 def test_unkeyed_publish_collision_preserves_both_pages(

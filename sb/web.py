@@ -22,7 +22,14 @@ from sb.config import Config, load_config
 from sb.effect_values import JsonInput, JsonObject
 from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
-from sb.inbox import RememberRejected, discard_inbox, write_inbox
+from sb.inbox import (
+    InboxModeRestoreError,
+    RememberFollowupError,
+    RememberOutcomeUnknown,
+    RememberRejected,
+    discard_inbox,
+    write_inbox,
+)
 from sb.life_actor import LifeActor
 from sb.life_contracts import LifeInputError
 from sb.life_json import decode_json
@@ -664,6 +671,8 @@ class Handler(BaseHTTPRequestHandler):
         except OwnerEffectError as exc:
             self.json_response(HTTPStatus.CONFLICT, {"error": str(exc)})
         except ManagedInspectionError as exc:
+            self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+        except (RememberFollowupError, RememberOutcomeUnknown, InboxModeRestoreError) as exc:
             self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
         except (
             ValueError,

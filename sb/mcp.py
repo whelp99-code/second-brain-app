@@ -12,7 +12,7 @@ import os
 import sqlite3
 import sys
 from collections.abc import Callable, Generator, Mapping
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -369,9 +369,17 @@ def _write_failure(
     cause: str | None,
     request_root: Path,
     vault_root: Path,
+    public_keys: dict[str, Ed25519PublicKey] | None,
+    provider_instance_id: str,
+    external_public_keys: dict[str, Ed25519PublicKey] | None,
 ) -> str:
     lookup = classify_delivery(
-        request_root, vault_root, raw.get("request_id"), raw.get("schema_version")
+        request_root,
+        vault_root,
+        raw,
+        public_keys=public_keys,
+        provider_instance_id=provider_instance_id,
+        external_public_keys=external_public_keys,
     )
     reported = code if cause is None else cause
     if lookup.evidence == "present" and lookup.path is not None and lookup.request_id is not None:
@@ -570,7 +578,11 @@ def build_server(
             mutations = GenerationMutationService.from_config(runtime_config, maintenance_only=read_only)
             try:
                 _ = mutations.maintain_if_idle(now) if read_only else mutations.maintain(now)
-            finally:
+            except BaseException:
+                with suppress(Exception):
+                    mutations.close()
+                raise
+            else:
                 mutations.close()
             return
         store = RequestStore(requests, maintenance_only=read_only or initial_scoped_policy is not None)
@@ -581,7 +593,11 @@ def build_server(
                 store.exports,
             )
             _ = ProviderLifecycle(publisher).maintain(now)
-        finally:
+        except BaseException:
+            with suppress(Exception):
+                store.close()
+            raise
+        else:
             store.close()
 
     @contextmanager
@@ -798,19 +814,9 @@ def build_server(
         content: str, title: str | None = None, request_id: str | None = None,
     ) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
-        maintain(datetime.now(UTC))
-        if not task30_enabled and high_water()[0] != 0:
-            raise ToolError("TOMBSTONE_FENCE_REQUIRED")
-        if task30_enabled:
-            reingress = ReingressGate(runtime_state_root / "reingress.db")
-            try:
-                reingress.check_content(content.encode("utf-8"))
-            except ErasureError as exc:
-                raise ToolError(str(exc)) from exc
-            finally:
-                reingress.close()
-
         def remember_json(payload: dict[str, object]) -> ToolError:
+            if request_id is not None:
+                payload["request_id"] = request_id
             return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
         def written_payload(path: str, cause: str, generation_id: str | None) -> ToolError:
@@ -844,7 +850,7 @@ def build_server(
             cause = type(exc.__cause__).__name__ if exc.__cause__ is not None else type(exc).__name__
             if isinstance(exc, RememberRejected):
                 return ToolError(str(exc))
-            state, path = observe_remember(root, content, title, identity)
+            state, path = observe_remember(root, content, title, identity, config=runtime_config)
             if isinstance(exc, InboxModeRestoreError):
                 saved = path
                 if saved is None and exc.saved is not None:
@@ -887,23 +893,36 @@ def build_server(
             identity = remember_identity(request_id, now=datetime.now(UTC))
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
-        if vault_root is not None and not root.is_symlink() and root.name != "vault":
-            try:
-                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
-            except RememberRejected as exc:
-                raise ToolError(str(exc)) from exc
-            except Exception as exc:
-                raise remember_failure(exc) from exc
-        mutations = GenerationMutationService.from_config(runtime_config)
         try:
-            rel = mutations.remember(content, title, datetime.now(UTC), identity)
-            rel = promote_published(root, rel, title)
-        except RememberRejected as exc:
+            maintain(datetime.now(UTC))
+            if not task30_enabled and high_water()[0] != 0:
+                raise ToolError("TOMBSTONE_FENCE_REQUIRED")
+            if task30_enabled:
+                reingress = ReingressGate(runtime_state_root / "reingress.db")
+                try:
+                    reingress.check_content(content.encode("utf-8"))
+                except BaseException:
+                    with suppress(Exception):
+                        reingress.close()
+                    raise
+                reingress.close()
+            if vault_root is not None and not root.is_symlink() and root.name != "vault":
+                return {"inbox_path": write_inbox(root, content, title, identity, config=runtime_config).as_posix()}
+            mutations = GenerationMutationService.from_config(runtime_config)
+            try:
+                rel = mutations.remember(content, title, datetime.now(UTC), identity)
+                rel = promote_published(root, rel, title)
+            except BaseException:
+                with suppress(Exception):
+                    mutations.close()
+                raise
+            mutations.close()
+        except (RememberRejected, ErasureError) as exc:
             raise ToolError(str(exc)) from exc
+        except ToolError:
+            raise
         except Exception as exc:
             raise remember_failure(exc) from exc
-        finally:
-            mutations.close()
         return {"inbox_path": rel.as_posix()}
 
     def sb_generation_status(
@@ -1136,8 +1155,6 @@ def build_server(
             return cast(ToolResult, target.as_dict())
 
     def accept_request(raw: JsonObject, is_effect: bool) -> ToolResult:
-        maintain(datetime.now(UTC))
-
         def accept() -> MemoryEffectWriteAcceptedV2 | MemoryWriteResultV1 | MemoryWriteResultV3:
             return accept_memory_write_request(
                 root,
@@ -1153,11 +1170,20 @@ def build_server(
             )
 
         try:
+            maintain(datetime.now(UTC))
             result = accept()
         except WriteRequestRejected as exc:
             raise ToolError(
                 _write_failure(
-                    raw, is_effect, exc.code, cause=None, request_root=requests, vault_root=root
+                    raw,
+                    is_effect,
+                    exc.code,
+                    cause=None,
+                    request_root=requests,
+                    vault_root=root,
+                    public_keys=public_keys,
+                    provider_instance_id=config.provider_instance_id,
+                    external_public_keys=external_public_keys,
                 )
             ) from exc
         except Exception as exc:
@@ -1169,6 +1195,9 @@ def build_server(
                     cause=type(exc).__name__,
                     request_root=requests,
                     vault_root=root,
+                    public_keys=public_keys,
+                    provider_instance_id=config.provider_instance_id,
+                    external_public_keys=external_public_keys,
                 )
             ) from exc
         if isinstance(result, MemoryEffectWriteAcceptedV2):
