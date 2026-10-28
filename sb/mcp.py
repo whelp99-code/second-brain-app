@@ -59,6 +59,7 @@ from sb.effect_write_values import model_object
 from sb.erasure import ErasureError, ReingressGate
 from sb.export_status import sign_export_status
 from sb.exports import ExportPublisher
+from sb.generation_changes import generation_recent_changes
 from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
@@ -142,6 +143,8 @@ LEGACY_TOOLS: Final = (
 )
 _CHANGES: Final = {"A": "added", "M": "modified", "D": "deleted"}
 _CONTRACT_PROFILE_ENV: Final = "SB_MCP_CONTRACT_PROFILE"
+_PERSONAL_MEMORY_PROFILE: Final = "personal-memory-v1"
+_PERSONAL_MEMORY_UNSUPPORTED: Final = "PERSONAL_MEMORY_PROFILE_UNSUPPORTED"
 _TASK30_PROFILE: Final = "task30-schema3"
 _TASK32_PROFILE: Final = "task32-schema4"
 _REMEMBER_PROFILE: Final = "remember-schema5"
@@ -243,7 +246,10 @@ def read_page(root: Path, page_id: str) -> PageRead:
     return PageRead(frontmatter=_frontmatter(block), body=body)
 
 
-def recent_changes(root: Path, days: int = 7) -> tuple[ChangeRow, ...]:
+def recent_changes(root: Path, days: int = 7, *, journal_path: Path | None = None) -> tuple[ChangeRow, ...]:
+    """Committed page deltas; MCP supplies its activation journal for sealed roots."""
+    if journal_path is not None and (root / "generation.json").exists():
+        return generation_recent_changes(root, journal_path, days)
     """Committed wiki/daily/conflicts name-status rows since `days` ago."""
     raw = git_run(
         root,
@@ -403,6 +409,10 @@ def build_server(
     desktop = config is not None
     config = load_config() if config is None else config
     require_vault_owner(Path(config.vault_root if vault_root is None else vault_root))
+    if os.environ.get(_CONTRACT_PROFILE_ENV) == _PERSONAL_MEMORY_PROFILE:
+        if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
+            raise ContractProfileError
+        return _personal_memory_server(config)
     if os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-request-status-v1":
         from sb.scoped_status_mcp import build_scoped_status_server
         if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
@@ -767,7 +777,8 @@ def build_server(
             current = high_water()
             require_read_fence(read_fence, "memory_read", "read", current)
             require_active_high_water(generation, current)
-            payload = {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
+            payload = {"changes": [row.as_dict() for row in recent_changes(
+                current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
             return bind_read(payload, generation, current)
 
     def sb_open_conflicts(
@@ -1236,7 +1247,8 @@ def build_server(
         """
         with pin_generation() as (current_root, _generation):
             require_legacy_genesis()
-            return {"changes": [row.as_dict() for row in recent_changes(current_root, days)]}
+            return {"changes": [row.as_dict() for row in recent_changes(
+                current_root, days, journal_path=Path(runtime_config.state_root) / "generation-journal.db")]}
 
     def legacy_open_conflicts() -> dict[str, list[dict[str, str]]]:
         """List unresolved contradictions between recorded sources.
@@ -1379,6 +1391,7 @@ def build_server(
         resolver = sb_resolve_memory_record if contract_schema_version >= 4 else sb_resolve_memory_target
         _ = server.tool(name="sb_resolve_memory_target")(resolver)
     return server
+
 
 
 def _personal_memory_server(config: Config) -> MCPServer:
@@ -1583,6 +1596,7 @@ def _recall_body(
         "model_revision": None,
         "uncertainty_reasons": reasons,
     }
+
 
 
 def main() -> None:
