@@ -63,7 +63,14 @@ from sb.generation_changes import ChangeRow, generation_recent_changes
 from sb.generation_reads import generation_read_binding
 from sb.generation_runtime import GenerationMutationService
 from sb.generations import GenerationManifestV1, GenerationStore
-from sb.inbox import RememberRejected, write_inbox
+from sb.inbox import (
+    InboxModeRestoreError,
+    RememberRejected,
+    observe_remember,
+    promote_published,
+    remember_identity,
+    write_inbox,
+)
 from sb.legacy_search_values import SearchHitDict as LegacySearchHitDict
 from sb.mcp_remember_models import MemoryRememberWriteRequest
 from sb.mcp_write_models import (
@@ -97,6 +104,16 @@ from sb.source_access import SourceAccess
 from sb.targets import GenerationIdentityV1, MemoryTargetSelectorV1, resolve_memory_target
 from sb.task30_barriers import Task30BarrierSink, UnixBarrierSink
 from sb.vault import PathEscapeError
+from sb.vault_owner import require_vault_owner
+from sb.write_delivery import (
+    NOTHING_WRITTEN,
+    WRITE_OUTCOME_UNKNOWN,
+    WRITTEN_WITH_FOLLOWUP_ERROR,
+    classify_delivery,
+    followup_fields,
+    not_written_fields,
+    unknown_fields,
+)
 from sb.write_request_values import WriteRequestRejected
 from sb.write_requests import accept_memory_write_request
 
@@ -274,6 +291,96 @@ def open_conflicts(root: Path) -> tuple[ConflictRow, ...]:
     return tuple(rows)
 
 
+def _not_written_error(
+    raw: JsonObject, is_effect: bool, code: str, *, cause: str | None = None
+) -> str:
+    """Strict JSON tool error for a write that published no request file."""
+    raw_id = raw.get("request_id")
+    request_id = raw_id if isinstance(raw_id, str) and raw_id.startswith("memeff:req:v2:") else None
+    fields = not_written_fields(cause=code if cause is None else cause)
+    if is_effect:
+        error = MemoryEffectWriteErrorV2(
+            schema_version=2,
+            kind="error",
+            code=code,
+            retryable=False,
+            request_id=request_id,
+        ).model_dump(mode="json")
+        error.update(fields)
+        if code == NOTHING_WRITTEN:
+            error["kind"] = "not_written"
+    else:
+        error = {
+            "schema_version": 3 if raw.get("schema_version") == 3 else 1,
+            "kind": "not_written" if code == NOTHING_WRITTEN else "error",
+            "code": code,
+            "retryable": False,
+            **fields,
+        }
+    return json.dumps(error, sort_keys=True, separators=(",", ":"))
+
+
+def _followup_error(
+    raw: JsonObject, is_effect: bool, path: str, request_id: str, cause: str
+) -> str:
+    """Strict JSON for a write whose durable file is already in the vault."""
+    fields = followup_fields(cause=cause, path=path, request_id=request_id)
+    if is_effect:
+        error = MemoryEffectWriteErrorV2(
+            schema_version=2,
+            kind="error",
+            code=WRITTEN_WITH_FOLLOWUP_ERROR,
+            retryable=False,
+            request_id=request_id if request_id.startswith("memeff:req:v2:") else None,
+        ).model_dump(mode="json")
+        error.update(fields)
+        error["kind"] = "written_with_followup_error"
+        error["code"] = WRITTEN_WITH_FOLLOWUP_ERROR
+    else:
+        error = {
+            "schema_version": 3 if raw.get("schema_version") == 3 else 1,
+            "kind": "written_with_followup_error",
+            "code": WRITTEN_WITH_FOLLOWUP_ERROR,
+            **fields,
+        }
+    return json.dumps(error, sort_keys=True, separators=(",", ":"))
+
+
+def _unknown_error(raw: JsonObject, is_effect: bool, cause: str) -> str:
+    fields = unknown_fields(cause=cause)
+    raw_id = raw.get("request_id")
+    request_id = raw_id if isinstance(raw_id, str) else None
+    error = {
+        "schema_version": 2 if is_effect else 3 if raw.get("schema_version") == 3 else 1,
+        "kind": "unknown",
+        "code": WRITE_OUTCOME_UNKNOWN,
+        **fields,
+    }
+    if request_id is not None:
+        error["request_id"] = request_id
+    return json.dumps(error, sort_keys=True, separators=(",", ":"))
+
+
+def _write_failure(
+    raw: JsonObject,
+    is_effect: bool,
+    code: str,
+    *,
+    cause: str | None,
+    request_root: Path,
+    vault_root: Path,
+) -> str:
+    lookup = classify_delivery(
+        request_root, vault_root, raw.get("request_id"), raw.get("schema_version")
+    )
+    reported = code if cause is None else cause
+    if lookup.evidence == "present" and lookup.path is not None and lookup.request_id is not None:
+        return _followup_error(raw, is_effect, lookup.path, lookup.request_id, reported)
+    if lookup.evidence == "unknown":
+        return _unknown_error(raw, is_effect, reported)
+    return _not_written_error(raw, is_effect, code, cause=cause)
+
+
 def build_server(
     vault_root: Path | str | None = None,
     request_root: Path | str | None = None,
@@ -291,6 +398,7 @@ def build_server(
     """
     desktop = config is not None
     config = load_config() if config is None else config
+    require_vault_owner(Path(config.vault_root if vault_root is None else vault_root))
     if os.environ.get(_CONTRACT_PROFILE_ENV) == "scoped-request-status-v1":
         from sb.scoped_status_mcp import build_scoped_status_server
         if any(value is not None for value in (vault_root, request_root, task30, contract_schema)):
@@ -686,7 +794,9 @@ def build_server(
                 conflicts.append(value)
             return bind_read({"conflicts": conflicts}, generation, current)
 
-    def sb_remember(content: str, title: str | None = None) -> dict[str, str]:
+    def sb_remember(
+        content: str, title: str | None = None, request_id: str | None = None,
+    ) -> dict[str, str]:
         """Record content in the legacy inbox for next-run compatibility."""
         maintain(datetime.now(UTC))
         if not task30_enabled and high_water()[0] != 0:
@@ -699,16 +809,99 @@ def build_server(
                 raise ToolError(str(exc)) from exc
             finally:
                 reingress.close()
-        if vault_root is not None and not root.is_symlink() and root.name != "vault":
-            try:
-                return {"inbox_path": write_inbox(root, content, title).as_posix()}
-            except RememberRejected as exc:
-                raise ToolError(str(exc)) from exc
-        mutations = GenerationMutationService.from_config(runtime_config)
+
+        def remember_json(payload: dict[str, object]) -> ToolError:
+            return ToolError(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
+        def written_payload(path: str, cause: str, generation_id: str | None) -> ToolError:
+            body: dict[str, object] = {
+                "cause": cause,
+                "code": WRITTEN_WITH_FOLLOWUP_ERROR,
+                "delivery": "written",
+                "inbox_path": path,
+                "kind": "written_with_followup_error",
+                "path": path,
+                "retry": "The note is already in the active generation. Do not treat this as not delivered.",
+                "retryable": True,
+                "written": True,
+            }
+            if generation_id is not None:
+                body["generation_id"] = generation_id
+            return remember_json(body)
+
+        def unknown_payload(cause: str) -> ToolError:
+            return remember_json({
+                "cause": cause,
+                "code": WRITE_OUTCOME_UNKNOWN,
+                "delivery": "unknown",
+                "kind": "unknown",
+                "retry": "Retry the same request. Do not treat this as not delivered.",
+                "retryable": True,
+                "written": None,
+            })
+
+        def remember_failure(exc: BaseException) -> ToolError:
+            cause = type(exc.__cause__).__name__ if exc.__cause__ is not None else type(exc).__name__
+            if isinstance(exc, RememberRejected):
+                return ToolError(str(exc))
+            state, path = observe_remember(root, content, title, identity)
+            if isinstance(exc, InboxModeRestoreError):
+                saved = path
+                if saved is None and exc.saved is not None:
+                    try:
+                        saved = exc.saved.resolve().relative_to(root.resolve()).as_posix()
+                    except (OSError, ValueError):
+                        saved = None
+                if state == "present" and saved is not None:
+                    return remember_json({
+                        "cause": "InboxModeRestoreError",
+                        "code": "INBOX_MODE_RESTORE_FAILED",
+                        "delivery": "written",
+                        "path": saved,
+                        "retry": "Restore the inbox directory mode, then retry the same request.",
+                        "retryable": True,
+                        "written": True,
+                    })
+                return remember_json({
+                    "cause": "InboxModeRestoreError",
+                    "code": "INBOX_MODE_RESTORE_FAILED",
+                    "delivery": "unknown",
+                    "retry": "Restore the inbox directory mode, then retry the same request.",
+                    "retryable": True,
+                    "written": None,
+                })
+            if state == "unknown" or state == "conflict":
+                return unknown_payload(cause)
+            if state == "present" and path is not None:
+                return written_payload(path, cause, None)
+            return remember_json({
+                "cause": type(exc).__name__,
+                "code": NOTHING_WRITTEN,
+                "delivery": "not_written",
+                "kind": "not_written",
+                "retryable": False,
+                "written": False,
+            })
+
         try:
-            rel = mutations.remember(content, title, datetime.now(UTC))
+            identity = remember_identity(request_id, now=datetime.now(UTC))
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
+        if vault_root is not None and not root.is_symlink() and root.name != "vault":
+            try:
+                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
+            except RememberRejected as exc:
+                raise ToolError(str(exc)) from exc
+            except Exception as exc:
+                raise remember_failure(exc) from exc
+        mutations = GenerationMutationService.from_config(runtime_config)
+        try:
+            rel = mutations.remember(content, title, datetime.now(UTC), identity)
+            rel = promote_published(root, rel, title)
+        except RememberRejected as exc:
+            raise ToolError(str(exc)) from exc
+        except Exception as exc:
+            raise remember_failure(exc) from exc
         finally:
             mutations.close()
         return {"inbox_path": rel.as_posix()}
@@ -962,28 +1155,22 @@ def build_server(
         try:
             result = accept()
         except WriteRequestRejected as exc:
-            raw_id = raw.get("request_id")
-            request_id = (
-                raw_id
-                if isinstance(raw_id, str) and raw_id.startswith("memeff:req:v2:")
-                else None
-            )
-            if is_effect:
-                error = MemoryEffectWriteErrorV2(
-                    schema_version=2,
-                    kind="error",
-                    code=exc.code,
-                    retryable=False,
-                    request_id=request_id,
-                ).model_dump(mode="json")
-            else:
-                error = {
-                    "schema_version": 3 if raw.get("schema_version") == 3 else 1,
-                    "kind": "error",
-                    "code": exc.code,
-                    "retryable": False,
-                }
-            raise ToolError(json.dumps(error, sort_keys=True, separators=(",", ":"))) from exc
+            raise ToolError(
+                _write_failure(
+                    raw, is_effect, exc.code, cause=None, request_root=requests, vault_root=root
+                )
+            ) from exc
+        except Exception as exc:
+            raise ToolError(
+                _write_failure(
+                    raw,
+                    is_effect,
+                    NOTHING_WRITTEN,
+                    cause=type(exc).__name__,
+                    request_root=requests,
+                    vault_root=root,
+                )
+            ) from exc
         if isinstance(result, MemoryEffectWriteAcceptedV2):
             return cast(ToolResult, result.model_dump(mode="json"))
         return cast(ToolResult, asdict(result))
@@ -1079,15 +1266,17 @@ def build_server(
             require_legacy_genesis()
             return {"conflicts": [row.as_dict() for row in open_conflicts(current_root)]}
 
-    def legacy_remember(content: str, title: str | None = None) -> dict[str, str]:
+    def legacy_remember(
+        content: str, title: str | None = None, request_id: str | None = None,
+    ) -> dict[str, str]:
         """Record `content` as a note for the second brain to absorb.
 
         This is the only write. Use it whenever the user says to remember,
         note, or record something, including personal details. The note lands
         in the vault inbox and is picked up by the next ingest run; it does not
-        appear in search immediately.
+        appear in search immediately. Pass the same request_id to retry.
         """
-        return sb_remember(content, title)
+        return sb_remember(content, title, request_id)
 
     def legacy_write_request(request: MemoryWriteRequestModel) -> MemoryWriteResultModel:
         """Accept one closed JARVIS memory request into the pending inbox queue."""
