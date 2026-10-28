@@ -1,9 +1,11 @@
 """Collision-safe `inbox/` writes, shared by the CLI and the MCP server.
 
-The final page path is a pure function of the normalized title and the exact
-body bytes. Publication is an exclusive create of that name. A retry observes
-the same path and never mints a second page. There is no in-content marker and
-no side retry file.
+The final page path is a pure function of the request id, the normalized
+title, and the exact body bytes. The same id, title, and body are one page.
+A different id or a different title is a different page. An omitted id is a
+new page, not a retry. Publication is an exclusive create of that name.
+A retry of the same id, title, and body observes the same path and never
+mints a second page. There is no in-content marker and no side retry file.
 """
 
 from __future__ import annotations
