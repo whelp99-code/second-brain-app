@@ -38,6 +38,7 @@ Not a package — there is no
   the script directory is on `sys.path`, not because `deploy` is importable.
 - `bundle_python_runtime.py` rejects external symlinks and FIFOs; budgets are 20k files /
   1 GiB.
+- 검색·순위 변경은 반영 전후 `deploy/vault-copy-search-compare.sh` 비교가 필수다.
 - Shipped units are hardened by default: `NoNewPrivileges`, `ProtectSystem=strict`,
   `ProtectHome=read-only`, `RestrictAddressFamilies=AF_UNIX`, `MemoryDenyWriteExecute=yes`,
   `UMask=0077`. The one documented exception is
