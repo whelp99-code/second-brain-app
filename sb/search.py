@@ -273,7 +273,10 @@ class SearchIndex:
         updated_to: str | None = None,
         scope: str | None = None,
     ) -> tuple[SearchHit, ...]:
-        """Refresh from Git HEAD only when needed, then BM25-search `query`."""
+        """Refresh from Git HEAD only when needed, then BM25-search `query`.
+
+        Cards that share an original hash keep the earlier card. Other cards keep their order.
+        """
         _ = LexicalQuery.parse(query)
         root = self.vault_root.resolve()
         if (root / "generation.json").is_file():
@@ -296,9 +299,9 @@ class SearchIndex:
                 ),
             )
             if not semantic:
-                return lexical
+                return _prefer_first_ingested(root, lexical)
             module = _sealed_vector_module()
-            return module.merge_ranked(lexical, semantic, limit)
+            return _prefer_first_ingested(root, module.merge_ranked(lexical, semantic, limit))
         db_path = _db_path(root)
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(db_path, root, registry)
@@ -306,7 +309,7 @@ class SearchIndex:
                 updated_from=updated_from, updated_to=updated_to, scope=scope)) as visible_hits:
             hits = tuple(islice(visible_hits, max(0, limit)))
         if not _wants_hybrid(self.hybrid):
-            return hits
+            return _prefer_first_ingested(root, hits)
         combined = _hybrid_or_lexical(
             hits,
             query,
@@ -316,7 +319,8 @@ class SearchIndex:
                 tuple(kinds or ()), status, updated_from, updated_to, scope, self.min_similarity
             ),
         )
-        return tuple(hit for hit in combined if _life_hit_allowed(root, hit.page_id))
+        kept = tuple(hit for hit in combined if _life_hit_allowed(root, hit.page_id))
+        return _prefer_first_ingested(root, kept)
 
     def iter_lexical_hits(
         self,
@@ -478,6 +482,121 @@ class SearchIndex:
                 "DELETE FROM docs WHERE source_ref LIKE ? OR text LIKE ?",
                 (f"%{content_hash}%", f"%{content_hash}%"),
             )
+
+
+def _prefer_first_ingested(root: Path, hits: tuple[SearchHit, ...]) -> tuple[SearchHit, ...]:
+    """Drop a later card only when the same original hash is also in this result."""
+    pages = tuple(dict.fromkeys(hit.page_id for hit in hits))
+    if len(pages) < 2:
+        return hits
+    cited = _page_source_hashes(root, pages)
+    drop = _later_same_source(cited, _ingested_orders(root, cited))
+    if not drop:
+        return hits
+    return tuple(hit for hit in hits if hit.page_id not in drop)
+
+
+def _page_source_hashes(
+    root: Path, pages: tuple[str, ...]
+) -> dict[str, tuple[tuple[str, str], ...]]:
+    from sb.store import parse_page_frontmatter
+
+    cited: dict[str, tuple[tuple[str, str], ...]] = {}
+    for page_id in pages:
+        if page_id.startswith("/") or ".." in Path(page_id).parts:
+            continue
+        text = committed_text(root, f"{page_id}.md")
+        if text is None:
+            continue
+        facts = parse_page_frontmatter(text)
+        if facts is None or not facts.sources:
+            continue
+        cited[page_id] = facts.sources
+    return cited
+
+
+def _ingested_orders(
+    root: Path, cited: dict[str, tuple[tuple[str, str], ...]]
+) -> dict[tuple[str, str], tuple[str, int]]:
+    wanted = {
+        (origin, digest)
+        for sources in cited.values()
+        for origin, digest in sources
+        if origin.partition(":")[1] and digest
+    }
+    ledger = root / ".sb" / "ledger.db"
+    if not wanted or not ledger.is_file():
+        return {}
+    hashes = tuple(sorted({digest for _origin, digest in wanted}))
+    marks = ",".join("?" for _ in hashes)
+    try:
+        connection = sqlite3.connect(f"{ledger.resolve().as_uri()}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return {}
+    try:
+        rows = connection.execute(
+            "SELECT source_id, source_uri, content_hash, run.started_at, source_item.rowid "
+            "FROM source_item LEFT JOIN run ON run.run_id = source_item.first_seen_run "
+            f"WHERE content_hash IN ({marks})",
+            hashes,
+        ).fetchall()
+    except sqlite3.Error:
+        return {}
+    finally:
+        connection.close()
+    orders: dict[tuple[str, str], tuple[str, int]] = {}
+    for source_id, source_uri, digest, started_at, rowid in rows:
+        if not all(isinstance(value, str) for value in (source_id, source_uri, digest, started_at)):
+            continue
+        if not isinstance(rowid, int):
+            continue
+        key = (f"{source_id}:{source_uri}", digest)
+        if key not in wanted:
+            continue
+        order = (started_at, rowid)
+        current = orders.get(key)
+        if current is None or order < current:
+            orders[key] = order
+    return orders
+
+
+def _later_same_source(
+    cited: dict[str, tuple[tuple[str, str], ...]],
+    orders: dict[tuple[str, str], tuple[str, int]],
+) -> set[str]:
+    grouped: dict[str, set[str]] = {}
+    for page_id, sources in cited.items():
+        for _origin, digest in sources:
+            grouped.setdefault(digest, set()).add(page_id)
+    earliest: set[str] = set()
+    later: set[str] = set()
+    for digest, pages in grouped.items():
+        if len(pages) < 2:
+            continue
+        ranked: list[tuple[tuple[str, int], str]] = []
+        for page_id in pages:
+            order = _hash_order(cited[page_id], digest, orders)
+            if order is None:
+                ranked = []
+                break
+            ranked.append((order, page_id))
+        if len(ranked) < 2:
+            continue
+        ranked.sort()
+        earliest.add(ranked[0][1])
+        later.update(page_id for _order, page_id in ranked[1:])
+    return later - earliest
+
+
+def _hash_order(
+    sources: tuple[tuple[str, str], ...],
+    digest: str,
+    orders: dict[tuple[str, str], tuple[str, int]],
+) -> tuple[str, int] | None:
+    matches = [(origin, digest) for origin, source_hash in sources if source_hash == digest]
+    if not matches or any(key not in orders for key in matches):
+        return None
+    return min(orders[key] for key in matches)
 
 
 def _life_hit_allowed(root: Path, page_id: str) -> bool:
