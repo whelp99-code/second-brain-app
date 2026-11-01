@@ -223,29 +223,54 @@ def _ingested_source_file(vault: Path, note: ParsedRemember) -> Path | None:
     return None
 
 
+def _cas_original(vault: Path, digest: str) -> bytes | None:
+    if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        return None
+    path = vault / "raw" / digest[:2] / digest
+    marker = path.with_name(f"{digest}.tombstone")
+    try:
+        if marker.is_file() or path.is_symlink() or not path.is_file():
+            return None
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
 def _matching_source_file(vault: Path, file_id: str) -> tuple[str, str] | None:
+    """Find an ingested inbox card by the file id stored in its CAS original.
+
+    A missing original is skipped. Any lookup error returns no match so remember
+    keeps the body-hash check instead of blocking the write.
+    """
     ledger = vault / ".sb" / "ledger.db"
     if not ledger.is_file():
         return None
     try:
         connection = sqlite3.connect(f"{ledger.resolve().as_uri()}?mode=ro", uri=True)
+        try:
+            rows = connection.execute(
+                "SELECT source_id, source_uri, content_hash FROM source_item WHERE source_id=?",
+                ("inbox",),
+            ).fetchall()
+        finally:
+            connection.close()
     except sqlite3.Error:
         return None
+    matches: list[tuple[str, str]] = []
     try:
-        rows = connection.execute(
-            "SELECT source_id, source_uri FROM source_item WHERE source_uri=? OR source_id=? OR source_uri=?",
-            (file_id, file_id, f"drive:{file_id}"),
-        ).fetchall()
-    except sqlite3.Error:
+        for source_id, source_uri, content_hash in rows:
+            if (
+                not isinstance(source_id, str)
+                or not isinstance(source_uri, str)
+                or not isinstance(content_hash, str)
+            ):
+                continue
+            original = _cas_original(vault, content_hash)
+            if original is None or _source_file_id(original) != file_id:
+                continue
+            matches.append((source_id, source_uri))
+    except (OSError, UnicodeError, sqlite3.Error):
         return None
-    finally:
-        connection.close()
-    matches = [
-        (source_id, source_uri)
-        for source_id, source_uri in rows
-        if isinstance(source_id, str) and isinstance(source_uri, str)
-        and (source_uri in {file_id, f"drive:{file_id}"} or source_id == file_id)
-    ]
     if not matches:
         return None
     return min(matches, key=lambda item: item[1])
