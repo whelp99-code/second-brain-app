@@ -5,8 +5,11 @@ from pathlib import Path
 from sb.compile_sources import page_id_for_origin
 from sb.config import Config
 from sb.pipeline import run_compile, run_ingest
-from sb.search import SearchHit, SearchIndex
-from sb.vault import init_vault
+from sb.search import SearchHit, SearchIndex, _prefer_first_ingested, committed_text
+from sb.store import parse_page_frontmatter
+from sb.contracts import PageSpec, SourceCite
+from sb.vault import Vault, init_vault
+from tests.vault_test_support import MemoryLedger
 
 
 def test_same_source_search_keeps_the_earlier_card(tmp_path: Path) -> None:
@@ -23,6 +26,36 @@ def test_same_source_search_keeps_the_earlier_card(tmp_path: Path) -> None:
     found = index.search("rankneedle", 10)
     assert _pages(found) == {other, canonical}
     assert found == tuple(hit for hit in raw if hit.page_id != duplicate)
+
+def test_daily_cite_of_the_same_hash_does_not_hide_the_wiki_card(tmp_path: Path) -> None:
+    root = init_vault(tmp_path / "vault").root
+    _ = _seed(root, "early.md", "rankneedle 같은 원문")
+    assert run_ingest(_config(root), ("inbox",)).exit_code == 0
+    wiki = _seed(root, "later.md", "rankneedle 같은 원문")
+    assert run_ingest(_config(root), ("inbox",)).exit_code == 0
+    assert run_compile(_config(root), llm_mode="fake").exit_code == 0
+    early = _sources(root, f"wiki/{page_id_for_origin('inbox:early.md')}")
+    later = _sources(root, wiki)
+    assert early and later and early[0][1] == later[0][1]
+    origin, digest = early[0]
+    cite = SourceCite(sid=digest[:8], origin=origin, hash=digest)
+    page = PageSpec(
+        page_id="daily/2026-11-01",
+        title="2026-11-01",
+        body_md=f"# 2026-11-01\nrankneedle daily 인용[^{cite.sid}]\n",
+        sources=[cite],
+        status="active",
+    )
+    written = Vault(root).write_pages([page], "repro-daily", MemoryLedger())
+    assert written.commit is not None
+    kept = _prefer_first_ingested(
+        root,
+        (
+            SearchHit(wiki, "", "rankneedle", 1.0),
+            SearchHit("daily/2026-11-01", "", "rankneedle", 1.0),
+        ),
+    )
+    assert _pages(kept) == {wiki, "daily/2026-11-01"}
 
 
 def test_different_source_search_keeps_both_cards(tmp_path: Path) -> None:
@@ -70,3 +103,10 @@ def _raw(index: SearchIndex, query: str) -> tuple[SearchHit, ...]:
 
 def _pages(hits: tuple[SearchHit, ...]) -> set[str]:
     return {hit.page_id for hit in hits}
+
+def _sources(root: Path, page_id: str) -> tuple[tuple[str, str], ...]:
+    text = committed_text(root, f"{page_id}.md")
+    assert text is not None
+    facts = parse_page_frontmatter(text)
+    assert facts is not None and facts.sources
+    return facts.sources

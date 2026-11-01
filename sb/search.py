@@ -485,7 +485,7 @@ class SearchIndex:
 
 
 def _prefer_first_ingested(root: Path, hits: tuple[SearchHit, ...]) -> tuple[SearchHit, ...]:
-    """Drop a later card only when the same original hash is also in this result."""
+    """Drop a later wiki card only when another wiki card in this result cites the same hash."""
     pages = tuple(dict.fromkeys(hit.page_id for hit in hits))
     if len(pages) < 2:
         return hits
@@ -566,6 +566,8 @@ def _later_same_source(
 ) -> set[str]:
     grouped: dict[str, set[str]] = {}
     for page_id, sources in cited.items():
+        if not page_id.startswith("wiki/"):
+            continue
         for _origin, digest in sources:
             grouped.setdefault(digest, set()).add(page_id)
     earliest: set[str] = set()
