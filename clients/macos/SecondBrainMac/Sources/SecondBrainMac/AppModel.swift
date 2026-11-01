@@ -22,14 +22,20 @@ final class AppModel: ObservableObject {
     let settingsStore: SettingsStore
     let tunnel = SSHTunnelController()
 
-    private let notificationService = BriefingNotificationService()
+    private lazy var notificationService = BriefingNotificationService()
     private let manifestStore: SyncManifestStore
+    private let session: URLSession
     private var watchers: [UUID: FolderWatcher] = [:]
     private var periodicTask: Task<Void, Never>?
     private var started = false
 
-    init(settingsStore: SettingsStore) {
+    init(
+        settingsStore: SettingsStore,
+        manifestStore: SyncManifestStore? = nil,
+        session: URLSession = .shared
+    ) {
         self.settingsStore = settingsStore
+        self.session = session
         let applicationSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
@@ -37,7 +43,7 @@ final class AppModel: ObservableObject {
         let manifestURL = applicationSupport
             .appendingPathComponent("SecondBrain", isDirectory: true)
             .appendingPathComponent("sync-manifest.json")
-        manifestStore = SyncManifestStore(fileURL: manifestURL)
+        self.manifestStore = manifestStore ?? SyncManifestStore(fileURL: manifestURL)
     }
 
     var menuBarSymbol: String {
@@ -162,10 +168,10 @@ final class AppModel: ObservableObject {
                         relativePath: candidate.relativePath
                     )
                     manifest.record(candidate, receipt: receipt)
+                    try await manifestStore.save(manifest)
                     uploaded += 1
                 }
             }
-            try await manifestStore.save(manifest)
             lastSync = Date()
             activity = uploaded == 0 ? "동기화 완료: 변경 없음" : "동기화 완료: \(uploaded)개 업로드"
             lastError = nil
@@ -301,7 +307,7 @@ final class AppModel: ObservableObject {
     }
 
     private func client() throws -> SecondBrainAPIClient {
-        SecondBrainAPIClient(configuration: try apiConfiguration())
+        SecondBrainAPIClient(configuration: try apiConfiguration(), session: session)
     }
 }
 

@@ -20,7 +20,20 @@ from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
 
 type CompanyOperation = Literal[
-    "receive", "read", "accept", "reject", "mark_processed", "list_candidates",
+    "receive",
+    "read",
+    "accept",
+    "reject",
+    "mark_processed",
+    "list_candidates",
+    "enroll_handoff",
+    "handoff",
+    "read_transition_receipt",
+    "read_freshness",
+    "reserve_progress",
+    "finish_progress",
+    "auto_process_internal",
+    "read_auto_report",
 ]
 type CompanyPurpose = Literal[
     "company_memory_receive",
@@ -28,6 +41,11 @@ type CompanyPurpose = Literal[
     "company_memory_accept",
     "company_memory_reject",
     "company_memory_process",
+    "company_memory_handoff",
+    "company_memory_receipt_read",
+    "company_freshness_progress",
+    "company_internal_auto_trigger",
+    "company_memory_auto_report",
 ]
 
 _AUTHORITY_DOMAIN = b"second-brain/company-memory-authority/v1\0"
@@ -41,6 +59,14 @@ _PURPOSE: dict[CompanyOperation, CompanyPurpose] = {
     "reject": "company_memory_reject",
     "mark_processed": "company_memory_process",
     "list_candidates": "company_memory_read",
+    "enroll_handoff": "company_memory_handoff",
+    "handoff": "company_memory_handoff",
+    "read_transition_receipt": "company_memory_receipt_read",
+    "read_freshness": "company_freshness_progress",
+    "reserve_progress": "company_freshness_progress",
+    "finish_progress": "company_freshness_progress",
+    "auto_process_internal": "company_internal_auto_trigger",
+    "read_auto_report": "company_memory_auto_report",
 }
 
 
@@ -100,6 +126,17 @@ def canonical_workspace_id(value: str) -> str:
 
 
 def company_request_digest(operation: CompanyOperation, arguments: JsonObject) -> str:
+    if operation in {"read_freshness", "reserve_progress", "finish_progress"}:
+        if set(arguments) != {"request", "evidence"}:
+            raise CompanyAuthorityRejected("COMPANY_CONTRACT_INVALID")
+        freshness_body: JsonObject = {
+            "method": operation,
+            "request": arguments["request"],
+            "evidence": arguments["evidence"],
+        }
+        return "sha256:" + hashlib.sha256(
+            b"second-brain/company-freshness-request/v1\0" + canonical_bytes(freshness_body),
+        ).hexdigest()
     body: JsonObject = {"operation": operation, "arguments": arguments}
     return "sha256:" + hashlib.sha256(_REQUEST_DOMAIN + canonical_bytes(body)).hexdigest()
 
@@ -162,7 +199,15 @@ def verify_company_authority(
         if claim.purpose != _PURPOSE[claim.operation] or claim.request_digest != expected_digest:
             raise ValueError("operation binding mismatch")
         issued, expires = parse_instant(claim.issued_at), parse_instant(claim.expires_at)
-        if not issued <= now < expires <= issued + timedelta(minutes=5):
+        ttl = (
+            timedelta(seconds=60)
+            if claim.operation in {
+                "read_transition_receipt", "read_freshness", "reserve_progress",
+                "finish_progress", "auto_process_internal", "read_auto_report",
+            }
+            else (timedelta(minutes=5))
+        )
+        if not issued <= now < expires <= issued + ttl:
             raise ValueError("invalid validity")
         key = keys.get(claim.signing_key_id)
         if key is None:
@@ -173,9 +218,21 @@ def verify_company_authority(
     except (ValueError, TypeError, ValidationError) as exc:
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED") from exc
     key_scope = key_scopes.get(claim.signing_key_id) if key_scopes is not None else None
+    if (
+        claim.operation in {
+            "handoff", "enroll_handoff", "read_transition_receipt",
+            "read_freshness", "reserve_progress", "finish_progress",
+            "auto_process_internal", "read_auto_report",
+        }
+        and key_scope is None
+    ):
+        raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
     if key_scope is not None:
         if claim.operation not in key_scope.operations:
             raise CompanyAuthorityRejected("COMPANY_KEY_OPERATION_DENIED")
-        if claim.operation == "receive" and arguments.get("source_system") not in key_scope.source_systems:
+        if (
+            claim.operation == "receive"
+            and arguments.get("source_system") not in key_scope.source_systems
+        ):
             raise CompanyAuthorityRejected("COMPANY_KEY_SOURCE_DENIED")
     return claim, scope

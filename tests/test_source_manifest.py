@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from sb.config import Config
+from sb.config import Config, TomlValue
 from sb.connectors import discover_adapters
+from sb.connectors.base import ItemMeta
 from sb.connectors.discovery import (
     SOURCE_DISCOVERY_REQUEST_V1,
     SourceDiscoveryRequestV1,
@@ -48,6 +49,22 @@ def _row(kind: str, text: str) -> bytes:
     return record(kind, text)
 
 
+def _toml_rows(rows: list[dict[str, str]]) -> list[TomlValue]:
+    converted: list[TomlValue] = []
+    for row in rows:
+        item: dict[str, TomlValue] = {}
+        for key, value in row.items():
+            item[key] = value
+        converted.append(item)
+    return converted
+
+
+def _fact_kind(meta: ItemMeta) -> str:
+    kind = dict(meta).get("fact_kind")
+    assert isinstance(kind, str)
+    return kind
+
+
 def _place(root: Path, kind: str, text: str) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     path = root / ("snapshot.json" if kind == "opencode" else "session.jsonl")
@@ -64,7 +81,11 @@ def test_absent_root_yields_unavailable_skip_not_absent_root_success(tmp_path: P
         entry.config_row()
     adapter = GjcSessionsAdapter((), "gjc")
     # Selection of an absent configured path is a typed skip, not a successful scan.
-    assert [meta["skip_reason"] for _, _, meta in adapter.scan(None)] == ["absent-root"]
+    reasons: list[str] = []
+    for _ref, _body, meta in adapter.scan(None):
+        assert "skip_reason" in meta
+        reasons.append(meta["skip_reason"])
+    assert reasons == ["absent-root"]
 
 
 def test_two_roots_two_source_rows_two_identities_no_legacy_cursor_merge(tmp_path: Path) -> None:
@@ -75,7 +96,7 @@ def test_two_roots_two_source_rows_two_identities_no_legacy_cursor_merge(tmp_pat
     rows = inventory(candidates)
     assert len({row.source_id for row in rows}) == 2
     config_rows = [row.config_row() for row in rows]
-    cfg = Config(raw={"sources": config_rows}, base_dir=tmp_path)
+    cfg = Config(raw={"sources": _toml_rows(config_rows)}, base_dir=tmp_path)
     adapters = _select_adapters(discover_adapters(cfg), None, cfg)
     assert len(adapters) == 2
     assert {ref.source_id for adapter in adapters for ref, _, _ in _visible(adapter)} == {
@@ -152,7 +173,10 @@ def test_credential_and_probe_noise_lines_filtered_per_family(tmp_path: Path, ki
 def test_fact_kind_tag_decision_attempt_test_commit_deploy(tmp_path: Path, kind: str, tag: str) -> None:
     root = tmp_path / kind
     _place(root, kind, f"{tag.title()}: evidence")
-    assert [meta['fact_kind'] for _, _, meta in _visible(FACTORIES[kind]((root,), kind, filter_noise=True))] == [tag]
+    assert [
+        _fact_kind(meta)
+        for _, _, meta in _visible(FACTORIES[kind]((root,), kind, filter_noise=True))
+    ] == [tag]
 
 
 @pytest.mark.parametrize("kind", tuple(FACTORIES))

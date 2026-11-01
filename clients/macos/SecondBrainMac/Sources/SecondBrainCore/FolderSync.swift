@@ -59,7 +59,9 @@ public struct FolderSyncPlanner: Sendable {
             let modified = values.contentModificationDate ?? .distantPast
             let signature = FileSignature(
                 bytes: bytes,
-                modifiedMilliseconds: Int64(modified.timeIntervalSince1970 * 1_000)
+                modifiedMilliseconds: Int64(modified.timeIntervalSince1970 * 1_000),
+                contentSHA256: SHA256.hash(data: try Data(contentsOf: canonicalFile, options: [.mappedIfSafe]))
+                    .map { String(format: "%02x", $0) }.joined()
             )
             let relativePath = Self.relativePath(rootPath: rootPath, fileURL: fileURL)
             guard !relativePath.isEmpty else { continue }

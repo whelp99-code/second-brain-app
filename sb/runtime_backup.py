@@ -53,7 +53,7 @@ def _freeze_request_journal(root: Path) -> Generator[None, None, None]:
 
 
 def backup_runtime(config: Config, destination: Path) -> BackupResult:
-    """Snapshot under pending -> generation -> journal locks; SQLite backup includes WAL."""
+    """Freeze a coherent snapshot, then archive with reader-compatible writer ownership."""
     root = Path(config.vault_root)
     if not root.is_symlink():
         return create_backup(root, destination)
@@ -62,17 +62,17 @@ def backup_runtime(config: Config, destination: Path) -> BackupResult:
     try:
         with (
             _lock_request_publication(Path(config.request_root)),
-            service.store.exclusive(),
-            _freeze_request_journal(Path(config.request_root)),
+            service.store.writer() as lease,
+            TemporaryDirectory(prefix=".snapshot-", dir=destination.parent) as directory,
         ):
             generation = service.store.active()
-            with TemporaryDirectory(prefix=".snapshot-", dir=destination.parent) as directory:
-                snapshot = Path(directory) / "vault"
-                _ = shutil.copytree(generation.root, snapshot)
-                for path in snapshot.rglob("*"):
-                    if not path.is_symlink():
-                        path.chmod(0o700 if path.is_dir() else 0o600)
-                snapshot.chmod(0o700)
+            snapshot = Path(directory) / "vault"
+            _ = shutil.copytree(generation.root, snapshot)
+            for path in snapshot.rglob("*"):
+                if not path.is_symlink():
+                    path.chmod(0o700 if path.is_dir() else 0o600)
+            snapshot.chmod(0o700)
+            with _freeze_request_journal(Path(config.request_root)):
                 control = snapshot / ".recovery"
                 for label, source in (
                     ("state", Path(config.state_root)),
@@ -95,6 +95,9 @@ def backup_runtime(config: Config, destination: Path) -> BackupResult:
                             target.parent.mkdir(parents=True, exist_ok=True)
                             _ = shutil.copyfile(path, target)
                             target.chmod(0o600)
+            # Keep admission and destructive writers excluded until publication,
+            # but allow search pins and their request-journal reader leases.
+            with lease.preparing():
                 return create_backup(snapshot, destination, origin=f"provider:{config.provider_instance_id}")
     finally:
         service.close()
@@ -112,12 +115,13 @@ def verify_runtime_backup(config: Config, archive: Path) -> BackupVerification:
     try:
         with (
             _lock_request_publication(Path(config.request_root)),
-            service.store.exclusive(),
-            _freeze_request_journal(Path(config.request_root)),
+            service.store.writer() as lease,
         ):
-            sequence, set_root = service.requests.tombstone_high_water()
-            return verify_backup(archive, expected_generation=BackupGeneration(
-                provider_instance_id=config.provider_instance_id,
-                tombstone_sequence=sequence, tombstone_set_root=set_root))
+            with _freeze_request_journal(Path(config.request_root)):
+                sequence, set_root = service.requests.tombstone_high_water()
+            with lease.preparing():
+                return verify_backup(archive, expected_generation=BackupGeneration(
+                    provider_instance_id=config.provider_instance_id,
+                    tombstone_sequence=sequence, tombstone_set_root=set_root))
     finally:
         service.close()

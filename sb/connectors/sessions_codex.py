@@ -15,9 +15,12 @@ type JVal = str | int | float | bool | None | list["JVal"] | dict[str, "JVal"]
 from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.connectors.session_checkpoint import (
     CHECKPOINT_KEY,
+    DELETIONS_KEY,
+    content_version,
     open_session_file,
     read_checkpoints,
     read_session_checkpoint,
+    session_deletions,
 )
 from sb.contracts import SourceRef
 
@@ -51,8 +54,12 @@ class CodexSessionsAdapter:
 
     accepted_adapters: Final = _ADAPTERS
 
-    def __init__(self, roots: tuple[Path, ...], source_id: str, filter_noise: bool = False) -> None:
+    def __init__(
+        self, roots: tuple[Path, ...], source_id: str, filter_noise: bool = False,
+        observe_deletions: bool = False,
+    ) -> None:
         self._filter_noise: bool = filter_noise
+        self._observe_deletions: bool = observe_deletions
         self.source_id: str = source_id
         self._roots: tuple[Path, ...] = roots
         self._next_cursor: str = "0"
@@ -69,27 +76,42 @@ class CodexSessionsAdapter:
         prior_checks = read_checkpoints(cursor)
         checks: dict[str, str] = {}
         if not self._roots:
-            self._next_cursor = "0"
+            self._next_cursor = cursor if cursor is not None else "0"
             yield (
                 SourceRef(self.source_id, "", "absent-root"),
                 b"",
                 {"relative_path": "", "skip_reason": "absent-root"},
             )
             return
+        if self._roots[0].is_symlink() or not self._roots[0].is_dir():
+            self._next_cursor = cursor if cursor is not None else "0"
+            yield _skip(self.source_id, "", "source-unavailable")
+            return
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
+        complete = True
         for root in self._roots:
             for path in _jsonl_paths(root):
                 rel = path.relative_to(root).as_posix()
                 extracted, consumed, checkpoint, reason = read_session_checkpoint(
                     path, rel, previous.get(rel, 0), prior_checks.get(rel), self.read_file,
+                    root=root,
                 )
                 current[rel] = consumed
                 if checkpoint is not None:
                     checks[rel] = checkpoint
                 if reason is not None:
+                    complete = False
                     items.append(_skip(self.source_id, rel, reason))
                 items.extend(extracted)
-        self._next_cursor = json.dumps({**current, CHECKPOINT_KEY: checks}, separators=(",", ":"), sort_keys=True)
+        missing, deleted = session_deletions(
+            self._roots[0], self.source_id, cursor, current, checks,
+            enabled=self._observe_deletions, complete=complete,
+        )
+        items.extend(missing)
+        payload: dict[str, int | dict[str, str]] = {**current, CHECKPOINT_KEY: checks}
+        if deleted:
+            payload[DELETIONS_KEY] = deleted
+        self._next_cursor = json.dumps(payload, separators=(",", ":"), sort_keys=True)
         yield from items
 
     def next_cursor(self) -> str:
@@ -101,7 +123,7 @@ class CodexSessionsAdapter:
         consumed = start
         items: list[tuple[SourceRef, bytes, ItemMeta]] = []
         state = _State()
-        with open_session_file(path) as handle:
+        with open_session_file(path, root=self._roots[0]) as handle:
             if start > 0:
                 for line in handle.read(start).splitlines():
                     parsed = _obj(line.strip())
@@ -133,7 +155,7 @@ class CodexSessionsAdapter:
                     if self._filter_noise and _noise(text):
                         continue
                     meta = _item_meta(rel, token, text, self._filter_noise)
-                    items.append((SourceRef(self.source_id, f"{rel}#{item_id}", token), text.encode(), meta))
+                    items.append((SourceRef(self.source_id, f"{rel}#{item_id}", content_version(text)), text.encode(), meta))
         return items, consumed
 
 
@@ -168,7 +190,12 @@ def create(config: _ConnectorConfig) -> SourceAdapter:
     enabled = any(row.get("session_profile") == "facts-v1" and
                   (row.get("adapter") or row.get("type")) in _ADAPTERS
                   for row in config.source_roots)
-    return CodexSessionsAdapter(roots=roots, source_id=source_id, filter_noise=enabled)
+    observe = any(row.get("deletion_observations") == "v1" and
+                  (row.get("adapter") or row.get("type")) in _ADAPTERS
+                  for row in config.source_roots)
+    return CodexSessionsAdapter(
+        roots=roots, source_id=source_id, filter_noise=enabled, observe_deletions=observe,
+    )
 
 
 def _configured_roots(config: _ConnectorConfig) -> tuple[str, tuple[Path, ...]]:
@@ -184,8 +211,7 @@ def _configured_roots(config: _ConnectorConfig) -> tuple[str, tuple[Path, ...]]:
         root_value = raw.get("root")
         if root_value:
             path = Path(root_value)
-            if path.exists():
-                found.append(path)
+            found.append(path)
     if not matched:
         found.extend(path for path in DEFAULT_ROOTS if path.exists())
     return source_id, tuple(found)

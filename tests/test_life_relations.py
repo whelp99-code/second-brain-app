@@ -138,8 +138,11 @@ def test_sid_collision_expands_to_full_id():
     assert rows[1]["sid"] == rows[1]["full_sid"]
     assert rows[0]["sid"] != rows[1]["sid"]
     index = index_citations(found)
-    assert resolve_citation(index, str(rows[0]["sid"]))["event_id"] == rows[0]["event_id"]
-    assert resolve_citation(index, str(rows[1]["sid"]))["event_id"] == rows[1]["event_id"]
+    first = resolve_citation(index, str(rows[0]["sid"]))
+    second = resolve_citation(index, str(rows[1]["sid"]))
+    assert first is not None and second is not None
+    assert first["event_id"] == rows[0]["event_id"]
+    assert second["event_id"] == rows[1]["event_id"]
     assert index.get(str(rows[0]["full_sid"])[:8]) is None
 
 

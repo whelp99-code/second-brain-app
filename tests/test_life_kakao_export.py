@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from hashlib import sha256
 from pathlib import Path
 
+from sb.connectors.base import ItemMeta
 from sb.contracts import SourceRef
 from sb.life_exports import export_parts
 from sb.life_ingest import complete_exports, prepare_exports
+from sb.life_json import LifePayload
 from sb.store.ledger import Ledger
 from tests.test_life_contracts import NOW
 from tests.test_life_pipeline import life_config
@@ -18,18 +21,27 @@ FIXTURES = Path(__file__).parent / "fixtures" / "life-exports"
 
 class _Always:
     source_id = "test-notes"
+    supports_life_events = True
     life_format = "kakao-export"
     life_timezone = "Asia/Seoul"
 
     def __init__(self, raw: bytes) -> None:
         self.raw = raw
 
-    def scan(self, _cursor: str | None):
+    def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
+        _ = cursor
         digest = sha256(self.raw).hexdigest()
-        yield SourceRef(self.source_id, "kakao.txt", digest), self.raw, {"relative_path": "kakao.txt"}
+        meta: ItemMeta = {"relative_path": "kakao.txt"}
+        yield SourceRef(self.source_id, "kakao.txt", digest), self.raw, meta
 
     def next_cursor(self) -> str:
         return json.dumps({"kakao.txt": sha256(self.raw).hexdigest()}, separators=(",", ":"))
+
+
+def _source_item_id(event: LifePayload) -> str:
+    value = event["source_item_id"]
+    assert isinstance(value, str)
+    return value
 
 
 def test_kakao_lines_become_messages_with_provisional_identity() -> None:
@@ -57,9 +69,8 @@ def test_same_export_twice_is_replay_not_duplicate(tmp_path: Path) -> None:
     assert first.errors == 0 and len(events) == 2
     assert len(second.events) == 2
     assert all(event.revision == 1 for event in events)
-    assert {event.source_item_id for event in events} == {
-        event["source_item_id"] for event in export_parts("kakao-export", raw, "kakao.txt")[0]
-    }
+    exported, _quarantined = export_parts("kakao-export", raw, "kakao.txt")
+    assert {event.source_item_id for event in events} == {_source_item_id(event) for event in exported}
 
 
 def test_malformed_line_quarantined_others_accepted(tmp_path: Path) -> None:

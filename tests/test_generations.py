@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
+import sqlite3
 import stat
 from datetime import UTC, datetime
 from pathlib import Path
@@ -8,11 +11,15 @@ from typing import cast
 
 import pytest
 
+from sb import generations
 from sb.generations import (
     Generation,
     GenerationError,
+    GenerationReaderDrainError,
     GenerationStore,
     _private_directory,
+    _proc_descriptors,
+    _reader_drain_error,
     _regular_files,
 )
 from sb.request_store import RequestStore
@@ -118,7 +125,22 @@ def test_fresh_generation_has_orphan_git_and_atomic_pointer(tmp_path: Path) -> N
     store.close()
 
 
-def test_reader_lease_blocks_predecessor_disposal(tmp_path: Path) -> None:
+def assert_drain_log(
+    caplog: pytest.LogCaptureFixture, error: GenerationReaderDrainError,
+) -> None:
+    records = [record for record in caplog.records if record.name == "sb.generations"]
+    assert len(records) == 1
+    line = records[0].getMessage()
+    assert len(line.splitlines()) == 1
+    assert json.loads(line) == error.diagnostics
+    assert str(error) == "GENERATION_READER_DRAIN_REQUIRED"
+    assert error.args == ("GENERATION_READER_DRAIN_REQUIRED",)
+    assert isinstance(error, GenerationError)
+
+
+def test_reader_lease_blocks_predecessor_disposal(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
     requests = RequestStore(tmp_path / "requests")
     store = GenerationStore(
         tmp_path / "state", tmp_path / "share",
@@ -128,16 +150,178 @@ def test_reader_lease_blocks_predecessor_disposal(tmp_path: Path) -> None:
     first = build_generation(store, text="first")
     store.activate(first, None, NOW)
     second = build_generation(store, first, "second")
-    requests.register_reader("reader:1", first.generation_id, os.getpid(), NOW)
-    with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
+    lease_id = "reader:1\nFORBIDDEN_LOG_LINE"
+    requests.register_reader(lease_id, first.generation_id, os.getpid(), NOW)
+    expected = requests.reader_diagnostic_metadata(first.generation_id, limit=32)[(lease_id, os.getpid())]
+    try:
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert caught.value.diagnostics["readers"] == [{
+            "lease_id": lease_id, "pid": os.getpid(), "opened_at": expected[0],
+            "process_identity": expected[1], "metadata_available": True,
+            "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+        }]
+        assert caught.value.diagnostics["generation_id"] == first.generation_id
+        assert caught.value.diagnostics["phase"] == "predecessor-disposal"
+        assert first.root.is_dir()
+        requests.release_reader(lease_id)
         store.activate(second, first, NOW)
-    requests.release_reader("reader:1")
-    assert store.active().generation_id == second.generation_id
-    store.close()
-    requests.close()
+        assert not first.root.exists()
+        assert store.active().generation_id == second.generation_id
+    finally:
+        store.close()
+        requests.close()
 
 
-def test_open_predecessor_descriptor_blocks_disposal(tmp_path: Path) -> None:
+@pytest.mark.parametrize("count", [0, 1, 32, 33, 4096])
+def test_reader_diagnostics_bound_metadata_before_serialization(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, count: int,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        generation = build_generation(store)
+        # Deliberately insert out of order; selection must follow readers(),
+        # not insertion order or process id (all leases share a live process).
+        for index in reversed(range(count)):
+            requests.register_reader(f"reader:{index:05d}", generation.generation_id, os.getpid(), NOW)
+        readers = requests.readers(generation.generation_id)
+        assert len(readers) == count
+        expected = requests.reader_diagnostic_metadata(generation.generation_id, limit=32)
+        fetched_rows = []
+        queries = []
+
+        def collect_row(_cursor: sqlite3.Cursor, row: tuple[object, ...]) -> tuple[object, ...]:
+            fetched_rows.append(row)
+            return row
+
+        original_row_factory = requests.db.row_factory
+        requests.db.row_factory = collect_row
+        requests.db.set_trace_callback(queries.append)
+        try:
+            error = _reader_drain_error(
+                generation, "predecessor-disposal", readers, (), [], requests,
+            )
+        finally:
+            requests.db.row_factory = original_row_factory
+            requests.db.set_trace_callback(None)
+        # Count rows at SQLite fetch time, before building the metadata dict
+        # and before constructing or serializing detailed reader objects.
+        assert len(fetched_rows) == min(count, 32)
+        assert len(queries) == (1 if count else 0)
+        if count:
+            assert "ORDER BY r.lease_id LIMIT 32" in queries[0]
+        assert_drain_log(caplog, error)
+        assert error.diagnostics["readers_total"] == count
+        assert error.diagnostics["readers_omitted"] == max(count - 32, 0)
+        assert error.diagnostics["readers"] == [{
+            "lease_id": lease_id, "pid": pid, "opened_at": expected[(lease_id, pid)][0],
+            "process_identity": expected[(lease_id, pid)][1], "metadata_available": True,
+            "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+        } for lease_id, pid in readers[:32]]
+        assert error.diagnostics["reader_metadata_status"] == (
+            "queried-after-denial-observation" if count else "not-needed"
+        )
+        assert error.diagnostics["readers_status"] == "observed-at-decision"
+        assert error.diagnostics["descriptors"] == []
+        assert error.diagnostics["descriptors_total"] == 0
+        assert error.diagnostics["descriptors_omitted"] == 0
+        assert requests.readers(generation.generation_id) == readers
+    finally:
+        store.close()
+        requests.close()
+
+
+@pytest.mark.parametrize("failure", ["sqlite", "missing"])
+def test_bounded_readers_keep_unavailable_metadata_diagnostics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    failure: str,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        generation = build_generation(store)
+        readers = tuple((f"reader:{index:02d}", os.getpid()) for index in range(33))
+
+        def unavailable(
+            _store: RequestStore, _generation_id: str, *, limit: int,
+        ) -> dict[tuple[str, int], tuple[str, str | None]]:
+            assert limit == 32
+            if failure == "sqlite":
+                raise sqlite3.OperationalError("FORBIDDEN_DATABASE_DETAIL")
+            return {}
+
+        monkeypatch.setattr(RequestStore, "reader_diagnostic_metadata", unavailable)
+        error = _reader_drain_error(generation, "predecessor-disposal", readers, (), [], requests)
+        assert_drain_log(caplog, error)
+        assert error.diagnostics["readers_total"] == 33
+        assert error.diagnostics["readers_omitted"] == 1
+        assert error.diagnostics["reader_metadata_status"] == (
+            "unavailable-sqlite-error" if failure == "sqlite" else "queried-after-denial-observation"
+        )
+        assert error.diagnostics["readers"] == [{
+            "lease_id": lease_id, "pid": pid, "opened_at": None,
+            "process_identity": None, "metadata_available": False,
+            "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+        } for lease_id, pid in readers[:32]]
+        assert "FORBIDDEN_" not in caplog.text
+    finally:
+        store.close()
+        requests.close()
+
+
+def test_omitted_reader_still_blocks_disposal_until_released(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        first = build_generation(store, text="first")
+        store.activate(first, None, NOW)
+        second = build_generation(store, first, "second")
+        leases = [f"reader:{index:02d}" for index in range(33)]
+        for lease in reversed(leases):
+            requests.register_reader(lease, first.generation_id, os.getpid(), NOW)
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert caught.value.diagnostics["readers_total"] == 33
+        assert caught.value.diagnostics["readers_omitted"] == 1
+        assert [item["lease_id"] for item in caught.value.diagnostics["readers"]] == leases[:32]
+        assert first.root.is_dir()
+        for lease in leases[:32]:
+            requests.release_reader(lease)
+        caplog.clear()
+        with pytest.raises(GenerationReaderDrainError) as remaining:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, remaining.value)
+        assert remaining.value.diagnostics["readers_total"] == 1
+        assert remaining.value.diagnostics["readers_omitted"] == 0
+        assert remaining.value.diagnostics["readers"][0]["lease_id"] == leases[-1]
+        assert requests.readers(first.generation_id) == ((leases[-1], os.getpid()),)
+        assert first.root.is_dir()
+        requests.release_reader(leases[-1])
+        store.activate(second, first, NOW)
+        assert not first.root.exists()
+        assert store.active().generation_id == second.generation_id
+    finally:
+        store.close()
+        requests.close()
+
+
+def test_open_predecessor_descriptor_blocks_disposal(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
     store = GenerationStore(
         tmp_path / "state", tmp_path / "share",
         provider_instance_id="provider:test", provider_release_sha="a" * 40,
@@ -146,12 +330,213 @@ def test_open_predecessor_descriptor_blocks_disposal(tmp_path: Path) -> None:
     store.activate(first, None, NOW)
     second = build_generation(store, first, "second")
     descriptor = os.open(first.root, os.O_RDONLY | os.O_DIRECTORY)
+    outside = tmp_path / "FORBIDDEN_OUTSIDE_PATH"
+    outside.mkdir()
+    outside_descriptor = os.open(outside, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        with pytest.raises(GenerationError, match="GENERATION_READER_DRAIN_REQUIRED"):
+        with pytest.raises(GenerationReaderDrainError) as caught:
             store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert caught.value.diagnostics["descriptors"] == [{
+            "pid": os.getpid(), "fd": descriptor, "path": str(first.root.resolve()),
+            "path_status": "observed-at-decision", "source": "/proc/self/fd",
+        }]
+        assert "FORBIDDEN_OUTSIDE_PATH" not in caplog.text
         assert first.root.is_dir()
     finally:
+        os.close(outside_descriptor)
         os.close(descriptor)
+        store.close()
+
+
+@pytest.mark.parametrize("failure", [
+    "metadata", "log-oserror", "log-closed-stream", "handler-runtime", "filter-runtime",
+    "keyboard-interrupt", "system-exit",
+])
+def test_drain_diagnostic_failure_preserves_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    requests = RequestStore(tmp_path / "requests")
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share", requests=requests,
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        first = build_generation(store, text="first")
+        store.activate(first, None, NOW)
+        second = build_generation(store, first, "second")
+        requests.register_reader("reader:1", first.generation_id, os.getpid(), NOW)
+        if failure == "metadata":
+            def unavailable(
+                _store: RequestStore, _generation_id: str, *, limit: int,
+            ) -> dict[tuple[str, int], tuple[str, str | None]]:
+                raise sqlite3.OperationalError("FORBIDDEN_DATABASE_DETAIL")
+            monkeypatch.setattr(RequestStore, "reader_diagnostic_metadata", unavailable)
+        elif failure in {"handler-runtime", "filter-runtime"}:
+            class RaisingHandler(logging.Handler):
+                def emit(self, record: logging.LogRecord) -> None:
+                    raise RuntimeError("FORBIDDEN_HANDLER_DETAIL")
+
+            class RaisingFilter(logging.Filter):
+                def filter(self, record: logging.LogRecord) -> bool:
+                    raise RuntimeError("FORBIDDEN_FILTER_DETAIL")
+
+            logger = logging.getLogger("sb.generations")
+            monkeypatch.setattr(logger, "handlers", [RaisingHandler()])
+            if failure == "filter-runtime":
+                monkeypatch.setattr(logger, "filters", [RaisingFilter()])
+        else:
+            def unavailable_log(*_args: object, **_kwargs: object) -> None:
+                if failure == "log-oserror":
+                    raise OSError("FORBIDDEN_SINK_DETAIL")
+                if failure == "keyboard-interrupt":
+                    raise KeyboardInterrupt
+                if failure == "system-exit":
+                    raise SystemExit
+                raise ValueError("I/O operation on closed file")
+            monkeypatch.setattr(logging.getLogger("sb.generations"), "warning", unavailable_log)
+        if failure in {"keyboard-interrupt", "system-exit"}:
+            with pytest.raises(KeyboardInterrupt if failure == "keyboard-interrupt" else SystemExit):
+                store.activate(second, first, NOW)
+            assert first.root.is_dir()
+            assert requests.readers(first.generation_id) == (("reader:1", os.getpid()),)
+            return
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert str(caught.value) == "GENERATION_READER_DRAIN_REQUIRED"
+        assert first.root.is_dir()
+        assert requests.readers(first.generation_id) == (("reader:1", os.getpid()),)
+        assert "FORBIDDEN_" not in json.dumps(caught.value.diagnostics)
+        if failure == "metadata":
+            assert caught.value.diagnostics["reader_metadata_status"] == "unavailable-sqlite-error"
+            assert caught.value.diagnostics["readers"] == [{
+                "lease_id": "reader:1", "pid": os.getpid(), "opened_at": None,
+                "process_identity": None, "metadata_available": False,
+                "call_location": None, "call_location_status": "not-recorded-by-lease-schema",
+            }]
+    finally:
+        store.close()
+        requests.close()
+
+
+@pytest.mark.parametrize(("count", "target_kind"), [
+    (0, "normal"), (32, "normal"), (33, "normal"), (4096, "normal"),
+    (1, "misleading"), (1, "relative"), (1, "deleted"),
+])
+def test_descriptor_capture_is_bounded_and_preserves_holder_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    count: int, target_kind: str,
+) -> None:
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share",
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    try:
+        generation = build_generation(store)
+        alias = tmp_path / "holder-namespace-alias"
+        alias.symlink_to(generation.root, target_is_directory=True)
+        raw_target = {
+            "normal": str(generation.root),
+            "misleading": str(alias) + "/wiki/../wiki/value.md",
+            "relative": "wiki/value.md",
+            "deleted": str(generation.root / "wiki/value.md") + " (deleted)",
+        }[target_kind]
+        pid = os.getpid() + 1000000
+        process = Path(f"/proc/{pid}")
+        original_iterdir = Path.iterdir
+        original_stat = Path.stat
+        original_readlink = os.readlink
+        original_observation = generations._DescriptorObservation
+        allocations = []
+        reads = []
+
+        def iterdir(path: Path):
+            if path == Path("/proc"):
+                return iter([process])
+            if path == process / "fd":
+                return (path / str(fd) for fd in reversed(range(count)))
+            return original_iterdir(path)
+
+        def metadata(path: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+            return original_stat(tmp_path if path == process else path, follow_symlinks=follow_symlinks)
+
+        def readlink(path: str | Path, *, dir_fd: int | None = None) -> str:
+            if Path(path).parent == process / "fd":
+                reads.append(int(Path(path).name))
+                return raw_target
+            return original_readlink(path, dir_fd=dir_fd)
+
+        def observation(pid: int, fd: int, path: str):
+            allocations.append((pid, fd, path))
+            return original_observation(pid, fd, path)
+
+        monkeypatch.setattr(Path, "iterdir", iterdir)
+        monkeypatch.setattr(Path, "stat", metadata)
+        monkeypatch.setattr(os, "readlink", readlink)
+        monkeypatch.setattr(generations, "_DescriptorObservation", observation)
+        observations = []
+        found = _proc_descriptors(generation.root, observations=observations)
+        # This is the pre-existing decision, even for misleading foreign paths:
+        # absolute targets resolve locally; relative targets do not match.
+        total = 0 if target_kind == "relative" else count
+        assert found == tuple((pid, fd) for fd in range(total))
+        assert reads == list(reversed(range(count)))
+        assert len(allocations) == len(observations) == min(total, 32)
+        assert _proc_descriptors(generation.root) == found
+        assert len(allocations) == min(total, 32)
+        error = _reader_drain_error(generation, "predecessor-disposal", (), found, observations, None)
+        assert_drain_log(caplog, error)
+        assert error.diagnostics["descriptors_total"] == total
+        assert error.diagnostics["descriptors_omitted"] == max(total - 32, 0)
+        assert error.diagnostics["descriptors"] == [{
+            "pid": pid, "fd": fd, "path": raw_target,
+            "path_status": "holder-namespace-observed-at-decision",
+            "source": "same-uid-proc-fd-scan",
+        } for fd in range(max(total - 32, 0), total)]
+    finally:
+        store.close()
+
+
+def test_drain_keeps_same_descriptor_observation_after_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    store = GenerationStore(
+        tmp_path / "state", tmp_path / "share",
+        provider_instance_id="provider:test", provider_release_sha="a" * 40,
+    )
+    held: int | None = None
+    try:
+        first = build_generation(store, text="FORBIDDEN_GENERATION_CONTENT")
+        store.activate(first, None, NOW)
+        second = build_generation(store, first, "second")
+        held = os.open(first.root, os.O_RDONLY | os.O_DIRECTORY)
+        descriptor = held
+        original_readlink = os.readlink
+        inspected = []
+
+        def close_after_observation(path: str | Path, *, dir_fd: int | None = None) -> str:
+            nonlocal held
+            target = original_readlink(path, dir_fd=dir_fd)
+            if str(path) == f"/proc/self/fd/{descriptor}" and held is not None:
+                inspected.append(str(path))
+                os.close(held)
+                held = None
+            return target
+
+        monkeypatch.setattr(os, "readlink", close_after_observation)
+        with pytest.raises(GenerationReaderDrainError) as caught:
+            store.activate(second, first, NOW)
+        assert_drain_log(caplog, caught.value)
+        assert inspected == [f"/proc/self/fd/{descriptor}"]
+        assert caught.value.diagnostics["descriptors"] == [{
+            "pid": os.getpid(), "fd": descriptor, "path": str(first.root.resolve()),
+            "path_status": "observed-at-decision", "source": "/proc/self/fd",
+        }]
+        assert "FORBIDDEN_GENERATION_CONTENT" not in caplog.text
+        assert first.root.is_dir()
+    finally:
+        if held is not None:
+            os.close(held)
         store.close()
 
 

@@ -35,7 +35,7 @@ From plan Scope. Do not add these.
 - MCP shares no mutable pipeline state. Writes are `sb_remember` into `inbox/` and the explicit `sb_run`, which delegates to the normal single-writer pipeline lock.
 - No writes to unified-db. The connector asserts `default_transaction_read_only` and `transaction_read_only` are `on` before SELECTs. No INSERT/UPDATE/DELETE/DDL.
 - The server has no file watcher, queue, or event bus. The native macOS client may watch user-selected local folders and upload changed files through the bounded desktop API; the server still ingests only from `inbox/`.
-- No signing, consent, authority, or dual-approval machinery.
+- No signing, consent, authority, or dual-approval machinery. Single scoped exception (owner decision, 대표-결정 C0C9YHNUHUN:1792502949): the company internal-automation policy receipt signer (`principal:company-internal-automation`, `sb/company_auto_*`) may sign and verify its own policy receipts. It must stay separate from every other signing identity and must not gate the default path.
 - No vault git remote. `raw/` and `.sb/` stay gitignored. Vault root stays mode `0700`.
 - No human-approval gate on the default path. There is no `--review` flag.
 - Secret redaction is credential regexes only (AWS keys, `ghp_`/`gho_`, `sk-`, PEM, `password=`/`token=`). Contact emails and phones stay.

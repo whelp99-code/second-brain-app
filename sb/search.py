@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import islice
 from pathlib import Path
-from typing import Final, Protocol, cast, runtime_checkable
+from typing import Final, NotRequired, Protocol, cast, runtime_checkable
 
 from typing_extensions import TypedDict
 
@@ -74,6 +74,7 @@ class SearchHitDict(TypedDict, closed=True):
     updated_at: str
     role: str
     verification: str
+    uncertainty: NotRequired[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +96,7 @@ class SearchHit:
 
     def as_dict(self) -> SearchHitDict:
         role, verification = _labels(self.knowledge_status, self.approval_status)
-        return {
+        result: SearchHitDict = {
             "page_id": self.page_id,
             "section": self.section,
             "snippet": self.snippet,
@@ -109,7 +110,10 @@ class SearchHit:
             "updated_at": self.updated_at,
             "role": role,
             "verification": verification,
-        } | ({"uncertainty": self.uncertainty} if self.uncertainty else {})
+        }
+        if self.uncertainty:
+            result["uncertainty"] = self.uncertainty
+        return result
 
     @property
     def role(self) -> str:

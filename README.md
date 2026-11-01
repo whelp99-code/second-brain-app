@@ -168,6 +168,10 @@ failure_window_hours = 48
 
 일반 stdio 기본 프로필에는 `sb_search`, `sb_read_page`, `sb_recent_changes`, `sb_open_conflicts`, `sb_remember`, `sb_write_request`의 6개 도구가 있다. `remember-schema5`는 이 6개와 `sb_generation_status`, `sb_request_status`, `sb_resolve_memory_target`의 총 9개를 제공한다. `sb_run`은 desktop용 서버 표면에만 있으며 일반 stdio 목록에는 없다.
 
+일반 stdio 기본 프로필과 desktop의 `sb_search`는 CLI처럼 관리형 active 세대를 reader lock으로 고정한다. 삭제 이력이 있어도 검증된 세대의 tombstone sequence/root가 현재 journal과 일치하면 검색하며, 검색 전후 불일치는 `TOMBSTONE_SET_STALE`로 실패 닫힘 처리한다. 오래된 백업을 active로 연결해 삭제를 복원하지 말고 정상 복원·재구축 절차로 journal과 세대를 일치시켜야 한다. 비관리형 vault에 삭제 이력이 있으면 여전히 `TOMBSTONE_FENCE_REQUIRED`다. 이 변경은 검색에만 적용하며 다른 레거시 읽기 도구의 genesis 제한은 유지한다.
+
+`task30-schema3`, `task32-schema4`, `remember-schema5`, cancellation 및 scoped 프로필은 로컬 CLI 검색이 아닌 서명된 호출자 계약이다. 삭제 이후에는 최신 `read_fence`를 권한 있는 JARVIS 발급자에게 받아 전달해야 한다(읽기는 `purpose=memory_read`, `operation=read`, 현재 provider/sequence/root, 유효 서명·만료 필요). scoped 프로필에는 `access_claim`도 필요하다. `TOMBSTONE_FENCE_REQUIRED`는 fence 누락·잘못된 서명/용도를, `TOMBSTONE_SET_STALE`은 최신 journal 불일치를 뜻한다. 재시도 전에 fence를 갱신해야 하며 보호 비활성화나 서명 자동 생성으로 해결하지 않는다.
+
 실제 Codex CLI와 Claude Code의 같은 기억 저장소 양방향 기록·회수는 [에이전트 클라이언트 인수 보고서](AGENT-CLIENT-MEMORY-ACCEPTANCE-2026-09-08.md)를 따른다. 이는 단일 소유자·삭제 이전의 격리 프로필 검증이며 프로젝트 접근 격리·자동 수집/문맥 주입·운영 연결을 보장하지 않는다.
 
 Ubuntu 서버에 SSH로 연결하는 맥 MCP 설정 예:

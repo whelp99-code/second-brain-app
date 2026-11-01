@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from sb.effect_values import JsonObject
 from sb.life_contracts import (
     LifeInputError,
     SourcePolicyV1,
@@ -15,6 +16,8 @@ from sb.life_contracts import (
 )
 from sb.life_values import parse_event
 from sb.memory_records import parse_page_records
+from tests.json_fixtures import parse_object
+from tests.life_test_support import json_object
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "life-contract"
@@ -34,56 +37,49 @@ POLICY = SourcePolicyV1(
 )
 
 
-def _schema() -> dict:
-    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+def _schema() -> JsonObject:
+    return parse_object(SCHEMA_PATH.read_bytes())
 
 
-def _load(name: str) -> dict:
-    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+def _load(name: str) -> JsonObject:
+    return parse_object((FIXTURES / name).read_bytes())
 
 
-def _inputs() -> dict[str, tuple[dict, int]]:
-    return {
-        "event-v1-minimal.json": (
-            {
-                "source_item_id": "item-minimal",
-                "source_version": "v1",
-                "event_type": "note_saved",
-                "title": "짧은 메모",
-                "body": "",
-                "occurred_start": None,
-                "time_precision": "unknown",
-                "timezone": "Asia/Seoul",
-            },
-            1,
-        ),
-        "event-v1-full.json": (
-            {
-                "source_item_id": "item-full",
-                "source_version": "v3",
-                "event_type": "calendar_event",
-                "title": "여행 중 회의",
-                "body": "파리 도착 후 일정",
-                "event_status": "planned",
-                "evidence_level": "observed",
-                "review_state": "confirmed",
-                "occurred_start": "2026-06-15T09:00:00+02:00",
-                "occurred_end": "2026-06-15T10:00:00+02:00",
-                "observed_at": "2026-06-15T09:05:00+02:00",
-                "timezone": "Europe/Paris",
-                "time_precision": "minute",
-                "valid_from": "2026-06-01T00:00:00+02:00",
-                "valid_until": "2026-06-30T00:00:00+02:00",
-                "entities": [{"entity_id": "person:ada", "kind": "person", "label": "Ada"}],
-                "value": 2,
-                "value_status": "observed",
-                "unit": "count",
-                "confidence": 0.5,
-                "change_reason": "owner correction",
-            },
-            2,
-        ),
-    }
+def _inputs() -> dict[str, tuple[JsonObject, int]]:
+    minimal = json_object({
+        "source_item_id": "item-minimal",
+        "source_version": "v1",
+        "event_type": "note_saved",
+        "title": "짧은 메모",
+        "body": "",
+        "occurred_start": None,
+        "time_precision": "unknown",
+        "timezone": "Asia/Seoul",
+    })
+    full = json_object({
+        "source_item_id": "item-full",
+        "source_version": "v3",
+        "event_type": "calendar_event",
+        "title": "여행 중 회의",
+        "body": "파리 도착 후 일정",
+        "event_status": "planned",
+        "evidence_level": "observed",
+        "review_state": "confirmed",
+        "occurred_start": "2026-06-15T09:00:00+02:00",
+        "occurred_end": "2026-06-15T10:00:00+02:00",
+        "observed_at": "2026-06-15T09:05:00+02:00",
+        "timezone": "Europe/Paris",
+        "time_precision": "minute",
+        "valid_from": "2026-06-01T00:00:00+02:00",
+        "valid_until": "2026-06-30T00:00:00+02:00",
+        "entities": [{"entity_id": "person:ada", "kind": "person", "label": "Ada"}],
+        "value": 2,
+        "value_status": "observed",
+        "unit": "count",
+        "confidence": 0.5,
+        "change_reason": "owner correction",
+    })
+    return {"event-v1-minimal.json": (minimal, 1), "event-v1-full.json": (full, 2)}
 
 
 def test_schema_sidecar_digest_matches_file():
@@ -127,6 +123,7 @@ def test_memory_record_digests_not_rehashed_by_life_link():
     record = parse_page_records(raw, "wiki/page")[0]
     before = record.record_digest
     event_id = _load("event-v1-minimal.json")["event_id"]
+    assert isinstance(event_id, str)
     link = life_record_link(
         record_id=record.record_id,
         record_digest=record.record_digest,

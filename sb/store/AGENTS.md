@@ -19,7 +19,7 @@ state machine, `__init__.py` holds the row types and frontmatter helpers both of
 ## CONVENTIONS
 - CAS layout is `<vault>/raw/<h[:2]>/<h>`; blobs land mode `0444`; erasure writes a
   `.tombstone` sidecar beside the blob.
-- Ledger lives at `<vault>/.sb/ledger.db` in WAL mode. `CURRENT_SCHEMA_VERSION = 5`; a
+- Ledger lives at `<vault>/.sb/ledger.db` in WAL mode. `CURRENT_SCHEMA_VERSION = 6`; a
   database reporting a higher version is refused, and an unknown lower version is backed up
   before migration.
 - Three cursor encodings live in `__init__.py`: file `mtime_ns:size:sha256`, Postgres ISO

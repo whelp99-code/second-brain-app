@@ -7,15 +7,19 @@ from datetime import timedelta
 
 import yaml
 
+from sb.effect_values import JsonObject, JsonValue
 from sb.life_api_reads import aligned_surfaces
 from sb.life_config import policy_for
+from sb.life_contracts import LifeEventV1
 from sb.life_http import LifeActor
+from sb.life_journal_contracts import EvidenceRef, JournalRow
 from sb.life_projection import project
 from sb.life_relations import add as add_relation
 from sb.life_values import parse_event
 from sb.life_views import DAILY_SECTIONS, obsidian_manifest
 from sb.store.ledger import Ledger
 from sb.store.life_journal import LifeJournal
+from tests.life_test_support import json_object
 from tests.test_life_contracts import NOW, payload, policy
 from tests.test_life_pipeline import life_config
 
@@ -23,11 +27,54 @@ DAY = "2026-09-26"
 TZ = "Asia/Seoul"
 
 
-def _frontmatter(content: str) -> dict:
+def _frontmatter(content: str) -> dict[str, JsonValue]:
     text = content.split("---", 2)[1]
     loaded = yaml.safe_load(text)
     assert isinstance(loaded, dict)
-    return loaded
+    return json_object(loaded)
+
+
+def _evidence(event: LifeEventV1) -> EvidenceRef:
+    return {
+        "event_id": event.event_id,
+        "revision": event.revision,
+        "raw_digest": event.raw_digest,
+        "source_id": event.source_id,
+        "policy_revision": event.policy_revision,
+    }
+
+
+def _relation(
+    event: LifeEventV1,
+    *,
+    kind: str,
+    from_id: str,
+    to_id: str,
+    state: str,
+    level: str,
+    valid_from: str | None,
+    valid_until: str | None,
+    evidence: list[EvidenceRef],
+) -> JournalRow:
+    body: JsonObject = {
+        "relation_kind": kind,
+        "from_id": from_id,
+        "to_id": to_id,
+        "state": state,
+        "evidence_level": level,
+        "valid_from": valid_from,
+        "valid_until": valid_until,
+    }
+    return {
+        "object_id": "relation:" + kind + ":" + from_id + ":" + to_id,
+        "kind": "relation",
+        "revision": 1,
+        "body": body,
+        "scopes": list(event.scopes),
+        "source_ids": [event.source_id],
+        "evidence": evidence,
+        "recorded_at": event.recorded_at,
+    }
 
 
 def test_daily_sections_follow_spec_order():
@@ -59,8 +106,10 @@ def test_event_page_flat_properties_include_generation_timezone_evidence_count_a
     assert meta["sb_generation"] == view["source_generation"]
     assert meta["sb_timezone"] == TZ
     assert meta["sb_evidence_count"] == 2
-    assert meta["sb_links"]
-    assert all(isinstance(link, str) and link.startswith("[[") for link in meta["sb_links"])
+    links = meta["sb_links"]
+    assert isinstance(links, list)
+    assert links
+    assert all(isinstance(link, str) and link.startswith("[[") for link in links)
     assert "generation" in "".join(meta)
     assert "timezone" in "".join(meta)
     assert "evidence_count" in "".join(str(meta))
@@ -73,7 +122,7 @@ def test_nested_metadata_absent_from_frontmatter():
     page = next(row["content"] for row in view["files"] if row["path"].startswith("Auto/Events/"))
     meta = _frontmatter(page)
 
-    def walk(value):
+    def walk(value: JsonValue) -> None:
         assert not isinstance(value, dict)
         if isinstance(value, list):
             for item in value:
@@ -85,44 +134,42 @@ def test_nested_metadata_absent_from_frontmatter():
 
 def test_relations_projection_grouped_by_kind_with_evidence_and_validity():
     event = parse_event(payload(), policy(), recorded_at=NOW)
-    workflows = {
+    cited = [_evidence(event)]
+    workflows: dict[str, list[JournalRow]] = {
         "relation": [
-            {
-                "body": {
-                    "relation_kind": "works_at",
-                    "from_id": "people:ada",
-                    "to_id": "org:lab",
-                    "state": "asserted",
-                    "evidence_level": "user_asserted",
-                    "valid_from": "2026-01-01T00:00:00+09:00",
-                    "valid_until": "2026-12-31T00:00:00+09:00",
-                },
-                "evidence": [{"event_id": event.event_id, "revision": 1}],
-            },
-            {
-                "body": {
-                    "relation_kind": "knows",
-                    "from_id": "people:ada",
-                    "to_id": "people:bob",
-                    "state": "candidate",
-                    "evidence_level": "inferred",
-                    "valid_from": None,
-                    "valid_until": None,
-                },
-                "evidence": [{"event_id": event.event_id, "revision": 1}],
-            },
-            {
-                "body": {
-                    "relation_kind": "knows",
-                    "from_id": "ghost",
-                    "to_id": "nobody",
-                    "state": "candidate",
-                    "evidence_level": "inferred",
-                    "valid_from": None,
-                    "valid_until": None,
-                },
-                "evidence": [],
-            },
+            _relation(
+                event,
+                kind="works_at",
+                from_id="people:ada",
+                to_id="org:lab",
+                state="asserted",
+                level="user_asserted",
+                valid_from="2026-01-01T00:00:00+09:00",
+                valid_until="2026-12-31T00:00:00+09:00",
+                evidence=cited,
+            ),
+            _relation(
+                event,
+                kind="knows",
+                from_id="people:ada",
+                to_id="people:bob",
+                state="candidate",
+                level="inferred",
+                valid_from=None,
+                valid_until=None,
+                evidence=cited,
+            ),
+            _relation(
+                event,
+                kind="knows",
+                from_id="ghost",
+                to_id="nobody",
+                state="candidate",
+                level="inferred",
+                valid_from=None,
+                valid_until=None,
+                evidence=[],
+            ),
         ]
     }
     view = project(

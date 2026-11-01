@@ -17,7 +17,6 @@ from sb.connectors.base import ItemMeta, SourceAdapter
 from sb.contracts import SourceRef
 from sb.parsers import (
     FormatUnsupported,
-    InvalidInput,
     LimitExceeded,
     OcrRequired,
     ParseError,
@@ -223,16 +222,14 @@ def _parse_body(suffix: str, body: bytes) -> _InboxText | str:
         return _InboxText(parser_for(suffix)(body))
     except UnsupportedSuffix:
         return "unsupported-suffix"
-    except InvalidInput as exc:
-        return exc.reason
     except LimitExceeded:
         return "size-limit"
     except FormatUnsupported:
         return "unsupported-format"
     except OcrRequired:
         return "ocr-required"
-    except ParseError as exc:
-        return str(exc)
+    except ParseError:
+        return "malformed-document"
 
 
 def move_done(root: Path, rel: str, version: str, verified: os.stat_result) -> None:

@@ -6,13 +6,15 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import json
+import logging
 import os
 import shutil
 import sqlite3
 import stat
 import subprocess
 from collections.abc import Callable, Generator, Iterable, Sequence
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager, nullcontext, suppress
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -47,6 +49,12 @@ from sb.sqlite_values import SQL_ROWS
 
 class GenerationError(RuntimeError):
     pass
+
+
+class GenerationReaderDrainError(GenerationError):
+    def __init__(self, diagnostics: dict[str, JsonValue]) -> None:
+        super().__init__("GENERATION_READER_DRAIN_REQUIRED")
+        self.diagnostics = diagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -542,7 +550,19 @@ def _seal_modes(root: Path) -> None:
     root.chmod(0o500)
 
 
-def _proc_descriptors(root: Path) -> tuple[tuple[int, int], ...]:
+_DRAIN_DETAILS_LIMIT = 32
+
+
+@dataclass(frozen=True, slots=True)
+class _DescriptorObservation:
+    pid: int
+    fd: int
+    path: str
+
+
+def _proc_descriptors(
+    root: Path, *, observations: list[_DescriptorObservation] | None = None,
+) -> tuple[tuple[int, int], ...]:
     resolved = root.resolve()
     found: list[tuple[int, int]] = []
     proc = Path("/proc")
@@ -563,12 +583,85 @@ def _proc_descriptors(root: Path) -> tuple[tuple[int, int], ...]:
             continue
         for descriptor in entries:
             try:
-                target = Path(os.readlink(descriptor).removesuffix(" (deleted)"))
-                if target.is_absolute() and target.resolve().is_relative_to(resolved):
-                    found.append((int(process.name), int(descriptor.name)))
+                pid, fd = int(process.name), int(descriptor.name)
+                # Keep the same all-process scan. For our own entries use the
+                # explicit self alias, not a second scan after the denial.
+                link = Path("/proc/self/fd") / descriptor.name if pid == os.getpid() else descriptor
+                raw_target = os.readlink(link)
+                target = Path(raw_target.removesuffix(" (deleted)"))
+                if target.is_absolute():
+                    resolved_target = target.resolve()
+                    if resolved_target.is_relative_to(resolved):
+                        found.append((pid, fd))
+                        if observations is not None and len(observations) < _DRAIN_DETAILS_LIMIT:
+                            observations.append(_DescriptorObservation(pid, fd, raw_target))
             except (OSError, ValueError):
                 continue
     return tuple(sorted(found))
+
+
+def _reader_drain_error(
+    generation: Generation,
+    phase: str,
+    readers: tuple[tuple[str, int], ...],
+    descriptors: tuple[tuple[int, int], ...],
+    observations: list[_DescriptorObservation],
+    requests: RequestStore | None,
+) -> GenerationReaderDrainError:
+    # The pairs are the actual denial observations. Metadata is a best-effort
+    # later journal query, never a replacement decision or a proc re-scan.
+    metadata: dict[tuple[str, int], tuple[str, str | None]] = {}
+    metadata_status = "not-needed"
+    if readers and requests is not None:
+        try:
+            metadata = requests.reader_diagnostic_metadata(
+                generation.generation_id, limit=_DRAIN_DETAILS_LIMIT,
+            )
+            metadata_status = "queried-after-denial-observation"
+        except sqlite3.Error:
+            metadata_status = "unavailable-sqlite-error"
+    reader_details: list[JsonValue] = []
+    # Keep the complete denial observation, but bound enrichment and objects
+    # before serialization while retaining the existing lease-id order.
+    for lease_id, pid in readers[:_DRAIN_DETAILS_LIMIT]:
+        detail = metadata.get((lease_id, pid))
+        reader_details.append({
+            "lease_id": lease_id, "pid": pid,
+            "opened_at": None if detail is None else detail[0],
+            "process_identity": None if detail is None else detail[1],
+            "metadata_available": detail is not None,
+            "call_location": None,
+            "call_location_status": "not-recorded-by-lease-schema",
+        })
+    descriptor_details: list[JsonValue] = [{
+        "pid": item.pid, "fd": item.fd, "path": item.path,
+        "path_status": ("observed-at-decision" if item.pid == os.getpid()
+                        else "holder-namespace-observed-at-decision"),
+        "source": "/proc/self/fd" if item.pid == os.getpid() else "same-uid-proc-fd-scan",
+    } for item in sorted(observations, key=lambda item: (item.pid, item.fd))]
+    diagnostics: dict[str, JsonValue] = {
+        "code": "GENERATION_READER_DRAIN_REQUIRED",
+        "generation_id": generation.generation_id,
+        "phase": phase,
+        "readers_status": "not-checked" if phase == "obsolete-sealed" else "observed-at-decision",
+        "reader_metadata_status": metadata_status,
+        "readers": reader_details,
+        "readers_total": len(readers),
+        "readers_omitted": len(readers) - len(reader_details),
+        "descriptors": descriptor_details,
+        "descriptors_total": len(descriptors),
+        "descriptors_omitted": len(descriptors) - len(descriptor_details),
+    }
+    error = GenerationReaderDrainError(diagnostics)
+    # Sink, handler and filter failures must not mask the original denial.
+    # Process-control BaseExceptions intentionally still propagate.
+    with suppress(Exception):
+        # ASCII JSON escapes identifier/path newlines and non-NFC filenames;
+        # no content, environment,
+        # arbitrary locals or process cmdlines. Foreign paths are raw holder
+        # namespace text, not claims about paths in our namespace.
+        logging.getLogger(__name__).warning("%s", json.dumps(diagnostics, sort_keys=True, ensure_ascii=True))
+    return error
 
 
 @final
@@ -694,8 +787,12 @@ class GenerationStore:
             root = self.generations / generation_id
             if root.exists():
                 generation = self.generation(generation_id)
-                if _proc_descriptors(generation.root):
-                    raise GenerationError("GENERATION_READER_DRAIN_REQUIRED")
+                observations: list[_DescriptorObservation] = []
+                descriptors = _proc_descriptors(generation.root, observations=observations)
+                if descriptors:
+                    raise _reader_drain_error(
+                        generation, "obsolete-sealed", (), descriptors, observations, self.requests,
+                    )
                 retired = self.staging / hashlib.sha256(generation_id.encode()).hexdigest()
                 root.chmod(0o700)
                 os.replace(root, retired)
@@ -1168,9 +1265,12 @@ class GenerationStore:
         if self.requests is not None:
             _ = self.requests.prune_dead_readers(predecessor.generation_id)
         readers = () if self.requests is None else self.requests.readers(predecessor.generation_id)
-        descriptors = _proc_descriptors(predecessor.root)
+        observations: list[_DescriptorObservation] = []
+        descriptors = _proc_descriptors(predecessor.root, observations=observations)
         if readers or descriptors:
-            raise GenerationError("GENERATION_READER_DRAIN_REQUIRED")
+            raise _reader_drain_error(
+                predecessor, "predecessor-disposal", readers, descriptors, observations, self.requests,
+            )
         drain_digest = digest(
             "generation",
             {"generation_id": predecessor.generation_id, "readers": [], "fds": []},

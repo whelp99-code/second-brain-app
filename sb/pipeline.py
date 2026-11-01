@@ -36,6 +36,7 @@ from sb.life_json import LifePayload, decode_json
 from sb.llm import LLMClient, LLMUnavailable
 from sb.page_ids import git_rel
 from sb.parsers import DocumentParseResult
+from sb.source_coverage import checkpoint_for_receipt
 from sb.store import (
     DerivationOutput,
     DerivStatus,
@@ -65,6 +66,7 @@ _RETRYABLE_READ_FAILURES: Final = frozenset(
         "database-limit",
         "unstable-session-file",
         "unreadable-session-file",
+        "incomplete-session-file",
     }
 )
 
@@ -491,8 +493,8 @@ def _scan_receipt_row(
         started_at=stamp,
         finished_at=stamp,
         state=state,
-        checkpoint_before=checkpoint_before,
-        checkpoint_after=checkpoint_after,
+        checkpoint_before=checkpoint_for_receipt(checkpoint_before),
+        checkpoint_after=checkpoint_for_receipt(checkpoint_after),
         scanned=scanned,
         accepted=accepted,
         unchanged=unchanged,
@@ -831,13 +833,21 @@ def _prepare_adapter_ingest(
     provenance: list[UnitProvenance] = []
     version_keys: list[tuple[str, str, str]] = []
     accepted: set[tuple[str, str, str]] = set()
+    legacy_content: set[tuple[str, str]] | None = None
     allocated_units: set[str] = set()
     failure: str | None = None
     errors = attempted = written = 0
     unchanged = filtered = quarantined = deferred = retryable = permanent = 0
     capped = adapter_failed = False
+    source_unavailable = False
     stamp = format_instant(datetime.now(UTC))
     for ref, data, meta in items:
+        if meta.get("skip_reason") == "source-unavailable":
+            errors += 1
+            attempted += 1
+            adapter_failed = source_unavailable = True
+            failure = failure or f"SOURCE_UNAVAILABLE: {adapter.source_id}"
+            break
         # A source configuration hold is not a deduplicated/quarantined item.
         # Recheck it on every run, even if older versions recorded a skip row.
         if meta.get("skip_reason") == "ambiguous-session-roots":
@@ -863,6 +873,18 @@ def _prepare_adapter_ingest(
         if version_key in seen or version_key in accepted:
             unchanged += 1
             continue
+        if ref.source_version.startswith("content-sha256:"):
+            content_digest = hashlib.sha256(data).hexdigest()
+            if ref.source_version == "content-sha256:" + content_digest:
+                if legacy_content is None:
+                    legacy_content = {
+                        (row.source_uri, row.content_hash)
+                        for row in ledger.list_source_items()
+                        if row.source_id == adapter.source_id and row.source_version.isdecimal()
+                    }
+                if (ref.source_uri, content_digest) in legacy_content:
+                    unchanged += 1
+                    continue
         if attempted >= remaining:
             capped = True
             deferred += 1
@@ -882,7 +904,10 @@ def _prepare_adapter_ingest(
             )
             version_keys.append(version_key)
             accepted.add(version_key)
-            filtered += 1
+            if meta.get("skip_reason") in {"malformed-json", "malformed-document"}:
+                quarantined += 1
+            else:
+                filtered += 1
             continue
         digest = hashlib.sha256(data).hexdigest()
         try:
@@ -957,7 +982,9 @@ def _prepare_adapter_ingest(
         allocated_units.update(unit.unit_id for unit in new_units)
         version_keys.append(version_key)
         accepted.add(version_key)
-        if units or not data:
+        if parsed is None:
+            quarantined += 1
+        elif units or not data:
             written += 1
     advance = not capped and not adapter_failed and (version_keys or attempted == 0)
     cursor: tuple[str, str] | None = None
@@ -966,7 +993,9 @@ def _prepare_adapter_ingest(
         cursor = (adapter.next_cursor(), datetime.now(UTC).isoformat())
     accepted_count = written
     scanned = accepted_count + unchanged + filtered + quarantined + deferred + retryable + permanent
-    state = "ok" if advance else "partial"
+    state = "unavailable" if source_unavailable else (
+        "ok" if advance else "partial"
+    )
     receipt = _scan_receipt_row(
         run_id,
         adapter.source_id,
@@ -1016,6 +1045,15 @@ def _note_source_unavailable(
                 ),
             )
         )
+        checkpoint = ledger.get_cursor(source_id)
+        canonical = checkpoint_for_receipt(checkpoint)
+        if canonical is not None and canonical != checkpoint:
+            ledger.set_cursor(source_id, canonical, format_instant(datetime.now(UTC)))
+        receipt = _scan_receipt_row(
+            run_id, source_id, format_instant(datetime.now(UTC)), "unavailable",
+            checkpoint, checkpoint, 0, 0, 0, 0, 0, 0, 0, 0,
+        )
+        ledger.insert_scan_receipt(receipt)
     _append_run_log(root, f"SOURCE_UNAVAILABLE: {source_id}: {code}")
 
 
@@ -1127,6 +1165,10 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
                     position, updated_at = prepared.cursor
                     ledger.set_cursor(adapter.source_id, position, updated_at)
                 if prepared.receipt is not None:
+                    checkpoint = ledger.get_cursor(adapter.source_id)
+                    canonical = checkpoint_for_receipt(checkpoint)
+                    if canonical is not None and canonical != checkpoint:
+                        ledger.set_cursor(adapter.source_id, canonical, format_instant(datetime.now(UTC)))
                     ledger.insert_scan_receipt(prepared.receipt)
             if isinstance(adapter, AcknowledgingSourceAdapter):
                 try:

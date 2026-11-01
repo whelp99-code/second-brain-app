@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import sqlite3
 from contextlib import closing
@@ -177,11 +178,15 @@ def test_managed_backup_keeps_provider_origin(configured: Config, tmp_path: Path
         observed_lock: list[bool] = []
 
         def check_lock(archive_path: Path, destination: Path) -> ops_module.RestoreResult:
-            with (
-                closing(sqlite3.connect(Path(config.request_root) / "journal.db", timeout=0)) as contender,
-                pytest.raises(sqlite3.OperationalError, match="locked"),
-            ):
+            with closing(sqlite3.connect(Path(config.request_root) / "journal.db", timeout=0)) as contender:
                 _ = contender.execute("BEGIN IMMEDIATE")
+                contender.rollback()
+            descriptor = os.open(Path(config.state_root) / "generation-writer.lock", os.O_RDWR)
+            try:
+                with pytest.raises(BlockingIOError):
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                os.close(descriptor)
             observed_lock.append(True)
             return original_restore(archive_path, destination)
 

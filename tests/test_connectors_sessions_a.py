@@ -418,8 +418,9 @@ def test_absent_root_is_skipped_without_raise(tmp_path: Path) -> None:
     scans = [list(adapter.scan(None)) for adapter in adapters]
 
     # Then: no raise; each scan reports a typed skip.
-    for items in scans:
-        assert "absent-root" in _skipped(items)
+    for adapter, items in zip(adapters, scans, strict=True):
+        reason = "absent-root" if adapter.source_id == "opencode" else "source-unavailable"
+        assert reason in _skipped(items)
         assert _delivered(items) == []
 
 

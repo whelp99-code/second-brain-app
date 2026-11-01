@@ -2,15 +2,20 @@
 
 from datetime import timedelta
 
+from sb.config import TomlValue
+from sb.effect_values import JsonObject, JsonValue
 from sb.life_attachments import inline
 from sb.pipeline import run_life_batch, run_life_maintenance
 from sb.store.ledger import Ledger
+from tests.life_test_support import config_table, json_int, json_object
 from tests.test_life_contracts import NOW, payload, policy
 from tests.test_life_pipeline import item, life_config
 
 
-def _attach(body: str, name: str, blob: bytes):
-    return payload(source_item_id=name, body=body, attachments=[inline(name + ".txt", "text/plain", blob)])
+def _attach(body: str, name: str, blob: bytes) -> JsonObject:
+    attachment = json_object(inline(name + ".txt", "text/plain", blob))
+    attachments: list[JsonValue] = [attachment]
+    return payload(source_item_id=name, body=body, attachments=attachments)
 
 
 def test_forget_last_reference_tombstones_raw_and_attachments(tmp_path):
@@ -59,15 +64,13 @@ def test_legacy_source_item_reference_blocks_tombstone(tmp_path):
 
 def test_maintenance_reports_physical_erasure_counts(tmp_path):
     config, root = life_config(tmp_path)
-    config = type(config)(
-        raw={
-            **config.raw,
-            "life": {
-                **config.raw["life"],
-                "sources": {"test-notes": {"enabled": True, "retention_days": 1}},
-            },
-        }
-    )
+    life = {key: value for key, value in config_table(config.raw["life"]).items()}
+    note: dict[str, TomlValue] = {"enabled": True, "retention_days": 1}
+    sources: dict[str, TomlValue] = {"test-notes": note}
+    life["sources"] = sources
+    raw: dict[str, TomlValue] = {key: value for key, value in config.raw.items()}
+    raw["life"] = life
+    config = type(config)(raw=raw)
     before = NOW - timedelta(days=3)
     outcome, receipts = run_life_batch(
         config, "test-notes", [item(body="만료된원본")], now=before
@@ -84,7 +87,7 @@ def test_maintenance_reports_physical_erasure_counts(tmp_path):
     )
     assert result.exit_code == 0, result
     assert state["expired_events"] == 1
-    assert state["physical_erasure_tombstoned"] >= 1
+    assert json_int(state["physical_erasure_tombstoned"]) >= 1
     assert state["physical_erasure_retained_shared"] == 0
     assert state["shared_raw_physically_erased"] is False
     with Ledger(root) as ledger:

@@ -65,7 +65,9 @@ def test_published_after_commit_searchable_after_index_only(tmp_path: Path, monk
     assert receipt.state == "accepted_pending"
     monkeypatch.setattr("sb.connectors.discover_adapters", lambda _config: {"fixture": _Adapter(payload)})
     assert run_ingest(config, ("docs",)).exit_code == 0
-    assert read(root, receipt.receipt_id).state == "accepted_pending"
+    pending = read(root, receipt.receipt_id)
+    assert pending is not None
+    assert pending.state == "accepted_pending"
 
     seen: dict[str, str] = {}
     real = SearchIndex.project

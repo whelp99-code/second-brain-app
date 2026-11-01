@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from sb.config import Config
-from sb.effect_values import canonical_bytes
+from sb.effect_values import JsonObject, JsonValue, canonical_bytes, is_json_object
 from sb.observation_admission import (
     STATES,
     AdmissionError,
@@ -19,6 +19,7 @@ from sb.observation_admission import (
     read_body,
 )
 from sb.personal_observation import TrustedSourceManifest
+from tests.json_fixtures import parse_object
 
 MANIFEST = {
     "emitter": "mail-fixture",
@@ -33,17 +34,19 @@ COMMIT = "a" * 40
 GENERATION = "sbgen:v1:" + ("b" * 64)
 
 
-def _observation(**overrides: object) -> dict[str, object]:
-    raw = json.loads(
-        (Path(__file__).parent / "fixtures" / "personal-observation" / "mail.json").read_text()
+def _observation(**overrides: JsonValue) -> JsonObject:
+    raw = parse_object(
+        (Path(__file__).parent / "fixtures" / "personal-observation" / "mail.json").read_bytes()
     )
-    body = dict(raw["observation"])
+    observation = raw["observation"]
+    assert is_json_object(observation)
+    body = dict(observation)
     body["evidence_spans"] = []
     body.update(overrides)
     return body
 
 
-def _payload(**overrides: object) -> bytes:
+def _payload(**overrides: JsonValue) -> bytes:
     return canonical_bytes(_observation(**overrides))
 
 

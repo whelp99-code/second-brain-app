@@ -6,9 +6,12 @@ import os
 import socket
 import subprocess
 import sys
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -54,9 +57,13 @@ def executor_config(tmp_path: Path) -> ExecutorConfig:
 def provider_fixture(tmp_path: Path) -> ProviderProcessFixture:
     config_values = executor_config(tmp_path)
     private_key = base64.urlsafe_b64encode(bytes(range(32))).rstrip(b"=").decode("ascii")
-    public_key = base64.urlsafe_b64encode(
-        config_values.jarvis_public_keys["jarvis:fixture"].public_bytes_raw()
-    ).rstrip(b"=").decode("ascii")
+    public_key = (
+        base64.urlsafe_b64encode(
+            config_values.jarvis_public_keys["jarvis:fixture"].public_bytes_raw()
+        )
+        .rstrip(b"=")
+        .decode("ascii")
+    )
     config = tmp_path / "config.toml"
     _ = config.write_text(
         "\n".join(
@@ -151,7 +158,9 @@ def spawn(fixture: ProviderProcessFixture, control: Path | None) -> subprocess.P
     if control is not None:
         argv.extend(("--test-control-socket", str(control)))
     env = {**os.environ, "SB_CONFIG": str(fixture.config)}
-    return subprocess.Popen(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    return subprocess.Popen(
+        argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+    )
 
 
 def spawn_publication(
@@ -169,19 +178,22 @@ def spawn_publication(
     return subprocess.Popen(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def listener(tmp_path: Path) -> tuple[socket.socket, Path, str]:
-    tmp_path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    control = tmp_path / "control.sock"
-    token = "barrier-token-" + tmp_path.name
-    token_path = control.with_suffix(".token")
-    _ = token_path.write_text(token, encoding="ascii")
-    token_path.chmod(0o600)
-    owner = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    owner.bind(str(control))
-    control.chmod(0o600)
-    owner.listen(1)
-    owner.settimeout(20)
-    return owner, control, token
+@contextmanager
+def listener(tmp_path: Path) -> Generator[tuple[socket.socket, Path, str], None, None]:
+    with (
+        TemporaryDirectory(prefix="sb-t30-", dir="/tmp") as directory,
+        socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as owner,
+    ):
+        control = Path(directory) / "control.sock"
+        token = "barrier-token-" + tmp_path.name
+        token_path = control.with_suffix(".token")
+        _ = token_path.write_text(token, encoding="ascii")
+        token_path.chmod(0o600)
+        owner.bind(str(control))
+        control.chmod(0o600)
+        owner.listen(1)
+        owner.settimeout(20)
+        yield owner, control, token
 
 
 def subscribe(

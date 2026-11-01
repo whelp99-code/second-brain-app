@@ -6,7 +6,7 @@ import json
 import sqlite3
 import subprocess
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -80,7 +80,7 @@ def _parse_page(row: bytes) -> tuple[str, str] | None:
     return name[:-3], blob
 
 
-def _stream_pages(generation: GenerationSnapshot) -> Iterator[tuple[str, str]]:
+def _stream_pages(generation: GenerationSnapshot) -> Generator[tuple[str, str], None, None]:
     """Yield (page_id, blob) in git path order without retaining the tree."""
     proc = subprocess.Popen(
         ["git", "-C", str(generation.root), "ls-tree", "-rz", generation.head,
