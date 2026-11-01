@@ -114,6 +114,48 @@ def test_mapping_without_open_fd_is_still_reported(tmp_path: Path) -> None:
         assert libc.munmap(address, 4096) == 0
 
 
+def _assert_closed_fd_mapping_is_reported(database: Path) -> None:
+    import ctypes
+
+    _ = database.write_bytes(bytes(4096))
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int,
+                          ctypes.c_int, ctypes.c_int, ctypes.c_long]
+    libc.mmap.restype = ctypes.c_void_p
+    libc.munmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+    libc.munmap.restype = ctypes.c_int
+    descriptor = os.open(database, os.O_RDONLY)
+    try:
+        address = TypeAdapter[int | None](int | None).validate_python(
+            libc.mmap(None, 4096, 1, 2, descriptor, 0), strict=True,
+        )
+        assert address != ctypes.c_void_p(-1).value
+    finally:
+        os.close(descriptor)
+    try:
+        result = subprocess.run([sys.executable, str(SCRIPT), str(database)],
+                                capture_output=True, text=True, timeout=20, check=False)
+        report = TypeAdapter(DatabaseReport).validate_json(result.stdout, strict=True)
+        assert not report['open_handles']
+        assert any(row['pid'] == os.getpid() for row in report['mapped_files'])
+        assert result.returncode == (2 if report['unreadable_pids'] else 1)
+    finally:
+        assert libc.munmap(address, 4096) == 0
+
+
+@pytest.mark.parametrize('parent', [Path('/tmp'), Path('/home/jm')])
+def test_closed_fd_mapping_is_reported_on_tmp_and_home(parent: Path) -> None:
+    if not os.access(parent, os.W_OK):
+        pytest.skip(f'{parent} is not writable')
+    root = parent / f'sbmap{os.getpid()}'
+    root.mkdir()
+    try:
+        _assert_closed_fd_mapping_is_reported(root / 'mapped.sqlite')
+    finally:
+        for child in root.iterdir():
+            child.unlink()
+        root.rmdir()
+
 @pytest.mark.parametrize('change', ['replace', 'remove', 'sidecar'])
 def test_file_identity_change_during_scan_is_incomplete(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: str) -> None:
     inspect = audit_api().inspect

@@ -239,14 +239,23 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
     final = f"{request.request_id}.json"
     temporary = f".{request.request_id}.{os.getpid()}.{secrets.token_hex(16)}.tmp"
     fd: int | None = None
+    listing: int | None = None
     try:
         fcntl.flock(directory, fcntl.LOCK_EX)
-        replay = _scan_pending(directory, request)
+        # The lock fd was opened before the lock. On btrfs its directory cache
+        # can miss files another process published while it waited.
+        listing = os.open(
+            root / "inbox" / ".requests" / "pending",
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+        )
+        if not _same(os.fstat(directory), os.fstat(listing)):
+            reject("WRITE_REQUEST_INBOX_UNSAFE")
+        replay = _scan_pending(listing, request)
         if replay is not None:
             return replay
         try:
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
-            fd = os.open(temporary, flags, 0o600, dir_fd=directory)
+            fd = os.open(temporary, flags, 0o600, dir_fd=listing)
             written = 0
             while written < len(payload):
                 count = os.write(fd, payload[written:])
@@ -260,24 +269,29 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
             os.link(
                 temporary,
                 final,
-                src_dir_fd=directory,
-                dst_dir_fd=directory,
+                src_dir_fd=listing,
+                dst_dir_fd=listing,
                 follow_symlinks=False,
             )
             after_link = os.fstat(fd)
-            final_metadata = os.stat(final, dir_fd=directory, follow_symlinks=False)
+            final_metadata = os.stat(final, dir_fd=listing, follow_symlinks=False)
             if not _same(before_link, after_link) or not _same(after_link, final_metadata):
                 reject("WRITE_REQUEST_INBOX_UNSAFE")
             if not _safe_file(after_link, links=2) or not _safe_file(final_metadata, links=2):
                 reject("WRITE_REQUEST_INBOX_UNSAFE")
         except FileExistsError:
-            replay = _scan_pending(directory, request)
+            os.close(listing)
+            listing = os.open(
+                root / "inbox" / ".requests" / "pending",
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            )
+            replay = _scan_pending(listing, request)
             if replay is None:
                 reject("WRITE_REQUEST_INBOX_UNSAFE")
             return replay
-        os.fsync(directory)
-        os.unlink(temporary, dir_fd=directory)
-        os.fsync(directory)
+        os.fsync(listing)
+        os.unlink(temporary, dir_fd=listing)
+        os.fsync(listing)
         return _result(request, accepted, request_file_digest, False)
     except WriteRequestRejected:
         raise
@@ -286,10 +300,17 @@ def accept_write_request(root: Path, value: JsonValue, now: datetime) -> MemoryW
     finally:
         if fd is not None:
             os.close(fd)
-        try:
-            os.unlink(temporary, dir_fd=directory)
-        except FileNotFoundError:
-            temporary = ""
+        if listing is not None:
+            try:
+                os.unlink(temporary, dir_fd=listing)
+            except FileNotFoundError:
+                temporary = ""
+            os.close(listing)
+        elif directory >= 0:
+            try:
+                os.unlink(temporary, dir_fd=directory)
+            except FileNotFoundError:
+                temporary = ""
         os.close(directory)
 
 
