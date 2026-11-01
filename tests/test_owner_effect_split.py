@@ -22,6 +22,7 @@ from tests.test_web import request, running
 from tests.test_web_effect_recovery import payload_for
 from tests.test_web_lifecycle import URL, ready
 
+
 def _commit(root: Path, *args: str) -> None:
     _ = subprocess.run(
         [

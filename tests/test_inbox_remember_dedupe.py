@@ -1,5 +1,5 @@
-from threading import Barrier, Thread
 from pathlib import Path
+from threading import Barrier, Thread
 
 from sb.inbox import write_inbox
 

@@ -4,10 +4,10 @@ from pathlib import Path
 
 from sb.compile_sources import page_id_for_origin
 from sb.config import Config
+from sb.contracts import PageSpec, SourceCite
 from sb.pipeline import run_compile, run_ingest
 from sb.search import SearchHit, SearchIndex, _prefer_first_ingested, committed_text
 from sb.store import parse_page_frontmatter
-from sb.contracts import PageSpec, SourceCite
 from sb.vault import Vault, init_vault
 from tests.vault_test_support import MemoryLedger
 
