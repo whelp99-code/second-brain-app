@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import socket
 import threading
 import urllib.error
 import urllib.parse
@@ -35,8 +36,8 @@ from tests.knowledge import stamp_knowledge
 
 classified = test_memory_access.classified
 TERM = "웹콘솔계약검색"
-# Upper bound for one loopback HTTP exchange. A ceiling, not a sleep: passing runs
-# return at once, while a loaded CI host no longer times out a healthy server.
+# Hang ceiling for one loopback exchange or the accept-loop ready signal.
+# Not a startup wait: a passing run returns as soon as the server signals.
 HTTP_TIMEOUT = 30
 
 
@@ -179,18 +180,51 @@ def _ready(tmp_path: Path) -> tuple[Config, Path]:
     return config, root
 
 
+def _listening_endpoint(server: SecondBrainHTTPServer) -> tuple[str, int]:
+    bound = server.socket.getsockname()
+    if not isinstance(bound, tuple) or len(bound) < 2:
+        raise RuntimeError("WEB_SERVER_NOT_BOUND")
+    host, port = bound[0], bound[1]
+    if not isinstance(host, str) or not isinstance(port, int) or port <= 0:
+        raise RuntimeError("WEB_SERVER_NOT_BOUND")
+    if not server.socket.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN):
+        raise RuntimeError("WEB_SERVER_NOT_LISTENING")
+    return host, port
+
+
+def _serve_until_accept_loop(server: SecondBrainHTTPServer, ready: threading.Event) -> None:
+    original = server.service_actions
+
+    def mark_ready() -> None:
+        ready.set()
+        original()
+
+    server.service_actions = mark_ready  # type: ignore[method-assign]
+    server.serve_forever()
+
+
 @contextmanager
 def running(config: Config, host: str = "127.0.0.1") -> Generator[str, None, None]:
     server: SecondBrainHTTPServer = build_server(config, host, 0)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    address = cast(tuple[str, int], server.server_address)
+    thread: threading.Thread | None = None
     try:
-        yield f"http://{address[0]}:{address[1]}"
+        bound_host, port = _listening_endpoint(server)
+        ready = threading.Event()
+        thread = threading.Thread(
+            target=_serve_until_accept_loop, args=(server, ready), daemon=True
+        )
+        thread.start()
+        with socket.create_connection((bound_host, port), timeout=HTTP_TIMEOUT):
+            pass
+        if not ready.wait(HTTP_TIMEOUT):
+            raise RuntimeError("WEB_SERVER_NOT_READY")
+        _ = _listening_endpoint(server)
+        yield f"http://{bound_host}:{port}"
     finally:
         server.shutdown()
         server.server_close()
-        thread.join(timeout=HTTP_TIMEOUT)
+        if thread is not None:
+            thread.join(timeout=HTTP_TIMEOUT)
 
 
 def request(
