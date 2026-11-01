@@ -18,6 +18,28 @@ def test_different_body_creates_a_second_card(tmp_path: Path) -> None:
     cards = list((tmp_path / "inbox").glob("*.md"))
     assert second != first
     assert len(cards) == 2
+def test_same_source_file_id_returns_the_existing_card(tmp_path: Path) -> None:
+    first = write_inbox(tmp_path, "본문 하나\nsource_file_id: 1AbCdEfGhIj\n", "첫 제목")
+    second = write_inbox(tmp_path, "다른 본문\nsource_file_id: 1AbCdEfGhIj\n", "다른 제목")
+    cards = list((tmp_path / "inbox").glob("*.md"))
+    assert second == first
+    assert len(cards) == 1
+
+
+def test_different_source_file_id_creates_a_new_card(tmp_path: Path) -> None:
+    first = write_inbox(tmp_path, "본문 하나\nsource_file_id: 1AbCdEfGhIj\n", "같은 제목")
+    second = write_inbox(tmp_path, "다른 본문\nsource_file_id: 2ZyXwVuTsRq\n", "같은 제목")
+    cards = list((tmp_path / "inbox").glob("*.md"))
+    assert second != first
+    assert len(cards) == 2
+
+
+def test_missing_source_file_id_keeps_the_body_hash_rule(tmp_path: Path) -> None:
+    first = write_inbox(tmp_path, "같은 본문", "같은 제목")
+    second = write_inbox(tmp_path, "다른 본문", "같은 제목")
+    cards = list((tmp_path / "inbox").glob("*.md"))
+    assert second != first
+    assert len(cards) == 2
 
 def test_concurrent_same_remember_creates_one_card(tmp_path: Path) -> None:
     barrier = Barrier(2)
@@ -77,3 +99,57 @@ def test_after_scan_different_body_creates_a_new_card(tmp_path: Path) -> None:
     titled = write_inbox(root, "같은 원문", "다른 제목")
     assert titled != second
     assert (root / titled).is_file()
+
+def test_after_compile_same_file_id_returns_the_existing_card(tmp_path: Path) -> None:
+    from sb.config import Config
+    from sb.pipeline import run_compile, run_ingest
+    from sb.vault import init_vault
+
+    root = init_vault(tmp_path / "vault").root
+    config = Config(raw={
+        "vault_root": str(root),
+        "sources": [{"id": "inbox", "adapter": "inbox-documents", "llm_policy": "deny"}],
+        "llm": {"prompt_version": "v1", "model_id": "fake"},
+    })
+    _ = write_inbox(root, "본문 하나\nsource_file_id: 1AbCdEfGhIj\n", "첫 제목")
+    assert run_ingest(config, ("inbox",)).exit_code == 0
+    assert run_compile(config, llm_mode="fake").exit_code == 0
+    assert list((root / "inbox").glob("*.md")) == []
+    second = write_inbox(root, "다른 본문\nsource_file_id: 1AbCdEfGhIj\n", "다른 제목")
+    assert second.parts[0] == "wiki"
+    assert (root / second).is_file()
+    assert list((root / "inbox").glob("*.md")) == []
+
+
+def test_missing_original_does_not_block_a_different_body(tmp_path: Path) -> None:
+    import sqlite3
+
+    from sb.config import Config
+    from sb.pipeline import run_compile, run_ingest
+    from sb.vault import init_vault
+
+    root = init_vault(tmp_path / "vault").root
+    config = Config(raw={
+        "vault_root": str(root),
+        "sources": [{"id": "inbox", "adapter": "inbox-documents", "llm_policy": "deny"}],
+        "llm": {"prompt_version": "v1", "model_id": "fake"},
+    })
+    _ = write_inbox(root, "본문 하나\nsource_file_id: 1AbCdEfGhIj\n", "첫 제목")
+    assert run_ingest(config, ("inbox",)).exit_code == 0
+    assert run_compile(config, llm_mode="fake").exit_code == 0
+    ledger = root / ".sb" / "ledger.db"
+    connection = sqlite3.connect(f"{ledger.resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        row = connection.execute(
+            "SELECT content_hash FROM source_item WHERE source_id='inbox'"
+        ).fetchone()
+    finally:
+        connection.close()
+    assert row is not None
+    digest = row[0]
+    blob = root / "raw" / digest[:2] / digest
+    blob.chmod(0o644)
+    blob.unlink()
+    second = write_inbox(root, "다른 본문\nsource_file_id: 1AbCdEfGhIj\n", "다른 제목")
+    assert second.parts[0] == "inbox"
+    assert (root / second).is_file()

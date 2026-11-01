@@ -16,6 +16,7 @@ from typing import Final, override
 
 MAX_REMEMBER_BYTES: Final = 1024 * 1024
 _SLUG_RE: Final = re.compile(r"[^0-9A-Za-z가-힣]+")
+_FILE_ID_RE: Final = re.compile(r"(?im)^(?:source_file_id|file_id|drive_file_id):\s*([A-Za-z0-9_-]{8,128})\s*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,7 @@ def parse_remember(content: str, title: str | None) -> ParsedRemember:
 
 
 def publish_inbox(root: Path, note: ParsedRemember) -> Path:
-    """Publish one parsed note. Same slug and body hash returns the existing card."""
+    """Publish one parsed note. Same slug and body hash, or the same source file id, returns the existing card."""
     data = note.data
     vault = root.resolve()
     inbox = (root / "inbox").resolve()
@@ -56,9 +57,15 @@ def publish_inbox(root: Path, note: ParsedRemember) -> Path:
         existing = _existing_card(inbox, note)
         if existing is not None:
             return existing.relative_to(vault)
+        existing_file = _existing_source_file(inbox, note)
+        if existing_file is not None:
+            return existing_file.relative_to(vault)
         ingested = _ingested_card(vault, note)
         if ingested is not None:
             return ingested.relative_to(vault)
+        ingested_file = _ingested_source_file(vault, note)
+        if ingested_file is not None:
+            return ingested_file.relative_to(vault)
         slug = _slug(note.title)
         stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%S%f")
         dest = inbox / f"{stamp}-{slug}.md"
@@ -166,6 +173,107 @@ def _existing_card(inbox: Path, note: ParsedRemember) -> Path | None:
     if not matches:
         return None
     return min(matches, key=lambda path: path.name)
+def _source_file_id(data: bytes) -> str | None:
+    try:
+        text = data.decode("utf-8")
+    except UnicodeError:
+        return None
+    match = _FILE_ID_RE.search(text)
+    return None if match is None else match.group(1)
+
+
+def _file_has_source_id(path: Path, file_id: str) -> bool:
+    try:
+        body = path.read_bytes()
+    except OSError:
+        return False
+    return _source_file_id(body) == file_id
+
+
+def _existing_source_file(inbox: Path, note: ParsedRemember) -> Path | None:
+    file_id = _source_file_id(note.data)
+    if file_id is None:
+        return None
+    matches = [
+        path for path in inbox.iterdir()
+        if path.is_file() and not path.is_symlink() and _file_has_source_id(path, file_id)
+    ]
+    if not matches:
+        return None
+    return min(matches, key=lambda path: path.name)
+
+
+def _ingested_source_file(vault: Path, note: ParsedRemember) -> Path | None:
+    file_id = _source_file_id(note.data)
+    if file_id is None:
+        return None
+    found = _matching_source_file(vault, file_id)
+    if found is None:
+        return None
+    source_id, source_uri = found
+    from sb.compile_sources import page_id_for_origin
+
+    page = vault / "wiki" / f"{page_id_for_origin(f'{source_id}:{source_uri}')}.md"
+    if page.is_file() and not page.is_symlink() and page.resolve().is_relative_to(vault):
+        return page
+    done = (vault / "inbox" / ".done" / Path(source_uri).name).resolve()
+    done_root = (vault / "inbox" / ".done").resolve()
+    if done.is_relative_to(done_root) and not done.is_symlink() and done.is_file():
+        return done
+    return None
+
+
+def _cas_original(vault: Path, digest: str) -> bytes | None:
+    if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        return None
+    path = vault / "raw" / digest[:2] / digest
+    marker = path.with_name(f"{digest}.tombstone")
+    try:
+        if marker.is_file() or path.is_symlink() or not path.is_file():
+            return None
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def _matching_source_file(vault: Path, file_id: str) -> tuple[str, str] | None:
+    """Find an ingested inbox card by the file id stored in its CAS original.
+
+    A missing original is skipped. Any lookup error returns no match so remember
+    keeps the body-hash check instead of blocking the write.
+    """
+    ledger = vault / ".sb" / "ledger.db"
+    if not ledger.is_file():
+        return None
+    try:
+        connection = sqlite3.connect(f"{ledger.resolve().as_uri()}?mode=ro", uri=True)
+        try:
+            rows = connection.execute(
+                "SELECT source_id, source_uri, content_hash FROM source_item WHERE source_id=?",
+                ("inbox",),
+            ).fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return None
+    matches: list[tuple[str, str]] = []
+    try:
+        for source_id, source_uri, content_hash in rows:
+            if (
+                not isinstance(source_id, str)
+                or not isinstance(source_uri, str)
+                or not isinstance(content_hash, str)
+            ):
+                continue
+            original = _cas_original(vault, content_hash)
+            if original is None or _source_file_id(original) != file_id:
+                continue
+            matches.append((source_id, source_uri))
+    except (OSError, UnicodeError, sqlite3.Error):
+        return None
+    if not matches:
+        return None
+    return min(matches, key=lambda item: item[1])
 
 
 def _ingested_card(vault: Path, note: ParsedRemember) -> Path | None:
