@@ -18,6 +18,28 @@ def test_different_body_creates_a_second_card(tmp_path: Path) -> None:
     cards = list((tmp_path / "inbox").glob("*.md"))
     assert second != first
     assert len(cards) == 2
+def test_same_source_file_id_returns_the_existing_card(tmp_path: Path) -> None:
+    first = write_inbox(tmp_path, "본문 하나\nsource_file_id: 1AbCdEfGhIj\n", "첫 제목")
+    second = write_inbox(tmp_path, "다른 본문\nsource_file_id: 1AbCdEfGhIj\n", "다른 제목")
+    cards = list((tmp_path / "inbox").glob("*.md"))
+    assert second == first
+    assert len(cards) == 1
+
+
+def test_different_source_file_id_creates_a_new_card(tmp_path: Path) -> None:
+    first = write_inbox(tmp_path, "본문 하나\nsource_file_id: 1AbCdEfGhIj\n", "같은 제목")
+    second = write_inbox(tmp_path, "다른 본문\nsource_file_id: 2ZyXwVuTsRq\n", "같은 제목")
+    cards = list((tmp_path / "inbox").glob("*.md"))
+    assert second != first
+    assert len(cards) == 2
+
+
+def test_missing_source_file_id_keeps_the_body_hash_rule(tmp_path: Path) -> None:
+    first = write_inbox(tmp_path, "같은 본문", "같은 제목")
+    second = write_inbox(tmp_path, "다른 본문", "같은 제목")
+    cards = list((tmp_path / "inbox").glob("*.md"))
+    assert second != first
+    assert len(cards) == 2
 
 def test_concurrent_same_remember_creates_one_card(tmp_path: Path) -> None:
     barrier = Barrier(2)
