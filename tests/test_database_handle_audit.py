@@ -186,99 +186,76 @@ def _mountinfo_bytes(lines: str) -> bytes:
     return lines.encode()
 
 
-def _maps_with_other_device(database: Path, metadata: os.stat_result, minor: int) -> bytes:
-    assert metadata.st_dev != os.makedev(0, minor)
-    return (
-        f"7f0000000000-7f0000001000 r--p 00000000 00:{minor:x} {metadata.st_ino} {database}\n"
-    ).encode()
+def test_mapping_device_uses_longest_covering_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    database = tmp_path / "space here" / "mapped.sqlite"
+    database.parent.mkdir()
+    _ = database.write_bytes(bytes(4096))
+    metadata = database.stat()
+    original = Path.read_bytes
+    escaped = str(database.parent).replace(" ", r"\040")
 
-
-def _read_bytes_with_maps(original, maps_path: Path, maps: bytes, mountinfo: bytes | None = None):
-    def read_bytes(path: Path) -> bytes:
-        if mountinfo is not None and path == Path("/proc/self/mountinfo"):
-            return mountinfo
-        if path == maps_path:
-            return maps
+    def mountinfo(path: Path) -> bytes:
+        if path == Path("/proc/self/mountinfo"):
+            return _mountinfo_bytes(
+                f"1 0 0:35 / / rw - btrfs none rw\n2 1 0:36 / {escaped} rw - btrfs none rw\n"
+            )
         return original(path)
 
-    return read_bytes
+    monkeypatch.setattr(Path, "read_bytes", mountinfo)
+    audit = audit_api()
+    assert audit.file_identities([database]) == {(metadata.st_dev, metadata.st_ino): database.name}
+    assert audit.file_identities([database], mapped=True) == {
+        (os.makedev(0, 36), metadata.st_ino): database.name
+    }
 
 
-def test_same_path_and_inode_matches_when_map_device_differs(
+def test_equal_mount_point_uses_later_mount_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     database = tmp_path / "space here" / "mapped.sqlite"
     database.parent.mkdir()
     _ = database.write_bytes(bytes(4096))
     metadata = database.stat()
-    maps_path = Path("/proc") / str(os.getpid()) / "maps"
+    original = Path.read_bytes
     escaped = str(database.parent).replace(" ", r"\040")
-    monkeypatch.setattr(
-        Path,
-        "read_bytes",
-        _read_bytes_with_maps(
-            Path.read_bytes,
-            maps_path,
-            _maps_with_other_device(database, metadata, 0x63),
-            _mountinfo_bytes(
-                f"1 0 0:35 / / rw - btrfs none rw\n2 1 0:36 / {escaped} rw - btrfs none rw\n"
-            ),
-        ),
-    )
-    report = audit_api().inspect(database)
-    assert any(row["pid"] == os.getpid() and row["file"] == database.name for row in report["mapped_files"])
 
-
-def test_later_mount_device_does_not_split_same_path_and_inode(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    database = tmp_path / "space here" / "mapped.sqlite"
-    database.parent.mkdir()
-    _ = database.write_bytes(bytes(4096))
-    metadata = database.stat()
-    maps_path = Path("/proc") / str(os.getpid()) / "maps"
-    escaped = str(database.parent).replace(" ", r"\040")
-    monkeypatch.setattr(
-        Path,
-        "read_bytes",
-        _read_bytes_with_maps(
-            Path.read_bytes,
-            maps_path,
-            _maps_with_other_device(database, metadata, 0x47),
-            _mountinfo_bytes(
+    def mountinfo(path: Path) -> bytes:
+        if path == Path("/proc/self/mountinfo"):
+            return _mountinfo_bytes(
                 "10 1 0:23 / / rw - tmpfs hidden rw\n"
                 f"20 10 0:23 / {escaped} rw - tmpfs hidden rw\n"
                 f"30 20 0:47 / {escaped} rw - tmpfs visible rw\n"
-            ),
-        ),
-    )
-    report = audit_api().inspect(database)
-    assert any(row["pid"] == os.getpid() and row["file"] == database.name for row in report["mapped_files"])
+            )
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", mountinfo)
+    audit = audit_api()
+    mapped = audit.file_identities([database], mapped=True)
+    assert mapped == {(os.makedev(0, 47), metadata.st_ino): database.name}
+    assert os.makedev(0, 23) not in {device for device, _inode in mapped}
 
 
-def test_non_utf8_unrelated_mount_keeps_path_and_inode(
+def test_non_utf8_unrelated_mount_does_not_abort_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     database = tmp_path / "mapped.sqlite"
     _ = database.write_bytes(bytes(4096))
     metadata = database.stat()
-    maps_path = Path("/proc") / str(os.getpid()) / "maps"
+    original = Path.read_bytes
     foreign = b"7 1 8:1 / " + bytes([0xFF, 0xFE]) + b"/snap rw - ext4 none rw\n"
-    monkeypatch.setattr(
-        Path,
-        "read_bytes",
-        _read_bytes_with_maps(
-            Path.read_bytes,
-            maps_path,
-            _maps_with_other_device(database, metadata, 0x63),
-            b"1 0 0:35 / / rw - btrfs none rw\n" + foreign,
-        ),
-    )
-    audit = audit_api()
-    assert audit.file_identities([database]) == {(metadata.st_dev, metadata.st_ino): database.name}
-    report = audit.inspect(database)
-    assert any(row["pid"] == os.getpid() and row["file"] == database.name for row in report["mapped_files"])
 
+    def mountinfo(path: Path) -> bytes:
+        if path == Path("/proc/self/mountinfo"):
+            return b"1 0 0:35 / / rw - btrfs none rw\n" + foreign
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", mountinfo)
+    audit = audit_api()
+    assert audit.file_identities([database], mapped=True) == {
+        (os.makedev(0, 35), metadata.st_ino): database.name
+    }
 
 
 def test_non_utf8_maps_pathname_does_not_abort_observation(

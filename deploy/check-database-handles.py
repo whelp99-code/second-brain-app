@@ -369,6 +369,7 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
     database = requested_database.resolve(strict=True)
     paths = [database, *(Path(str(database) + suffix) for suffix in ("-wal", "-shm", "-journal"))]
     identities = file_identities(paths)
+    mapped_identities = file_identities(paths, mapped=True)
     matches, mapped, unreadable = [], [], []
     denied: dict[int, set[str]] = {}
 
@@ -416,17 +417,18 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
             mark_denied(int(process.name), "maps")
             continue
         mapped_names = set()
-        expected_inode = {path.name: path.stat().st_ino for path in paths if path.exists()}
         for line in process_maps.splitlines():
             fields = line.split(maxsplit=5)
-            if len(fields) < 6:
+            if len(fields) < 5:
                 continue
-            shown = fields[5].removesuffix(" (deleted)")
-            name = Path(shown).name
-            inode = int(fields[4])
-            if expected_inode.get(name) != inode:
-                continue
-            mapped_names.add(name)
+            major, minor = fields[3].split(":")
+            identity = (os.makedev(int(major, 16), int(minor, 16)), int(fields[4]))
+            target = mapped_identities.get(identity)
+            pathname = fields[5] if len(fields) > 5 else ""
+            if target is not None and _mapping_is_selected(
+                paths, pathname, target, int(process.name), fields[0]
+            ):
+                mapped_names.add(target)
         mapped.extend({"pid": int(process.name), "file": name} for name in sorted(mapped_names))
     diagnostics = []
     for pid in sorted(set(unreadable)):
@@ -456,8 +458,10 @@ def inspect(database: Path, uid: int | None = None) -> dict[str, object]:
         "holder_processes": [process_owner(pid) for pid in holders],
         "unreadable_pids": sorted(set(unreadable)),
         "unreadable_processes": diagnostics,
-        "target_identity_changed": target_path_changed or file_identities(paths) != identities,
-        "scope": "selected-UID /proc fd and maps path+inode snapshot of current files; device numbers are not compared; no future-open exclusion",
+        "target_identity_changed": target_path_changed
+        or file_identities(paths) != identities
+        or file_identities(paths, mapped=True) != mapped_identities,
+        "scope": "selected-UID /proc fd and maps snapshot of current file inodes; no future-open exclusion",
         "drain_authorized": False,
     }
 
