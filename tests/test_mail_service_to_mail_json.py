@@ -82,7 +82,44 @@ def test_timezone_notation_is_preserved() -> None:
     assert raised.value.code == "MAIL_JSON_TIMEZONE_REQUIRED"
 
 
-def test_duplicate_id_is_rejected(tmp_path: Path) -> None:
+def test_same_id_and_same_content_keeps_one(tmp_path: Path) -> None:
+    module = _converter()
+    payload = {
+        "messages": [
+            {
+                "internetMessageId": "<synthetic-copy@example.invalid>",
+                "subject": "synthetic copy",
+                "body": "same body",
+                "receivedAt": "2026-11-02T01:00:00Z",
+                "sentAt": "2026-11-02T00:59:00Z",
+                "folder": "inbox",
+            },
+            {
+                "internetMessageId": "<synthetic-copy@example.invalid>",
+                "subject": "synthetic copy",
+                "body": "same body",
+                "receivedAt": "2026-11-02T01:00:00Z",
+                "sentAt": "2026-11-02T00:59:00Z",
+                "folder": "archive",
+            },
+        ]
+    }
+    document = module.convert(payload)
+    assert document["messages"] == [
+        {
+            "id": "<synthetic-copy@example.invalid>",
+            "subject": "synthetic copy",
+            "body": "same body",
+            "received_at": "2026-11-02T01:00:00Z",
+            "sent_at": "2026-11-02T00:59:00Z",
+        }
+    ]
+    fixture = tmp_path / "same.json"
+    fixture.write_text(json.dumps(payload), encoding="utf-8")
+    assert module.main([str(fixture)]) == 0
+
+
+def test_same_id_and_different_content_is_rejected(tmp_path: Path) -> None:
     module = _converter()
     payload = {
         "messages": [

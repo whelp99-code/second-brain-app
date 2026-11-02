@@ -23,7 +23,11 @@ class ConvertError(Exception):
 
 
 def convert(payload: object) -> dict[str, list[dict[str, str | None]]]:
-    """Return a mail-json document. Rejects a repeated internetMessageId."""
+    """Return a mail-json document.
+
+    The same internetMessageId with the same subject, body, and times is kept
+    once. A repeated id whose content differs is rejected.
+    """
     if isinstance(payload, dict) and set(payload) >= {"messages"}:
         rows = payload.get("messages")
     elif isinstance(payload, list):
@@ -32,26 +36,17 @@ def convert(payload: object) -> dict[str, list[dict[str, str | None]]]:
         raise ConvertError("MAIL_JSON_INVALID")
     if not isinstance(rows, list):
         raise ConvertError("MAIL_JSON_INVALID")
-    seen: set[str] = set()
+    seen: dict[str, dict[str, str | None]] = {}
     messages: list[dict[str, str | None]] = []
     for row in rows:
-        if not isinstance(row, dict):
-            raise ConvertError("MAIL_JSON_INVALID")
-        message_id = row.get("internetMessageId")
-        if not isinstance(message_id, str) or not message_id or len(message_id) > 4096:
-            raise ConvertError("MAIL_JSON_INVALID")
-        if message_id in seen:
+        item = _message(row)
+        prior = seen.get(item["id"])
+        if prior is None:
+            seen[item["id"]] = item
+            messages.append(item)
+            continue
+        if prior != item:
             raise ConvertError("MAIL_JSON_DUPLICATE_ID")
-        seen.add(message_id)
-        messages.append(
-            {
-                "id": message_id,
-                "subject": _text(row.get("subject", "")),
-                "body": _text(row.get("body", "")),
-                "received_at": _offset_time(row.get("receivedAt")),
-                "sent_at": _offset_time(row.get("sentAt")),
-            }
-        )
     return {"messages": messages}
 
 
@@ -78,6 +73,21 @@ def _text(value: object) -> str:
     if not isinstance(value, str) or len(value) > 100000:
         raise ConvertError("MAIL_JSON_INVALID")
     return value
+
+
+def _message(row: object) -> dict[str, str | None]:
+    if not isinstance(row, dict):
+        raise ConvertError("MAIL_JSON_INVALID")
+    message_id = row.get("internetMessageId")
+    if not isinstance(message_id, str) or not message_id or len(message_id) > 4096:
+        raise ConvertError("MAIL_JSON_INVALID")
+    return {
+        "id": message_id,
+        "subject": _text(row.get("subject", "")),
+        "body": _text(row.get("body", "")),
+        "received_at": _offset_time(row.get("receivedAt")),
+        "sent_at": _offset_time(row.get("sentAt")),
+    }
 
 
 def _offset_time(value: object) -> str | None:
