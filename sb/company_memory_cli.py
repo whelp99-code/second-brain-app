@@ -60,6 +60,7 @@ from sb.company_processor_progress import (
     local_checkpoint,
     save_checkpoint,
 )
+from sb.company_source_bindings import profile_with_stored_bindings
 from sb.company_transition_receipt import read_transition_receipt
 from sb.effect_values import (
     CanonicalValueError,
@@ -450,7 +451,7 @@ def _run(
         arguments = {
             **arguments,
             "content": resolve_company_source(
-                config.source_profile,
+                profile_with_stored_bindings(config.source_profile, database),
                 arguments,
                 config.personal_data_roots,
             ),
