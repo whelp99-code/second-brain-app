@@ -2,12 +2,19 @@
 """Read-only calendar export to the SB life import document.
 
 Outlook consent uses the same authorize endpoint as the mail connection and
-adds only Calendars.Read. This file does not open a network, read a token, or
-write a vault. Google has no connection yet; the same converter accepts its
-events.list JSON once a read-only client exists.
+adds only Calendars.Read. `outlook-today` reads the mail token store and writes
+a graph-calendar file for `sb life import`. It does not write the vault, start
+consent, or print a token. Google has no connection yet; the same converter
+accepts its events.list JSON once a read-only client exists.
 """
 from __future__ import annotations
 
+import base64
+import json
+import sys
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from datetime import date, datetime, time, timedelta, timezone
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
@@ -123,3 +130,169 @@ def _bound(value: object, zone: str, *, end: bool) -> datetime | None:
         name = value.get("timeZone")
         parsed_dt = parsed_dt.replace(tzinfo=ZoneInfo(name if isinstance(name, str) and name else zone))
     return parsed_dt.astimezone(timezone.utc)
+CONSENT_MESSAGE = "동의 필요"
+MAIL_DATA = Path("/home/jm/orca/projects/mail-intelligence/data")
+GRAPH_CALENDAR_VIEW = "https://graph.microsoft.com/v1.0/me/calendarView"
+
+
+def calendar_view_url(day: date, zone: str = "Asia/Seoul") -> str:
+    start = datetime.combine(day, time.min, tzinfo=ZoneInfo(zone))
+    end = start + timedelta(days=1)
+    query = urlencode({"startDateTime": start.isoformat(), "endDateTime": end.isoformat(), "$top": "100"})
+    return f"{GRAPH_CALENDAR_VIEW}?{query}"
+
+
+def scopes_from_access_token(token: str) -> frozenset[str]:
+    parts = token.split(".")
+    if len(parts) < 2:
+        return frozenset()
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
+    except (ValueError, json.JSONDecodeError):
+        return frozenset()
+    scp = payload.get("scp") if isinstance(payload, dict) else None
+    if isinstance(scp, str):
+        return frozenset(scp.split())
+    if isinstance(scp, list):
+        return frozenset(str(item) for item in scp)
+    return frozenset()
+
+
+def require_calendar_consent(status: object) -> str:
+    if not isinstance(status, dict):
+        raise CalendarReadError("CONSENT_REQUIRED")
+    token = status.get("access_token")
+    scopes = status.get("scopes")
+    if not isinstance(token, str) or not token or not isinstance(scopes, (list, tuple, set, frozenset)):
+        raise CalendarReadError("CONSENT_REQUIRED")
+    if CALENDAR_READ not in scopes:
+        raise CalendarReadError("CONSENT_REQUIRED")
+    return token
+
+
+def mail_token_status(data_dir: Path = MAIL_DATA) -> dict[str, object]:
+    """Read the mail secret store. Never writes it and never returns a printed token."""
+    secrets_path = data_dir / ".outlook-secrets.enc.json"
+    key_path = data_dir / ".mail-intelligence.key"
+    if not secrets_path.is_file() or not key_path.is_file():
+        raise CalendarReadError("CONSENT_REQUIRED")
+    try:
+        envelope = json.loads(secrets_path.read_text(encoding="utf-8"))
+        key = base64.b64decode(key_path.read_text(encoding="utf-8").strip(), validate=True)
+        token = _access_token(envelope, key)
+    except CalendarReadError:
+        raise
+    except Exception as exc:
+        raise CalendarReadError("STORE_UNREADABLE") from exc
+    if not token:
+        raise CalendarReadError("CONSENT_REQUIRED")
+    scopes = scopes_from_access_token(token)
+    if CALENDAR_READ not in scopes:
+        raise CalendarReadError("CONSENT_REQUIRED")
+    return {"access_token": token, "scopes": sorted(scopes)}
+
+
+def _access_token(envelope: object, key: bytes) -> str:
+    if not isinstance(envelope, dict) or envelope.get("version") != 1 or envelope.get("algorithm") != "aes-256-gcm":
+        raise CalendarReadError("STORE_UNREADABLE")
+    if len(key) != 32:
+        raise CalendarReadError("STORE_UNREADABLE")
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    iv = base64.b64decode(str(envelope.get("iv") or ""), validate=True)
+    tag = base64.b64decode(str(envelope.get("tag") or ""), validate=True)
+    ciphertext = base64.b64decode(str(envelope.get("ciphertext") or ""), validate=True)
+    if len(iv) != 12 or len(tag) != 16 or not ciphertext:
+        raise CalendarReadError("STORE_UNREADABLE")
+    parsed = json.loads(AESGCM(key).decrypt(iv, ciphertext + tag, None))
+    token = parsed.get("accessToken") if isinstance(parsed, dict) else None
+    if token is None:
+        return ""
+    if not isinstance(token, str):
+        raise CalendarReadError("STORE_UNREADABLE")
+    return token
+
+
+def graph_get(url: str, access_token: str) -> dict[str, object]:
+    request = Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+            "Prefer": 'outlook.timezone="Asia/Seoul"',
+        },
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise CalendarReadError("GRAPH_CALENDAR_FAILED") from exc
+    if not isinstance(payload, dict):
+        raise CalendarReadError("CALENDAR_EXPORT_INVALID")
+    return payload
+
+
+def collect_calendar_view(url: str, access_token: str, fetch=graph_get) -> dict[str, list[object]]:
+    rows: list[object] = []
+    next_url: str | None = url
+    for _ in range(10):
+        if not next_url:
+            break
+        page = fetch(next_url, access_token)
+        value = page.get("value")
+        if not isinstance(value, list):
+            raise CalendarReadError("CALENDAR_EXPORT_INVALID")
+        rows.extend(value)
+        link = page.get("@odata.nextLink")
+        next_url = link if isinstance(link, str) and link else None
+    else:
+        raise CalendarReadError("CALENDAR_PAGE_LIMIT")
+    return {"value": rows}
+
+
+def write_outlook_today(
+    out: Path,
+    *,
+    day: date,
+    zone: str = "Asia/Seoul",
+    token_status=None,
+    fetch=None,
+) -> int:
+    status_fn = mail_token_status if token_status is None else token_status
+    fetch_fn = graph_get if fetch is None else fetch
+    token = require_calendar_consent(status_fn())
+    document = to_sb_document(
+        collect_calendar_view(calendar_view_url(day, zone), token, fetch_fn),
+        "graph",
+        day=day,
+        zone=zone,
+    )
+    text = json.dumps(document, ensure_ascii=False, separators=(",", ":"))
+    temporary = out.with_suffix(out.suffix + ".tmp")
+    temporary.write_text(text + "\n", encoding="utf-8")
+    temporary.chmod(0o600)
+    temporary.replace(out)
+    return len(document["value"])
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args[:1] != ["outlook-today"] or "--out" not in args:
+        print("usage: calendar_read.py outlook-today --out FILE [--day YYYY-MM-DD]", file=sys.stderr)
+        return 64
+    out = Path(args[args.index("--out") + 1])
+    day = date.today() if "--day" not in args else date.fromisoformat(args[args.index("--day") + 1])
+    try:
+        count = write_outlook_today(out, day=day)
+    except CalendarReadError as exc:
+        if exc.code == "CONSENT_REQUIRED":
+            print(CONSENT_MESSAGE)
+            return 2
+        print(exc.code, file=sys.stderr)
+        return 1
+    print(f"wrote {out} events={count}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
