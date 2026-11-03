@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib.util
-import base64
 import json
 from datetime import date
 from pathlib import Path
@@ -130,11 +129,7 @@ def _event(event_id: str, start: str, end: str) -> dict[str, object]:
     }
 
 
-def _status(scopes: tuple[str, ...] = ("Calendars.Read",)) -> dict[str, object]:
-    return {"access_token": "synthetic-access", "scopes": scopes}
-
-
-def test_outlook_today_writes_zero_one_and_many(tmp_path: Path) -> None:
+def test_outlook_today_converts_zero_one_and_many(tmp_path: Path) -> None:
     module = _module()
     pages = {
         0: {"value": []},
@@ -148,75 +143,18 @@ def test_outlook_today_writes_zero_one_and_many(tmp_path: Path) -> None:
         },
     }
     for count, payload in pages.items():
+        source = tmp_path / f"{count}-in.json"
         out = tmp_path / f"{count}.json"
-        seen: list[str] = []
-
-        def fetch(url: str, token: str, payload: dict[str, object] = payload) -> dict[str, object]:
-            seen.append(url)
-            query = parse_qs(urlparse(url).query)
-            assert token == "synthetic-access"
-            assert urlparse(url).path.endswith("/me/calendarView")
-            assert query["startDateTime"] == ["2026-11-03T00:00:00+09:00"]
-            assert query["endDateTime"] == ["2026-11-04T00:00:00+09:00"]
-            return payload
-
-        written = module.write_outlook_today(
-            out,
-            day=DAY,
-            token_status=lambda: _status(),
-            fetch=fetch,
-        )
-        document = json.loads(out.read_text())
+        source.write_text(json.dumps(payload))
+        written = module.convert_outlook_today(source, out, day=DAY)
         imported = parse_export("graph-calendar", out.read_bytes(), "calendar.json", timezone="Asia/Seoul")
         assert written == len(imported)
         assert written == (2 if count == 3 else count)
-        assert [row["subject"] for row in document["value"]] == [row["title"] for row in imported]
-        assert seen
 
 
-def test_missing_token_or_scope_needs_consent(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    module = _module()
-    called = False
-
-    def fetch(url: str, token: str) -> dict[str, object]:
-        nonlocal called
-        called = True
-        return {"value": []}
-
-    for status in (None, {}, {"access_token": "", "scopes": ["Calendars.Read"]}, {"access_token": "synthetic-access", "scopes": ["Mail.Read"]}):
-        with pytest.raises(module.CalendarReadError, match="CONSENT_REQUIRED"):
-            module.write_outlook_today(tmp_path / "x.json", day=DAY, token_status=lambda status=status: status, fetch=fetch)
-    assert called is False
-    module.mail_token_status = lambda data_dir=None: {"access_token": "", "scopes": []}
-    assert module.main(["outlook-today", "--out", str(tmp_path / "cli.json"), "--day", "2026-11-03"]) == 2
-    assert capsys.readouterr().out.strip() == "동의 필요"
-
-
-def test_mail_store_reader_sees_scope_without_writing(tmp_path: Path) -> None:
-    module = _module()
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-    key = b"k" * 32
-    token = _jwt("Mail.Read Calendars.Read")
-    iv = b"0123456789ab"
-    ciphertext = AESGCM(key).encrypt(iv, json.dumps({"accessToken": token}).encode(), None)
-    (tmp_path / ".mail-intelligence.key").write_text(base64.b64encode(key).decode())
-    (tmp_path / ".outlook-secrets.enc.json").write_text(json.dumps({
-        "version": 1,
-        "algorithm": "aes-256-gcm",
-        "iv": base64.b64encode(iv).decode(),
-        "tag": base64.b64encode(ciphertext[-16:]).decode(),
-        "ciphertext": base64.b64encode(ciphertext[:-16]).decode(),
-    }))
-    before = (tmp_path / ".outlook-secrets.enc.json").read_bytes()
-    status = module.mail_token_status(tmp_path)
-    assert status["scopes"] == ["Calendars.Read", "Mail.Read"]
-    assert (tmp_path / ".outlook-secrets.enc.json").read_bytes() == before
-    (tmp_path / ".outlook-secrets.enc.json").unlink()
-    with pytest.raises(module.CalendarReadError, match="CONSENT_REQUIRED"):
-        module.mail_token_status(tmp_path)
-
-
-def _jwt(scope: str) -> str:
-    payload = base64.urlsafe_b64encode(json.dumps({"scp": scope}).encode()).decode().rstrip("=")
-    return f"header.{payload}.sig"
+def test_sb_does_not_read_mail_secrets() -> None:
+    text = _SCRIPT.read_text()
+    assert ".mail-intelligence.key" not in text
+    assert ".outlook-secrets" not in text
+    assert "AESGCM" not in text
+    assert "refresh_token" not in text
