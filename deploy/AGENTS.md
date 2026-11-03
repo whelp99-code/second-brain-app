@@ -26,6 +26,7 @@ Not a package — there is no
 | DB/lease audits | `check-database-handles.py`, `check-jarvis-pending-state.py` (both export `inspect`) |
 | Installed unit templates | `deploy/systemd/second-brain{,-web,-backup}.service`, `.timer` |
 | Mail service fields to SB mail-json | `mail-service-to-mail-json.py` — `convert`; file or stdin only, no mailbox |
+| Outlook or Google calendar JSON to SB life import | `calendar_read.py` — `outlook_calendar_consent_url`, `to_sb_document`; no network or token |
 
 ## CONVENTIONS
 - `prepare-release.py` builds from `git archive` of **committed HEAD** and refuses a dirty
