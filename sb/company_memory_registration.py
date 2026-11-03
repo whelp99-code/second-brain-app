@@ -70,6 +70,36 @@ def _publish(path: Path, raw: bytes, *, replace: bool = True) -> None:
     finally:
         temporary.unlink(missing_ok=True)
 
+def drop_duplicated_config_bindings(
+    config_path: Path,
+    document: JsonObject,
+    database: Path,
+    profile: CompanySourceProfile | None,
+    config_maximum: int,
+) -> CompanySourceProfile | None:
+    """Drop config bindings already stored identically. A different row stops the write."""
+    if profile is None or not profile.bindings:
+        return profile
+    stored = read_source_bindings(database)
+    shared = [locator for locator in profile.bindings if locator in stored]
+    if not shared:
+        return profile
+    if any(profile.bindings[locator] != stored[locator] for locator in shared):
+        raise CompanyMemoryError("COMPANY_SOURCE_BINDING_CONFLICT")
+    updated = profile.model_copy(update={
+        "bindings": {
+            locator: binding
+            for locator, binding in profile.bindings.items()
+            if locator not in stored
+        },
+    })
+    serialized = canonical_bytes({**document, "source_profile": model_object(updated)})
+    _ = strict_loads(serialized, config_maximum)
+    if config_path.read_bytes() != serialized:
+        _publish(config_path, serialized)
+    return updated
+
+
 
 def register_original(
     config_path: Path,
@@ -82,6 +112,9 @@ def register_original(
     personal_roots: list[str],
 ) -> JsonObject:
     """Append one authenticated binding after its retained original is durable."""
+    profile = drop_duplicated_config_bindings(
+        config_path, document, database, profile, config_maximum,
+    )
     try:
         source = RegistrationArguments.model_validate(arguments)
         raw = content.encode("utf-8")

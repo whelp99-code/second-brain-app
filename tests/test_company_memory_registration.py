@@ -14,7 +14,7 @@ import sb.company_memory_registration as registration
 from sb.company_memory import CompanyMemoryError
 from sb.company_memory_authority import CompanyAuthorityRejected, company_request_digest
 from sb.company_memory_sources import CompanySourceBinding
-from sb.company_source_bindings import read_source_bindings
+from sb.company_source_bindings import read_source_bindings, write_source_bindings
 from sb.effect_values import CanonicalValueError, JsonObject, canonical_bytes, format_instant
 from tests.task30_clock import FrozenTask30DateTime
 from tests.test_company_memory_product import KEY_ID, RECEIVE, config, signed_authority
@@ -343,3 +343,56 @@ def test_binding_growth_does_not_hit_the_config_limit(
     del request["content"]
     completed = invoke(path, canonical_bytes(request), registering=False)
     assert completed.returncode == 0, completed.stderr.decode()
+
+def _restore_config_binding(path: Path, locator: str, binding: CompanySourceBinding) -> None:
+    document = decoded_object(path.read_bytes())
+    profile = document["source_profile"]
+    assert isinstance(profile, dict)
+    profile["bindings"] = {
+        locator: {
+            "path": binding.path,
+            "source_system": binding.source_system,
+            "source_event_id": binding.source_event_id,
+            "parser_version": binding.parser_version,
+            "content_digest": binding.content_digest,
+        },
+    }
+    path.write_bytes(canonical_bytes(document))
+
+
+def test_receive_drops_config_bindings_already_stored(source: tuple[Path, JsonObject]) -> None:
+    path, arguments = source
+    registered = cli.run(path, envelope(arguments), now=NOW, register_source=True)
+    assert registered["registration"]["state"] == "registered"
+    database = Path(str(decoded_object(path.read_bytes())["company_database"]))
+    stored = read_source_bindings(database)
+    current = stored[str(arguments["source_locator"])]
+    write_source_bindings(database, {"Graph/extra": current.model_copy(update={
+        "source_event_id": "event-extra",
+    })})
+    _restore_config_binding(path, str(arguments["source_locator"]), current)
+    request = decoded_object(envelope(arguments))
+    del request["content"]
+    completed = invoke(path, canonical_bytes(request), registering=False)
+    assert completed.returncode == 0, completed.stderr.decode()
+    assert decoded_object(path.read_bytes())["source_profile"]["bindings"] == {}
+    assert set(read_source_bindings(database)) == {str(arguments["source_locator"]), "Graph/extra"}
+
+
+def test_receive_stops_when_duplicated_binding_differs(source: tuple[Path, JsonObject]) -> None:
+    path, arguments = source
+    _ = cli.run(path, envelope(arguments), now=NOW, register_source=True)
+    database = Path(str(decoded_object(path.read_bytes())["company_database"]))
+    stored = read_source_bindings(database)
+    changed = stored[str(arguments["source_locator"])].model_copy(
+        update={"source_event_id": "event-other"},
+    )
+    _restore_config_binding(path, str(arguments["source_locator"]), changed)
+    before = path.read_bytes()
+    request = decoded_object(envelope(arguments))
+    del request["content"]
+    completed = invoke(path, canonical_bytes(request), registering=False)
+    assert completed.returncode == 2
+    assert decoded_object(completed.stderr)["error"] == "COMPANY_SOURCE_BINDING_CONFLICT"
+    assert path.read_bytes() == before
+    assert read_source_bindings(database) == stored
