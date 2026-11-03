@@ -27,6 +27,7 @@ Not a package — there is no
 | Installed unit templates | `deploy/systemd/second-brain{,-web,-backup}.service`, `.timer` |
 | Mail service fields to SB mail-json | `mail-service-to-mail-json.py` — `convert`; file or stdin only, no mailbox |
 | Outlook or Google calendar JSON to SB life import | `calendar_read.py` — `to_sb_document` converts Mail's graph-calendar file; no Mail key or token |
+| 06:30 Outlook file, convert, import, morning briefing | `outlook-morning.sh`; unit `systemd/user/jm-second-brain-outlook-morning.{service,timer}` — create only, do not enable |
 
 ## CONVENTIONS
 - `prepare-release.py` builds from `git archive` of **committed HEAD** and refuses a dirty
