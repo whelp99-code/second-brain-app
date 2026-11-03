@@ -25,6 +25,7 @@ Not a package — there is no
 | Unit drain audit (18 units, both naming schemes) | `check-transition-units.py` — `assess_unit` |
 | DB/lease audits | `check-database-handles.py`, `check-jarvis-pending-state.py` (both export `inspect`) |
 | Installed unit templates | `deploy/systemd/second-brain{,-web,-backup}.service`, `.timer` |
+| Mail service fields to SB mail-json | `mail-service-to-mail-json.py` — `convert`; file or stdin only, no mailbox |
 
 ## CONVENTIONS
 - `prepare-release.py` builds from `git archive` of **committed HEAD** and refuses a dirty
