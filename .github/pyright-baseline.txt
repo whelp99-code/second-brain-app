@@ -60,3 +60,27 @@ tests/test_observation_admission.py
 tests/test_observation_receipt_pipeline.py
 tests/test_source_manifest.py
 tests/test_web_source_observations.py
+
+# Pre-existing basedpyright errors on master 03c1f875. These files are unchanged
+# by the #96-#100 bundle. Do not add entries to hide new errors.
+sb/company_auto_cancellation.py
+sb/company_auto_engine.py
+sb/company_freshness_genesis.py
+tests/company_db_freshness_smoke.py
+tests/test_company_approver_guards.py
+tests/test_company_crash_boundaries.py
+tests/test_company_deletion_bridge.py
+tests/test_company_jarvis_evidence.py
+tests/test_company_memory_registration.py
+tests/test_company_round10_integrity.py
+tests/test_company_round11_integrity.py
+tests/test_company_round12_integrity.py
+tests/test_company_round14_integrity.py
+tests/test_company_round14_q_legacy.py
+tests/test_company_round15_integrity.py
+tests/test_company_round16_integrity.py
+tests/test_company_round9_integrity.py
+tests/test_company_six_integrity.py
+tests/test_database_handle_audit.py
+tests/test_generations.py
+tests/test_mcp_local_search_fence.py
