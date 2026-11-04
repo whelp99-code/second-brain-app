@@ -8,11 +8,13 @@ from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 import sb.company_freshness_operator as operator
 import sb.company_processor_execution as execution
+from sb.company_approver_binding import CompanyHandoffPolicy
 from sb.company_auto_engine import _candidate_ids, run_auto_internal
 from sb.company_auto_report import read_auto_report
 from sb.company_db_freshness import GenesisInventory, bootstrap_company_scope
@@ -20,7 +22,11 @@ from sb.company_db_freshness_models import FreshnessRegistry, GenesisEntry
 from sb.company_freshness_anchor import AnchorRejected, nv_public_is_extend_only
 from sb.company_freshness_models import FreshnessScope, ReadFreshnessRequest
 from sb.company_memory import CompanyMemoryStore
-from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
+from sb.company_memory_authority import (
+    CompanyAuthorityContext,
+    CompanyAuthorityRejected,
+    CompanyMemoryAuthorityV1,
+)
 from sb.company_processor_progress import local_checkpoint
 from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_values import model_object
@@ -254,12 +260,18 @@ def test_expiry_after_real_reserve_releases_only_new_unapplied_operation(tmp_pat
                 store,
                 provider,
                 context=authority_context,
-                policy=None,
+                policy=cast(CompanyHandoffPolicy, cast(object, None)),
                 owner_keys={},
-                authority=SimpleNamespace(
-                    request_digest=digest,
-                    issued_at=format_instant(context.now),
-                    expires_at=format_instant(context.now + timedelta(minutes=5)),
+                authority=cast(
+                    CompanyMemoryAuthorityV1,
+                    cast(
+                        object,
+                        SimpleNamespace(
+                            request_digest=digest,
+                            issued_at=format_instant(context.now),
+                            expires_at=format_instant(context.now + timedelta(minutes=5)),
+                        ),
+                    ),
                 ),
                 operation="accept",
                 arguments={"candidate_id": "mail:expiry", "handoff_id": handoff_id},
