@@ -86,6 +86,8 @@ policy_revision = "policy:1"
 
 한 원본이 전체 unit 예산을 넘으면 `INGEST_UNIT_BUDGET_EXCEEDED`와 종료 코드 1을 반환하고 원본을 보존한다. 해당 원본의 규모를 확인해 설정을 조정하거나 원본을 나눈 뒤 재실행한다. 잔여 예산에만 맞지 않는 원본은 `capped`로 남고 다음 실행에서 처리한다. [예산 계약과 인수](INGEST-BUDGET-CONTRACT-2026-09-08.md).
 
+관리형 세대의 `sb run`은 세대 변경 전에 미완료 owner-effect를 먼저 복구한다. 복구 실패나 그 이후 새 삭제 상태와의 불일치는 그대로 차단하며 삭제 fence를 건너뛰지 않는다. 수집원 연결 장애만 있고 다른 수집원이 정상 스캔을 끝냈으면 새 항목이 없어도 `partial`·종료 코드 0으로 기록한다. 정상 완료한 수집원이 없으면 `failed`·종료 코드 1이다. 연결 장애는 `ConnectionError`·`TimeoutError` 및 psycopg의 `ConnectionException`·`ConnectionTimeout`으로 한정한다. 권한·데이터·검증·미분류 예외는 정상 형제가 있어도 `SOURCE_SCAN_FAILED`·종료 코드 1이며 예산 오류의 기존 차단도 유지한다. 연결 장애의 `run_stage.detail`에는 수집원 성공/실패 수와 안전한 진단을 남기며, 명시적 치명 오류의 기존 detail 문자열은 유지한다. `runs.log`의 원천 오류 줄에는 시각과 예외 종류만 남긴다. 부분 성공은 장애 수집원의 cursor나 삭제 상태를 성공으로 승격하지 않는다.
+
 ## macOS 앱
 
 맥에 저장소를 체크아웃한 뒤:

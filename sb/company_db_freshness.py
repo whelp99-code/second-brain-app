@@ -702,11 +702,26 @@ class CompanyDbFreshnessProvider:
             expected = self.publish_assessment(scope, digest, expected)
         return expected
 
-    def validate_auto_policy_pin(self, scope: FreshnessScope) -> None:
-        """Reject invalid operator advancement before writing any local policy row."""
+    def install_auto_policy(
+        self,
+        scope: FreshnessScope,
+        commit_policy: Callable[[], str],
+        policy_digest: str,
+        key_id: str,
+        key_fingerprint: str,
+    ) -> tuple[str, Checkpoint]:
+        """Validate, commit and anchor the same registry pin under one lock."""
         with self._locked():
             self._recover(allow_policy_update=True, read_only=True)
             pin = current_auto_pin(self._registry(), scope)
+            if (
+                pin.policy_digest != policy_digest
+                or pin.key_id != key_id
+                or pin.public_key_fingerprint != key_fingerprint
+                or policy_digest in pin.revoked_policy_digests
+                or key_fingerprint in pin.revoked_key_fingerprints
+            ):
+                raise AnchorRejected("COMPANY_POLICY_REGISTRATION_REQUIRED")
             connection = _connect(self.database)
             try:
                 previous = latest_auto_pins(load_journal(connection)).get(
@@ -716,81 +731,84 @@ class CompanyDbFreshnessProvider:
                 connection.close()
             if pin != previous:
                 require_forward_pin(previous, pin)
+            digest = commit_policy()
+            return digest, self._install_auto_policy_pin(scope)
 
     def install_auto_policy_pin(self, scope: FreshnessScope) -> Checkpoint:
         """Operator-only activation of the exact protected registry entry."""
         with self._locked():
-            self._recover(allow_policy_update=True)
-            head = self._require_head(scope)
-            if self.actor_store != "second_brain" or self._pending(scope) or self._closed(scope):
-                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-            pin = current_auto_pin(self._registry(), scope)
-            connection = _connect(self.database)
-            try:
-                journal = load_journal(connection)
-                previous = latest_auto_pins(journal).get(
-                    (scope.provider_instance_id, scope.workspace_id),
-                )
-                local_row = connection.execute(
-                    "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
-                    (scope.workspace_id,),
-                ).fetchone()
-            finally:
-                connection.close()
-            if previous == pin:
-                return head
-            require_forward_pin(previous, pin)
-            if local_row is None:
-                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-            local = Checkpoint.model_validate_json(local_row[0], strict=True)
-            if not is_other_store_prefix(local, head, "second_brain") or not any(
-                entry.scope == scope
-                and entry.published_sequence is not None
-                and entry.after == local
-                for entry in journal
-            ):
-                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-            record: JsonObject = {
-                "kind": "internal_auto_policy",
-                "pin": model_object(pin),
-                "processor_checkpoint_before": checkpoint_object(local),
+            return self._install_auto_policy_pin(scope)
+
+    def _install_auto_policy_pin(self, scope: FreshnessScope) -> Checkpoint:
+        self._recover(allow_policy_update=True)
+        head = self._require_head(scope)
+        if self.actor_store != "second_brain" or self._pending(scope) or self._closed(scope):
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        pin = current_auto_pin(self._registry(), scope)
+        connection = _connect(self.database)
+        try:
+            journal = load_journal(connection)
+            previous = latest_auto_pins(journal).get(
+                (scope.provider_instance_id, scope.workspace_id),
+            )
+            local_row = connection.execute(
+                "SELECT checkpoint_json FROM company_processor_checkpoint WHERE workspace_id=?",
+                (scope.workspace_id,),
+            ).fetchone()
+        finally:
+            connection.close()
+        if previous == pin:
+            return head
+        require_forward_pin(previous, pin)
+        if local_row is None:
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        local = Checkpoint.model_validate_json(local_row[0], strict=True)
+        if not is_other_store_prefix(local, head, "second_brain") or not any(
+            entry.scope == scope and entry.published_sequence is not None and entry.after == local
+            for entry in journal
+        ):
+            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+        record: JsonObject = {
+            "kind": "internal_auto_policy",
+            "pin": model_object(pin),
+            "processor_checkpoint_before": checkpoint_object(local),
+        }
+        digest = prefixed_digest(b"second-brain/company-auto-policy-registration/v1\0", record)
+        evidence = [
+            _stream_projection(
+                scope,
+                "registry",
+                "revocation",
+                head.revocation_root,
+                head.revocation_sequence + 1,
+                f"auto-policy:{pin.revision}",
+                digest,
+                {"original_at": self.clock(), "kind": "policy_registration"},
+            )
+        ]
+        after = _advance_intent(head, record).model_copy(
+            update={
+                "revocation_sequence": head.revocation_sequence + 1,
+                "revocation_root": evidence[0]["root"],
             }
-            digest = prefixed_digest(b"second-brain/company-auto-policy-registration/v1\0", record)
-            evidence = [
-                _stream_projection(
-                    scope,
-                    "registry",
-                    "revocation",
-                    head.revocation_root,
-                    head.revocation_sequence + 1,
-                    f"auto-policy:{pin.revision}",
-                    digest,
-                    {"original_at": self.clock(), "kind": "policy_registration"},
-                )
-            ]
-            after = _advance_intent(head, record).model_copy(
-                update={
-                    "revocation_sequence": head.revocation_sequence + 1,
-                    "revocation_root": evidence[0]["root"],
-                }
-            )
-            self._publish_new(
-                scope=scope,
-                phase="registry",
-                operation_id="auto-policy:" + digest,
-                record=record,
-                evidence=evidence,
-                before=head,
-                after=after,
-                challenge="auto-policy:" + digest,
-                reservation_id="policy",
-                operation="complete",
-                event_digest=digest,
-                expected_json=checkpoint_text(head),
-                terminal_state=None,
-                evidence_digest=None,
-            )
-            return after
+        )
+        self._publish_new(
+            scope=scope,
+            phase="registry",
+            operation_id="auto-policy:" + digest,
+            record=record,
+            evidence=evidence,
+            before=head,
+            after=after,
+            challenge="auto-policy:" + digest,
+            reservation_id="policy",
+            operation="complete",
+            event_digest=digest,
+            expected_json=checkpoint_text(head),
+            terminal_state=None,
+            evidence_digest=None,
+        )
+        return after
 
     def require_auto_policy(
         self,
@@ -1388,13 +1406,11 @@ class CompanyDbFreshnessProvider:
                             reclassify=False,
                         )
             for entry in entries:
-                operation_id = entry.operation_id
-                if operation_id is None:
-                    continue
+
                 if entry.phase != "finish" or entry.record.get("terminal_state") == "cancelled":
                     continue
                 original = indexed.get(
-                    (entry.scope.provider_instance_id, entry.scope.workspace_id, operation_id)
+                    (entry.scope.provider_instance_id, entry.scope.workspace_id, entry.operation_id)
                 )
                 if (
                     original is not None
@@ -1546,11 +1562,9 @@ class CompanyDbFreshnessProvider:
             for entry in entries:
                 if entry.phase != "finish":
                     continue
-                operation_id = entry.operation_id
-                if not isinstance(operation_id, str):
-                    continue
+
                 original = jarvis_operations.get(
-                    (entry.scope.provider_instance_id, entry.scope.workspace_id, operation_id)
+                    (entry.scope.provider_instance_id, entry.scope.workspace_id, entry.operation_id)
                 )
                 if original is None:
                     continue
@@ -1862,8 +1876,19 @@ class CompanyDbFreshnessProvider:
         with self._locked():
             pin = _pin(self._registry(), scope)
             self._recover()
-            if self._head(scope) is not None:
+            checkpoint = _genesis_checkpoint(
+                scope,
+                approval_policy_version=approval_policy_version,
+                approval_binding_digest=approval_binding_digest,
+                inventory=inventory,
+            )
+            if checkpoint.intent_root != pin.genesis_digest or pin.epoch != 1:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            head = self._head(scope)
+            if head is not None:
+                if head != checkpoint:
+                    raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+                return head
             if len(self.anchor.read_value()) != 32:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
             if _history_present(self.database, scope):
@@ -1879,21 +1904,12 @@ class CompanyDbFreshnessProvider:
                 )
             finally:
                 connection.close()
-            checkpoint = _genesis_checkpoint(
-                scope,
-                approval_policy_version=approval_policy_version,
-                approval_binding_digest=approval_binding_digest,
-                inventory=inventory,
-            )
-            if checkpoint.intent_root != pin.genesis_digest or pin.epoch != 1:
-                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-            transition_receipts: list[JsonValue] = []
-            transition_receipts.extend(default_transition_receipts)
+
             record: JsonObject = {
                 "phase": "bootstrap",
                 "epoch": 1,
                 "inventory": model_object(inventory),
-                "default_transition_receipts": transition_receipts,
+                "default_transition_receipts": default_transition_receipts,
                 "source_deletion_sequence": pin.source_deletion_sequence,
                 "source_deletion_root": pin.source_deletion_root,
                 "source_context_digest": pin.source_context_digest,
@@ -2743,7 +2759,7 @@ def _verify_unapplied_cancellation(
             or original.operation_id
             != operation_id_for(
                 scope,
-                request_id=handoff_id,
+                request_id=binding["handoff_id"],
                 command_digest=command_digest(model_object(command)),
                 operation=original.operation,
             )
