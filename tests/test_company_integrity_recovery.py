@@ -16,7 +16,7 @@ import sb.company_freshness_operator as operator
 from sb.company_approver_binding import public_key_fingerprint
 from sb.company_auto_policy import policy_digest
 from sb.company_auto_settings import AutoInternalRejected
-from sb.company_db_freshness_models import FreshnessRegistry
+from sb.company_db_freshness_models import FreshnessRegistry, OperationRow
 from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_migrations import apply_component_migration
 from sb.company_freshness_models import FreshnessScope
@@ -457,7 +457,7 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
             update={"policy_version": settings.policy.policy_version + 1}
         ),
     )
-    updates = {
+    updates: dict[str, object] = {
         "policy_digest": policy_digest(changed.policy),
         "revoked_policy_digests": [old.policy_digest],
     }
