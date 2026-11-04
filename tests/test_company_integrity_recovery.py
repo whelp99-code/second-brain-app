@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from threading import Event, Thread
 from types import SimpleNamespace
 
 import pytest
@@ -25,6 +26,102 @@ from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_values import model_object
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import WORKSPACE, contact_body, receive, trigger
+
+
+def test_operator_pin_advance_at_first_lock_release_is_consistent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sb.company_db_freshness_integrity import load_journal
+    from sb.company_freshness_registry import latest_auto_pins
+
+    provider, settings, context = real_company_runtime(tmp_path)
+    registry = FreshnessRegistry.model_validate_json(provider.registry_path.read_bytes())
+    old = registry.auto_policies[0]
+    changed = replace(
+        settings,
+        policy=settings.policy.model_copy(
+            update={"policy_version": settings.policy.policy_version + 1}
+        ),
+    )
+    pin_a = old.model_copy(
+        update={
+            "revision": 2,
+            "policy_digest": policy_digest(changed.policy),
+            "revoked_policy_digests": [old.policy_digest],
+        }
+    )
+    pin_b = pin_a.model_copy(
+        update={
+            "revision": 3,
+            "policy_digest": "sha256:" + "ee" * 32,
+            "revoked_policy_digests": [old.policy_digest, pin_a.policy_digest],
+        }
+    )
+
+    def write_pin(pin):
+        provider.registry_path.write_bytes(
+            canonical_bytes(model_object(registry.model_copy(update={"auto_policies": [pin]})))
+        )
+
+    write_pin(pin_a)
+    config = SimpleNamespace(
+        provider_instance_id=settings.provider_instance_id,
+        workspace_id=WORKSPACE,
+        freshness_provider=None,
+    )
+    monkeypatch.setattr(operator, "os", SimpleNamespace(geteuid=lambda: 0))
+    monkeypatch.setattr(operator, "require_trusted_file", lambda *args, **kwargs: None)
+    monkeypatch.setattr(operator, "load_company_config", lambda _: config)
+    monkeypatch.setattr(operator, "company_database_path", lambda _: provider.database)
+    monkeypatch.setattr(operator, "provider_from_config", lambda *args, **kwargs: provider)
+    monkeypatch.setattr(operator, "auto_settings", lambda *args: changed)
+    released = Event()
+    advanced = Event()
+    original_lock = provider._locked
+    failures = []
+
+    def advance():
+        try:
+            assert released.wait(10), "operator did not release its first lock"
+            with original_lock():
+                write_pin(pin_b)
+        except (AssertionError, OSError) as exc:
+            failures.append(exc)
+        finally:
+            advanced.set()
+
+    @contextmanager
+    def boundary():
+        with original_lock():
+            yield
+        if not released.is_set():
+            released.set()
+            assert advanced.wait(10), "registry writer did not finish"
+
+    monkeypatch.setattr(provider, "_locked", boundary)
+    worker = Thread(target=advance)
+    worker.start()
+    try:
+        result = operator.run_operator(
+            "auto-policy-install",
+            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            b"",
+            context.now,
+        )
+    finally:
+        released.set()
+        worker.join(10)
+    assert not worker.is_alive()
+    assert not failures
+    assert advanced.is_set()
+    assert result["policy_digest"] == pin_a.policy_digest
+    with closing(sqlite3.connect(provider.database)) as db:
+        pins = latest_auto_pins(load_journal(db))
+        assert db.execute(
+            "SELECT policy_digest FROM company_auto_policies WHERE policy_version=?",
+            (changed.policy.policy_version,),
+        ).fetchone() == (pin_a.policy_digest,)
+    assert pins[(old.scope.provider_instance_id, old.scope.workspace_id)] == pin_a
 
 
 @pytest.mark.parametrize("resumed,crash", [(False, False), (True, False), (False, True)])
@@ -166,10 +263,18 @@ def test_accepted_workflow_completes_after_policy_rotation(
         provider.registry_path.write_bytes(
             canonical_bytes(model_object(registry.model_copy(update={"auto_policies": [pin]})))
         )
-        provider.validate_auto_policy_pin(scope)
-        with closing(sqlite3.connect(provider.database)) as db, db:
-            install_auto_policy(db, rotated, WORKSPACE, context.now)
-        provider.install_auto_policy_pin(scope)
+
+        def commit_policy() -> str:
+            with closing(sqlite3.connect(provider.database)) as db, db:
+                return install_auto_policy(db, rotated, WORKSPACE, context.now)
+
+        provider.install_auto_policy(
+            scope,
+            commit_policy,
+            policy_digest(rotated.policy),
+            rotated.signer.key_id,
+            public_key_fingerprint(rotated.signer.public_key),
+        )
         for index in range(100):
             receive(provider.database, f"mail:new:{index:03}", f"event:new:{index}", contact_body())
         assert engine._candidate_ids(provider.database, context, rotated)[0] == "mail:1"
