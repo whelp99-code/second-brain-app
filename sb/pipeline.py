@@ -702,13 +702,19 @@ def run_locked(
             and report.source_errors
             and report.errors == len(report.source_errors)
         ):
-            status, exit_code = "partial", 0
+            status, exit_code = "partial", 1
         elif report.attempted > 0 and report.errors * 2 > report.attempted:
             status, exit_code = "failed", 1
         elif report.errors > 0:
             status, exit_code = "partial", 0
         else:
             status, exit_code = "ok", 0
+        # Connection failures and source-unavailable are recorded in source_errors
+        # without a stage failure so a live sibling can still be partial. They must
+        # not certify the run as success, including when a sibling is capped or the
+        # error ratio stays below the failed threshold.
+        if report.source_errors and exit_code == 0:
+            exit_code = 1
         if status == "failed" and failure is None:
             failure = "; ".join(report.source_errors) or (
                 f"STAGE_ERROR_RATIO_EXCEEDED: {stage_name}: "
