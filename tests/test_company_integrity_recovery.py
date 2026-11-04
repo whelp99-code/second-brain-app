@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 from threading import Event, Thread
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -16,16 +17,20 @@ import sb.company_freshness_operator as operator
 from sb.company_approver_binding import public_key_fingerprint
 from sb.company_auto_policy import policy_digest
 from sb.company_auto_settings import AutoInternalRejected
-from sb.company_db_freshness_models import FreshnessRegistry
+from sb.company_db_freshness_models import FreshnessRegistry, OperationRow
 from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_migrations import apply_component_migration
 from sb.company_freshness_models import FreshnessScope
 from sb.company_memory import CompanyMemoryError
 from sb.company_processor_progress import local_checkpoint
-from sb.effect_values import canonical_bytes, format_instant
+from sb.effect_values import JsonObject, canonical_bytes, format_instant
 from sb.effect_write_values import model_object
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import WORKSPACE, contact_body, receive, trigger
+
+
+def _operator_config() -> Path:
+    return cast(Path, cast(object, SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0))))
 
 
 def test_operator_pin_advance_at_first_lock_release_is_consistent(
@@ -104,7 +109,7 @@ def test_operator_pin_advance_at_first_lock_release_is_consistent(
     try:
         result = operator.run_operator(
             "auto-policy-install",
-            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            _operator_config(),
             b"",
             context.now,
         )
@@ -446,7 +451,7 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
             update={"policy_version": settings.policy.policy_version + 1}
         ),
     )
-    updates = {
+    updates: dict[str, object] = {
         "policy_digest": policy_digest(changed.policy),
         "revoked_policy_digests": [old.policy_digest],
     }
@@ -482,7 +487,7 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
     if invalid == "valid":
         result = operator.run_operator(
             "auto-policy-install",
-            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            _operator_config(),
             b"",
             context.now,
         )
@@ -494,7 +499,7 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
     with pytest.raises(AnchorRejected, match="COMPANY_POLICY_REGISTRATION_REQUIRED"):
         operator.run_operator(
             "auto-policy-install",
-            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            _operator_config(),
             b"",
             context.now,
         )
@@ -542,4 +547,6 @@ def test_cancellation_refuses_applied_or_pending_evidence(evidence: str) -> None
             db.execute(f"CREATE TABLE IF NOT EXISTS {evidence}(workspace_id, request_digest)")
             db.execute(f"INSERT INTO {evidence} VALUES(?,?)", (WORKSPACE, "event"))
         with pytest.raises(AnchorRejected, match="COMPANY_PROGRESS_UNCERTAIN"):
-            freshness._verify_unapplied_cancellation(db, scope, original, record)
+            freshness._verify_unapplied_cancellation(
+                db, scope, cast(OperationRow, cast(object, original)), cast(JsonObject, record)
+            )

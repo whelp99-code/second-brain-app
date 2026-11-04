@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 from psycopg.errors import (
@@ -171,7 +172,7 @@ def test_refresh_counts_empty_successful_sources_and_reports_failures(
             return iter(())
 
     class Unavailable(_Down):
-        def scan(self, cursor):
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
             yield SourceRef("down", "unavailable", "v1"), b"", {"skip_reason": "source-unavailable"}
 
     down, notes = (_Down() if transport == "exception" else Unavailable()), Empty()
@@ -210,10 +211,13 @@ def test_successful_source_with_no_new_items_preserves_partial_status(
 
 
 def test_non_source_error_ratio_has_failure_and_stage_detail(tmp_path: Path) -> None:
-    from sb.pipeline import StageReport, run_locked
+    from sb.pipeline import StageFn, StageReport, run_locked
+
+    def exceed_ratio(_ledger: object, _vault: object, _run_id: str) -> StageReport:
+        return StageReport((), 0, 1, 1, False)
 
     root = tmp_path / "vault"
-    outcome = run_locked(root, lambda *_: StageReport((), 0, 1, 1, False), "compile")
+    outcome = run_locked(root, cast(StageFn, cast(object, exceed_ratio)), "compile")
     assert outcome.exit_code == 1
     assert outcome.failure == "STAGE_ERROR_RATIO_EXCEEDED: compile: errors=1 attempted=1"
     with closing(sqlite3.connect(root / ".sb/ledger.db")) as db:
@@ -238,15 +242,17 @@ def test_nonconnection_source_error_with_empty_sibling_remains_failed(
     config = _config(tmp_path)
     outcome = run_ingest(config, ("down", "notes"))
     assert (outcome.status, outcome.exit_code) == ("failed", 1)
-    assert outcome.failure == f"SOURCE_SCAN_FAILED: down: {error_type.__name__}"
+    failure = outcome.failure
+    assert isinstance(failure, str)
+    assert failure == f"SOURCE_SCAN_FAILED: down: {error_type.__name__}"
     with closing(sqlite3.connect(Path(config.vault_root) / ".sb/ledger.db")) as db:
         assert db.execute("SELECT detail FROM run_stage WHERE stage='ingest'").fetchone() == (
-            outcome.failure,
+            failure,
         )
     log = (Path(config.vault_root) / ".sb/runs.log").read_text()
-    assert outcome.failure in log
+    assert failure in log
     assert "synthetic confidential payload" not in log
-    assert "synthetic confidential payload" not in outcome.failure
+    assert "synthetic confidential payload" not in failure
 
 
 @pytest.mark.parametrize(
