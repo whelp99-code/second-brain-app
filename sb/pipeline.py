@@ -83,6 +83,9 @@ class StageReport:
     derivations: tuple[tuple[str, DerivationOutput], ...] = ()
     compiled_by: tuple[str, str] | None = None
     failure: str | None = None
+    sources_succeeded: int = 0
+    sources_failed: int = 0
+    source_errors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -689,16 +692,28 @@ def run_locked(
             line = f"{started} run {run_id} failed pages=0 conflicts=0 errors=1"
             _append_run_log(root, line)
             return RunOutcome(run_id, "failed", 0, 0, 1, 1, None, failure=detail)
-        if report.failure is not None:
+        failure = report.failure
+        if failure is not None:
             status, exit_code = "failed", 1
         elif report.capped:
             status, exit_code = "capped", 0
+        elif (
+            report.sources_succeeded > 0
+            and report.source_errors
+            and report.errors == len(report.source_errors)
+        ):
+            status, exit_code = "partial", 0
         elif report.attempted > 0 and report.errors * 2 > report.attempted:
             status, exit_code = "failed", 1
         elif report.errors > 0:
             status, exit_code = "partial", 0
         else:
             status, exit_code = "ok", 0
+        if status == "failed" and failure is None:
+            failure = "; ".join(report.source_errors) or (
+                f"STAGE_ERROR_RATIO_EXCEEDED: {stage_name}: "
+                f"errors={report.errors} attempted={report.attempted}"
+            )
         commit, pages, conflicts, errors = None, 0, report.conflicts, report.errors
         rendered = f"{started} run {run_id} {status} pages={{0}} conflicts={{1}} errors={{2}}"
         if report.pages:
@@ -739,7 +754,17 @@ def run_locked(
                 report.attempted,
                 report.written or pages,
                 errors,
-                report.failure,
+                json.dumps(
+                    {
+                        "sources_succeeded": report.sources_succeeded,
+                        "sources_failed": report.sources_failed,
+                        "source_errors": report.source_errors,
+                        "failure": failure,
+                    },
+                    separators=(",", ":"),
+                )
+                if (report.sources_succeeded or report.sources_failed) and report.failure is None
+                else failure,
             )
         )
         _append_run_log(root, rendered.format(pages, conflicts, errors))
@@ -753,7 +778,7 @@ def run_locked(
             commit,
             False,
             report.written,
-            report.failure,
+            failure,
         )
 
 
@@ -993,9 +1018,7 @@ def _prepare_adapter_ingest(
         cursor = (adapter.next_cursor(), datetime.now(UTC).isoformat())
     accepted_count = written
     scanned = accepted_count + unchanged + filtered + quarantined + deferred + retryable + permanent
-    state = "unavailable" if source_unavailable else (
-        "ok" if advance else "partial"
-    )
+    state = "unavailable" if source_unavailable else ("ok" if advance else "partial")
     receipt = _scan_receipt_row(
         run_id,
         adapter.source_id,
@@ -1027,11 +1050,19 @@ def _prepare_adapter_ingest(
     )
 
 
-def _note_source_unavailable(
+def _is_connection_failure(exc: Exception) -> bool:
+    from psycopg.errors import ConnectionException, ConnectionTimeout
+
+    return isinstance(exc, (ConnectionError, TimeoutError, ConnectionException, ConnectionTimeout))
+
+
+def _note_source_failure(
     ledger: Ledger, root: Path, source_id: str, run_id: str, exc: Exception
-) -> None:
+) -> str:
     code = type(exc).__name__
-    digest = hashlib.sha256(f"SOURCE_UNAVAILABLE:{source_id}:{code}".encode()).hexdigest()
+    unavailable = _is_connection_failure(exc)
+    prefix = "SOURCE_UNAVAILABLE" if unavailable else "SOURCE_SCAN_FAILED"
+    digest = hashlib.sha256(f"{prefix}:{source_id}:{code}".encode()).hexdigest()
     with ledger.transaction():
         _ = ledger.upsert_source_items(
             (
@@ -1050,11 +1081,25 @@ def _note_source_unavailable(
         if canonical is not None and canonical != checkpoint:
             ledger.set_cursor(source_id, canonical, format_instant(datetime.now(UTC)))
         receipt = _scan_receipt_row(
-            run_id, source_id, format_instant(datetime.now(UTC)), "unavailable",
-            checkpoint, checkpoint, 0, 0, 0, 0, 0, 0, 0, 0,
+            run_id,
+            source_id,
+            format_instant(datetime.now(UTC)),
+            "unavailable",
+            checkpoint,
+            checkpoint,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
         )
         ledger.insert_scan_receipt(receipt)
-    _append_run_log(root, f"SOURCE_UNAVAILABLE: {source_id}: {code}")
+    detail = f"{prefix}: {source_id}: {code}"
+    _append_run_log(root, f"{format_instant(datetime.now(UTC))} {detail}")
+    return detail
 
 
 def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) -> StageFn:
@@ -1095,6 +1140,8 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
         capped = False
         used_units = 0
         failure: str | None = None
+        sources_succeeded = sources_failed = 0
+        source_errors: list[str] = []
         for adapter in adapters:
             if isinstance(adapter, LifeExportAdapter) and adapter.supports_life_events:
                 from sb.life_ingest import complete_exports, prepare_exports
@@ -1119,12 +1166,18 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
                     written += life_written
                     capped = capped or life_result.capped
                     if life_result.errors:
+                        sources_failed += 1
                         failure = failure or "LIFE_EXPORT_PARTIAL_FAILURE"
+                    elif not life_result.capped:
+                        sources_succeeded += 1
                 except (OSError, ValueError, RuntimeError, GitCommandError, VaultLintError) as exc:
                     errors += 1
                     attempted += 1
                     failure = failure or "LIFE_EXPORT_FAILED"
-                    _note_source_unavailable(ledger, vault.root, adapter.source_id, run_id, exc)
+                    sources_failed += 1
+                    source_errors.append(
+                        _note_source_failure(ledger, vault.root, adapter.source_id, run_id, exc)
+                    )
                 if capped and attempted >= cap:
                     break
                 continue
@@ -1150,7 +1203,14 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
             except Exception as exc:  # noqa: BLE001 - one unreachable source must not abort the batch
                 errors += 1
                 attempted += 1
-                _note_source_unavailable(ledger, vault.root, adapter.source_id, run_id, exc)
+                sources_failed += 1
+                diagnostic = _note_source_failure(
+                    ledger, vault.root, adapter.source_id, run_id, exc
+                )
+                if _is_connection_failure(exc):
+                    source_errors.append(diagnostic)
+                else:
+                    failure = failure or diagnostic
                 continue
             with ledger.transaction():
                 _ = ledger.upsert_source_items(prepared.source_items)
@@ -1168,8 +1228,11 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
                     checkpoint = ledger.get_cursor(adapter.source_id)
                     canonical = checkpoint_for_receipt(checkpoint)
                     if canonical is not None and canonical != checkpoint:
-                        ledger.set_cursor(adapter.source_id, canonical, format_instant(datetime.now(UTC)))
+                        ledger.set_cursor(
+                            adapter.source_id, canonical, format_instant(datetime.now(UTC))
+                        )
                     ledger.insert_scan_receipt(prepared.receipt)
+            acknowledgement_failed = False
             if isinstance(adapter, AcknowledgingSourceAdapter):
                 try:
                     adapter.acknowledge(
@@ -1181,6 +1244,7 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
                     )
                 except OSError:
                     errors += 1
+                    acknowledgement_failed = True
                     failure = failure or "SOURCE_ACKNOWLEDGEMENT_FAILED"
             seen.update(prepared.version_keys)
             used_units += len(prepared.units)
@@ -1188,10 +1252,32 @@ def ingest(config: Config, source_ids: Sequence[str] | None, limit: int | None) 
             attempted += prepared.attempted
             written += prepared.written
             capped = capped or prepared.capped
-            failure = failure or prepared.failure
+            if prepared.failure == f"SOURCE_UNAVAILABLE: {adapter.source_id}":
+                sources_failed += 1
+                diagnostic = prepared.failure or f"SOURCE_UNAVAILABLE: {adapter.source_id}"
+                source_errors.append(diagnostic)
+                _append_run_log(vault.root, f"{format_instant(datetime.now(UTC))} {diagnostic}")
+            else:
+                if prepared.errors or acknowledgement_failed:
+                    sources_failed += 1
+                elif not prepared.capped:
+                    sources_succeeded += 1
+                failure = failure or prepared.failure
             if capped and attempted >= cap:
                 break
-        return StageReport((), 0, errors, attempted, capped, None, written, failure=failure)
+        return StageReport(
+            (),
+            0,
+            errors,
+            attempted,
+            capped,
+            None,
+            written,
+            failure=failure,
+            sources_succeeded=sources_succeeded,
+            sources_failed=sources_failed,
+            source_errors=tuple(source_errors),
+        )
 
     return stage
 
@@ -1490,7 +1576,9 @@ def _observation_ids(root: Path) -> tuple[str, ...]:
     return tuple(path.stem for path in journal.rglob("*.json") if len(path.stem) == 64)
 
 
-def _advance_observations_published(root: Path, pages: Sequence[PageSpec], commit: str | None) -> None:
+def _advance_observations_published(
+    root: Path, pages: Sequence[PageSpec], commit: str | None
+) -> None:
     """Published only after a commit sha exists. Searchable is a later proof."""
     if not commit or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit):
         return
@@ -1601,7 +1689,9 @@ def _publish_life_events(
 
         explicit = Path(config.knowledge_registry) if "knowledge_registry" in config.raw else None
         SearchIndex(vault_root=vault.root, registry_path=explicit).project()
-        _advance_searchable(ledger.life_store(), tuple(event.event_id for event in events), vault.root)
+        _advance_searchable(
+            ledger.life_store(), tuple(event.event_id for event in events), vault.root
+        )
     return count
 
 
@@ -2127,6 +2217,11 @@ def run_all(config: Config, sources: Sequence[str] | None = None) -> RunOutcome:
     root = Path(config.vault_root)
     if not root.is_symlink() and "share_root" not in config.raw:
         return run_all_mutable(config, sources)
+    from sb.owner_effects import recover_owner_effects
+
+    # Recovery owns its publication/request locks. Do not nest those locks
+    # under the generation writer lock; mutate still checks live authority.
+    recover_owner_effects(config)
     lock_root = generation_runtime_paths(config).state
     fd = try_lock(lock_root)
     if fd is None:
