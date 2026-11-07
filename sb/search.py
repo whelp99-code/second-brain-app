@@ -58,6 +58,26 @@ _ACTIVE_SCOPE: Final = "active"
 _CANDIDATE_SCOPE: Final = "candidate"
 _REFERENCE_SCOPE: Final = "reference"
 _ALL_SCOPE: Final = "all"
+# A role word, not a company name. Drop it only when the full AND misses.
+_UNBOUND_ROLE_TERMS: Final = frozenset({"고객사"})
+
+def _serialize_retained_term(term: str) -> str:
+    if term and not any(char.isspace() or char in '"\\' for char in term):
+        return term
+    escaped = term.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+
+
+def without_unbound_role(query: str) -> str | None:
+    terms = LexicalQuery.parse(query).terms
+    kept = tuple(term for term in terms if term not in _UNBOUND_ROLE_TERMS)
+    if not kept or len(kept) == len(terms):
+        return None
+    return " ".join(_serialize_retained_term(term) for term in kept)
+
+
 
 
 class SearchHitDict(TypedDict, closed=True):
@@ -276,12 +296,30 @@ class SearchIndex:
         updated_from: str | None = None,
         updated_to: str | None = None,
         scope: str | None = None,
+        _drop_unbound_role: bool = True,
     ) -> tuple[SearchHit, ...]:
         """Refresh from Git HEAD only when needed, then BM25-search `query`.
 
         Cards that share an original hash keep the earlier card. Other cards keep their order.
         """
         _ = LexicalQuery.parse(query)
+        def finish(found: tuple[SearchHit, ...]) -> tuple[SearchHit, ...]:
+            if found or not _drop_unbound_role:
+                return found
+            relaxed = without_unbound_role(query)
+            if relaxed is None:
+                return found
+            return self.search(
+                relaxed,
+                limit,
+                kinds=kinds,
+                status=status,
+                updated_from=updated_from,
+                updated_to=updated_to,
+                scope=scope,
+                _drop_unbound_role=False,
+            )
+
         root = self.vault_root.resolve()
         if (root / "generation.json").is_file():
             with closing(
@@ -303,9 +341,9 @@ class SearchIndex:
                 ),
             )
             if not semantic:
-                return _prefer_first_ingested(root, lexical)
+                return finish(_prefer_first_ingested(root, lexical))
             module = _sealed_vector_module()
-            return _prefer_first_ingested(root, module.merge_ranked(lexical, semantic, limit))
+            return finish(_prefer_first_ingested(root, module.merge_ranked(lexical, semantic, limit)))
         db_path = _db_path(root)
         registry = KnowledgeRegistry(resolve_registry_path(root, self.registry_path))
         _refresh(db_path, root, registry)
@@ -313,7 +351,7 @@ class SearchIndex:
                 updated_from=updated_from, updated_to=updated_to, scope=scope)) as visible_hits:
             hits = tuple(islice(visible_hits, max(0, limit)))
         if not _wants_hybrid(self.hybrid):
-            return _prefer_first_ingested(root, hits)
+            return finish(_prefer_first_ingested(root, hits))
         combined = _hybrid_or_lexical(
             hits,
             query,
@@ -324,7 +362,7 @@ class SearchIndex:
             ),
         )
         kept = tuple(hit for hit in combined if _life_hit_allowed(root, hit.page_id))
-        return _prefer_first_ingested(root, kept)
+        return finish(_prefer_first_ingested(root, kept))
 
     def iter_lexical_hits(
         self,
