@@ -31,7 +31,7 @@ from sb.knowledge_registry import (
 from sb.page_metadata import frontmatter_value as _frontmatter_value
 from sb.page_metadata import frontmatter_values
 from sb.search_filters import SearchFilters
-from sb.search_query import LexicalQuery, normalize
+from sb.search_query import LexicalQuery, group_sources, normalize
 
 _LOGGER: Final = logging.getLogger(__name__)
 _DB_NAME: Final = "search.db"
@@ -61,21 +61,18 @@ _ALL_SCOPE: Final = "all"
 # A role word, not a company name. Drop it only when the full AND misses.
 _UNBOUND_ROLE_TERMS: Final = frozenset({"고객사"})
 
-def _serialize_retained_term(term: str) -> str:
-    if term and not any(char.isspace() or char == '"' for char in term):
-        return term
-    escaped = term.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
-
-
-
-
 def without_unbound_role(query: str) -> str | None:
-    terms = LexicalQuery.parse(query).terms
-    kept = tuple(term for term in terms if term not in _UNBOUND_ROLE_TERMS)
-    if not kept or len(kept) == len(terms):
+    parsed = LexicalQuery.parse(query)
+    if not any(term in _UNBOUND_ROLE_TERMS for term in parsed.terms):
         return None
-    return " ".join(_serialize_retained_term(term) for term in kept)
+    kept = [
+        raw
+        for raw, term in group_sources(query.strip())
+        if term not in _UNBOUND_ROLE_TERMS
+    ]
+    if not kept:
+        return None
+    return " ".join(kept)
 
 
 
