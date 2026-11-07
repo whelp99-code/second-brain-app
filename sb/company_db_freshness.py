@@ -1388,10 +1388,13 @@ class CompanyDbFreshnessProvider:
                             reclassify=False,
                         )
             for entry in entries:
+                operation_id = entry.operation_id
+                if operation_id is None:
+                    continue
                 if entry.phase != "finish" or entry.record.get("terminal_state") == "cancelled":
                     continue
                 original = indexed.get(
-                    (entry.scope.provider_instance_id, entry.scope.workspace_id, entry.operation_id)
+                    (entry.scope.provider_instance_id, entry.scope.workspace_id, operation_id)
                 )
                 if (
                     original is not None
@@ -1543,8 +1546,11 @@ class CompanyDbFreshnessProvider:
             for entry in entries:
                 if entry.phase != "finish":
                     continue
+                operation_id = entry.operation_id
+                if not isinstance(operation_id, str):
+                    continue
                 original = jarvis_operations.get(
-                    (entry.scope.provider_instance_id, entry.scope.workspace_id, entry.operation_id)
+                    (entry.scope.provider_instance_id, entry.scope.workspace_id, operation_id)
                 )
                 if original is None:
                     continue
@@ -1881,11 +1887,13 @@ class CompanyDbFreshnessProvider:
             )
             if checkpoint.intent_root != pin.genesis_digest or pin.epoch != 1:
                 raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+            transition_receipts: list[JsonValue] = []
+            transition_receipts.extend(default_transition_receipts)
             record: JsonObject = {
                 "phase": "bootstrap",
                 "epoch": 1,
                 "inventory": model_object(inventory),
-                "default_transition_receipts": default_transition_receipts,
+                "default_transition_receipts": transition_receipts,
                 "source_deletion_sequence": pin.source_deletion_sequence,
                 "source_deletion_root": pin.source_deletion_root,
                 "source_context_digest": pin.source_context_digest,
@@ -2696,6 +2704,9 @@ def _verify_unapplied_cancellation(
     if binding is not None:
         if not isinstance(binding, dict):
             raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
+        handoff_id = binding["handoff_id"]
+        if not isinstance(handoff_id, str):
+            raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")
         reserved = [
             entry
             for entry in load_journal(connection)
@@ -2732,7 +2743,7 @@ def _verify_unapplied_cancellation(
             or original.operation_id
             != operation_id_for(
                 scope,
-                request_id=binding["handoff_id"],
+                request_id=handoff_id,
                 command_digest=command_digest(model_object(command)),
                 operation=original.operation,
             )

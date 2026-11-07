@@ -27,6 +27,7 @@ from tests.company_internal_auto_support import (
     trigger,
 )
 from tests.test_company_round12_integrity import readiness
+from tests.typed_json import require_object
 
 
 class Crash(BaseException):
@@ -223,8 +224,10 @@ def test_q_existing_enrollment_never_grants_default_genesis_authority(tmp_path, 
         config_root = tmp_path / "enrollment-config"
         config_root.mkdir()
         config = load_company_config(setup_config(config_root))
+        policy = config.handoff_policy
+        assert policy is not None
         with closing(sqlite3.connect(kwargs["database"])) as db, db:
-            enroll_policy(db, CONTEXT, config.handoff_policy, {}, NOW)
+            enroll_policy(db, CONTEXT, policy, {}, NOW)
         before_nv = kwargs["anchor"].read_value()
         with pytest.raises((EvidenceRejected, AnchorRejected)):
             bootstrap(**kwargs)
@@ -255,9 +258,12 @@ def test_q_published_default_finish_survives_enrollment(tmp_path, monkeypatch):
             config_root = tmp_path / "enrollment-config"
             config_root.mkdir()
             config = load_company_config(setup_config(config_root))
+            policy = config.handoff_policy
+            if policy is None:
+                raise AssertionError("handoff_policy")
             with closing(sqlite3.connect(provider.database)) as db, db:
                 enroll_policy(
-                    db, replace(CONTEXT, provider="provider.one"), config.handoff_policy, {}, NOW
+                    db, replace(CONTEXT, provider="provider.one"), policy, {}, NOW
                 )
             enrolled = True
         return result
@@ -310,15 +316,17 @@ def test_s_baseline_receipt_does_not_block_expired_zero_effect_cancel(
     tmp_path, monkeypatch, operation
 ):
     provider, settings, context = real_company_runtime(tmp_path)
-    arguments = {
-        "candidate_id": "baseline:mail",
-        "source_system": "mail",
-        "source_locator": "msg/baseline",
-        "source_event_id": "baseline:event",
-        "content": contact_body(),
-        "parser_version": "mail:1",
-        "locator": {"kind": "message"},
-    }
+    arguments = require_object(
+        {
+            "candidate_id": "baseline:mail",
+            "source_system": "mail",
+            "source_locator": "msg/baseline",
+            "source_event_id": "baseline:event",
+            "content": contact_body(),
+            "parser_version": "mail:1",
+            "locator": {"kind": "message"},
+        }
+    )
     with closing(CompanyMemoryStore(provider.database)) as store:
         receipt = store.execute(
             workspace_id=WORKSPACE,
@@ -330,11 +338,12 @@ def test_s_baseline_receipt_does_not_block_expired_zero_effect_cancel(
             now=NOW,
         )
         if operation == "read":
+            read_arguments = require_object({"candidate_id": "baseline:mail"})
             receipt = store.execute(
                 workspace_id=WORKSPACE,
-                request_digest=company_request_digest("read", {"candidate_id": "baseline:mail"}),
+                request_digest=company_request_digest("read", read_arguments),
                 operation="read",
-                arguments={"candidate_id": "baseline:mail"},
+                arguments=read_arguments,
                 current=ACCESS,
                 deletion=DELETION,
                 now=NOW,

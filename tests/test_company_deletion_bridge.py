@@ -85,21 +85,23 @@ def test_registered_deletion_records_original_times_then_closes_unsafe_enrollmen
     before_spool = spool.read_bytes()
     finish = provider.finish_progress
 
-    def interrupted_finish(request: FinishProgressRequest):
-        def fail(*_args: object, **_kwargs: object) -> None:
-            raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
-
-        with monkeypatch.context() as fault:
-            name = {
-                "witness": "append_witness_frame",
-                "extend": "extend_if_needed",
-                "publication": "_finish_operation",
-            }[boundary]
-            fault.setattr(freshness, name, fail)
-            return finish(request)
-
     if boundary is not None:
+        fault_name = {
+            "witness": "append_witness_frame",
+            "extend": "extend_if_needed",
+            "publication": "_finish_operation",
+        }[boundary]
+
+        def interrupted_finish(request: FinishProgressRequest):
+            def fail(*_args: object, **_kwargs: object) -> None:
+                raise AnchorRejected("COMPANY_FRESHNESS_REQUIRED")
+
+            with monkeypatch.context() as fault:
+                fault.setattr(freshness, fault_name, fail)
+                return finish(request)
+
         monkeypatch.setattr(provider, "finish_progress", interrupted_finish)
+
     result = provider.bridge_deletion(
         scope=PROVIDER_SCOPE,
         deletion_plan_digest=RECEIPT_BINDING,

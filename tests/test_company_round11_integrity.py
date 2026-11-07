@@ -13,6 +13,7 @@ import sb.company_auto_readback as readback
 import sb.company_internal_effects as effects
 from sb.company_auto_settings import AutoInternalRejected
 from sb.company_freshness_anchor import AnchorRejected
+from sb.effect_values import JsonObject
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import contact_body, receive, trigger
 
@@ -57,8 +58,25 @@ def upgrade_classifier(monkeypatch: pytest.MonkeyPatch, *, changed_output: bool)
 
     digest = engine.assessment_digest
 
-    def current_digest(**kwargs):
-        return digest(**(kwargs | {"classifier_version": version}))
+    def current_digest(
+        *,
+        candidate_id: str,
+        content_digest: str,
+        policy_digest_value: str,
+        classification: str,
+        reason_codes: tuple[str, ...],
+        payload: JsonObject | None,
+        classifier_version: str = version,
+    ) -> str:
+        return digest(
+            candidate_id=candidate_id,
+            content_digest=content_digest,
+            policy_digest_value=policy_digest_value,
+            classification=classification,
+            reason_codes=reason_codes,
+            payload=payload,
+            classifier_version=version,
+        )
 
     monkeypatch.setattr(engine, "classify_mail_candidate", changed)
     monkeypatch.setattr(engine, "assessment_digest", current_digest)

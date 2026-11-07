@@ -41,6 +41,7 @@ from tests.company_internal_auto_support import (
 )
 from tests.test_company_auto_report import query
 from tests.test_company_db_cancellation import cancelled_runtime, finish_with_proof
+from tests.typed_json import dig_text, require_object
 
 
 def report(
@@ -170,7 +171,7 @@ def test_cancellation_source_reuse_is_rejected_before_irreversible_publication(
     command_digest = "sha256:" + hashlib.sha256(canonical_bytes(proof["command"])).hexdigest()
     operation = operation_id_for(
         scope,
-        request_id=proof["command"]["request_id"],
+        request_id=dig_text(proof, "command", "request_id"),
         command_digest=command_digest,
         operation="decide_reject",
     )
@@ -186,12 +187,16 @@ def test_cancellation_source_reuse_is_rejected_before_irreversible_publication(
         )
     )
     assert isinstance(reserved, ReserveProgressResponse) and reserved.outcome == "reserved"
-    duplicate = {
-        **first,
-        "operation_id": operation,
-        "reservation_id": reserved.reservation_id,
-        "expected_checkpoint": reserved.checkpoint.model_dump(mode="json"),
-    }
+    assert reserved.checkpoint is not None
+    assert reserved.reservation_id is not None
+    duplicate = require_object(
+        {
+            **first,
+            "operation_id": operation,
+            "reservation_id": reserved.reservation_id,
+            "expected_checkpoint": reserved.checkpoint.model_dump(mode="json"),
+        }
+    )
     nv = provider.anchor.read_value()
     witness = (provider.witness_dir / "frames.jsonl").read_bytes()
     with closing(sqlite3.connect(provider.database)) as db:

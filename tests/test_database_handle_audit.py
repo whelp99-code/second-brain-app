@@ -1,7 +1,9 @@
 import os
+import re
 import sqlite3
 import subprocess
 import sys
+import types
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -47,6 +49,20 @@ class DatabaseAudit(Protocol):
     ) -> dict[tuple[int, int], str]: ...
     def inspect(self, database: Path, uid: int | None = None) -> DatabaseReport: ...
     def process_owner(self, pid: int) -> Owner: ...
+    os: types.ModuleType
+    _MAP_RANGE: re.Pattern[str]
+    def subvolume_id(self, path: Path) -> int: ...
+    def _holder_root(self, pid: int) -> Path | None: ...
+    def _mapping_path(self, pid: int, pathname: str) -> Path | None: ...
+    def _mapping_is_selected(
+        self, paths: list[Path], pathname: str, name: str, pid: int, address_range: str = ""
+    ) -> bool: ...
+    def _same_file(self, joined: Path, canonical: Path) -> bool: ...
+    def _map_files_link(self, pid: int, address_range: str) -> Path | None: ...
+    def _map_file_identity(self, pid: int, address_range: str) -> tuple[int, int, int] | None: ...
+    def _identities_differ(
+        self, mapped: tuple[int, int, int], selected: tuple[int, int, int]
+    ) -> bool: ...
 
 
 def audit_api() -> DatabaseAudit:
@@ -601,9 +617,10 @@ def test_proc_root_is_joined_before_resolve(monkeypatch: pytest.MonkeyPatch) -> 
     seen: list[str] = []
     original = os.path.realpath
 
-    def tracing_realpath(path: object, *, strict: bool = False) -> str:
-        seen.append(os.fsdecode(os.fsencode(path)))  # type: ignore[arg-type]
-        return original(path, strict=strict)  # type: ignore[arg-type]
+    def tracing_realpath(path: str | bytes | os.PathLike[str], *, strict: bool = False) -> str:
+        seen.append(os.fsdecode(os.fsencode(path)))
+        resolved = original(path, strict=strict)
+        return resolved if isinstance(resolved, str) else os.fsdecode(resolved)
 
     executable = Path(sys.executable).resolve(strict=True)
     monkeypatch.setattr(audit.os.path, "realpath", tracing_realpath)
@@ -697,9 +714,9 @@ def test_different_namespace_mapping_stays_reported_when_unresolvable(
             return True
         return original_is_dir(path)
 
-    def missing_realpath(path: object, *, strict: bool = False) -> str:
+    def missing_realpath(path: str | bytes | os.PathLike[str], *, strict: bool = False) -> str:
         del strict
-        seen.append(os.fsdecode(os.fsencode(path)))  # type: ignore[arg-type]
+        seen.append(os.fsdecode(os.fsencode(path)))
         raise FileNotFoundError(path)
 
     monkeypatch.setattr(Path, "is_dir", root_visible)
@@ -861,6 +878,7 @@ def test_live_map_files_follow_is_denied_without_opening_foreign_files() -> None
     )
     link = audit._map_files_link(pid, ranged)
     assert link == Path("/proc") / str(pid) / "map_files" / ranged
+    assert link is not None
     try:
         followed = link.stat()
     except PermissionError as exc:

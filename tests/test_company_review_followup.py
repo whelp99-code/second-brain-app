@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
+
+
+@dataclass
+class ExpiredAuthority:
+    request_digest: str
+    issued_at: str
+    expires_at: str
+
+
 
 import pytest
 
@@ -39,6 +48,7 @@ from tests.company_internal_auto_support import (
     report_grant,
     trigger,
 )
+from tests.test_company_approver_binding import fixture_policy
 from tests.test_company_auto_report import query
 
 
@@ -254,9 +264,9 @@ def test_expiry_after_real_reserve_releases_only_new_unapplied_operation(tmp_pat
                 store,
                 provider,
                 context=authority_context,
-                policy=None,
+                policy=fixture_policy()[1],
                 owner_keys={},
-                authority=SimpleNamespace(
+                authority=ExpiredAuthority(
                     request_digest=digest,
                     issued_at=format_instant(context.now),
                     expires_at=format_instant(context.now + timedelta(minutes=5)),

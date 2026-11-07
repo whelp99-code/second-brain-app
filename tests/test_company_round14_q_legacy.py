@@ -174,13 +174,17 @@ def runtime(tmp_path, kind, operation, monkeypatch, mode="missing"):
                     reservation=reservation,
                 ),
             )
+        reservation_id = reservation.reservation_id
+        checkpoint = reservation.checkpoint
+        if reservation_id is None or checkpoint is None:
+            raise AssertionError("reservation")
         finished = provider.finish_progress(
             FinishProgressRequest(
                 schema_version=2,
                 scope=SCOPE,
                 operation_id=operation_id,
-                reservation_id=reservation.reservation_id,
-                expected_checkpoint=reservation.checkpoint,
+                reservation_id=reservation_id,
+                expected_checkpoint=checkpoint,
                 evidence_digest=receipt.receipt_digest,
                 terminal_state="accepted" if operation == "accept" else "rejected",
                 challenge="legacy:finish",
@@ -213,11 +217,14 @@ def enroll(tmp_path, provider):
     root = tmp_path / "enrollment"
     root.mkdir()
     config = load_company_config(setup_config(root))
+    policy = config.handoff_policy
+    if policy is None:
+        raise AssertionError("handoff_policy")
     with closing(sqlite3.connect(provider.database)) as db, db:
         enroll_policy(
             db,
             replace(CONTEXT, provider=PROVIDER, workspace_id=WORKSPACE),
-            config.handoff_policy,
+            policy,
             {},
             NOW,
         )

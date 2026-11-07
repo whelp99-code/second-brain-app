@@ -240,6 +240,8 @@ def _one(
             candidate_id, "human_required", 0, (), ("fence_advanced",), False
         ), checkpoint
     with closing(sqlite3.connect(database)) as db:
+        accepted_payload = None
+        accepted_receipt = None
         if human_path_blocks(db, scope, candidate_id):
             return _outcome(
                 candidate_id, "skipped_human", 0, (), ("human_path",), False
@@ -325,6 +327,8 @@ def _one(
     digest = policy_digest(settings.policy)
     classification: Literal["auto_internal", "human_required"]
     if candidate.state == "accepted":
+        if accepted_payload is None or accepted_receipt is None:
+            raise AutoInternalRejected("COMPANY_PROGRESS_UNCERTAIN")
         kind = accepted_payload.record_kind
         fields = accepted_payload.fields
         reasons: tuple[str, ...] = ()
