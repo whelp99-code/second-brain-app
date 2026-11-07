@@ -60,30 +60,3 @@ tests/test_observation_admission.py
 tests/test_observation_receipt_pipeline.py
 tests/test_source_manifest.py
 tests/test_web_source_observations.py
-
-# Pre-existing errors on master 03c1f875 (518 errors, 23 files).
-# Byte-identical on this branch; this PR does not modify them.
-# tests/test_company_approver_guards.py and tests/test_outlook_morning.py stay out: 0 errors.
-sb/company_auto_cancellation.py
-sb/company_auto_engine.py
-sb/company_db_freshness.py
-sb/company_freshness_genesis.py
-tests/company_db_freshness_smoke.py
-tests/test_company_crash_boundaries.py
-tests/test_company_deletion_bridge.py
-tests/test_company_integrity_recovery.py
-tests/test_company_jarvis_evidence.py
-tests/test_company_memory_registration.py
-tests/test_company_review_followup.py
-tests/test_company_round10_integrity.py
-tests/test_company_round11_integrity.py
-tests/test_company_round12_integrity.py
-tests/test_company_round14_integrity.py
-tests/test_company_round14_q_legacy.py
-tests/test_company_round15_integrity.py
-tests/test_company_round16_integrity.py
-tests/test_company_round9_integrity.py
-tests/test_company_six_integrity.py
-tests/test_database_handle_audit.py
-tests/test_generations.py
-tests/test_mcp_local_search_fence.py
