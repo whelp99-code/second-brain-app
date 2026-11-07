@@ -15,21 +15,22 @@ def normalize(text: str) -> str:
     return _compact(text.casefold())
 
 
-def _groups(text: str) -> tuple[str, ...]:
-    groups: list[str] = []
+def _group_spans(text: str) -> tuple[tuple[int, int, str], ...]:
+    spans: list[tuple[int, int, str]] = []
     index = 0
     while index < len(text):
         if text[index].isspace():
             index += 1
             continue
-        if len(groups) >= MAX_QUERY_GROUPS:
+        if len(spans) >= MAX_QUERY_GROUPS:
             raise SearchQueryError("SEARCH_QUERY_TOO_MANY_GROUPS: maximum 32")
         if text[index] != '"':
             start = index
             while index < len(text) and not text[index].isspace():
                 index += 1
-            groups.append(text[start:index])
+            spans.append((start, index, text[start:index]))
             continue
+        start = index
         index += 1
         characters: list[str] = []
         while index < len(text) and text[index] != '"':
@@ -40,13 +41,26 @@ def _groups(text: str) -> tuple[str, ...]:
         if index == len(text):
             raise SearchQueryError("SEARCH_QUERY_SYNTAX: unclosed quoted phrase")
         index += 1
+        end = index
         if index < len(text) and not text[index].isspace():
             raise SearchQueryError("SEARCH_QUERY_SYNTAX: separate quoted groups with whitespace")
         phrase = "".join(characters)
         if not phrase.strip():
             raise SearchQueryError("SEARCH_QUERY_SYNTAX: empty quoted phrase")
-        groups.append(phrase)
-    return tuple(dict.fromkeys(groups))
+        spans.append((start, end, phrase))
+    unique: dict[str, tuple[int, int, str]] = {}
+    for span in spans:
+        unique.setdefault(span[2], span)
+    return tuple(unique.values())
+
+
+def group_sources(text: str) -> tuple[tuple[str, str], ...]:
+    """Original source slice and parsed term for each unique group, in order."""
+    return tuple((text[start:end], term) for start, end, term in _group_spans(text))
+
+
+def _groups(text: str) -> tuple[str, ...]:
+    return tuple(term for _, _, term in _group_spans(text))
 
 
 @dataclass(frozen=True, slots=True)
