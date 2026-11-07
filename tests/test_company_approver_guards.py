@@ -6,7 +6,7 @@ import subprocess
 from contextlib import closing
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import pytest
 
