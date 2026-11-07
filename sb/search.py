@@ -62,7 +62,7 @@ _ALL_SCOPE: Final = "all"
 _UNBOUND_ROLE_TERMS: Final = frozenset({"고객사"})
 
 def _serialize_retained_term(term: str) -> str:
-    if term and not any(char.isspace() or char in '"\\' for char in term):
+    if term and not any(char.isspace() or char == '"' for char in term):
         return term
     escaped = term.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
