@@ -100,18 +100,14 @@ def test_two_events_reach_morning_cards_without_send(tmp_path: Path) -> None:
     listener.listen(1)
     cli = tmp_path / "write-calendar"
     cli.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'out=""',
-                'while [ $# -gt 0 ]; do',
-                '  if [ "$1" = "--out" ]; then out="$2"; shift 2; else shift; fi',
-                "done",
-                'printf "%s\\n" "$CALENDAR_FIXTURE" > "$out"',
-                "exit 0",
-                "",
-            ]
-        ),
+        """#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+  if [ "$1" = "--out" ]; then out="$2"; shift 2; else shift; fi
+done
+printf "%s\\n" "$CALENDAR_FIXTURE" > "$out"
+exit 0
+""",
         encoding="utf-8",
     )
     cli.chmod(0o700)
