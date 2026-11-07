@@ -15,7 +15,7 @@ import sb.company_freshness_operator as operator
 from sb.company_approver_binding import public_key_fingerprint
 from sb.company_auto_policy import policy_digest
 from sb.company_auto_settings import AutoInternalRejected
-from sb.company_db_freshness_models import FreshnessRegistry
+from sb.company_db_freshness_models import FreshnessRegistry, OperationRow
 from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_migrations import apply_component_migration
 from sb.company_freshness_models import FreshnessScope
@@ -25,6 +25,7 @@ from sb.effect_values import canonical_bytes, format_instant
 from sb.effect_write_values import model_object
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import WORKSPACE, contact_body, receive, trigger
+from tests.typed_json import require_object
 
 
 @pytest.mark.parametrize("resumed,crash", [(False, False), (True, False), (False, True)])
@@ -341,7 +342,7 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
             update={"policy_version": settings.policy.policy_version + 1}
         ),
     )
-    updates = {
+    updates: dict[str, object] = {
         "policy_digest": policy_digest(changed.policy),
         "revoked_policy_digests": [old.policy_digest],
     }
@@ -374,10 +375,20 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
     monkeypatch.setattr(operator, "company_database_path", lambda _: provider.database)
     monkeypatch.setattr(operator, "provider_from_config", lambda *args, **kwargs: provider)
     monkeypatch.setattr(operator, "auto_settings", lambda *args: changed)
+    config_path = tmp_path / "operator.toml"
+    config_path.write_bytes(b"")
+    original_stat = Path.stat
+    monkeypatch.setattr(
+        Path,
+        "stat",
+        lambda path, *args, **kwargs: SimpleNamespace(st_uid=0)
+        if path == config_path
+        else original_stat(path, *args, **kwargs),
+    )
     if invalid == "valid":
         result = operator.run_operator(
             "auto-policy-install",
-            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            config_path,
             b"",
             context.now,
         )
@@ -389,7 +400,7 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
     with pytest.raises(AnchorRejected, match="COMPANY_POLICY_REGISTRATION_REQUIRED"):
         operator.run_operator(
             "auto-policy-install",
-            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            config_path,
             b"",
             context.now,
         )
@@ -410,12 +421,19 @@ def test_operator_rejects_invalid_pin_before_policy_commit(
 )
 def test_cancellation_refuses_applied_or_pending_evidence(evidence: str) -> None:
     scope = FreshnessScope(provider_instance_id="fixture-provider", workspace_id=WORKSPACE)
-    original = SimpleNamespace(
-        actor_store="second_brain",
-        operation="accept",
+    original = OperationRow(
         operation_id="op",
-        reservation_id="reserve",
+        operation="accept",
+        actor_store="second_brain",
         event_digest="event",
+        reservation_id="reserve",
+        reserve_expected_json="{}",
+        reserved_checkpoint_json="{}",
+        state="reserved",
+        finish_expected_json=None,
+        evidence_digest=None,
+        terminal_state=None,
+        finished_checkpoint_json=None,
     )
     record = {
         "operation_id": "op",
@@ -437,4 +455,6 @@ def test_cancellation_refuses_applied_or_pending_evidence(evidence: str) -> None
             db.execute(f"CREATE TABLE IF NOT EXISTS {evidence}(workspace_id, request_digest)")
             db.execute(f"INSERT INTO {evidence} VALUES(?,?)", (WORKSPACE, "event"))
         with pytest.raises(AnchorRejected, match="COMPANY_PROGRESS_UNCERTAIN"):
-            freshness._verify_unapplied_cancellation(db, scope, original, record)
+            freshness._verify_unapplied_cancellation(
+                db, scope, original, require_object(record)
+            )

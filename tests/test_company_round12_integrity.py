@@ -27,6 +27,7 @@ from tests.test_company_candidate_handoff import (
 from tests.test_company_db_human_integration import human_runtime
 from tests.test_company_memory_product import NOW
 from tests.test_company_round11_integrity import accepted_runtime
+from tests.typed_json import dig_text
 
 
 def readiness(provider, scope):
@@ -46,7 +47,7 @@ def readiness(provider, scope):
 def changed_registry(provider, kind):
     registry = FreshnessRegistry.model_validate_json(provider.registry_path.read_bytes())
     old = registry.auto_policies[0]
-    change = {"revision": old.revision + 1}
+    change: dict[str, object] = {"revision": old.revision + 1}
     if kind == "policy":
         change.update(
             policy_digest="sha256:" + "ee" * 32, revoked_policy_digests=[old.policy_digest]
@@ -219,8 +220,8 @@ def test_human_decision_damage_is_not_ready(tmp_path, operation, damage):
     )
     run(cfg, request, now=NOW, process_only=True, freshness_provider=provider)
     scope = FreshnessScope(
-        provider_instance_id=proposal["command"]["target"]["provider_instance_id"],
-        workspace_id=proposal["command"]["target"]["workspace_id"],
+        provider_instance_id=dig_text(proposal, "command", "target", "provider_instance_id"),
+        workspace_id=dig_text(proposal, "command", "target", "workspace_id"),
     )
     assert readiness(provider, scope).status == "ready"
     with closing(sqlite3.connect(provider.database)) as db, db:
@@ -285,8 +286,8 @@ def test_human_forward_transition_and_latest_receipt_remain_ready(tmp_path, monk
         freshness_provider=provider,
     )
     scope = FreshnessScope(
-        provider_instance_id=proposal["command"]["target"]["provider_instance_id"],
-        workspace_id=proposal["command"]["target"]["workspace_id"],
+        provider_instance_id=dig_text(proposal, "command", "target", "provider_instance_id"),
+        workspace_id=dig_text(proposal, "command", "target", "workspace_id"),
     )
     command = CompanyControlRequest.model_validate_json(
         canonical_bytes(proposal["command"]), strict=True
@@ -302,6 +303,7 @@ def test_human_forward_transition_and_latest_receipt_remain_ready(tmp_path, monk
         clock=lambda: format_instant(NOW),
     )
     head = engine.local_checkpoint(provider.database, scope.workspace_id, None)
+    assert head is not None
     effect = "sha256:" + "ef" * 32
     complete_sidecar(
         jarvis,
@@ -312,11 +314,11 @@ def test_human_forward_transition_and_latest_receipt_remain_ready(tmp_path, monk
             operation_id=operation_id_for(
                 scope,
                 request_id=command.request_id,
-                command_digest=proposal["command_digest"],
+                command_digest=dig_text(proposal, "command_digest"),
                 operation="complete",
             ),
             expected_checkpoint=head,
-            event_digest=accepted["receipt_digest"],
+            event_digest=dig_text(accepted, "receipt_digest"),
             challenge="round12:complete",
         ),
         JarvisSidecarEvidence(
@@ -329,7 +331,7 @@ def test_human_forward_transition_and_latest_receipt_remain_ready(tmp_path, monk
                 "schema_version": 2,
                 "state": "completed",
                 "request_id": command.request_id,
-                "command_digest": proposal["command_digest"],
+                "command_digest": dig_text(proposal, "command_digest"),
                 "candidate_id": command.target.candidate_id,
                 "content_digest": command.target.content_digest,
                 "acceptance_receipt_digest": accepted["receipt_digest"],

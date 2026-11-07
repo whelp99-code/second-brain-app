@@ -19,6 +19,7 @@ from sb.effect_values import CanonicalValueError, JsonObject, canonical_bytes, f
 from tests.task30_clock import FrozenTask30DateTime
 from tests.test_company_memory_product import KEY_ID, RECEIVE, config, signed_authority
 from tests.test_company_memory_profile import CLI_COMMAND, decoded_object
+from tests.typed_json import json_object, json_text
 
 NOW = FrozenTask30DateTime.now(UTC)
 CONTENT = "Retained Mail original\n"
@@ -324,9 +325,10 @@ def test_binding_growth_does_not_hit_the_config_limit(
 ) -> None:
     path, arguments = source
     first = cli.run(path, envelope(arguments), now=NOW, register_source=True)
-    assert first["registration"]["state"] == "registered"
+    assert json_text(json_object(first["registration"])["state"]) == "registered"
     ceiling = len(path.read_bytes())
     monkeypatch.setattr(cli, "_MAX_CONFIG", ceiling)
+    other = arguments
     for index in range(30):
         other = {
             **arguments,
@@ -334,9 +336,10 @@ def test_binding_growth_does_not_hit_the_config_limit(
             "source_event_id": f"event-{index}",
         }
         registered = cli.run(path, envelope(other), now=NOW, register_source=True)
-        assert registered["registration"]["state"] == "registered"
+        assert json_text(json_object(registered["registration"])["state"]) == "registered"
     assert len(path.read_bytes()) == ceiling
-    assert decoded_object(path.read_bytes())["source_profile"]["bindings"] == {}
+    profile = json_object(decoded_object(path.read_bytes())["source_profile"])
+    assert profile["bindings"] == {}
     stored = read_source_bindings(Path(str(decoded_object(path.read_bytes())["company_database"])))
     assert len(stored) == 31
     request = decoded_object(envelope(other))
@@ -363,7 +366,7 @@ def _restore_config_binding(path: Path, locator: str, binding: CompanySourceBind
 def test_receive_drops_config_bindings_already_stored(source: tuple[Path, JsonObject]) -> None:
     path, arguments = source
     registered = cli.run(path, envelope(arguments), now=NOW, register_source=True)
-    assert registered["registration"]["state"] == "registered"
+    assert json_text(json_object(registered["registration"])["state"]) == "registered"
     database = Path(str(decoded_object(path.read_bytes())["company_database"]))
     stored = read_source_bindings(database)
     current = stored[str(arguments["source_locator"])]
@@ -375,7 +378,7 @@ def test_receive_drops_config_bindings_already_stored(source: tuple[Path, JsonOb
     del request["content"]
     completed = invoke(path, canonical_bytes(request), registering=False)
     assert completed.returncode == 0, completed.stderr.decode()
-    assert decoded_object(path.read_bytes())["source_profile"]["bindings"] == {}
+    assert json_object(decoded_object(path.read_bytes())["source_profile"])["bindings"] == {}
     assert set(read_source_bindings(database)) == {str(arguments["source_locator"]), "Graph/extra"}
 
 

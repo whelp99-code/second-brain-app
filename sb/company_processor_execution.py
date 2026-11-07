@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Callable
 from contextlib import nullcontext
 from datetime import UTC, datetime
+from typing import Protocol
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -21,7 +22,6 @@ from sb.company_memory import CompanyMemoryReceipt, CompanyMemoryStore, MemoryCa
 from sb.company_memory_authority import (
     CompanyAuthorityContext,
     CompanyAuthorityRejected,
-    CompanyMemoryAuthorityV1,
 )
 from sb.company_memory_handoff import authorize_transition
 from sb.company_processor_finish import PendingFinish, save_pending_finish
@@ -36,6 +36,12 @@ from sb.effect_write_values import model_object
 from sb.source_access import SourceAccess
 
 
+class TransitionAuthority(Protocol):
+    request_digest: str
+    issued_at: str
+    expires_at: str
+
+
 def execute_processor_transition(
     store: CompanyMemoryStore,
     provider: CompanyFreshnessProvider,
@@ -43,7 +49,7 @@ def execute_processor_transition(
     context: CompanyAuthorityContext,
     policy: CompanyHandoffPolicy,
     owner_keys: dict[str, Ed25519PublicKey],
-    authority: CompanyMemoryAuthorityV1,
+    authority: TransitionAuthority,
     operation: ProcessorOperation,
     arguments: JsonObject,
     checkpoint: Checkpoint,
