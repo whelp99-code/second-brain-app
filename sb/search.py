@@ -61,13 +61,21 @@ _ALL_SCOPE: Final = "all"
 # A role word, not a company name. Drop it only when the full AND misses.
 _UNBOUND_ROLE_TERMS: Final = frozenset({"고객사"})
 
+def _serialize_retained_term(term: str) -> str:
+    if term and not any(char.isspace() or char in '"\\' for char in term):
+        return term
+    escaped = term.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+
 
 def without_unbound_role(query: str) -> str | None:
     terms = LexicalQuery.parse(query).terms
     kept = tuple(term for term in terms if term not in _UNBOUND_ROLE_TERMS)
     if not kept or len(kept) == len(terms):
         return None
-    return " ".join(kept)
+    return " ".join(_serialize_retained_term(term) for term in kept)
 
 
 
