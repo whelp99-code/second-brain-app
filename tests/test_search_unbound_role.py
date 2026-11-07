@@ -65,6 +65,46 @@ def test_relaxed_backslash_query_stays_within_parser_limit() -> None:
     assert LexicalQuery.parse(relaxed).terms == (filler,)
 
 
+def _quoted_at_limit(body: str) -> str:
+    prefix = "고객사 "
+    query = prefix + '"' + body + '"'
+    assert len(query.encode()) == 4096
+    return query
+
+
+def test_relaxed_quoted_backslash_stays_within_parser_limit() -> None:
+    prefix = "고객사 "
+    inner = 4096 - len(prefix.encode()) - 2
+    pair = "\\x"
+    body = " " + pair * ((inner - 1) // 2)
+    body += "y" * (inner - len(body))
+    query = _quoted_at_limit(body)
+    parsed = LexicalQuery.parse(query)
+    relaxed = without_unbound_role(query)
+    assert relaxed is not None
+    assert len(relaxed.encode()) <= 4096
+    assert LexicalQuery.parse(relaxed).terms == tuple(
+        term for term in parsed.terms if term != "고객사"
+    )
+
+
+def test_relaxed_repeated_quotes_stay_within_parser_limit(tmp_path: Path) -> None:
+    prefix = "고객사 "
+    inner = 4096 - len(prefix.encode()) - 2
+    unit = '\\"' + "\\x"
+    body = unit * (inner // len(unit))
+    body += "y" * (inner - len(body))
+    query = _quoted_at_limit(body)
+    parsed = LexicalQuery.parse(query)
+    relaxed = without_unbound_role(query)
+    assert relaxed is not None
+    assert len(relaxed.encode()) <= 4096
+    kept = tuple(term for term in parsed.terms if term != "고객사")
+    assert LexicalQuery.parse(relaxed).terms == kept
+    root = init_vault(tmp_path / "vault").root
+    assert SearchIndex(vault_root=root).search(query) == ()
+
+
 def test_relaxed_phrase_does_not_match_split_terms(tmp_path: Path) -> None:
     root = init_vault(tmp_path / "vault").root
     commit_page(root, "wiki/false-split.md", "# 기록\n실패는 세 번까지 기록한다\n")
