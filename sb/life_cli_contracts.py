@@ -21,6 +21,7 @@ class LifeArguments(TypedDict):
     slot: str | None
     query: str | None
     as_of: str | None
+    namespace: str | None
     send: bool
 
 
