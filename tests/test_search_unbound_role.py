@@ -52,6 +52,19 @@ def test_relaxed_phrase_keeps_quotes_and_escapes() -> None:
     assert LexicalQuery.parse(escaped).terms == ('"hello',)
 
 
+def test_relaxed_backslash_query_stays_within_parser_limit() -> None:
+    prefix = "고객사 "
+    filler = "\\" * (4096 - len(prefix.encode()))
+    query = prefix + filler
+    assert len(query.encode()) == 4096
+    assert LexicalQuery.parse(query).terms == ("고객사", filler)
+    relaxed = without_unbound_role(query)
+    assert relaxed == filler
+    assert relaxed is not None
+    assert len(relaxed.encode()) <= 4096
+    assert LexicalQuery.parse(relaxed).terms == (filler,)
+
+
 def test_relaxed_phrase_does_not_match_split_terms(tmp_path: Path) -> None:
     root = init_vault(tmp_path / "vault").root
     commit_page(root, "wiki/false-split.md", "# 기록\n실패는 세 번까지 기록한다\n")
