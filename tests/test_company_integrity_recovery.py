@@ -135,6 +135,102 @@ def test_operator_pin_advance_at_first_lock_release_is_consistent(
     assert pins[(old.scope.provider_instance_id, old.scope.workspace_id)] == pin_a
 
 
+def test_operator_pin_advance_at_first_lock_release_is_consistent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sb.company_db_freshness_integrity import load_journal
+    from sb.company_freshness_registry import latest_auto_pins
+
+    provider, settings, context = real_company_runtime(tmp_path)
+    registry = FreshnessRegistry.model_validate_json(provider.registry_path.read_bytes())
+    old = registry.auto_policies[0]
+    changed = replace(
+        settings,
+        policy=settings.policy.model_copy(
+            update={"policy_version": settings.policy.policy_version + 1}
+        ),
+    )
+    pin_a = old.model_copy(
+        update={
+            "revision": 2,
+            "policy_digest": policy_digest(changed.policy),
+            "revoked_policy_digests": [old.policy_digest],
+        }
+    )
+    pin_b = pin_a.model_copy(
+        update={
+            "revision": 3,
+            "policy_digest": "sha256:" + "ee" * 32,
+            "revoked_policy_digests": [old.policy_digest, pin_a.policy_digest],
+        }
+    )
+
+    def write_pin(pin):
+        provider.registry_path.write_bytes(
+            canonical_bytes(model_object(registry.model_copy(update={"auto_policies": [pin]})))
+        )
+
+    write_pin(pin_a)
+    config = SimpleNamespace(
+        provider_instance_id=settings.provider_instance_id,
+        workspace_id=WORKSPACE,
+        freshness_provider=None,
+    )
+    monkeypatch.setattr(operator, "os", SimpleNamespace(geteuid=lambda: 0))
+    monkeypatch.setattr(operator, "require_trusted_file", lambda *args, **kwargs: None)
+    monkeypatch.setattr(operator, "load_company_config", lambda _: config)
+    monkeypatch.setattr(operator, "company_database_path", lambda _: provider.database)
+    monkeypatch.setattr(operator, "provider_from_config", lambda *args, **kwargs: provider)
+    monkeypatch.setattr(operator, "auto_settings", lambda *args: changed)
+    released = Event()
+    advanced = Event()
+    original_lock = provider._locked
+    failures = []
+
+    def advance():
+        try:
+            assert released.wait(10), "operator did not release its first lock"
+            with original_lock():
+                write_pin(pin_b)
+        except (AssertionError, OSError) as exc:
+            failures.append(exc)
+        finally:
+            advanced.set()
+
+    @contextmanager
+    def boundary():
+        with original_lock():
+            yield
+        if not released.is_set():
+            released.set()
+            assert advanced.wait(10), "registry writer did not finish"
+
+    monkeypatch.setattr(provider, "_locked", boundary)
+    worker = Thread(target=advance)
+    worker.start()
+    try:
+        result = operator.run_operator(
+            "auto-policy-install",
+            SimpleNamespace(stat=lambda: SimpleNamespace(st_uid=0)),
+            b"",
+            context.now,
+        )
+    finally:
+        released.set()
+        worker.join(10)
+    assert not worker.is_alive()
+    assert not failures
+    assert advanced.is_set()
+    assert result["policy_digest"] == pin_a.policy_digest
+    with closing(sqlite3.connect(provider.database)) as db:
+        pins = latest_auto_pins(load_journal(db))
+        assert db.execute(
+            "SELECT policy_digest FROM company_auto_policies WHERE policy_version=?",
+            (changed.policy.policy_version,),
+        ).fetchone() == (pin_a.policy_digest,)
+    assert pins[(old.scope.provider_instance_id, old.scope.workspace_id)] == pin_a
+
+
 @pytest.mark.parametrize("resumed,crash", [(False, False), (True, False), (False, True)])
 def test_expired_during_accept_reserve_is_cancelled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, resumed: bool, crash: bool
