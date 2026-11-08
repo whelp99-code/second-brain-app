@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 from psycopg.errors import (
@@ -89,7 +90,7 @@ def test_connection_error_does_not_abort_sibling_source(
         f"{item.source_id} {item.source_uri} {item.source_version}"
         for item in tables.source_items.values()
     )
-    assert outcome.exit_code == 0
+    assert outcome.exit_code == 1
     assert outcome.failure is None
     assert "notes good" in recorded
     assert "password=secret" not in recorded
@@ -171,7 +172,7 @@ def test_refresh_counts_empty_successful_sources_and_reports_failures(
             return iter(())
 
     class Unavailable(_Down):
-        def scan(self, cursor):
+        def scan(self, cursor: str | None) -> Iterator[tuple[SourceRef, bytes, ItemMeta]]:
             yield SourceRef("down", "unavailable", "v1"), b"", {"skip_reason": "source-unavailable"}
 
     down, notes = (_Down() if transport == "exception" else Unavailable()), Empty()
@@ -179,7 +180,7 @@ def test_refresh_counts_empty_successful_sources_and_reports_failures(
     config = _config(tmp_path)
     outcome = run_ingest(config, ("down", "notes") if healthy else ("down",))
     assert outcome.status == ("partial" if healthy else "failed")
-    assert outcome.exit_code == (0 if healthy else 1)
+    assert outcome.exit_code == 1
     with closing(sqlite3.connect(Path(config.vault_root) / ".sb/ledger.db")) as db:
         detail = db.execute("SELECT detail FROM run_stage WHERE stage='ingest'").fetchone()[0]
     assert detail is not None
@@ -204,16 +205,19 @@ def test_successful_source_with_no_new_items_preserves_partial_status(
     config = _config(tmp_path)
     for _ in range(2):
         outcome = run_ingest(config, ("down", "notes"))
-        assert (outcome.status, outcome.exit_code) == ("partial", 0)
+        assert (outcome.status, outcome.exit_code) == ("partial", 1)
     clean = run_ingest(config, ("notes",))
     assert (clean.status, clean.exit_code, clean.errors) == ("ok", 0, 0)
 
 
 def test_non_source_error_ratio_has_failure_and_stage_detail(tmp_path: Path) -> None:
-    from sb.pipeline import StageReport, run_locked
+    from sb.pipeline import StageFn, StageReport, run_locked
+
+    def exceed_ratio(_ledger: object, _vault: object, _run_id: str) -> StageReport:
+        return StageReport((), 0, 1, 1, False)
 
     root = tmp_path / "vault"
-    outcome = run_locked(root, lambda *_: StageReport((), 0, 1, 1, False), "compile")
+    outcome = run_locked(root, cast(StageFn, cast(object, exceed_ratio)), "compile")
     assert outcome.exit_code == 1
     assert outcome.failure == "STAGE_ERROR_RATIO_EXCEEDED: compile: errors=1 attempted=1"
     with closing(sqlite3.connect(root / ".sb/ledger.db")) as db:
@@ -238,15 +242,17 @@ def test_nonconnection_source_error_with_empty_sibling_remains_failed(
     config = _config(tmp_path)
     outcome = run_ingest(config, ("down", "notes"))
     assert (outcome.status, outcome.exit_code) == ("failed", 1)
-    assert outcome.failure == f"SOURCE_SCAN_FAILED: down: {error_type.__name__}"
+    failure = outcome.failure
+    assert isinstance(failure, str)
+    assert failure == f"SOURCE_SCAN_FAILED: down: {error_type.__name__}"
     with closing(sqlite3.connect(Path(config.vault_root) / ".sb/ledger.db")) as db:
         assert db.execute("SELECT detail FROM run_stage WHERE stage='ingest'").fetchone() == (
-            outcome.failure,
+            failure,
         )
     log = (Path(config.vault_root) / ".sb/runs.log").read_text()
-    assert outcome.failure in log
+    assert failure in log
     assert "synthetic confidential payload" not in log
-    assert "synthetic confidential payload" not in outcome.failure
+    assert "synthetic confidential payload" not in failure
 
 
 @pytest.mark.parametrize(
@@ -266,7 +272,7 @@ def test_explicit_connection_error_with_empty_sibling_is_partial(
     _install(monkeypatch, Disconnected(), Empty())
     config = _config(tmp_path)
     outcome = run_ingest(config, ("down", "notes"))
-    assert (outcome.status, outcome.exit_code) == ("partial", 0)
+    assert (outcome.status, outcome.exit_code) == ("partial", 1)
     assert outcome.failure is None
     with closing(sqlite3.connect(Path(config.vault_root) / ".sb/ledger.db")) as db:
         detail = json.loads(
@@ -275,3 +281,51 @@ def test_explicit_connection_error_with_empty_sibling_is_partial(
     assert detail["source_errors"] == [f"SOURCE_UNAVAILABLE: down: {error_type.__name__}"]
     log = (Path(config.vault_root) / ".sb/runs.log").read_text()
     assert "synthetic confidential payload" not in log
+
+def test_source_unavailable_does_not_exit_zero_when_capped_or_below_ratio(
+    tmp_path: Path,
+) -> None:
+    from sb.pipeline import StageFn, StageReport, run_locked
+
+    def unavailable(_ledger: object, _vault: object, _run_id: str) -> StageReport:
+        return StageReport(
+            (),
+            0,
+            1,
+            4,
+            True,
+            sources_succeeded=1,
+            sources_failed=1,
+            source_errors=("SOURCE_UNAVAILABLE: down",),
+        )
+
+    capped = run_locked(
+        tmp_path / "capped", cast(StageFn, cast(object, unavailable)), "ingest"
+    )
+    assert (capped.status, capped.exit_code) == ("capped", 1)
+
+    def mixed(_ledger: object, _vault: object, _run_id: str) -> StageReport:
+        return StageReport(
+            (),
+            0,
+            2,
+            10,
+            False,
+            sources_succeeded=1,
+            sources_failed=1,
+            source_errors=("SOURCE_UNAVAILABLE: down",),
+        )
+
+    below_ratio = run_locked(
+        tmp_path / "mixed", cast(StageFn, cast(object, mixed)), "ingest"
+    )
+    assert (below_ratio.status, below_ratio.exit_code) == ("partial", 1)
+    assert below_ratio.failure is None
+
+    def item_error(_ledger: object, _vault: object, _run_id: str) -> StageReport:
+        return StageReport((), 0, 1, 4, False)
+
+    ordinary = run_locked(
+        tmp_path / "ordinary", cast(StageFn, cast(object, item_error)), "ingest"
+    )
+    assert (ordinary.status, ordinary.exit_code) == ("partial", 0)

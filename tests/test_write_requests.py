@@ -285,6 +285,43 @@ def test_32_changed_contenders_under_one_key_publish_once(tmp_path: Path) -> Non
     assert len(list((tmp_path / "inbox/.requests/pending").glob("*.json"))) == 1
 
 
+def _assert_one_publish(root: Path) -> None:
+    _queue(root)
+    original = _request()
+    changed = dict(original)
+    changed["payload"] = {"content": "contending canonical body"}
+    _rederive(changed)
+    requests = [original if index % 2 == 0 else changed for index in range(32)]
+    with ProcessPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(_accept_process, [(str(root), request) for request in requests]))
+    assert sum(accepted and not replayed for accepted, replayed, _code in results) == 1
+    assert sum(code == "WRITE_REQUEST_REPLAY_CONFLICT" for _accepted, _replayed, code in results) == 16
+    assert len(list((root / "inbox/.requests/pending").glob("*.json"))) == 1
+
+
+@pytest.mark.parametrize("parent", [Path("/tmp"), Path("/home/jm")])
+def test_32_contenders_publish_once_on_tmp_and_home(parent: Path) -> None:
+    if not os.access(parent, os.W_OK):
+        pytest.skip(f"{parent} is not writable")
+    root = parent / f"sbwr{os.getpid()}"
+    root.mkdir()
+    try:
+        _assert_one_publish(root)
+    finally:
+        pending = root / "inbox" / ".requests" / "pending"
+        if pending.exists():
+            for child in pending.iterdir():
+                child.unlink()
+        for path in (
+            pending,
+            root / "inbox" / ".requests",
+            root / "inbox",
+            root / "wiki",
+            root,
+        ):
+            if path.exists():
+                path.rmdir()
+
 def test_visible_unknown_malformed_and_over_cap_entries_fail_unsafe(tmp_path: Path) -> None:
     # Given
     _queue(tmp_path)

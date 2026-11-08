@@ -57,6 +57,13 @@ def verify_auto_cancellation(
     receipt = PolicyAutoReceiptV1.model_validate_json(rows[0][0], strict=True)
     command = strict_loads(rows[0][1], 1_048_576)
     content_digest, content, state, event_id = rows[0][2:]
+    progress = request.operation
+    if progress == "accept" or progress == "complete":
+        progress_digest = memory_request_digest(
+            progress, intent.candidate_id, intent.auto_request_id
+        )
+    else:
+        progress_digest = None
     if (
         request.scope != scope
         or request.operation not in {"accept", "complete"}
@@ -83,8 +90,7 @@ def verify_auto_cancellation(
             operation=request.operation,
         )
         != original.operation_id
-        or memory_request_digest(request.operation, intent.candidate_id, intent.auto_request_id)
-        != original.event_digest
+        or progress_digest != original.event_digest
         or human_path_blocks(db, scope, intent.candidate_id)
     ):
         raise AnchorRejected("COMPANY_PROGRESS_UNCERTAIN")

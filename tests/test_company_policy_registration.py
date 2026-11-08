@@ -65,3 +65,48 @@ def test_scope_epoch_override_does_not_reenroll_existing_history(tmp_path: Path)
     )
     assert response.status != "ready"
     assert response.checkpoint is None
+
+
+@pytest.mark.parametrize("failure", ["stale_pin", "commit_failure"])
+def test_policy_install_failure_does_not_publish_pin(tmp_path: Path, failure: str) -> None:
+    from sb.company_approver_binding import public_key_fingerprint
+    from sb.company_auto_policy import policy_digest
+
+    provider, settings, _ = real_company_runtime(tmp_path)
+    scope = FreshnessScope(provider_instance_id=PROVIDER, workspace_id=WORKSPACE)
+    before = (provider.anchor.read_value(), (provider.witness_dir / "frames.jsonl").read_bytes())
+    called = False
+
+    def commit() -> str:
+        nonlocal called
+        called = True
+        raise OSError("synthetic commit failure")
+
+    if failure == "stale_pin":
+        registry = FreshnessRegistry.model_validate_json(provider.registry_path.read_bytes())
+        pin = registry.auto_policies[0].model_copy(
+            update={
+                "revision": 2,
+                "policy_digest": "sha256:" + "ee" * 32,
+                "revoked_policy_digests": [policy_digest(settings.policy)],
+            }
+        )
+        provider.registry_path.write_bytes(
+            canonical_bytes(model_object(registry.model_copy(update={"auto_policies": [pin]})))
+        )
+        error, match = AnchorRejected, "COMPANY_POLICY_REGISTRATION_REQUIRED"
+    else:
+        error, match = OSError, "synthetic commit failure"
+    with pytest.raises(error, match=match):
+        provider.install_auto_policy(
+            scope,
+            commit,
+            policy_digest(settings.policy),
+            settings.signer.key_id,
+            public_key_fingerprint(settings.signer.public_key),
+        )
+    assert called == (failure == "commit_failure")
+    assert (
+        provider.anchor.read_value(),
+        (provider.witness_dir / "frames.jsonl").read_bytes(),
+    ) == before

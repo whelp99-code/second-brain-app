@@ -23,6 +23,7 @@ from sb.generations import (
     _regular_files,
 )
 from sb.request_store import RequestStore
+from tests.typed_json import json_objects, json_text
 
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
 ROOT = "sha256:" + "0" * 64
@@ -297,7 +298,8 @@ def test_omitted_reader_still_blocks_disposal_until_released(
         assert_drain_log(caplog, caught.value)
         assert caught.value.diagnostics["readers_total"] == 33
         assert caught.value.diagnostics["readers_omitted"] == 1
-        assert [item["lease_id"] for item in caught.value.diagnostics["readers"]] == leases[:32]
+        readers = json_objects(caught.value.diagnostics["readers"])
+        assert [json_text(item["lease_id"]) for item in readers] == leases[:32]
         assert first.root.is_dir()
         for lease in leases[:32]:
             requests.release_reader(lease)
@@ -307,7 +309,8 @@ def test_omitted_reader_still_blocks_disposal_until_released(
         assert_drain_log(caplog, remaining.value)
         assert remaining.value.diagnostics["readers_total"] == 1
         assert remaining.value.diagnostics["readers_omitted"] == 0
-        assert remaining.value.diagnostics["readers"][0]["lease_id"] == leases[-1]
+        remaining_readers = json_objects(remaining.value.diagnostics["readers"])
+        assert json_text(remaining_readers[0]["lease_id"]) == leases[-1]
         assert requests.readers(first.generation_id) == ((leases[-1], os.getpid()),)
         assert first.root.is_dir()
         requests.release_reader(leases[-1])

@@ -38,7 +38,10 @@ def main(argv: list[str] | None = None) -> int:
         print(SIMULATED_ANCHOR_LABEL)
         cross = root / "original-cross-store"
         cross.mkdir(mode=0o700)
-        test_original_approval_and_completion_prove_human_mark_processed(cross)
+        with pytest.MonkeyPatch.context() as patch:
+            test_original_approval_and_completion_prove_human_mark_processed(
+                cross, patch, None, None
+            )
         with closing(sqlite3.connect(cross / "company" / "company.db")) as db:
             rows: list[tuple[str, int]] = db.execute(
                 """SELECT operation,count(*) FROM company_memory_receipts
@@ -55,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             target = root / f"finish-{boundary}"
             target.mkdir(mode=0o700)
             with pytest.MonkeyPatch.context() as patch:
-                test_original_finish_recovers_once(target, patch, boundary)
+                test_original_finish_recovers_once(target, patch, boundary, False)
             print(f"finish_recovery_boundary={boundary} extra_extend=0 PASS")
         for same in (False, True):
             target = root / f"process-cas-{same}"

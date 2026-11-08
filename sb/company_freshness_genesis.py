@@ -47,8 +47,53 @@ from sb.company_memory_handoff import (
     handoff_key,
 )
 from sb.company_transition_receipt import TransitionReceiptSelector, read_original_receipt
-from sb.effect_values import canonical_bytes, parse_instant, strict_loads
+from sb.effect_values import JsonObject, JsonValue, canonical_bytes, parse_instant, strict_loads
 from sb.effect_write_values import model_object
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        raise TypeError("expected strings")
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise TypeError("expected strings")
+        items.append(item)
+    return items
+
+
+def _text(value: JsonObject, key: str) -> str:
+    item = value[key]
+    if not isinstance(item, str):
+        raise TypeError(key)
+    return item
+
+
+def _enrolled_context(
+    enrolled: JsonObject, *, agent: str, session: str
+) -> CompanyAuthorityContext:
+    deletion_sequence = enrolled["deletion_sequence"]
+    projects = _string_list(enrolled["projects"])
+    if not isinstance(deletion_sequence, int):
+        raise TypeError("deletion_sequence")
+    return CompanyAuthorityContext(
+        provider=_text(enrolled, "provider"),
+        workspace_id=_text(enrolled, "workspace"),
+        principal=_text(enrolled, "owner"),
+        agent=agent,
+        session=session,
+        projects=tuple(projects),
+        policy_revision=_text(enrolled, "policy"),
+        deletion_sequence=deletion_sequence,
+        deletion_set_root=_text(enrolled, "deletion_root"),
+    )
+
+
+def _pin_policy_digest(record: JsonObject) -> JsonValue | None:
+    pin = record.get("pin", {})
+    if not isinstance(pin, dict):
+        raise TypeError("pin")
+    return pin.get("policy_digest")
 
 
 def owned_genesis_receipts(
@@ -201,7 +246,11 @@ def audit_owned_receipts(
             and bootstrap.published_sequence is not None
         ):
             defaults = _legacy_default_receipts(db, scope, inventory)
-        if not isinstance(defaults, list) or not all(isinstance(value, str) for value in defaults):
+        try:
+            receipt_defaults = _string_list(defaults)
+        except TypeError:
+            receipt_defaults = None
+        if receipt_defaults is None:
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         verify_owned_genesis(
             db,
@@ -209,7 +258,7 @@ def audit_owned_receipts(
             inventory,
             exact=False,
             approval_binding_digest=bootstrap.after.approval_binding_digest,
-            default_transition_receipts=tuple(defaults),
+            default_transition_receipts=tuple(receipt_defaults),
         )
         wanted = {entry.source_record_id: entry for entry in inventory.second_brain_receipts}
         for item in operations:
@@ -271,11 +320,12 @@ def audit_owned_receipts(
                 original.event_digest,
                 digest,
             )
-            if original.operation in {"accept", "reject"}:
+            transition = original.operation
+            if transition == "accept" or transition == "reject":
                 _require_transition_authority(
                     db,
                     scope,
-                    original.operation,
+                    transition,
                     original.event_digest,
                     digest,
                     bootstrap.after.approval_binding_digest,
@@ -356,17 +406,7 @@ def _audit_handoff_workflow(db: sqlite3.Connection, scope: FreshnessScope) -> No
         if not isinstance(evidence, dict) or not isinstance(enrolled, dict):
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         policy = CompanyHandoffPolicy.model_validate(evidence.get("policy"), strict=True)
-        context = CompanyAuthorityContext(
-            provider=enrolled["provider"],
-            workspace_id=enrolled["workspace"],
-            principal=enrolled["owner"],
-            agent="workflow-audit",
-            session="workflow-audit",
-            projects=tuple(enrolled["projects"]),
-            policy_revision=enrolled["policy"],
-            deletion_sequence=enrolled["deletion_sequence"],
-            deletion_set_root=enrolled["deletion_root"],
-        )
+        context = _enrolled_context(enrolled, agent="workflow-audit", session="workflow-audit")
         binding = binding_digest(context, policy)
         if (
             context.workspace_id != scope.workspace_id
@@ -389,7 +429,7 @@ def _audit_handoff_workflow(db: sqlite3.Connection, scope: FreshnessScope) -> No
             ).fetchone()
             if candidate is None:
                 raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
-            projects = strict_loads(candidate[2], 1_048_576)
+            projects = _string_list(strict_loads(candidate[2], 1_048_576))
             target = ControlTarget(
                 provider_instance_id=context.provider,
                 workspace_id=scope.workspace_id,
@@ -515,23 +555,16 @@ def _require_transition_authority(
         if enrollment is None:
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         evidence = strict_loads(enrollment[0], 1_048_576)
-        if not isinstance(evidence, dict) or not isinstance(evidence.get("context_json"), str):
+        if not isinstance(evidence, dict):
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
-        enrolled = strict_loads(evidence["context_json"], 1_048_576)
+        context_json = evidence.get("context_json")
+        if not isinstance(context_json, str):
+            raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+        enrolled = strict_loads(context_json, 1_048_576)
         if not isinstance(enrolled, dict):
             raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
         policy = CompanyHandoffPolicy.model_validate(evidence.get("policy"), strict=True)
-        context = CompanyAuthorityContext(
-            provider=enrolled["provider"],
-            workspace_id=enrolled["workspace"],
-            principal=enrolled["owner"],
-            agent="receipt-audit",
-            session="receipt-audit",
-            projects=tuple(enrolled["projects"]),
-            policy_revision=enrolled["policy"],
-            deletion_sequence=enrolled["deletion_sequence"],
-            deletion_set_root=enrolled["deletion_root"],
-        )
+        context = _enrolled_context(enrolled, agent="receipt-audit", session="receipt-audit")
         if (
             context.provider != scope.provider_instance_id
             or context.workspace_id != scope.workspace_id
@@ -556,7 +589,7 @@ def _require_transition_authority(
                 operation=operation,
                 transition_request_digest=request_digest,
                 command_digest=outbox[1],
-                content_digest=snapshot["content_digest"],
+                content_digest=_text(snapshot, "content_digest"),
                 approval_policy_version=policy.approval_policy_version,
                 approval_binding_digest=anchored_binding,
             ),
@@ -827,13 +860,22 @@ def audit_owned_pending(
             request = intent.request
             scope = request.scope
             original = indexed.get((provider, workspace, request.operation_id))
+            progress = request.operation
+            if (
+                progress == "accept"
+                or progress == "complete"
+                or progress == "mark_processed"
+            ):
+                progress_digest = memory_request_digest(
+                    progress, intent.candidate_id, intent.auto_request_id
+                )
+            else:
+                progress_digest = None
             if (
                 (provider, workspace) != (scope.provider_instance_id, scope.workspace_id)
                 or request.operation not in {"accept", "complete", "mark_processed"}
                 or request.event_digest
-                != memory_request_digest(
-                    request.operation, intent.candidate_id, intent.auto_request_id
-                )
+                != progress_digest
                 or request.operation_id
                 != operation_id_for(
                     scope,
@@ -900,7 +942,7 @@ def audit_owned_pending(
                 if entry.scope == scope
                 and entry.published_sequence is not None
                 and entry.record.get("kind") == "internal_auto_policy"
-                and entry.record.get("pin", {}).get("policy_digest") == receipt.policy_digest
+                and _pin_policy_digest(entry.record) == receipt.policy_digest
             ]
             if (
                 not isinstance(command, dict)
@@ -950,14 +992,17 @@ def audit_owned_pending(
             f"SELECT {provider_column},workspace_id,request_digest,pending_json FROM {table}"
         ):
             pending = strict_loads(raw, 1_048_576)
-            if not isinstance(pending, dict) or not isinstance(pending.get("operation_id"), str):
+            if not isinstance(pending, dict):
+                raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            pending_operation_id = pending.get("operation_id")
+            if not isinstance(pending_operation_id, str):
                 raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
             reservation = ReserveProgressResponse.model_validate(
                 pending.get("reservation"), strict=True
             )
             scope = reservation.scope
             original = indexed.get(
-                (scope.provider_instance_id, workspace, pending.get("operation_id"))
+                (scope.provider_instance_id, workspace, pending_operation_id)
             )
             checkpoint = (
                 db.execute(
@@ -983,6 +1028,19 @@ def audit_owned_pending(
                 or original.terminal_state == "cancelled"
             ):
                 raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            candidate_id = pending.get("candidate_id")
+            pending_auto_id = pending.get("auto_request_id")
+            owned = original.operation
+            if (
+                isinstance(candidate_id, str)
+                and isinstance(pending_auto_id, str)
+                and (
+                    owned == "accept" or owned == "complete" or owned == "mark_processed"
+                )
+            ):
+                pending_digest = memory_request_digest(owned, candidate_id, pending_auto_id)
+            else:
+                pending_digest = None
             if table == "company_internal_pending_finish" and (
                 pending.get("request_digest") != digest
                 or pending.get("operation") != original.operation
@@ -993,19 +1051,19 @@ def audit_owned_pending(
                 != original.reserve_expected_json
                 or not isinstance(pending.get("candidate_id"), str)
                 or not isinstance(pending.get("auto_request_id"), str)
-                or memory_request_digest(
-                    original.operation, pending["candidate_id"], pending["auto_request_id"]
-                )
-                != digest
+                or pending_digest != digest
             ):
                 raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
             if table == "company_internal_pending_finish":
+                if not isinstance(candidate_id, str):
+                    raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
                 candidate = db.execute(
                     "SELECT content_digest FROM company_memory_candidates WHERE workspace_id=? AND candidate_id=?",
-                    (workspace, pending["candidate_id"]),
+                    (workspace, candidate_id),
                 ).fetchone()
                 if candidate is None or candidate[0] != pending.get("content_digest"):
                     raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+            evidence_digest = pending.get("evidence_digest")
             if original.operation == "complete":
                 from sb.company_db_freshness_evidence import verify_internal_effect
 
@@ -1013,19 +1071,21 @@ def audit_owned_pending(
                     pending.get("operation") != "complete"
                     or reservation.reservation_id != original.reservation_id
                     or pending.get("request_digest") != digest
-                    or pending.get("evidence_digest") is None
+                    or not isinstance(evidence_digest, str)
                     or reservation.checkpoint
                     != Checkpoint.model_validate_json(
                         original.reserved_checkpoint_json, strict=True
                     )
                 ):
                     raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
+                if not isinstance(evidence_digest, str):
+                    raise EvidenceRejected("COMPANY_RECEIPT_EVIDENCE_ABSENT")
                 verify_internal_effect(
                     db,
                     scope,
                     original.operation_id,
                     digest,
-                    pending["evidence_digest"],
+                    evidence_digest,
                     registry,
                     reclassify=False,
                 )

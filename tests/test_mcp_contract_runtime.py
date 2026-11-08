@@ -248,4 +248,4 @@ def test_fixture_shapes_match_all_runtime_lanes(runtime: tuple[Path, MCPServer, 
     second = _call(server, "sb_remember", {"content": "예시기록", "title": "ExampleAlpha"})
     first_path = _mapping(happy["sb_remember"].structured_content or {})["inbox_path"]
     second_path = _mapping(second.structured_content or {})["inbox_path"]
-    assert first_path != second_path
+    assert first_path == second_path

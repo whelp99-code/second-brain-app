@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Outlook morning briefing chain at 06:30
+# File only. Do not enable until the representative says so.
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+AccuracySec=1min
+Persistent=false
+Unit=jm-second-brain-outlook-morning.service
+
+[Install]
+WantedBy=timers.target
