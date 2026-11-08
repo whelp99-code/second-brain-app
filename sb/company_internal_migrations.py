@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from typing import Final, cast
 
@@ -71,17 +72,20 @@ def apply_internal_auto_migration(db: sqlite3.Connection, now: datetime) -> str:
 
 
 def _schema_incomplete(db: sqlite3.Connection) -> bool:
-    needed = (
-        "company_auto_policies",
-        "company_auto_assessments",
-        "company_candidate_execution_claims",
-        "company_auto_policy_receipts",
-        "company_internal_pending_finish",
-        "company_internal_pending_reserve",
-        "company_internal_effects",
-        "company_internal_records",
-    )
-    return any(not _table(db, name) for name in needed)
+    # A migration marker and table names do not prove that a partial restore
+    # retained the immutability triggers or the unique policy-digest index.
+    with closing(sqlite3.connect(":memory:")) as canonical:
+        canonical.executescript(INTERNAL_AUTO_SQL)
+        required = canonical.execute(
+            "SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL"
+        ).fetchall()
+    for kind, name, sql in required:
+        actual = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type=? AND name=?", (kind, name)
+        ).fetchone()
+        if actual is None or " ".join(actual[0].split()) != " ".join(sql.split()):
+            return True
+    return False
 
 
 def _partial_internal_schema(db: sqlite3.Connection) -> bool:
