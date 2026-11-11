@@ -23,7 +23,7 @@ from sb.effect_values import JsonObject, JsonValue
 from sb.generation_runtime import GenerationMutationService, GenerationOperation
 from sb.generations import GenerationError
 from sb.governance import GovernanceError, collect_orphans, retention_report, source_status
-from sb.inbox import RememberRejected
+from sb.inbox import RememberRejected, promote_published
 from sb.metrics import record_command
 from sb.metrics import summary as metrics_summary
 from sb.ops import (
@@ -44,6 +44,7 @@ from sb.search import SearchIndex
 from sb.search_errors import GenerationIndexError, SearchQueryError
 from sb.store.ledger import rebuild_from_vault
 from sb.vault import Vault, VaultLintError, init_vault
+from sb.vault_owner import VaultOwnerMismatch, require_vault_owner
 
 _ARG_VALUE: Final = TypeAdapter[JsonValue](JsonValue)
 
@@ -129,6 +130,7 @@ def _parser() -> argparse.ArgumentParser:
     remember = sub.add_parser(Command.REMEMBER.value)
     _ = remember.add_argument("content")
     _ = remember.add_argument("--title")
+    _ = remember.add_argument("--request-id")
     cancellation = sub.add_parser(Command.APPLY_CANCELLATION.value)
     _ = cancellation.add_argument("--intent-id", required=True)
     apply_requests = sub.add_parser(Command.APPLY_REQUESTS.value)
@@ -211,6 +213,7 @@ def _mcp() -> int:
 
 def _dispatch(command: Command, ns: argparse.Namespace) -> int:
     config = load_config()
+    require_vault_owner(Path(config.vault_root))
     if command == Command.LIFE:
         from sb.life_cli import run as run_life
         from sb.pipeline import run_life_import, run_life_maintenance, run_life_workflow
@@ -370,7 +373,10 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
             return 2
         mutations = GenerationMutationService.from_config(config)
         try:
-            rel = mutations.remember(content, _opt_str(ns, "title"), datetime.now(UTC))
+            rel = mutations.remember(
+                content, _opt_str(ns, "title"), datetime.now(UTC), _opt_str(ns, "request_id"),
+            )
+            rel = promote_published(Path(config.vault_root), rel, _opt_str(ns, "title"))
         except RememberRejected as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -687,7 +693,7 @@ def _dispatch(command: Command, ns: argparse.Namespace) -> int:
         if root.is_dir():
             try:
                 record_command(root, command.value, exit_code, (monotonic() - started) * 1000)
-            except OSError:
+            except (OSError, VaultOwnerMismatch):
                 pass
 
 
@@ -719,6 +725,7 @@ def main(argv: list[str] | None = None) -> int:
         GenerationError,
         GenerationIndexError,
         PostCompactHookError,
+        VaultOwnerMismatch,
     ) as exc:
         print(str(exc), file=sys.stderr)
         return 1
