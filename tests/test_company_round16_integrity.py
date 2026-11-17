@@ -32,6 +32,7 @@ from tests.test_company_db_human_integration import human_runtime
 from tests.test_company_memory_product import NOW
 from tests.test_company_round12_integrity import readiness
 from tests.test_company_round14_integrity import Crash, scope, snapshot
+from tests.typed_json import dig_text
 
 
 @pytest.mark.parametrize("boundary", ["human_required", "assessment_commit", "issued"])
@@ -158,8 +159,8 @@ def test_aa_replaced_outbox_cancellation_releases_next_command(tmp_path, monkeyp
         )
     )
     target = FreshnessScope(
-        provider_instance_id=proposal["command"]["target"]["provider_instance_id"],
-        workspace_id=proposal["command"]["target"]["workspace_id"],
+        provider_instance_id=dig_text(proposal, "command", "target", "provider_instance_id"),
+        workspace_id=dig_text(proposal, "command", "target", "workspace_id"),
     )
     request = signed_request(
         "accept",

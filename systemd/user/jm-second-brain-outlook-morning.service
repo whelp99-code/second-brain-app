@@ -1,0 +1,21 @@
+[Unit]
+Description=Import today's Outlook calendar and build the morning briefing
+# Not enabled. MemoryDenyWriteExecute is omitted because the Mail CLI is node.
+
+[Service]
+Type=oneshot
+Environment=SB_CONFIG=%h/.config/second-brain/config.toml
+Environment=SB_LIFE_SOURCE=outlook
+Environment=MAIL_CALENDAR_CLI=%h/tg/mail-outlook-calendars-read/scripts/calendar-today.mjs
+Environment=MAIL_INTELLIGENCE_CALENDAR_SOCKET=%h/orca/projects/mail-intelligence/data/calendar-today.sock
+Environment=SB_PYTHON=/usr/bin/python3
+Environment=NODE_BIN=%h/.nvm/versions/node/v24.19.0/bin/node
+ExecStart=/usr/bin/env bash %h/tg/sb-calendar-read/deploy/outlook-morning.sh
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%h/.local/state/second-brain %h/.local/share/second-brain
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+UMask=0077

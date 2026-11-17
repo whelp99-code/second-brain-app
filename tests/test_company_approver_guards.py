@@ -338,12 +338,19 @@ def test_smoke_uses_signed_instant_despite_child_wall_clock_change(
     run = subprocess.run
     instants: list[str] = []
 
-    def changed_wall_clock(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+    def changed_wall_clock(
+        command: list[str],
+        *,
+        input: bytes,
+        capture_output: bool = False,
+        check: bool = False,
+        timeout: float | None = None,
+    ) -> subprocess.CompletedProcess[bytes]:
         # Advance the child's wall clock past the one-minute authority lifetime,
         # or move it before issuance, without waiting or changing the host clock.
         assert command[1:3] == ["-m", "tests.company_approver_test_cli"]
         at = command[command.index("--test-now") + 1]
-        payload = decoded_object(kwargs["input"])
+        payload = decoded_object(input)
         authority = payload["authority"]
         assert isinstance(authority, dict)
         assert authority["issued_at"] == at
@@ -357,7 +364,13 @@ def test_smoke_uses_signed_instant_despite_child_wall_clock_change(
             "patch('sb.company_memory_cli.datetime', clock).start(); "
             "runpy.run_module('tests.company_approver_test_cli', run_name='__main__')"
         )
-        return run([command[0], "-c", script, *command[3:]], **kwargs)
+        return run(
+            [command[0], "-c", script, *command[3:]],
+            input=input,
+            capture_output=capture_output,
+            check=check,
+            timeout=timeout,
+        )
 
     monkeypatch.setattr(smoke.subprocess, "run", changed_wall_clock)
     result = smoke.scenario(tmp_path / "smoke", operation)

@@ -35,6 +35,7 @@ from tests.test_company_db_human_integration import human_runtime
 from tests.test_company_memory_product import NOW
 from tests.test_company_round12_integrity import readiness
 from tests.test_company_round14_integrity import Crash, scope, snapshot
+from tests.typed_json import dig_text
 
 
 def issued_runtime(tmp_path, monkeypatch):
@@ -159,6 +160,7 @@ def test_w_accept_receipt_half_open_validity(tmp_path, monkeypatch, seconds, all
     provider, settings, context = issued_runtime(tmp_path, monkeypatch)
     with closing(sqlite3.connect(provider.database)) as db:
         intent = engine.pending_auto_reserve(db, scope())
+        assert intent is not None
         candidate = TypeAdapter(MemoryCandidate).validate_json(
             canonical_bytes(
                 candidate_result(db, context.workspace_id, intent.candidate_id, DELETION)
@@ -208,8 +210,8 @@ def test_x_every_handoff_decision_has_authenticated_command_and_transition(
             db.execute(
                 "INSERT INTO company_handoff_decisions VALUES(?,?,?,?,?,?,?)",
                 (
-                    proposal["command"]["target"]["workspace_id"],
-                    proposal["command"]["target"]["candidate_id"],
+                    dig_text(proposal, "command", "target", "workspace_id"),
+                    dig_text(proposal, "command", "target", "candidate_id"),
                     approval["request_id"],
                     approval["receipt_id"],
                     company_request_digest(operation, args),
@@ -242,8 +244,8 @@ def test_x_every_handoff_decision_has_authenticated_command_and_transition(
                     (row[0], "orphan:candidate", "orphan:request", "orphan:receipt", *row[4:]),
                 )
     target = FreshnessScope(
-        provider_instance_id=proposal["command"]["target"]["provider_instance_id"],
-        workspace_id=proposal["command"]["target"]["workspace_id"],
+        provider_instance_id=dig_text(proposal, "command", "target", "provider_instance_id"),
+        workspace_id=dig_text(proposal, "command", "target", "workspace_id"),
     )
     before = snapshot(provider)
     assert readiness(provider, target).status != "ready"
@@ -430,8 +432,8 @@ def test_x_authenticated_decision_and_pending_transition_remain_auditable(
         )
     )
     target = FreshnessScope(
-        provider_instance_id=proposal["command"]["target"]["provider_instance_id"],
-        workspace_id=proposal["command"]["target"]["workspace_id"],
+        provider_instance_id=dig_text(proposal, "command", "target", "provider_instance_id"),
+        workspace_id=dig_text(proposal, "command", "target", "workspace_id"),
     )
     assert readiness(provider, target).status == "ready"
     approval = owner_receipt(proposal, "approve" if operation == "accept" else "reject")

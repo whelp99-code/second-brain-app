@@ -1303,7 +1303,7 @@ def _sb_recall(
             selected,
             last_states,
         )
-    data: dict[str, object] = {"query": query, "limit": limit, "trigger": "explicit_question"}
+    data: JsonObject = {"query": query, "limit": limit, "trigger": "explicit_question"}
     end = None if time_range is None else time_range.get("end")
     if isinstance(end, str) and "T" in end:
         data["as_of"] = end
@@ -1363,7 +1363,7 @@ def _sb_recall(
     )
 
 
-def _evidence_ref(hit: dict[str, object]) -> dict[str, object] | None:
+def _evidence_ref(hit: Mapping[str, object]) -> dict[str, object] | None:
     evidence = hit.get("evidence")
     revision = hit.get("revision")
     event_id = hit.get("event_id")

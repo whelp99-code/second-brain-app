@@ -13,6 +13,7 @@ from datetime import datetime
 from sb.effect_values import JsonInput
 from sb.life_contracts import LifeEventV1, LifeInputError
 from sb.life_fields import integer
+from sb.life_grouping import entity_namespace, qualified_entity_id
 from sb.life_read_contracts import RecallHit, RecallResult
 from sb.life_values import instant, text
 from sb.search_query import LexicalQuery, normalize
@@ -57,6 +58,22 @@ def temporal_versions(
     return tuple(result)
 
 
+def searchable(event: LifeEventV1) -> str:
+    labels = "\n".join(entity.label for entity in event.entities)
+    return event.title + "\n" + event.body + "\n" + labels
+
+
+def in_namespace(event: LifeEventV1, namespace: str) -> bool:
+    spaces = {
+        entity_namespace(event.source_id, entity.entity_id) for entity in event.entities
+    }
+    if namespace == "company":
+        return "company" in spaces
+    if namespace == "personal":
+        return "company" not in spaces
+    raise LifeInputError("LIFE_NAMESPACE_INVALID")
+
+
 def rank(events: Sequence[LifeEventV1], query: str, limit: int = 5) -> tuple[LifeEventV1, ...]:
     if type(limit) is not int or not 1 <= limit <= 100:
         raise LifeInputError("LIFE_LIMIT_INVALID")
@@ -65,7 +82,7 @@ def rank(events: Sequence[LifeEventV1], query: str, limit: int = 5) -> tuple[Lif
         raise LifeInputError("LIFE_QUERY_INVALID")
     found: list[tuple[int, float, str, LifeEventV1]] = []
     for event in events:
-        content = event.title + "\n" + event.body
+        content = searchable(event)
         compact = normalize(content)
         if not all(normalize(term) in compact for term in plan.terms):
             continue
@@ -85,7 +102,7 @@ def recall(
     source_ids: tuple[str, ...],
     now: datetime,
 ) -> RecallResult:
-    if set(data) - {"query", "as_of", "limit", "entity_id", "trigger"}:
+    if set(data) - {"query", "as_of", "limit", "entity_id", "trigger", "namespace"}:
         raise LifeInputError("LIFE_UNKNOWN_FIELD")
     query = text(data.get("query"), maximum=4096)
     as_of = data.get("as_of")
@@ -98,7 +115,14 @@ def recall(
         "calendar",
     }:
         raise LifeInputError("LIFE_TRIGGER_INVALID")
+    namespace = data.get("namespace")
+    if namespace is None:
+        namespace = "personal"
+    if not isinstance(namespace, str) or namespace not in {"personal", "company"}:
+        raise LifeInputError("LIFE_NAMESPACE_INVALID")
     versions = temporal_versions(store, events, scopes=scopes, as_of=as_of, now=now)
+    if isinstance(namespace, str):
+        versions = tuple(event for event in versions if in_namespace(event, namespace))
     selected_id = data.get("entity_id")
     if selected_id is not None:
         selected_id = text(selected_id, maximum=320)
@@ -106,7 +130,10 @@ def recall(
             e
             for e in versions
             if e.event_id == selected_id
-            or any(e.source_id + ":" + entity.entity_id == selected_id for entity in e.entities)
+            or any(
+                qualified_entity_id(e.source_id, entity.entity_id) == selected_id
+                for entity in e.entities
+            )
         )
     matched = rank(versions, query, integer(data.get("limit", 5), "LIFE_LIMIT_INVALID"))
     journal = LifeJournal(store)

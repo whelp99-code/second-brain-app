@@ -196,6 +196,7 @@ def test_cli_evidence_links_matches_http(tmp_path: Path) -> None:
         slot=None,
         query=None,
         as_of=None,
+        namespace=None,
         send=False,
     )
     cli_body = dispatch(ns, config, workflow=workflow, importer=importer, ingest=ingest, maintainer=maintainer)

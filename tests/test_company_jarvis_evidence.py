@@ -17,6 +17,7 @@ from sb.company_freshness_models import (
     Checkpoint,
     FinishProgressRequest,
     FreshnessScope,
+    FreshnessWireError,
     ReserveProgressRequest,
 )
 from sb.company_memory_cli import run
@@ -66,12 +67,15 @@ def complete_sidecar(
         challenge="finish:" + request.operation_id,
     )
 
+    policy = config.handoff_policy
+    assert policy is not None
+
     def finish():
         return provider.finish_with_jarvis_sidecar(
             finish_request,
             sidecar,
             context=CONTEXT,
-            policy=config.handoff_policy,
+            policy=policy,
         )
 
     if boundary is not None:
@@ -109,6 +113,7 @@ def complete_sidecar(
             return checkpoint
     result = finish()
     assert result.outcome == ("recorded" if boundary is None else "already_recorded")
+    assert not isinstance(result, FreshnessWireError)
     assert result.checkpoint is not None and result.checkpoint != checkpoint
     return result.checkpoint
 

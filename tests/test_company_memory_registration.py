@@ -13,10 +13,13 @@ import sb.company_memory_cli as cli
 import sb.company_memory_registration as registration
 from sb.company_memory import CompanyMemoryError
 from sb.company_memory_authority import CompanyAuthorityRejected, company_request_digest
+from sb.company_memory_sources import CompanySourceBinding
+from sb.company_source_bindings import read_source_bindings, write_source_bindings
 from sb.effect_values import CanonicalValueError, JsonObject, canonical_bytes, format_instant
 from tests.task30_clock import FrozenTask30DateTime
 from tests.test_company_memory_product import KEY_ID, RECEIVE, config, signed_authority
 from tests.test_company_memory_profile import CLI_COMMAND, decoded_object
+from tests.typed_json import json_object, json_text
 
 NOW = FrozenTask30DateTime.now(UTC)
 CONTENT = "Retained Mail original\n"
@@ -85,17 +88,21 @@ def test_cli_registers_private_original_and_binding_without_candidate(
     profile = after.pop("source_profile")
     assert isinstance(profile, dict)
     assert profile["source_roots"] == [str(blob.parent)]
-    bindings = profile["bindings"]
-    assert isinstance(bindings, dict)
-    assert bindings[str(arguments["source_locator"])] == {
-        "path": str(blob),
-        "source_system": "mail",
-        "source_event_id": arguments["source_event_id"],
-        "parser_version": arguments["parser_version"],
-        "content_digest": arguments["content_digest"],
-    }
+    assert profile["bindings"] == {}
+    database = Path(str(after["company_database"]))
+    assert read_source_bindings(database)[str(arguments["source_locator"])] == CompanySourceBinding(
+        path=str(blob),
+        source_system="mail",
+        source_event_id=str(arguments["source_event_id"]),
+        parser_version=str(arguments["parser_version"]),
+        content_digest=str(arguments["content_digest"]),
+    )
     assert after == before
-    assert not (blob.parent.parent / "company.db").exists()
+    assert database.is_file()
+    tables = __import__("sqlite3").connect(database).execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()
+    assert "company_memory_candidates" not in {row[0] for row in tables}
 
 
 def test_registered_original_is_received_as_candidate(source: tuple[Path, JsonObject]) -> None:
@@ -123,7 +130,11 @@ def test_registration_does_not_grant_accept(source: tuple[Path, JsonObject]) -> 
     }))
     assert denied.returncode == 2
     assert decoded_object(denied.stderr)["error"] == "COMPANY_KEY_OPERATION_DENIED"
-    assert not (original(path).parent.parent / "company.db").exists()
+    assert "company_memory_candidates" not in {
+        row[0] for row in __import__("sqlite3").connect(original(path).parent.parent / "company.db").execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )
+    }
 
 
 def test_exact_replay_preserves_original_inode_and_config(source: tuple[Path, JsonObject]) -> None:
@@ -305,6 +316,86 @@ def test_concurrent_registrations_keep_both_bindings(
         _ = second.result(timeout=5)
     profile = decoded_object(path.read_bytes())["source_profile"]
     assert isinstance(profile, dict)
-    bindings = profile["bindings"]
-    assert isinstance(bindings, dict)
-    assert set(bindings) == {"Graph/id:../original", "Graph/second"}
+    assert profile["bindings"] == {}
+    stored = read_source_bindings(Path(str(decoded_object(path.read_bytes())["company_database"])))
+    assert set(stored) == {"Graph/id:../original", "Graph/second"}
+
+def test_binding_growth_does_not_hit_the_config_limit(
+    source: tuple[Path, JsonObject], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path, arguments = source
+    first = cli.run(path, envelope(arguments), now=NOW, register_source=True)
+    assert json_text(json_object(first["registration"])["state"]) == "registered"
+    ceiling = len(path.read_bytes())
+    monkeypatch.setattr(cli, "_MAX_CONFIG", ceiling)
+    other = arguments
+    for index in range(30):
+        other = {
+            **arguments,
+            "source_locator": f"Graph/{index}",
+            "source_event_id": f"event-{index}",
+        }
+        registered = cli.run(path, envelope(other), now=NOW, register_source=True)
+        assert json_text(json_object(registered["registration"])["state"]) == "registered"
+    assert len(path.read_bytes()) == ceiling
+    profile = json_object(decoded_object(path.read_bytes())["source_profile"])
+    assert profile["bindings"] == {}
+    stored = read_source_bindings(Path(str(decoded_object(path.read_bytes())["company_database"])))
+    assert len(stored) == 31
+    request = decoded_object(envelope(other))
+    del request["content"]
+    completed = invoke(path, canonical_bytes(request), registering=False)
+    assert completed.returncode == 0, completed.stderr.decode()
+
+def _restore_config_binding(path: Path, locator: str, binding: CompanySourceBinding) -> None:
+    document = decoded_object(path.read_bytes())
+    profile = document["source_profile"]
+    assert isinstance(profile, dict)
+    profile["bindings"] = {
+        locator: {
+            "path": binding.path,
+            "source_system": binding.source_system,
+            "source_event_id": binding.source_event_id,
+            "parser_version": binding.parser_version,
+            "content_digest": binding.content_digest,
+        },
+    }
+    path.write_bytes(canonical_bytes(document))
+
+
+def test_receive_drops_config_bindings_already_stored(source: tuple[Path, JsonObject]) -> None:
+    path, arguments = source
+    registered = cli.run(path, envelope(arguments), now=NOW, register_source=True)
+    assert json_text(json_object(registered["registration"])["state"]) == "registered"
+    database = Path(str(decoded_object(path.read_bytes())["company_database"]))
+    stored = read_source_bindings(database)
+    current = stored[str(arguments["source_locator"])]
+    write_source_bindings(database, {"Graph/extra": current.model_copy(update={
+        "source_event_id": "event-extra",
+    })})
+    _restore_config_binding(path, str(arguments["source_locator"]), current)
+    request = decoded_object(envelope(arguments))
+    del request["content"]
+    completed = invoke(path, canonical_bytes(request), registering=False)
+    assert completed.returncode == 0, completed.stderr.decode()
+    assert json_object(decoded_object(path.read_bytes())["source_profile"])["bindings"] == {}
+    assert set(read_source_bindings(database)) == {str(arguments["source_locator"]), "Graph/extra"}
+
+
+def test_receive_stops_when_duplicated_binding_differs(source: tuple[Path, JsonObject]) -> None:
+    path, arguments = source
+    _ = cli.run(path, envelope(arguments), now=NOW, register_source=True)
+    database = Path(str(decoded_object(path.read_bytes())["company_database"]))
+    stored = read_source_bindings(database)
+    changed = stored[str(arguments["source_locator"])].model_copy(
+        update={"source_event_id": "event-other"},
+    )
+    _restore_config_binding(path, str(arguments["source_locator"]), changed)
+    before = path.read_bytes()
+    request = decoded_object(envelope(arguments))
+    del request["content"]
+    completed = invoke(path, canonical_bytes(request), registering=False)
+    assert completed.returncode == 2
+    assert decoded_object(completed.stderr)["error"] == "COMPANY_SOURCE_BINDING_CONFLICT"
+    assert path.read_bytes() == before
+    assert read_source_bindings(database) == stored

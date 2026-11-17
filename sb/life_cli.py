@@ -102,6 +102,7 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("--slot", choices=("morning", "evening"))
     _ = parser.add_argument("--query")
     _ = parser.add_argument("--as-of")
+    _ = parser.add_argument("--namespace", choices=("personal", "company"))
     _ = parser.add_argument(
         "--send",
         action="store_true",
@@ -156,6 +157,7 @@ def _payload(ns: LifeArguments) -> JsonObject:
         (ns["slot"], "slot"),
         (ns["query"], "query"),
         (ns["as_of"], "as_of"),
+        (ns["namespace"], "namespace"),
     ):
         if argument is not None:
             value[key] = argument

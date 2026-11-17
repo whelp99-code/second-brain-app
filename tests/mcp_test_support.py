@@ -11,7 +11,7 @@ from mcp_types import CallToolResult
 from pydantic import BaseModel, ConfigDict
 
 from sb.contracts import PageSpec, SourceCite
-from sb.effect_values import JsonObject
+from sb.effect_values import JsonObject, JsonValue
 from sb.store.cas import ContentAddressedStore
 from sb.vault import init_vault
 
@@ -167,7 +167,7 @@ def remember_result(result: CallToolResult) -> RememberOut | None:
 def call(
     server: MCPServer,
     name: str,
-    arguments: Mapping[str, str | int | None],
+    arguments: Mapping[str, JsonValue],
 ) -> CallToolResult:
     async def go() -> CallToolResult:
         async with Client(server, mode="legacy", cache=None) as client:

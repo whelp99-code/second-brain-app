@@ -52,7 +52,11 @@ from sb.company_memory_handoff import (
     require_enrollment,
 )
 from sb.company_memory_reader import list_mail_candidates
-from sb.company_memory_registration import register_original, registration_lock
+from sb.company_memory_registration import (
+    drop_duplicated_config_bindings,
+    register_original,
+    registration_lock,
+)
 from sb.company_memory_sources import resolve_company_source
 from sb.company_processor_execution import execute_processor_transition
 from sb.company_processor_finish import resume_pending_finish
@@ -60,6 +64,7 @@ from sb.company_processor_progress import (
     local_checkpoint,
     save_checkpoint,
 )
+from sb.company_source_bindings import profile_with_stored_bindings
 from sb.company_transition_receipt import read_transition_receipt
 from sb.effect_values import (
     CanonicalValueError,
@@ -160,6 +165,19 @@ def _request(
         raise CompanyAuthorityRejected("COMPANY_AUTHORITY_REQUIRED") from exc
     _validate_arguments(authority.operation, arguments, keys_only, processor)
     return authority, authority_value, arguments
+
+
+def _config_document(config: CompanyCliConfigV1) -> JsonObject:
+    document = model_object(config)
+    for field in (
+        "handoff_policy",
+        "freshness_provider",
+        "internal_auto_policy",
+        "policy_auto_key_id",
+    ):
+        if field not in config.model_fields_set:
+            del document[field]
+    return document
 
 
 def run(
@@ -427,15 +445,7 @@ def _run(
             or key_scope.source_systems != ["mail"]
         ):
             raise CompanyAuthorityRejected("COMPANY_SOURCE_REGISTRATION_DENIED")
-        document = model_object(config)
-        for field in (
-            "handoff_policy",
-            "freshness_provider",
-            "internal_auto_policy",
-            "policy_auto_key_id",
-        ):
-            if field not in config.model_fields_set:
-                del document[field]
+        document = _config_document(config)
         return register_original(
             config_path,
             document,
@@ -447,10 +457,19 @@ def _run(
             config.personal_data_roots,
         )
     if authority.operation == "receive" and config.source_profile is not None:
+        with registration_lock(config_path):
+            profile = drop_duplicated_config_bindings(
+                config_path,
+                _config_document(config),
+                database,
+                config.source_profile,
+                _MAX_CONFIG,
+            )
+        assert profile is not None
         arguments = {
             **arguments,
             "content": resolve_company_source(
-                config.source_profile,
+                profile_with_stored_bindings(profile, database),
                 arguments,
                 config.personal_data_roots,
             ),

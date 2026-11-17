@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import timedelta
-from types import SimpleNamespace
 
 import pytest
 
@@ -16,13 +15,22 @@ from sb.company_freshness_anchor import AnchorRejected
 from sb.company_freshness_models import FreshnessScope
 from sb.company_memory import CompanyMemoryStore
 from sb.company_memory_authority import CompanyAuthorityContext, CompanyAuthorityRejected
-from sb.effect_values import format_instant
+from sb.effect_values import JsonObject, format_instant
 from tests.company_db_auto_support import real_company_runtime
 from tests.company_internal_auto_support import PROVIDER, WORKSPACE, contact_body, receive, trigger
+from tests.test_company_approver_binding import fixture_policy
+from tests.typed_json import json_object, json_text
 
 
 class Crash(BaseException):
     pass
+
+
+@dataclass
+class ExpiredAuthority:
+    request_digest: str
+    issued_at: str
+    expires_at: str
 
 
 @pytest.mark.parametrize("boundary", ["claim_auto", "save_policy_receipt", "prepare_auto_reserve"])
@@ -144,7 +152,8 @@ def prepare_test_handoffs(db, context, tmp_path, candidate_ids):
             strict=True,
         )
         proposal = prepare_handoff(db, candidate, authority_context, policy, context.now)
-        handoffs.append(proposal["command"]["request_id"])
+        command = json_object(proposal["command"])
+        handoffs.append(json_text(command["request_id"]))
     return handoffs
 
 
@@ -171,21 +180,14 @@ def test_resumed_processor_zero_effect_expiry_cancels_original(
         context.deletion_sequence,
         context.deletion_set_root,
     )
-    kwargs = {
-        "context": authority_context,
-        "policy": None,
-        "owner_keys": {},
-        "authority": SimpleNamespace(
-            request_digest="sha256:" + "ab" * 32,
-            issued_at=format_instant(context.now),
-            expires_at=format_instant(context.now + timedelta(minutes=5)),
-        ),
-        "operation": "accept",
-        "arguments": {"candidate_id": "mail:expiry", "handoff_id": handoff_id},
-        "checkpoint": context.observed_checkpoint,
-        "now": context.now,
-        "clock": lambda: context.now,
-    }
+    policy = fixture_policy()[1]
+    authority = ExpiredAuthority(
+        request_digest="sha256:" + "ab" * 32,
+        issued_at=format_instant(context.now),
+        expires_at=format_instant(context.now + timedelta(minutes=5)),
+    )
+    arguments: JsonObject = {"candidate_id": "mail:expiry", "handoff_id": handoff_id}
+    clock = lambda: context.now
     monkeypatch.setattr(execution, "authorize_transition", lambda *a, **kw: None)
     reserve = execution.reserve_operation
 
@@ -193,11 +195,26 @@ def test_resumed_processor_zero_effect_expiry_cancels_original(
         reserve(*args, **kwargs)
         raise Crash("reserve committed; execute not started")
 
+    def run_transition(store: CompanyMemoryStore):
+        return execution.execute_processor_transition(
+            store,
+            provider,
+            context=authority_context,
+            policy=policy,
+            owner_keys={},
+            authority=authority,
+            operation="accept",
+            arguments=arguments,
+            checkpoint=context.observed_checkpoint,
+            now=context.now,
+            clock=clock,
+        )
+
     with closing(CompanyMemoryStore(provider.database)) as store:
         with monkeypatch.context() as fault:
             fault.setattr(execution, "reserve_operation", crash)
             with pytest.raises(Crash):
-                execution.execute_processor_transition(store, provider, **kwargs)
+                run_transition(store)
         calls = 0
 
         def expired(*args, **kw):
@@ -223,7 +240,7 @@ def test_resumed_processor_zero_effect_expiry_cancels_original(
                 store.db.execute("INSERT INTO company_handoff_decisions VALUES(?,?,?,?,?,?,?)", (WORKSPACE, "mail:expiry", handoff_id, "other-receipt", "other-request", "approve", "{}"))
         before = provider.database.read_bytes()
         with pytest.raises((AnchorRejected, CompanyAuthorityRejected) if unsafe else CompanyAuthorityRejected, match="UNCERTAIN|ROLLBACK" if unsafe else "EXPIRED"):
-            execution.execute_processor_transition(store, provider, **kwargs)
+            run_transition(store)
         if unsafe:
             assert provider.database.read_bytes() == before
             assert store.db.execute("SELECT state,terminal_state FROM company_freshness_operations").fetchall() == [("reserved", None)]

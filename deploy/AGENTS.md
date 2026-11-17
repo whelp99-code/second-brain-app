@@ -25,6 +25,9 @@ Not a package — there is no
 | Unit drain audit (18 units, both naming schemes) | `check-transition-units.py` — `assess_unit` |
 | DB/lease audits | `check-database-handles.py`, `check-jarvis-pending-state.py` (both export `inspect`) |
 | Installed unit templates | `deploy/systemd/second-brain{,-web,-backup}.service`, `.timer` |
+| Mail service fields to SB mail-json | `mail-service-to-mail-json.py` — `convert`; file or stdin only, no mailbox |
+| Outlook or Google calendar JSON to SB life import | `calendar_read.py` — `to_sb_document` converts Mail's graph-calendar file; no Mail key or token |
+| 06:30 Outlook file, convert, import, morning briefing | `outlook-morning.sh`; unit `systemd/user/jm-second-brain-outlook-morning.{service,timer}` — create only, do not enable |
 
 ## CONVENTIONS
 - `prepare-release.py` builds from `git archive` of **committed HEAD** and refuses a dirty
@@ -38,6 +41,7 @@ Not a package — there is no
   the script directory is on `sys.path`, not because `deploy` is importable.
 - `bundle_python_runtime.py` rejects external symlinks and FIFOs; budgets are 20k files /
   1 GiB.
+- 검색·순위 변경은 반영 전후 `deploy/vault-copy-search-compare.sh` 비교가 필수다.
 - Shipped units are hardened by default: `NoNewPrivileges`, `ProtectSystem=strict`,
   `ProtectHome=read-only`, `RestrictAddressFamilies=AF_UNIX`, `MemoryDenyWriteExecute=yes`,
   `UMask=0077`. The one documented exception is

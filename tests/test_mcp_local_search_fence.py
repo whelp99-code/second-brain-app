@@ -184,6 +184,10 @@ def test_stale_or_restored_generation_is_closed(
                 parent = first
                 if mismatch == "restored_snapshot":
                     parent = publish(store, journal, first, deleted=True)
+                def restore_deleted(root: Path) -> None:
+                    (root / "wiki/deleted.md").write_text(
+                        "# Restored\nFenceNeedle removed\n"
+                    )
                 stale = store.build(
                     request_id=f"fixture:{mismatch}",
                     parent=parent,
@@ -191,9 +195,7 @@ def test_stale_or_restored_generation_is_closed(
                     tombstone_set_root="sha256:" + "0" * 64,
                     created_at=NOW,
                     allowed=lambda _: True,
-                    mutate=lambda root: (root / "wiki/deleted.md").write_text(
-                        "# Restored\nFenceNeedle removed\n"
-                    ),
+                    mutate=restore_deleted,
                 )
                 store.activate(stale, parent, NOW)
             mcp = server(config, monkeypatch, surface)

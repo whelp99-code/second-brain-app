@@ -7,6 +7,7 @@ import sqlite3
 
 from pydantic import Field, ValidationError
 
+from sb.company_auto_policy import auto_request_id
 from sb.company_auto_publication import PublishedAssessment
 from sb.company_auto_settings import AutoInternalRejected, AutoReportGrant
 from sb.company_db_freshness import CompanyDbFreshnessProvider
@@ -143,12 +144,10 @@ def read_auto_report(
     for sequence, raw, _created_at in rows:
         snapshot = PublishedAssessment.model_validate_json(raw, strict=True)
         if snapshot.candidate_id in dispositions:
-            disposition_sequence, operation_id, state = dispositions[snapshot.candidate_id]
+            disposition_sequence, operation_id, updates = dispositions[snapshot.candidate_id]
             if disposition_sequence > sequence:
                 sequence = disposition_sequence
-                snapshot = snapshot.model_copy(
-                    update={"state": state, "operation_id": operation_id}
-                )
+                snapshot = snapshot.model_copy(update={**updates, "operation_id": operation_id})
         if sequence <= query.from_global_sequence:
             continue
         latest[snapshot.candidate_id] = AutoReportRow.model_validate(
@@ -268,7 +267,7 @@ def _candidate_dispositions(
     db: sqlite3.Connection,
     scope: FreshnessScope,
     head: int,
-) -> dict[str, tuple[int, str, str]]:
+) -> dict[str, tuple[int, str, dict[str, str | None]]]:
     authorities: list[tuple[str, str]] = db.execute(
         """SELECT candidate_id,auto_request_id FROM company_auto_policy_receipts
         WHERE provider_instance_id=? AND workspace_id=?""",
@@ -279,6 +278,36 @@ def _candidate_dispositions(
         for candidate, request_id in authorities
         for operation in ("accept", "complete", "mark_processed")
     }
+    completed_events = {
+        memory_request_digest("mark_processed", candidate, request_id)
+        for candidate, request_id in authorities
+    }
+    # Authority tables can be restored together to a point before issuance.
+    # Derive expected identities independently of those rows, then require the
+    # original receipt for every matching anchored reservation at this cut.
+    assessments: list[tuple[str, str | None, str | None]] = db.execute(
+        """SELECT json_extract(l.record_json,'$.snapshot.candidate_id'),
+          a.content_digest,a.policy_digest
+        FROM company_freshness_log l
+        JOIN company_freshness_publication p ON p.global_sequence=l.global_sequence
+        LEFT JOIN company_auto_assessments a
+          ON a.provider_instance_id=l.provider_instance_id AND a.workspace_id=l.workspace_id
+          AND a.assessment_digest=json_extract(l.record_json,'$.snapshot.assessment_digest')
+          AND a.candidate_id=json_extract(l.record_json,'$.snapshot.candidate_id')
+        WHERE l.provider_instance_id=? AND l.workspace_id=? AND l.global_sequence<=?
+          AND json_extract(l.record_json,'$.kind')='internal_auto_assessment'
+          AND json_extract(l.record_json,'$.snapshot.classification')='auto_internal'""",
+        (scope.provider_instance_id, scope.workspace_id, head),
+    ).fetchall()
+    expected_events: set[str] = set()
+    for candidate, content, policy in assessments:
+        if content is None or policy is None:
+            raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED")
+        request_id = auto_request_id(scope, candidate, content, policy)
+        expected_events.update(
+            memory_request_digest(operation, candidate, request_id)
+            for operation in ("accept", "complete", "mark_processed")
+        )
     log: list[tuple[int, str, str, str | None, str | None]] = db.execute(
         """SELECT l.global_sequence,l.phase,l.operation_id,
         json_extract(l.record_json,'$.event_digest'),
@@ -289,18 +318,47 @@ def _candidate_dispositions(
           AND l.phase IN ('reserve','finish') ORDER BY l.global_sequence""",
         (scope.provider_instance_id, scope.workspace_id, head),
     ).fetchall()
-    pending: dict[str, tuple[str, int]] = {}
-    dispositions: dict[str, tuple[int, str, str]] = {}
+    pending: dict[str, tuple[str, bool]] = {}
+    dispositions: dict[str, tuple[int, str, dict[str, str | None]]] = {}
     for sequence, phase, operation_id, digest, terminal_state in log:
+        if phase == "reserve" and digest in expected_events and digest not in events:
+            raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED")
         if phase == "finish":
             reserved = pending.pop(operation_id, None)
             if reserved is not None:
-                candidate, _ = reserved
+                candidate, marks_processed = reserved
                 if terminal_state == "cancelled":
-                    dispositions[candidate] = (sequence, operation_id, "cancelled")
+                    dispositions[candidate] = (sequence, operation_id, {"state": "cancelled"})
+                elif terminal_state == "processed_complete" and marks_processed:
+                    completed: list[tuple[str, str, str]] = db.execute(
+                        """SELECT m.receipt_id,m.created_at,r.record_kind
+                        FROM company_memory_receipts m
+                        JOIN company_internal_records r ON r.workspace_id=m.workspace_id
+                          AND r.source_candidate_id=m.candidate_id
+                        JOIN company_freshness_log l ON l.operation_id=? AND l.phase='finish'
+                          AND l.provider_instance_id=r.provider_instance_id
+                          AND l.workspace_id=r.workspace_id
+                          AND json_extract(l.record_json,'$.evidence_digest')=m.receipt_digest
+                        WHERE r.provider_instance_id=? AND m.workspace_id=?
+                          AND m.candidate_id=? AND m.operation='mark_processed'""",
+                        (operation_id, scope.provider_instance_id, scope.workspace_id, candidate),
+                    ).fetchall()
+                    if len(completed) != 1:
+                        raise AutoInternalRejected("COMPANY_FRESHNESS_REQUIRED")
+                    receipt_id, processed_at, record_kind = completed[0]
+                    dispositions[candidate] = (
+                        sequence,
+                        operation_id,
+                        {
+                            "state": "processed_complete",
+                            "receipt_id": receipt_id,
+                            "processed_at": processed_at,
+                            "record_kind": record_kind,
+                        },
+                    )
                 else:
                     _ = dispositions.pop(candidate, None)
         elif digest is not None and digest in events:
-            pending[operation_id] = (events[digest], sequence)
-            dispositions[events[digest]] = (sequence, operation_id, "uncertain")
+            pending[operation_id] = (events[digest], digest in completed_events)
+            dispositions[events[digest]] = (sequence, operation_id, {"state": "uncertain"})
     return dispositions

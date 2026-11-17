@@ -32,6 +32,7 @@ from tests.company_internal_auto_support import (
     trigger,
 )
 from tests.test_company_round8_integrity import request, rotate
+from tests.typed_json import require_object
 
 
 @pytest.mark.parametrize("same_event", [False, True])
@@ -60,37 +61,59 @@ def test_two_candidate_preflights_cannot_share_a_winning_record(tmp_path: Path, 
         barrier.wait(timeout=10)
         if index == 1:
             assert committed.wait(timeout=10)
-        kwargs = {
-            "operation_id": f"round9:operation:{index}",
-            "auto_request_id": f"round9:request:{index}",
-            "candidate_id": candidate.candidate_id,
-            "record_kind": "contact",
-            "entity_key": _entity_key("contact", fields),
-            "payload": fields,
-            "source_event_id": candidate.source_event_id,
-            "content_digest": candidate.content_digest,
-            "deletion": DELETION,
-            "created_at": format_instant(NOW),
-            "forbidden_digests": (),
-            "source_context": SourceContext(
-                workspace_id=WORKSPACE,
-                owner=context.owner,
-                projects=list(context.projects),
-                policy_revision=context.policy_revision,
-                deletion_sequence=DELETION[0],
-                deletion_set_root=DELETION[1],
-            ),
-        }
+        operation_id = f"round9:operation:{index}"
+        auto_request_id = f"round9:request:{index}"
+        source_context = SourceContext(
+            workspace_id=WORKSPACE,
+            owner=context.owner,
+            projects=list(context.projects),
+            policy_revision=context.policy_revision,
+            deletion_sequence=DELETION[0],
+            deletion_set_root=DELETION[1],
+        )
         try:
             with closing(sqlite3.connect(provider.database)) as db, db:
                 db.execute("BEGIN IMMEDIATE")
-                digest = insert_effect(db, scope, **kwargs)
+                digest = insert_effect(
+                    db,
+                    scope,
+                    operation_id=operation_id,
+                    auto_request_id=auto_request_id,
+                    candidate_id=candidate.candidate_id,
+                    record_kind="contact",
+                    entity_key=_entity_key("contact", fields),
+                    payload=require_object(fields),
+                    source_event_id=candidate.source_event_id,
+                    content_digest=candidate.content_digest,
+                    deletion=DELETION,
+                    created_at=format_instant(NOW),
+                    forbidden_digests=(),
+                    source_context=source_context,
+                )
             if index == 0:
                 # Same-candidate replay keeps the original effect and record.
                 with closing(sqlite3.connect(provider.database)) as db, db:
-                    assert insert_effect(db, scope, **kwargs) == digest
+                    assert (
+                        insert_effect(
+                            db,
+                            scope,
+                            operation_id=operation_id,
+                            auto_request_id=auto_request_id,
+                            candidate_id=candidate.candidate_id,
+                            record_kind="contact",
+                            entity_key=_entity_key("contact", fields),
+                            payload=require_object(fields),
+                            source_event_id=candidate.source_event_id,
+                            content_digest=candidate.content_digest,
+                            deletion=DELETION,
+                            created_at=format_instant(NOW),
+                            forbidden_digests=(),
+                            source_context=source_context,
+                        )
+                        == digest
+                    )
                 assert verify_internal_readback(
-                    provider.database, scope, kwargs["operation_id"], digest
+                    provider.database, scope, operation_id, digest
                 )
             return "committed"
         except AutoInternalRejected as exc:

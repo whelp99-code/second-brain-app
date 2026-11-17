@@ -16,6 +16,7 @@ from pydantic import Field, ValidationError
 
 from sb.company_memory import CompanyMemoryError
 from sb.company_memory_sources import CompanySourceBinding, CompanySourceProfile
+from sb.company_source_bindings import read_source_bindings, write_source_bindings
 from sb.effect_values import JsonObject, canonical_bytes, strict_loads
 from sb.effect_write_models import ClosedModel
 from sb.effect_write_values import model_object
@@ -69,6 +70,36 @@ def _publish(path: Path, raw: bytes, *, replace: bool = True) -> None:
     finally:
         temporary.unlink(missing_ok=True)
 
+def drop_duplicated_config_bindings(
+    config_path: Path,
+    document: JsonObject,
+    database: Path,
+    profile: CompanySourceProfile | None,
+    config_maximum: int,
+) -> CompanySourceProfile | None:
+    """Drop config bindings already stored identically. A different row stops the write."""
+    if profile is None or not profile.bindings:
+        return profile
+    stored = read_source_bindings(database)
+    shared = [locator for locator in profile.bindings if locator in stored]
+    if not shared:
+        return profile
+    if any(profile.bindings[locator] != stored[locator] for locator in shared):
+        raise CompanyMemoryError("COMPANY_SOURCE_BINDING_CONFLICT")
+    updated = profile.model_copy(update={
+        "bindings": {
+            locator: binding
+            for locator, binding in profile.bindings.items()
+            if locator not in stored
+        },
+    })
+    serialized = canonical_bytes({**document, "source_profile": model_object(updated)})
+    _ = strict_loads(serialized, config_maximum)
+    if config_path.read_bytes() != serialized:
+        _publish(config_path, serialized)
+    return updated
+
+
 
 def register_original(
     config_path: Path,
@@ -81,6 +112,9 @@ def register_original(
     personal_roots: list[str],
 ) -> JsonObject:
     """Append one authenticated binding after its retained original is durable."""
+    profile = drop_duplicated_config_bindings(
+        config_path, document, database, profile, config_maximum,
+    )
     try:
         source = RegistrationArguments.model_validate(arguments)
         raw = content.encode("utf-8")
@@ -105,15 +139,22 @@ def register_original(
         parser_version=source.parser_version,
         content_digest=digest,
     )
-    existing = profile.bindings.get(source.source_locator) if profile is not None else None
+    file_bindings = dict(profile.bindings) if profile is not None else {}
+    stored = read_source_bindings(database)
+    existing = file_bindings.get(source.source_locator) or stored.get(source.source_locator)
     if existing is not None and existing != binding:
         raise CompanyMemoryError("COMPANY_SOURCE_BINDING_CONFLICT")
     roots = list(profile.source_roots) if profile is not None else []
     if str(root) not in roots:
         roots.append(str(root))
-    bindings = dict(profile.bindings) if profile is not None else {}
-    bindings[source.source_locator] = binding
-    updated = CompanySourceProfile(schema_version=1, source_roots=roots, bindings=bindings)
+    migrated = dict(file_bindings)
+    migrated[source.source_locator] = binding
+    for locator, prior in stored.items():
+        current = migrated.get(locator)
+        if current is not None and current != prior:
+            raise CompanyMemoryError("COMPANY_SOURCE_BINDING_CONFLICT")
+        migrated.setdefault(locator, prior)
+    updated = CompanySourceProfile(schema_version=1, source_roots=roots, bindings={})
     serialized = canonical_bytes({**document, "source_profile": model_object(updated)})
     _ = strict_loads(serialized, config_maximum)
     try:
@@ -139,7 +180,8 @@ def register_original(
                 raise CompanyMemoryError("COMPANY_SOURCE_BINDING_MISMATCH")
         else:
             _publish(path, raw, replace=False)
-        if existing is None:
+        write_source_bindings(database, migrated)
+        if config_path.read_bytes() != serialized:
             _publish(config_path, serialized)
     except OSError as exc:
         raise CompanyMemoryError("COMPANY_SOURCE_REGISTRATION_FAILED") from exc

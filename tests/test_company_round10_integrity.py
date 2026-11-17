@@ -60,6 +60,7 @@ from tests.test_company_db_cancellation import cancelled_runtime
 from tests.test_company_db_human_integration import human_runtime
 from tests.test_company_memory_product import NOW as HUMAN_NOW
 from tests.test_company_round8_integrity import request
+from tests.typed_json import json_object, json_text
 
 
 def jarvis_publication_template(root):
@@ -78,9 +79,11 @@ def jarvis_publication_template(root):
         *DELETION,
     )
     binding = binding_digest(context, policy)
-    command = proof["command"]
-    command["target"].update(provider_instance_id=PROVIDER, workspace_id=WORKSPACE)
-    command["args"].update(
+    command = json_object(proof["command"])
+    target = json_object(command["target"])
+    args = json_object(command["args"])
+    target.update(provider_instance_id=PROVIDER, workspace_id=WORKSPACE)
+    args.update(
         owner=ACCESS.owner,
         projects=list(ACCESS.projects),
         policy_revision=ACCESS.policy_revision,
@@ -93,15 +96,15 @@ def jarvis_publication_template(root):
     command["requested_by"] = ACCESS.owner
     command["request_id"] = (
         handoff_key(
-            ControlTarget.model_validate(command["target"]),
-            ControlArguments.model_validate_json(canonical_bytes(command["args"]), strict=True),
+            ControlTarget.model_validate(target),
+            ControlArguments.model_validate_json(canonical_bytes(args), strict=True),
         )
         + ":1"
     )
     command["nonce"] = command["request_id"]
     command_hash = "sha256:" + hashlib.sha256(canonical_bytes(command)).hexdigest()
     payload = {
-        "request_id": command["request_id"],
+        "request_id": json_text(command["request_id"]),
         "reason": "withdrawn before execution",
         "revoked_by": "owner",
         "revoked_at": format_instant(NOW),
@@ -109,7 +112,7 @@ def jarvis_publication_template(root):
     digest = "sha256:" + hashlib.sha256(canonical_bytes(payload)).hexdigest()
     record_id = "control-revocation:" + digest.removeprefix("sha256:")
     proof.update(source_record_id=record_id, original_at=format_instant(NOW))
-    proof["record"]["revocation"].update(
+    json_object(json_object(proof["record"])["revocation"]).update(
         **payload,
         revocation_id=record_id,
         command_digest=command_hash,
@@ -150,6 +153,8 @@ def advance_jarvis(provider, before, template):
         )
     )
     assert reserved.outcome == "reserved"
+    assert isinstance(reserved.reservation_id, str)
+    assert reserved.checkpoint is not None
     finished = jarvis.finish_with_jarvis_sidecar(
         FinishProgressRequest(
             schema_version=2,
@@ -283,7 +288,7 @@ def test_cached_human_receipt_cannot_bypass_reserve_and_finish(tmp_path: Path):
     arguments = processor_arguments(proposal, owner_receipt(proposal))
     signed = signed_request("accept", arguments, PROCESSOR_KEY, "processor", PROCESSOR)
     authority = json.loads(signed)["authority"]
-    candidate_id = arguments["candidate_id"]
+    candidate_id = json_text(arguments["candidate_id"])
     with closing(sqlite3.connect(provider.database)) as db, db:
         insert_memory_receipt(
             db,
