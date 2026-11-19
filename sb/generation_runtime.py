@@ -35,7 +35,7 @@ from sb.generation_staging import (
     remove_provisional_git,
 )
 from sb.generations import Generation, GenerationStore
-from sb.inbox import parse_remember, publish_inbox
+from sb.inbox import RememberIdentity, parse_remember, publish_inbox, remember_identity
 from sb.provider_lifecycle import MaintenanceResult, ProviderLifecycle
 from sb.request_store import RequestStore
 from sb.sqlite_values import OPTIONAL_INTEGER_ROW
@@ -94,15 +94,19 @@ class GenerationMutationService:
         self.store.close()
         self.requests.close()
 
-    def remember(self, content: str, title: str | None, now: datetime) -> Path:
+    def remember(
+        self, content: str, title: str | None, now: datetime,
+        request_id: str | RememberIdentity | None = None,
+    ) -> Path:
         note = parse_remember(content, title)
+        identity = remember_identity(request_id, now=now)
         result = self.mutate(
             GenerationMutation(
                 mutation_id=f"inbox:{uuid4().hex}",
                 operation=GenerationOperation.INBOX,
                 now=now,
                 authority=GenerationAuthority(None, None),
-                apply=lambda root: publish_inbox(root, note),
+                apply=lambda root: publish_inbox(root, note, identity),
             )
         )
         return result.value
