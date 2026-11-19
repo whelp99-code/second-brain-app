@@ -314,17 +314,18 @@ def test_mcp_open_conflicts_lists_committed_conflict(tmp_path: Path) -> None:
     assert all(row.conflict_id and row.page_id and row.summary for row in rows)
 
 
-def test_mcp_remember_writes_collision_safe_inbox_file(tmp_path: Path) -> None:
+def test_mcp_remember_without_request_id_writes_distinct_inbox_files(tmp_path: Path) -> None:
     root = _seed(tmp_path)
     server = build_server(root, config=Config(raw={"vault_root":str(root)}))
     first = _remember(_call(server, "sb_remember", {"content": "one", "title": "dup"}))
     repeated = _remember(_call(server, "sb_remember", {"content": "one", "title": "dup"}))
     second = _remember(_call(server, "sb_remember", {"content": "two", "title": "dup"}))
     assert first is not None and repeated is not None and second is not None
-    assert first.inbox_path == repeated.inbox_path
+    assert first.inbox_path != repeated.inbox_path
     assert first.inbox_path != second.inbox_path
+    assert repeated.inbox_path != second.inbox_path
     listing = sorted(path.name for path in (root / "inbox").iterdir() if path.is_file())
-    assert len(listing) == 2
+    assert len(listing) == 3
     assert all(name.endswith(".md") for name in listing)
     assert "dup.md" not in {path.name for path in (root / "wiki").iterdir() if path.is_file()}
 
