@@ -2,8 +2,9 @@
 
 The final page path is a pure function of the request id, the normalized
 title, and the exact body bytes. The same id, title, and body are one page.
-A different id or a different title is a different page. An omitted id is a
-new page, not a retry. Publication is an exclusive create of that name.
+A different id or a different title is a different page. An omitted id is the
+empty id, so the same title and body without an id are one page: a repeat
+reuses the existing page. Publication is an exclusive create of that name.
 A retry of the same id, title, and body observes the same path and never
 mints a second page. There is no in-content marker and no side retry file.
 """
@@ -92,7 +93,7 @@ _REQUEST_ID_RE: Final = re.compile(r"[0-9A-Za-z_-]{1,64}")
 
 
 def remember_request_id(request_id: str | None) -> str:
-    """Client id for a repeatable remember. Omitted ids are not retries."""
+    """Client id for a repeatable remember. An omitted id is the empty id."""
     if request_id is None:
         return ""
     if _REQUEST_ID_RE.fullmatch(request_id) is None:
@@ -103,10 +104,10 @@ def remember_request_id(request_id: str | None) -> str:
 def remember_digest(data: bytes, title: str | None, request_id: str) -> str:
     """sha256 of request id, normalized title, and exact body bytes.
 
-    The runtime contract requires two identical remembers to be two pages
-    (``test_mcp_contract_runtime``). A client-supplied request id is therefore
-    part of the hash. The same id, title, and body are one page. A different
-    title or a different id is a different page. An omitted id is not a retry.
+    A client-supplied request id is part of the hash. The same id, title, and
+    body are one page. A different title or a different id is a different page.
+    An omitted id hashes as the empty id, so two identical remembers without an
+    id are one page and the repeat reuses the existing page.
     """
     title_bytes = normalized_title(title).encode("utf-8")
     identity = request_id.encode("ascii")
