@@ -17,7 +17,6 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Final, Literal, TypedDict, cast, override
-from uuid import uuid4
 
 import anyio
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -894,21 +893,20 @@ def build_server(
             })
 
         try:
-            identity = remember_request_id(request_id)
+            identity = "" if request_id is None else remember_request_id(request_id)
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
-        if request_id is None:
-            identity = uuid4().hex
+        published_id = None if request_id is None else identity
         if vault_root is not None and not root.is_symlink() and root.name != "vault":
             try:
-                return {"inbox_path": write_inbox(root, content, title, identity).as_posix()}
+                return {"inbox_path": write_inbox(root, content, title, published_id).as_posix()}
             except RememberRejected as exc:
                 raise ToolError(str(exc)) from exc
             except Exception as exc:
                 raise remember_failure(exc) from exc
         mutations = GenerationMutationService.from_config(runtime_config)
         try:
-            rel = mutations.remember(content, title, datetime.now(UTC), identity)
+            rel = mutations.remember(content, title, datetime.now(UTC), published_id)
             rel = promote_published(root, rel, title)
         except RememberRejected as exc:
             raise ToolError(str(exc)) from exc
