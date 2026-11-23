@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, Literal, assert_never, override
+from typing import Final, Literal, assert_never
 
 MAX_REMEMBER_BYTES: Final = 1024 * 1024
 _SLUG_RE: Final = re.compile(r"[^0-9A-Za-z가-힣]+")
@@ -31,24 +31,25 @@ _AT_FDCWD: Final = -100
 PageState = Literal["present", "absent", "unknown", "conflict"]
 
 
-@dataclass(frozen=True, slots=True)
 class RememberRejected(Exception):
-    reason: str
+    """The remember payload was refused before any durable write."""
 
-    @override
-    def __str__(self) -> str:
-        return self.reason
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(reason)
 
 
-@dataclass(frozen=True, slots=True)
 class RememberFollowupError(Exception):
-    """Final page is present; a later step failed. Not NOTHING_WRITTEN."""
+    """Final page is present; a later step failed. Not NOTHING_WRITTEN.
 
-    relative: Path
+    A plain Exception subclass on purpose: frozen dataclass exceptions cannot
+    survive the `__traceback__` assignment a context manager exit performs, and
+    the public surfaces must observe the real outcome class.
+    """
 
-    @override
-    def __str__(self) -> str:
-        return f"WRITTEN_WITH_FOLLOWUP_ERROR: {self.relative.as_posix()}"
+    def __init__(self, relative: Path) -> None:
+        self.relative = relative
+        super().__init__(f"WRITTEN_WITH_FOLLOWUP_ERROR: {relative.as_posix()}")
 
 
 class RememberOutcomeUnknown(Exception):
@@ -252,8 +253,20 @@ def _rename_noreplace(src: Path, dst: Path) -> None:
         raise OSError(err, os.strerror(err), str(dst))
 
 
-def _link_noreplace(src: Path, dst: Path) -> None:
-    """Publish by exclusive link. Fall back to renameat2 only if link cannot work."""
+def _discard_temporary(temporary: Path) -> None:
+    """Best-effort removal of a temporary name. Never masks the primary error."""
+    try:
+        temporary.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _link_noreplace(src: Path, dst: Path) -> bool:
+    """Publish by exclusive link. Fall back to renameat2 only if link cannot work.
+
+    Returns True when the fallback rename already moved the source name, so the
+    caller must not unlink that now-missing path again.
+    """
     try:
         os.link(src, dst)
     except FileExistsError:
@@ -262,6 +275,8 @@ def _link_noreplace(src: Path, dst: Path) -> None:
         if exc.errno not in _LINK_FALLBACK:
             raise
         _rename_noreplace(src, dst)
+        return True
+    return False
 
 
 def _exclusive_create(dest: Path, data: bytes) -> None:
@@ -282,18 +297,21 @@ def _exclusive_create(dest: Path, data: bytes) -> None:
         raise
     os.close(descriptor)
     try:
-        _link_noreplace(temporary, dest)
+        moved = _link_noreplace(temporary, dest)
     except FileExistsError:
-        temporary.unlink(missing_ok=True)
+        _discard_temporary(temporary)
         raise
     except OSError:
-        temporary.unlink(missing_ok=True)
+        _discard_temporary(temporary)
         raise
     try:
         _fsync_directory(dest.parent)
-        temporary.unlink()
-        _fsync_directory(dest.parent)
+        if not moved:
+            temporary.unlink()
+            _fsync_directory(dest.parent)
     except OSError as exc:
+        if not moved:
+            _discard_temporary(temporary)
         raise RememberFollowupError(dest.relative_to(dest.parent.parent)) from exc
 
 
@@ -316,8 +334,10 @@ def publish_inbox(root: Path, note: ParsedRemember, request_id: RememberIdentity
     """Publish one final name without replacing another note.
 
     An omitted request id keeps a distinct timestamp page. An explicit id retries
-    one content-addressed path. A repeated source file id returns the existing
-    inbox card or ingested original instead of a second copy.
+    one content-addressed path, consulting durable acknowledgement and ingestion
+    evidence first so a consumed page is never minted a second time. A repeated
+    source file id returns the existing inbox card or ingested original instead
+    of a second copy.
     """
     vault = root.resolve()
     inbox = (root / "inbox").resolve()
@@ -332,6 +352,12 @@ def publish_inbox(root: Path, note: ParsedRemember, request_id: RememberIdentity
             ingested_file = _ingested_source_file(vault, note)
             if ingested_file is not None:
                 return ingested_file.relative_to(vault)
+        else:
+            live = inbox / page_filename(note.data, note.title, request_id)
+            if observe_page(live, note.data) != "present":
+                consumed = _consumed_explicit_page(vault, inbox, live.name, note.data)
+                if consumed is not None:
+                    return consumed.relative_to(vault)
         return _publish_exclusive(vault, inbox, note.data, note.title, request_id)
 
 
@@ -477,6 +503,78 @@ def _cas_original(vault: Path, digest: str) -> bytes | None:
         return path.read_bytes()
     except OSError:
         return None
+
+
+def _cas_tombstone(vault: Path, digest: str) -> bool:
+    if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+        return False
+    try:
+        return (vault / "raw" / digest[:2] / f"{digest}.tombstone").is_file()
+    except OSError:
+        return False
+
+
+def _payload_variants(data: bytes) -> tuple[bytes, ...]:
+    """The stored original may differ from the page bytes only by a BOM strip."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeError:
+        return (data,)
+    if not text.startswith("\ufeff"):
+        return (data,)
+    return (data, text[1:].encode("utf-8"))
+
+
+def _ingested_explicit_original(vault: Path, name: str) -> Path:
+    """Where an ingested explicit page lives now: its wiki page, else the archive."""
+    from sb.compile_sources import page_id_for_origin
+
+    page = vault / "wiki" / f"{page_id_for_origin(f'inbox:{name}')}.md"
+    if page.is_file() and not page.is_symlink() and page.resolve().is_relative_to(vault):
+        return page
+    return vault / "inbox" / ".done" / name
+
+
+def _consumed_explicit_page(vault: Path, inbox: Path, name: str, data: bytes) -> Path | None:
+    """Durable evidence that this explicit page was published and consumed.
+
+    A retry must not mint a second page after `acknowledge` moved the published
+    card into `.done`, or after generation cleanup removed that archive. The
+    durable evidence is an inbox ledger row for the content-addressed name whose
+    CAS original holds the page bytes. A tombstoned original still counts, so
+    erased content is never republished.
+    """
+    done = inbox / ".done" / name
+    if observe_page(done, data) == "present":
+        return done
+    ledger = vault / ".sb" / "ledger.db"
+    if not ledger.is_file():
+        return None
+    try:
+        connection = sqlite3.connect(f"{ledger.resolve().as_uri()}?mode=ro", uri=True)
+        try:
+            rows = connection.execute(
+                "SELECT source_id, content_hash FROM source_item WHERE source_uri=?",
+                (name,),
+            ).fetchall()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return None
+    if not rows:
+        return None
+    variants = _payload_variants(data)
+    for source_id, content_hash in rows:
+        if not isinstance(content_hash, str) or not isinstance(source_id, str):
+            continue
+        original = _cas_original(vault, content_hash)
+        if original is not None:
+            if original in variants:
+                return _ingested_explicit_original(vault, name)
+            continue
+        if source_id == "inbox" and _cas_tombstone(vault, content_hash):
+            return _ingested_explicit_original(vault, name)
+    return None
 
 
 def _matching_source_file(vault: Path, file_id: str) -> tuple[str, str] | None:

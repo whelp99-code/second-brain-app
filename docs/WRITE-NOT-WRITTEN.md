@@ -20,7 +20,7 @@ After the file is linked, moved to `processing`/`receipts`, recorded in the requ
 {"code":"WRITTEN_WITH_FOLLOWUP_ERROR","delivery":"written","retryable":true,"written":true}
 ```
 
-The object also includes `path` and, when known, `request_id` or `generation_id`. Retry the same request. Do not abandon it as undelivered.
+The object also includes `path` and, when known, `request_id` or `generation_id`. A located artifact counts as evidence only when its stored envelope carries the submitted `request_digest`; a same-id different-digest submission is never reconciled as written. Retry the same request. Do not abandon it as undelivered.
 
 If a lookup (`lstat`, directory read, or journal read) fails, or a prior delivery might already exist but cannot be confirmed, the outcome is unknown. Absence of a pending file is not proof that nothing was written.
 
@@ -30,7 +30,9 @@ If a lookup (`lstat`, directory read, or journal read) fails, or a prior deliver
 
 With an explicit `request_id`, a remember page path is `inbox/<sha256(request id, normalized title, body)>-<slug>.md`. Without one, the frozen timestamp path `inbox/<timestamp>-<slug>[-<collision>].md` is preserved and every call is a new page. Collision selection is shared with failure observation and never replaces an existing file. Frozen MCP artifacts and digests remain unchanged.
 
-The body is stored unchanged. There is no in-content marker and no side retry file. Pass the same `request_id` (`[0-9A-Za-z_-]{1,64}`) to retry a page: the same id, title, and body return that path and never a second page. A different title or ID is a different page; surrounding title whitespace is ignored. Outcome comes only from observing that final path: expected bytes mean written, `ENOENT` means `NOTHING_WRITTEN`, and a stat/read error means `WRITE_OUTCOME_UNKNOWN`. Publication is exclusive (`os.link`, or `renameat2` `RENAME_NOREPLACE` if link cannot work). Sealed inbox modes are restored in `finally`; a failed restore is `INBOX_MODE_RESTORE_FAILED`, never `NOTHING_WRITTEN`.
+The body is stored unchanged. There is no in-content marker and no side retry file. Pass the same `request_id` (`[0-9A-Za-z_-]{1,64}`) to retry a page: the same id, title, and body return that path and never a second page. A different title or ID is a different page; surrounding title whitespace is ignored. Outcome comes only from observing that final path: expected bytes mean written, `ENOENT` means `NOTHING_WRITTEN`, and a stat/read error means `WRITE_OUTCOME_UNKNOWN`. Publication is exclusive (`os.link`, or `renameat2` `RENAME_NOREPLACE` if link cannot work); a successful fallback rename is a completed publication, not a follow-up failure. Sealed inbox modes are restored in `finally`; a failed restore is `INBOX_MODE_RESTORE_FAILED`, never `NOTHING_WRITTEN`.
+
+With an explicit `request_id`, every `sb_remember` failure payload repeats that id. A retry consults durable acknowledgement and ingestion evidence before republishing: the acknowledged archive (`inbox/.done/<name>`) first, then the inbox ledger row for the content-addressed name with its stored CAS original. If the page was ingested, the retry returns its durable location (the compiled wiki page when present, else the archive path) and never mints a second copy, even after generation cleanup removed `.done` or the content was tombstoned.
 
 Contract for JARVIS reconcile:
 

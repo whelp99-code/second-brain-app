@@ -10,6 +10,7 @@ import stat
 import subprocess
 import sys
 import traceback
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -82,6 +83,7 @@ def test_mcp_sb_remember_before_save_is_nothing_written_and_retry_writes_once(
     assert payload["written"] is False
     assert payload["code"] == "NOTHING_WRITTEN"
     assert payload["delivery"] == "not_written"
+    assert payload["request_id"] == "retry-same"
     assert _inbox_pages(root) == []
     monkeypatch.setattr(os, "write", real_write)
     retried = _call(server, "sb_remember", {"content": "once", "title": "note", "request_id": "retry-same"})
@@ -111,6 +113,7 @@ def test_mcp_sb_remember_after_save_reports_written_and_retry_does_not_duplicate
     assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
     assert payload["written"] is True
     assert payload["code"] != "NOTHING_WRITTEN"
+    assert payload["request_id"] == "retry-same"
     path = root / str(payload["path"])
     assert path.is_file()
     assert path.read_text(encoding="utf-8") == "kept"
@@ -267,12 +270,14 @@ def test_lookup_error_is_unknown_not_nothing_written(
         real_fsync(fd)
 
     monkeypatch.setattr(os, "fsync", fail_directory_fsync)
-    failed = _call(server, "sb_write_request", {"request": write_fixture_request()})
+    request = write_fixture_request()
+    failed = _call(server, "sb_write_request", {"request": request})
     assert failed.is_error is True
     payload = _error_payload(_error_text(failed))
     assert payload["code"] == "WRITE_OUTCOME_UNKNOWN"
     assert payload["delivery"] == "unknown"
     assert payload["written"] is None
+    assert payload["request_id"] == request["request_id"]
     assert payload["code"] != "NOTHING_WRITTEN"
     assert isinstance(payload["retry"], str)
 
@@ -744,3 +749,344 @@ def test_unkeyed_publish_collision_preserves_both_pages(
     assert sorted(page.read_text(encoding="utf-8") for page in pages) == [
         "concurrent note", "new note",
     ]
+
+
+def test_rename_fallback_success_keeps_the_published_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A successful renameat2 fallback publishes; it is not a follow-up error."""
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+
+    def link_unsupported(
+        src: str | os.PathLike[str], dst: str | os.PathLike[str], *args: object, **kwargs: object
+    ) -> None:
+        del src, dst, args, kwargs
+        raise OSError(errno.EXDEV, "link unsupported")
+
+    monkeypatch.setattr(os, "link", link_unsupported)
+    result = _call(
+        server, "sb_remember", {"content": _MARKER_BODY, "title": "note", "request_id": "retry-same"}
+    )
+    assert result.is_error is False
+    pages = _inbox_pages(root)
+    assert len(pages) == 1
+    assert pages[0].read_bytes() == _MARKER_BODY.encode()
+    assert list((root / "inbox").glob(".*.tmp")) == []
+    monkeypatch.undo()
+    retried = _call(
+        server, "sb_remember", {"content": _MARKER_BODY, "title": "note", "request_id": "retry-same"}
+    )
+    assert retried.is_error is False
+    assert _inbox_pages(root) == pages
+
+
+def test_linked_temporary_is_removed_on_followup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A follow-up failure must not leave the hard linked temporary behind."""
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    real_fsync = os.fsync
+
+    def fail_directory_fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError("injected directory fsync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", fail_directory_fsync)
+    failed = _call(server, "sb_remember", {"content": "kept", "title": "note", "request_id": "retry-same"})
+    assert failed.is_error is True
+    payload = _error_payload(_error_text(failed))
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert payload["written"] is True
+    assert payload["cause"] == "RememberFollowupError"
+    assert payload["request_id"] == "retry-same"
+    page = root / str(payload["path"])
+    assert page.is_file()
+    assert page.stat().st_nlink == 1
+    assert list((root / "inbox").glob(".*.tmp")) == []
+    monkeypatch.setattr(os, "fsync", real_fsync)
+    retried = _call(server, "sb_remember", {"content": "kept", "title": "note", "request_id": "retry-same"})
+    assert retried.is_error is False
+    kept = [item for item in (root / "inbox").rglob("*.md") if item.is_file() and item.read_bytes() == b"kept"]
+    assert kept == [page]
+
+
+def test_delivery_digest_mismatch_is_not_evidence(tmp_path: Path) -> None:
+    """An artifact of a different request never reconciles this submission."""
+    from sb.write_delivery import classify_delivery
+
+    request_root = tmp_path / "requests"
+    pending = request_root / "pending"
+    pending.mkdir(parents=True)
+    identity = "memreq:pos:v2:" + "ab" * 32
+    envelope = {
+        "schema_version": 2,
+        "state": "pending",
+        "accepted_at": "2026-08-31T00:00:00.000Z",
+        "request": {"request_id": identity, "request_digest": "sha256:" + "aa" * 32},
+    }
+    artifact = pending / f"{identity}.v2.json"
+    _ = artifact.write_text(json.dumps(envelope), encoding="utf-8")
+    vault = tmp_path / "vault"
+    found = classify_delivery(request_root, vault, identity, 2, "sha256:" + "aa" * 32)
+    assert found.evidence == "present"
+    foreign = classify_delivery(request_root, vault, identity, 2, "sha256:" + "bb" * 32)
+    assert foreign.evidence == "absent"
+    assert foreign.request_id == identity
+    _ = artifact.write_text("{}", encoding="utf-8")
+    unprovable = classify_delivery(request_root, vault, identity, 2, "sha256:" + "aa" * 32)
+    assert unprovable.evidence == "unknown"
+    unchecked = classify_delivery(request_root, vault, identity, 2)
+    assert unchecked.evidence == "present"
+    database = request_root / "journal.db"
+    with sqlite3.connect(database) as connection:
+        _ = connection.execute(
+            "CREATE TABLE requests(request_id TEXT PRIMARY KEY, result_json TEXT NOT NULL)"
+        )
+        _ = connection.execute(
+            "INSERT INTO requests VALUES (?, ?)",
+            (
+                identity,
+                json.dumps({
+                    "inbox_path": "pending/kept.json",
+                    "request_digest": "sha256:" + "aa" * 32,
+                }),
+            ),
+        )
+    _ = artifact.unlink()
+    journal = classify_delivery(request_root, vault, identity, 2, "sha256:" + "aa" * 32)
+    assert journal.evidence == "present"
+    assert journal.path == "pending/kept.json"
+    foreign_journal = classify_delivery(request_root, vault, identity, 2, "sha256:" + "bb" * 32)
+    assert foreign_journal.evidence == "absent"
+
+
+def test_rejected_request_with_unrelated_digest_is_not_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rejected submission whose digest differs from the artifact is not written."""
+    root = init_vault(tmp_path / "vault").root
+    monkeypatch.setattr(mcp_module, "datetime", FrozenTask30DateTime)
+    server = build_server(root, task30=False)
+    request = write_fixture_request()
+    accepted = _call(server, "sb_write_request", {"request": request})
+    assert accepted.is_error is False
+    forged = dict(request)
+    forged["request_digest"] = "sha256:" + "cd" * 32
+    failed = _call(server, "sb_write_request", {"request": forged})
+    assert failed.is_error is True
+    payload = _error_payload(_error_text(failed))
+    assert payload["written"] is False
+    assert payload["delivery"] == "not_written"
+    assert payload["code"] == "WRITE_REQUEST_IDENTITY_INVALID"
+    assert len(list((tmp_path / ".requests" / "pending").glob("*.json"))) == 1
+
+
+def test_maintain_failure_before_accept_is_not_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-accept maintenance failure is a strict JSON not_written answer."""
+    from sb.provider_lifecycle import ProviderLifecycle
+
+    root = init_vault(tmp_path / "vault").root
+    monkeypatch.setattr(mcp_module, "datetime", FrozenTask30DateTime)
+
+    def broken_maintain(self: ProviderLifecycle, now: object) -> object:
+        del self, now
+        raise OSError("injected maintain")
+
+    monkeypatch.setattr(ProviderLifecycle, "maintain", broken_maintain)
+    server = build_server(root, task30=False)
+    request = write_fixture_request()
+    result = _call(server, "sb_write_request", {"request": request})
+    assert result.is_error is True
+    payload = _error_payload(_error_text(result))
+    assert payload["code"] == "NOTHING_WRITTEN"
+    assert payload["delivery"] == "not_written"
+    assert payload["written"] is False
+    assert payload["cause"] == "OSError"
+    assert list((tmp_path / ".requests" / "pending").glob("*.json")) == []
+
+
+def test_remember_maintain_failure_is_classified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-publish maintenance failure carries the known explicit request id."""
+    from sb.provider_lifecycle import ProviderLifecycle
+
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+
+    def broken_maintain(self: ProviderLifecycle, now: object) -> object:
+        del self, now
+        raise OSError("injected maintain")
+
+    monkeypatch.setattr(ProviderLifecycle, "maintain", broken_maintain)
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    result = _call(server, "sb_remember", {"content": "m", "title": "note", "request_id": "retry-same"})
+    assert result.is_error is True
+    payload = _error_payload(_error_text(result))
+    assert payload["code"] == "NOTHING_WRITTEN"
+    assert payload["delivery"] == "not_written"
+    assert payload["written"] is False
+    assert payload["request_id"] == "retry-same"
+    assert _inbox_pages(root) == []
+
+
+def test_mutation_construction_failure_is_classified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mutation service construction failure is not the generic MCP error."""
+    from sb.generation_runtime import GenerationMutationService
+
+    root = init_vault(tmp_path / "vault").root
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+
+    def broken_from_config(cls: type, config: object, **kwargs: object) -> object:
+        del cls, config, kwargs
+        raise OSError("injected construction")
+
+    monkeypatch.setattr(GenerationMutationService, "from_config", classmethod(broken_from_config))
+    result = _call(server, "sb_remember", {"content": "m", "title": "note", "request_id": "retry-same"})
+    assert result.is_error is True
+    payload = _error_payload(_error_text(result))
+    assert payload["code"] == "NOTHING_WRITTEN"
+    assert payload["written"] is False
+    assert payload["request_id"] == "retry-same"
+
+
+def test_mutation_close_failure_after_write_is_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A close failure after activation still reports the written page."""
+    from sb.generation_runtime import GenerationMutationService
+
+    root = init_vault(tmp_path / "vault").root
+    server = build_server(root, config=Config(raw={"vault_root": str(root)}))
+    closes = {"count": 0}
+
+    def broken_close(self: GenerationMutationService) -> None:
+        del self
+        closes["count"] += 1
+        raise OSError("injected close")
+
+    monkeypatch.setattr(GenerationMutationService, "close", broken_close)
+    result = _call(server, "sb_remember", {"content": "kept-close", "title": "note", "request_id": "retry-same"})
+    assert result.is_error is True
+    payload = _error_payload(_error_text(result))
+    assert payload["code"] == "WRITTEN_WITH_FOLLOWUP_ERROR"
+    assert payload["written"] is True
+    assert payload["request_id"] == "retry-same"
+    assert closes["count"] == 1
+    notes = [path for path in (root / "inbox").rglob("*.md") if path.is_file()]
+    assert len(notes) == 1
+    assert notes[0].read_text(encoding="utf-8") == "kept-close"
+
+
+def test_explicit_retry_after_acknowledgement_returns_the_consumed_page(tmp_path: Path) -> None:
+    """A consumed explicit page is returned from durable evidence, never reminted."""
+    import shutil
+
+    from sb.connectors.inbox_documents import InboxDocumentsAdapter
+    from sb.store.cas import ContentAddressedStore
+    from sb.store.ledger import Ledger, SourceItem
+
+    root = tmp_path / "notes"
+    _ = init_vault(root)
+    rel = write_inbox(root, "consumed body", "note", "retry-same")
+    name = Path(rel).name
+    body = (root / rel).read_bytes()
+    adapter = InboxDocumentsAdapter(root=root / "inbox", source_id="inbox")
+    committed = [ref for ref, _payload, meta in adapter.scan("0") if not meta.get("skip_reason")]
+    adapter.acknowledge(committed)
+    retried = write_inbox(root, "consumed body", "note", "retry-same")
+    assert retried == Path("inbox") / ".done" / name
+    assert (root / retried).read_bytes() == body
+    assert list((root / "inbox").glob("*.md")) == []
+    shutil.rmtree(root / "inbox" / ".done")
+    digest = ContentAddressedStore(root).put(body)
+    with Ledger(root) as ledger:
+        _ = ledger.upsert_source_item(
+            SourceItem("inbox", name, f"{name}:{digest}", digest, "run", "run")
+        )
+    again = write_inbox(root, "consumed body", "note", "retry-same")
+    assert again == Path("inbox") / ".done" / name
+    assert list((root / "inbox").glob("*.md")) == []
+
+
+def test_web_remember_outcome_errors_answer_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Outcome errors at the web write boundary stay JSON responses."""
+    import sb.web as web_module
+    from sb.inbox import RememberFollowupError, RememberOutcomeUnknown
+    from tests.test_web import _ready, _request, _running
+
+    config, _root = _ready(tmp_path)
+    for error in (
+        RememberFollowupError(Path("inbox/x.md")),
+        RememberOutcomeUnknown(Path("inbox/x.md")),
+    ):
+        def broken_write_inbox(_root: Path, _content: str, _title: str | None, failure=error) -> Path:
+            raise failure
+
+        monkeypatch.setattr(web_module, "write_inbox", broken_write_inbox)
+        with _running(config) as base:
+            status, payload = _request(
+                base + "/api/remember", method="POST", payload={"content": "kept", "title": "note"}
+            )
+        assert status == 500
+        assert payload == {"error": type(error).__name__}
+        monkeypatch.undo()
+
+
+def test_cli_remember_outcome_errors_exit_cleanly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Outcome errors at the CLI write boundary print the code and exit 1."""
+    from sb.cli import main
+    from sb.generation_runtime import GenerationMutationService
+    from sb.inbox import RememberFollowupError, RememberOutcomeUnknown
+
+    root = tmp_path / "vault"
+    _ = init_vault(root)
+    cfg = tmp_path / "config.toml"
+    _ = cfg.write_text(
+        f'vault_root = "{root}"\nstate_root = "{tmp_path / "state"}"\n', encoding="utf-8"
+    )
+    monkeypatch.setenv("SB_CONFIG", str(cfg))
+    cases = (
+        (RememberFollowupError(Path("inbox/x.md")), "WRITTEN_WITH_FOLLOWUP_ERROR"),
+        (RememberOutcomeUnknown(Path("inbox/x.md")), "WRITE_OUTCOME_UNKNOWN"),
+    )
+    for error, code in cases:
+        monkeypatch.setattr(
+            GenerationMutationService,
+            "remember",
+            _remember_failure(error),
+        )
+        assert main(["remember", "kept", "--title", "note", "--request-id", "retry-same"]) == 1
+        captured = capsys.readouterr()
+        assert code in captured.err
+        monkeypatch.undo()
+
+
+def _remember_failure(error: BaseException) -> Callable[..., Path]:
+    """Patch GenerationMutationService.remember to surface one outcome error."""
+
+    def remember(
+        self: object,
+        content: str,
+        title: str | None,
+        now: object,
+        request_id: object = None,
+        failure: BaseException = error,
+    ) -> Path:
+        del self, content, title, now, request_id
+        raise failure
+
+    return remember

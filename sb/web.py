@@ -22,7 +22,14 @@ from sb.config import Config, load_config
 from sb.effect_values import JsonInput, JsonObject
 from sb.generation_runtime_models import GenerationOperation
 from sb.governance import retention_report, source_status
-from sb.inbox import RememberRejected, discard_inbox, write_inbox
+from sb.inbox import (
+    InboxModeRestoreError,
+    RememberFollowupError,
+    RememberOutcomeUnknown,
+    RememberRejected,
+    discard_inbox,
+    write_inbox,
+)
 from sb.life_actor import LifeActor
 from sb.life_contracts import LifeInputError
 from sb.life_json import decode_json
@@ -676,7 +683,14 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
-        except (OSError, GitCommandError, RuntimeError) as exc:
+        except (
+            OSError,
+            GitCommandError,
+            RuntimeError,
+            RememberFollowupError,
+            RememberOutcomeUnknown,
+            InboxModeRestoreError,
+        ) as exc:
             self.json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": type(exc).__name__})
 
     def _post(self) -> None:

@@ -30,6 +30,7 @@ NOTHING_WRITTEN: Final = "NOTHING_WRITTEN"
 WRITTEN_WITH_FOLLOWUP_ERROR: Final = "WRITTEN_WITH_FOLLOWUP_ERROR"
 WRITE_OUTCOME_UNKNOWN: Final = "WRITE_OUTCOME_UNKNOWN"
 RETRY_GUIDANCE: Final = "Retry the same request. Do not treat this as not delivered."
+_ARTIFACT_LIMIT: Final = 262_144
 
 
 def not_written_fields(*, cause: str) -> dict[str, object]:
@@ -124,7 +125,9 @@ def _names(identity: str, schema_version: object) -> tuple[str, ...]:
     )
 
 
-def _scan_dir(directory: Path, identity: str, names: tuple[str, ...]) -> Evidence | Path:
+def _scan_dir(
+    directory: Path, identity: str, names: tuple[str, ...], digest: str | None
+) -> Evidence | Path:
     kind = _stat_kind(directory)
     if kind == "missing" or kind == "other":
         return "absent"
@@ -142,14 +145,40 @@ def _scan_dir(directory: Path, identity: str, names: tuple[str, ...]) -> Evidenc
         if not matched:
             continue
         file_kind = _stat_kind(entry)
-        if file_kind == "file":
-            return entry
         if file_kind == "error":
+            return "unknown"
+        if file_kind != "file":
+            continue
+        if digest is None:
+            return entry
+        verdict = _artifact_digest(entry, digest)
+        if verdict == "match":
+            return entry
+        if verdict == "unknown":
             return "unknown"
     return "absent"
 
 
-def _journal_hit(request_root: Path, identity: str) -> Evidence | str:
+def _artifact_digest(entry: Path, digest: str) -> Literal["match", "mismatch", "unknown"]:
+    """Check the stored envelope belongs to this exact submitted request."""
+    try:
+        raw = entry.read_bytes()
+    except OSError:
+        return "unknown"
+    if len(raw) > _ARTIFACT_LIMIT:
+        return "unknown"
+    try:
+        loaded = json.loads(raw)
+    except (UnicodeDecodeError, ValueError):
+        return "unknown"
+    request = loaded.get("request") if isinstance(loaded, dict) else None
+    stored = request.get("request_digest") if isinstance(request, dict) else None
+    if not isinstance(stored, str):
+        return "unknown"
+    return "match" if stored == digest else "mismatch"
+
+
+def _journal_hit(request_root: Path, identity: str, digest: str | None) -> Evidence | str:
     database = request_root / "journal.db"
     kind = _stat_kind(database)
     if kind == "missing":
@@ -174,6 +203,12 @@ def _journal_hit(request_root: Path, identity: str) -> Evidence | str:
         except json.JSONDecodeError:
             loaded = None
         if isinstance(loaded, dict):
+            if digest is not None:
+                stored = loaded.get("request_digest")
+                if not isinstance(stored, str):
+                    return "unknown"
+                if stored != digest:
+                    return "absent"
             inbox = loaded.get("inbox_path")
             if isinstance(inbox, str) and inbox:
                 return inbox
@@ -181,12 +216,22 @@ def _journal_hit(request_root: Path, identity: str) -> Evidence | str:
 
 
 def classify_delivery(
-    request_root: Path, vault_root: Path, request_id: object, schema_version: object
+    request_root: Path,
+    vault_root: Path,
+    request_id: object,
+    schema_version: object,
+    request_digest: object = None,
 ) -> DeliveryLookup:
-    """Decide from pending, processing, receipts, and the journal. Lookup errors are unknown."""
+    """Decide from pending, processing, receipts, and the journal. Lookup errors are unknown.
+
+    With a submitted ``request_digest``, an artifact only counts as evidence when
+    its stored envelope carries that digest, so a same-id different-content
+    submission is never reconciled as written.
+    """
     identity = _safe_request_id(request_id)
     if identity is None:
         return DeliveryLookup("absent")
+    expected = request_digest if isinstance(request_digest, str) and request_digest else None
     names = _names(identity, schema_version)
     uncertain = False
     directories = (
@@ -196,12 +241,12 @@ def classify_delivery(
         vault_root / "inbox" / ".requests" / "pending",
     )
     for directory in directories:
-        found = _scan_dir(directory, identity, names)
+        found = _scan_dir(directory, identity, names, expected)
         if isinstance(found, Path):
             return DeliveryLookup("present", _relative(found, request_root, vault_root), identity)
         if found == "unknown":
             uncertain = True
-    journal = _journal_hit(request_root, identity)
+    journal = _journal_hit(request_root, identity, expected)
     if isinstance(journal, str) and journal not in {"absent", "unknown"}:
         return DeliveryLookup("present", journal, identity)
     if journal == "unknown":
