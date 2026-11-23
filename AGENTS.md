@@ -2,30 +2,78 @@
 
 > 리포 간 결정·관례·라우팅 규칙은 [`../dev-wiki`](../dev-wiki/README.md) 를 정본으로 본다. 이 파일은 이 리포 내부 규칙만 담는다.
 
-# Agent notes
+# PROJECT KNOWLEDGE BASE
 
-Use the selected app repository root: Ubuntu `/home/jm/orca/projects/second-brain-app`; the historical Mac path is `/Volumes/DevSpace/second-brain-app` and must be verified before use. The vault at `/Volumes/DevSpace/second-brain` is a different repo. Do not push either, and leave `/Volumes/DevSpace/me-wiki` and `/Volumes/DevSpace/orca/Wiki-spike` untouched.
+**Generated:** 2026-11-21T13:21:11Z
+**Commit:** 215c50b4
+**Branch:** master
 
-## Module boundaries
+## OVERVIEW
 
-Ledger-centric batch library plus a thin CLI. Layers, top to bottom:
+Ledger-centric batch library plus a thin CLI. Console scripts: `sb = sb.cli:main`, `sb-company = sb.company_memory_cli:main`. Python `>=3.12`, build backend `uv_build`, `module-root = ""`. Selected app root: Ubuntu `/home/jm/orca/projects/second-brain-app`. Historical Mac path `/Volumes/DevSpace/second-brain-app` must be verified before use. Vault `/Volumes/DevSpace/second-brain` is a different repo. Do not push either. Leave `/Volumes/DevSpace/me-wiki` and `/Volumes/DevSpace/orca/Wiki-spike` untouched.
 
-| Layer | Owns | May import |
-| --- | --- | --- |
-| L0 | `sb/contracts.py`, `sb/config.py` | stdlib only in contracts |
-| L1 | `sb/store/cas.py`, `sb/store/ledger.py` | L0 |
-| L2 | `sb/connectors/*`, `sb/parsers/*` | L0, L1, `fs_safety` |
-| L3 | `sb/normalize.py` | L0, L1 |
-| L4 | `sb/llm.py`, `sb/compile.py`, `sb/conflict.py`, `sb/briefing.py` | L0, L1, prompts |
-| L5 | `sb/vault.py` | L0. Sole writer of `wiki/`, `daily/`, `conflicts/`, `log.md`, and the only git committer. |
-| L6 | `sb/pipeline.py` | stages above. Lock, logs, briefing I/O, dispatch. |
-| L7 | `sb/cli.py`, `sb/mcp.py`, `sb/web.py` | config, explicit pipeline run surfaces, search, vault reads, inbox/upload writes |
+## STRUCTURE
 
-`sb/search.py`, `sb/embeddings.py`, and `sb/hybrid_search.py` sit beside L7. Search reads committed git blobs. Hybrid is off unless `[search] hybrid` is true.
+```
+second-brain-app/
+├── sb/              # flat engine; empty __init__.py; layer table below
+├── sb/store/        # L1 CAS + WAL ledger
+├── sb/connectors/   # filename-discovered adapters
+├── tests/           # flat pytest; no __init__.py
+├── scripts/         # gates, not product; not on testpaths
+├── contracts/       # MCP/scoped JSON freezes + .sha256
+├── clients/         # macos SwiftPM and obsidian CJS; not one package
+├── phone-history/   # sibling project; own Makefile; not the root uv flow
+├── deploy/          # observe-only release gates
+└── docs/            # second-brain-2 notes, core5 status; not runners
+```
 
-File ownership stays one module per concern. Later connectors add a new file. They do not edit `sb/connectors/__init__.py`.
+## WHERE TO LOOK
 
-## Forbidden couplings
+| Task | Location | Notes |
+|------|----------|-------|
+| Layer ownership | this file | L0–L7; child files must not copy this table |
+| Engine navigation | `sb/AGENTS.md` | flat package; empty `__init__.py` |
+| CAS and ledger | `sb/store/AGENTS.md` | `CURRENT_SCHEMA_VERSION = 5`; CAS never unlinks blobs |
+| Add a connector | `sb/connectors/AGENTS.md` | registry does not import adapters by name |
+| Pytest rules | `tests/AGENTS.md` | modules double as fixture libraries; autouse umask, `SB_CONFIG`, `SB_MCP_CONTRACT_PROFILE` |
+| Gate scripts | `scripts/AGENTS.md` | kebab-case = runnable gate; snake_case = importable library |
+| Phone history | `phone-history/AGENTS.md` | hatchling; root layer table and `uv run` gates do not apply; inbox sink only |
+| iOS client | `phone-history/ios/AGENTS.md` | XcodeGen, iOS 17, Swift 5.10; do not hand-edit `Generated*.swift` |
+| Phone ingest | `phone-history/server/AGENTS.md` | stdlib package; does not repeat parent route table |
+| Release observe | `deploy/AGENTS.md` | `activation_authorized: false`; `deploy/systemd/` is not what production runs |
+| Mac client | `clients/macos/SecondBrainMac` | SwiftPM, macOS 14, `swift test`, `Scripts/build-app.sh` |
+| Obsidian plugin | `clients/obsidian` | private CJS; `npm test` = `node --test`; bundle via `build.cjs` |
+| Contract freeze | `contracts/` | `*.json` plus matching `.sha256` |
+| Shipping pins | `docs/shipping-plan.json` | stale sibling hash fails `tests/test_shipping_plan_sources.py` |
+| Life cases | `tests/life_memory_cases/` | `t01.py`–`t04.py` define `run`; not `test_*.py` |
+
+## CODE MAP
+
+Centrality unmeasured this reduce. Line counts are hotspots, not a split license.
+
+| Symbol | Type | Location | Role |
+|--------|------|----------|------|
+| `sb` | console | `sb/cli.py` | L7 CLI |
+| `sb-company` | console | `sb/company_memory_cli.py` | company CLI |
+| pipeline | module | `sb/pipeline.py` | L6 lock, logs, briefing I/O, dispatch (2059 lines) |
+| mcp | module | `sb/mcp.py` | L7 MCP (1234 lines) |
+| ledger | module | `sb/store/ledger.py` | WAL ledger (772 lines) |
+| repository | module | `phone-history/server/phone_history/repository.py` | phone store (856 lines; a parent note said 839) |
+
+## CONVENTIONS
+
+- Ruff line-length 100.
+- One module per concern. Later connectors add a new file. They do not edit `sb/connectors/__init__.py`.
+- Auto-discovery loads only `sessions_*`, `records_*`, `*_documents`, `markdown_vault`, `unified_db`.
+- `sqlite-vec` is the optional product extra and sits in the `dev` group, so `tests/test_embeddings.py` needs no extra install. Those tests encode with a fake model. The Ubuntu gate ignores that file.
+- `memory-integration-ids-v1.json` and `cancellation-result-v1.json` are pretty-printed, not one-line freezes.
+- `docs/second-brain-2/` is P00–P20 notes plus two reconciliation files. `docs/core5/` is `STATUS.md`, `COMPANY-MEMORY-DONOR-CONTRACT.md` (7482 bytes), and `COMPANY-MEMORY-PRODUCT-DESIGN.md` (6142 bytes). Those bodies are not copied here. Neither tree is a runner.
+- `t01.py` says the negative control is a forged result, never a pass assertion.
+- Known drift, not a drive-by fix: `sb/store/ledger.py` imports above L0.
+- `sb/search.py`, `sb/embeddings.py`, and `sb/hybrid_search.py` sit beside L7. Search reads committed git blobs. Hybrid is off unless `[search] hybrid` is true.
+
+## ANTI-PATTERNS (THIS PROJECT)
 
 From plan Scope. Do not add these.
 
@@ -40,25 +88,22 @@ From plan Scope. Do not add these.
 - No human-approval gate on the default path. There is no `--review` flag.
 - Secret redaction is credential regexes only (AWS keys, `ghp_`/`gho_`, `sk-`, PEM, `password=`/`token=`). Contact emails and phones stay.
 
-## Tests
+## UNIQUE STYLES
 
-From the app root. The whole suite runs on a plain `uv sync`; `sqlite-vec` sits in the `dev`
-group so `tests/test_embeddings.py` needs no extra. The `embeddings` extra is the product's
-optional feature, not a test dependency -- those tests encode with a fake model.
+Layers, top to bottom:
 
-```bash
-cd /Volumes/DevSpace/second-brain-app
-uv run pytest -q
-```
+| Layer | Owns | May import |
+| --- | --- | --- |
+| L0 | `sb/contracts.py`, `sb/config.py` | stdlib only in contracts |
+| L1 | `sb/store/cas.py`, `sb/store/ledger.py` | L0 |
+| L2 | `sb/connectors/*`, `sb/parsers/*` | L0, L1, `fs_safety` |
+| L3 | `sb/normalize.py` | L0, L1 |
+| L4 | `sb/llm.py`, `sb/compile.py`, `sb/conflict.py`, `sb/briefing.py` | L0, L1, prompts |
+| L5 | `sb/vault.py` | L0. Sole writer of `wiki/`, `daily/`, `conflicts/`, `log.md`, and the only git committer. |
+| L6 | `sb/pipeline.py` | stages above. Lock, logs, briefing I/O, dispatch. |
+| L7 | `sb/cli.py`, `sb/mcp.py`, `sb/web.py` | config, explicit pipeline run surfaces, search, vault reads, inbox/upload writes |
 
-```bash
-cd /Volumes/DevSpace/second-brain-app
-uv run ruff check sb tests
-```
-
-Focused modules follow the same pattern: `uv run pytest -q tests/test_<area>.py`. Integration gate is `tests/integration/test_walking_skeleton.py`. Tests must be deterministic. No sleeps.
-
-## Add a connector (5 steps)
+Add a connector (5 steps):
 
 1. Add `sb/connectors/<name>.py` whose filename is `sessions_*`, `records_*`, `*_documents`, `markdown_vault`, or `unified_db`. Auto-discovery loads those names only. Leave `__init__.py` alone.
 2. Export `ADAPTER_ID: str` and `create(config) -> SourceAdapter`. Keep `ADAPTER_ID` unique.
@@ -66,6 +111,26 @@ Focused modules follow the same pattern: `uv run pytest -q tests/test_<area>.py`
 4. Add a `[[sources]]` row to the vault `config.toml` (`id`, `adapter`, optional `root`). Aliases belong in the module's accepted-adapter set, not in the registry.
 5. Add `tests/test_connectors_<name>.py` covering parse, skip, and unchanged-cursor resume. Run `uv run pytest -q tests/test_connectors_<name>.py`.
 
+## COMMANDS
+
+From the app root. The whole suite runs on a plain `uv sync`; `sqlite-vec` sits in the `dev` group so `tests/test_embeddings.py` needs no extra. The `embeddings` extra is the product's optional feature, not a test dependency -- those tests encode with a fake model.
+
+```bash
+cd /home/jm/orca/projects/second-brain-app
+uv run ruff check sb tests
+uv run basedpyright sb tests
+uv run pytest -q
+```
+
+Ubuntu gate ignores the optional embeddings file: `uv run pytest -q --ignore=tests/test_embeddings.py`. Historical Mac root, only after that path is verified: `cd /Volumes/DevSpace/second-brain-app` then the same `uv run` commands. Focused modules: `uv run pytest -q tests/test_<area>.py`. Integration gate is `tests/integration/test_walking_skeleton.py`. Tests must be deterministic. No sleeps.
+
+`phone-history/` is not this uv flow: `cd phone-history && python3 -m pytest -q`; `make verify` runs `scripts/run_predevice_gate.py`.
+
+## NOTES
+
+- Child files already cover tests, sb, scripts, store, connectors, phone-history, ios, deploy, and phone-history/server. Do not copy their rules here.
+- Skipped (parent covers): `contracts` (JSON sidecars), `clients` (two trees), parsers, docs, phone-history tests/scripts.
+- Digest gap: none. One digest, `sb-w01.md`.
 
 <!-- github-development-management:v1:start -->
 ## GitHub 기반 개발 작업 관리 (사용자 지정 기본 흐름)

@@ -31,7 +31,7 @@ from sb.vault import init_vault
 from sb.web import MAX_BODY_BYTES, SecondBrainHTTPServer, build_server
 from tests import test_memory_access
 from tests.json_fixtures import parse_json
-from tests.knowledge import stamp_knowledge
+from tests.knowledge import commit_page, register_page, stamp_knowledge
 
 classified = test_memory_access.classified
 TERM = "웹콘솔계약검색"
@@ -229,6 +229,56 @@ def test_search_query_errors_are_http_400(tmp_path: Path, query: str) -> None:
     assert isinstance(payload, dict)
     assert "SEARCH_QUERY_" in str(cast(dict[str, object], payload).get("error"))
     assert not (root / ".sb/search.db").exists()
+
+
+def test_search_ui_exposes_candidate_scope_without_promoting_results(tmp_path: Path) -> None:
+    config, root = _ready(tmp_path)
+    candidate_token = "PhoneHistoryCandidateRecordingToken"
+    commit_page(
+        root,
+        "wiki/phone-history-candidate.md",
+        "---\ntitle: Phone History candidate\nstatus: candidate\n---\n\n"
+        f"# Phone History candidate\n{candidate_token}\n",
+    )
+    _ = register_page(
+        root,
+        "wiki/phone-history-candidate",
+        knowledge_status="CANDIDATE",
+        approval_status="PENDING",
+    )
+
+    with _running(config) as base:
+        response = cast(HTTPResponse, urllib.request.urlopen(f"{base}/", timeout=3))
+        with response:
+            html = response.read().decode("utf-8")
+        assert '<select id="searchScope"' in html
+        assert '<option value="active" selected>활성 자료 (기본)</option>' in html
+        assert '<option value="candidate">미검토 녹음·후보</option>' in html
+        assert '<option value="all">전체 자료</option>' in html
+        assert "params.set('scope',byId('searchScope').value)" in html
+        assert "Phone History 녹음을 포함한 미검토 후보 자료입니다." in html
+        assert "item.knowledge_status==='CANDIDATE'?'미검토 후보'" in html
+
+        encoded = urllib.parse.quote(candidate_token)
+        active_status, active = _request(f"{base}/api/search?q={encoded}")
+        candidate_status, candidate = _request(
+            f"{base}/api/search?q={encoded}&scope=candidate"
+        )
+        all_status, all_results = _request(f"{base}/api/search?q={encoded}&scope=all")
+
+    assert active_status == candidate_status == all_status == 200
+    assert isinstance(active, dict) and active.get("results") == []
+    assert isinstance(candidate, dict)
+    candidate_hits = candidate.get("results")
+    assert isinstance(candidate_hits, list) and len(candidate_hits) == 1
+    candidate_hit = cast(dict[str, object], candidate_hits[0])
+    assert candidate_hit["page_id"] == "wiki/phone-history-candidate"
+    assert candidate_hit["knowledge_status"] == "CANDIDATE"
+    assert candidate_hit["approval_status"] == "PENDING"
+    assert candidate_hit["canonical"] == ""
+    assert candidate_hit["role"] == "REFERENCE"
+    assert candidate_hit["verification"] == "UNVERIFIED"
+    assert isinstance(all_results, dict) and all_results.get("results") == candidate_hits
 
 
 def test_home_health_status_remember_search_read_and_changes(tmp_path: Path) -> None:

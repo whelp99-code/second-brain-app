@@ -458,6 +458,12 @@ def _brief_facts(inputs: BriefingInputs, day: date, content_ids: tuple[str, ...]
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _compiled_knowledge_state(page: PageSpec) -> tuple[str, str]:
+    if page.status == "candidate":
+        return "CANDIDATE", "PENDING"
+    return "ACTIVE", "APPROVED"
+
+
 def _commit_pages(
     root: Path,
     vault: Vault,
@@ -481,6 +487,7 @@ def _commit_pages(
     try:
         with ledger.transaction():
             for page in applied:
+                knowledge_status, approval_status = _compiled_knowledge_state(page)
                 relative = git_rel(page.page_id)
                 raw = subprocess.check_output(
                     ["git", "-C", str(root), "show", f"{result.commit or 'HEAD'}:{relative}"],
@@ -490,8 +497,8 @@ def _commit_pages(
                     BoundKnowledge(
                         relative.removesuffix(".md"),
                         "sha256:" + hashlib.sha256(raw).hexdigest(),
-                        "ACTIVE",
-                        "APPROVED",
+                        knowledge_status,
+                        approval_status,
                     )
                 )
     except (subprocess.CalledProcessError, ValueError) as exc:
@@ -513,7 +520,7 @@ def register_compiled(
     if not pages or ".staging" in root.parts:
         return
     from sb.config import load_config
-    from sb.knowledge_registry import ACTIVE, APPROVED, KnowledgeRegistry
+    from sb.knowledge_registry import KnowledgeRegistry
     from sb.search import SearchIndex, resolve_registry_path
 
     config = config if config is not None else load_config()
@@ -522,10 +529,12 @@ def register_compiled(
     for page in pages:
         if page.page_id.startswith("wiki/_proposed/"):
             continue
+        knowledge_status, approval_status = _compiled_knowledge_state(page)
         _ = registry.put(
             git_rel(page.page_id).removesuffix(".md"),
-            knowledge_status=ACTIVE,
-            approval_status=APPROVED,
+            knowledge_status=knowledge_status,
+            approval_status=approval_status,
+            canonical="false" if page.status == "candidate" else "",
             decided_by="sb-compile",
             reason="ai-first auto ingest",
         )

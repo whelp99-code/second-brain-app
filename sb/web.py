@@ -117,7 +117,9 @@ label{display:block;margin:8px 0 4px}.grid{display:grid;grid-template-columns:re
 <div class="grid">
 <div><label for="kind">종류</label><select id="kind"><option value="">전체</option><option value="wiki">Wiki</option><option value="daily">Daily</option><option value="conflicts">Conflicts</option></select></div>
 <div><label for="searchStatus">상태</label><input id="searchStatus" placeholder="active / conflicted / resolved"></div>
+<div><label for="searchScope">검색 범위</label><select id="searchScope" onchange="updateSearchScopeHelp()"><option value="active" selected>활성 자료 (기본)</option><option value="candidate">미검토 녹음·후보</option><option value="all">전체 자료</option></select></div>
 </div>
+<p id="searchScopeHelp" class="muted"></p>
 <pre id="searchResult" class="muted"></pre>
 <label for="pageId">페이지 ID</label><div class="row"><input id="pageId" placeholder="검색 결과의 page_id"><button class="secondary" onclick="readPage()">전체 열기</button><button class="secondary" id="forgetPageButton" onclick="forgetPage()">페이지 삭제</button></div>
 <pre id="pageResult" class="muted"></pre>
@@ -179,7 +181,10 @@ let pageRecords=[];
 let editingPage=false;
 function clearPageReceipt(){pageReceipt=null;pageRecords=[];byId('correctionRecord').replaceChildren()}
 function selectCorrection(){const record=pageRecords.find(row=>row.record_id===byId('correctionRecord').value);if(record)byId('correctionContent').value=record.record_text}
-async function search(){const requestId=++searchRequestId;pageRequestId++;clearPageReceipt();byId('pageId').value='';show('pageResult','');show('searchResult','검색 중…');try{const params=new URLSearchParams({q:byId('query').value});if(byId('kind').value)params.append('kind',byId('kind').value);if(byId('searchStatus').value)params.set('status',byId('searchStatus').value);const data=await api('/api/search?'+params.toString());if(requestId!==searchRequestId)return;show('searchResult',data);if(data.results&&data.results.length)byId('pageId').value=data.results[0].page_id}catch(error){if(requestId===searchRequestId)show('searchResult',error.message)}}
+function searchScopeMessage(scope){if(scope==='candidate')return 'Phone History 녹음을 포함한 미검토 후보 자료입니다. 검색 결과는 정본이 아니며 검토가 필요합니다.';if(scope==='all')return '활성 자료와 미검토 후보·참고 항목을 함께 검색합니다. 결과의 검토 상태를 확인하세요.';return '승인된 활성 자료만 검색합니다.'}
+function updateSearchScopeHelp(){show('searchScopeHelp',searchScopeMessage(byId('searchScope').value))}
+function presentSearchResults(data){return {...data,results:(data.results||[]).map(item=>({...item,review_label:item.verification==='VERIFIED'?'검증됨':item.knowledge_status==='CANDIDATE'?'미검토 후보':'미검토 참고'}))}}
+async function search(){const requestId=++searchRequestId;pageRequestId++;clearPageReceipt();byId('pageId').value='';show('pageResult','');show('searchResult','검색 중…');try{const params=new URLSearchParams({q:byId('query').value});if(byId('kind').value)params.append('kind',byId('kind').value);if(byId('searchStatus').value)params.set('status',byId('searchStatus').value);params.set('scope',byId('searchScope').value);const data=await api('/api/search?'+params.toString());if(requestId!==searchRequestId)return;show('searchResult',presentSearchResults(data));if(data.results&&data.results.length)byId('pageId').value=data.results[0].page_id}catch(error){if(requestId===searchRequestId)show('searchResult',error.message)}}
 async function readPage(){const requestId=++pageRequestId;const pageId=byId('pageId').value;clearPageReceipt();show('pageResult','불러오는 중…');try{const data=await api('/api/pages/'+encodeURIComponent(pageId));if(requestId!==pageRequestId||byId('pageId').value!==pageId)return;show('pageResult',data);pageReceipt=data.receipt;pageRecords=data.records||[];for(const record of pageRecords){const option=document.createElement('option');option.value=record.record_id;option.textContent=record.record_text;byId('correctionRecord').append(option)}selectCorrection()}catch(error){if(requestId===pageRequestId&&byId('pageId').value===pageId)show('pageResult',error.message)}}
 async function editPage(operation){
  if(editingPage)return;
@@ -202,7 +207,7 @@ async function resolveConflict(){try{const id=byId('conflictId').value;const dat
 async function loadChanges(){try{show('changeResult',await api('/api/changes?days=7'))}catch(error){show('changeResult',error.message)}}
 async function loadGovernance(){try{const sources=await api('/api/sources');const retention=await api('/api/retention');const metrics=await api('/api/metrics');show('governanceResult',{...sources,retention,metrics})}catch(error){show('governanceResult',error.message)}}
 const dropzone=byId('dropzone');dropzone.addEventListener('dragover',(event)=>{event.preventDefault();dropzone.classList.add('active')});dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('active'));dropzone.addEventListener('drop',(event)=>{event.preventDefault();dropzone.classList.remove('active');uploadFiles(event.dataTransfer.files)});dropzone.addEventListener('click',()=>byId('fileInput').click());byId('fileInput').addEventListener('change',(event)=>uploadFiles(event.target.files));
-byId('token').value=localStorage.getItem('sb_token')||'';loadStatus();loadConflicts();loadGovernance();if(location.hash.startsWith('#fix=')){byId('content').value=decodeURIComponent(location.hash.slice(5));remember().then(()=>runPipeline());}else if(location.hash==='#run')runPipeline();
+byId('token').value=localStorage.getItem('sb_token')||'';updateSearchScopeHelp();loadStatus();loadConflicts();loadGovernance();if(location.hash.startsWith('#fix=')){byId('content').value=decodeURIComponent(location.hash.slice(5));remember().then(()=>runPipeline());}else if(location.hash==='#run')runPipeline();
 </script>
 </body>
 </html>

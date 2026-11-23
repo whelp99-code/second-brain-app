@@ -24,6 +24,25 @@ The closed config has schema version 1 and these mandatory fields:
 
 Removing a key revokes it. The config is trusted operator state; request values are never copied into expected context.
 
+An operator may opt into keys-only receive requests with `source_profile`:
+
+- `schema_version`: `1`;
+- `source_roots`: nonempty absolute company source directories;
+- `bindings`: a map from the exact `source_locator` to `path`, `source_system`,
+  `source_event_id`, `parser_version`, and `content_digest`.
+
+The binding pins a local original and its SHA-256 digest. In this profile, receive
+arguments contain `content_digest` instead of `content`; all other receive keys
+stay unchanged. Authority verification covers these original keys-only arguments
+before the CLI resolves source bytes. The resulting receipt retains their request
+digest. Inline receive requests are refused when this profile is configured.
+
+Resolution refuses unregistered or mismatched references, personal paths, paths
+outside company source roots, symlink files, changed digests, non-UTF-8 sources,
+and sources over 1 MiB before opening the company database. Source roots and
+bindings are operator configuration, not fields supplied by the donor. This local
+profile does not establish live provider access or provision an authority grant.
+
 ## Request
 
 The envelope has exactly `authority` and `arguments`. Encoding is canonical UTF-8 JSON as implemented by `sb.effect_values.canonical_bytes`.
@@ -70,3 +89,39 @@ The receipt is a local durable integrity digest, not an external signed executio
 The donor must derive workspace/provider/mailbox/source event/locator from its authenticated source record. Company names are not identity or merge keys. Mail text is evidence, not mutation authority. Candidate IDs must be stable per workspace.
 
 Do not call `sb remember`, `/api/remember`, `sb_remember`, personal search, or the personal vault for this flow. The donor publisher is not implemented in this repository and remains a separately audited integration while CRM's auth worker is active.
+
+## Local company snapshot preparation
+
+`create_company_snapshot(source_path, artifact_directory, workspace_id=...,
+profile=..., personal_roots=...)` creates a new mode-0700 artifact directory
+containing only mode-0600 `company.db` and `manifest.json`. The explicit trusted
+operator profile pins retained originals; it is not an email-supplied config.
+The data manifest records schema version, workspace, exact database hash,
+complete candidate/receipt rows, ACL/policy/deletion fences, source revisions
+and original paths/digests. Originals remain outside the artifact, so this is
+not a self-contained original-file archive. Signing keys and runtime config
+are not inputs or payloads.
+
+Keep the returned `manifest_sha256` outside the artifact.
+`verify_company_snapshot(artifact_directory, destination,
+expected_manifest_sha256=..., workspace_id=..., profile=..., personal_roots=...)`
+requires that caller-held pin, reconciles database and retained original
+inventory, and verifies a separate new private target. It returns a bounded
+`CompanySnapshotResult` with `created` or `verified`, workspace, digests and
+counts. Those values prove data integrity, not origin, current permission or
+activation approval. Artifact-supplied checksums do not replace the external pin.
+
+`sb.company_memory_snapshot.snapshot_company_memory(source_path, destination,
+personal_roots=...)` copies an explicit company SQLite store into a distinct,
+new mode-0600 target. It refuses personal roots, symlink files, the original
+destination, existing targets and databases containing non-company tables.
+The source is read-only. SQLite integrity and the complete schema and row dump,
+including candidate fences, states and durable receipts, are reconciled against
+the separate target before returning.
+
+This operator-local primitive is not a signed company operation or a live restore
+command. It archives no signing keys, runtime config or original source files.
+The operator must retain and independently verify the pinned originals and use
+an isolated restored profile for authorized reads. A snapshot excludes work
+accepted afterward; that work remains in the current store. Never overwrite the
+current store with the old snapshot or claim this primitive replays a later delta.

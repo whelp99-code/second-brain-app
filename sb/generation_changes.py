@@ -28,7 +28,7 @@ class GenerationSnapshot(Protocol):
     @property
     def head(self) -> str: ...
 
-_MAX_PAGES: Final = 4096
+_MAX_PAGES: Final = 16384
 _MAX_GENERATIONS: Final = 4096
 _MAX_TREE_BYTES: Final = 4 * 1024 * 1024
 
